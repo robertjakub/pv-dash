@@ -38,35 +38,38 @@ scrape_configs:
 | `huawei_home_consumption_watts` | home load, derived as `PV − net grid` (− battery when enabled) |
 | `huawei_grid_net_watts` | signed net grid power (debugging aid) |
 | `huawei_up` | 1 if the last poll succeeded |
-| `huawei_battery` | 1 if battery support is enabled (always exported) |
 | `huawei_modbus_errors_total` / `huawei_last_poll_timestamp_seconds` | poller health |
+| `huawei_battery` | 1 if battery support is enabled (always exported) |
 | `huawei_battery_net_watts` | signed battery power, +charge/−discharge (`--battery` only) |
 | `huawei_battery_charge_watts` / `huawei_battery_discharge_watts` | the split, ≥ 0, for stacked graphs (`--battery` only) |
 | `huawei_battery_soc_percent` | battery state of charge (`--battery` only) |
 
-Sign convention: the grid register value is split into export/import by sign —
-by default **positive = export**; set `--grid-positive-import` if your device
-reports the opposite. Huawei power registers already report **watts** (their
-gain convention divides raw by 1000 to get kW), so both scales default to 1;
-`--scale` / `--grid-scale` exist for devices that report raw kW. Sanity caps
-are on by default: `--max-kwp 6` (6 kWp array) and `--max-grid-kw 12`
-(12 kW power line). Readings above `max-kwp × 1000` W (register 32064) or
-|grid power| above `max-grid-kw × 1000` W in **either direction**
-(register 37113) make the exporter log an error (`PV energy exceeds
-max_kwp: ...` / `Grid power exceeds max_grid_kw: ...`) and serve
-**HTTP 503** with `# Error collecting metrics from inverter` instead of
-metrics (until a good poll). **Negative PV readings always trigger the
-error** regardless of the cap settings — a negative inverter input is
-bogus data that would corrupt the derived home load. Exported power above
-the PV cap is rejected too: with home load ≥ 0, every exported watt must
-come from the inverter, so `export > max-kwp × 1000` means bad data (or a
-battery/second source the setup does not model). The caps assume
-`max-kwp ≤ max-grid-kw` (the line must carry the inverter's full output);
-a startup warning fires otherwise.
+Sign conventions and sanity caps:
 
-Metric names, help texts and types live in **`scrape/src/metrics.json`** next to
-the script and are loaded at startup — edit it to rename metrics or reword
-`# HELP` lines without touching the code.
+- The grid register value is split into export/import by sign — by default
+  **positive = export**; set `--grid-positive-import` if your device reports
+  the opposite.
+- Huawei power registers already report **watts** (their gain convention
+  divides raw by 1000 to get kW), so both scales default to 1;
+  `--scale` / `--grid-scale` exist for devices that report raw kW.
+- Caps are on by default: `--max-kwp 6` (6 kWp array) and `--max-grid-kw 12`
+  (12 kW power line). A reading above `max-kwp × 1000` W (register 32064),
+  |grid power| above `max-grid-kw × 1000` W in **either direction**
+  (register 37113), or exported power above the PV cap (with home load ≥ 0,
+  every exported watt must come from the inverter — unless a battery covers
+  it) means bad data: the exporter logs an error (`PV energy exceeds
+  max_kwp: ...` / `Grid power exceeds max_grid_kw: ...`) and serves
+  **HTTP 503** with `# Error collecting metrics from inverter` instead of
+  metrics, until a good poll.
+- **Negative PV readings always trigger the error** regardless of the cap
+  settings — a negative inverter input is bogus data that would corrupt the
+  derived home load.
+- The caps assume `max-kwp ≤ max-grid-kw` (the line must carry the
+  inverter's full output); a startup warning fires otherwise.
+
+Metric names, help texts and types live in **`scrape/src/metrics.json`**
+next to the script and are loaded at startup — edit it to rename metrics or
+reword `# HELP` lines without touching the code.
 
 ## Configuration
 
@@ -94,12 +97,15 @@ modbus_port = 5502
 unit = 1
 modbus_offset = 0
 timeout = 3
-pv_register = 32089
-grid_register = 37258
+pv_register = 32064
+grid_register = 37113
 scale = 1
 grid_scale = 1
 max_kwp = 6
 max_grid_kw = 12
+battery = false
+battery_register = 37001
+battery_soc_register = 37004
 grid_positive_import = false
 listen = 0.0.0.0:9350
 interval = 5
@@ -167,41 +173,54 @@ python3 scrape/src/fake_inverter.py --static              # constant PV 4000 W, 
 python3 scrape/src/fake_inverter.py --port 15502 --log-level DEBUG
 ```
 
-Served registers: 32064/32080 power (I32 W), 37113 grid power (I32 W,
-positive = feed-in), the smart meter block 37100+ (status, per-phase
-voltages/currents, reactive power, power factor, grid frequency,
-37119 exported / 37121 imported kWh totals that grow through the simulated
-day), 32089 device status (512 on-grid / 40960 standby at night), 32087
-temperature (I16, °C×10), 32114 daily and 32106 total yield (U32, kWh×100).
-Unknown addresses read as 0, other functions get a Modbus exception; also
-packaged as `sun2000-fake-inverter`.
+Served registers:
+
+- **32064** / **32080** — PV power / power limit (I32 W)
+- **37113** — grid power (I32 W, positive = feed-in)
+- **37100+** — smart meter block: status, per-phase voltages/currents,
+  reactive power, power factor, grid frequency, and 37119 exported /
+  37121 imported kWh totals that grow through the simulated day
+- **32089** — device status (512 on-grid / 40960 standby at night)
+- **32087** — temperature (I16, °C×10); **32114** daily and **32106** total
+  yield (U32, kWh×100)
+- Unknown addresses read as 0, other functions get a Modbus exception
+
+Also packaged as `sun2000-fake-inverter`.
 
 ## Battery (Huawei LUNA2000)
 
 When a battery is present, enable support with `--battery` (env
 `SUN2000_BATTERY`, ini `battery = true`). The energy balance gains a battery
-term — register **37001** (I32, W, **positive = charging**, negative =
-discharging; SoC at 37004, percent×10 — the defaults follow the same Huawei
-register convention as `--pv-register`) — and the home load derivation
-becomes:
+term and the home load derivation becomes:
 
 ```
-home = pv − batt − grid      (today without battery: home = pv − grid)
+home = pv − batt − grid      (without battery: home = pv − grid)
 ```
+
+Battery registers (defaults follow the same Huawei convention as
+`--pv-register`):
+
+- **37001** — battery power, I32 W, **positive = charging**,
+  negative = discharging
+- **37004** — state of charge, U16, percent×10
 
 Charging midday surplus reduces the home value; evening discharge covers the
 home load even with PV at 0. The battery metrics —
 `huawei_battery_net_watts` (signed, +charge/−discharge),
 `huawei_battery_charge_watts` / `huawei_battery_discharge_watts`
-(the split, >= 0, for stacked graphs) and `huawei_battery_soc_percent` —
+(the split, ≥ 0, for stacked graphs) and `huawei_battery_soc_percent` —
 are only exported when battery support is enabled; without it they are
 absent from /metrics.
 
-The consistency checks adapt: exported power may exceed the PV cap by the
-battery discharge (a battery feeding the grid is legitimate), and a derived
-`home < 0` is rejected as inconsistent data — with a battery, charging and
-export together cannot exceed the PV input. The fake inverter can emulate
-the battery for testing: `python3 scrape/src/fake_inverter.py --battery`.
+The consistency checks adapt:
+
+- Exported power may exceed the PV cap by the battery discharge (a battery
+  feeding the grid is legitimate).
+- A derived `home < 0` is rejected as inconsistent data — with a battery,
+  charging and export together cannot exceed the PV input.
+
+The fake inverter can emulate the battery for testing:
+`python3 scrape/src/fake_inverter.py --battery`.
 
 ## Nix
 

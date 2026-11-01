@@ -44,7 +44,7 @@
   .badge.off{background:rgba(239,68,68,.15);color:#f87171}
   .grid{display:grid;grid-template-columns:minmax(360px,5fr) 7fr;gap:20px;min-width:0}
   .card{background:var(--card);border:1px solid var(--card-border);border-radius:20px;box-shadow:var(--shadow);padding:22px}
-  .flow-card{grid-column:1;grid-row:1;display:flex;flex-direction:column;padding:16px 20px}
+  .flow-card{grid-column:1;grid-row:1;display:flex;flex-direction:column;padding:16px 20px;min-width:0}
   .stats-card{grid-column:2;grid-row:1;min-width:0}
   .chart-card{grid-column:1 / -1;grid-row:2;min-width:0}
   .flow-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
@@ -130,3 +130,17 @@
   .nodestate{font-size:18px;font-weight:700;fill:#4ade80;text-anchor:middle}
   .nodestate.charging,.nodestate.discharging{fill:var(--batt)}
   @media (max-width:1020px){.grid{grid-template-columns:1fr}.flow-card,.stats-card,.chart-card{grid-column:1;grid-row:auto}.flow-stage{min-height:340px}.flow-card svg{height:auto;max-height:none}.stats-grid{grid-template-columns:1fr}.vsep{display:none}}
+  @media (max-width:480px){
+    .wrap{padding:14px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
+    header{gap:10px;margin-bottom:14px}
+    .card{padding:16px;border-radius:16px}
+    .banner{height:auto;min-height:40px;padding:8px 16px;font-size:13px;margin-bottom:14px}
+    .self-row{flex-wrap:wrap}
+    .self-chip{flex:1 1 100%}
+    .stat-title b{font-size:1.45em}
+    table.data-table{font-size:12.5px}
+    table.data-table th,table.data-table td{padding:8px 7px}
+    table.data-table tr.sub td:first-child{padding-left:18px}
+    #chart,#fallback{height:300px}
+    .consent{bottom:calc(16px + env(safe-area-inset-bottom))}
+  }

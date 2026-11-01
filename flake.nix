@@ -21,6 +21,7 @@
         in
         {
           pv-dashboard = pkgs.callPackage ./package.nix { };
+          sun2000-scraper = pkgs.callPackage ./scrape/package.nix { };
           default = self.packages.${system}.pv-dashboard;
         }
       );
@@ -29,6 +30,10 @@
         pv-dashboard = {
           type = "app";
           program = "${self.packages.${system}.default}/bin/pv-dashboard";
+        };
+        sun2000-scraper = {
+          type = "app";
+          program = "${self.packages.${system}.sun2000-scraper}/bin/sun2000-scraper";
         };
         default = self.apps.${system}.pv-dashboard;
       });
@@ -40,6 +45,7 @@
 
       nixosModules = {
         pv-dashboard = import ./module.nix;
+        sun2000-scraper = import ./scrape/module.nix;
         default = self.nixosModules.pv-dashboard;
       };
     };

@@ -17,6 +17,7 @@ A single-page dashboard for home PV monitoring, fed by Prometheus.
 | `src/server.py` / `src/server.ini` | static server + Prometheus proxy (serves `src/static/` by default) |
 | `src/config.js` | user settings (`SOLAR_CONFIG`) — lives next to `server.py`, served at `/config.js` |
 | `package.nix` / `module.nix` / `flake.nix` | Nix packaging and service module |
+| `scrape/` | Huawei SUN2000 Prometheus scraper (Modbus TCP, stdlib only) — see `scrape/README.md` |
 
 
 - **Flow diagram** — live PV / Load / Grid nodes with animated energy particles
@@ -204,9 +205,22 @@ dynamic user and systemd hardening; put a reverse proxy in front for LAN/HTTPS.
 ## Metrics source
 
 This page expects Huawei SUN2000 inverter metrics in Prometheus
-(`huawei_*_watts`). An example Prometheus scraper configuration for the
-Huawei SUN2000 (e.g. via the inverter's Modbus TCP interface) will be added
-in the **next release**.
+(`huawei_*_watts`). The `scrape/` subproject ships a dependency-free Python
+exporter that polls the inverter over Modbus TCP and serves exactly those
+metrics — see [`scrape/README.md`](scrape/README.md):
+
+```bash
+python3 scrape/src/scraper.py --host <inverter-lan-ip> --listen 0.0.0.0:9350
+```
+
+```yaml
+# prometheus.yml — the job name must be "sun2000" (the dashboard filters on it)
+scrape_configs:
+  - job_name: sun2000
+    scrape_interval: 10s          # match scrapeSec in config.js
+    static_configs:
+      - targets: ['localhost:9350']
+```
 
 ## License
 

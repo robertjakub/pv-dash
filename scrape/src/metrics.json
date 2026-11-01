@@ -1,0 +1,15 @@
+{
+  "pv":            {"name": "huawei_pv_generation_watts",         "help": "Current PV (inverter input) power in watts."},
+  "export":        {"name": "huawei_grid_export_watts",           "help": "Current power exported to the grid in watts (>= 0)."},
+  "import":        {"name": "huawei_grid_import_watts",           "help": "Current power imported from the grid in watts (>= 0)."},
+  "home":          {"name": "huawei_home_consumption_watts",      "help": "Home consumption in watts (PV input minus battery power minus net grid power)."},
+  "grid":          {"name": "huawei_grid_net_watts",              "help": "Net grid power in watts (positive = export by default)."},
+  "batt_net":      {"name": "huawei_battery_net_watts",           "help": "Battery net power in watts (positive = charging, negative = discharging)."},
+  "batt_charge":   {"name": "huawei_battery_charge_watts",        "help": "Battery charging power in watts (0 when not charging)."},
+  "batt_discharge":{"name": "huawei_battery_discharge_watts",     "help": "Battery discharging power in watts (0 when not discharging)."},
+  "batt_soc":      {"name": "huawei_battery_soc_percent",         "help": "Battery state of charge in percent."},
+  "battery":       {"name": "huawei_battery",                     "help": "1 if battery support is enabled (always exported)."},
+  "up":            {"name": "huawei_up",                          "type": "gauge",   "help": "1 if the last Modbus poll of the inverter succeeded."},
+  "modbus_errors": {"name": "huawei_modbus_errors_total",         "type": "counter", "help": "Total failed or rejected polls since start."},
+  "last_poll":     {"name": "huawei_last_poll_timestamp_seconds", "type": "gauge",   "help": "Unix time of the last successful poll."}
+}

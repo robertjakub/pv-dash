@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "pv-dashboard";
-  version = "0.0.2";
+  version = "0.0.3";
 
   src = lib.cleanSource ./src;
 

@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "sun2000-scraper";
-  version = "0.0.2";
+  version = "0.0.3";
 
   src = lib.cleanSource ./.;
 

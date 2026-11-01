@@ -113,7 +113,7 @@ class Handler(BaseHTTPRequestHandler):
             path = '/index.html'
         name = path.lstrip('/')
         if name == 'config.js' and self.config_js and os.path.isfile(self.config_js):
-            self.serve_file(self.config_js)
+            self.serve_file(self.config_js, inject_battery=self.battery)
             return
         fpath = os.path.realpath(os.path.join(self.static_dir, path.lstrip('/')))
         base = os.path.realpath(self.static_dir)
@@ -125,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         self.serve_file(fpath)
 
-    def serve_file(self, fpath):
+    def serve_file(self, fpath, inject_battery=False):
         try:
             ctype = mimetypes.guess_type(fpath)[0] or 'application/octet-stream'
             with open(fpath, 'rb') as f:
@@ -134,6 +134,8 @@ class Handler(BaseHTTPRequestHandler):
             logger.error('cannot read %s: %s', fpath, e)
             self.send_error(500, 'cannot read file')
             return
+        if inject_battery and b'battery: true' not in body:
+            body = body.replace(b'\n};', b',\n  battery: true\n};', 1)
         self.relay(200, body, ctype)
 
     def log_message(self, fmt, *args):
@@ -166,6 +168,8 @@ def main():
                     help='log level (default: config file or INFO); DEBUG logs every request')
     ap.add_argument('--log-queries', action='store_true', default=None,
                     help='log proxied Prometheus queries at INFO level')
+    ap.add_argument('--battery', action='store_true', default=None,
+                    help='enable battery support in the served config.js (default: config file, $BATTERY or off)')
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -190,6 +194,13 @@ def main():
     except ValueError as e:
         logger.error('invalid log_queries in config: %s (using false)', e)
         log_queries = False
+    try:
+        battery = args.battery if args.battery is not None else cfg.getboolean('battery', fallback=None)
+    except ValueError as e:
+        logger.error('invalid battery in config: %s (using false)', e)
+        battery = False
+    if battery is None:
+        battery = os.environ.get('BATTERY', '').lower() in ('1', 'true', 'yes', 'on')
 
     logging.basicConfig(level=getattr(logging, level, logging.INFO),
                         format='%(asctime)s %(levelname)-7s %(message)s')
@@ -198,10 +209,12 @@ def main():
     Handler.static_dir = static_dir
     Handler.config_js = config_js
     Handler.prom_prefix = prom_prefix
+    Handler.battery = battery
 
-    logger.info('serving %s on http://%s:%d (proxy: %s/* -> %s, config.js: %s, log level: %s%s)',
+    logger.info('serving %s on http://%s:%d (proxy: %s/* -> %s, config.js: %s, log level: %s%s%s)',
                 static_dir, bind, port, prom_prefix or '/', upstream, config_js, level,
-                ', query logging on' if log_queries else '')
+                ', query logging on' if log_queries else '',
+                ', battery enabled' if battery else '')
     try:
         Server((bind, port), Handler).serve_forever()
     except KeyboardInterrupt:

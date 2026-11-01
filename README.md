@@ -43,6 +43,16 @@ A single-page dashboard for home PV monitoring, fed by Prometheus.
   (`window.SOLAR_I18N`): edit the strings there or add a new language
   (e.g. `de: { ... }`) — it appears in the switcher automatically and is merged
   over the built-in English fallback.
+ - **Battery (optional, experimental)** — enable with `battery: true` in `config.js`
+  (or `server.py --battery` / `BATTERY=1` / `battery = true` in `server.ini`,
+  which injects it into the served config.js, or `?battery=1` for testing):
+  a Battery node joins the flow diagram (teal particles up = discharging,
+  down = charging, state line with SoC %), the energy splits become three-way
+  (PV / battery / grid) in the bars, table and chart, and the CSV gains
+  Battery Charge / Discharge columns. Selectors: `metrics.battery` (signed
+  net watts, +charging) and `metrics.batterySoC` (percent).
+  **Experimental: untested against real hardware** — verified only against
+  simulated data so far.
 - If Prometheus is unreachable, the page switches to **DEMO DATA** so you can
   preview the layout.
 
@@ -53,11 +63,14 @@ All settings live in `src/config.js` next to `server.py` (served at `/config.js`
 ```js
 const SOLAR_CONFIG = {
   prometheusUrl: '/prom',
+  battery: false,
   metrics: {
     pv: 'huawei_pv_generation_watts{job="sun2000"}',
     gridExport: 'huawei_grid_export_watts{job="sun2000"}',
     gridImport: 'huawei_grid_import_watts{job="sun2000"}',
-    load: 'huawei_home_consumption_watts{job="sun2000"}'
+    load: 'huawei_home_consumption_watts{job="sun2000"}',
+    battery: 'huawei_battery_net_watts{job="sun2000"}',
+    batterySoC: 'huawei_battery_soc_percent{job="sun2000"}'
   },
   scrapeSec: 10,
   smoothMin: 30,
@@ -71,6 +84,8 @@ const SOLAR_CONFIG = {
 |------------------|------------------------------------------------------|
 | `prometheusUrl`  | `/prom` (same-origin proxy from `server.py`) or a direct Prometheus URL |
 | `metrics`        | full metric selectors — label matchers like `{job="sun2000"}` are allowed and passed through to PromQL; values are always expected in **watts**. `gridExport` = export power (≥ 0); with optional `gridImport` set, the net grid value is computed as `export − import` (negative = importing) |
+| `load`           | home consumption selector |
+| `battery`         | `true`/`false` — master switch for battery support: Battery node, three-way energy split, battery chart series; selectors come from `metrics.battery` (signed W) / `metrics.batterySoC` (%) |
 | `scrapeSec`      | Prometheus scrape interval in seconds (bucket size)  |
 | `smoothMin`      | display smoothing window in minutes (default 30, 0 = raw)   |
 | `refreshSec`     | default auto-refresh interval in seconds (overridden by the header combo; 0 = off) |
@@ -120,6 +135,7 @@ static_dir = /var/www/pv-dashboard
 prom_prefix = /prom
 log_level = INFO
 log_queries = false
+battery = false
 ```
 
 `--prom-prefix ''` (empty) proxies *every* unmatched path to Prometheus.

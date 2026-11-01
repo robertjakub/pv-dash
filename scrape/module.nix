@@ -82,13 +82,7 @@ in
     battery = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = ''
-        Battery support enabled (Huawei LUNA2000): reads the battery
-        registers, adds the battery term to the home derivation
-        (home = PV - battery - net grid) and exports the battery metrics
-        huawei_battery_net_watts / huawei_battery_charge_watts /
-        huawei_battery_discharge_watts / huawei_battery_soc_percent.
-      '';
+      description = "Battery support (experimental, untested against real hardware).";
     };
 
     batteryRegister = lib.mkOption {

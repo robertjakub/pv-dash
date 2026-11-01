@@ -39,7 +39,7 @@ scrape_configs:
 | `huawei_grid_net_watts` | signed net grid power (debugging aid) |
 | `huawei_up` | 1 if the last poll succeeded |
 | `huawei_modbus_errors_total` / `huawei_last_poll_timestamp_seconds` | poller health |
-| `huawei_battery` | 1 if battery support is enabled (always exported) |
+| `huawei_battery` | 1 if battery support is enabled (always exported); the dashboard treats 0 / missing as "no battery" and dims its battery node |
 | `huawei_battery_net_watts` | signed battery power, +charge/−discharge (`--battery` only) |
 | `huawei_battery_charge_watts` / `huawei_battery_discharge_watts` | the split, ≥ 0, for stacked graphs (`--battery` only) |
 | `huawei_battery_soc_percent` | battery state of charge (`--battery` only) |
@@ -189,6 +189,9 @@ Also packaged as `sun2000-fake-inverter`.
 
 ## Battery (Huawei LUNA2000)
 
+**Experimental — so far verified only against simulated data** (fake inverter /
+mock Prometheus), not against real hardware.
+
 When a battery is present, enable support with `--battery` (env
 `SUN2000_BATTERY`, ini `battery = true`). The energy balance gains a battery
 term and the home load derivation becomes:
@@ -245,3 +248,8 @@ Options: `enable`, `package`, `inverterHost`, `inverterPort` (502), `unitId`,
 `maxGridKw`, `battery`, `batteryRegister`, `batterySocRegister`,
 `gridPositiveImport`, `timeout`, `interval`, `listenHost`, `listenPort`,
 `openFirewall`.
+
+## License
+
+The scraper (source, Nix packaging, service module) is licensed under the
+**BSD 3-Clause License** — see the `LICENSE` file in the repository root.

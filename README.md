@@ -50,7 +50,14 @@ A single-page dashboard for home PV monitoring, fed by Prometheus.
   down = charging, state line with SoC %), the energy splits become three-way
   (PV / battery / grid) in the bars, table and chart, and the CSV gains
   Battery Charge / Discharge columns. Selectors: `metrics.battery` (signed
-  net watts, +charging) and `metrics.batterySoC` (percent).
+  net watts, +charging), `metrics.batterySoC` (percent) and `metrics.batteryFlag`
+  (presence flag). The chart series become **PV+Battery output / Total
+  consumption / Consumed from PV** (charge counts into consumption and
+  PV-side series, discharge into the output), and the KPIs count the battery
+  too: self-consumption includes charging, self-sustainment includes
+  discharge. When `huawei_battery` is `0` or missing, the Battery node is
+  dimmed and a warning banner appears (the current scraper release does not
+  export the flag yet, so the node stays dimmed until you upgrade it).
   **Experimental: untested against real hardware** — verified only against
   simulated data so far.
 - If Prometheus is unreachable, the page switches to **DEMO DATA** so you can
@@ -70,7 +77,8 @@ const SOLAR_CONFIG = {
     gridImport: 'huawei_grid_import_watts{job="sun2000"}',
     load: 'huawei_home_consumption_watts{job="sun2000"}',
     battery: 'huawei_battery_net_watts{job="sun2000"}',
-    batterySoC: 'huawei_battery_soc_percent{job="sun2000"}'
+    batterySoC: 'huawei_battery_soc_percent{job="sun2000"}',
+    batteryFlag: 'huawei_battery{job="sun2000"}'
   },
   scrapeSec: 10,
   smoothMin: 30,
@@ -85,7 +93,7 @@ const SOLAR_CONFIG = {
 | `prometheusUrl`  | `/prom` (same-origin proxy from `server.py`) or a direct Prometheus URL |
 | `metrics`        | full metric selectors — label matchers like `{job="sun2000"}` are allowed and passed through to PromQL; values are always expected in **watts**. `gridExport` = export power (≥ 0); with optional `gridImport` set, the net grid value is computed as `export − import` (negative = importing) |
 | `load`           | home consumption selector |
-| `battery`         | `true`/`false` — master switch for battery support: Battery node, three-way energy split, battery chart series; selectors come from `metrics.battery` (signed W) / `metrics.batterySoC` (%) |
+| `battery`         | `true`/`false` — master switch for battery support: Battery node, three-way energy split, battery chart series; selectors come from `metrics.battery` (signed W) / `metrics.batterySoC` (%) / `metrics.batteryFlag` (0 or missing = no battery → dimmed node + warning banner) |
 | `scrapeSec`      | Prometheus scrape interval in seconds (bucket size)  |
 | `smoothMin`      | display smoothing window in minutes (default 30, 0 = raw)   |
 | `refreshSec`     | default auto-refresh interval in seconds (overridden by the header combo; 0 = off) |
@@ -94,8 +102,10 @@ const SOLAR_CONFIG = {
 | `liveSec`        | refresh interval for the flow diagram                |
 | `chartSec`       | refresh interval for the chart/energy panel          |
 
-URL params (`?prom=...&gridExport=...&grid=...&gridImport=...&pv=...&load=...&scrape=...&smooth=...&refresh=...&lang=...`)
-override `config.js` for quick testing (`refresh` in seconds).
+URL params (`?prom=...&gridExport=...&grid=...&gridImport=...&pv=...&load=...&battery=1&batteryMetric=...&batterySoC=...&batteryFlag=...&scrape=...&smooth=...&refresh=...&lang=...&demoHour=...&consent=0`)
+override `config.js` for quick testing (`refresh` in seconds; `demoHour` pins
+the demo-data flow clock to an hour, e.g. `?demoHour=12`; `consent=0` hides
+the storage notice).
 
 `config.js` and `i18n.js` locations are configurable: `?config=<path>` /
 `?i18n=<path>` (e.g. a shared `?config=/configs/config.js`). If a path fails to
@@ -212,7 +222,9 @@ option. A flake at the repo root exposes `packages.default`, an overlay and
 ```
 
 Options: `enable`, `package`, `host` (127.0.0.1), `port` (8080),
-`prometheusUrl`, `promPrefix` (/prom), `staticDir`, `settings` (SOLAR_CONFIG
+`prometheusUrl`, `promPrefix` (/prom), `staticDir`, `battery` (passes
+`--battery` to the server; add the battery selectors to `settings.metrics`),
+`settings` (SOLAR_CONFIG
 attrset, rendered to the served `config.js`), `configFile` (use an explicit
 config.js instead of `settings`), `openFirewall`. The service runs with a
 dynamic user and systemd hardening; put a reverse proxy in front for LAN/HTTPS.
@@ -240,7 +252,9 @@ scrape_configs:
 ## License
 
 The pv-dashboard code (server, page, Nix packaging) is licensed under the
-**BSD 3-Clause License** — see the `LICENSE` file.
+**BSD 3-Clause License** — see the `LICENSE` file. The `scrape/` subproject
+(exporter, fake inverter, its Nix packaging) is also licensed under the
+**BSD 3-Clause License**.
 
 The bundled chart library `src/static/vendor/echarts.min.js` is
 [Apache ECharts](https://echarts.apache.org/) 5.5.1, licensed under the

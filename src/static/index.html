@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solar Energy Flow</title>
+<script src="vendor/echarts.min.js"></script>
+<script src="boot.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="banner" id="banner">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+    <span id="bannerText"></span>
+  </div>
+  <header>
+    <div class="brand" id="brand" title="Back to today">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="3"></circle>
+          <path d="M12 2.5v1M6.9 4.4l.7.7M17.1 4.4l-.7.7M4.5 8h1M18.5 8h1"></path>
+          <path d="M5.5 13.5h13l-1.8 6.5H7.3z"></path>
+          <path d="M7.6 17h8.8M10.4 13.5l-.7 6.5M13.6 13.5l.7 6.5"></path>
+        </svg>
+      </div>
+      <div>
+        <h1 data-i18n="title">Solar overview</h1>
+        <div class="sub" id="headerSub">Live energy flow</div>
+      </div>
+    </div>
+    <div class="controls">
+      <select id="refreshSel" title="Auto refresh interval">
+        <option value="30" data-i18n="opt30">30 sec</option>
+        <option value="60" data-i18n="opt60">1 min</option>
+        <option value="300" data-i18n="opt300">5 min</option>
+        <option value="1800" data-i18n="opt1800">30 min</option>
+        <option value="custom" id="optCustom" data-i18n="optCustom">Custom</option>
+      </select>
+      <span id="customWrap" style="display:none"><input id="customSec" type="number" min="5" step="1" placeholder="sec" data-i18n-ph="secPh" title="Custom interval in seconds" style="width:74px"><span class="suffix" data-i18n="secPh">sec</span></span>
+      <button id="reloadBtn" data-i18n="refresh">Refresh</button>
+      <span id="badge" class="badge demo">DEMO DATA</span>
+      <div class="seg-ctrl theme-seg" title="Theme">
+        <button data-t="light" title="Light">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"></path></svg>
+        </button>
+        <button data-t="dark" title="Dark">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"></path></svg>
+        </button>
+        <button data-t="system" title="System">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M9 20h6M12 16v4"></path></svg>
+        </button>
+      </div>
+      <div class="seg-ctrl" id="langSeg" title="Language / Język"></div>
+    </div>
+  </header>
+
+  <div class="consent" id="consentBar">
+    <span id="consentText"></span>
+    <button id="consentOk" data-i18n="consentOk">OK</button>
+  </div>
+
+  <main class="grid">
+    <section class="card flow-card">
+      <div class="card-head">
+        <div>
+          <h2 data-i18n="flowTitle">Energy flow</h2>
+          <div class="sub" id="flowSubEl">current power</div>
+        </div>
+      </div>
+      <div class="flow-stage">
+      <svg id="flowSvg" viewBox="66 24 668 542">
+        <defs>
+          <marker id="arrOrange" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto">
+            <path d="M0 0 L10 5 L0 10 Z"></path>
+          </marker>
+          <marker id="arrViolet" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto">
+            <path d="M0 0 L10 5 L0 10 Z"></path>
+          </marker>
+        </defs>
+
+        <path class="tube" d="M 400 232 V 404 Q 400 420 384 420 H 262"></path>
+        <path class="tube" d="M 400 232 V 404 Q 400 420 416 420 H 538"></path>
+        <path class="tube" d="M 538 420 H 262"></path>
+
+        <path id="fVert" class="flow f-pv" d="M 400 232 V 402"></path>
+        <path id="fPvToLoad" class="flow f-pv" d="M 386 420 H 270" marker-end="url(#arrOrange)"></path>
+        <path id="fToGrid" class="flow f-pv" d="M 414 420 H 530" marker-end="url(#arrOrange)"></path>
+        <path id="fGridToLoad" class="flow f-grid" d="M 530 420 H 270" marker-end="url(#arrViolet)"></path>
+
+        <g id="dots"></g>
+        <text class="flowlabel" id="lblPvLoad" x="335" y="398" style="display:none"></text>
+        <text class="flowlabel" id="lblToGrid" x="466" y="398" style="display:none"></text>
+        <text class="flowlabel" id="lblImport" x="466" y="398" style="display:none"></text>
+
+        <g class="node pv" transform="translate(400,150)">
+          <circle class="halo" r="84"></circle>
+          <circle class="ring" r="70"></circle>
+          <g class="icon" transform="translate(0,-34)">
+            <circle cx="0" cy="-15" r="6"></circle>
+            <line x1="9.5" y1="-15" x2="14.5" y2="-15"></line><line x1="-9.5" y1="-15" x2="-14.5" y2="-15"></line>
+            <line x1="0" y1="-24.5" x2="0" y2="-29.5"></line>
+            <line x1="6.7" y1="-21.7" x2="10.3" y2="-25.3"></line><line x1="-6.7" y1="-21.7" x2="-10.3" y2="-25.3"></line>
+            <line x1="6.7" y1="-8.3" x2="10.3" y2="-4.7"></line><line x1="-6.7" y1="-8.3" x2="-10.3" y2="-4.7"></line>
+            <path d="M-20 3 H20 L13.5 27 H-13.5 Z"></path>
+            <path d="M-16.7 15 H16.7 M-6.8 3 L-4.6 27 M6.8 3 L4.6 27"></path>
+          </g>
+          <text class="val" y="20" text-anchor="middle"><tspan id="pvVal">0.000</tspan></text>
+          <text class="unit" id="pvUnit" y="44" text-anchor="middle">kW</text>
+        </g>
+        <text class="nodelabel" x="400" y="52" text-anchor="middle">PV</text>
+
+        <g class="node load" transform="translate(180,420)">
+          <circle class="halo" r="84"></circle>
+          <circle class="ring" r="70"></circle>
+          <g class="icon" transform="translate(0,-34)">
+            <path d="M-22 0 L0 -20 L22 0"></path>
+            <path d="M-15 -5 V22 H15 V-5"></path>
+            <path class="bolt" d="M2.5 -2 L-4.5 9 H-0.3 L-1.8 18 L5.5 6.5 H1 Z"></path>
+          </g>
+          <text class="val" y="20" text-anchor="middle"><tspan id="loadVal">0.000</tspan></text>
+          <text class="unit" id="loadUnit" y="44" text-anchor="middle">kW</text>
+        </g>
+        <text class="nodelabel" x="180" y="530" text-anchor="middle" data-i18n="nLoad">Home</text>
+
+        <g class="node grid" id="nodeGrid" transform="translate(620,420)">
+          <circle class="halo" r="84"></circle>
+          <circle class="ring" r="70"></circle>
+          <g class="icon" transform="translate(0,-34)">
+            <path d="M-13 22 L-4.5 -14 M13 22 L4.5 -14"></path>
+            <path d="M-4.5 -14 L0 -20 L4.5 -14"></path>
+            <path d="M-18 -10 H18 M-12 -2 H12"></path>
+            <path d="M0 -20 V-10 M-9 -10 V-2 M9 -10 V-2"></path>
+            <path d="M-8.5 5 L8.5 -1 M8.5 5 L-8.5 -1 M-10 15 L10 9 M10 15 L-10 9"></path>
+            <path d="M-16 22 H16"></path>
+          </g>
+          <text class="val" y="20" text-anchor="middle"><tspan id="gridVal">0.000</tspan></text>
+          <text class="unit" id="gridUnit" y="44" text-anchor="middle">kW</text>
+        </g>
+        <text class="nodelabel" x="620" y="530" text-anchor="middle" data-i18n="nGrid">Grid</text>
+        <text class="nodestate" id="gridState" x="620" y="550" text-anchor="middle"></text>
+      </svg>
+      </div>
+      <div class="self-row">
+        <div class="self-chip c1" title="of PV production used directly" data-i18n-title="selfConsHint">
+          <span class="l" id="selfConsLbl">Self-consumption</span>
+          <span class="v" id="selfConsVal">–</span>
+        </div>
+        <div class="self-chip c2" title="of demand covered by PV" data-i18n-title="selfSusHint">
+          <span class="l" id="selfSusLbl">Self-sustainment</span>
+          <span class="v" id="selfSusVal">–</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card stats-card">
+        <div class="card-head">
+          <div>
+            <h2 id="periodTitle">Today</h2>
+            <div class="sub" id="periodLine"></div>
+          </div>
+          <div class="range-nav">
+            <button class="nav-btn" id="prevBtn" title="Previous">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+            </button>
+            <div class="seg-ctrl ranges">
+              <button data-r="today" class="active" data-i18n="rToday">Today</button>
+              <button data-r="month" data-i18n="rMonth">Month</button>
+              <button data-r="year" data-i18n="rYear">Year</button>
+              <button data-r="all" data-i18n="rAll">All time</button>
+            </div>
+            <button class="nav-btn" id="nextBtn" title="Next">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-block">
+            <div class="stat-title"><span data-i18n="genByPv">Generated by PV</span><span><b id="pvGenVal">–</b> <span class="kwh" id="pvGenUnit">kWh</span></span></div>
+            <div class="duo">
+              <div class="duo-item"><span class="v" style="color:#22c55e" id="selfKwh">–</span><span class="l" data-i18n="selfConsumed">Consumed directly</span></div>
+              <div class="duo-item right"><span class="v" style="color:#4ade80" id="fedKwh">–</span><span class="l" data-i18n="fedToGrid">Fed to grid</span></div>
+            </div>
+            <div class="bar">
+              <div class="seg-bar g1" id="barSelf" style="width:50%">–</div>
+              <div class="seg-bar g2" id="barFed" style="width:50%">–</div>
+            </div>
+          </div>
+          <div class="vsep"></div>
+          <div class="stat-block">
+            <div class="stat-title"><span data-i18n="consumedAppl">Consumed by appliances</span><span><b id="consVal">–</b> <span class="kwh" id="consUnit">kWh</span></span></div>
+            <div class="duo">
+              <div class="duo-item"><span class="v" style="color:#f97316" id="fromPvKwh">–</span><span class="l" data-i18n="fromPvKwh">From PV</span></div>
+              <div class="duo-item right"><span class="v" style="color:#eab308" id="fromGridKwh">–</span><span class="l" data-i18n="fromGridKwh">From grid</span></div>
+            </div>
+            <div class="bar">
+              <div class="seg-bar o1" id="barFromPv" style="width:50%">–</div>
+              <div class="seg-bar o2" id="barFromGrid" style="width:50%">–</div>
+            </div>
+          </div>
+        </div>
+
+        <table class="data-table">
+          <thead><tr><th data-i18n="thFlow">Energy flow</th><th class="num" data-i18n="thEnergy">Energy</th><th class="num" data-i18n="thShare">Share of parent</th></tr></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+    </section>
+
+    <section class="card chart-card">
+        <div class="card-head">
+          <div>
+            <h2 data-i18n="power">Power</h2>
+            <div class="sub" id="chartSub">kW · drag the slider to zoom</div>
+          </div>
+          <div class="head-right">
+            <span id="smoothWrap" class="smooth-wrap">
+              <label class="ctl-label" for="smoothSel" data-i18n="smoothLbl">Smoothing</label>
+              <select id="smoothSel" title="Smoothing window (day view)"></select>
+            </span>
+            <button id="csvHourBtn" data-i18n="exportCsvHour" style="display:none">Export hourly CSV</button>
+            <button id="csvBtn" data-i18n="exportCsv">Export CSV</button>
+          </div>
+        </div>        <div id="chart"></div>
+        <div id="fallback" style="display:none"></div>
+    </section>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

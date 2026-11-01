@@ -134,20 +134,22 @@ only reachability changes at INFO/WARNING (every poll at DEBUG). Under systemd
 | `--interval` | `5` | seconds between Modbus polls |
 | `--log-level` | `INFO` | `DEBUG` logs every poll |
 
-Register defaults follow Huawei's official "Solar Inverter Modbus Interface
-Definitions" (Issue 04, 2023-01-10): 32064 Input power (I32, unit kW with
-gain 1000 — i.e. raw values are watts) and 37113 [Power meter] Active power
-(I32, > 0 = feed-in).
-Inverters on the older 20200520 protocol expose input power at 32089 and
-meter power at 37258 instead — pass `--pv-register 32089 --grid-register
-37258` there. Note 37113 is populated by the connected power meter (DTSU666
-etc.); without a meter the inverter alone cannot report grid power. Beware
-a unit quirk: the inverter's `[Power meter collection]` copy of 37113 has
-been observed reporting **watts** (gain 1) while the meter-section table
-says kW (gain 1000) — the defaults assume watts (`--grid-scale 1`); if
-grid power looks 1000× off the other way, pass `--grid-scale 1000`. With a battery (LUNA2000) the derived home load
-is wrong while the battery charges/discharges — point the dashboard's `load`
-metric at a real meter register/exporter instead.
+Register defaults follow Huawei's official *Solar Inverter Modbus Interface
+Definitions* (Issue 04, 2023-01-10):
+
+- **32064** — Input power, I32. Unit kW with gain 1000, i.e. raw values are watts.
+- **37113** — [Power meter] Active power, I32, `> 0` = feed-in. Populated by
+  the connected power meter (DTSU666 etc.); without a meter the inverter
+  alone cannot report grid power.
+- Older **20200520** protocol: input power at **32089**, meter power at
+  **37258** — pass `--pv-register 32089 --grid-register 37258` there.
+- Unit quirk: the inverter's `[Power meter collection]` copy of 37113 has
+  been observed reporting **watts** (gain 1) while the meter-section table
+  says kW (gain 1000). The defaults assume watts (`--grid-scale 1`); if
+  grid power looks 1000× off the other way, pass `--grid-scale 1000`.
+- With a battery (LUNA2000) the derived home load is wrong while the battery
+  charges/discharges — point the dashboard's `load` metric at a real meter
+  register/exporter instead.
 
 ## Fake inverter
 

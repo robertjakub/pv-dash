@@ -19,6 +19,7 @@ A single-page dashboard for home PV monitoring, fed by Prometheus.
 | `package.nix` / `module.nix` / `flake.nix` | Nix packaging and service module |
 | `scrape/` | Huawei SUN2000 Prometheus scraper (Modbus TCP, stdlib only) — see `scrape/README.md` |
 
+## Features
 
 - **Flow diagram** — live PV / Load / Grid nodes with animated energy particles
   (orange = solar energy, violet = grid import; speed and particle rate follow
@@ -94,11 +95,10 @@ proxies `/prom/*` to your Prometheus — the browser never talks to Prometheus
 directly:
 
 ```bash
-cd pv-dashboard
-python3 server.py                          # upstream http://localhost:9090
-python3 server.py --port 8080 --upstream http://192.168.1.50:9090
-python3 server.py --bind 127.0.0.1         # localhost only
-PROM_URL=http://pi:9090 python3 server.py  # via env
+python3 src/server.py                          # upstream http://localhost:9090
+python3 src/server.py --port 8080 --upstream http://192.168.1.50:9090
+python3 src/server.py --bind 127.0.0.1         # localhost only
+PROM_URL=http://pi:9090 python3 src/server.py  # via env
 # open http://localhost:8080
 ```
 
@@ -124,9 +124,10 @@ log_queries = false
 
 `--prom-prefix ''` (empty) proxies *every* unmatched path to Prometheus.
 
-**Static-only mode:** any web server works (e.g. `python3 -m http.server 8080`),
-but then set `prometheusUrl` in `config.js` to the direct Prometheus URL — the
-browser will fetch it directly, which requires CORS to be allowed.
+**Static-only mode:** any web server works (e.g.
+`python3 -m http.server 8080 -d src/static`), but then set `prometheusUrl`
+in `config.js` to the direct Prometheus URL — the browser will fetch it
+directly, which requires CORS to be allowed.
 
 ## Behind a reverse proxy
 
@@ -141,7 +142,7 @@ location / { proxy_pass http://127.0.0.1:8080; }   # nginx
 solar.example.com { reverse_proxy 127.0.0.1:8080 }  # Caddy
 ```
 
-Run `server.py --bind 127.0.0.1` so only the proxy reaches it.
+Run `src/server.py --bind 127.0.0.1` so only the proxy reaches it.
 
 **B. Proxy serves static files and routes `/prom` to Prometheus itself:**
 
@@ -171,10 +172,8 @@ prefix); add auth at the proxy if exposed to the internet.
 
 `package.nix` builds the dashboard (`src/static/` + `src/server.py` wrapped
 with a `pv-dashboard` launcher); `module.nix` adds a `services.pv-dashboard`
-option:
-
-A flake at the repo root exposes `packages.default` (run with
-`nix run path:./pv-dashboard`), an overlay and `nixosModules.default`:
+option. A flake at the repo root exposes `packages.default`, an overlay and
+`nixosModules.default` — `nix run .` runs the dashboard locally:
 
 ```nix
 # your flake.nix

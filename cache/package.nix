@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-cache";
-  version = "0.0.6";
+  version = "0.1.0";
 
   src = lib.cleanSource ./.;
 

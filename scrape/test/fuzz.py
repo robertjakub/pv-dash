@@ -17,7 +17,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 SCRAPE_DIR = os.path.dirname(TEST_DIR)
 REPO = os.path.dirname(SCRAPE_DIR)
 P = os.path.join(SCRAPE_DIR, 'src', 'scraper.py')
-F = os.path.join(SCRAPE_DIR, 'src', 'fake_inverter.py')
+F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
 FAKE_PORT, PORT = 15545, 19455
 ROUNDS = 3000
 
@@ -53,7 +53,7 @@ import socket  # noqa: E402  (late import keeps the helpers above readable)
 
 procs = []
 try:
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(FAKE_PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--port', str(FAKE_PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     with open('/tmp/scr_fuzz.ini', 'w') as fh:

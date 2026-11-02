@@ -20,7 +20,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_DIR = os.path.dirname(TEST_DIR)
 REPO = os.path.dirname(CACHE_DIR)
 P = os.path.join(CACHE_DIR, 'src', 'modbus_cache.py')
-F = os.path.join(REPO, 'scrape', 'src', 'fake_inverter.py')
+F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
 INV_PORT, CACHE_PORT = 15601, 15602
 CLIENTS, DURATION = 100, 15.0
 
@@ -47,7 +47,7 @@ def check(name, cond, detail=''):
 
 
 try:
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', str(INV_PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(INV_PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, preexec_fn=raise_fds))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),

@@ -2,7 +2,7 @@
 
 A dependency-free (Python stdlib only) Prometheus exporter that polls a Huawei
 SUN2000 inverter over **Modbus TCP** and exposes the `huawei_*_watts` metrics
-the [pv-dashboard](../README.md) expects, plus health gauges. It can poll the
+the [dashboard](../dashboard/README.md) expects, plus health gauges. It can poll the
 inverter directly or through the [modbus-cache](../cache/README.md) proxy
 (which it detects automatically).
 
@@ -230,40 +230,9 @@ Definitions* (Issue 04, 2023-01-10):
   charges/discharges — point the dashboard's `load` metric at a real meter
   register/exporter instead.
 
-## Fake inverter
+## Test inverter
 
-`fake_inverter.py` is a Modbus TCP server with demo values for testing the
-scraper (and the whole dashboard stack) without hardware. By default it
-simulates a sunny day: bell-curve PV between 06:00 and 18:00 (peak 75 % of
-`--max-kwp`), home load with morning and evening peaks — so the grid value
-exports around noon and imports mornings/evenings. Energy counters grow
-during the simulated day; raw values are watts / kWh×100 like the real map.
-It also serves the modbus-cache diagnostics block (65000–65003), so the
-scraper's `huawei_cache_*` auto-detection can be exercised without a cache.
-
-```bash
-python3 scrape/src/fake_inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
-python3 scrape/src/fake_inverter.py --time 12:00          # frozen noon: ~4.5 kW PV, exporting
-python3 scrape/src/fake_inverter.py --static              # constant PV 4000 W, grid -1500 W
-python3 scrape/src/fake_inverter.py --static --battery    # the same, charging 1200 W at 65 %
-python3 scrape/src/fake_inverter.py --port 15502 --log-level DEBUG
-```
-
-Served registers:
-
-- **32064** / **32080** — PV power / power limit (I32 W)
-- **37113** — grid power (I32 W, positive = feed-in)
-- **37100+** — smart meter block: status, per-phase voltages/currents,
-  reactive power, power factor, grid frequency, and 37119 exported /
-  37121 imported kWh totals that grow through the simulated day
-- **32089** — device status (512 on-grid / 40960 standby at night)
-- **32087** — temperature (I16, °C×10); **32114** daily and **32106** total
-  yield (U32, kWh×100)
-- **65000–65003** — cache diagnostics block (magic `0xCAFE`)
-- Unknown addresses read as 0, other functions get a Modbus exception
-  (`--strict` rejects unknown addresses with exception `02` like the real device)
-
-Also packaged as `modbus-fake-inverter`.
+The demo inverter lives in its own subproject now: [inverter/](../inverter/README.md) — a Modbus TCP server with day/static demo values, battery + meter simulation, a runtime control server (`set`/`show` values, chaos injection) and the `fake_ctl` CLI. Both regression suites start it automatically.
 
 ## Battery (Huawei LUNA2000)
 
@@ -301,7 +270,7 @@ The consistency checks adapt:
   charging and export together cannot exceed the PV input.
 
 The fake inverter can emulate the battery for testing:
-`python3 scrape/src/fake_inverter.py --battery`.
+`python3 inverter/src/fake_inverter.py --battery`.
 
 ## Nix
 
@@ -359,7 +328,11 @@ scrape/src/
 ├── scraper.py          # CLI, logging setup, signal handling
 ├── scraper.ini         # sample config
 ├── metrics.json        # metric names / HELP / TYPE specs
-├── fake_inverter.py    # Modbus TCP demo server
+├── fake_inverter.py    # Modbus TCP demo server (entry; see fake/)
+├── fake/
+│   ├── simulator.py    # day curves, runtime overrides, register map
+│   ├── chaos.py        # seeded hostile-reply dice layer
+│   └── server.py       # Modbus server + line-protocol control server
 └── lib/
     ├── protocol.py     # Modbus TCP client (hardened framing)
     ├── config.py       # settings resolution + validation

@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""Signal handling mirroring the scraper/cache family: SIGHUP reloads the
+FAKE_* environment layer (keep-last-good), SIGUSR1 resets the scenario,
+SIGTERM/SIGINT shut down gracefully with a session summary."""
+import logging
+import os
+import signal
+import sys
+import threading
+import time
+
+logger = logging.getLogger('fake-sun2000')
+
+
+def parse_time(text):
+    """HH:MM -> float hours; anything else raises ValueError."""
+    h, m = text.split(':')
+    t = int(h) + int(m) / 60.0
+    if not 0 <= t < 24:
+        raise ValueError(t)
+    return t
+
+
+class SignalBox:
+    """Installs the family signal set; a watcher thread does the work so the
+    Modbus accept loop (main thread) is never interrupted mid-request."""
+
+    def __init__(self, simulator, chaos, fake, control=None):
+        self.simulator = simulator
+        self.chaos = chaos
+        self.fake = fake
+        self.control = control
+        self.started = time.monotonic()
+        self.received = []          # signal names, drained by the watcher
+        self.stop = False
+
+    def install(self):
+        for sig in (signal.SIGHUP, signal.SIGUSR1, signal.SIGTERM, signal.SIGINT):
+            signal.signal(sig, self._on)
+        threading.Thread(target=self.watch, daemon=True).start()
+
+    def _on(self, signum, frame):
+        self.received.append(signal.Signals(signum).name)
+
+    def watch(self):
+        while not self.stop:
+            if self.received:
+                name, self.received = self.received[0], self.received[1:]
+                try:
+                    if name == 'SIGHUP':
+                        self.reload()
+                    elif name == 'SIGUSR1':
+                        self.reset()
+                    else:
+                        self.shutdown(name)   # SIGTERM / SIGINT
+                        return
+                except Exception as e:
+                    logger.error('%s handling crashed (%s)', name, e)
+            time.sleep(0.2)
+
+    # ---- SIGHUP: re-read the FAKE_* environment layer, all-or-nothing
+
+    def reload(self):
+        plan = []
+        env = os.environ
+        try:
+            v = env.get('FAKE_CHAOS')
+            if v:
+                plan.append(('chaos=%g' % float(v), lambda v=float(v): self.chaos.set_probability(v)))
+            v = env.get('FAKE_MAX_KWP')
+            if v:
+                plan.append(('peak=%gW' % (0.75 * float(v) * 1000.0),
+                             lambda v=float(v): setattr(self.simulator, 'peak_w', 0.75 * v * 1000.0)))
+            v = env.get('FAKE_BATTERY')
+            if v:
+                flag = v.strip().lower() in ('1', 'true', 'yes', 'on')
+                plan.append(('battery=%s' % flag, lambda: setattr(self.simulator, 'battery', flag)))
+            v = env.get('FAKE_STRICT')
+            if v:
+                flag = v.strip().lower() in ('1', 'true', 'yes', 'on')
+                plan.append(('strict=%s' % flag, lambda: setattr(self.fake, 'strict', flag)))
+            v = env.get('FAKE_TIME')
+            if v:
+                if v.strip().lower() in ('auto', 'live'):
+                    plan.append(('time=live', lambda: self.simulator.freeze(None)))
+                else:
+                    plan.append(('time=%s' % v.strip(), lambda v=v: self.simulator.freeze(parse_time(v))))
+            v = env.get('FAKE_LOG_LEVEL')
+            if v:
+                level = getattr(logging, v.strip().upper())
+                plan.append(('log_level=%s' % v.strip().upper(),
+                             lambda: (logging.getLogger('fake-sun2000').setLevel(level),
+                                      logging.getLogger('fake-sun2000-control').setLevel(level))))
+        except (ValueError, AttributeError) as e:
+            logger.warning('SIGHUP: reload failed (%s), keeping previous settings', e)
+            return
+        if not plan:
+            logger.info('SIGHUP: reloaded, no FAKE_* environment settings to apply')
+            return
+        for _, fn in plan:
+            fn()
+        logger.info('SIGHUP: reloaded %d setting(s): %s', len(plan), ', '.join(label for label, _ in plan))
+
+    # ---- SIGUSR1: reset the scenario (release pins + drop the write overlay)
+
+    def reset(self):
+        pins = self.simulator.reset_overrides()
+        overlay = len(self.fake.overlay)
+        self.fake.overlay.clear()
+        logger.info('SIGUSR1: scenario reset (%d pin(s), %d overlay register(s) cleared), simulation continues',
+                    pins, overlay)
+
+    # ---- SIGTERM / SIGINT
+
+    def shutdown(self, name):
+        self.stop = True
+        dur = time.monotonic() - self.started
+        logger.info('shutdown: %s received after %.0fs (%d client connection(s), %d request(s), %d chaos hit(s))',
+                    name, dur, self.fake.conns, self.fake.requests, self.chaos.hits)
+        if self.control:
+            self.control.cleanup()   # unlink the socket file before anything can exit first
+        self.fake.stopping = True
+        fake_serve = getattr(self.fake, 'srv', None)
+        if fake_serve:
+            try:
+                fake_serve.close()
+            except OSError:
+                pass
+        for h in logging.getLogger().handlers:
+            try:
+                h.flush()
+            except OSError:
+                pass
+        os._exit(0)

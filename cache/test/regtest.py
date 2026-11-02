@@ -16,7 +16,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_DIR = os.path.dirname(TEST_DIR)
 REPO = os.path.dirname(CACHE_DIR)
 P = os.path.join(CACHE_DIR, 'src', 'modbus_cache.py')
-F = os.path.join(REPO, 'scrape', 'src', 'fake_inverter.py')
+F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
 R = os.path.join(CACHE_DIR, 'src', 'registers.json')
 
 CACHE_PORT = 15505
@@ -170,7 +170,7 @@ class EvilUpstream:
 
 try:
     # 1. baseline: strict fake (undefined regs rejected with 02) + cache
-    start([sys.executable, F, '--static', '--battery', '--strict', '--port', str(INV_PORT)])
+    start([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(INV_PORT)])
     time.sleep(0.7)
     start([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT), '--listen', '127.0.0.1:%d' % CACHE_PORT,
            '--interval', '1', '--cache-ttl', '3', '--allow-write', '--registers-file', R], log='/tmp/reg_cache.log')
@@ -288,7 +288,7 @@ try:
           b[0] == 3 and w[:2] == (0xCAFE, 0) and w[2] >= 3, str(w))
 
     # 3. poll status caching: registers.json variant with an undefined register
-    procs[0] = subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', str(INV_PORT)],
+    procs[0] = subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(INV_PORT)],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(0.7)
     import json as _json

@@ -2,7 +2,7 @@
 """Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP, stdlib only).
 
 Polls the inverter over Modbus TCP and serves the huawei_* metrics the
-pv-dashboard expects at /metrics in the Prometheus text format.
+dashboard expects at /metrics in the Prometheus text format.
 
 Layout: lib/protocol (Modbus client), lib/config (settings resolution),
 lib/metrics (metric specs), lib/poller (poller + sanity checks),

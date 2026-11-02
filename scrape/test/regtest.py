@@ -21,7 +21,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 SCRAPE_DIR = os.path.dirname(TEST_DIR)
 REPO = os.path.dirname(SCRAPE_DIR)
 P = os.path.join(SCRAPE_DIR, 'src', 'scraper.py')
-F = os.path.join(SCRAPE_DIR, 'src', 'fake_inverter.py')
+F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
 FAKE_PORT = 15541
 PORT_A, PORT_B = 19441, 19442
 
@@ -161,7 +161,7 @@ def write_ini(path, extra=''):
 procs = []
 try:
     # 1. baseline: fake with battery + scraper with battery enabled
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', str(FAKE_PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(FAKE_PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     write_ini('/tmp/scr_base.ini')
@@ -198,6 +198,317 @@ try:
     status, m = wait_metrics(PORT_B)
     check('battery off: flag 0', m.get('huawei_battery') == 0)
     check('battery off: no battery metrics', 'huawei_battery_net_watts' not in m)
+
+    # 2c. fake extras: control server (runtime overrides) + chaos injection
+    def ctl(cmd, port):
+        s = socket.create_connection(('127.0.0.1', port), timeout=5)
+        s.sendall((cmd + '\n').encode())
+        r = s.recv(512)
+        s.close()
+        return r.decode().strip()
+
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15570',
+                                   '--control-port', '15571'],
+                                  stdout=open('/tmp/scr_ctl_fake.log', 'w'), stderr=subprocess.STDOUT))
+    write_ini('/tmp/scr_ctl.ini')
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_ctl.ini',
+                                   '--host', '127.0.0.1', '--modbus-port', '15570',
+                                   '--listen', '127.0.0.1:19455', '--battery'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    status, m = wait_metrics(19455)
+    check('control: baseline static values', m.get('huawei_pv_generation_watts') == 4000)
+    ctl('set pv 2500', 15571)
+    time.sleep(1.5)
+    m = metrics_dict(get('/metrics', 19455)[1])
+    check('control: pv pinned at runtime', m.get('huawei_pv_generation_watts') == 2500,
+          str(m.get('huawei_pv_generation_watts')))
+    ctl('set soc 30', 15571)
+    time.sleep(1.5)
+    m = metrics_dict(get('/metrics', 19455)[1])
+    check('control: soc pinned at runtime', m.get('huawei_battery_soc_percent') == 30,
+          str(m.get('huawei_battery_soc_percent')))
+    ctl('set pv auto', 15571)
+    time.sleep(1.5)
+    m = metrics_dict(get('/metrics', 19455)[1])
+    check('control: pv override released', m.get('huawei_pv_generation_watts') == 4000)
+    check('control: status line', 'pv=4000W' in ctl('status', 15571)
+          and 'pinned: soc=30.0' in ctl('status', 15571), ctl('status', 15571))
+
+    # 2d. fake_ctl.py: the CLI tool speaks TCP and unix-socket control servers
+    C = os.path.join(REPO, 'inverter', 'src', 'fake_ctl.py')
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'pv', '2700'], capture_output=True, text=True)
+    check('fake_ctl: TCP pin via tool', r.returncode == 0 and r.stdout.startswith('ok pv=2700 '), r.stdout.strip())
+    time.sleep(1.5)
+    m = metrics_dict(get('/metrics', 19455)[1])
+    check('fake_ctl: pinned value reaches /metrics', m.get('huawei_pv_generation_watts') == 2700,
+          str(m.get('huawei_pv_generation_watts')))
+    r = subprocess.run([sys.executable, C, '--control-port', '19999', 'status'], capture_output=True, text=True)
+    check('fake_ctl: dead port -> clean rc=1', r.returncode == 1 and 'cannot reach' in r.stderr)
+
+    # 2e. fake audit-logging + malformed-input defense (no tracebacks, no bricking)
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'pv', 'nan'], capture_output=True, text=True)
+    check('control: non-finite pin rejected', r.stdout.startswith('err value must be finite'), r.stdout.strip())
+    time.sleep(1)
+    m = metrics_dict(get('/metrics', 19455)[1])
+    check('control: register truth intact after rejected pin (pv pin 2700 survives)',
+          m.get('huawei_pv_generation_watts') == 2700, str(m.get('huawei_pv_generation_watts')))
+    s = socket.create_connection(('127.0.0.1', 15570), timeout=5)
+    s.sendall(struct.pack('>HHHB', 4, 0, 0, 1))   # MBAP length 0: malformed
+    s.close()
+    s = socket.create_connection(('127.0.0.1', 15570), timeout=5)
+    s.sendall(struct.pack('>HHHB', 5, 0, 6, 1) + struct.pack('>BHH', 6, 47415, 99))
+    s.recv(64)
+    s.close()
+    s = socket.create_connection(('127.0.0.1', 15570), timeout=5)
+    s.sendall(struct.pack('>HHHB', 6, 0, 6, 1) + struct.pack('>BHH', 5, 1, 255))
+    s.recv(64)
+    s.close()
+    time.sleep(0.5)
+    ctl_log = open('/tmp/scr_ctl_fake.log').read()
+    check('fake audit: write + rejected FC + malformed frame logged one-line',
+          'write: register 47415 = 99 (single register, unit 1)' in ctl_log
+          and 'rejected FC5 from' in ctl_log
+          and 'malformed frame from' in ctl_log)
+    subprocess.run([sys.executable, C, '--control-port', '15571', 'pv', '1234'], capture_output=True)
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'reset'], capture_output=True, text=True)
+    check('control: reset clears all pins', r.returncode == 0
+          and r.stdout.startswith('ok reset (') and 'pinned' not in r.stdout, r.stdout.strip())
+    time.sleep(1)
+    m = metrics_dict(get('/metrics', 19455)[1])
+    check('control: reset returns the register truth', m.get('huawei_pv_generation_watts') == 4000,
+          str(m.get('huawei_pv_generation_watts')))
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'reset'], capture_output=True, text=True)
+    check('control: reset is idempotent', r.returncode == 0
+          and r.stdout.startswith('ok reset (0 pin(s)') and 'pinned' not in r.stdout, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'help'], capture_output=True, text=True)
+    check('control: help lists the commands', r.returncode == 0
+          and r.stdout.startswith('commands: set <pv|load|batt|soc') and 'chaos' in r.stdout, r.stdout.strip())
+
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'settings'], capture_output=True, text=True)
+    check('control: show settings lists every setting', r.returncode == 0
+          and all(k in r.stdout for k in ('pv=', 'load=', 'batt=', 'soc=', 'cloud=', 'time=', 'chaos=',
+                                          'seed=', 'battery=', 'strict=', 'static=', 'max-kwp=',
+                                          'battery-kwh=', 'log-level=', 'scenario=')), r.stdout.strip())
+    subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'battery', 'off'], capture_output=True)
+    time.sleep(1)
+    m = metrics_dict(get('/metrics', 19455)[1])
+    check('control: set battery off zeroes battery values live (scraper flag unaffected)',
+          m.get('huawei_battery') == 1 and m.get('huawei_battery_net_watts') == 0
+          and m.get('huawei_pv_generation_watts') == 4000, str(m.get('huawei_battery_net_watts')))
+    subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'battery', 'on'], capture_output=True)
+    check('fake audit: control commands logged at INFO (status too)',
+          'control: set pv nan -> err' in ctl_log and 'control: set soc 30 -> ok' in ctl_log
+          and 'control: status -> pv=' in ctl_log)
+
+    # 2f. FAKE_CTL environment (short name) drives both tools when the flag is unset
+    r = subprocess.run([sys.executable, C, 'set', 'pv', '2200'], capture_output=True, text=True,
+                       env={**os.environ, 'FAKE_CTL': '15571'})
+    check('fake_ctl: FAKE_CTL env picks the target', r.returncode == 0
+          and r.stdout.startswith('ok pv=2200 '), r.stdout.strip() or r.stderr.strip())
+    time.sleep(1)
+    m = metrics_dict(get('/metrics', 19455)[1])
+    check('fake_ctl: env-pinned value reaches /metrics', m.get('huawei_pv_generation_watts') == 2200,
+          str(m.get('huawei_pv_generation_watts')))
+    SIG_SOCK2 = '/tmp/fake-inverter-15577.socket'
+    fake_env = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15577'],
+                                stdout=open('/tmp/scr_sig2.log', 'w'), stderr=subprocess.STDOUT,
+                                env={**os.environ, 'FAKE_CTL': SIG_SOCK2})
+    procs.append(fake_env)
+    time.sleep(0.8)
+    r = subprocess.run([sys.executable, C, 'status'], capture_output=True, text=True,
+                       env={**os.environ, 'FAKE_CTL': SIG_SOCK2})
+    check('fake: FAKE_CTL env opens the default-flag-less control server',
+          r.returncode == 0 and 'pv=4000W' in r.stdout and os.path.exists(SIG_SOCK2), r.stdout.strip())
+    os.kill(fake_env.pid, signal.SIGTERM)
+    time.sleep(1)
+    check('fake: env-socket unlinked on shutdown', not os.path.exists(SIG_SOCK2)
+          and fake_env.poll() == 0)
+
+    # 2g1. battery state machine: SoC integrates the effective battery power
+    # with the simulated clock (clock jumps = time-lapse), reserve floor 10 %
+    procs.append(subprocess.Popen([sys.executable, F, '--battery', '--time', '12:00',
+                                   '--port', '15580', '--control-port', '15583'],
+                                  stdout=open('/tmp/scr_batt.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(0.8)
+    st = ctl('status', 15583)
+    check('battery machine: full battery holds the noon surplus for the grid',
+          'batt=0W soc=100.0%' in st, st)
+    ctl('set soc 95', 15583); ctl('set pv 3000', 15583); ctl('set load 1000', 15583)
+    st = ctl('status', 15583)
+    check('battery machine: surplus charges with the grid margin', 'batt=1700W' in st, st)
+    ctl('set pv 6000', 15583); ctl('set load 500', 15583)
+    st = ctl('status', 15583)
+    check('battery machine: charge clamp at max power', 'batt=2500W' in st, st)
+    ctl('set pv 0', 15583); ctl('set load 1000', 15583)
+    st = ctl('status', 15583)
+    check('battery machine: deficit discharges', 'batt=-850W' in st, st)
+    ctl('set soc auto', 15583); ctl('set time 18:00', 15583)
+    st = ctl('status', 15583)
+    check('battery machine: clock jump integrates the SoC (time-lapse)',
+          'soc=21.1%' in st and 'batt=-850W' in st, st)
+    ctl('set load 6000', 15583); ctl('set time 19:00', 15583)
+    st = ctl('status', 15583)
+    check('battery machine: discharge stops at the 10 % reserve',
+          'soc=10.0%' in st and 'batt=0W' in st, st)
+    ctl('set soc 80', 15583)
+    st = ctl('set scenario night', 15583)
+    check('scenario: preset pins the clock and integrates the battery',
+          st.startswith('ok scenario=night') and 'soc=67.3%' in st, st)
+    check('scenario: preset releases the value pins', 'pinned' not in st, st)
+    st = ctl('set scenario tea', 15583)
+    check('scenario: unknown name rejected with the valid list',
+          st.startswith('err unknown scenario tea') and 'morning' in st, st)
+    ctl('set pv 2200', 15583)
+    st = ctl('show scenario', 15583)
+    check('scenario: manual pin turns the state custom', st == 'ok scenario=custom', st)
+
+    # 2g2. control 'shutdown' command = graceful stop without a signal
+    fake_sd = subprocess.Popen([sys.executable, F, '--static', '--port', '15578', '--control-port', '15579'],
+                               stdout=open('/tmp/scr_sd.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(fake_sd)
+    time.sleep(0.8)
+    r = subprocess.run([sys.executable, C, '--control-port', '15579', 'shutdown'], capture_output=True, text=True)
+    time.sleep(1)
+    sd_log = open('/tmp/scr_sd.log').read()
+    check('control: shutdown stops the fake gracefully', r.returncode == 0
+          and 'bye shutdown' in r.stdout and fake_sd.poll() == 0
+          and 'shutdown: control received after' in sd_log
+          and 'chaos hit(s)' in sd_log, r.stdout.strip() or r.stderr.strip())
+
+    # 2g1. fake_cli.py: the Cisco-style session — silent set confirmations,
+    # full show/status replies, [confirm] before shutdown
+    K = os.path.join(REPO, 'inverter', 'src', 'fake_cli.py')
+
+    def cli(stdin, port=15571):
+        return subprocess.run([sys.executable, K, '--control-port', str(port)],
+                              input=stdin, capture_output=True, text=True, timeout=30)
+
+    r = cli('set pv 3000\n')
+    check('fake_cli: set prints only the confirmation', r.returncode == 0
+          and r.stdout.rstrip() == 'fake-inverter:15571 > ok\nfake-inverter:15571 >', repr(r.stdout))
+    check('fake_cli: set reply really carried no status tail',
+          'load=' not in r.stdout and 'pinned' not in r.stdout, repr(r.stdout))
+    time.sleep(1.5)
+    m = metrics_dict(get('/metrics', 19455)[1])
+    check('fake_cli: pinned value reaches /metrics', m.get('huawei_pv_generation_watts') == 3000,
+          str(m.get('huawei_pv_generation_watts')))
+    r = cli('shutdown\nn\n')
+    check('fake_cli: shutdown refuses without confirming', r.returncode == 0
+          and 'Proceed with shutdown? [confirm]' in r.stdout and '% Aborted.' in r.stdout, repr(r.stdout))
+    ctl('status', 15571)
+    r = cli('show pv\nstatus\nquit\n')
+    lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
+    check('fake_cli: show prints the bare value, status the full line', r.returncode == 0
+          and '3000' in lines and any(l.startswith('pv=3000W') for l in lines), repr(r.stdout))
+    r = cli('help soc\n')
+    check('fake_cli: help <setting> describes it (shared registry)', r.returncode == 0
+          and r.stdout.startswith('fake-inverter:15571 > ok soc - pin the state of charge'), repr(r.stdout))
+    r = cli('show settings\nquit\n')
+    rows = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
+    check('fake_cli: show settings prints one setting per line', r.returncode == 0
+          and len(rows) >= 15 and any(r2.startswith('pv ') for r2 in rows)
+          and any(r2.startswith('log-level ') for r2 in rows), repr(r.stdout))
+    r = cli('set ?\n')
+    check('fake_cli: ? lists the options for the position', r.returncode == 0
+          and 'scenario' in r.stdout and 'max-kwp' in r.stdout
+          and 'ok' not in r.stdout, repr(r.stdout))
+    fake_k = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15586',
+                               '--control-port', '15587'],
+                              stdout=open('/tmp/scr_cli.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(fake_k)
+    time.sleep(0.8)
+    r = cli('shutdown\n\n', 15587)
+    time.sleep(1)
+    check('fake_cli: RETURN at [confirm] stops the fake', r.returncode == 0
+          and 'bye shutdown' in r.stdout and fake_k.poll() == 0, repr(r.stdout))
+
+    # 2g1b. unset command + scenario custom (server side, shared registry)
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'pv'], capture_output=True, text=True)
+    check('control: unset releases the pin back to the simulation', r.returncode == 0
+          and r.stdout.startswith('ok pv=auto '), r.stdout.strip())
+    time.sleep(1.5)
+    m = metrics_dict(get('/metrics', 19455)[1])
+    check('control: unset really releases (metrics back to the static base)',
+          m.get('huawei_pv_generation_watts') == 4000, str(m.get('huawei_pv_generation_watts')))
+    subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'pv', '2700'], capture_output=True)
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'scenario', 'custom'],
+                       capture_output=True, text=True)
+    check('control: scenario custom releases pins + clock', r.returncode == 0
+          and r.stdout.startswith('ok scenario=custom ') and 'pinned' not in r.stdout, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'seed'], capture_output=True, text=True)
+    check('control: unset seed restores the random RNG', r.returncode == 0
+          and r.stdout.startswith('ok seed=random '), r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'bogus'], capture_output=True, text=True)
+    check('control: unset of an unknown setting is rejected', r.returncode == 0
+          and r.stdout.startswith('err unknown setting bogus'), r.stdout.strip())
+
+    # 2e. signals, mirroring the scraper/cache family: SIGHUP = FAKE_* env reload,
+    # SIGUSR1 = scenario reset (pins + write overlay), SIGTERM = summary + exit 0
+    SIG_SOCK = '/tmp/scr_sig_ctl.sock'
+    fake_ctl = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15574',
+                                 '--control-port', SIG_SOCK],
+                                stdout=open('/tmp/scr_sig.log', 'w'), stderr=subprocess.STDOUT,
+                                env={**os.environ, 'FAKE_CHAOS': '0.9', 'FAKE_LOG_LEVEL': 'DEBUG'})
+    procs.append(fake_ctl)
+    time.sleep(0.8)
+    check('signals: chaos off by flag despite FAKE_CHAOS env',
+          'chaos=0.00' in subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'status'], capture_output=True, text=True).stdout)
+    s = socket.create_connection(('127.0.0.1', 15574), timeout=5)
+    s.sendall(struct.pack('>HHHB', 5, 0, 6, 1) + struct.pack('>BHH', 6, 47415, 99))
+    s.recv(64)
+    s.close()
+    subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'set', 'pv', '2500'], capture_output=True)
+    os.kill(fake_ctl.pid, signal.SIGHUP)
+    time.sleep(0.8)
+    sig_status = subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'status'], capture_output=True, text=True).stdout
+    check('signals: SIGHUP re-applies the FAKE_* env layer',
+          'chaos=0.90' in sig_status and 'pinned: pv=2500' in sig_status, sig_status)
+    os.kill(fake_ctl.pid, signal.SIGUSR1)
+    time.sleep(0.8)
+    sig_status = subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'status'], capture_output=True, text=True).stdout
+    check('signals: SIGUSR1 resets pins + write overlay', 'pinned' not in sig_status
+          and '1 overlay register(s) cleared' in open('/tmp/scr_sig.log').read(), sig_status)
+    os.kill(fake_ctl.pid, signal.SIGTERM)
+    time.sleep(1)
+    sig_log = open('/tmp/scr_sig.log').read()
+    check('signals: SIGTERM -> session summary + exit',
+          fake_ctl.poll() == 0 and 'shutdown: SIGTERM received after' in sig_log
+          and 'chaos hit(s)' in sig_log)
+    check('signals: unix control socket unlinked on shutdown', not os.path.exists(SIG_SOCK))
+
+    # 2e. fake dry-run: validate config, print effective settings, family exit codes
+    r = subprocess.run([sys.executable, F, '--dry-run', '--static', '--battery'], capture_output=True)
+    check('fake dry-run: valid rc=0', r.returncode == 0
+          and b'nothing was bound or connected' in r.stderr
+          and b'peak PV 4500W' in r.stderr)
+    r = subprocess.run([sys.executable, F, '--dry-run', '--unit', '300'], capture_output=True)
+    check('fake dry-run: invalid rc=1, clean message', r.returncode == 1
+          and b'--unit out of range (1-247): 300' in r.stderr
+          and b'Traceback' not in r.stderr)
+    r = subprocess.run([sys.executable, F, '--dry-run', '--time', '25:00'], capture_output=True)
+    check('fake dry-run: bad time rc=1', r.returncode == 1 and b'--time invalid' in r.stderr)
+
+
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15572',
+                                   '--control-port', '15573', '--chaos', '0.4', '--seed', '42'],
+                                  stdout=open('/tmp/scr_chaos_fake.log', 'w'), stderr=subprocess.STDOUT))
+    write_ini('/tmp/scr_chaos.ini')
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_chaos.ini',
+                                   '--host', '127.0.0.1', '--modbus-port', '15572',
+                                   '--listen', '127.0.0.1:19456'],
+                                  stdout=open('/tmp/scr_chaos.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(6)
+    status, body = get('/metrics', 19456)
+    m = metrics_dict(body)
+    check('chaos: exporter stays up, errors counted', status == 200
+          and m.get('huawei_modbus_errors_total', 0) > 0, str(m.get('huawei_modbus_errors_total')))
+    ctl('set chaos off', 15573)
+    time.sleep(2)
+    status, body = get('/metrics', 19456)
+    m = metrics_dict(body)
+    check('chaos off: recovery to up=1', status == 200 and m.get('huawei_up') == 1)
+    check('chaos: zero tracebacks in fake + scraper logs',
+          'Traceback' not in open('/tmp/scr_chaos.log').read())
     check('battery off: home = pv - grid', m.get('huawei_home_consumption_watts') == 5500)
 
     # 3. sanity caps: max_kwp=2 -> 4000 W exceeds -> 503, then reload fixes it
@@ -503,7 +814,7 @@ try:
     check('inverter dead: up=0, still HTTP 200 with last values',
           status == 200 and m.get('huawei_up') == 0 and m.get('huawei_pv_generation_watts') == 4000)
     check('inverter dead: error counter grew', m.get('huawei_modbus_errors_total', 0) >= 1)
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', str(FAKE_PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(FAKE_PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(2)
     status, body = get('/metrics', PORT_A)

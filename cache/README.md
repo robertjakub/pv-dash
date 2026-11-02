@@ -81,6 +81,13 @@ the plan converges to the largest blocks the device actually answers.
 python3 cache/src/modbus_cache.py --host 192.168.1.100 --listen 0.0.0.0:15502
 ```
 
+Add **`--dry-run`** to validate the configuration and the register map and
+print the effective settings (poll plan, ACLs, limits) without binding the
+listen port or contacting the inverter — handy for checking NixOS-rendered
+config files (`--config /nix/store/…-modbus_cache.ini --dry-run`).
+Exit codes: `0` = valid; `1` = invalid (reason on stderr, stdout stays
+clean); `2` = command-line misuse.
+
 The source is split into a `lib/` package next to the entry script:
 `protocol` (wire format/errors), `config` (settings + register map),
 `upstream` (inverter connection), `cache` (register cache + block plan),

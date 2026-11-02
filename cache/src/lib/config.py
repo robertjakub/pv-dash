@@ -86,6 +86,40 @@ def parse_listen(text):
     return host.strip('[]'), port
 
 
+def validate_config(cfg):
+    """Fail fast on nonsensical settings.
+
+    Raises SystemExit with a clean message; at startup that aborts with a
+    proper error, on SIGHUP the reload watcher keeps the previous settings.
+    """
+    def fail(key, rule):
+        raise SystemExit('invalid %s = %r: %s' % (key, cfg.get(key), rule))
+
+    if not 1 <= cfg['port'] <= 65535:
+        fail('port', 'must be 1..65535')
+    if not 1 <= cfg['unit'] <= 247:
+        fail('unit', 'must be 1..247 (Modbus unit id)')
+    if cfg['timeout'] <= 0:
+        fail('timeout', 'must be > 0')
+    if cfg['interval'] <= 0:
+        fail('interval', 'must be > 0')
+    if cfg['read_delay'] < 0:
+        fail('read_delay', 'must be >= 0')
+    if cfg['merge_gap'] < 0:
+        fail('merge_gap', 'must be >= 0')
+    if cfg['cache_ttl'] < 0:
+        fail('cache_ttl', 'must be >= 0')
+    if cfg['max_clients'] < 0:
+        fail('max_clients', 'must be >= 0')
+    if cfg['client_timeout'] < 0:
+        fail('client_timeout', 'must be >= 0')
+    if cfg['level'] not in ('DEBUG', 'INFO', 'WARNING', 'ERROR'):
+        fail('log-level', 'must be DEBUG, INFO, WARNING or ERROR')
+    parse_listen(cfg['listen'])
+    if not cfg['host']:
+        fail('host', 'must not be empty')
+
+
 def load_config(path):
     cfg = configparser.ConfigParser()
     try:
@@ -127,7 +161,7 @@ def resolve_config(args, script_dir):
         return resolve(cli_value, env_name, cfg_key, default, parse_bool)
 
     interval = resolve(args.interval, 'MODBUS_CACHE_INTERVAL', 'interval', 10.0, float)
-    return {
+    cfg = {
         'host': resolve(args.host, 'MODBUS_CACHE_HOST', 'host', '127.0.0.1', str),
         'port': resolve(args.port, 'MODBUS_CACHE_PORT', 'port', 5502, int),
         'unit': resolve(args.unit, 'MODBUS_CACHE_UNIT', 'unit', 1, int),
@@ -150,3 +184,5 @@ def resolve_config(args, script_dir):
                                'write-acl'),
         'level': resolve(args.log_level, 'MODBUS_CACHE_LOG_LEVEL', 'log_level', 'INFO', str).upper(),
     }
+    validate_config(cfg)
+    return cfg

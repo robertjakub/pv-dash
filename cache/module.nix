@@ -214,7 +214,7 @@ in
       default = null;
       description = ''
         Refuse further connections past this many simultaneous clients
-        (0 / null = no limit).
+        (proxy default: 64; 0 = no limit).
       '';
     };
 
@@ -222,9 +222,9 @@ in
       type = lib.types.nullOr lib.types.float;
       default = null;
       description = ''
-        Disconnect clients silent for this many seconds (0 / null = never).
-        Set it to shed connections from clients that died without closing
-        (power cut, NAT drop).
+        Disconnect clients silent for this many seconds (proxy default:
+        300; 0 = never). Set it to shed connections from clients that
+        died without closing (power cut, NAT drop).
       '';
     };
 

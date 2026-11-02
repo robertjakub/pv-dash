@@ -44,6 +44,11 @@ Resilience:
 - **Garbage from the device** (malformed frames, short bodies, disconnects) —
   the poller logs it and retries; it cannot be killed by bad input, and a
   device that starts answering again is picked up on the next cycle.
+- **Garbage from clients** (random PDUs, lying MBAP lengths, wrong
+  protocol/unit ids, pipelined bursts, truncated frames) — every request is
+  answered (or the connection is closed for lying headers); malformed
+  frames, fuzzing and soak-tested: a client cannot crash the proxy, only
+  burn its own connection.
 
 ## Register map
 
@@ -143,8 +148,8 @@ with a clean one-line error instead of failing later at runtime.
 | `--connect-acl` | `any` | clients allowed to connect: `any` or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `any` | clients allowed to write — still requires `--allow-write` — see [Access control](#access-control) |
 | **Limits** | | |
-| `--max-clients` | `0` (no limit) | refuse further connections past this many simultaneous clients |
-| `--client-timeout` | `0` (never) | disconnect clients silent for this many seconds — sheds connections from clients that died without closing |
+| `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
+| `--client-timeout` | `300` | disconnect clients silent for this many seconds — sheds connections from clients that died without closing (`0` = never) |
 | **Logging** | | |
 | `--log-level` | `INFO` | `DEBUG` adds per-client traffic |
 | `--log-access` | `DEBUG` | log client connects/disconnects at `INFO` instead of `DEBUG` |
@@ -268,12 +273,11 @@ port can read and write inverter registers** (write forwarding is off until
 to a private interface and don't expose it to the internet.
 
 Python is memory-safe (no buffer overflows, all request sizes bounds-checked
-and fuzzed), but connection resources are not unlimited by default:
-`maxClients` caps simultaneous clients (each is a thread) and
-`clientTimeout` reaps clients that died without closing — e.g.
-`maxClients = 64; clientTimeout = 300;` are reasonable LAN values. The ACLs
-add per-source control within the LAN; for stricter isolation use the
-firewall (`openFirewall`).
+and fuzzed), but connection resources are not unlimited:
+`maxClients` (default **64**) caps simultaneous clients (each is a thread)
+and `clientTimeout` (default **300 s**) reaps clients that died without
+closing; set `0` to disable either. The ACLs add per-source control within
+the LAN; for stricter isolation use the firewall (`openFirewall`).
 
 ## Source layout
 

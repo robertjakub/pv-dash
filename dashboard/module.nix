@@ -6,7 +6,7 @@
 }:
 
 let
-  cfg = config.services.pv-dashboard;
+  cfg = config.services.dashboard;
 
   # config.js for the front-end: either a user-provided file or generated
   # from settings (an attrset matching the SOLAR_CONFIG structure).
@@ -14,7 +14,7 @@ let
     if cfg.configFile != null then
       cfg.configFile
     else
-      pkgs.writeText "pv-dashboard-config.js" "const SOLAR_CONFIG = ${builtins.toJSON cfg.settings};";
+      pkgs.writeText "dashboard-config.js" "const SOLAR_CONFIG = ${builtins.toJSON cfg.settings};";
 
   execArgs = lib.concatStringsSep " " (
     [
@@ -29,14 +29,14 @@ let
   );
 in
 {
-  options.services.pv-dashboard = {
+  options.services.dashboard = {
     enable = lib.mkEnableOption "the PV dashboard static server with Prometheus proxy";
 
     package = lib.mkOption {
       type = lib.types.package;
       default = pkgs.callPackage ./package.nix { };
       defaultText = lib.literalExpression "pkgs.callPackage ./package.nix { }";
-      description = "The pv-dashboard package to run.";
+      description = "The dashboard package to run.";
     };
 
     host = lib.mkOption {
@@ -113,7 +113,7 @@ in
   config = lib.mkIf cfg.enable {
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.port ];
 
-    systemd.services.pv-dashboard = {
+    systemd.services.dashboard = {
       description = "PV dashboard server (static + Prometheus proxy)";
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];

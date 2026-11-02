@@ -6,8 +6,8 @@
 }:
 
 stdenv.mkDerivation (finalAttrs: {
-  pname = "pv-dashboard";
-  version = "0.0.4";
+  pname = "dashboard";
+  version = "0.1.0";
 
   src = lib.cleanSource ./src;
 
@@ -20,13 +20,13 @@ stdenv.mkDerivation (finalAttrs: {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/share/pv-dashboard $out/bin
-    cp -r static $out/share/pv-dashboard/static
-    install -Dm755 server.py $out/share/pv-dashboard/server.py
-    install -Dm644 config.js $out/share/pv-dashboard/config.js
+    mkdir -p $out/share/dashboard $out/bin
+    cp -r static $out/share/dashboard/static
+    install -Dm755 server.py $out/share/dashboard/server.py
+    install -Dm644 config.js $out/share/dashboard/config.js
 
-    makeWrapper ${lib.getExe python3} $out/bin/pv-dashboard \
-      --add-flags "$out/share/pv-dashboard/server.py"
+    makeWrapper ${lib.getExe python3} $out/bin/dashboard \
+      --add-flags "$out/share/dashboard/server.py"
 
     runHook postInstall
   '';
@@ -42,10 +42,10 @@ stdenv.mkDerivation (finalAttrs: {
     longDescription = ''
       Static single-page dashboard (energy flow diagram, energy summary and
       chart) fed by Prometheus through the bundled stdlib-only proxy server
-      (pv-dashboard launcher runs server.py; /prom is proxied to the upstream).
+      (dashboard launcher runs server.py; /prom is proxied to the upstream).
     '';
     license = lib.licenses.bsd3;
-    mainProgram = "pv-dashboard";
+    mainProgram = "dashboard";
     platforms = lib.platforms.unix;
   };
 })

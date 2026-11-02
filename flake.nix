@@ -1,5 +1,5 @@
 {
-  description = "Single-page home PV monitoring dashboard with a Prometheus proxy";
+  description = "pv-suite — a family of home-PV tools: dashboard, Modbus scraper, cache proxy, fake inverter";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -20,17 +20,18 @@
           pkgs = nixpkgs.legacyPackages.${system};
         in
         {
-          pv-dashboard = pkgs.callPackage ./package.nix { };
+          dashboard = pkgs.callPackage ./dashboard/package.nix { };
           modbus-scraper = pkgs.callPackage ./scrape/package.nix { };
           modbus-cache = pkgs.callPackage ./cache/package.nix { };
-          default = self.packages.${system}.pv-dashboard;
+          modbus-fake-inverter = pkgs.callPackage ./inverter/package.nix { };
+          default = self.packages.${system}.dashboard;
         }
       );
 
       apps = forAllSystems (system: {
-        pv-dashboard = {
+        dashboard = {
           type = "app";
-          program = "${self.packages.${system}.default}/bin/pv-dashboard";
+          program = "${self.packages.${system}.default}/bin/dashboard";
         };
         modbus-scraper = {
           type = "app";
@@ -40,19 +41,23 @@
           type = "app";
           program = "${self.packages.${system}.modbus-cache}/bin/modbus-cache";
         };
-        default = self.apps.${system}.pv-dashboard;
+        modbus-fake-inverter = {
+          type = "app";
+          program = "${self.packages.${system}.modbus-fake-inverter}/bin/modbus-fake-inverter";
+        };
+        default = self.apps.${system}.dashboard;
       });
 
       overlays = {
-        pv-dashboard = final: _prev: { pv-dashboard = final.callPackage ./package.nix { }; };
-        default = self.overlays.pv-dashboard;
+        dashboard = final: _prev: { dashboard = final.callPackage ./dashboard/package.nix { }; };
+        default = self.overlays.dashboard;
       };
 
       nixosModules = {
-        pv-dashboard = import ./module.nix;
+        dashboard = import ./dashboard/module.nix;
         modbus-scraper = import ./scrape/module.nix;
         modbus-cache = import ./cache/module.nix;
-        default = self.nixosModules.pv-dashboard;
+        default = self.nixosModules.dashboard;
       };
     };
 }

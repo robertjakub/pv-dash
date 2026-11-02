@@ -170,6 +170,7 @@ during the simulated day; raw values are watts / kWh×100 like the real map.
 python3 scrape/src/fake_inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
 python3 scrape/src/fake_inverter.py --time 12:00          # frozen noon: ~4.5 kW PV, exporting
 python3 scrape/src/fake_inverter.py --static              # constant PV 4000 W, grid -1500 W
+python3 scrape/src/fake_inverter.py --static --battery    # the same, charging 1200 W at 65 %
 python3 scrape/src/fake_inverter.py --port 15502 --log-level DEBUG
 ```
 

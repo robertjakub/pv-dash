@@ -2,12 +2,15 @@
 """Fake Huawei SUN2000 inverter: a Modbus TCP server with demo values.
 
 Simulates a sunny day (bell-curve PV between 06:00 and 18:00, home load
-with morning and evening peaks) and serves the registers the sun2000-scraper
-reads: 32064 PV input power and 37113 grid active power (positive = feed-in,
-as reported by the simulated smart meter), plus the smart meter block
-(37100+ status/voltages/currents/energies), device status (32089), inverter
-output (32080), temperature (32087) and PV yields (32106/32114). Raw
-register values are watts and kWh*100, matching the Huawei gain convention.
+with morning and evening peaks) and serves the registers from Huawei's
+Modbus Interface Definitions the sun2000-scraper reads: 32064 PV input
+power and 37113 grid active power (positive = feed-in, as reported by the
+simulated smart meter), plus the smart meter block (37100+ status/
+voltages/currents/energies), device status (32089), inverter output
+(32080), PV strings (32016-32019, voltage x10 V / current x100 A), phase
+voltages (32069+), grid frequency (32085), temperature (32087) and PV
+yields (32106/32114). Raw register values are watts and kWh*100, matching
+the Huawei gain convention.
 """
 import argparse
 import logging
@@ -95,9 +98,11 @@ class Simulator:
             put_i32(regs, 37113, grid_w)
             regs[32087] = 280
             regs[32089] = 512
+            self.string_regs(regs, pv_w, 405.0)
+            self.output_regs(regs, pv_w)
+            regs[32085] = 5000
             if self.battery:
-                put_i32(regs, 37001, batt_w)
-                regs[37004] = 650
+                self.battery_regs(regs, 1200.0, 65.0, 25000, 18000, 1234, 890)
             self.meter_regs(regs, grid_w, METER_EXPORT_KWH, METER_IMPORT_KWH)
             return regs
         t = self.clock()
@@ -122,11 +127,46 @@ class Simulator:
         put_i32(regs, 37113, grid_w)
         regs[32087] = int(180 + 140 * pv_frac) & 0xFFFF
         regs[32089] = 512 if pv_w > 0 else 40960
+        self.string_regs(regs, pv_w, 420.0 - 40.0 * pv_frac)
+        self.output_regs(regs, pv_w)
+        regs[32085] = 5000
         if self.battery:
-            put_i32(regs, 37001, batt_w)
-            regs[37004] = int(round(self.soc(t) * 10))
+            self.battery_regs(regs, batt_w, self.soc(t),
+                              int((50000.0 + self.integrate_kwh(lambda u: max(self.batt(u), 0.0), 0.0, t) * 100)),
+                              int(self.integrate_kwh(lambda u: max(-self.batt(u), 0.0), 0.0, t) * 100),
+                              int(self.integrate_kwh(lambda u: max(self.batt(u), 0.0), 0.0, t) * 100),
+                              int(self.integrate_kwh(lambda u: max(-self.batt(u), 0.0), 0.0, t) * 100))
         self.meter_regs(regs, grid_w, METER_EXPORT_KWH + export_day, METER_IMPORT_KWH + import_day)
         return regs
+
+    def string_regs(self, regs, pv_w, voltage):
+        v = int(round(voltage * 10))
+        i = int(round(pv_w / 2.0 / max(voltage, 1.0) * 100))
+        for addr in (32016, 32018):
+            regs[addr] = v
+            regs[addr + 1] = i
+
+    def output_regs(self, regs, pv_w):
+        for addr in (32069, 32070, 32071):
+            regs[addr] = 2300
+        for addr in (32066, 32067, 32068):
+            regs[addr] = 4000
+        current = int(round(pv_w / 3.0 / 230.0 * 1000))
+        for addr in (32072, 32074, 32076):
+            put_i32(regs, addr, current)
+        put_i32(regs, 32078, pv_w)
+        put_i32(regs, 32082, 0)
+        regs[32084] = 1000
+        regs[32086] = 970
+
+    def battery_regs(self, regs, batt_w, soc, charge_kwh100, discharge_kwh100, charge_day_kwh100, discharge_day_kwh100):
+        put_i32(regs, 37001, batt_w)
+        regs[37003] = 0
+        regs[37004] = int(round(soc * 10))
+        regs[37760] = int(round(soc * 10))
+        for addr, value in ((37780, charge_kwh100), (37782, discharge_kwh100),
+                            (37784, charge_day_kwh100), (37786, discharge_day_kwh100)):
+            put_i32(regs, addr, value)
 
     def meter_regs(self, regs, grid_w, export_kwh, import_kwh):
         regs[37100] = 1
@@ -157,9 +197,11 @@ def recv_exact(sock, n):
 
 
 class FakeInverter:
-    def __init__(self, unit, simulator):
+    def __init__(self, unit, simulator, strict=False):
         self.unit = unit
         self.simulator = simulator
+        self.strict = strict
+        self.overlay = {}
 
     def serve(self, host, port):
         srv = socket.socket()
@@ -177,19 +219,36 @@ class FakeInverter:
             while True:
                 txn, proto, length, unit = struct.unpack('>HHHB', recv_exact(client, 7))
                 pdu = recv_exact(client, length - 1)
-                func, addr_, count = struct.unpack('>BHH', pdu)
+                func, addr_, count = struct.unpack('>BHH', pdu[:5])
                 if unit != self.unit:
                     logger.debug('request for unit %d, serving %d', unit, self.unit)
-                if func != 3:
-                    body = struct.pack('>BB', func + 0x80, 1)
+                if func == 3:
+                    regs = self.simulator.registers()
+                    regs.update(self.overlay)
+                    if self.strict and any(addr_ + i not in regs for i in range(count)):
+                        body = struct.pack('>BB', 3 + 0x80, 2)
+                        client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
+                        logger.debug('read %d regs @%d -> exception 02 (undefined register)', count, addr_)
+                        continue
+                    words = [regs.get(addr_ + i, 0) & 0xFFFF for i in range(count)]
+                    data = struct.pack('>%dH' % count, *words) if words else b''
+                    body = struct.pack('>BB', func, count * 2) + data
                     client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
-                    continue
-                regs = self.simulator.registers()
-                words = [regs.get(addr_ + i, 0) & 0xFFFF for i in range(count)]
-                data = struct.pack('>%dH' % count, *words) if words else b''
-                body = struct.pack('>BB', func, count * 2) + data
-                client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
-                logger.debug('read %d regs @%d -> %s', count, addr_, words)
+                    logger.debug('read %d regs @%d -> %s', count, addr_, words)
+                elif func == 6 and len(pdu) == 5:
+                    self.overlay[addr_] = struct.unpack('>H', pdu[3:5])[0]
+                    client.sendall(struct.pack('>HHHB', txn, 0, len(pdu) + 1, unit) + pdu)
+                    logger.debug('wrote %d = %d', addr_, self.overlay[addr_])
+                elif func == 16 and len(pdu) >= 6 and pdu[5] == count * 2 and len(pdu) == 6 + count * 2:
+                    values = struct.unpack('>%dH' % count, pdu[6:6 + count * 2])
+                    for i, w in enumerate(values):
+                        self.overlay[addr_ + i] = w
+                    body = struct.pack('>BHH', func, addr_, count)
+                    client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
+                    logger.debug('wrote %d regs @%d -> %s', count, addr_, list(values))
+                else:
+                    body = struct.pack('>BB', func + 0x80, 1 if func not in (6, 16) else 3)
+                    client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
         except (ConnectionError, OSError) as e:
             logger.info('client %s:%d disconnected (%s)', *addr[:2], e)
         except Exception as e:
@@ -218,6 +277,7 @@ def main():
     p.add_argument('--time', help='freeze simulated time HH:MM (default: real clock)')
     p.add_argument('--static', action='store_true', help='constant demo values instead of the day simulation')
     p.add_argument('--battery', action='store_true', help='simulate a LUNA2000 battery')
+    p.add_argument('--strict', action='store_true', help='reject reads of undefined registers with exception 02 (like the real device)')
     p.add_argument('--battery-kwh', type=float, default=6.9, help='usable battery capacity in kWh (default %(default)s)')
     p.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'])
     args = p.parse_args()
@@ -227,7 +287,7 @@ def main():
     simulator = Simulator(0.75 * args.max_kwp * 1000.0, args.static, parse_time(args.time) if args.time else None,
                           battery=args.battery, battery_kwh=args.battery_kwh)
     try:
-        FakeInverter(args.unit, simulator).serve(args.host, args.port)
+        FakeInverter(args.unit, simulator, strict=args.strict).serve(args.host, args.port)
     except KeyboardInterrupt:
         logger.info('stopped')
     except OSError as e:

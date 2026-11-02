@@ -18,6 +18,7 @@ A single-page dashboard for home PV monitoring, fed by Prometheus.
 | `src/config.js` | user settings (`SOLAR_CONFIG`) — lives next to `server.py`, served at `/config.js` |
 | `package.nix` / `module.nix` / `flake.nix` | Nix packaging and service module |
 | `scrape/` | Huawei SUN2000 Prometheus scraper (Modbus TCP, stdlib only) — see `scrape/README.md` |
+| `cache/` | Modbus TCP caching proxy for single-client devices (stdlib only, experimental) — see `cache/README.md` |
 
 ## Features
 
@@ -249,12 +250,15 @@ scrape_configs:
       - targets: ['localhost:9350']
 ```
 
+The inverter accepts only one Modbus TCP client — the `cache/` subproject is
+an **experimental** caching proxy that multiplexes that one connection so the
+scraper can share it with other tools: [`cache/README.md`](cache/README.md).
+
 ## License
 
 The pv-dashboard code (server, page, Nix packaging) is licensed under the
-**BSD 3-Clause License** — see the `LICENSE` file. The `scrape/` subproject
-(exporter, fake inverter, its Nix packaging) is also licensed under the
-**BSD 3-Clause License**.
+**BSD 3-Clause License** — see the `LICENSE` file. The `scrape/` and `cache/`
+subprojects are also licensed under the **BSD 3-Clause License**.
 
 The bundled chart library `src/static/vendor/echarts.min.js` is
 [Apache ECharts](https://echarts.apache.org/) 5.5.1, licensed under the

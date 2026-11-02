@@ -1,0 +1,17 @@
+{
+  "registers": [
+    { "name": "PV1/PV2 voltage (/10 V) + current (/100 A)", "start": 32016, "count": 4 },
+    { "name": "Input power DC (int32, /1000 kW)", "start": 32064, "count": 2 },
+    { "name": "Phase A/B/C voltage (/10 V)", "start": 32069, "count": 3 },
+    { "name": "Active power (int32, /1000 kW)", "start": 32080, "count": 2 },
+    { "name": "Grid frequency (/100 Hz)", "start": 32085, "count": 1 },
+    { "name": "Inverter temperature (/10 degC)", "start": 32087, "count": 1 },
+    { "name": "Accumulated energy yield (uint32, /100 kWh)", "start": 32106, "count": 2 },
+    { "name": "Daily energy yield (uint32, /100 kWh)", "start": 32114, "count": 2 },
+    { "name": "Active grid power (int32, W, + = export)", "start": 37113, "count": 2 },
+    { "name": "Grid energy: exported + imported (2 x int32, /100 kWh)", "start": 37119, "count": 4 },
+    { "name": "Battery SOC (/10 %)", "start": 37004, "count": 1 },
+    { "name": "Battery power, unit 1 (int32, W, + = charging)", "start": 37001, "count": 2 },
+    { "name": "Battery energy: total charged/discharged + today (4 x uint32, /100 kWh)", "start": 37780, "count": 8 }
+  ]
+}

@@ -226,6 +226,22 @@ journalctl -u modbus-cache | grep -E 'SIGHUP|shutdown'        # lifecycle
 journalctl -u modbus-cache | grep -i 'not on'                 # ACL rejections
 ```
 
+## Testing
+
+Three standalone suites live in `cache/test/` — stdlib only, each starts its
+own fake inverter + proxy on scratch ports and cleans up after itself:
+
+```bash
+python3 cache/test/regtest.py    # ~22 functional checks (cache, forwarding,
+                                 #   writes/refusals, reloads, poll status)
+python3 cache/test/stress.py     # 100 clients / 15 s load + latency report
+python3 cache/test/fuzz.py [n]   # n client-garbage frames (default 3000)
+```
+
+The regression suite's last check compares the register map rendered by the
+NixOS module against `cache/src/registers.json` (needs `nix` on PATH) — keep
+the inline default in `module.nix` in sync.
+
 ## Nix / NixOS
 
 ```bash

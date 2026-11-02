@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """The proxy itself: poller thread, client handling, forwarding and reload (stdlib only)."""
+import ipaddress
 import logging
 import socket
 import struct
@@ -8,8 +9,8 @@ import time
 from collections import deque
 
 from .protocol import (MAX_COUNT, MAX_PDU, WRITE_FUNCS, GATEWAY_FAILED, ILLEGAL_FUNCTION,
-                         ILLEGAL_VALUE, ModbusError, DeviceError, recv_exact, exception_frame,
-                         describe_write)
+                       ILLEGAL_VALUE, ModbusError, DeviceError, recv_exact, exception_frame,
+                       describe_write)
 from .config import load_registers_file
 from .cache import build_blocks, span
 
@@ -27,6 +28,12 @@ class Proxy:
         self.config = config or {}
         self.allow_write = bool(self.config.get('allow_write', False))
         self.log_access = bool(self.config.get('log_access', False))
+        self.max_clients = max(0, int(self.config.get('max_clients') or 0))
+        self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
+        self.connect_acl = self.config.get('connect_acl')
+        self.write_acl = self.config.get('write_acl')
+        self.client_count = 0
+        self.client_lock = threading.Lock()
         self.blocks = build_blocks(cache.ranges, merge_gap)
         self.generation = 0
         self.poll_wake = threading.Event()
@@ -34,7 +41,10 @@ class Proxy:
 
     def poll_loop(self):
         while True:
-            self.poll_once()
+            try:
+                self.poll_once()
+            except Exception as e:
+                logger.error('poll cycle crashed (%s), retrying next cycle', e)
             self.poll_wake.wait(self.interval)
             self.poll_wake.clear()
 
@@ -59,6 +69,10 @@ class Proxy:
         self.interval = self.config['interval']
         self.allow_write = bool(self.config.get('allow_write', False))
         self.log_access = bool(self.config.get('log_access', False))
+        self.max_clients = max(0, int(self.config.get('max_clients') or 0))
+        self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
+        self.connect_acl = self.config.get('connect_acl')
+        self.write_acl = self.config.get('write_acl')
         self.cache.cache_ttl = self.config['cache_ttl']
         self.cache.update_map(ranges, names)
         self.generation += 1
@@ -126,16 +140,49 @@ class Proxy:
         if generation == self.generation:
             self.blocks = done
 
+    def _allowed(self, acl, ip):
+        if acl is None:
+            return True
+        try:
+            a = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        return any(a.version == n.version and a in n for n in acl)
+
     def serve(self, host, port):
         srv = socket.socket()
         srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         srv.bind((host, port))
         srv.listen(128)
         self.listen_sock = srv
-        logger.info('modbus-cache listening on %s:%d', host, port)
+        logger.info('modbus-cache listening on %s:%d (client limit %s, client timeout %s)',
+                    host, port,
+                    self.max_clients or 'none', '%gs' % self.client_timeout if self.client_timeout else 'none')
         while True:
             client, addr = srv.accept()
-            threading.Thread(target=self.handle, args=(client, addr), daemon=True).start()
+            admitted = False
+            try:
+                if self.client_timeout:
+                    client.settimeout(self.client_timeout)
+                if not self._allowed(self.connect_acl, addr[0]):
+                    logger.info('connection rejected: %s:%d not on the connect ACL', *addr[:2])
+                elif self.max_clients and self.client_count >= self.max_clients:
+                    logger.info('connection refused: client limit of %d reached (%s:%d)',
+                                self.max_clients, *addr[:2])
+                else:
+                    with self.client_lock:
+                        self.client_count += 1
+                    admitted = True
+                    threading.Thread(target=self.handle, args=(client, addr), daemon=True).start()
+            except (OSError, RuntimeError) as e:
+                logger.error('connection from %s:%d failed before serving (%s)', addr[0], addr[1], e)
+                if admitted:
+                    with self.client_lock:
+                        self.client_count -= 1
+                    admitted = False
+            finally:
+                if not admitted:
+                    client.close()
 
     def handle(self, client, addr):
         access = logger.info if self.log_access else logger.debug
@@ -147,27 +194,34 @@ class Proxy:
                 if not 2 <= length <= MAX_PDU + 2:
                     break
                 pdu = recv_exact(client, length - 1)
-                client.sendall(self.respond(txn, proto, unit, pdu))
+                client.sendall(self.respond(txn, proto, unit, pdu, addr))
         except (ConnectionError, OSError) as e:
             access('client %s:%d disconnected (%s)', *addr[:2], e)
         except Exception as e:
             logger.error('error handling %s:%d: %s', *addr[:2], e)
         finally:
+            with self.client_lock:
+                self.client_count -= 1
             client.close()
 
-    def respond(self, txn, proto, unit, pdu):
+    def respond(self, txn, proto, unit, pdu, addr):
         if proto != 0 or not pdu:
             return exception_frame(txn, proto, unit, pdu[0] if pdu else 3, ILLEGAL_VALUE)
         func = pdu[0]
-        if not self.allow_write and func in WRITE_FUNCS:
-            desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
-            logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)
-            return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
+        if func in WRITE_FUNCS:
+            if not self.allow_write:
+                desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
+                logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)
+                return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
+            if not self._allowed(self.write_acl, addr[0]):
+                desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
+                logger.info('write: refused %s (client %s not on the write ACL)', desc, addr[0])
+                return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
         if func == 3:
             if len(pdu) < 5:
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
             addr, count = struct.unpack('>HH', pdu[1:5])
-            if not 1 <= count <= MAX_COUNT:
+            if not 1 <= count <= MAX_COUNT or addr + count > 65536:
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
             code = self.cache.failed_leaf(addr, count)
             if code is not None:

@@ -51,6 +51,10 @@ def parse_args():
     ap.add_argument('--allow-write', action='store_true', help='forward write requests (FC05/06/15/16) to the inverter; default: refuse them with a Modbus illegal-function exception')
     ap.add_argument('--local-time', action='store_true', help='log timestamps in the system time zone instead of UTC')
     ap.add_argument('--log-access', action='store_true', help='log client connects/disconnects at INFO instead of DEBUG')
+    ap.add_argument('--max-clients', type=int, help='refuse further connections past this many simultaneous clients, 0 = no limit (default: config, $MODBUS_CACHE_MAX_CLIENTS or 0)')
+    ap.add_argument('--client-timeout', type=float, help='disconnect clients silent for this many seconds, 0 = never (default: config, $MODBUS_CACHE_CLIENT_TIMEOUT or 0)')
+    ap.add_argument('--connect-acl', help='clients allowed to connect: "any" or comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16 (default: config, $MODBUS_CACHE_CONNECT_ACL or any)')
+    ap.add_argument('--write-acl', help='clients allowed to write (requires --allow-write): "any" or comma-separated IPs/prefixes (default: config, $MODBUS_CACHE_WRITE_ACL or any)')
     ap.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                     help='log level (default: config, $MODBUS_CACHE_LOG_LEVEL or INFO)')
     return ap.parse_args()
@@ -138,13 +142,16 @@ def main():
     cache = Cache(ranges, cfg['cache_ttl'], range_names)
     proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
                   cfg['registers_file'], cfg)
-    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; serving Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s)',
+    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; serving Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s)',
                 len(ranges), cfg['registers_file'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if proxy.allow_write else 'disabled (write requests are refused)',
                 'INFO' if proxy.log_access else 'DEBUG',
                 listen_host, listen_port, args.config, cfg['level'],
-                'local' if cfg['local_time'] else 'UTC')
+                'local' if cfg['local_time'] else 'UTC',
+                proxy.max_clients or 'none', '%gs' % proxy.client_timeout if proxy.client_timeout else 'none',
+                'any' if proxy.connect_acl is None else '%d network(s)' % len(proxy.connect_acl),
+                'any' if proxy.write_acl is None else '%d network(s)' % len(proxy.write_acl))
     proxy.log_map()
     install_signal_handlers(proxy, cache, args)
     try:

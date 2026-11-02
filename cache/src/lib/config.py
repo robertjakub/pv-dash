@@ -1,11 +1,28 @@
 #!/usr/bin/env python3
 """Configuration for modbus-cache: ini/env/CLI resolution and the register map (stdlib only)."""
 import configparser
+import ipaddress
 import json
 import logging
 import os
 
 logger = logging.getLogger('modbus-cache')
+
+
+def parse_acl(text, label):
+    """'any'/empty/None -> None (allow all); 'IP, CIDR, ...' -> tuple of networks."""
+    if text is None or str(text).strip() in ('', 'any', '*'):
+        return None
+    nets = []
+    for part in str(text).split(','):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            nets.append(ipaddress.ip_network(part, strict=False))
+        except ValueError as e:
+            raise SystemExit('%s: bad ACL entry %r (%s)' % (label, part, e))
+    return tuple(nets)
 
 
 def check_range(start, count, label):
@@ -60,7 +77,13 @@ def parse_listen(text):
     host, sep, port = text.rpartition(':')
     if not sep:
         raise SystemExit('--listen must be HOST:PORT, got %r' % text)
-    return host.strip('[]'), int(port)
+    try:
+        port = int(port)
+    except ValueError:
+        raise SystemExit('--listen port must be a number, got %r' % port)
+    if not 0 <= port <= 65535:
+        raise SystemExit('--listen port out of range, got %d' % port)
+    return host.strip('[]'), port
 
 
 def load_config(path):
@@ -119,5 +142,11 @@ def resolve_config(args, script_dir):
         'cache_ttl': resolve(args.cache_ttl, 'MODBUS_CACHE_TTL', 'cache_ttl', 3 * interval, float),
         'local_time': resolve_bool(args.local_time, 'MODBUS_CACHE_LOCAL_TIME', 'local_time', False),
         'log_access': resolve_bool(args.log_access, 'MODBUS_CACHE_LOG_ACCESS', 'log_access', False),
+        'max_clients': resolve(args.max_clients, 'MODBUS_CACHE_MAX_CLIENTS', 'max_clients', 0, int),
+        'client_timeout': resolve(args.client_timeout, 'MODBUS_CACHE_CLIENT_TIMEOUT', 'client_timeout', 0.0, float),
+        'connect_acl': parse_acl(resolve(args.connect_acl, 'MODBUS_CACHE_CONNECT_ACL', 'connect_acl', 'any', str),
+                                 'connect-acl'),
+        'write_acl': parse_acl(resolve(args.write_acl, 'MODBUS_CACHE_WRITE_ACL', 'write_acl', 'any', str),
+                               'write-acl'),
         'level': resolve(args.log_level, 'MODBUS_CACHE_LOG_LEVEL', 'log_level', 'INFO', str).upper(),
     }

@@ -105,7 +105,9 @@ Settings are resolved in this order (first hit wins), mirroring
    `MODBUS_CACHE_LISTEN`, `MODBUS_CACHE_INTERVAL`, `MODBUS_CACHE_READ_DELAY`,
    `MODBUS_CACHE_MERGE_GAP`, `MODBUS_CACHE_REGISTERS_FILE`,
    `MODBUS_CACHE_TTL`, `MODBUS_CACHE_ALLOW_WRITE`, `MODBUS_CACHE_LOCAL_TIME`,
-   `MODBUS_CACHE_LOG_LEVEL`
+   `MODBUS_CACHE_LOG_ACCESS`, `MODBUS_CACHE_MAX_CLIENTS`,
+   `MODBUS_CACHE_CLIENT_TIMEOUT`, `MODBUS_CACHE_CONNECT_ACL`,
+   `MODBUS_CACHE_WRITE_ACL`, `MODBUS_CACHE_LOG_LEVEL`
 3. Config file (snake_case keys, `[cache]` section) — `--config` picks the
    file (default: `modbus_cache.ini` next to `modbus_cache.py`; missing file
    is fine)
@@ -147,6 +149,10 @@ kill -USR1 $(pgrep -f modbus_cache.py)
 | `--log-level` | `INFO` | `DEBUG` logs per-client traffic |
 | `--local-time` | UTC | log timestamps in the system time zone (env `MODBUS_CACHE_LOCAL_TIME`, ini `local_time`) |
 | `--log-access` | DEBUG | log client connects/disconnects at `INFO` instead of `DEBUG` (env `MODBUS_CACHE_LOG_ACCESS`, ini `log_access`) |
+| `--max-clients` | `0` (no limit) | refuse further connections past this many simultaneous clients (env `MODBUS_CACHE_MAX_CLIENTS`, ini `max_clients`) |
+| `--client-timeout` | `0` (never) | disconnect clients silent for this many seconds — sheds connections from clients that died without closing (env `MODBUS_CACHE_CLIENT_TIMEOUT`, ini `client_timeout`) |
+| `--connect-acl` | `any` | clients allowed to connect: `any` or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 (env `MODBUS_CACHE_CONNECT_ACL`, ini `connect_acl`) |
+| `--write-acl` | `any` | clients allowed to write — still requires `--allow-write` (env `MODBUS_CACHE_WRITE_ACL`, ini `write_acl`) |
 
 `cache/src/modbus_cache.ini` is a sample with the defaults.
 
@@ -217,6 +223,23 @@ journalctl -u modbus-cache --since today | grep 'write:'      # all write attemp
 journalctl -u modbus-cache | grep -E 'SIGHUP|shutdown'        # lifecycle
 ```
 
+## Access control
+
+Both ACLs default to **`any`**. When set, they take a comma-separated list
+of IPs and CIDR prefixes (IPv4 or IPv6, e.g.
+`--connect-acl 127.0.0.1,10.48.3.0/24`); the config-file/env/NixOS forms
+are `connect_acl`/`write_acl` (NixOS `connectAcl`/`writeAcl`).
+
+- **Connect ACL** — who may connect at all; a rejected connection is
+  closed at accept and logged (`connection rejected: … not on the connect ACL`).
+- **Write ACL** — whose write requests are forwarded; everything else is
+  refused with a Modbus illegal-function exception, logged with the client
+  IP. Writing still requires `--allow-write`: effective write permission =
+  `--allow-write` **and** client on the write ACL.
+
+ACLs re-resolve on `SIGHUP` like every other setting; a malformed list
+keeps the previous one.
+
 ## Security
 
 No authentication is used on either side. Modbus TCP (as spoken by the
@@ -225,7 +248,11 @@ control — the proxy forwards writes, so **anyone who can reach the listen
 port can read and write inverter registers** (write forwarding is off
 until `--allow-write` is set). Keep the proxy on a trusted
 LAN, bind `listenHost` to a private interface and don't expose it to the
-internet.
+internet. Memory/resource exhaustion is bounded the same way as buffer
+overflows are impossible in Python, but connection resources are not
+unlimited by default: `maxClients` caps simultaneous clients (each is a
+thread) and `clientTimeout` reaps clients that died without closing —
+e.g. `maxClients = 64; clientTimeout = 300;` are reasonable LAN values.
 
 ## License
 

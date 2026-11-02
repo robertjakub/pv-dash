@@ -41,7 +41,7 @@ class Upstream:
             self._connect()
         self.sock.sendall(frame)
         txn, proto, length, unit = struct.unpack('>HHHB', self._recv_exact(7))
-        if not 1 <= length <= MAX_PDU + 2:
+        if not 2 <= length <= MAX_PDU + 2:
             raise ModbusError('bad response length %d' % length)
         body = self._recv_exact(length - 1)
         if txn != want_txn:
@@ -62,6 +62,8 @@ class Upstream:
                               body[1] if len(body) > 1 else -1)
         if func != 3:
             raise ModbusError('unexpected function byte 0x%02x' % func)
+        if len(body) < 2:
+            raise ModbusError('short response: function byte only')
         got = body[1]
         if got != count * 2:
             raise ModbusError('expected %d register bytes, got %d' % (count * 2, got))

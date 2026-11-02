@@ -28,6 +28,14 @@ let
         if cfg.registersFile != null then toString cfg.registersFile else registersJson;
     } // lib.optionalAttrs (cfg.cacheTtl != null) {
       cache_ttl = toString cfg.cacheTtl;
+    } // lib.optionalAttrs (cfg.maxClients != null) {
+      max_clients = toString cfg.maxClients;
+    } // lib.optionalAttrs (cfg.clientTimeout != null) {
+      client_timeout = toString cfg.clientTimeout;
+    } // lib.optionalAttrs (cfg.connectAcl != null) {
+      connect_acl = cfg.connectAcl;
+    } // lib.optionalAttrs (cfg.writeAcl != null) {
+      write_acl = cfg.writeAcl;
     } // {
       allow_write = lib.boolToString cfg.allowWrite;
       local_time = lib.boolToString cfg.localTime;
@@ -198,6 +206,44 @@ in
       description = ''
         Log client connects/disconnects at INFO (they are DEBUG by default,
         since a polling fleet can produce a lot of them).
+      '';
+    };
+
+    maxClients = lib.mkOption {
+      type = lib.types.nullOr lib.types.int;
+      default = null;
+      description = ''
+        Refuse further connections past this many simultaneous clients
+        (0 / null = no limit).
+      '';
+    };
+
+    clientTimeout = lib.mkOption {
+      type = lib.types.nullOr lib.types.float;
+      default = null;
+      description = ''
+        Disconnect clients silent for this many seconds (0 / null = never).
+        Set it to shed connections from clients that died without closing
+        (power cut, NAT drop).
+      '';
+    };
+
+    connectAcl = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Clients allowed to connect: "any" or a comma-separated list of IPs
+        and CIDR prefixes (e.g. "10.0.0.7,10.48.0.0/16", IPv4 or IPv6).
+        null = any.
+      '';
+    };
+
+    writeAcl = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Clients allowed to write (also needs allowWrite): "any" or a
+        comma-separated list of IPs and CIDR prefixes. null = any.
       '';
     };
 

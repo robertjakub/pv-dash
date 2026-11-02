@@ -168,8 +168,8 @@ in
 
     listenHost = lib.mkOption {
       type = lib.types.str;
-      default = "0.0.0.0";
-      description = "Proxy bind address.";
+      default = "127.0.0.1";
+      description = "Proxy bind address (loopback by default — set 0.0.0.0 when Modbus clients live on other hosts).";
     };
 
     listenPort = lib.mkOption {
@@ -255,6 +255,8 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    warnings = lib.optional (cfg.openFirewall && cfg.listenHost == "127.0.0.1")
+      "services.modbus-cache: openFirewall is set but the proxy binds to 127.0.0.1 — the firewall hole is unreachable; set listenHost to 0.0.0.0 (or the external IP) if Modbus clients live on other hosts.";
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.listenPort ];
 
     systemd.services.modbus-cache = {

@@ -21,7 +21,7 @@
         in
         {
           pv-dashboard = pkgs.callPackage ./package.nix { };
-          sun2000-scraper = pkgs.callPackage ./scrape/package.nix { };
+          modbus-scraper = pkgs.callPackage ./scrape/package.nix { };
           modbus-cache = pkgs.callPackage ./cache/package.nix { };
           default = self.packages.${system}.pv-dashboard;
         }
@@ -32,9 +32,9 @@
           type = "app";
           program = "${self.packages.${system}.default}/bin/pv-dashboard";
         };
-        sun2000-scraper = {
+        modbus-scraper = {
           type = "app";
-          program = "${self.packages.${system}.sun2000-scraper}/bin/sun2000-scraper";
+          program = "${self.packages.${system}.modbus-scraper}/bin/modbus-scraper";
         };
         modbus-cache = {
           type = "app";
@@ -50,7 +50,7 @@
 
       nixosModules = {
         pv-dashboard = import ./module.nix;
-        sun2000-scraper = import ./scrape/module.nix;
+        modbus-scraper = import ./scrape/module.nix;
         modbus-cache = import ./cache/module.nix;
         default = self.nixosModules.pv-dashboard;
       };

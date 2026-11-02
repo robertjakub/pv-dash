@@ -42,7 +42,7 @@ def parse_args():
     ap.add_argument('--port', type=int, help='inverter Modbus TCP port (default: config, $MODBUS_CACHE_PORT or 5502)')
     ap.add_argument('--unit', type=int, help='Modbus unit id (default: config, $MODBUS_CACHE_UNIT or 1)')
     ap.add_argument('--timeout', type=float, help='Modbus connect/read timeout in seconds (default: config, $MODBUS_CACHE_TIMEOUT or 3)')
-    ap.add_argument('--listen', help='listen address HOST:PORT (default: config, $MODBUS_CACHE_LISTEN or 0.0.0.0:15502)')
+    ap.add_argument('--listen', help='listen address HOST:PORT (default: config, $MODBUS_CACHE_LISTEN or 127.0.0.1:15502)')
     ap.add_argument('--interval', type=float, help='seconds between cache polls (default: config, $MODBUS_CACHE_INTERVAL or 10)')
     ap.add_argument('--read-delay', type=float, help='seconds between consecutive inverter reads within a poll cycle, 0 = no delay (default: config, $MODBUS_CACHE_READ_DELAY or 0.05)')
     ap.add_argument('--merge-gap', type=int, help='max register gap when merging ranges into block reads, 0 = read ranges separately (default: config, $MODBUS_CACHE_MERGE_GAP or 8)')

@@ -3,7 +3,7 @@
 
 Simulates a sunny day (bell-curve PV between 06:00 and 18:00, home load
 with morning and evening peaks) and serves the registers from Huawei's
-Modbus Interface Definitions the sun2000-scraper reads: 32064 PV input
+Modbus Interface Definitions the modbus-scraper reads: 32064 PV input
 power and 37113 grid active power (positive = feed-in, as reported by the
 simulated smart meter), plus the smart meter block (37100+ status/
 voltages/currents/energies), device status (32089), inverter output
@@ -104,6 +104,7 @@ class Simulator:
             if self.battery:
                 self.battery_regs(regs, 1200.0, 65.0, 25000, 18000, 1234, 890)
             self.meter_regs(regs, grid_w, METER_EXPORT_KWH, METER_IMPORT_KWH)
+            self.diag_regs(regs)
             return regs
         t = self.clock()
         pv_w = self.pv(t)
@@ -137,7 +138,13 @@ class Simulator:
                               int(self.integrate_kwh(lambda u: max(self.batt(u), 0.0), 0.0, t) * 100),
                               int(self.integrate_kwh(lambda u: max(-self.batt(u), 0.0), 0.0, t) * 100))
         self.meter_regs(regs, grid_w, METER_EXPORT_KWH + export_day, METER_IMPORT_KWH + import_day)
+        self.diag_regs(regs)
         return regs
+
+    def diag_regs(self, regs):
+        """modbus-cache-style diagnostics block: magic, device up, cache age, uptime."""
+        for i, w in enumerate((0xCAFE, 1, 7, 4242)):
+            regs[65000 + i] = w
 
     def string_regs(self, regs, pv_w, voltage):
         v = int(round(voltage * 10))

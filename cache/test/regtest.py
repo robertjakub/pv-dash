@@ -87,6 +87,87 @@ def start(cmd, log=None):
     return p
 
 
+def _recvn(sock, n):
+    buf = b''
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            raise ConnectionError('eof')
+        buf += chunk
+    return buf
+
+
+class EvilUpstream:
+    """Scripted FC3 server: live-mutable reply modes for hostile-upstream tests."""
+
+    REGS = {32064: 0, 32065: 4000}
+
+    def __init__(self, port):
+        self.mode = 'fine'  # fine | garbage | short | lying | txn | unit | stall | garbage_after
+        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv.bind(('127.0.0.1', port))
+        srv.listen(8)
+        srv.settimeout(0.2)
+        self.srv = srv
+        self.running = True
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    def _serve(self):
+        while self.running:
+            try:
+                conn, _ = self.srv.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                return
+            threading.Thread(target=self._client, args=(conn,), daemon=True).start()
+
+    def _client(self, conn):
+        try:
+            conn.settimeout(15)
+            while True:
+                tid, _pid, length = struct.unpack('>HHH', _recvn(conn, 6))
+                rest = _recvn(conn, length)
+                uid, fc = rest[0], rest[1]
+                if fc != 3 or len(rest) < 6:
+                    raise ConnectionError('unsupported request')
+                start, count = struct.unpack('>HH', rest[2:6])
+                payload = bytes([count * 2]) + b''.join(
+                    struct.pack('>H', self.REGS.get(a, 0)) for a in range(start, start + count))
+                mode = self.mode
+                if mode == 'garbage':
+                    conn.sendall(b'\xde\xad\xbe\xef' * 8)
+                    raise ConnectionError('garbage sent')
+                if mode == 'short':
+                    conn.sendall(struct.pack('>HHH', tid, 0, 8) + bytes([uid, 3]))
+                    raise ConnectionError('short body sent')
+                if mode == 'lying':
+                    conn.sendall(struct.pack('>HHH', tid, 0, 0xFFFF) + bytes([uid, 3]) + b'\x00' * 8)
+                    raise ConnectionError('lying length sent')
+                if mode == 'txn':
+                    conn.sendall(struct.pack('>HHH', (tid + 1) & 0xFFFF, 0, 2 + len(payload))
+                                 + bytes([uid, 3]) + payload)
+                elif mode == 'unit':
+                    conn.sendall(struct.pack('>HHH', tid, 0, 2 + len(payload))
+                                 + bytes([uid + 1, 3]) + payload)
+                elif mode == 'stall':
+                    time.sleep(12)  # the cache's upstream timeout must fire first
+                elif mode == 'garbage_after':
+                    conn.sendall(struct.pack('>HHH', tid, 0, 2 + len(payload))
+                                 + bytes([uid, 3]) + payload + b'\xde\xad' * 4)
+                else:
+                    conn.sendall(struct.pack('>HHH', tid, 0, 2 + len(payload)) + bytes([uid, 3]) + payload)
+        except (ConnectionError, OSError, struct.error, IndexError):
+            pass
+        finally:
+            conn.close()
+
+    def stop(self):
+        self.running = False
+        self.srv.close()
+
+
 try:
     # 1. baseline: strict fake (undefined regs rejected with 02) + cache
     start([sys.executable, F, '--static', '--battery', '--strict', '--port', str(INV_PORT)])
@@ -155,6 +236,18 @@ try:
     check('refused write did not reach the inverter', struct.unpack('>H', b[2:4])[0] == 5)
     check('refusal logged with detail', 'write: refused register 47415 = 99' in open('/tmp/reg_cache_nowrite.log').read())
 
+    # 1c. diagnostics registers: synthesized by the cache from poller state (never forwarded)
+    b = rd(65000, 4)
+    w = struct.unpack('>4H', b[2:10]) if b[0] == 3 else ()
+    check('diag block: magic, device up, fresh age', b[0] == 3 and w[:2] == (0xCAFE, 1) and w[2] <= 2, str(w))
+    b = rd(65002, 2)
+    check('diag sub-range read (age, uptime)', b[0] == 3 and b[1] == 4
+          and struct.unpack('>H', b[2:4])[0] <= 2 and struct.unpack('>H', b[4:6])[0] < 300, b.hex())
+    b = rd(64999, 2)
+    check('diag straddle read -> exception 02', b[0] == 0x83 and b[1] == 2, b.hex())
+    b = rd(65004, 1)
+    check('past diag block -> forwarded to the device (02)', b[0] == 0x83 and b[1] == 2, b.hex())
+
     # lock/deadlock stress: mixed cached + passthrough + writes while polling at 10Hz
     errs = []
     maxlat = [0.0]
@@ -189,6 +282,10 @@ try:
     time.sleep(3.5)  # > cache-ttl 3
     b = rd(32064, 2)
     check('expired + inverter dead -> gateway exception 0x0B', b[0] == 0x83 and b[1] == 11, b.hex())
+    b = rd(65000, 4)
+    w = struct.unpack('>4H', b[2:10]) if b[0] == 3 else ()
+    check('device dead: diag still served, flags down, age grows',
+          b[0] == 3 and w[:2] == (0xCAFE, 0) and w[2] >= 3, str(w))
 
     # 3. poll status caching: registers.json variant with an undefined register
     procs[0] = subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', str(INV_PORT)],
@@ -216,6 +313,36 @@ try:
     check('failed leaf answered from poll status, no device hammering', n1 == n2)
     b = rd(32064, 2, port=15506)
     check('healthy leaf unaffected by failed sibling', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000)
+
+    # 4. hostile upstream: every garbage reply mode must fail clean (0x0B, one-line log) and recover
+    evil = EvilUpstream(15509)
+    evil.mode = 'garbage'  # cold from the start: no fine-mode poll can fill the cache
+    start([sys.executable, P, '--host', '127.0.0.1', '--port', '15509',
+           '--listen', '127.0.0.1:15508', '--interval', '1', '--cache-ttl', '3',
+           '--registers-file', R], log='/tmp/reg_evil.log')
+    time.sleep(2)
+    for mode in ('garbage', 'short', 'lying', 'txn', 'unit', 'stall'):
+        evil.mode = mode
+        time.sleep(1.2)
+        b = rd(32064, 2, port=15508)
+        check('evil upstream %s -> client gets 0x0B' % mode, b[0] == 0x83 and b[1] == 11, b.hex())
+    evil.mode = 'garbage_after'  # valid reply + trailing junk: the read itself may succeed
+    time.sleep(1.2)
+    b = rd(32064, 2, port=15508)
+    check('evil upstream garbage_after: handled without a crash',
+          (b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000) or (b[0] == 0x83 and b[1] == 11), b.hex())
+    b = rd(65000, 4, port=15508)
+    w = struct.unpack('>4H', b[2:10]) if b[0] == 3 else ()
+    check('diag unaffected by hostile upstream', b[0] == 3 and w[0] == 0xCAFE, str(w))
+    evil.mode = 'fine'
+    time.sleep(2.5)
+    b = rd(32064, 2, port=15508)
+    check('evil upstream: recovers when replies turn sane',
+          b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
+    evil_log = open('/tmp/reg_evil.log').read()
+    check('evil upstream: zero tracebacks, failures are one-liners',
+          'Traceback' not in evil_log and 'poll of' in evil_log)
+    evil.stop()
 finally:
     for p in procs:
         p.kill()

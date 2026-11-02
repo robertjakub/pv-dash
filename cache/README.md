@@ -3,7 +3,7 @@
 A dependency-free (Python stdlib only) **Modbus TCP caching proxy** for devices
 that accept only a single client — Huawei SUN2000 inverters and their
 SDongle/EMMA radios are limited to one Modbus TCP connection, so the
-[sun2000-scraper](../scrape/README.md) cannot share them with anything else.
+[modbus-scraper](../scrape/README.md) cannot share them with anything else.
 
 > **Experimental — so far verified only against simulated data**
 > (fake inverter, fuzzing and regression/stress suites), not against real
@@ -90,8 +90,11 @@ the plan converges to the largest blocks the device actually answers.
 ## Usage
 
 ```bash
-python3 cache/src/modbus_cache.py --host 192.168.1.100 --listen 0.0.0.0:15502
+python3 cache/src/modbus_cache.py --host 192.168.1.100
 ```
+
+By default the proxy **binds to 127.0.0.1:15502** (loopback only) — pass
+`--listen 0.0.0.0:15502` when Modbus clients live on other hosts.
 
 Add **`--dry-run`** to validate the configuration and the register map and
 print the effective settings (poll plan, ACLs, limits) without binding the
@@ -104,13 +107,13 @@ Point the scraper (or any other Modbus client) at the proxy instead of the
 inverter:
 
 ```bash
-python3 scrape/src/scraper.py --host 127.0.0.1 --modbus-port 15502 --listen 0.0.0.0:9350
+python3 scrape/src/scraper.py --host 127.0.0.1 --modbus-port 15502
 ```
 
 ## Configuration
 
 Settings are resolved in this order (first hit wins), mirroring
-`sun2000-scraper`:
+`modbus-scraper`:
 
 1. CLI flags (`--host`, `--listen`, …)
 2. Environment variables — same names prefixed: `MODBUS_CACHE_HOST`,
@@ -137,7 +140,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--unit` | `1` | Modbus unit id (1–247) |
 | `--timeout` | `3` | Modbus connect/read timeout, seconds |
 | **Proxy** | | |
-| `--listen` | `0.0.0.0:15502` | proxy listen address |
+| `--listen` | `127.0.0.1:15502` | proxy listen address `HOST:PORT` (loopback by default) |
 | `--registers-file` | `registers.json` next to the script | JSON register map to cache (see above) |
 | `--interval` | `10` | seconds between cache polls |
 | `--cache-ttl` | 3× `--interval` | per-register cache TTL in seconds: older entries are refetched from the inverter (`0` = never expire) |
@@ -157,6 +160,22 @@ with a clean one-line error instead of failing later at runtime.
 
 `cache/src/modbus_cache.ini` is a sample with the defaults. Boolean ini/env
 values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
+
+## Diagnostics registers
+
+The cache synthesizes a 4-register diagnostics block at **65000** from live
+poller state — it is answered instantly, never forwarded, never cached:
+
+| Register | Meaning |
+|---|---|
+| 65000 | magic `0xCAFE` (validity check for clients) |
+| 65001 | `1` if the last completed poll cycle had at least one successful read, else `0` |
+| 65002 | seconds since the last successful device read (`65535` = none yet); grows while the device is down |
+| 65003 | cache process uptime in seconds |
+
+Reads that straddle the block are rejected with exception `02`; reads past it
+behave like any other uncached register. The scraper auto-detects the block
+(magic check) and exports it as `huawei_cache_*` gauges — see its README.
 
 ## Runtime control (signals)
 
@@ -256,7 +275,7 @@ services.modbus-cache = {
   inverterHost = "192.168.1.100";   # the inverter's LAN IP
   openFirewall = true;              # when clients run on another host
 };
-services.sun2000-scraper = {
+services.modbus-scraper = {
   enable = true;
   inverterHost = "127.0.0.1";       # the proxy
   inverterPort = 15502;

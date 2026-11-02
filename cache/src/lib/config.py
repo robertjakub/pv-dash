@@ -166,7 +166,7 @@ def resolve_config(args, script_dir):
         'port': resolve(args.port, 'MODBUS_CACHE_PORT', 'port', 5502, int),
         'unit': resolve(args.unit, 'MODBUS_CACHE_UNIT', 'unit', 1, int),
         'timeout': resolve(args.timeout, 'MODBUS_CACHE_TIMEOUT', 'timeout', 3.0, float),
-        'listen': resolve(args.listen, 'MODBUS_CACHE_LISTEN', 'listen', '0.0.0.0:15502', str),
+        'listen': resolve(args.listen, 'MODBUS_CACHE_LISTEN', 'listen', '127.0.0.1:15502', str),
         'interval': interval,
         'read_delay': resolve(args.read_delay, 'MODBUS_CACHE_READ_DELAY', 'read_delay', 0.05, float),
         'merge_gap': resolve(args.merge_gap, 'MODBUS_CACHE_MERGE_GAP', 'merge_gap', 8, int),

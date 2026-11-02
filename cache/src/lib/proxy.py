@@ -9,12 +9,20 @@ import time
 from collections import deque
 
 from .protocol import (MAX_COUNT, MAX_PDU, WRITE_FUNCS, GATEWAY_FAILED, ILLEGAL_FUNCTION,
-                       ILLEGAL_VALUE, ModbusError, DeviceError, recv_exact, exception_frame,
-                       describe_write)
+                       ILLEGAL_VALUE, ILLEGAL_ADDRESS, ModbusError, DeviceError, recv_exact,
+                       exception_frame, describe_write)
 from .config import load_registers_file
 from .cache import build_blocks, span
 
 logger = logging.getLogger('modbus-cache')
+
+# Diagnostics registers synthesized by the cache (never forwarded, never cached):
+# 65000 magic, 65001 device flag, 65002 cache age in s (0xFFFF = no read yet),
+# 65003 cache uptime in s.
+DIAG_BASE = 65000
+DIAG_COUNT = 4
+DIAG_MAGIC = 0xCAFE
+DIAG_MAX = 0xFFFF
 
 
 class Proxy:
@@ -34,6 +42,9 @@ class Proxy:
         self.write_acl = self.config.get('write_acl')
         self.client_count = 0
         self.client_lock = threading.Lock()
+        self.started = time.monotonic()
+        self.last_ok = None
+        self.poll_ok = False
         self.blocks = build_blocks(cache.ranges, merge_gap)
         self.generation = 0
         self.poll_wake = threading.Event()
@@ -121,6 +132,7 @@ class Proxy:
                 with self.upstream.lock:
                     words = self.upstream.read(start, count)
                 self.cache.store(start, words, version)
+                self.last_ok = time.monotonic()
                 for leaf in leaves:
                     self._leaf_ok(leaf)
                     ok[leaf] = True
@@ -139,6 +151,7 @@ class Proxy:
                     done.append((start, count, leaves))
         if generation == self.generation:
             self.blocks = done
+        self.poll_ok = any(ok.values())
 
     def _allowed(self, acl, ip):
         if acl is None:
@@ -223,6 +236,12 @@ class Proxy:
             addr, count = struct.unpack('>HH', pdu[1:5])
             if not 1 <= count <= MAX_COUNT or addr + count > 65536:
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
+            if addr >= DIAG_BASE:
+                if addr + count <= DIAG_BASE + DIAG_COUNT:
+                    return self._diag(txn, proto, unit, addr, count)
+                return exception_frame(txn, proto, unit, func, ILLEGAL_ADDRESS)
+            if addr < DIAG_BASE and addr + count > DIAG_BASE:
+                return exception_frame(txn, proto, unit, func, ILLEGAL_ADDRESS)
             code = self.cache.failed_leaf(addr, count)
             if code is not None:
                 logger.info('read: registers %d:%d served from last poll: the device rejects them (modbus exception %d)',
@@ -234,6 +253,21 @@ class Proxy:
                 body = struct.pack('>BB', func, count * 2) + struct.pack('>%dH' % count, *words)
                 return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
         return self.forward(txn, proto, unit, pdu)
+
+    def _diag(self, txn, proto, unit, addr, count):
+        """Answer a diagnostics read from live poller state (no device contact)."""
+        now = time.monotonic()
+        age = DIAG_MAX if self.last_ok is None else min(int(now - self.last_ok), DIAG_MAX)
+        words = [DIAG_MAGIC,
+                 1 if self.poll_ok else 0,
+                 age,
+                 min(int(now - self.started), DIAG_MAX)]
+        vals = words[addr - DIAG_BASE:addr - DIAG_BASE + count]
+        logger.debug('read: diag registers %d:%d (device %s, cache age %ss)',
+                     addr, count, 'up' if words[1] else 'DOWN',
+                     'n/a' if age == DIAG_MAX else age)
+        body = struct.pack('>BB', 3, count * 2) + struct.pack('>%dH' % count, *vals)
+        return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
 
     def forward(self, txn, proto, unit, pdu):
         desc = describe_write(pdu, unit)
@@ -247,6 +281,8 @@ class Proxy:
         try:
             with self.upstream.lock:
                 resp = self.upstream.forward(frame)
+            if resp[6:7] != bytes([unit & 0xFF]):
+                raise ModbusError('reply from unit id %d, expected %d' % (resp[6], unit))
             body = resp[7:]
             if resp and body and body[0] == pdu[0] | 0x80:
                 code = body[1] if len(body) > 1 else -1

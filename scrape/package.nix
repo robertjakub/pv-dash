@@ -6,8 +6,8 @@
 }:
 
 stdenv.mkDerivation (finalAttrs: {
-  pname = "sun2000-scraper";
-  version = "0.0.4";
+  pname = "modbus-scraper";
+  version = "0.0.6";
 
   src = lib.cleanSource ./.;
 
@@ -20,13 +20,15 @@ stdenv.mkDerivation (finalAttrs: {
   installPhase = ''
     runHook preInstall
 
-    install -Dm755 src/scraper.py $out/share/sun2000-scraper/scraper.py
-    install -Dm644 src/metrics.json $out/share/sun2000-scraper/metrics.json
-    install -Dm755 src/fake_inverter.py $out/share/sun2000-scraper/fake_inverter.py
-    makeWrapper ${lib.getExe python3} $out/bin/sun2000-scraper \
-      --add-flags "$out/share/sun2000-scraper/scraper.py"
-    makeWrapper ${lib.getExe python3} $out/bin/sun2000-fake-inverter \
-      --add-flags "$out/share/sun2000-scraper/fake_inverter.py"
+    install -Dm755 src/scraper.py $out/share/modbus-scraper/scraper.py
+    install -dm755 $out/share/modbus-scraper/lib
+    install -m644 src/lib/*.py $out/share/modbus-scraper/lib/
+    install -Dm644 src/metrics.json $out/share/modbus-scraper/metrics.json
+    install -Dm755 src/fake_inverter.py $out/share/modbus-scraper/fake_inverter.py
+    makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper \
+      --add-flags "$out/share/modbus-scraper/scraper.py"
+    makeWrapper ${lib.getExe python3} $out/bin/modbus-fake-inverter \
+      --add-flags "$out/share/modbus-scraper/fake_inverter.py"
 
     runHook postInstall
   '';
@@ -45,7 +47,7 @@ stdenv.mkDerivation (finalAttrs: {
       text format. Python standard library only, no third-party dependencies.
     '';
     license = lib.licenses.bsd3;
-    mainProgram = "sun2000-scraper";
+    mainProgram = "modbus-scraper";
     platforms = lib.platforms.unix;
   };
 })

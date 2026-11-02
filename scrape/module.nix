@@ -6,41 +6,46 @@
 }:
 
 let
-  cfg = config.services.sun2000-scraper;
+  cfg = config.services.modbus-scraper;
 
-  execArgs = lib.concatStringsSep " " (
-    [
-      "--host ${cfg.inverterHost}"
-      "--modbus-port ${toString cfg.inverterPort}"
-      "--unit ${toString cfg.unitId}"
-      "--listen ${cfg.listenHost}:${toString cfg.listenPort}"
-      "--interval ${toString cfg.interval}"
-      "--pv-register ${toString cfg.pvRegister}"
-      "--grid-register ${toString cfg.gridRegister}"
-      "--scale ${toString cfg.scale}"
-      "--grid-scale ${toString cfg.gridScale}"
-      "--timeout ${toString cfg.timeout}"
-    ]
-    ++ lib.optional (cfg.modbusOffset != 0) "--modbus-offset ${toString cfg.modbusOffset}"
-    ++ lib.optional (cfg.maxKwp > 0.0) "--max-kwp ${toString cfg.maxKwp}"
-    ++ lib.optional (cfg.maxGridKw > 0.0) "--max-grid-kw ${toString cfg.maxGridKw}"
-    ++ lib.optionals cfg.battery [
-      "--battery"
-      "--battery-register ${toString cfg.batteryRegister}"
-      "--battery-soc-register ${toString cfg.batterySocRegister}"
-    ]
-    ++ lib.optional cfg.gridPositiveImport "--grid-positive-import"
-  );
+  configIni = pkgs.writeText "scraper.ini" (lib.generators.toINI { } {
+    scraper = {
+      host = cfg.inverterHost;
+      modbus_port = toString cfg.inverterPort;
+      unit = toString cfg.unitId;
+      modbus_offset = toString cfg.modbusOffset;
+      timeout = toString cfg.timeout;
+      pv_register = toString cfg.pvRegister;
+      grid_register = toString cfg.gridRegister;
+      scale = toString cfg.scale;
+      grid_scale = toString cfg.gridScale;
+      max_kwp = toString cfg.maxKwp;
+      max_grid_kw = toString cfg.maxGridKw;
+      battery = lib.boolToString cfg.battery;
+      battery_register = toString cfg.batteryRegister;
+      battery_soc_register = toString cfg.batterySocRegister;
+      grid_positive_import = lib.boolToString cfg.gridPositiveImport;
+      listen = "${cfg.listenHost}:${toString cfg.listenPort}";
+      interval = toString cfg.interval;
+      log_level = cfg.logLevel;
+      local_time = lib.boolToString cfg.localTime;
+      log_access = lib.boolToString cfg.logAccess;
+      auth_token = if cfg.authToken == null then "" else cfg.authToken;
+      auth_token_file = if cfg.authTokenFile == null then "" else cfg.authTokenFile;
+      max_clients = toString cfg.maxClients;
+      client_timeout = toString cfg.clientTimeout;
+    };
+  });
 in
 {
-  options.services.sun2000-scraper = {
+  options.services.modbus-scraper = {
     enable = lib.mkEnableOption "the Huawei SUN2000 Modbus TCP Prometheus exporter";
 
     package = lib.mkOption {
       type = lib.types.package;
       default = pkgs.callPackage ./package.nix { };
       defaultText = lib.literalExpression "pkgs.callPackage ./package.nix { }";
-      description = "The sun2000-scraper package to run.";
+      description = "The modbus-scraper package to run.";
     };
 
     inverterHost = lib.mkOption {
@@ -155,8 +160,8 @@ in
 
     listenHost = lib.mkOption {
       type = lib.types.str;
-      default = "0.0.0.0";
-      description = "Exporter bind address.";
+      default = "127.0.0.1";
+      description = "Exporter bind address (loopback by default — set 0.0.0.0 when Prometheus scrapes from another host).";
     };
 
     listenPort = lib.mkOption {
@@ -170,18 +175,89 @@ in
       default = false;
       description = "Open the listen port in the firewall (needed when Prometheus runs on another host).";
     };
+
+    logLevel = lib.mkOption {
+      type = lib.types.enum [ "DEBUG" "INFO" "WARNING" "ERROR" ];
+      default = "INFO";
+      description = "Log level.";
+    };
+
+    localTime = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Log timestamps in the system time zone instead of UTC.";
+    };
+
+    logAccess = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Log every HTTP request (Prometheus scrape) at INFO — audit trail for who polled /metrics and when.";
+    };
+
+    maxClients = lib.mkOption {
+      type = lib.types.int;
+      default = 64;
+      description = "Maximum concurrent HTTP clients; extras get an immediate 503 (0 = unlimited).";
+    };
+
+    clientTimeout = lib.mkOption {
+      type = lib.types.float;
+      default = 300.0;
+      description = "Seconds an idle keep-alive HTTP client is kept before being kicked (0 = off).";
+    };
+
+    authToken = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Require `Authorization: Bearer <token>` on every HTTP request (default: no auth).
+        Caution: the token is written to the world-readable Nix store as part of the
+        rendered config — prefer `authTokenFile` for anything non-trivial.
+      '';
+    };
+
+    authTokenFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Path to a file with the bearer token (single line, trimmed). Keeps the secret out
+        of the Nix store; the file is read at startup and **on every SIGHUP reload**, so a
+        token rotates with `systemctl reload` after rewriting the file. The service user
+        must be able to read the path (note: `ProtectHome = true` blocks `/root` — put the
+        file under `/etc` or use systemd `LoadCredential`).
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    warnings = lib.optional (cfg.authToken != null && cfg.authTokenFile != null)
+      "services.modbus-scraper: both authToken and authTokenFile are set — the inline token wins and the file is ignored."
+      ++ lib.optional (cfg.openFirewall && cfg.listenHost == "127.0.0.1")
+      "services.modbus-scraper: openFirewall is set but the exporter binds to 127.0.0.1 — the firewall hole is unreachable; set listenHost to 0.0.0.0 (or the external IP) if Prometheus scrapes from another host.";
+
+    assertions = [
+      {
+        assertion = cfg.maxKwp == 0 || cfg.maxKwp > 0;
+        message = "services.modbus-scraper: maxKwp must be 0 (checks off) or a positive kW value, got ${toString cfg.maxKwp}";
+      }
+      {
+        assertion = cfg.maxGridKw == 0 || cfg.maxGridKw > 0;
+        message = "services.modbus-scraper: maxGridKw must be 0 (checks off) or a positive kW value, got ${toString cfg.maxGridKw}";
+      }
+    ];
+
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.listenPort ];
 
-    systemd.services.sun2000-scraper = {
+    systemd.services.modbus-scraper = {
       description = "Huawei SUN2000 Modbus TCP Prometheus exporter";
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
+      reloadIfChanged = true;
+      restartIfChanged = false;
 
       serviceConfig = {
-        ExecStart = "${lib.getExe cfg.package} ${execArgs}";
+        ExecStart = "${lib.getExe cfg.package} --config ${configIni}";
+        ExecReload = "${pkgs.util-linux}/bin/kill -HUP $MAINPID";
         DynamicUser = true;
         Restart = "on-failure";
         RestartSec = 3;

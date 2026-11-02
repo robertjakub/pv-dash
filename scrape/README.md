@@ -2,7 +2,9 @@
 
 A dependency-free (Python stdlib only) Prometheus exporter that polls a Huawei
 SUN2000 inverter over **Modbus TCP** and exposes the `huawei_*_watts` metrics
-the [pv-dashboard](../README.md) expects, plus health gauges.
+the [pv-dashboard](../README.md) expects, plus health gauges. It can poll the
+inverter directly or through the [modbus-cache](../cache/README.md) proxy
+(which it detects automatically).
 
 ## Prerequisites
 
@@ -15,10 +17,10 @@ id **1**.
 ```bash
 python3 scrape/src/scraper.py --host 192.168.1.100
 curl http://localhost:9350/metrics
+```
 
 By default the exporter **binds to 127.0.0.1:9350** (loopback only) — pass
 `--listen 0.0.0.0:9350` when Prometheus scrapes from another host.
-```
 
 Add **`--dry-run`** to validate the configuration and print the effective
 settings without binding the port or contacting the inverter. Exit codes:
@@ -101,7 +103,7 @@ fails cleanly at startup (one-line error, exit 1), never a traceback.
 ## Configuration
 
 Settings are resolved in this order (first hit wins), mirroring
-`server.py`:
+`modbus-cache`:
 
 1. CLI flags (`--host`, `--listen`, …)
 2. Environment variables — same names prefixed: `SCRAPER_HOST`,
@@ -128,13 +130,6 @@ one-line error instead of failing later at runtime. The only soft spot is
 `timeout > interval`: that logs a warning (polls run back-to-back) instead
 of failing.
 
-**`SIGHUP` reloads the configuration** without dropping the exporter: poll
-interval, scales, caps, register addresses, battery flag and the upstream
-address/port/unit/timeout take effect immediately (the Modbus socket
-reconnects on the next poll). An invalid value keeps the previous settings —
-the error is logged and the next `SIGHUP` retries. The listen address, log
-level and `metrics.json` need a restart.
-
 `scrape/src/scraper.ini` is a sample with the defaults:
 
 ```ini
@@ -159,6 +154,19 @@ interval = 5
 log_level = INFO
 ```
 
+## Runtime control (signals)
+
+| Signal | Effect |
+|---|---|
+| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, scales, caps, register addresses, battery flag, auth token (+ file re-read = rotation), client limits and the upstream address/port/unit/timeout take effect immediately (the Modbus socket reconnects on the next poll). An invalid value keeps the previous settings — the error is logged and the next `SIGHUP` retries. The listen address, log level and `metrics.json` need a restart. |
+| `SIGTERM` / `SIGINT` | **Graceful shutdown**: the exporter stops, and the shutdown logs a session summary (duration + poll-error count). |
+
+```bash
+kill -HUP  $(pgrep -f scraper.py)   # reload the config
+```
+
+## Logging and audit trail
+
 Logging is `logging`-based with **UTC timestamps by default** (`--local-time`
 switches to the system time zone): one startup line with the effective
 settings, reachability changes and reloads at INFO/WARNING (every poll at
@@ -171,34 +179,8 @@ rejections an INFO, and SIGTERM/SIGINT shutdowns log a session summary
 up, idle kick, poll-cycle crash) always log a single line — the suite
 enforces that **no scenario produces a traceback**.
 
-`python3 scrape/test/fuzz.py` — client-garbage fuzz (3000 frames: binary junk,
-70 KB request lines, wrong methods, pipelined + null bytes, partial requests,
-bursts, slow trickle): the exporter must stay up, keep correct metrics and
-never print a traceback. Under systemd (`JOURNAL_STREAM` set) log
-lines omit their own timestamp — journald adds one.
-
-## Source layout
-
-```
-scrape/src/
-├── scraper.py          # CLI, logging setup, signal handling
-├── scraper.ini         # sample config
-├── metrics.json        # metric names / HELP / TYPE specs
-├── fake_inverter.py    # Modbus TCP demo server
-└── lib/
-    ├── protocol.py     # Modbus TCP client (hardened framing)
-    ├── config.py       # settings resolution + validation
-    ├── metrics.py      # metrics.json loader
-    ├── poller.py       # poll loop + sanity checks
-    └── server.py       # Prometheus exposition endpoint
-```
-
-## Testing
-
-`python3 scrape/test/regtest.py` — 65 functional checks (values, export/import
-split, battery on/off, cap 503 + recovery, inverter death/recovery,
-SIGHUP-applied settings, dry-run exit codes) against the fake inverter; each
-run starts its own instances on scratch ports and cleans up.
+Under systemd (`JOURNAL_STREAM` set) log lines omit their own timestamp —
+journald adds one.
 
 ## Flags
 
@@ -256,6 +238,8 @@ simulates a sunny day: bell-curve PV between 06:00 and 18:00 (peak 75 % of
 `--max-kwp`), home load with morning and evening peaks — so the grid value
 exports around noon and imports mornings/evenings. Energy counters grow
 during the simulated day; raw values are watts / kWh×100 like the real map.
+It also serves the modbus-cache diagnostics block (65000–65003), so the
+scraper's `huawei_cache_*` auto-detection can be exercised without a cache.
 
 ```bash
 python3 scrape/src/fake_inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
@@ -275,7 +259,9 @@ Served registers:
 - **32089** — device status (512 on-grid / 40960 standby at night)
 - **32087** — temperature (I16, °C×10); **32114** daily and **32106** total
   yield (U32, kWh×100)
+- **65000–65003** — cache diagnostics block (magic `0xCAFE`)
 - Unknown addresses read as 0, other functions get a Modbus exception
+  (`--strict` rejects unknown addresses with exception `02` like the real device)
 
 Also packaged as `modbus-fake-inverter`.
 
@@ -344,9 +330,43 @@ Options: `enable`, `package`, `inverterHost`, `inverterPort` (502), `unitId`,
 
 The module renders the **config INI into the store** and runs the service
 with `--config`. A `nixos-rebuild switch` applies changes with
-`systemctl reload` (SIGHUP): interval, caps, registers, battery flag and the
-upstream address are picked up live. Changes to `listenHost`/`listenPort`/
-`logLevel` need a manual `systemctl restart modbus-scraper`.
+`systemctl reload` (SIGHUP): interval, caps, registers, battery flag, auth
+token and the upstream address are picked up live. Changes to
+`listenHost`/`listenPort`/`logLevel` need a manual
+`systemctl restart modbus-scraper`.
+
+## Testing
+
+Two standalone suites live in `scrape/test/` — stdlib only, each starts its
+own fake inverter + exporters on scratch ports and cleans up after itself:
+
+```bash
+python3 scrape/test/regtest.py   # 70 functional checks (values, export/import
+                                 #   split, battery on/off, caps 503 + recovery,
+                                 #   auth + token rotation, limits, diagnostics,
+                                 #   SIGHUP, inverter death, hostile-inverter
+                                 #   phase, dry-run exit codes)
+python3 scrape/test/fuzz.py [n]  # n client-garbage HTTP frames (default 3000)
+```
+
+Every scenario must end with the exporter serving correct metrics and
+**zero tracebacks** in the logs.
+
+## Source layout
+
+```
+scrape/src/
+├── scraper.py          # CLI, logging setup, signal handling
+├── scraper.ini         # sample config
+├── metrics.json        # metric names / HELP / TYPE specs
+├── fake_inverter.py    # Modbus TCP demo server
+└── lib/
+    ├── protocol.py     # Modbus TCP client (hardened framing)
+    ├── config.py       # settings resolution + validation
+    ├── metrics.py      # metrics.json loader
+    ├── poller.py       # poll loop + sanity checks + cache diagnostics
+    └── server.py       # Prometheus exposition endpoint (auth, limits)
+```
 
 ## License
 

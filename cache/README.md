@@ -23,9 +23,12 @@ it:
   reads — **cached for `--cache-ttl`** like everything else. Such a read
   waits for a free slot between poll reads, at most one transaction + read
   delay;
-- **writes** (FC06 single / FC16 multiple registers) are forwarded when
-  enabled (see [Access control](#access-control)) and always logged with
-  register, value(s) and outcome.
+- **writes** (FC05/06/15/16/22/23) are forwarded when enabled (see
+  [Access control](#access-control)) and always logged with register,
+  value(s) and outcome;
+- a synthesized **diagnostics block** (registers 65000–65003: device-up flag,
+  cache age, uptime) lets clients tell live data from cache-served values —
+  see [Diagnostics registers](#diagnostics-registers).
 
 Resilience:
 
@@ -41,9 +44,10 @@ Resilience:
   cache remembers that **poll status** and answers client reads in that range
   with the same exception until a poll succeeds again: no repeated device
   hammering, and clients see the failure the device actually reports.
-- **Garbage from the device** (malformed frames, short bodies, disconnects) —
-  the poller logs it and retries; it cannot be killed by bad input, and a
-  device that starts answering again is picked up on the next cycle.
+- **Garbage from the device** (malformed frames, short bodies, disconnects,
+  lying lengths, wrong transaction/unit ids, stalls) — the poller logs it
+  one-line and retries; it cannot be killed by bad input, and a device that
+  starts answering again is picked up on the next cycle.
 - **Garbage from clients** (random PDUs, lying MBAP lengths, wrong
   protocol/unit ids, pipelined bursts, truncated frames) — every request is
   answered (or the connection is closed for lying headers); malformed
@@ -110,6 +114,10 @@ inverter:
 python3 scrape/src/scraper.py --host 127.0.0.1 --modbus-port 15502
 ```
 
+The scraper auto-detects the diagnostics block and exports it as
+`huawei_cache_*` Prometheus gauges — device-down-behind-cache becomes visible
+downstream instead of flowing through as fresh data.
+
 ## Configuration
 
 Settings are resolved in this order (first hit wins), mirroring
@@ -147,14 +155,14 @@ with a clean one-line error instead of failing later at runtime.
 | `--read-delay` | `0.05` | seconds between consecutive inverter reads within a poll cycle (`0` = no wait) |
 | `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Behaviour toggles** | | |
-| `--allow-write` | disabled | forward write requests (FC05/06/15/16) to the inverter; disabled, they are refused with a Modbus illegal-function exception (ini `allow_write`, env `MODBUS_CACHE_ALLOW_WRITE` accept `true`/`false`) |
+| `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (ini `allow_write`, env `MODBUS_CACHE_ALLOW_WRITE` accept `true`/`false`) |
 | `--connect-acl` | `any` | clients allowed to connect: `any` or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `any` | clients allowed to write — still requires `--allow-write` — see [Access control](#access-control) |
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect clients silent for this many seconds — sheds connections from clients that died without closing (`0` = never) |
 | **Logging** | | |
-| `--log-level` | `INFO` | `DEBUG` adds per-client traffic |
+| `--log-level` | `INFO` | `DEBUG` adds per-client traffic and per-poll detail |
 | `--log-access` | `DEBUG` | log client connects/disconnects at `INFO` instead of `DEBUG` |
 | `--local-time` | UTC | log timestamps in the system time zone instead of UTC |
 
@@ -174,8 +182,8 @@ poller state — it is answered instantly, never forwarded, never cached:
 | 65003 | cache process uptime in seconds |
 
 Reads that straddle the block are rejected with exception `02`; reads past it
-behave like any other uncached register. The scraper auto-detects the block
-(magic check) and exports it as `huawei_cache_*` gauges — see its README.
+behave like any other uncached register. Reply unit ids are validated on
+every forwarded request before anything is cached.
 
 ## Runtime control (signals)
 
@@ -251,11 +259,18 @@ Three standalone suites live in `cache/test/` — stdlib only, each starts its
 own fake inverter + proxy on scratch ports and cleans up after itself:
 
 ```bash
-python3 cache/test/regtest.py    # ~22 functional checks (cache, forwarding,
-                                 #   writes/refusals, reloads, poll status)
+python3 cache/test/regtest.py    # 36 functional checks (cache, forwarding,
+                                 #   writes/refusals, diagnostics registers,
+                                 #   device death, poll status, reloads,
+                                 #   hostile-upstream phase)
 python3 cache/test/stress.py     # 100 clients / 15 s load + latency report
 python3 cache/test/fuzz.py [n]   # n client-garbage frames (default 3000)
 ```
+
+Every scenario must end with the proxy alive and **zero tracebacks** in the
+logs — the hostile-upstream phase (garbage replies, short bodies, lying
+lengths, wrong transaction/unit ids, stalls, junk tails) proves that per
+mode, including recovery when the device starts answering sanely again.
 
 The regression suite's last check compares the register map rendered by the
 NixOS module against `cache/src/registers.json` (needs `nix` on PATH) — keep
@@ -273,7 +288,8 @@ imports = [ inputs.pv-dash.nixosModules.modbus-cache ];
 services.modbus-cache = {
   enable = true;
   inverterHost = "192.168.1.100";   # the inverter's LAN IP
-  openFirewall = true;              # when clients run on another host
+  listenHost = "0.0.0.0";           # only when Modbus clients live on other hosts
+  openFirewall = true;              # together with a non-loopback listenHost
 };
 services.modbus-scraper = {
   enable = true;
@@ -300,19 +316,20 @@ manual `systemctl restart modbus-cache`.
 
 ## Security
 
-No authentication is used on either side. Modbus TCP (as spoken by the
-SUN2000 inverter and this proxy) has no auth, no encryption and no access
-control — the proxy forwards writes, so **anyone who can reach the listen
-port can read and write inverter registers** (write forwarding is off until
-`--allow-write` is set). Keep the proxy on a trusted LAN, bind `listenHost`
-to a private interface and don't expose it to the internet.
+Modbus TCP (as spoken by the SUN2000 inverter and this proxy) has no auth,
+no encryption and no access control — the proxy forwards writes, so **anyone
+who can reach the listen port can read and write inverter registers** (write
+forwarding is off until `--allow-write` is set). The proxy therefore **binds
+to 127.0.0.1 by default**; widen `listenHost` deliberately, keep it on a
+trusted LAN, and don't expose it to the internet. The connect/write ACLs add
+per-source control within the LAN; for stricter isolation use the firewall
+(`openFirewall`, with a non-loopback bind).
 
 Python is memory-safe (no buffer overflows, all request sizes bounds-checked
 and fuzzed), but connection resources are not unlimited:
 `maxClients` (default **64**) caps simultaneous clients (each is a thread)
 and `clientTimeout` (default **300 s**) reaps clients that died without
-closing; set `0` to disable either. The ACLs add per-source control within
-the LAN; for stricter isolation use the firewall (`openFirewall`).
+closing; set `0` to disable either.
 
 ## Source layout
 

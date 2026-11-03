@@ -35,7 +35,7 @@ pv-suite/
 ├── dashboard/    # the dashboard web UI + proxy server (package + NixOS module)
 ├── scrape/       # modbus-scraper exporter (package + NixOS module + tests)
 ├── cache/        # modbus-cache proxy (package + NixOS module + tests)
-├── inverter/     # fake inverter, control clients (package, tests)
+├── inverter/     # fake inverter, control clients (package, tests, [TODO](inverter/TODO.md))
 ├── profiles/     # shared inverter profiles ([the format](profiles/README.md))
 ├── tests/        # the test suites, one per Modbus tool
 ├── flake.nix     # the suite entry point

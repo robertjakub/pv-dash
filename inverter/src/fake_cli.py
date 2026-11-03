@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cisco-style interactive CLI for the fake inverter's control server.
+"""console-style interactive CLI for the fake inverter's control server.
 
 A session front-end on top of the line-protocol control socket: prompt with
 the connected port, TAB completion and `?` in every position (with the short
@@ -18,6 +18,7 @@ import os
 import re
 import socket
 import sys
+import threading
 
 try:
     import readline
@@ -26,6 +27,9 @@ except ImportError:
 
 from lib.paths import resolve_control_target
 from lib.settings import COMMAND_HELP, SETTING_BY_NAME, SETTING_NAMES, describe_value
+
+KEEPALIVE_ENV = 'FAKE_CLI_KEEPALIVE'    # ping interval in seconds; 0 = off
+DEFAULT_KEEPALIVE = 55.0                # well under the control server's idle timeout
 
 HELP = """commands (TAB completes, ? lists the options + descriptions in any position):
 """ + ''.join('  %-10s %s\n' % (n, d) for n, d in
@@ -91,9 +95,23 @@ _last_listed = None   # the completer is called several times per attempt;
                       # list each distinct buffer only once
 _prompt = 'fake-inverter > '   # the session's prompt; the completer re-echoes it after the list
 
+_send_lock = threading.Lock()   # the keepalive thread and exchange() share the wire
+_stop_ping = threading.Event()
+
+
+def keepalive(sock, interval):
+    """Send pings while the user thinks, so the control server's idle timeout
+    never drops a live session; any traffic resets that timer."""
+    while not _stop_ping.wait(interval):
+        try:
+            with _send_lock:
+                sock.sendall(b'ping\n')
+        except OSError:
+            return   # session is gone; the main thread will notice too
+
 
 def complete(text, state):
-    """TAB completer, Cisco-style: extend the word silently while the common
+    """TAB completer, console-style: extend the word silently while the common
     prefix grows (a single-match return inserts it — verified libedit adds no
     space and lists nothing); once the prefix is exhausted, print the options
     OURSELVES — one candidate per line with the short descriptions (editline
@@ -126,7 +144,7 @@ def complete(text, state):
 
 
 def print_options(buf):
-    """Cisco `?`: one candidate per line, with the short description."""
+    """console ?`: one candidate per line, with the short description."""
     matches, hint, desc = candidates(buf)
     if not matches:
         print('% Invalid input.')
@@ -139,7 +157,7 @@ def print_options(buf):
 
 
 def main():
-    p = argparse.ArgumentParser(description='Cisco-style CLI for the fake inverter control server (TCP or unix socket).')
+    p = argparse.ArgumentParser(description='console-style CLI for the fake inverter control server (TCP or unix socket).')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/fake-inverter-5502.socket; env FAKE_CTL when unset) — same flag as the fake itself')
     p.add_argument('--timeout', type=float, default=5.0, help='socket timeout in seconds (default %(default)s)')
     args = p.parse_args()
@@ -175,8 +193,19 @@ def session(sock, prompt):
     """Read-execute loop: local commands first, everything else goes to the fake."""
     global _prompt
     _prompt = prompt
+    interval = float(os.environ.get(KEEPALIVE_ENV, '') or DEFAULT_KEEPALIVE)
+    if interval > 0:
+        threading.Thread(target=keepalive, args=(sock, interval), daemon=True).start()
+    try:
+        _loop(sock, prompt)
+    finally:
+        _stop_ping.set()
+
+
+def _loop(sock, prompt):
     while True:
         try:
+            print()                     # breathing room: every prompt on a fresh line
             line = input(prompt)
         except (EOFError, KeyboardInterrupt):
             print()
@@ -187,6 +216,9 @@ def session(sock, prompt):
         low = cmd.lower()
         if low in ('quit', 'exit', 'logout'):
             return
+        if low == 'ping':               # local: the wire pings belong to the keepalive thread
+            print('ok pong')
+            continue
         if low in ('?', 'help'):
             print(HELP)
             continue
@@ -225,7 +257,7 @@ def format_settings(reply):
 
 
 def confirm_shutdown(sock):
-    """Cisco-style [confirm]: RETURN or y/yes proceeds, anything else aborts."""
+    """console-style [confirm]: RETURN or y/yes proceeds, anything else aborts."""
     try:
         ans = input('Proceed with shutdown? [confirm] ')
     except (EOFError, KeyboardInterrupt):
@@ -242,19 +274,28 @@ def confirm_shutdown(sock):
 
 
 def exchange(sock, cmd):
-    """Send one command, return the reply; None = the connection is gone."""
+    """Send one command, return the reply; None = the connection is gone.
+    Keep-alive pongs are absorbed: they can land before or after the reply
+    we are actually waiting for (replies are strictly ordered on the wire)."""
     try:
-        sock.sendall((cmd + '\n').encode())
+        with _send_lock:
+            sock.sendall((cmd + '\n').encode())
         buf = b''
-        while not buf.endswith(b'\n'):
-            chunk = sock.recv(4096)
-            if not chunk:
-                return None
-            buf += chunk
+        while True:
+            while b'\n' not in buf:
+                chunk = sock.recv(4096)
+                if not chunk:
+                    return None
+                buf += chunk
+            line, buf = buf.split(b'\n', 1)
+            text = line.decode('utf-8', 'replace').strip()
+            if text == 'ok pong':
+                continue
+            if text:
+                return text
     except OSError as e:
         print('control error: %s' % e, file=sys.stderr)
         raise SystemExit(1)
-    return buf.decode('utf-8', 'replace').strip()
 
 
 if __name__ == '__main__':

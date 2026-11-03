@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Single source of truth for the fake inverter's control grammar: every
 command and setting with its short description and value hints. Both the
-control server (lib.control) and the Cisco CLI (fake_cli) read from here,
+control server (lib.control) and the console CLI (fake_cli) read from here,
 so the wire grammar, the help texts and the completions can never drift."""
 
 
@@ -32,8 +32,10 @@ SETTINGS = (
             {'auto': 'follow the simulation'}),
     Setting('soc', 'pin the state of charge (seeds the machine), or auto', ('auto',), '%|auto',
             {'auto': 'follow the simulation'}),
-    Setting('cloud', 'scale the PV: 0 = clear, 1 = dark, or auto', ('auto',), '0..1|auto',
-            {'auto': 'follow the simulation'}),
+    Setting('cloud', 'scale the PV: 0 = clear, 1 = dark, auto, or a cloud machine', ('auto', 'autumn', 'winter'),
+            '0..1|auto|autumn|winter',
+            {'auto': 'clear sky', 'autumn': 'passing clouds, quick swings',
+             'winter': 'heavy overcast spells, slow breaks'}),
     Setting('time', 'freeze the clock HH:MM (jumps integrate the battery), or auto', ('auto',), 'HH:MM|auto',
             {'auto': 'follow the real clock'}),
     Setting('scenario', 'preset scene; releases the value pins',
@@ -54,6 +56,8 @@ SETTINGS = (
             {'on': 'constant demo values', 'off': 'day simulation'}),
     Setting('max-kwp', 'PV array size (peak = 75 % of it)', (), 'kW', {}),
     Setting('battery-kwh', 'usable battery capacity', (), 'kWh', {}),
+    Setting('profile', 'register-map profile (JSON: name -> register + optional type/scale)', (), '<file>',
+            {'default': 'the shipped SUN2000 map'}),
     Setting('log-level', 'log verbosity', ('DEBUG', 'INFO', 'WARNING', 'ERROR'), None,
             {'DEBUG': 'client traffic + per-poll detail',
              'INFO': 'lifecycle, control commands, writes',

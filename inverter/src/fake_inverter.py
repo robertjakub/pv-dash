@@ -32,6 +32,7 @@ from lib.chaos import Chaos
 from lib.paths import resolve_control_target
 from lib.control import ControlServer
 from lib.inverter import FakeInverter
+from lib.profile import load_profile, profile_label, resolve_profile
 from lib.signals import SignalBox, parse_time
 from lib.simulator import Simulator
 
@@ -64,7 +65,7 @@ def validate(args):
     return problems
 
 
-def configured_defaults(args, frozen):
+def configured_defaults(args, frozen, profile_text):
     """Every setting's configured startup value — what `unset <setting>` restores."""
     return {
         'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'soc': 'auto', 'cloud': 'auto',
@@ -77,6 +78,7 @@ def configured_defaults(args, frozen):
         'static': 'on' if args.static else 'off',
         'max-kwp': '%g' % args.max_kwp,
         'battery-kwh': '%g' % args.battery_kwh,
+        'profile': profile_text,
         'log-level': args.log_level,
     }
 
@@ -93,6 +95,7 @@ def main():
     p.add_argument('--strict', action='store_true', help='reject reads of undefined registers with exception 02 (like the real device)')
     p.add_argument('--battery-kwh', type=float, default=6.9, help='usable battery capacity in kWh (default %(default)s)')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path (default: /tmp/fake-inverter-<modbus-port>.socket) or TCP port number on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with fake_ctl.py')
+    p.add_argument('--profile', default=None, help='register-map profile JSON: name -> register (+ optional type/scale), e.g. profiles/sun2000.json (default); FAKE_PROFILE when unset')
     p.add_argument('--chaos', type=float, default=0.0, help='probability 0..1 that a request is answered hostile and dropped (default: off); seed with --seed for reproducibility')
     p.add_argument('--seed', type=int, help='chaos RNG seed (default: random)')
     p.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
@@ -112,18 +115,22 @@ def main():
         for problem in problems:
             logger.error(problem)
         raise SystemExit(1)
+    profile_text = args.profile or os.environ.get('FAKE_PROFILE') or 'sun2000'
+    profile_path = resolve_profile(profile_text)
     simulator = Simulator(0.75 * args.max_kwp * 1000.0, args.static, frozen,
-                          battery=args.battery, battery_kwh=args.battery_kwh)
+                          battery=args.battery, battery_kwh=args.battery_kwh,
+                          profile=load_profile(profile_path), seed=args.seed)
     chaos = Chaos(args.chaos, seed=args.seed)
     target = resolve_control_target(args.control_port, args.port)
     if args.dry_run:
-        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, control server %s)',
+        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, profile %s: %s, %d register(s), control server %s)',
                     args.host, args.port, args.unit, 0.75 * args.max_kwp * 1000.0,
                     'static values' if args.static else 'day simulation',
                     'on' if args.battery else 'off',
                     ' (%g kWh)' % args.battery_kwh if args.battery else '',
                     args.strict, args.chaos,
                     args.seed if args.seed is not None else 'random',
+                    simulator.profile.description, profile_label(profile_path), len(simulator.profile.entries),
                     ('127.0.0.1:' + target) if target.isdigit() else ('unix:' + target) if target != '0' else 'off')
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
@@ -131,7 +138,7 @@ def main():
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,
-                                defaults=configured_defaults(args, frozen))
+                                defaults=configured_defaults(args, frozen, profile_text))
         threading.Thread(target=control.serve, daemon=True).start()
     box = SignalBox(simulator, chaos, fake, control=control)
     if control:

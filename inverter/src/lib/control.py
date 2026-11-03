@@ -11,7 +11,9 @@ import threading
 import time
 
 from .protocol import recv_exact
+from .profile import load_profile, profile_label, resolve_profile
 from .settings import SETTING_NAMES, SETTING_BY_NAME, describe_setting
+from .simulator import CLOUD_MACHINES
 
 logger = logging.getLogger('fake-sun2000')
 
@@ -67,7 +69,7 @@ class ControlServer:
                 line, buf = buf.split(b'\n', 1)
                 cmd = line.decode('utf-8', 'replace').strip()
                 reply = self.command(cmd)
-                logger.info('control: %s -> %s', cmd, reply.split(' pinned')[0])
+                logger.debug('control: %s -> %s', cmd, reply.split(' pinned')[0])
                 client.sendall((reply + '\n').encode())
                 if reply.startswith('bye'):
                     break
@@ -106,6 +108,11 @@ class ControlServer:
         val = value.lower()
         auto = val in ('auto', 'off', 'none', 'clear', 'live')
         if key in ('pv', 'load', 'batt', 'soc', 'cloud'):
+            if key == 'cloud' and val in CLOUD_MACHINES:
+                sim.set_cloud_mode(val)
+                return val
+            if key == 'cloud':
+                sim.set_cloud_mode(None)   # 'auto' = clear sky: the machine is off
             sim.override(key, None if auto else float(val))
             return 'auto' if auto else '%g' % float(val)
         if key == 'time':
@@ -142,6 +149,14 @@ class ControlServer:
                 raise ValueError('max-kwp must be a positive kW value')
             sim.peak_w = 0.75 * v * 1000.0
             return '%g' % v
+        if key == 'profile':
+            path = 'sun2000' if val in ('default', 'auto', 'none') else resolve_profile(value.strip())
+            try:
+                m = load_profile(path)
+            except SystemExit as e:
+                raise ValueError(str(e))
+            sim.set_profile(m)
+            return '%s (%s)' % (m.description, profile_label(m.path))
         if key == 'battery-kwh':
             v = float(val)
             if not math.isfinite(v) or v <= 0:
@@ -197,6 +212,8 @@ class ControlServer:
             return '%g' % (sim.peak_w / 750.0)
         if key == 'battery-kwh':
             return '%g' % sim.battery_kwh
+        if key == 'profile':
+            return '%s (%s)' % (sim.profile.description, profile_label(sim.profile.path))
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger('fake-sun2000').getEffectiveLevel())
         if key == 'scenario':
@@ -211,6 +228,8 @@ class ControlServer:
             return 'err empty command'
         parts = line.split()
         cmd, args = parts[0].lower(), parts[1:]
+        if cmd == 'ping':                 # keep-alive from fake_cli
+            return 'ok pong'
         if cmd in ('help', '?'):
             if args:
                 what = args[0].lower()
@@ -277,6 +296,6 @@ class ControlServer:
         return ('pv=%.0fW load=%.0fW batt=%.0fW soc=%s cloud=%s t=%02d:%02d chaos=%.2f hits=%d%s'
                 % (pv_w, load_w, batt_w,
                    '%.1f%%' % soc if soc is not None else 'n/a',
-                   'auto' if ov['cloud'] is None else cloud,
+                   sim.cloud_display(),
                    int(t), round((t % 1.0) * 60), self.chaos.p, self.chaos.hits,
                    (' pinned: ' + pinned) if pinned else ''))

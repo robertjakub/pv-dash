@@ -9,6 +9,8 @@ import sys
 import threading
 import time
 
+from .profile import load_profile, profile_label
+
 logger = logging.getLogger('fake-sun2000')
 
 
@@ -85,13 +87,20 @@ class SignalBox:
                     plan.append(('time=live', lambda: self.simulator.freeze(None)))
                 else:
                     plan.append(('time=%s' % v.strip(), lambda v=v: self.simulator.freeze(parse_time(v))))
+            v = env.get('FAKE_PROFILE')
+            if v:
+                path = v.strip()
+                new_map = load_profile(path)   # eager: a bad profile keeps everything
+                plan.append(('profile=%s: %s' % (profile_label(new_map.path), new_map.description),
+                             lambda m=new_map: self.simulator.set_profile(m)))
+            v = env.get('FAKE_LOG_LEVEL')
             v = env.get('FAKE_LOG_LEVEL')
             if v:
                 level = getattr(logging, v.strip().upper())
                 plan.append(('log_level=%s' % v.strip().upper(),
                              lambda: (logging.getLogger('fake-sun2000').setLevel(level),
                                       logging.getLogger('fake-sun2000-control').setLevel(level))))
-        except (ValueError, AttributeError) as e:
+        except (ValueError, AttributeError, SystemExit) as e:
             logger.warning('SIGHUP: reload failed (%s), keeping previous settings', e)
             return
         if not plan:

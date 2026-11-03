@@ -36,7 +36,7 @@ def _profile_candidates(name):
 
 
 def resolve_profile(text):
-    """A profile name (sun2000, deye -> the shared profiles/ subproject) or
+    """A profile name (sun2000, deye-sg04lp3, ... -> the shared profiles/) or
     a JSON path, passed through."""
     t = (text or '').strip()
     if os.path.exists(t):
@@ -73,8 +73,9 @@ def encode_value(regs, typ, addr, value, scale):
 class RegisterMap:
     """An ordered set of named entries: (name, addr, type, scale)."""
 
-    def __init__(self, entries, path='<embedded>', description=None, mappings=None):
+    def __init__(self, entries, path='<embedded>', description=None, mappings=None, descs=None):
         self.entries = entries   # [(name, addr, typ, scale)]
+        self.descs = descs or {}  # name -> description (for show registers)
         self.path = path
         self.description = description or 'unnamed profile'
         # value maps for coded registers: [{register, values: {code: word}}]
@@ -147,6 +148,7 @@ def load_profile(path):
                                          for m in mappings)):
         raise SystemExit('register profile %s: "mappings" must be a list of '
                          '{"register": name, "values": {code: word}} objects' % path)
+    descs = {str(e['name']): str(e.get('desc', '')).strip() for e in entries if isinstance(e, dict)}
     return RegisterMap(out, path=path,
                        description=str(description).strip() if description else None,
-                       mappings=mappings)
+                       mappings=mappings, descs=descs)

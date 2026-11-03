@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-cache";
-  version = "0.2.0";
+  version = "0.2.1";
 
   src = lib.cleanSource ./.;
 
@@ -42,7 +42,7 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   meta = {
-    description = "Modbus TCP caching proxy for single-client devices like Huawei SUN2000 inverters (stdlib only, experimental) + console-style control CLI";
+    description = "Modbus TCP caching proxy for single-client devices (stdlib only, experimental) + console-style control CLI";
     longDescription = ''
       Owns the one Modbus TCP connection the inverter allows and multiplexes
       it: a background loop polls the configured register ranges at a fixed

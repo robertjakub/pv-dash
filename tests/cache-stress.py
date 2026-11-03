@@ -16,9 +16,9 @@ import sys
 import threading
 import time
 
-TEST_DIR = os.path.dirname(os.path.abspath(__file__))
-CACHE_DIR = os.path.dirname(TEST_DIR)
-REPO = os.path.dirname(CACHE_DIR)
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CACHE_DIR = os.path.join(REPO, 'cache')
+
 P = os.path.join(CACHE_DIR, 'src', 'modbus_cache.py')
 F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
 INV_PORT, CACHE_PORT = 15601, 15602

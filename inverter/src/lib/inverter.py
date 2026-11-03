@@ -8,8 +8,9 @@ import threading
 import time
 
 from .protocol import recv_exact
+from .version import version_string
 
-logger = logging.getLogger('fake-sun2000')
+logger = logging.getLogger('fake-inverter')
 
 
 class FakeInverter:
@@ -30,7 +31,8 @@ class FakeInverter:
         srv.bind((host, port))
         srv.listen(4)
         self.srv = srv
-        logger.info('fake SUN2000 listening on %s:%d (unit %d, peak PV %gW)%s',
+        logger.info('fake inverter %s listening on %s:%d (unit %d, peak PV %gW)%s',
+                    version_string(),
                     host, port, self.unit, self.simulator.peak_w,
                     ', chaos p=%.2f' % self.chaos.p if self.chaos and self.chaos.p else '')
         while True:

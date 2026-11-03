@@ -1,15 +1,18 @@
-# Fake Huawei SUN2000 inverter
+# Fake Inverter Simulator
 
 > **Experimental — work in progress.** The whole pv-suite is still under
 > active development: interfaces, file formats and behavior can still change
 > at any time.
 
-A dependency-free (Python stdlib only) Modbus TCP server that plays a Huawei
-SUN2000 inverter — with a LUNA2000 battery, a smart meter and the
-modbus-cache diagnostics block — so the
-[modbus-scraper](../scrape/README.md), the
-[modbus-cache](../cache/README.md) and the whole
-[pv-suite](../README.md) stack can be exercised without hardware.
+A dependency-free (Python stdlib only) Modbus TCP server that plays an
+inverter — with a battery, a smart meter and the modbus-cache diagnostics
+block — so the [modbus-scraper](../scrape/README.md), the
+[modbus-cache](../cache/README.md) and the whole [pv-suite](../README.md)
+stack can be exercised without hardware.
+
+Through **inverter profiles** it can emulate different devices: the shipped
+default profile is the Huawei SUN2000 map, and Deye hybrid profiles are
+included as well — see [profiles/README.md](../profiles/README.md).
 
 It ships three tools:
 
@@ -24,8 +27,7 @@ It ships three tools:
 ```bash
 python3 inverter/src/fake_inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
 python3 inverter/src/fake_inverter.py --time 12:00          # frozen noon: ~4.5 kW PV, exporting
-python3 inverter/src/fake_inverter.py --static              # constant PV 4000 W, grid -1500 W
-python3 inverter/src/fake_inverter.py --static --battery    # the same, charging 1200 W at 65 %
+python3 inverter/src/fake_inverter.py --static              # constant PV 4000 W, grid -1500 W, battery charging 1200 W at 65 %
 python3 inverter/src/fake_inverter.py --port 15502 --log-level DEBUG
 ```
 
@@ -35,16 +37,25 @@ By default it simulates a sunny day: bell-curve PV between 06:00 and 18:00
 (peak 75 % of `--max-kwp`), home load with morning and evening peaks — so the
 grid exports around noon and imports in the mornings/evenings. Panel
 temperature follows the ambient curve + sun heating. Energy counters grow
-during the simulated day. Raw wire values are watts / kWh×100 like the real
-map.
+during the simulated day. The battery state machine decides
+charge/discharge every tick (battery on by default, `--no-battery` opts
+out) — described below. Raw wire values are watts / kWh×100 like the
+default profile's map.
 
-The battery in the day simulation is **not a fixed value**: with `--battery`
-the LUNA2000 runs the state machine described below. The familiar fixed
-1200 W at 65 % SoC belongs exclusively to `--static` mode, where the classic
-demo values replace the day simulation (PV 4000 W, home 4300 W, grid
-−1500 W; static battery: charging 1200 W at 65 %).
+`--static` replaces the day simulation with constant demo values: PV
+4000 W, home 4300 W, grid −1500 W, battery charging 1200 W at 65 % SoC —
+the classic numbers, useful for screenshots and the load tests. The
+runtime control (`set pv`, `set load`, …) pins the individual terms on
+top of either mode.
 
-### Battery state machine (day simulation)
+### The three state machines
+
+**PV (the sun).** A sine bell between 06:00 and 18:00, peaking at 75 % of
+`--max-kwp`; night = 0 W. The cloud factor scales it in real time, so the
+cloud machine modulates the sun itself.
+
+**Battery.** The battery state machine (day simulation, battery on — the
+default; `--no-battery` opts out):
 
 - charges from the PV surplus, keeping a 300 W grid margin (max ±2500 W)
 - covers the home deficit by discharging (150 W standby excluded)
@@ -55,81 +66,38 @@ simulated clock. Moving the clock (`set time 18:00`) therefore acts as a
 time-lapse control; a full battery holds the surplus for the grid; a drained
 one lets the grid cover the home. `set soc <pct>` seeds the machine (unpinning
 resumes from there); `reset` re-seeds the SoC from the simulated day.
+`set battery-state charging|discharging` forces the machine to full charge or
+discharge power regardless of the surplus (the SoC bounds still hold); `auto`
+(or `unset battery-state`) hands the decision back to the machine.
 
-### Cloud machines (`set cloud autumn|winter`)
-
-Besides a pinned factor (`set cloud 0.7`) and a clear sky (`auto`), the cloud
-cover can be a small state machine — a mean-reverting random walk over the
-simulated clock:
+**Clouds.** A pinned factor (`set cloud 0.7`), a clear sky (`set cloud clear`
+— the default state, shown as `cloud=clear`), or a small state machine — a
+mean-reverting random walk over the simulated clock:
 
 | Mode | Character |
 |---|---|
 | `autumn` | passing clouds, quick swings (factor mostly 0.05–0.95 around a 0.45 mean) |
+| `spring` | fair-weather cumulus, brief dips (mostly 0.02–0.80 around a 0.25 mean) |
 | `winter` | heavy overcast spells, slow breaks (mostly 0.10–1.00 around a 0.75 mean) |
 
-Like the battery, the machine integrates with the simulated clock: clock
+Like the battery, the machines integrate with the simulated clock: clock
 jumps move the clouds (time-lapse), a frozen clock freezes them. `reset`
 returns to a clear sky.
 
-### Register-map profiles
+### Inverter profiles
 
-The fake doesn't hardcode the SUN2000 layout: the simulator computes **named
+The fake doesn't hardcode any device layout: the simulator computes **named
 physical values** (`pv-power`, `device-temperature`, `grid-power`,
-`battery-soc`, …) and a **profile** maps each name onto a register address
-and encoding. The shipped default `src/profiles/sun2000.json` (description
-"SUN2000 with optional LUNA2000 battery and meter") reproduces the classic
-layout byte for byte.
+`battery-soc`, …) and the **inverter profile** maps each name onto a register
+address and encoding. The profile JSON format, the semantics (an omitted name
+does not exist) and the shipped devices (the Huawei SUN2000 default, the Deye
+hybrids) are documented once in
+[profiles/README.md](../profiles/README.md).
 
-A custom profile reuses the names on different registers to emulate a
-different inverter/battery/meter — optional per-entry `type`
-(`i16/u16/i32/u32`) and `scale` override the encoding:
-
-```json
-{
-  "description": "SUN2000 with optional LUNA2000 battery and meter",
-  "registers": [
-    {"name": "pv-power", "register": 32064, "type": "i32", "scale": 1,
-     "desc": "PV power, all strings (W)"},
-    {"name": "device-temperature", "register": 32087, "type": "i16",
-     "scale": 10, "desc": "device temperature (C x10)"}
-  ]
-}
-```
-
-Every fact about an entry lives in the JSON (register, type, scale, desc) —
-no hardcoded tables.
-
-**A name left out of the profile does not exist on this device**: the fake
-serves it like any unknown register — reads as 0, or exception 02 in strict
-mode. A device that doesn't expose, say, `string-1-voltage` (a Fibaro-style
-setup without per-string data) simply omits it — the same applies to a
-profile name the fake cannot simulate. Overlapping registers and unreadable
-files fail with a clean one-line error. The 65000-65003 diagnostics block is
-**not part of any profile** (it is not a device register): it is internal to
-the cache/scraper discovery (the 0xCAFE magic), and the fake always mocks
-it.
-
-The profile carries a `description` (shown in the logs, the dry-run and
-`show profile`), a `desc` per entry (what the value means) and a
-**`mappings`** list for coded registers —
-`[{"register": "device-status", "values": {"512": "on-grid", "40960": "standby"}}, ...]` —
-the REAL device's codes (the sun2000: 512 = on-grid / 40960 = standby; the
-Deye: 1 = self-checking / 2 = normal / 3 = fault), and the fake serves the
-codes from it — a hybrid without a confirmed standby code stays `normal`
-around the clock; the consumers
-select what to fetch/scrape from the same file via their own configs (the
-cache's selection list, the scraper's metrics spec). Four profiles ship in the suite's [`profiles/`](../profiles/) subproject:
-**`sun2000`** (the classic layout), **`deye-sg03lp1`** (a Deye SUN
-single-phase hybrid — real Deye addresses, SoC as plain percent, no
-`pv-limit`/`meter` registers it doesn't have), **`deye-sg04lp3`** and
-**`deye-sg05lp3`** (Deye SUN three-phase hybrids — the 6xx register block,
-three grid phases, daily/total battery counters). The `device-status`
-entries carry their value map in the `desc` (e.g. sun2000: 512 = on-grid,
-40960 = standby). Every profile there is addressable by name:
-`--profile sun2000`, `FAKE_PROFILE=deye-sg03lp1`, `set profile
-deye-sg05lp3`; any other value is a JSON path. Swap live via the control server (`set profile
-my-device.json`), restore the configured one with `unset profile`; `show
-profile` reports the active map's description and name/path.
+`show registers` prints the loaded profile as a table (name, register,
+description), `set profile <name|path>` swaps it live, `--profile` /
+`FAKE_PROFILE` pick it at start; `unset profile` returns to the configured
+map.
 
 ## Served registers (the default profile)
 
@@ -141,7 +109,7 @@ profile` reports the active map's description and name/path.
 - **32089** — device status (512 on-grid / 40960 standby at night)
 - **32087** — temperature (I16, °C×10); **32114** daily and **32106** total
   yield (U32, kWh×100)
-- **37001+** — battery block when `--battery` (power, SoC, lifetime totals)
+- **37001+** — battery block when the battery is on (the default; power, SoC, lifetime totals)
 - **65000–65003** — modbus-cache diagnostics block (magic `0xCAFE`, always
   mocked — not in the profile), so the scraper's `huawei_cache_*`
   auto-detection can be exercised without a cache
@@ -169,7 +137,9 @@ One command per line, one reply per line (`ok …` / `err …` / `bye …`):
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
 | `show settings` | every setting and its value |
-| `status` | one-line **effective** state (what the registers serve right now + what is pinned) |
+| `show status` | one-line **effective** state (what the registers serve right now + what is pinned) |
+| `show registers` | the loaded profile's register map, one register per line: `name \| register \| type`, columns aligned |
+| `show version` | the fake-inverter version (`0.2.0`, or `0.2.0-<short git>` from a checkout) |
 | `set scenario <name>` | apply a scenario preset (below) |
 | `reset` | clear **all** pinned settings and the Modbus write overlay at once (like SIGUSR1, per-connection) |
 | `shutdown` | gracefully stop the fake inverter (same as SIGTERM: session summary, control socket unlinked) |
@@ -184,12 +154,13 @@ One command per line, one reply per line (`ok …` / `err …` / `bye …`):
 | `load` | `W` \| `auto` | pin the home load |
 | `batt` | `W` \| `auto` | pin the battery power, +charge/−discharge (the state machine integrates it into the SoC) |
 | `soc` | `%` \| `auto` | pin the state of charge (also seeds the machine) |
-| `cloud` | `0..1` \| `auto` \| `autumn` \| `winter` | scale the PV: a pinned factor, a clear sky, or a cloud state machine |
+| `cloud` | `0..1` \| `clear` \| `autumn` \| `spring` \| `winter` | scale the PV: a pinned factor, a clear sky (the default), or a cloud state machine |
 | `time` | `HH:MM` \| `auto` | freeze / unfreeze the clock — clock jumps integrate the battery and move the clouds (time-lapse) |
 | `scenario` | `morning` \| `noon` \| `evening` \| `night` \| `custom` | freeze the clock at a typical moment **and release the value pins** (08:30 / 12:00 / 19:30 / 23:00); manual pins turn it `custom`, `set scenario custom` releases everything again |
 | `chaos` | `0..1` \| `off` | tune chaos injection live |
 | `seed` | `N` | re-seed the chaos RNG |
-| `battery` | `on` \| `off` | toggle the simulated LUNA2000 |
+| `battery` | `on` \| `off` | toggle the simulated battery (on by default) |
+| `battery-state` | `auto` \| `charging` \| `discharging` | force the battery state machine at full power; `auto` lets it decide (the default) |
 | `strict` | `on` \| `off` | reject undefined registers with exception 02 |
 | `static` | `on` \| `off` | switch static demo values / day simulation |
 | `max-kwp` | `kW` | PV array size (peak = 75 % of it) |
@@ -206,7 +177,7 @@ read, so the wire grammar, the help texts and the completions can never drift.
 ```bash
 python3 inverter/src/fake_ctl.py set pv 2500
 python3 inverter/src/fake_ctl.py show settings
-printf 'set pv 2500\nset soc 30\nstatus\n' | python3 inverter/src/fake_ctl.py --control-port 15599
+printf 'set pv 2500\nset soc 30\nshow status\n' | python3 inverter/src/fake_ctl.py --control-port 15599
 ```
 
 Same `--control-port` flag / `FAKE_CTL` env as the fake itself; several
@@ -282,20 +253,39 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--max-kwp` | `6` | PV array size in kWp, peak = 75 % of it |
 | `--time` | real clock | freeze simulated time `HH:MM` |
 | `--static` | off | constant demo values instead of the day simulation |
-| `--battery` | off | simulate a LUNA2000 battery |
+| `--battery` | on | simulate a battery (the battery state machine runs; on by default) |
+| `--no-battery` | | no battery values |
 | `--battery-kwh` | `6.9` | usable battery capacity in kWh |
 | `--profile` | `sun2000` | register-map profile: the built-in name or a JSON path (name → register + optional type/scale); `FAKE_PROFILE` when unset |
 | `--strict` | off | reject undefined registers with exception 02 |
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
+| `--control-log-replies` | off | DEBUG-log the full output of every control command, not just the command |
 | `--chaos` | `0` | probability 0..1 that a request is answered hostile and dropped |
 | `--seed` | random | chaos/cloud RNG seed for reproducible runs |
 | `--dry-run` | off | validate the configuration, print the effective settings and exit (`0` = valid, `1` = invalid, `2` = CLI misuse) |
 | `--log-level` | `INFO` | `DEBUG` adds per-client traffic and per-poll detail |
 
+## Docker
+
+The fake ships as an alpine container — stdlib-only, no pip, running as
+the unprivileged `pvsuite` user with the tools on `PATH`. The files live
+in [`docker/`](../docker/) (`Dockerfile.inverter` + `compose.yaml`; the
+shared [`profiles/`](../profiles/README.md) directory is copied in):
+
+```bash
+cd docker
+docker compose up -d fake-inverter              # build + serve on 0.0.0.0:5502
+docker compose exec fake-inverter fake-cli      # console session on the control server
+docker compose down
+```
+
+The version reports as `0.2.0` inside the image (no git metadata; a
+checkout shows `0.2.0-<short git>`).
+
 ## Nix
 
 ```bash
-nix run .#modbus-fake-inverter -- --static --battery --control-port 15599
+nix run .#modbus-fake-inverter -- --static --control-port 15599
 ```
 
 The flake exposes the package with three binaries (`modbus-fake-inverter`,

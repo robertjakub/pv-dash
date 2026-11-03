@@ -39,7 +39,7 @@ let
 in
 {
   options.services.modbus-scraper = {
-    enable = lib.mkEnableOption "the Huawei SUN2000 Modbus TCP Prometheus exporter";
+    enable = lib.mkEnableOption "the Modbus TCP Prometheus exporter";
 
     package = lib.mkOption {
       type = lib.types.package;
@@ -93,7 +93,7 @@ in
     batteryRegister = lib.mkOption {
       type = lib.types.int;
       default = 37001;
-      description = "Holding register of the signed 32-bit battery power in watts, positive = charging (LUNA2000: 37001); used when battery is enabled.";
+      description = "Holding register of the signed 32-bit battery power in watts, positive = charging (37001 on the default profile); used when battery is enabled.";
     };
 
     batterySocRegister = lib.mkOption {
@@ -105,7 +105,7 @@ in
     scale = lib.mkOption {
       type = lib.types.float;
       default = 1.0;
-      description = "Multiplier for the PV register raw value (Huawei power registers already report watts via the gain convention; set 1000.0 for devices reporting kW).";
+      description = "Multiplier for the PV register raw value (the default profile's power registers already report watts via the gain convention; set 1000.0 for devices reporting kW).";
     };
 
     gridScale = lib.mkOption {
@@ -249,7 +249,7 @@ in
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.listenPort ];
 
     systemd.services.modbus-scraper = {
-      description = "Huawei SUN2000 Modbus TCP Prometheus exporter";
+      description = "Modbus TCP Prometheus exporter";
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
       reloadIfChanged = true;

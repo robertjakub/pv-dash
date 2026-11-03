@@ -7,16 +7,16 @@
     {"name": "pv-power", "register": 186, "type": "u16", "scale": 1, "desc": "PV1 power (W)"},
     {"name": "grid-power", "register": 169, "type": "i16", "scale": 1, "desc": "grid power (W, + = export)"},
     {"name": "device-temperature", "register": 90, "type": "i16", "scale": 10, "desc": "DC temperature (C x10)"},
-    {"name": "yield-day", "register": 108, "type": "u16", "scale": 10, "desc": "daily production (kWh x10)"},
-    {"name": "yield-total", "register": 96, "type": "u32", "scale": 10, "desc": "total production (kWh x10)"},
+    {"name": "yield-day", "register": 108, "type": "u16", "scale": 10, "desc": "daily yield (kWh x10)"},
+    {"name": "yield-total", "register": 96, "type": "u32", "scale": 10, "desc": "total yield (kWh x10)"},
     {"name": "string-1-voltage", "register": 109, "type": "u16", "scale": 10, "desc": "PV1 voltage (V x10)"},
     {"name": "string-1-current", "register": 110, "type": "u16", "scale": 10, "desc": "PV1 current (A x10)"},
     {"name": "string-2-voltage", "register": 111, "type": "u16", "scale": 10, "desc": "PV2 voltage (V x10)"},
     {"name": "string-2-current", "register": 112, "type": "u16", "scale": 10, "desc": "PV2 current (A x10)"},
     {"name": "meter-voltage-a", "register": 150, "type": "u16", "scale": 10, "desc": "grid voltage L1 (V x10)"},
-    {"name": "battery-power", "register": 190, "type": "i16", "scale": 1, "desc": "battery power (W, + = charging)"},
+    {"name": "battery-power", "register": 190, "type": "i16", "scale": 1, "desc": "battery power (W)"},
     {"name": "battery-soc", "register": 184, "type": "u16", "scale": 1, "desc": "battery SOC (%)"},
-    {"name": "battery-charge-total", "register": 72, "type": "u32", "scale": 10, "desc": "total battery charge (kWh x10)"},
-    {"name": "battery-discharge-total", "register": 74, "type": "u32", "scale": 10, "desc": "total battery discharge (kWh x10)"}
+    {"name": "battery-charge-total", "register": 72, "type": "u32", "scale": 10, "desc": "total charge (kWh x10)"},
+    {"name": "battery-discharge-total", "register": 74, "type": "u32", "scale": 10, "desc": "total discharge (kWh x10)"}
   ]
 }

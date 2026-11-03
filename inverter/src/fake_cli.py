@@ -35,8 +35,7 @@ HELP = """commands (TAB completes, ? lists the options + descriptions in any pos
 """ + ''.join('  %-10s %s\n' % (n, d) for n, d in
               (('set', 'configure a setting (set soc auto, set scenario noon)'),
                ('unset', 'restore a setting to its configured value (unset pv, unset seed)'),
-               ('show', 'print the bare value of a setting, or all of them'),
-               ('status', 'effective register state + pins'),
+               ('show', 'print a setting, the status line, or all of them'),
                ('reset', 'clear all pins + the write overlay'),
                ('shutdown', 'stop the fake inverter (asks to confirm)'),
                ('quit', 'close the session'),
@@ -70,14 +69,14 @@ def candidates(buf):
     elif head == 'set' and len(done) == 1:
         pool, hint, desc = SETTING_NAMES, None, describe_word
     elif head == 'show' and len(done) == 1:
-        pool, hint, desc = SETTING_NAMES + ('settings',), None, describe_word
+        pool, hint, desc = SETTING_NAMES + ('settings', 'status', 'registers', 'version'), None, describe_word
     elif head in ('set', 'unset') and len(done) == 2:
         s = SETTING_BY_NAME.get(done[1].lower())
         pool, hint = (s.values if s else []), (s.hint if s else None)
         desc = (lambda w, _n=done[1].lower(): describe_value(_n, w))
     else:
         return [], None, None
-    return [w for w in pool if w.startswith(text.lower())], hint, desc
+    return sorted(w for w in pool if w.startswith(text.lower())), hint, desc
 
 
 def describe_word(w):
@@ -88,6 +87,12 @@ def describe_word(w):
         return COMMAND_HELP[w]
     if w == 'settings':
         return 'every setting, one per line'
+    if w == 'status':
+        return 'the effective state line'
+    if w == 'registers':
+        return "the loaded profile's register map"
+    if w == 'version':
+        return 'the fake-inverter version'
     return None
 
 
@@ -226,7 +231,7 @@ def _loop(sock, prompt):
             reply = exchange(sock, cmd)     # help <setting>: the registry answer
             if reply is None:
                 return
-            print(reply)
+            display(reply)
             continue
         if low.endswith('?'):
             print_options(low[:-1])
@@ -239,14 +244,23 @@ def _loop(sock, prompt):
         if reply is None:
             return
         if low.startswith(('set ', 'unset ')) and reply.startswith('ok'):
-            print('ok')             # set/unset confirm silently
+            print('% ok')           # set/unset confirm silently
         elif low in ('show settings', 'show all') and reply.startswith('ok '):
             for row in format_settings(reply):
                 print(row)
         elif low.startswith('show ') and reply.startswith('ok ') and '=' in reply:
             print(reply.split(' ', 1)[1].split('=', 1)[1])   # the bare value
         else:
-            print(reply)
+            display(reply)
+
+
+def display(text):
+    """console-style: every ok/err line printed with a '% ' prefix (the
+    multi-line tables keep their raw continuation lines)."""
+    out = []
+    for line in text.splitlines():
+        out.append(('% ' + line) if line.startswith(('ok ', 'ok', 'err ', 'err')) else line)
+    print('\n'.join(out))
 
 
 def format_settings(reply):
@@ -292,6 +306,14 @@ def exchange(sock, cmd):
             if text == 'ok pong':
                 continue
             if text:
+                if text.startswith('ok registers'):   # multi-line: read to '.'
+                    while not buf.endswith(b'\n.\n'):
+                        chunk = sock.recv(65536)
+                        if not chunk:
+                            break
+                        buf += chunk
+                    text += '\n' + buf.decode('utf-8', 'replace').rsplit('\n.', 1)[0]
+                    buf = b''
                 return text
     except OSError as e:
         print('control error: %s' % e, file=sys.stderr)

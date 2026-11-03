@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Fake Huawei SUN2000 inverter: a Modbus TCP server with demo values.
+"""Fake Inverter Simulator: a Modbus TCP server with demo values. Through
+inverter profiles it can emulate different inverter/battery/meter devices —
+the shipped default profile is the Huawei SUN2000 map, a Deye hybrid map is
+included as well.
 
 Simulates a sunny day (bell-curve PV between 06:00 and 18:00, home load
-with morning and evening peaks) and serves the registers from Huawei's
-Modbus Interface Definitions the modbus-scraper reads: 32064 PV input
-power and 37113 grid active power (positive = feed-in, as reported by the
-simulated smart meter), plus the smart meter block (37100+ status/
+with morning and evening peaks) and serves the profile's registers: 32064 PV
+input power and 37113 grid active power (positive = feed-in, as reported by
+the simulated smart meter), plus the smart meter block (37100+ status/
 voltages/currents/energies), device status (32089), inverter output
 (32080), PV strings (32016-32019, voltage x10 V / current x100 A), phase
 voltages (32069+), grid frequency (32085), temperature (32087) and PV
 yields (32106/32114), plus the modbus-cache diagnostics block (65000+).
-Raw register values are watts and kWh*100, matching the Huawei gain
+Raw register values are watts and kWh*100, matching the default profile's gain
 convention.
 
 Optional extras for demos and testing: a line-protocol control server
@@ -33,10 +35,11 @@ from lib.paths import resolve_control_target
 from lib.control import ControlServer
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
+from lib.version import version_string
 from lib.signals import SignalBox, parse_time
 from lib.simulator import Simulator
 
-logger = logging.getLogger('fake-sun2000')
+logger = logging.getLogger('fake-inverter')
 
 
 def validate(args):
@@ -68,12 +71,13 @@ def validate(args):
 def configured_defaults(args, frozen, profile_text):
     """Every setting's configured startup value — what `unset <setting>` restores."""
     return {
-        'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'soc': 'auto', 'cloud': 'auto',
+        'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'soc': 'auto', 'cloud': 'clear',
         'time': '%02d:%02d' % (int(frozen), round((frozen % 1.0) * 60)) if frozen is not None else 'auto',
         'scenario': 'custom',
         'chaos': '%.2f' % args.chaos,
         'seed': 'random' if args.seed is None else str(args.seed),
         'battery': 'on' if args.battery else 'off',
+        'battery-state': 'auto',
         'strict': 'on' if args.strict else 'off',
         'static': 'on' if args.static else 'off',
         'max-kwp': '%g' % args.max_kwp,
@@ -84,18 +88,25 @@ def configured_defaults(args, frozen, profile_text):
 
 
 def main():
-    p = argparse.ArgumentParser(description='Fake Huawei SUN2000 inverter + smart meter (Modbus TCP server with demo values).')
+    import sys
+    if '--version' in sys.argv:
+        from lib.version import version_string
+        print(version_string())
+        raise SystemExit(0)
+    p = argparse.ArgumentParser(description='Fake Inverter Simulator: a Modbus TCP server with demo values. Simulates different inverter/battery/meter devices through inverter profiles — the shipped default is the Huawei SUN2000 map, a Deye hybrid map is included as well.')
     p.add_argument('--host', default='127.0.0.1', help='bind address (default %(default)s)')
     p.add_argument('--port', type=int, default=5502, help='Modbus TCP port (default %(default)s)')
     p.add_argument('--unit', type=int, default=1, help='Modbus unit id served (default %(default)s)')
     p.add_argument('--max-kwp', type=float, default=6.0, help='PV array size in kWp, peak = 75%% of it (default %(default)s)')
     p.add_argument('--time', help='freeze simulated time HH:MM (default: real clock)')
     p.add_argument('--static', action='store_true', help='constant demo values instead of the day simulation')
-    p.add_argument('--battery', action='store_true', help='simulate a LUNA2000 battery')
+    p.add_argument('--battery', action='store_true', default=True, help='simulate a battery (the default)')
+    p.add_argument('--no-battery', dest='battery', action='store_false', help='no battery values')
     p.add_argument('--strict', action='store_true', help='reject reads of undefined registers with exception 02 (like the real device)')
     p.add_argument('--battery-kwh', type=float, default=6.9, help='usable battery capacity in kWh (default %(default)s)')
+    p.add_argument('--control-log-replies', action='store_true', help='DEBUG-log the full output of every control command (the default logs the command only)')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path (default: /tmp/fake-inverter-<modbus-port>.socket) or TCP port number on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with fake_ctl.py')
-    p.add_argument('--profile', default=None, help='register-map profile JSON: name -> register (+ optional type/scale), e.g. profiles/sun2000.json (default); FAKE_PROFILE when unset')
+    p.add_argument('--profile', default=None, help='inverter profile JSON: name -> register (+ optional type/scale), e.g. profiles/sun2000.json (the default); FAKE_PROFILE when unset')
     p.add_argument('--chaos', type=float, default=0.0, help='probability 0..1 that a request is answered hostile and dropped (default: off); seed with --seed for reproducibility')
     p.add_argument('--seed', type=int, help='chaos RNG seed (default: random)')
     p.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
@@ -138,7 +149,8 @@ def main():
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,
-                                defaults=configured_defaults(args, frozen, profile_text))
+                                defaults=configured_defaults(args, frozen, profile_text),
+                                log_replies=args.control_log_replies)
         threading.Thread(target=control.serve, daemon=True).start()
     box = SignalBox(simulator, chaos, fake, control=control)
     if control:

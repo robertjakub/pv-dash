@@ -13,9 +13,8 @@ import sys
 import time
 import urllib.request
 
-TEST_DIR = os.path.dirname(os.path.abspath(__file__))
-SCRAPE_DIR = os.path.dirname(TEST_DIR)
-REPO = os.path.dirname(SCRAPE_DIR)
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRAPE_DIR = os.path.join(REPO, 'scrape')
 P = os.path.join(SCRAPE_DIR, 'src', 'scraper.py')
 F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
 FAKE_PORT, PORT = 15545, 19455

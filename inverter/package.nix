@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-fake-inverter";
-  version = "0.2.0";
+  version = "0.2.1";
 
   src = lib.cleanSource ./.;
 
@@ -43,14 +43,15 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   meta = {
-    description = "Fake Huawei SUN2000 inverter + smart meter (stdlib-only Modbus TCP demo server with runtime control) [experimental]";
+    description = "Fake Inverter Simulator: a stdlib-only Modbus TCP demo device [experimental]";
     longDescription = ''
-      EXPERIMENTAL, work in progress: a Modbus TCP server simulating a Huawei SUN2000 inverter with a
-      LUNA2000 battery and a smart meter: day curve or static demo values,
-      the modbus-cache diagnostics block, an optional line-protocol control
+      EXPERIMENTAL, work in progress: a Modbus TCP demo device emulating
+      an inverter with a battery and a smart meter (the device layout comes
+      from inverter profiles): day curve or static demo values, the
+      modbus-cache diagnostics block, an optional line-protocol control
       server (set/show values at runtime) and seeded chaos injection.
-      Includes fake_ctl, a CLI client for the control server. Python
-      standard library only.
+      Includes fake_ctl and fake_cli, CLI clients for the control server.
+      Python standard library only.
     '';
     license = lib.licenses.bsd3;
     mainProgram = "modbus-fake-inverter";

@@ -1,0 +1,13 @@
+# The Fake Inverter Simulator as a compose service. The build context is
+# ../inverter; the shared profiles/ directory rides in as a named context.
+# Run only this service: docker compose up -d fake-inverter
+services:
+  fake-inverter:
+    build:
+      context: ../inverter
+      additional_contexts:
+        profiles: ../profiles
+    image: fake-inverter
+    ports:
+      - "5502:5502"
+    restart: unless-stopped

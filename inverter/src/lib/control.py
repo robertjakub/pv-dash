@@ -12,10 +12,11 @@ import time
 
 from .protocol import recv_exact
 from .profile import load_profile, profile_label, resolve_profile
+from .version import version_string
 from .settings import SETTING_NAMES, SETTING_BY_NAME, describe_setting
 from .simulator import CLOUD_MACHINES
 
-logger = logging.getLogger('fake-sun2000')
+logger = logging.getLogger('fake-inverter')
 
 
 class ControlServer:
@@ -23,8 +24,6 @@ class ControlServer:
     the README for the command list. The target is either a TCP port (bound to
     127.0.0.1) or a unix socket path (stale files are replaced, unlinked on
     shutdown)."""
-
-    CMDS = ('pv', 'load', 'batt', 'soc', 'cloud', 'time', 'chaos', 'status')
 
     def describe(self):
         return 'unix:%s' % self.sockpath if self.is_unix else '127.0.0.1:%d' % self.port
@@ -47,7 +46,7 @@ class ControlServer:
             srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             srv.bind(('127.0.0.1', self.port))
         srv.listen(4)
-        logger.info('control server listening on %s (pv/load/batt/soc/cloud/time/chaos/status)', self.describe())
+        logger.info('control server listening on %s', self.describe())
         while True:
             try:
                 client, addr = srv.accept()
@@ -56,8 +55,16 @@ class ControlServer:
                 logger.error('control accept failed (%s), retrying', e)
                 time.sleep(0.1)
 
+    @staticmethod
+    def peer(addr):
+        """Where the client sits: an IP:port for TCP, the socket for unix."""
+        if isinstance(addr, (tuple, list)) and len(addr) >= 2:
+            return '%s:%d' % (addr[0], addr[1])
+        return 'unix socket'
+
     def handle(self, client, addr):
-        logger.debug('control client connected')
+        who = self.peer(addr)
+        logger.debug('control client connected from %s', who)
         try:
             client.settimeout(300)
             buf = b''
@@ -69,7 +76,10 @@ class ControlServer:
                 line, buf = buf.split(b'\n', 1)
                 cmd = line.decode('utf-8', 'replace').strip()
                 reply = self.command(cmd)
-                logger.debug('control: %s -> %s', cmd, reply.split(' pinned')[0])
+                if self.log_replies:
+                    logger.debug('control from %s: %s -> %s', who, cmd, reply)
+                else:
+                    logger.debug('control from %s: %s', who, cmd)
                 client.sendall((reply + '\n').encode())
                 if reply.startswith('bye'):
                     break
@@ -80,7 +90,7 @@ class ControlServer:
         except Exception as e:
             logger.error('control handler crashed (%s)', e)
         finally:
-            logger.debug('control client disconnected')
+            logger.debug('control client from %s disconnected', who)
             client.close()
 
     # every configurable of the fake: the shared registry (lib.settings)
@@ -90,7 +100,8 @@ class ControlServer:
     # value pins, so the day simulation (and the battery machine) take over
     SCENARIOS = {'morning': 8.5, 'noon': 12.0, 'evening': 19.5, 'night': 23.0}
 
-    def __init__(self, simulator, chaos, target, fake=None, defaults=None):
+    def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False):
+        self.log_replies = log_replies   # DEBUG also logs the full command output
         self.simulator = simulator
         self.chaos = chaos
         self.fake = fake
@@ -112,9 +123,11 @@ class ControlServer:
                 sim.set_cloud_mode(val)
                 return val
             if key == 'cloud':
-                sim.set_cloud_mode(None)   # 'auto' = clear sky: the machine is off
+                sim.set_cloud_mode(None)   # 'clear' = clear sky: the machine is off
             sim.override(key, None if auto else float(val))
-            return 'auto' if auto else '%g' % float(val)
+            if auto:
+                return 'clear' if key == 'cloud' else 'auto'
+            return '%g' % float(val)
         if key == 'time':
             if auto:
                 sim.freeze(None)
@@ -137,6 +150,13 @@ class ControlServer:
         if key == 'battery':
             sim.battery = val in ('on', 'true', '1', 'yes')
             return 'on' if sim.battery else 'off'
+        if key == 'battery-state':
+            if val not in ('auto', 'charging', 'discharging'):
+                raise ValueError('battery-state must be auto|charging|discharging')
+            if val != 'auto' and not sim.battery:
+                raise ValueError('battery-state needs the battery on (set battery on)')
+            sim.batt_state = None if val == 'auto' else val
+            return val
         if key == 'strict':
             fake.strict = val in ('on', 'true', '1', 'yes')
             return 'on' if fake.strict else 'off'
@@ -167,7 +187,7 @@ class ControlServer:
             level = val.upper()
             if level not in ('DEBUG', 'INFO', 'WARNING', 'ERROR'):
                 raise ValueError('log level must be DEBUG|INFO|WARNING|ERROR')
-            logging.getLogger('fake-sun2000').setLevel(level)
+            logging.getLogger('fake-inverter').setLevel(level)
             return level
         if key == 'scenario':
             if val == 'custom':
@@ -195,7 +215,9 @@ class ControlServer:
     def _get(self, key):
         sim, ov, fake, chaos = self.simulator, self.simulator.overrides(), self.fake, self.chaos
         if key in ('pv', 'load', 'batt', 'soc', 'cloud'):
-            return 'auto' if ov[key] is None else '%g' % ov[key]
+            if ov[key] is None:
+                return 'clear' if key == 'cloud' else 'auto'
+            return '%g' % ov[key]
         if key == 'time':
             return 'auto' if sim.frozen_time is None else '%02d:%02d' % (int(sim.frozen_time), round((sim.frozen_time % 1.0) * 60))
         if key == 'chaos':
@@ -204,6 +226,8 @@ class ControlServer:
             return 'random' if chaos.seed is None else str(chaos.seed)
         if key == 'battery':
             return 'on' if sim.battery else 'off'
+        if key == 'battery-state':
+            return sim.batt_state or 'auto'
         if key == 'strict':
             return 'on' if fake.strict else 'off'
         if key == 'static':
@@ -215,7 +239,7 @@ class ControlServer:
         if key == 'profile':
             return '%s (%s)' % (sim.profile.description, profile_label(sim.profile.path))
         if key == 'log-level':
-            return logging.getLevelName(logging.getLogger('fake-sun2000').getEffectiveLevel())
+            return logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel())
         if key == 'scenario':
             return self.scenario or 'custom'
         return '?'
@@ -236,8 +260,8 @@ class ControlServer:
                 if what in SETTING_BY_NAME:
                     return 'ok %s' % describe_setting(what)
                 return 'err unknown setting %s (try help)' % what
-            return ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|settings>, '
-                    'status, reset, shutdown, quit; help <setting> describes it' % '|'.join(self.SETTING_KEYS))
+            return ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|settings>, '
+                    'reset, shutdown, quit; help <setting> describes it' % '|'.join(self.SETTING_KEYS))
         if cmd == 'unset':
             if not args:
                 return 'err unset needs a setting (try help)'
@@ -262,14 +286,28 @@ class ControlServer:
             return 'bye shutdown'
         if cmd == 'quit':
             return 'bye'
-        if cmd == 'status':
-            return self.status()
         if cmd == 'show':
             if not args:
-                return 'err show what? (a setting, or "settings")'
+                return 'err show what? (a setting, "status", or "settings")'
             what = args[0].lower()
+            if what == 'status':
+                return self.status()
+            if what == 'version':
+                return 'fake-inverter %s' % version_string()
             if what in ('settings', 'all'):
                 return 'ok ' + self.settings()
+            if what == 'registers':
+                entries = self.simulator.profile.entries
+                rows = ['%s | %d | %s' % (name, addr, typ)
+                        for name, addr, typ, _scale in entries]
+                if not rows:
+                    return 'ok registers: (the profile has no registers)'
+                # a multi-line reply: the clients read on until the '.' terminator
+                w1 = max(len(r.split(' | ')[0]) for r in rows)
+                w2 = max(len(r.split(' | ')[1]) for r in rows)
+                table = '\n'.join('%-*s | %*s | %s' % (w1, a, w2, b, c)
+                                  for a, b, c in (r.split(' | ') for r in rows))
+                return 'ok registers (%d)\n%s\n.' % (len(rows), table)
             if what not in self.SETTING_KEYS:
                 return 'err unknown setting %s (try help)' % what
             return 'ok %s=%s' % (what, self._get(what))
@@ -293,9 +331,10 @@ class ControlServer:
         pv_w, load_w, batt_w, soc, cloud, ov = sim.effective()
         t = sim.clock()
         pinned = ' '.join('%s=%s' % (k, ov[k]) for k in ('pv', 'load', 'batt', 'soc', 'cloud') if ov[k] is not None)
-        return ('pv=%.0fW load=%.0fW batt=%.0fW soc=%s cloud=%s t=%02d:%02d chaos=%.2f hits=%d%s'
+        extra = ' batt-state=%s' % sim.batt_state if sim.batt_state else ''
+        return ('pv=%.0fW load=%.0fW batt=%.0fW soc=%s cloud=%s t=%02d:%02d chaos=%.2f hits=%d%s%s'
                 % (pv_w, load_w, batt_w,
                    '%.1f%%' % soc if soc is not None else 'n/a',
                    sim.cloud_display(),
-                   int(t), round((t % 1.0) * 60), self.chaos.p, self.chaos.hits,
+                   int(t), round((t % 1.0) * 60), self.chaos.p, self.chaos.hits, extra,
                    (' pinned: ' + pinned) if pinned else ''))

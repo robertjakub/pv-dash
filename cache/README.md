@@ -64,6 +64,8 @@ The proxy caches the registers listed in the **device profile** — the same
 shared schema the [fake inverter](../inverter/README.md) serves and the
 [scraper](../scrape/README.md) scrapes; the shipped profiles live in the
 suite's [`profiles/`](../profiles/) subproject (`sun2000.json` by default).
+The profile JSON format is documented in
+[profiles/README.md](../profiles/README.md).
 Resolution: `--profile` flag, env `MODBUS_CACHE_PROFILE`, ini `profile`,
 then the bundled copy; the file is re-read on `SIGHUP`. Entry `type`
 (i16/u16/i32/u32) gives the word width, `name` decorates the poll logs.
@@ -316,16 +318,16 @@ journalctl -u modbus-cache | grep -i 'not on'                 # ACL rejections
 
 ## Testing
 
-Three standalone suites live in `cache/test/` — stdlib only, each starts its
+Three standalone suites live in the suite-root [`tests/`](../tests/) — stdlib only, each starts its
 own fake inverter + proxy on scratch ports and cleans up after itself:
 
 ```bash
-python3 cache/test/regtest.py    # 36 functional checks (cache, forwarding,
+python3 tests/cache-regtest.py    # 59 functional checks (cache, forwarding,
                                  #   writes/refusals, diagnostics registers,
                                  #   device death, poll status, reloads,
                                  #   hostile-upstream phase)
-python3 cache/test/stress.py     # 100 clients / 15 s load + latency report
-python3 cache/test/fuzz.py [n]   # n client-garbage frames (default 3000)
+python3 tests/cache-stress.py     # 100 clients / 15 s load + latency report
+python3 tests/cache-fuzz.py [n]   # n client-garbage frames (default 3000)
 ```
 
 Every scenario must end with the proxy alive and **zero tracebacks** in the

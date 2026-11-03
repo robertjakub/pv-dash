@@ -14,9 +14,9 @@ import subprocess
 import sys
 import time
 
-TEST_DIR = os.path.dirname(os.path.abspath(__file__))
-CACHE_DIR = os.path.dirname(TEST_DIR)
-REPO = os.path.dirname(CACHE_DIR)
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CACHE_DIR = os.path.join(REPO, 'cache')
+
 P = os.path.join(CACHE_DIR, 'src', 'modbus_cache.py')
 F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
 INV_PORT, CACHE_PORT = 15591, 15592
@@ -39,7 +39,7 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
                                    '--listen', '127.0.0.1:%d' % CACHE_PORT, '--interval', '1',
                                    '--allow-write', '--profile',
-                                   os.path.join(os.path.dirname(CACHE_DIR), 'profiles', 'sun2000.json')],
+                                   os.path.join(REPO, 'profiles', 'sun2000.json')],
                                   stdout=open('/tmp/fuzz_cache.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)
 

@@ -104,7 +104,8 @@ Sign conventions and sanity caps:
 *Where* the primary values live comes from a **device profile** — the same
 shared schema the [fake inverter](../inverter/README.md) serves and the
 [cache](../cache/README.md) polls; the shipped profiles live in the suite's
-[`profiles/`](../profiles/) subproject (`sun2000.json` by default). WHICH entries feed the
+[`profiles/`](../profiles/) subproject (`sun2000.json` by default); the JSON
+format is documented in [profiles/README.md](../profiles/README.md). WHICH entries feed the
 register-backed metrics comes from **`src/metrics.json`** itself: an entry
 carries a `profile` field naming the device-profile register it is read
 from (`"huawei_pv_generation_watts": {"profile": "pv-power", ...}`); the
@@ -221,7 +222,7 @@ journald adds one.
 | `--grid-scale` | `1` | multiplier for the grid register raw value (W; set `1000` if your device reports kW) |
 | `--max-kwp` | `6` | PV input power check against the array size: above `max-kwp × 1000` W → HTTP 503 + error log; `0` = off. Negative PV and export above the PV cap always error |
 | `--max-grid-kw` | `12` | power line grid exchange check: \|grid power\| above `max-grid-kw × 1000` W (either direction) → HTTP 503 + error log; `0` = off |
-| `--battery` | off | enable battery support (LUNA2000): battery term in the home derivation + battery metrics |
+| `--battery` | off | enable battery support: battery term in the home derivation + battery metrics |
 | `--battery-register` | `37001` | battery power register (I32 W, positive = charging); used when `--battery` is set |
 | `--battery-soc-register` | `37004` | battery state of charge (U16, percent×10); used when `--battery` is set |
 | `--grid-positive-import` | off | grid register positive means import |
@@ -250,7 +251,7 @@ Definitions* (Issue 04, 2023-01-10):
   been observed reporting **watts** (gain 1) while the meter-section table
   says kW (gain 1000). The defaults assume watts (`--grid-scale 1`); if
   grid power looks 1000× off the other way, pass `--grid-scale 1000`.
-- With a battery (LUNA2000) the derived home load is wrong while the battery
+- With a battery the derived home load is wrong while the battery
   charges/discharges — point the dashboard's `load` metric at a real meter
   register/exporter instead.
 
@@ -258,7 +259,7 @@ Definitions* (Issue 04, 2023-01-10):
 
 The demo inverter lives in its own subproject now: [inverter/](../inverter/README.md) — a Modbus TCP server with day/static demo values, battery + meter simulation, a runtime control server (`set`/`show` values, chaos injection) and the `fake_ctl` CLI. Both regression suites start it automatically.
 
-## Battery (Huawei LUNA2000)
+## Battery
 
 **Experimental — so far verified only against simulated data** (fake inverter /
 mock Prometheus), not against real hardware.
@@ -311,7 +312,7 @@ services.modbus-scraper = {
   inverterHost = "192.168.1.100";
   listenHost = "0.0.0.0";        # only if Prometheus runs on another host
   listenPort = 9350;
-  battery = true;               # once the LUNA2000 is installed
+  battery = true;               # once a battery is installed
 };
 ```
 
@@ -330,16 +331,16 @@ token and the upstream address are picked up live. Changes to
 
 ## Testing
 
-Two standalone suites live in `scrape/test/` — stdlib only, each starts its
+Two standalone suites live in the suite-root [`tests/`](../tests/) — stdlib only, each starts its
 own fake inverter + exporters on scratch ports and cleans up after itself:
 
 ```bash
-python3 scrape/test/regtest.py   # 70 functional checks (values, export/import
+python3 tests/scrape-regtest.py   # 70 functional checks (values, export/import
                                  #   split, battery on/off, caps 503 + recovery,
                                  #   auth + token rotation, limits, diagnostics,
                                  #   SIGHUP, inverter death, hostile-inverter
                                  #   phase, dry-run exit codes)
-python3 scrape/test/fuzz.py [n]  # n client-garbage HTTP frames (default 3000)
+  # n client-garbage HTTP frames (default 3000)
 ```
 
 Every scenario must end with the exporter serving correct metrics and

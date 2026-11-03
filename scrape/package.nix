@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-scraper";
-  version = "0.2.0";
+  version = "0.2.1";
 
   src = lib.cleanSource ./.;
 
@@ -38,12 +38,13 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   meta = {
-    description = "Prometheus exporter for Huawei SUN2000 inverters (stdlib-only Modbus TCP poller)";
+    description = "Prometheus exporter for Modbus TCP inverters (stdlib-only Modbus TCP poller)";
     longDescription = ''
-      Polls Huawei SUN2000 PV inverters over Modbus TCP (FC3 holding
-      registers) and exposes the huawei_*_watts metrics the dashboard
-      expects, plus sun2000_up health gauges, at /metrics in the Prometheus
-      text format. Python standard library only, no third-party dependencies.
+      Polls Modbus TCP inverters over FC3 holding registers and exposes the
+      huawei_*_watts metrics the dashboard expects (the metric names follow
+      the dashboard contract), plus health gauges, at /metrics in the
+      Prometheus text format. Python standard library only, no third-party
+      dependencies.
     '';
     license = lib.licenses.bsd3;
     mainProgram = "modbus-scraper";

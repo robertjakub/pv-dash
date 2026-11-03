@@ -1,0 +1,34 @@
+# Fake Inverter Simulator in an alpine container — stdlib-only, no pip.
+# Runs as the unprivileged user `pvsuite`; the profiles come from the shared
+# profiles/ directory via a named build context.
+#
+# Build (the context = ../inverter, the profiles = ../profiles):
+#   cd docker
+#   docker build -t fake-inverter --build-context profiles=../profiles ../inverter
+#   # or: docker compose up -d
+#
+# Run:
+#   docker run --rm -p 5502:5502 fake-inverter               # serves on 0.0.0.0:5502
+#   docker run --rm -it fake-inverter bash                   # poke around as pvsuite
+#   docker run --rm -p 5502:5502 fake-inverter \
+#       fake-inverter --profile deye-sg04lp3 --no-battery    # any flags via the CMD override
+#
+# The same pattern extends to the scraper and the cache: swap the COPY/CMD
+# lines for their src/ trees.
+FROM alpine:3.20
+
+RUN apk add --no-cache python3 bash \
+    && adduser -D pvsuite
+
+WORKDIR /pv-suite
+COPY --chown=pvsuite --from=profiles profiles/ profiles/
+COPY --chown=pvsuite src/ inverter/src/
+RUN chmod +x inverter/src/fake_inverter.py inverter/src/fake_cli.py inverter/src/fake_ctl.py \
+    && ln -s /pv-suite/inverter/src/fake_inverter.py /usr/local/bin/fake-inverter \
+    && ln -s /pv-suite/inverter/src/fake_ctl.py /usr/local/bin/fake-ctl \
+    && ln -s /pv-suite/inverter/src/fake_cli.py /usr/local/bin/fake-cli
+
+USER pvsuite
+
+EXPOSE 5502
+CMD ["fake-inverter", "--host", "0.0.0.0", "--port", "5502"]

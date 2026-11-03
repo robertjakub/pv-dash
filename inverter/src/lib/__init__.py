@@ -1,1 +1,1 @@
-"""Fake Huawei SUN2000 inverter: simulator, chaos injection, server + control."""
+"""Fake Inverter Simulator: simulator, chaos injection, server + control."""

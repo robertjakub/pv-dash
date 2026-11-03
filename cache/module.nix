@@ -103,7 +103,7 @@ in
         Device-profile JSON selecting the registers to cache (the shared
         profiles/sun2000.json format: {"registers": [{"name", "register",
         "type", "scale", "cache", ...}]}, only entries marked "cache": true
-        are polled). null = the profile bundled with the package (the SUN2000
+        are polled). null = the profile bundled with the package (the default
         monitoring set); reads outside the profile are forwarded to the
         inverter.
       '';

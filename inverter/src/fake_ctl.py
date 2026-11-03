@@ -20,6 +20,25 @@ import sys
 from lib.paths import resolve_control_target
 
 
+
+def read_reply(sock, first, rest):
+    """Assemble a multi-line reply (show registers) up to the '.' terminator."""
+    lines = [first] + rest.split('\n')
+    while True:
+        while lines and not lines[-1].strip():
+            lines.pop()
+        if lines and lines[-1].strip() == '.':
+            lines.pop()
+            break
+        chunk = sock.recv(65536)
+        if not chunk:
+            break
+        lines += chunk.decode('utf-8', 'replace').split('\n')
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return '\n'.join(lines)
+
+
 def main():
     p = argparse.ArgumentParser(description='Send commands to the fake inverter control server (TCP or unix socket).')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/fake-inverter-5502.socket; env FAKE_CTL when unset) — same flag as the fake itself')
@@ -58,7 +77,12 @@ def main():
                 if not chunk:
                     break   # server said goodbye and closed (e.g. after shutdown)
                 buf += chunk
-            print(buf.decode('utf-8', 'replace').strip())
+            first = buf.decode('utf-8', 'replace').split('\n', 1)[0].strip()
+            if not first.startswith('ok registers'):
+                print(buf.decode('utf-8', 'replace').strip())
+                continue
+            rest = buf.decode('utf-8', 'replace').split('\n', 1)[1] if b'\n' in buf else ''
+            print(read_reply(s, first, rest))
     except OSError as e:
         print('control error: %s' % e, file=sys.stderr)
         raise SystemExit(1)

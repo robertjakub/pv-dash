@@ -11,7 +11,7 @@ import time
 
 from .profile import load_profile, profile_label
 
-logger = logging.getLogger('fake-sun2000')
+logger = logging.getLogger('fake-inverter')
 
 
 def parse_time(text):
@@ -98,8 +98,8 @@ class SignalBox:
             if v:
                 level = getattr(logging, v.strip().upper())
                 plan.append(('log_level=%s' % v.strip().upper(),
-                             lambda: (logging.getLogger('fake-sun2000').setLevel(level),
-                                      logging.getLogger('fake-sun2000-control').setLevel(level))))
+                             lambda: (logging.getLogger('fake-inverter').setLevel(level),
+                                      logging.getLogger('fake-inverter-control').setLevel(level))))
         except (ValueError, AttributeError, SystemExit) as e:
             logger.warning('SIGHUP: reload failed (%s), keeping previous settings', e)
             return

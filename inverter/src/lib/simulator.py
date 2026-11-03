@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The simulated day (or frozen/static) values: curves, runtime overrides,
-the battery machine wiring and the register-map assembly."""
+the battery machine wiring and the profile-driven register assembly."""
 import math
 import random
 import threading
@@ -16,6 +16,7 @@ SUNRISE, SUNSET = 6.0, 18.0
 # freezes them): mode -> (mean, theta/h, sigma/sqrt(h), lo, hi)
 CLOUD_MACHINES = {
     'autumn': (0.45, 2.5, 0.60, 0.05, 0.95),   # passing clouds, quick swings
+    'spring': (0.25, 2.0, 0.50, 0.02, 0.80),   # fair-weather cumulus, brief dips
     'winter': (0.75, 0.8, 0.35, 0.10, 1.00),   # heavy overcast spells, slow breaks
 }
 
@@ -44,19 +45,20 @@ class Simulator:
         self._overrides = {k: None for k in OVERRIDE_KEYS}
         self.batt_machine = BatteryMachine()
         self.profile = profile if profile is not None else load_profile(resolve_profile('sun2000'))
-        self.cloud_mode = None          # None = clear sky; 'autumn'/'winter' = the machine
+        self.cloud_mode = None          # None = clear sky; 'autumn'/'spring'/'winter' = the machine
+        self.batt_state = None          # None = the machine decides; 'charging'/'discharging' = forced
         self._cloud_rng = random.Random(seed)
         self._cloud_value = 0.0
         self._cloud_t = None
 
     def set_profile(self, profile_map):
-        """Swap the register map (SIGHUP); clients serving from the old map
+        """Swap the inverter profile (SIGHUP); clients serving from the old map
         see the new one on the next poll."""
         with self._lock:
             self.profile = profile_map
 
     def set_cloud_mode(self, mode):
-        """Enter a cloud state machine (autumn/winter) or None for a clear sky."""
+        """Enter a cloud state machine (autumn/spring/winter) or None for a clear sky."""
         if mode is not None and mode not in CLOUD_MACHINES:
             raise KeyError(mode)
         with self._lock:
@@ -71,7 +73,7 @@ class Simulator:
             return '%g' % ov['cloud']
         if self.cloud_mode:
             return '%s(%0.2f)' % (self.cloud_mode, self._cloud_value)
-        return 'auto'
+        return 'clear'
 
     def _cloud(self, t):
         """The effective cloud factor: a pinned scalar, or the mode's machine
@@ -184,7 +186,7 @@ class Simulator:
             u = u2
         return total / 1000.0
 
-    # ---- register map
+    # ---- register map (profile-driven)
 
     def effective(self):
         """Effective (pv_w, load_w, batt_w, soc, cloud, overrides) after pins —
@@ -195,22 +197,34 @@ class Simulator:
         if self.static:
             pv = ov['pv'] if ov['pv'] is not None else 4000.0 * (1.0 - cloud)
             load = ov['load'] if ov['load'] is not None else 4300.0
-            batt = ov['batt'] if ov['batt'] is not None else (1200.0 if self.battery else 0.0)
+            batt = ov['batt'] if ov['batt'] is not None else (
+                self._forced_batt(1200.0) if self.battery else 0.0)
             soc = ov['soc'] if ov['soc'] is not None else (65.0 if self.battery else None)
         else:
             pv = ov['pv'] if ov['pv'] is not None else self.pv(t) * (1.0 - cloud)
             load = ov['load'] if ov['load'] is not None else self.home(t)
             soc = ov['soc'] if ov['soc'] is not None else self._tick_soc(t, pv, load)
             batt = ov['batt'] if ov['batt'] is not None else (
-                0.0 if not self.battery or soc is None else BatteryMachine.decide(pv, load, soc))
+                0.0 if not self.battery or soc is None else
+                self._forced_batt(BatteryMachine.decide(pv, load, soc)))
         return pv, load, batt, soc, cloud, ov
+
+    def _forced_batt(self, decided=0.0):
+        """The battery-state force: charging/discharging at full power, or the
+        machine's own decision when unset (auto)."""
+        if self.batt_state == 'charging':
+            return BATT_MAX_W
+        if self.batt_state == 'discharging':
+            return -BATT_MAX_W
+        return decided
 
     def _tick_soc(self, t, pv_w, load_w):
         """Stateful SoC: seed from the curve on first use, then integrate."""
         m = self.batt_machine
         if m.soc is None and self.battery:
             m.seed(self.curve_soc(t))
-        return m.tick(t, pv_w, load_w, self.battery_kwh, self.battery)
+        return m.tick(t, pv_w, load_w, self.battery_kwh, self.battery,
+                      self._forced_batt() if self.batt_state else None)
 
     def values(self):
         """Named physical values for the current tick — the profile decides
@@ -219,7 +233,7 @@ class Simulator:
         pv_w, home_w, batt_w, soc, _cloud, ov = self.effective()
         t = self.clock()
         # the device-status codes come from the profile's value map (the
-        # entry's desc); the sun2000 defaults keep the classic semantics
+        # entry's desc); the default profile keeps the classic semantics
         sm = self.profile.status_map or {'on-grid': 512, 'standby': 40960}
         if self.static:
             # the classic static demo: PV 4000 W, battery charging 1200 W at

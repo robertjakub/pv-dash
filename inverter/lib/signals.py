@@ -27,11 +27,12 @@ class SignalBox:
     """Installs the family signal set; a watcher thread does the work so the
     Modbus accept loop (main thread) is never interrupted mid-request."""
 
-    def __init__(self, simulator, chaos, fake, control=None):
+    def __init__(self, simulator, chaos, fake, control=None, audit=None):
         self.simulator = simulator
         self.chaos = chaos
         self.fake = fake
         self.control = control
+        self.audit = audit               # the INV audit trail (lib.audit), None = off
         self.started = time.monotonic()
         self.received = []          # signal names, drained by the watcher
         self.stop = False
@@ -102,13 +103,19 @@ class SignalBox:
                                       logging.getLogger('fake-inverter-control').setLevel(level))))
         except (ValueError, AttributeError, SystemExit) as e:
             logger.warning('SIGHUP: reload failed (%s), keeping previous settings', e)
+            if self.audit:
+                self.audit.event('RELOAD', 'failed: %s' % e)
             return
         if not plan:
             logger.info('SIGHUP: reloaded, no FAKE_* environment settings to apply')
+            if self.audit:
+                self.audit.event('RELOAD', 'no FAKE_* environment settings to apply')
             return
         for _, fn in plan:
             fn()
         logger.info('SIGHUP: reloaded %d setting(s): %s', len(plan), ', '.join(label for label, _ in plan))
+        if self.audit:
+            self.audit.event('RELOAD', '%d setting(s): %s' % (len(plan), ', '.join(label for label, _ in plan)))
 
     # ---- SIGUSR1: reset the scenario (release pins + drop the write overlay)
 
@@ -118,6 +125,8 @@ class SignalBox:
         self.fake.overlay.clear()
         logger.info('SIGUSR1: scenario reset (%d pin(s), %d overlay register(s) cleared), simulation continues',
                     pins, overlay)
+        if self.audit:
+            self.audit.event('RESET', 'SIGUSR1: %d pin(s), %d overlay register(s) cleared' % (pins, overlay))
 
     # ---- SIGTERM / SIGINT
 
@@ -126,6 +135,9 @@ class SignalBox:
         dur = time.monotonic() - self.started
         logger.info('shutdown: %s received after %.0fs (%d client connection(s), %d request(s), %d chaos hit(s))',
                     name, dur, self.fake.conns, self.fake.requests, self.chaos.hits)
+        if self.audit:
+            self.audit.event('SHUTDOWN', '%s: uptime=%.0fs conns=%d requests=%d chaos_hits=%d'
+                             % (name, dur, self.fake.conns, self.fake.requests, self.chaos.hits))
         if self.control:
             self.control.cleanup()   # unlink the socket file before anything can exit first
         self.fake.stopping = True

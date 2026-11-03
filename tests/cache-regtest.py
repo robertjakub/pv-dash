@@ -17,7 +17,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(REPO, 'cache')
 
 P = os.path.join(CACHE_DIR, 'src', 'modbus_cache.py')
-F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
+F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
 R = os.path.join(REPO, 'profiles', 'sun2000.json')
 
 CACHE_PORT = 15505

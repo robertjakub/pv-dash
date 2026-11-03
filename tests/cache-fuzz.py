@@ -18,7 +18,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(REPO, 'cache')
 
 P = os.path.join(CACHE_DIR, 'src', 'modbus_cache.py')
-F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
+F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
 INV_PORT, CACHE_PORT = 15591, 15592
 ITERATIONS = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
 

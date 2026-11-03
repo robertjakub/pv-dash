@@ -75,8 +75,8 @@ docker run --rm -it fake-inverter bash          # poke around as pvsuite
 ```
 
 The same pattern extends to the scraper and the cache: swap the `COPY`/`CMD`
-lines for their `src/` trees. The version reports as `0.2.0` inside the
-image (no git metadata; a checkout shows `0.2.0-<short git>`).
+lines for their `src/` trees. The version reports as `0.2.1` inside the
+image (no git metadata; a checkout shows `0.2.1-<short git>`).
 
 ## License
 

@@ -20,11 +20,11 @@ stdenv.mkDerivation (finalAttrs: {
   installPhase = ''
     runHook preInstall
 
-    install -Dm755 src/fake_inverter.py $out/share/modbus-fake-inverter/fake_inverter.py
-    install -Dm755 src/fake_ctl.py $out/share/modbus-fake-inverter/fake_ctl.py
-    install -Dm755 src/fake_cli.py $out/share/modbus-fake-inverter/fake_cli.py
+    install -Dm755 bin/fake_inverter.py $out/share/modbus-fake-inverter/fake_inverter.py
+    install -Dm755 bin/fake_ctl.py $out/share/modbus-fake-inverter/fake_ctl.py
+    install -Dm755 bin/fake_cli.py $out/share/modbus-fake-inverter/fake_cli.py
     install -dm755 $out/share/modbus-fake-inverter/lib
-    install -m644 src/lib/*.py $out/share/modbus-fake-inverter/lib/
+    install -m644 lib/*.py $out/share/modbus-fake-inverter/lib/
     install -dm755 $out/share/modbus-fake-inverter/profiles
     install -m644 ${../profiles}/*.json $out/share/modbus-fake-inverter/profiles/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-fake-inverter \

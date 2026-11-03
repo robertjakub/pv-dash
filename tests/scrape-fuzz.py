@@ -16,7 +16,7 @@ import urllib.request
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRAPE_DIR = os.path.join(REPO, 'scrape')
 P = os.path.join(SCRAPE_DIR, 'src', 'scraper.py')
-F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
+F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
 FAKE_PORT, PORT = 15545, 19455
 ROUNDS = 3000
 

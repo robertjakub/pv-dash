@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """The battery state machine: charges the PV surplus (keeping a grid margin),
 covers the home deficit from storage, never leaves its SoC bounds. The SoC is
-stateful — it integrates the effective battery power with the simulated clock,
-so freezing/jumping the clock is the time-lapse control."""
+stateful — it integrates the effective battery power with the simulated clock
+(charge efficiency 95 %, self-discharge 0.01 %/h), so freezing/jumping the
+clock is the time-lapse control and the %SoC really moves while the battery
+charges/discharges."""
 import threading
 
 BATT_MAX_W = 2500.0         # max charge/discharge power
@@ -10,6 +12,10 @@ BATT_RESERVE_SOC = 10.0     # discharge floor
 BATT_GRID_MARGIN_W = 300.0  # keep this much export before charging
 BATT_STANDBY_W = 150.0      # home baseline the battery won't cover
 BATT_MAX_TICK_H = 24.0      # integration cap per clock step
+BATT_CHARGE_EFF = 0.95      # charge efficiency (5 % losses on the way in)
+BATT_SELF_DISCH_H = 0.01    # self-discharge, %/h
+BATT_DISCHARGE_CAP = 0.8    # only 80 % of the rating reaches the home: a
+                            # 10 kW battery can output at most 8 kW
 
 
 class BatteryMachine:
@@ -66,7 +72,8 @@ class BatteryMachine:
             if dt_h <= 0 or dt_h > BATT_MAX_TICK_H:
                 return self.soc
             w = self.decide(pv_w, load_w, self.soc) if forced_w is None else forced_w
-            d_soc = w * dt_h / (kwh * 10.0)
+            stored = w * (BATT_CHARGE_EFF if w > 0 else 1.0)   # the charge losses
+            d_soc = stored * dt_h / (kwh * 10.0) - BATT_SELF_DISCH_H * dt_h
             new = min(100.0, max(0.0, self.soc + d_soc))
             if d_soc < 0:
                 new = max(new, BATT_RESERVE_SOC)

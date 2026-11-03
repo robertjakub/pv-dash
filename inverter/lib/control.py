@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
-"""Line-protocol control server: set/show the fake's settings at runtime,
-scenario presets, status/reset/shutdown. Speaks one command per line, one
-reply per line; the target is a TCP port (bound to 127.0.0.1) or a unix
-socket path."""
+"""JSON-lines control server: set/show the fake's settings at runtime
+(value pins, the grid setpoint, the battery state force, cloud machines,
+clock freeze, chaos), scenario presets, and the status report / registers
+table / version / reset / shutdown. Speaks one command per line, one reply
+line. Every request and reply is one JSON object per line (the stdlib
+json module): the request = {"cmd": "<command>"}, the reply =
+{"status": "ok|err|bye", "text": "<reply text>"}. The target is a TCP port
+(bound to 127.0.0.1) or a unix socket path. TCP connections need a token
+auth handshake when --control-token is set ({"cmd": "auth", "token": ...});
+the unix socket relies on filesystem permissions instead."""
+import hmac
+import json
 import logging
 import math
 import os
@@ -10,7 +18,7 @@ import socket
 import threading
 import time
 
-from .protocol import recv_exact
+from .audit import AuditLog
 from .profile import load_profile, profile_label, resolve_profile
 from .version import version_string
 from .settings import SETTING_NAMES, SETTING_BY_NAME, describe_setting
@@ -20,10 +28,11 @@ logger = logging.getLogger('fake-inverter')
 
 
 class ControlServer:
-    """Line-protocol control socket: pin values, freeze time, tune chaos — see
+    """JSON-lines control socket: pin values, freeze time, tune chaos — see
     the README for the command list. The target is either a TCP port (bound to
     127.0.0.1) or a unix socket path (stale files are replaced, unlinked on
-    shutdown)."""
+    shutdown). A TCP connection must authenticate with the token first when
+    one is configured; the unix socket relies on filesystem permissions."""
 
     def describe(self):
         return 'unix:%s' % self.sockpath if self.is_unix else '127.0.0.1:%d' % self.port
@@ -45,7 +54,7 @@ class ControlServer:
         else:
             srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             srv.bind(('127.0.0.1', self.port))
-        srv.listen(4)
+        srv.listen(16)
         logger.info('control server listening on %s', self.describe())
         while True:
             try:
@@ -54,6 +63,33 @@ class ControlServer:
             except (OSError, RuntimeError) as e:
                 logger.error('control accept failed (%s), retrying', e)
                 time.sleep(0.1)
+
+    def framed(self, line, who, authed):
+        """One wire frame in, one out: parse {"cmd": ...}, gate the TCP auth,
+        run the command, return (cmd, reply-obj, internal-reply). The text of
+        a multi-line reply keeps its embedded newlines; the '.' terminator of
+        the internal form is stripped (the JSON frame needs no framing)."""
+        try:
+            obj = json.loads(line) if line else {}
+        except ValueError:
+            obj = None
+        if not isinstance(obj, dict) or not isinstance(obj.get('cmd'), str):
+            return '', {'status': 'err',
+                        'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request'
+        cmd = obj['cmd']
+        if self.token and not self.is_unix and cmd.lower() != 'auth' and not authed:
+            return cmd, {'status': 'err', 'text': 'authenticate first: {"cmd": "auth", "token": "..."}'}, \
+                'err authenticate first'
+        if cmd.lower() == 'auth':
+            given = obj.get('token')
+            if self.token and isinstance(given, str) and hmac.compare_digest(given, self.token):
+                return 'auth', {'status': 'ok', 'text': 'authenticated'}, 'ok authenticated'
+            return 'auth', {'status': 'err', 'text': 'bad token'}, 'err bad token'
+        reply = self.command(cmd)
+        if reply.endswith('\n.'):        # a legacy multi-line terminator; the JSON frames need none
+            reply = reply[:-2]
+        status, _, text = reply.partition(' ')
+        return cmd, {'status': status, 'text': text}, reply
 
     @staticmethod
     def peer(addr):
@@ -65,22 +101,35 @@ class ControlServer:
     def handle(self, client, addr):
         who = self.peer(addr)
         logger.debug('control client connected from %s', who)
+        authed = False
         try:
             client.settimeout(300)
             buf = b''
             while True:
-                chunk = recv_exact(client, 1) if b'\n' not in buf else b''
+                if b'\n' not in buf:      # buffered reads: a 1 MB frame must not
+                    chunk = client.recv(65536)   # cost a syscall per byte
+                    if not chunk:
+                        break
+                else:
+                    chunk = b''
                 buf += chunk
                 if b'\n' not in buf:
                     continue
                 line, buf = buf.split(b'\n', 1)
-                cmd = line.decode('utf-8', 'replace').strip()
-                reply = self.command(cmd)
+                cmd, obj, reply = self.framed(line.decode('utf-8', 'replace').strip(), who, authed)
+                if cmd == 'auth':
+                    ok = reply.startswith('ok')
+                    if ok:
+                        authed = True
+                    elif self.audit:
+                        self.audit.event('AUTH-FAIL', 'peer=%s' % who)
+                elif self.audit and cmd.lower() != 'ping':
+                    self.audit.event('COMMAND', "peer=%s '%s' -> %s" % (who, cmd, reply.split(' ', 1)[0]))
                 if self.log_replies:
                     logger.debug('control from %s: %s -> %s', who, cmd, reply)
                 else:
                     logger.debug('control from %s: %s', who, cmd)
-                client.sendall((reply + '\n').encode())
+                client.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())
                 if reply.startswith('bye'):
                     break
             if self.shutdown_pending and self.signalbox:
@@ -100,8 +149,10 @@ class ControlServer:
     # value pins, so the day simulation (and the battery machine) take over
     SCENARIOS = {'morning': 8.5, 'noon': 12.0, 'evening': 19.5, 'night': 23.0}
 
-    def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False):
+    def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None):
         self.log_replies = log_replies   # DEBUG also logs the full command output
+        self.audit = audit               # the INV audit trail (lib.audit), None = off
+        self.token = token               # the TCP auth token; None = no auth (the unix = the perms)
         self.simulator = simulator
         self.chaos = chaos
         self.fake = fake
@@ -110,6 +161,7 @@ class ControlServer:
         self.scenario = None        # last applied preset, or None = 'custom'
         self.defaults = defaults or {}   # setting -> configured startup value ('unset')
         self.target = str(target)
+        self.started = time.monotonic()
         self.is_unix = not self.target.isdigit()
         self.port = int(self.target) if not self.is_unix else None
         self.sockpath = self.target if self.is_unix else None
@@ -118,7 +170,7 @@ class ControlServer:
         sim, chaos, fake = self.simulator, self.chaos, self.fake
         val = value.lower()
         auto = val in ('auto', 'off', 'none', 'clear', 'live')
-        if key in ('pv', 'load', 'batt', 'soc', 'cloud'):
+        if key in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud'):
             if key == 'cloud' and val in CLOUD_MACHINES:
                 sim.set_cloud_mode(val)
                 return val
@@ -128,6 +180,11 @@ class ControlServer:
             if auto:
                 return 'clear' if key == 'cloud' else 'auto'
             return '%g' % float(val)
+        if key == 'timezone':
+            if val not in ('utc', 'local'):
+                raise ValueError('timezone must be utc|local')
+            sim.utc = val == 'utc'
+            return val
         if key == 'time':
             if auto:
                 sim.freeze(None)
@@ -150,6 +207,11 @@ class ControlServer:
         if key == 'battery':
             sim.battery = val in ('on', 'true', '1', 'yes')
             return 'on' if sim.battery else 'off'
+        if key == 'mppt':
+            if val not in ('both', 'east', 'west', 'none'):
+                raise ValueError('mppt must be both|east|west|none')
+            sim.mppt = val
+            return val
         if key == 'battery-state':
             if val not in ('auto', 'charging', 'discharging'):
                 raise ValueError('battery-state must be auto|charging|discharging')
@@ -157,6 +219,12 @@ class ControlServer:
                 raise ValueError('battery-state needs the battery on (set battery on)')
             sim.batt_state = None if val == 'auto' else val
             return val
+        if key == 'grid-voltage':
+            v = float(val)
+            if not 1 <= v <= 500:
+                raise ValueError('grid-voltage must be a sane nominal voltage (1-500 V)')
+            sim.grid_voltage = v
+            return '%g' % v
         if key == 'strict':
             fake.strict = val in ('on', 'true', '1', 'yes')
             return 'on' if fake.strict else 'off'
@@ -192,14 +260,14 @@ class ControlServer:
         if key == 'scenario':
             if val == 'custom':
                 sim.freeze(None)
-                for k in ('pv', 'load', 'batt', 'soc', 'cloud'):
+                for k in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud'):
                     sim.override(k, None)
                 self.scenario = 'custom'
                 return val
             if val not in self.SCENARIOS:
                 raise ValueError('unknown scenario %s (try %s)' % (val, '|'.join(sorted(self.SCENARIOS))))
             sim.freeze(self.SCENARIOS[val])
-            for k in ('pv', 'load', 'batt', 'soc', 'cloud'):
+            for k in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud'):
                 sim.override(k, None)
             self.scenario = val
             return val
@@ -214,10 +282,12 @@ class ControlServer:
 
     def _get(self, key):
         sim, ov, fake, chaos = self.simulator, self.simulator.overrides(), self.fake, self.chaos
-        if key in ('pv', 'load', 'batt', 'soc', 'cloud'):
+        if key in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud'):
             if ov[key] is None:
                 return 'clear' if key == 'cloud' else 'auto'
             return '%g' % ov[key]
+        if key == 'timezone':
+            return 'utc' if sim.utc else 'local'
         if key == 'time':
             return 'auto' if sim.frozen_time is None else '%02d:%02d' % (int(sim.frozen_time), round((sim.frozen_time % 1.0) * 60))
         if key == 'chaos':
@@ -226,8 +296,12 @@ class ControlServer:
             return 'random' if chaos.seed is None else str(chaos.seed)
         if key == 'battery':
             return 'on' if sim.battery else 'off'
+        if key == 'mppt':
+            return sim.mppt
         if key == 'battery-state':
             return sim.batt_state or 'auto'
+        if key == 'grid-voltage':
+            return '%g' % sim.grid_voltage
         if key == 'strict':
             return 'on' if fake.strict else 'off'
         if key == 'static':
@@ -291,23 +365,37 @@ class ControlServer:
                 return 'err show what? (a setting, "status", or "settings")'
             what = args[0].lower()
             if what == 'status':
-                return self.status()
+                return self.status_report()
             if what == 'version':
-                return 'fake-inverter %s' % version_string()
+                return 'ok fake-inverter %s' % version_string()
             if what in ('settings', 'all'):
                 return 'ok ' + self.settings()
             if what == 'registers':
                 entries = self.simulator.profile.entries
-                rows = ['%s | %d | %s' % (name, addr, typ)
-                        for name, addr, typ, _scale in entries]
-                if not rows:
+                if not entries:
                     return 'ok registers: (the profile has no registers)'
+                # name | register | type | current value (NaN = the profile
+                # maps a value the simulator is not calculating right now,
+                # e.g. the battery block with the battery off)
+                vals = self.simulator.values()
+                overlay = dict(self.fake.overlay) if self.fake else {}
+                rows = []
+                for name, addr, typ, _scale in entries:
+                    if addr in overlay:
+                        val = '%d *' % overlay[addr]   # a write overlay wins (set register/FC16)
+                    elif vals.get(name) is None:
+                        val = 'NaN'
+                    else:
+                        val = '%g' % vals.get(name)
+                    rows.append((name, str(addr), typ, val))
                 # a multi-line reply: the clients read on until the '.' terminator
-                w1 = max(len(r.split(' | ')[0]) for r in rows)
-                w2 = max(len(r.split(' | ')[1]) for r in rows)
-                table = '\n'.join('%-*s | %*s | %s' % (w1, a, w2, b, c)
-                                  for a, b, c in (r.split(' | ') for r in rows))
-                return 'ok registers (%d)\n%s\n.' % (len(rows), table)
+                w1 = max(len(r[0]) for r in rows)
+                w2 = max(len(r[1]) for r in rows)
+                w3 = max(len(r[2]) for r in rows)
+                w4 = max(len(r[3]) for r in rows)
+                table = '\n'.join('%-*s | %*s | %*s | %*s' % (w1, a, w2, b, w3, c, w4, d)
+                                  for a, b, c, d in rows)
+                return 'ok registers (%d)\n%s' % (len(rows), table)
             if what not in self.SETTING_KEYS:
                 return 'err unknown setting %s (try help)' % what
             return 'ok %s=%s' % (what, self._get(what))
@@ -315,6 +403,20 @@ class ControlServer:
             if len(args) < 2:
                 return 'err set needs a setting and a value (try help)'
             key, value = args[0].lower(), ' '.join(args[1:])
+            if key == 'register':   # the control write = the Modbus write: the same
+                if not self.fake:   # overlay FC06/FC16 land in, so the scrapers see it
+                    return 'err no modbus device attached'
+                if len(args) < 3:
+                    return 'err set register needs an address and a value'
+                try:
+                    addr, val = int(args[1]), int(args[2])
+                except ValueError:
+                    return 'err register address and value must be integers'
+                if not 0 <= addr <= 65535 or not 0 <= val <= 65535:
+                    return 'err register address/value out of range (0..65535)'
+                self.fake.overlay[addr] = val
+                logger.info('control: set register %d=%d (write overlay)', addr, val)
+                return 'ok register %d=%d (the write overlay, the scrapers read it)' % (addr, val)
             if key not in self.SETTING_KEYS:
                 return 'err unknown setting %s (try help)' % key
             try:
@@ -326,15 +428,38 @@ class ControlServer:
             return 'ok %s=%s %s' % (key, shown, self.status())
         return 'err unknown command %s (try help)' % cmd
 
+    def status_report(self):
+        """The status as a compact multi-field report: one stable key=value
+        per line (scriptable)."""
+        sim = self.simulator
+        pv_w, load_w, batt_w, soc, cloud, ov = sim.effective()
+        grid_w = pv_w - batt_w - load_w
+        t = sim.clock()
+        pinned = ','.join('%s=%s' % (k, ov[k]) for k in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud')
+                          if ov[k] is not None) or 'none'
+        rows = ['pv=%d' % round(pv_w), 'load=%d' % round(load_w), 'grid=%d' % round(grid_w),
+                'mppt=%s' % sim.mppt, 'grid_voltage=%g' % sim.grid_voltage,
+                'timezone=%s' % ('utc' if sim.utc else 'local')]
+        if sim.battery:
+            rows += ['battery=%d' % round(batt_w),
+                     'soc=%s' % ('%.1f' % soc if soc is not None else 'n/a'),
+                     'battery_state=%s' % (sim.batt_state or 'auto')]
+        rows += ['cloud=%s' % sim.cloud_display(),
+                 'clock=%02d:%02d' % (int(t), round((t % 1.0) * 60)),
+                 'uptime=%d' % int(time.monotonic() - self.started),
+                 'chaos=%.2f' % self.chaos.p, 'chaos_hits=%d' % self.chaos.hits,
+                 'pinned=%s' % pinned, 'profile=%s' % sim.profile.description]
+        return 'ok status\n' + '\n'.join(rows)
+
     def status(self):
         sim = self.simulator
         pv_w, load_w, batt_w, soc, cloud, ov = sim.effective()
         t = sim.clock()
-        pinned = ' '.join('%s=%s' % (k, ov[k]) for k in ('pv', 'load', 'batt', 'soc', 'cloud') if ov[k] is not None)
+        pinned = ' '.join('%s=%s' % (k, ov[k]) for k in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud') if ov[k] is not None)
         extra = ' batt-state=%s' % sim.batt_state if sim.batt_state else ''
-        return ('pv=%.0fW load=%.0fW batt=%.0fW soc=%s cloud=%s t=%02d:%02d chaos=%.2f hits=%d%s%s'
+        return ('pv=%.0fW load=%.0fW batt=%.0fW soc=%s cloud=%s mppt=%s t=%02d:%02d chaos=%.2f hits=%d%s%s'
                 % (pv_w, load_w, batt_w,
                    '%.1f%%' % soc if soc is not None else 'n/a',
-                   sim.cloud_display(),
+                   sim.cloud_display(), sim.mppt,
                    int(t), round((t % 1.0) * 60), self.chaos.p, self.chaos.hits, extra,
                    (' pinned: ' + pinned) if pinned else ''))

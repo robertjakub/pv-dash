@@ -22,13 +22,14 @@ RUN apk add --no-cache python3 bash \
 
 WORKDIR /pv-suite
 COPY --chown=pvsuite --from=profiles profiles/ profiles/
-COPY --chown=pvsuite src/ inverter/src/
-RUN chmod +x inverter/src/fake_inverter.py inverter/src/fake_cli.py inverter/src/fake_ctl.py \
-    && ln -s /pv-suite/inverter/src/fake_inverter.py /usr/local/bin/fake-inverter \
-    && ln -s /pv-suite/inverter/src/fake_ctl.py /usr/local/bin/fake-ctl \
-    && ln -s /pv-suite/inverter/src/fake_cli.py /usr/local/bin/fake-cli
+COPY --chown=pvsuite bin/ inverter/bin/
+COPY --chown=pvsuite lib/ inverter/lib/
+RUN chmod +x inverter/bin/*.py \
+    && ln -s /pv-suite/inverter/bin/fake_inverter.py /usr/local/bin/fake-inverter \
+    && ln -s /pv-suite/inverter/bin/fake_ctl.py /usr/local/bin/fake-ctl \
+    && ln -s /pv-suite/inverter/bin/fake_cli.py /usr/local/bin/fake-cli
 
 USER pvsuite
 
 EXPOSE 5502
-CMD ["fake-inverter", "--host", "0.0.0.0", "--port", "5502"]
+CMD ["fake-inverter", "--host", "0.0.0.0", "--port", "5502", "--audit-log", "-"]

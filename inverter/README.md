@@ -25,13 +25,17 @@ It ships three tools:
 ## Quick start
 
 ```bash
-python3 inverter/src/fake_inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
-python3 inverter/src/fake_inverter.py --time 12:00          # frozen noon: ~4.5 kW PV, exporting
-python3 inverter/src/fake_inverter.py --static              # constant PV 4000 W, grid -1500 W, battery charging 1200 W at 65 %
-python3 inverter/src/fake_inverter.py --port 15502 --log-level DEBUG
+python3 inverter/bin/fake_inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
+python3 inverter/bin/fake_inverter.py --time 12:00          # frozen noon: ~4.5 kW PV, exporting
+python3 inverter/bin/fake_inverter.py --static              # constant PV 4000 W, grid -1500 W, battery charging 1200 W at 65 %
+python3 inverter/bin/fake_inverter.py --port 15502 --log-level DEBUG
 ```
 
 ## Simulation
+
+All the state machines integrate with a **simulated clock: UTC by default**
+(`--timezone local` / `set timezone local` for the host wall clock; the
+frozen `--time`/`set time` clock is zone-independent).
 
 By default it simulates a sunny day: bell-curve PV between 06:00 and 18:00
 (peak 75 % of `--max-kwp`), home load with morning and evening peaks — so the
@@ -48,11 +52,16 @@ the classic numbers, useful for screenshots and the load tests. The
 runtime control (`set pv`, `set load`, …) pins the individual terms on
 top of either mode.
 
-### The three state machines
+### The state machines
 
-**PV (the sun).** A sine bell between 06:00 and 18:00, peaking at 75 % of
-`--max-kwp`; night = 0 W. The cloud factor scales it in real time, so the
-cloud machine modulates the sun itself.
+**PV (the sun, two MPPT strings).** The array is two strings with an
+east/west orientation — string-1 = the **east** array (sine bell 06:00–16:00,
+peaking late morning), string-2 = the **west** array (08:00–18:00, peaking
+early afternoon). Each carries half the array; together they make a
+double-shouldered day with a high midday plateau. `set mppt
+both|east|west|none` enables/assigns the strings (`both` = the default);
+a dark string serves 0 V/0 A, `none` = PV 0. The cloud factor scales the
+sun in real time. The day yield integrates the actual string curve.
 
 **Battery.** The battery state machine (day simulation, battery on — the
 default; `--no-battery` opts out):
@@ -62,13 +71,28 @@ default; `--no-battery` opts out):
 - stops at the bounds: 100 % full, 10 % reserve floor
 
 The SoC is **stateful**: it integrates the effective battery power with the
-simulated clock. Moving the clock (`set time 18:00`) therefore acts as a
-time-lapse control; a full battery holds the surplus for the grid; a drained
-one lets the grid cover the home. `set soc <pct>` seeds the machine (unpinning
+simulated clock — charge/discharge really moves the %SoC, with the realism
+folded in:
+
+- the **charge efficiency** is 95 % (5 % losses on the way in)
+- the **self-discharge** is 0.01 %/h
+- the **discharge is capped at 80 % of the rating** — a 10 kW battery can
+  output at most 8 kW to the home (the full rating charges)
+- the power is **temperature-derated**: the deep cold (below 0 °C) allows
+  half power, below 10 °C 80 %, above 40 °C 90 %, above 50 °C 70 % (the
+  battery follows the site temperature model) Moving the clock (`set time 18:00`) therefore
+acts as a time-lapse control; a full battery holds the surplus for the
+grid; a drained one lets the grid cover the home. `set soc <pct>` seeds the machine (unpinning
 resumes from there); `reset` re-seeds the SoC from the simulated day.
 `set battery-state charging|discharging` forces the machine to full charge or
 discharge power regardless of the surplus (the SoC bounds still hold); `auto`
 (or `unset battery-state`) hands the decision back to the machine.
+
+**Grid setpoint.** `set grid <W>` pins the grid line: the battery balances —
+it charges or discharges whatever holds the grid at the pinned power, so
+`set grid 0` is a zero-export home (the surplus charges, the deficit
+discharges, the battery limits let the residual spill to the grid). `auto`
+(or `unset grid`) returns the grid to the plain pv − battery − home balance.
 
 **Clouds.** A pinned factor (`set cloud 0.7`), a clear sky (`set cloud clear`
 — the default state, shown as `cloud=clear`), or a small state machine — a
@@ -83,6 +107,21 @@ mean-reverting random walk over the simulated clock:
 Like the battery, the machines integrate with the simulated clock: clock
 jumps move the clouds (time-lapse), a frozen clock freezes them. `reset`
 returns to a clear sky.
+
+**Grid voltage.** The grid-side phase voltages come from a small state
+machine: three independent mean-reverting walks around the nominal voltage,
+clamped to ±10 % — the phases wander differently (an unbalanced grid). It
+integrates with the simulated clock like everything else (time-lapse moves
+it, a frozen clock freezes it). The nominal comes from `--grid-voltage`
+(default 230 V, `120` supported — the currents double to carry the same
+power) and `set grid-voltage 120|230` at runtime; the output- and
+meter-voltage/current registers follow per phase.
+
+**The unbalanced home.** The home load is not split into symmetric thirds:
+three slow mean-reverting walks around 1/3 per phase (each clamped to
+22–44 %, renormalised) distribute the load asymmetrically — the per-phase
+meter currents really differ. The inverter injection stays balanced; the
+meter sees the net per-phase power.
 
 ### Inverter profiles
 
@@ -129,7 +168,16 @@ ever lands in the working directory. Pass a TCP port number to bind
 resolve the target the same way: flag > **`FAKE_CTL`** environment variable >
 default socket.
 
-One command per line, one reply per line (`ok …` / `err …` / `bye …`):
+The wire is **JSON lines** (stdlib `json` only): one request object per
+line, one reply object per line. The request is `{"cmd": "<command>"}`, the
+reply is `{"status": "ok" | "err" | "bye", "text": "<reply text>"}` — a
+multi-line reply (`show status`, `show registers`) keeps its newlines inside
+`text`, no framing terminator needed. `{"cmd": "ping"}` answers
+`{"status": "ok", "text": "pong"}` (the keepalive). **TCP connections need a
+token when `--control-token <secret>` is set**: the first request must be
+`{"cmd": "auth", "token": "..."}`; the unix socket needs no token (the
+filesystem permissions are the auth). The clients take `--control-token`
+/ **`FAKE_CONTROL_TOKEN`** and authenticate automatically:
 
 | Command | Effect |
 |---|---|
@@ -137,9 +185,9 @@ One command per line, one reply per line (`ok …` / `err …` / `bye …`):
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
 | `show settings` | every setting and its value |
-| `show status` | one-line **effective** state (what the registers serve right now + what is pinned) |
-| `show registers` | the loaded profile's register map, one register per line: `name \| register \| type`, columns aligned |
-| `show version` | the fake-inverter version (`0.2.0`, or `0.2.0-<short git>` from a checkout) |
+| `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `uptime`, `chaos`, `chaos_hits`, `pinned`, `profile`, `timezone`), `.`-terminated — scriptable |
+| `show registers` | the loaded profile's register map, one register per line: `name \| register \| type \| value`, columns aligned; the value = what the registers serve right now, `NaN` = not calculated (e.g. the battery block with the battery off) |
+| `show version` | the fake-inverter version (`0.2.1`, or `0.2.1-<short git>` from a checkout) |
 | `set scenario <name>` | apply a scenario preset (below) |
 | `reset` | clear **all** pinned settings and the Modbus write overlay at once (like SIGUSR1, per-connection) |
 | `shutdown` | gracefully stop the fake inverter (same as SIGTERM: session summary, control socket unlinked) |
@@ -153,8 +201,12 @@ One command per line, one reply per line (`ok …` / `err …` / `bye …`):
 | `pv` | `W` \| `auto` | pin the PV power |
 | `load` | `W` \| `auto` | pin the home load |
 | `batt` | `W` \| `auto` | pin the battery power, +charge/−discharge (the state machine integrates it into the SoC) |
+| `grid` | `W` \| `auto` | pin the **grid setpoint** (+export/−import): the battery balances to hold it (`set grid 0` = zero-export) |
+| `grid-voltage` | `120` \| `230` | nominal grid phase voltage (V); the per-phase machine wanders ±10 % around it |
 | `soc` | `%` \| `auto` | pin the state of charge (also seeds the machine) |
+| `mppt` | `both` \| `east` \| `west` \| `none` | enabled PV strings: string-1 = the east array (the morning peak), string-2 = the west array (the afternoon peak); `both` = the default, `none` = PV 0 |
 | `cloud` | `0..1` \| `clear` \| `autumn` \| `spring` \| `winter` | scale the PV: a pinned factor, a clear sky (the default), or a cloud state machine |
+| `timezone` | `utc` \| `local` | clock the state machines integrate over: UTC (the default) or the host wall clock |
 | `time` | `HH:MM` \| `auto` | freeze / unfreeze the clock — clock jumps integrate the battery and move the clouds (time-lapse) |
 | `scenario` | `morning` \| `noon` \| `evening` \| `night` \| `custom` | freeze the clock at a typical moment **and release the value pins** (08:30 / 12:00 / 19:30 / 23:00); manual pins turn it `custom`, `set scenario custom` releases everything again |
 | `chaos` | `0..1` \| `off` | tune chaos injection live |
@@ -165,6 +217,7 @@ One command per line, one reply per line (`ok …` / `err …` / `bye …`):
 | `static` | `on` \| `off` | switch static demo values / day simulation |
 | `max-kwp` | `kW` | PV array size (peak = 75 % of it) |
 | `battery-kwh` | `kWh` | usable battery capacity |
+| `register` | `addr value` | `set register <addr> <value>` — write a raw register into the **write overlay** (the same store the FC06/FC16 writes use, so the scrapers read it); `reset` clears it, `show registers` marks the rows with `*` |
 | `profile` | `<file>` | swap the register-map profile live |
 | `log-level` | `DEBUG\|INFO\|WARNING\|ERROR` | live log level |
 
@@ -175,19 +228,29 @@ read, so the wire grammar, the help texts and the completions can never drift.
 ### `fake_ctl` — one-shot / batch client
 
 ```bash
-python3 inverter/src/fake_ctl.py set pv 2500
-python3 inverter/src/fake_ctl.py show settings
-printf 'set pv 2500\nset soc 30\nshow status\n' | python3 inverter/src/fake_ctl.py --control-port 15599
+python3 inverter/bin/fake_ctl.py set pv 2500
+python3 inverter/bin/fake_ctl.py show settings
+printf 'set pv 2500\nset soc 30\nshow status\n' | python3 inverter/bin/fake_ctl.py --control-port 15599
 ```
 
 Same `--control-port` flag / `FAKE_CTL` env as the fake itself; several
 commands can be passed as arguments or piped on stdin (one reply per line).
 Exit codes: `0` = ok, `1` = connection/control error, `2` = CLI misuse.
+Every invocation lands in the audit log (below).
 
 ### `fake_cli` — console-style session
 
-An interactive front-end on the same socket (same flag/env resolution): the
-prompt shows the connected port, `set`/`unset` print only the `ok`
+An interactive front-end on the same socket (same flag/env resolution): on
+the first connect it probes the status and greets you —
+
+```
+% Welcome to the Fake Inverter console —
+%   SUN2000 with optional LUNA2000 battery and meter
+%   running for 30 s | utc clock | 230 V grid | battery on
+%   TAB completes, ? lists the commands, help <setting> explains one, quit leaves
+```
+
+The prompt shows the connected port, `set`/`unset` print only the `ok`
 confirmation, `show <setting>` prints the bare value, `show settings` prints
 one setting per line, and `shutdown` asks `Proceed with shutdown? [confirm]`
 first — RETURN or `y` proceeds, anything else aborts with `% Aborted.`.
@@ -202,7 +265,7 @@ from the shared registry. `?` in any position prints the same list without
 completing; `help <setting>` shows the description on the wire, too.
 
 ```
-$ python3 inverter/src/fake_cli.py
+$ python3 inverter/bin/fake_cli.py
 
 fake-inverter:5502 > set pv 2500
 ok
@@ -250,8 +313,13 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--host` | `127.0.0.1` | bind address |
 | `--port` | `5502` | Modbus TCP port |
 | `--unit` | `1` | Modbus unit id served |
+| `--grid-voltage` | `230` | nominal grid phase voltage (V, 120 or 230); the per-phase machine wanders ±10 % around it |
+| `--audit-log` | XDG state | the audit trail: a file path or `-` for stdout (docker logs / journald) |
+| `--audit-max-mb` | `10` | rotate the audit log at this size, keeping 3 backups; `0` = off |
+| `--audit-daily` | off | also rotate the audit log at UTC midnight |
 | `--max-kwp` | `6` | PV array size in kWp, peak = 75 % of it |
-| `--time` | real clock | freeze simulated time `HH:MM` |
+| `--timezone` | `utc` | clock the state machines integrate over (`utc` or `local`) |
+| `--time` | real clock | freeze simulated time `HH:MM` (zone-independent) |
 | `--static` | off | constant demo values instead of the day simulation |
 | `--battery` | on | simulate a battery (the battery state machine runs; on by default) |
 | `--no-battery` | | no battery values |
@@ -279,8 +347,69 @@ docker compose exec fake-inverter fake-cli      # console session on the control
 docker compose down
 ```
 
-The version reports as `0.2.0` inside the image (no git metadata; a
-checkout shows `0.2.0-<short git>`).
+The version reports as `0.2.1` inside the image (no git metadata; a
+checkout shows `0.2.1-<short git>`).
+
+### Audit trail
+
+The fake itself and both clients append to the **audit log** — on by
+default everywhere, at the **XDG state home**
+(`~/.local/state/fake-inverter/audit.log`, NOT the working directory: a
+packaged install has a read-only one). `--audit-log <file>` renames it,
+`--no-audit-log` turns it off. **`--audit-log -` sends the trail to
+stdout, not stderr** — the audit is data, not an error, and stdout keeps it
+in the single ordered stream the service manager captures (docker logs,
+journald); the shipped Dockerfile runs with it. `--audit-files N` (the
+default 3) sets how many rotated backups the file sink keeps; the stdout
+sink never rotates. If the audit file
+cannot be opened, the trail falls back to stdout rather than vanishing. **Rotation is gated**: `--audit-max-mb 10`
+(the default) rotates at 10 MB keeping 3 backups (`audit.log.1..3`),
+`--audit-daily` additionally rotates at UTC midnight, `--audit-max-mb 0`
+= unbounded. One line per event; the prefix names the writer — `INV`
+(the fake), `CLI` (fake_cli), `CTL` (fake_ctl):
+
+```
+2026-11-03T20:10:06Z INV START version=0.2.1 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
+2026-11-03T20:10:07Z INV COMMAND peer=127.0.0.1:54425 'set soc 40' -> ok
+2026-11-03T20:10:08Z INV RESET SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
+2026-11-03T20:10:08Z INV SHUTDOWN SIGTERM: uptime=2s conns=0 requests=0 chaos_hits=0
+2026-11-03T18:44:10Z CLI CONNECT target=127.0.0.1:15731 user=oom
+2026-11-03T18:44:10Z CLI COMMAND 'quit' -> local
+2026-11-03T18:44:10Z CLI DISCONNECT target=127.0.0.1:15731
+```
+
+UTC stamps, the command as entered and its outcome (`ok` / `err`) — the
+NIS2/DORA-style who-when-what evidence trail. **Every wire command is
+audited once, by the server** (`INV COMMAND`, with the client peer — it
+knows the who); the clients audit their session (the CONNECT/the
+DISCONNECT) and the local-only events (`quit`, an aborted `shutdown`).
+The fake logs its lifecycle too: `START`, `RELOAD` (SIGHUP), `RESET`
+(SIGUSR1) and `SHUTDOWN` (a restart = the SHUTDOWN + the next START).
+ping/pong keepalives are never logged; the file is flushed per event, so
+a crash keeps everything up to the last command.
+
+The operational log (stdout — journald/docker capture it) keeps mirroring
+the commands at the INFO level; the audit file is the structured evidence
+trail, not a duplicate of it.
+
+## Security
+
+Honest scope of a demo device, with the NIS2/DORA arguments where they hold:
+
+- **Minimal supply chain.** Every tool is Python standard library only — the
+  SBOM is two lines (python + alpine in the container). No pip, no vendored
+  code, nothing to audit beyond the stdlib.
+- **The control surface is plain-text by design** — a demo harness: the TCP
+  control server binds `127.0.0.1` only, and `--control-token` adds a
+  token-auth handshake for TCP (the clients authenticate with
+  `FAKE_CONTROL_TOKEN`); the unix socket relies on filesystem permissions.
+  The container runs as the unprivileged `pvsuite` user. Do not expose the
+  control port to untrusted networks.
+- **Auditable by default.** The CLIs keep the append-only audit trail above
+  (who, when, what, result) — the NIS2/DORA-style logging evidence, on
+  unless explicitly disabled.
+- **Synthetic data only.** Nothing served is measured from a real device;
+  there is no PII and no production telemetry to protect.
 
 ## Nix
 
@@ -295,7 +424,7 @@ fake is a test/demo tool, not a daemon you deploy.
 ## Source layout
 
 ```
-inverter/src/
+inverter/bin/
 ├── fake_inverter.py    # CLI entry, logging, wiring
 ├── fake_ctl.py         # control-server CLI client (one-shot / batch)
 ├── fake_cli.py         # console-style interactive control session

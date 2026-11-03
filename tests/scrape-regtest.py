@@ -6,6 +6,7 @@ Starts its own fake inverter + scraper instances on scratch ports and
 cleans up after itself.
 """
 import json as _json
+import getpass
 import os
 import random
 import signal
@@ -22,7 +23,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRAPE_DIR = os.path.join(REPO, 'scrape')
 
 P = os.path.join(SCRAPE_DIR, 'src', 'scraper.py')
-F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
+F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
 FAKE_PORT = 15541
 PORT_A, PORT_B = 19441, 19442
 
@@ -298,11 +299,18 @@ try:
 
     # 2c. fake extras: control server (runtime overrides) + chaos injection
     def ctl(cmd, port):
+        # the JSON-lines control transport: one request object, one reply object
         s = socket.create_connection(('127.0.0.1', port), timeout=5)
-        s.sendall((cmd + '\n').encode())
-        r = s.recv(512)
+        s.sendall((_json.dumps({'cmd': cmd}, ensure_ascii=False) + '\n').encode())
+        buf = b''
+        while not buf.endswith(b'\n'):
+            chunk = s.recv(65536)
+            if not chunk:
+                break
+            buf += chunk
         s.close()
-        return r.decode().strip()
+        obj = _json.loads(buf.decode('utf-8', 'replace'))
+        return '%s %s' % (obj.get('status', 'err'), str(obj.get('text', '')))
 
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15570',
                                    '--control-port', '15571'],
@@ -328,11 +336,12 @@ try:
     time.sleep(1.5)
     m = metrics_dict(get('/metrics', 19455)[1])
     check('control: pv override released', m.get('huawei_pv_generation_watts') == 4000)
-    check('control: status line', 'pv=4000W' in ctl('show status', 15571)
-          and 'pinned: soc=30.0' in ctl('show status', 15571), ctl('show status', 15571))
+    st = ctl('show status', 15571)
+    check('control: status report (key=value rows)', st.startswith('ok status\n')
+          and '\npv=4000\n' in st and '\npinned=soc=30.0\n' in st, st)
 
     # 2d. fake_ctl.py: the CLI tool speaks TCP and unix-socket control servers
-    C = os.path.join(REPO, 'inverter', 'src', 'fake_ctl.py')
+    C = os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py')
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'pv', '2700'], capture_output=True, text=True)
     check('fake_ctl: TCP pin via tool', r.returncode == 0 and r.stdout.startswith('ok pv=2700 '), r.stdout.strip())
     time.sleep(1.5)
@@ -379,7 +388,7 @@ try:
           and r.stdout.startswith('ok reset (0 pin(s)') and 'pinned' not in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'help'], capture_output=True, text=True)
     check('control: help lists the commands', r.returncode == 0
-          and r.stdout.startswith('commands: set <pv|load|batt|soc') and 'chaos' in r.stdout, r.stdout.strip())
+          and r.stdout.startswith('commands: set <pv|load|batt|grid|soc') and 'chaos' in r.stdout, r.stdout.strip())
 
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'settings'], capture_output=True, text=True)
     check('control: show settings lists every setting', r.returncode == 0
@@ -417,7 +426,7 @@ try:
     time.sleep(1)
     ctl_full = open('/tmp/scr_ctl_full.log').read()
     check('fake audit: --control-log-replies logs the full command output',
-          ': set soc 30 -> ok' in ctl_full and ': show status -> pv=' in ctl_full, ctl_full[-200:])
+          ': set soc 30 -> ok' in ctl_full and ': show status -> ok status' in ctl_full, ctl_full[-200:])
 
     # 2f. FAKE_CTL environment (short name) drives both tools when the flag is unset
     r = subprocess.run([sys.executable, C, 'set', 'pv', '2200'], capture_output=True, text=True,
@@ -437,7 +446,8 @@ try:
     r = subprocess.run([sys.executable, C, 'show', 'status'], capture_output=True, text=True,
                        env={**os.environ, 'FAKE_CTL': SIG_SOCK2})
     check('fake: FAKE_CTL env opens the default-flag-less control server',
-          r.returncode == 0 and 'pv=4000W' in r.stdout and os.path.exists(SIG_SOCK2), r.stdout.strip())
+          r.returncode == 0 and '\npv=4000\n' in r.stdout and '\ngrid=-1500\n' in r.stdout
+          and '\nbattery=1200\n' in r.stdout and '\npinned=none\n' in r.stdout, r.stdout.strip())
     os.kill(fake_env.pid, signal.SIGTERM)
     time.sleep(1)
     check('fake: env-socket unlinked on shutdown', not os.path.exists(SIG_SOCK2)
@@ -451,28 +461,132 @@ try:
     time.sleep(0.8)
     st = ctl('show status', 15583)
     check('battery machine: full battery holds the noon surplus for the grid',
-          'batt=0W soc=100.0%' in st, st)
+          '\nbattery=0\n' in st and '\nsoc=100.0\n' in st, st)
     ctl('set soc 95', 15583); ctl('set pv 3000', 15583); ctl('set load 1000', 15583)
     st = ctl('show status', 15583)
-    check('battery machine: surplus charges with the grid margin', 'batt=1700W' in st, st)
+    check('battery machine: surplus charges with the grid margin', '\nbattery=1700\n' in st, st)
     ctl('set pv 6000', 15583); ctl('set load 500', 15583)
     st = ctl('show status', 15583)
-    check('battery machine: charge clamp at max power', 'batt=2500W' in st, st)
+    check('battery machine: charge clamp at the temperature-derated max', '\nbattery=2250\n' in st, st)
     ctl('set pv 0', 15583); ctl('set load 1000', 15583)
     st = ctl('show status', 15583)
-    check('battery machine: deficit discharges', 'batt=-850W' in st, st)
+    check('battery machine: deficit discharges', '\nbattery=-850\n' in st, st)
     ctl('set soc auto', 15583); ctl('set time 18:00', 15583)
     st = ctl('show status', 15583)
     check('battery machine: clock jump integrates the SoC (time-lapse)',
-          'soc=21.1%' in st and 'batt=-850W' in st, st)
+          '\nsoc=21.0\n' in st and '\nbattery=-850\n' in st, st)
     ctl('set load 6000', 15583); ctl('set time 19:00', 15583)
     st = ctl('show status', 15583)
     check('battery machine: discharge stops at the 10 % reserve',
-          'soc=10.0%' in st and 'batt=0W' in st, st)
+          '\nsoc=10.0\n' in st and '\nbattery=0\n' in st, st)
+    # 2g2. grid setpoint: the battery balances to hold the grid line
+    ctl('set pv 3000', 15583); ctl('set load 1000', 15583); ctl('set soc 80', 15583)
+    ctl('set grid 0', 15583)
+    st = ctl('show status', 15583)
+    check('grid setpoint: zero-export held by the battery', '\ngrid=0\n' in st
+          and '\nbattery=2000\n' in st and 'grid=0.0' in st.split('pinned=')[1], st)
+    r = read3(37113, 2, 15580)
+    check('grid setpoint: the grid register serves the pinned 0',
+          r[0] == 3 and struct.unpack('>i', r[2:6])[0] == 0, r.hex())
+    ctl('unset grid', 15583)
+    st = ctl('show status', 15583)
+    check('grid setpoint: unset returns to the balance', '\ngrid=300\n' in st
+          and 'pinned=pv=3000.0,load=1000.0,soc=80.0' in st, st)
+    # 2g2b. mppt strings: string-1 = the east array (the morning peak), string-2 =
+    # the west array (the afternoon peak); the setting enables/assigns them
+    ctl('set pv auto', 15583); ctl('set load auto', 15583); ctl('set soc auto', 15583)
+    ctl('set time 12:00', 15583)
+    ctl('set mppt west', 15583)
+    r = read3(32016, 4, 15580)     # the string-1 V/I, the string-2 V/I
+    words = struct.unpack('>4H', r[2:10])
+    check('mppt: west only = the east string dark, the west string live',
+          words[0] == 0 and words[1] == 0 and words[2] > 0 and words[3] > 0, str(words))
+    st = ctl('show status', 15583)
+    check('mppt: the status report names the assignment', '\nmppt=west\n' in st, st)
+    ctl('set mppt both', 15583)
+    r = read3(32016, 4, 15580)
+    words = struct.unpack('>4H', r[2:10])
+    check('mppt: both = both strings live (the oriented bells)', all(w > 0 for w in words), str(words))
+    ctl('set mppt none', 15583)
+    r = read3(32016, 4, 15580)
+    check('mppt: none = PV 0, both strings dark',
+          all(w == 0 for w in struct.unpack('>4H', r[2:10])), r.hex())
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'unset', 'mppt'],
+                       capture_output=True, text=True)
+    check('mppt: unset restores both', r.returncode == 0 and 'ok mppt=both' in r.stdout, r.stdout.strip())
+    st = ctl('show status', 15583)
+    check('mppt: the day curve doubles the shoulder with both strings',
+          '4000' < st.split('\npv=')[1].split('\n')[0] < '5000', st)
+    # 2g2c. grid voltage: the nominal 120/230 setting + the per-phase wander
+    # machine (the phases differ, +-10 % clamp, the time-lapse moves it)
+    ctl('set time 12:00', 15583)
+    subprocess.run([sys.executable, C, '--control-port', '15583', 'show', 'registers'],
+                   capture_output=True, text=True)   # the first values() anchors the machine
+    ctl('set grid-voltage 120', 15583)
+    ctl('set time 13:30', 15583)   # the clock jump = the wander
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'show', 'registers'],
+                       capture_output=True, text=True)
+    regs = {l.split(' | ')[0].strip(): l.split(' | ')[-1].strip()
+            for l in r.stdout.splitlines() if ' | ' in l}
+    vs = [float(regs[k]) for k in ('meter-voltage-a', 'meter-voltage-b', 'meter-voltage-c')]
+    check('grid voltage: 120 V nominal, the phases wander apart within +-10 %',
+          all(108 <= v <= 132 for v in vs) and len(set(vs)) == 3, str(vs))
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'unset', 'grid-voltage'],
+                       capture_output=True, text=True)
+    check('grid voltage: unset restores the 230 V nominal', 'ok grid-voltage=230' in r.stdout, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'show', 'registers'],
+                       capture_output=True, text=True)
+    regs = {l.split(' | ')[0].strip(): l.split(' | ')[-1].strip()
+            for l in r.stdout.splitlines() if ' | ' in l}
+    vs = [float(regs[k]) for k in ('meter-voltage-a', 'meter-voltage-b', 'meter-voltage-c')]
+    check('grid voltage: 230 V nominal band 207..253, the currents follow (the 120 V = the double)',
+          all(207 <= v <= 253 for v in vs), str(vs))
+    r = subprocess.run([sys.executable, F, '--dry-run', '--grid-voltage', '120'], capture_output=True, text=True)
+    check('grid voltage: --grid-voltage flag accepted (dry-run rc 0)', r.returncode == 0, r.stderr[-80:])
+    # 2g2c-bis. control register writes: set register = the same overlay the
+    # FC06/FC16 writes land in — the scrapers see it; show registers marks it
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'set', 'register', '32064', '5000'],
+                       capture_output=True, text=True)
+    check('control writes: set register lands in the write overlay', r.returncode == 0
+          and 'ok register 32064=5000' in r.stdout, r.stdout.strip())
+    r = read3(32064, 1, 15580)
+    check('control writes: the scraper reads the overlay value',
+          r[0] == 3 and struct.unpack('>H', r[2:4])[0] == 5000, r.hex())
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'show', 'registers'],
+                       capture_output=True, text=True)
+    check('control writes: show registers marks the overlay row',
+          any(l.startswith('pv-power') and l.split(' | ')[-1].strip().startswith('5000 *')
+              for l in r.stdout.splitlines()), r.stdout.strip()[:80])
+    subprocess.run([sys.executable, C, '--control-port', '15583', 'reset'], capture_output=True)
+
+    # 2g2d. the per-phase home load asymmetry: the unbalanced home
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'show', 'registers'],
+                       capture_output=True, text=True)
+    regs = {l.split(' | ')[0].strip(): l.split(' | ')[-1].strip()
+            for l in r.stdout.splitlines() if ' | ' in l}
+    cur = [float(regs[k]) for k in ('meter-current-a', 'meter-current-b', 'meter-current-c')]
+    check('per-phase loads: the meter currents really differ', len(set(cur)) == 3, str(cur))
+
+    # 2g2d. the state machines integrate over the UTC clock (configurable);
+    # the clock is frozen from the mppt/grid-voltage blocks — unfreeze first
+    ctl('set time auto', 15583)
+    st = ctl('show status', 15583)
+    check('timezone: the state machines default to UTC', '\ntimezone=utc\n' in st
+          and int(st.split('\nclock=')[1][:2]) == time.gmtime().tm_hour % 24, st)
+    ctl('set timezone local', 15583)
+    st = ctl('show status', 15583)
+    check('timezone: local = the wall clock', '\ntimezone=local\n' in st
+          and int(st.split('\nclock=')[1][:2]) == time.localtime().tm_hour % 24, st)
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'unset', 'timezone'],
+                       capture_output=True, text=True)
+    check('timezone: unset restores UTC', 'ok timezone=utc' in r.stdout, r.stdout.strip())
+    r = subprocess.run([sys.executable, F, '--dry-run', '--timezone', 'local'], capture_output=True, text=True)
+    check('timezone: --timezone flag accepted (dry-run rc 0)', r.returncode == 0, r.stderr[-80:])
+    ctl('set time 13:30', 15583)   # re-freeze: the scenario integrates the same path as before
     ctl('set soc 80', 15583)
     st = ctl('set scenario night', 15583)
-    check('scenario: preset pins the clock and integrates the battery',
-          st.startswith('ok scenario=night') and 'soc=67.3%' in st, st)
+    check('scenario: preset pins the clock and integrates the battery (the mppt-aware day)',
+          st.startswith('ok scenario=night') and 'soc=49.8%' in st, st)
     check('scenario: preset releases the value pins', 'pinned' not in st, st)
     st = ctl('set scenario tea', 15583)
     check('scenario: unknown name rejected with the valid list',
@@ -496,10 +610,11 @@ try:
 
     # 2g1. fake_cli.py: the Cisco-style session — silent set confirmations,
     # full show/status replies, [confirm] before shutdown
-    K = os.path.join(REPO, 'inverter', 'src', 'fake_cli.py')
+    K = os.path.join(REPO, 'inverter', 'bin', 'fake_cli.py')
 
-    def cli(stdin, port=15571):
-        return subprocess.run([sys.executable, K, '--control-port', str(port)],
+    def cli(stdin, port=15571, audit=None):
+        extra = ['--audit-log', audit] if audit else []
+        return subprocess.run([sys.executable, K, '--control-port', str(port)] + extra,
                               input=stdin, capture_output=True, text=True, timeout=30)
 
     r = cli('set pv 3000\n')
@@ -517,11 +632,37 @@ try:
     ctl('show status', 15571)
     r = cli('show pv\nshow status\nquit\n')
     lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
-    check('fake_cli: show prints the bare value, show status the full line', r.returncode == 0
-          and '3000' in lines and any(l.startswith('pv=3000W') for l in lines), repr(r.stdout))
-    r = cli('help soc\n')
-    check('fake_cli: help <setting> describes it (shared registry)', r.returncode == 0
-          and r.stdout.startswith('\nfake-inverter:15571 > % ok soc - pin the state of charge'), repr(r.stdout))
+    check('fake_cli: show prints the bare value, show status the report bare', r.returncode == 0
+          and '3000' in lines and '% ok status' not in r.stdout
+          and any(l == 'pv=3000' for l in lines) and any(l == 'pinned=pv=3000.0' for l in lines), repr(r.stdout))
+    r = cli('help soc\nshow registers\nquit\n')
+    lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
+    check('fake_cli: the ok data prints bare (the help, the register table)', r.returncode == 0
+          and 'soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' in lines
+          and 'pv-power' in ''.join(lines) and '% ok' not in r.stdout, repr(r.stdout[:80]))
+
+    # 2g3. the audit trail: the UTC stamp, the CLI/CTL prefix, the who-when-what,
+    # ping/pong never logged, --no-audit-log switches it off
+    AUD = '/tmp/scr_audit_ctl.log'
+    if os.path.exists(AUD):
+        os.unlink(AUD)
+    subprocess.run([sys.executable, C, '--control-port', '15571', '--audit-log', AUD, 'set', 'pv', '2600'],
+                   capture_output=True, text=True)
+    subprocess.run([sys.executable, C, '--control-port', '15571', '--no-audit-log', '--audit-log', AUD,
+                    'show', 'pv'], capture_output=True, text=True)
+    rows = open(AUD).read().strip().split('\n')
+    check('audit: ctl logs CONNECT/DISCONNECT; the commands belong to the server trail',
+          len(rows) == 2 and rows[0].split(' ')[1] == 'CTL' and rows[0].split(' ')[2] == 'CONNECT'
+          and rows[1].split(' ')[2] == 'DISCONNECT', '\n'.join(rows))
+    AUD2 = '/tmp/scr_audit_cli.log'
+    if os.path.exists(AUD2):
+        os.unlink(AUD2)
+    r = cli('show version\nping\nquit\n', audit=AUD2)
+    cli_rows = open(AUD2).read()
+    check('audit: cli logs the session + the local commands; the wire commands = the server trail',
+          'CLI CONNECT target=' in cli_rows and "CLI COMMAND 'quit' -> local" in cli_rows
+          and 'CLI DISCONNECT' in cli_rows and "CLI COMMAND 'show" not in cli_rows
+          and 'ping' not in cli_rows and 'pong' not in cli_rows, cli_rows)
     r = cli('show settings\nquit\n')
     rows = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
     check('fake_cli: show settings prints one setting per line', r.returncode == 0
@@ -552,6 +693,28 @@ try:
     time.sleep(1)
     check('fake_cli: RETURN at [confirm] stops the fake', r.returncode == 0
           and 'bye shutdown' in r.stdout and fake_k.poll() == 0, repr(r.stdout))
+
+    # 2g3b. the INV audit trail: the server side logs the lifecycle + the commands
+    AUDD = '/tmp/scr_audit_inv.log'
+    if os.path.exists(AUDD):
+        os.unlink(AUDD)
+    inv = subprocess.Popen([sys.executable, F, '--static', '--port', '15586', '--control-port', '15587',
+                            '--audit-log', AUDD],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(0.8)
+    ctl('set soc 55', 15587)
+    ctl('ping', 15587)
+    os.kill(inv.pid, signal.SIGHUP)
+    os.kill(inv.pid, signal.SIGUSR1)
+    time.sleep(0.8)
+    os.kill(inv.pid, signal.SIGTERM)
+    time.sleep(1)
+    inv_rows = open(AUDD).read()
+    check('audit: INV logs START, COMMAND (peer), RELOAD, RESET, SHUTDOWN; ping skipped',
+          'INV START version=' in inv_rows and "INV COMMAND peer=127.0.0.1" in inv_rows
+          and "'set soc 55' -> ok" in inv_rows and 'INV RELOAD' in inv_rows
+          and 'INV RESET SIGUSR1' in inv_rows and 'INV SHUTDOWN SIGTERM' in inv_rows
+          and 'ping' not in inv_rows, inv_rows)
 
     # 2g1b. unset command + scenario custom (server side, shared registry)
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'pv'], capture_output=True, text=True)
@@ -688,23 +851,23 @@ try:
 
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'battery-state', 'discharging'], capture_output=True, text=True)
     check('battery-state: force discharges at full power', r.returncode == 0
-          and 'batt=-2500W' in r.stdout and 'batt-state=discharging' in r.stdout, r.stdout.strip())
+          and 'batt=-2000W' in r.stdout and 'batt-state=discharging' in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'battery-state', 'auto'], capture_output=True, text=True)
     check('battery-state: auto hands back to the machine', r.returncode == 0
           and 'batt-state' not in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'registers'], capture_output=True, text=True)
     rows = [l for l in r.stdout.splitlines() if ' | ' in l]
     cols = {l.index(' | ') for l in rows}
-    check('show registers: name | register | type, columns aligned', r.returncode == 0
+    check('show registers: name | register | type | current value, columns aligned', r.returncode == 0
           and r.stdout.startswith('ok registers (') and len(rows) >= 49 and len(cols) == 1
-          and any(l.startswith('pv-power') and '| 32064 | i32' in l for l in rows)
-          and any(l.startswith('battery-power') and '| 37001 | i32' in l for l in rows)
-          and max(len(l) for l in rows) <= 40, r.stdout.strip()[:80])
+          and any(l.startswith('pv-power') and '| 32064 | i32 |' in l and l.split(' | ')[3].strip().isdigit()
+                  for l in rows)
+          and any(l.startswith('battery-power') and '| 37001 | i32 |' in l for l in rows)
+          and max(len(l) for l in rows) <= 60, r.stdout.strip()[:80])
 
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'version'], capture_output=True, text=True)
-    check('show version: fake-inverter 0.2.1-<git>', r.returncode == 0
-          and r.stdout.strip().startswith('fake-inverter 0.2.1-')
-          and len(r.stdout.strip()) > len('fake-inverter 0.2.0-'), r.stdout.strip())
+    check('show version: ok fake-inverter 0.2.1-<git>', r.returncode == 0
+          and r.stdout.strip().startswith('ok fake-inverter 0.2.1-'), r.stdout.strip())
     r = subprocess.run([sys.executable, F, '--version'], capture_output=True, text=True)
     check('fake_inverter: --version reports 0.2.1-<short git>', r.returncode == 0
           and r.stdout.strip().startswith('0.2.1-') and len(r.stdout.strip()) > 10
@@ -724,6 +887,11 @@ try:
     r = subprocess.run([sys.executable, C, '--control-port', '15639', 'set', 'battery-state', 'charging'], capture_output=True, text=True)
     check('battery-state: refuses with the battery off',
           'err battery-state needs the battery on' in r.stdout, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15639', 'show', 'registers'], capture_output=True, text=True)
+    rows = [l for l in r.stdout.splitlines() if ' | ' in l]
+    check('show registers: NaN when the value is not calculated (the battery off)',
+          any(l.startswith('battery-power') and l.split(' | ')[-1].strip() == 'NaN' for l in rows)
+          and any(l.startswith('pv-power') and l.split(' | ')[-1].strip() != 'NaN' for l in rows), r.stdout.strip()[:120])
     subprocess.run([sys.executable, C, '--control-port', '15639', 'shutdown'], capture_output=True)
 
     # 2e. signals, mirroring the scraper/cache family: SIGHUP = FAKE_* env reload,
@@ -746,11 +914,11 @@ try:
     time.sleep(0.8)
     sig_status = subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'show', 'status'], capture_output=True, text=True).stdout
     check('signals: SIGHUP re-applies the FAKE_* env layer',
-          'chaos=0.90' in sig_status and 'pinned: pv=2500' in sig_status, sig_status)
+          '\nchaos=0.90\n' in sig_status and '\npinned=pv=2500.0\n' in sig_status, sig_status)
     os.kill(fake_ctl.pid, signal.SIGUSR1)
     time.sleep(0.8)
     sig_status = subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'show', 'status'], capture_output=True, text=True).stdout
-    check('signals: SIGUSR1 resets pins + write overlay', 'pinned' not in sig_status
+    check('signals: SIGUSR1 resets pins + write overlay', '\npinned=none\n' in sig_status
           and '1 overlay register(s) cleared' in open('/tmp/scr_sig.log').read(), sig_status)
     os.kill(fake_ctl.pid, signal.SIGTERM)
     time.sleep(1)

@@ -30,9 +30,9 @@ import os
 
 
 def _profile_candidates(name):
-    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return [os.path.join(here, 'profiles', name),
-            os.path.join(os.path.dirname(os.path.dirname(here)), 'profiles', name)]
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the inverter/
+    return [os.path.join(here, 'profiles', name),                        # inverter/profiles (the embedded)
+            os.path.join(os.path.dirname(here), 'profiles', name)]       # the repo profiles/ (the suite)
 
 
 def resolve_profile(text):

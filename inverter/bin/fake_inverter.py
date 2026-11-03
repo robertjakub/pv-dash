@@ -24,6 +24,10 @@ mirror the family: SIGHUP re-applies the FAKE_* environment layer
 keep-last-good), SIGUSR1 resets the scenario (releases pins + write
 overlay), SIGTERM/SIGINT shut down with a session summary.
 """
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the src/ — the lib/ lives next to bin/
+
 import argparse
 import logging
 import math
@@ -31,6 +35,7 @@ import os
 import threading
 
 from lib.chaos import Chaos
+from lib.audit import AuditLog
 from lib.paths import resolve_control_target
 from lib.control import ControlServer
 from lib.inverter import FakeInverter
@@ -71,13 +76,16 @@ def validate(args):
 def configured_defaults(args, frozen, profile_text):
     """Every setting's configured startup value — what `unset <setting>` restores."""
     return {
-        'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'soc': 'auto', 'cloud': 'clear',
+        'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'grid': 'auto', 'soc': 'auto', 'cloud': 'clear',
         'time': '%02d:%02d' % (int(frozen), round((frozen % 1.0) * 60)) if frozen is not None else 'auto',
         'scenario': 'custom',
         'chaos': '%.2f' % args.chaos,
         'seed': 'random' if args.seed is None else str(args.seed),
         'battery': 'on' if args.battery else 'off',
         'battery-state': 'auto',
+        'mppt': 'both',
+        'grid-voltage': '%g' % args.grid_voltage,
+        'timezone': args.timezone,
         'strict': 'on' if args.strict else 'off',
         'static': 'on' if args.static else 'off',
         'max-kwp': '%g' % args.max_kwp,
@@ -90,13 +98,14 @@ def configured_defaults(args, frozen, profile_text):
 def main():
     import sys
     if '--version' in sys.argv:
-        from lib.version import version_string
         print(version_string())
         raise SystemExit(0)
     p = argparse.ArgumentParser(description='Fake Inverter Simulator: a Modbus TCP server with demo values. Simulates different inverter/battery/meter devices through inverter profiles — the shipped default is the Huawei SUN2000 map, a Deye hybrid map is included as well.')
     p.add_argument('--host', default='127.0.0.1', help='bind address (default %(default)s)')
     p.add_argument('--port', type=int, default=5502, help='Modbus TCP port (default %(default)s)')
     p.add_argument('--unit', type=int, default=1, help='Modbus unit id served (default %(default)s)')
+    p.add_argument('--timezone', default='utc', choices=['utc', 'local'], help='clock the state machines integrate over (the PV bell, the home load, the clouds, the battery, the grid voltage): UTC (the default) or the local wall clock')
+    p.add_argument('--grid-voltage', type=float, default=230.0, help='nominal grid phase voltage in V (120 or 230; the per-phase machine wanders ±10 %% around it, default %(default)s)')
     p.add_argument('--max-kwp', type=float, default=6.0, help='PV array size in kWp, peak = 75%% of it (default %(default)s)')
     p.add_argument('--time', help='freeze simulated time HH:MM (default: real clock)')
     p.add_argument('--static', action='store_true', help='constant demo values instead of the day simulation')
@@ -111,6 +120,12 @@ def main():
     p.add_argument('--seed', type=int, help='chaos RNG seed (default: random)')
     p.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
     p.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'])
+    p.add_argument('--audit-log', default=None, help='INV audit trail: a file path or - for stdout (the docker/journald way); default: %s — the XDG state home' % AuditLog.default_path())
+    p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation (default %(default)s)')
+    p.add_argument('--audit-daily', action='store_true', help='also rotate the audit log at UTC midnight')
+    p.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
+    p.add_argument('--no-audit-log', action='store_true', help='disable the INV audit trail')
+    p.add_argument('--control-token', default=None, help='require a token on TCP control connections: the client authenticates with {"cmd": "auth", "token": ...}; the unix socket needs no token')
     args = p.parse_args()
     logging.basicConfig(level=getattr(logging, args.log_level),
                         format='%(levelname)-7s %(message)s' if os.environ.get('JOURNAL_STREAM')
@@ -145,17 +160,25 @@ def main():
                     ('127.0.0.1:' + target) if target.isdigit() else ('unix:' + target) if target != '0' else 'off')
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
+    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'INV', args.audit_max_mb,
+                                                    args.audit_daily, args.audit_files)
     fake = FakeInverter(args.unit, simulator, strict=args.strict, chaos=chaos)
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,
                                 defaults=configured_defaults(args, frozen, profile_text),
-                                log_replies=args.control_log_replies)
+                                log_replies=args.control_log_replies, audit=audit,
+                                token=args.control_token)
         threading.Thread(target=control.serve, daemon=True).start()
-    box = SignalBox(simulator, chaos, fake, control=control)
+    box = SignalBox(simulator, chaos, fake, control=control, audit=audit)
     if control:
         control.signalbox = box
     box.install()
+    if audit:
+        audit.event('START', 'version=%s modbus=%s:%d control=%s profile=%s: %s'
+                    % (version_string(), args.host, args.port,
+                       ('127.0.0.1:' + target) if target != '0' else 'off',
+                       profile_label(profile_path), simulator.profile.description))
     try:
         fake.serve(args.host, args.port)
     except KeyboardInterrupt:

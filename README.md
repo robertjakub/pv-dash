@@ -1,5 +1,9 @@
 # pv-suite
 
+> **Experimental — work in progress.** The whole pv-suite is still under
+> active development: interfaces, file formats and behavior can still change
+> at any time.
+
 A family of dependency-free (Python stdlib only) home-PV tools around a
 Huawei SUN2000 inverter, packaged together as one Nix flake:
 
@@ -8,7 +12,8 @@ Huawei SUN2000 inverter, packaged together as one Nix flake:
 | [`dashboard/`](dashboard/README.md) | `dashboard` | Single-page energy-flow dashboard fed by Prometheus, with a bundled stdlib-only proxy server and a NixOS module |
 | [`scrape/`](scrape/README.md) | `modbus-scraper` | Huawei SUN2000 Prometheus exporter (Modbus TCP, stdlib only) with a NixOS module |
 | [`cache/`](cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
-| [`inverter/`](inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake SUN2000 + LUNA2000 + smart meter for testing the stack without hardware — with a runtime control server, Cisco-style CLI and chaos injection |
+| [`inverter/`](inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake SUN2000 + LUNA2000 + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
+| [`profiles/`](profiles/) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; the tools select what to fetch/scrape via their own files |
 
 ## The flake
 

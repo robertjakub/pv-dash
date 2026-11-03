@@ -1,5 +1,9 @@
 # Solar Energy Flow dashboard
 
+> **Experimental — work in progress.** The whole pv-suite is still under
+> active development: interfaces, file formats and behavior can still change
+> at any time.
+
 A single-page dashboard for home PV monitoring, fed by Prometheus.
 Part of the **pv-suite** family — the scraper, cache proxy, fake inverter
 and packaging overview live in the [suite root](../README.md).

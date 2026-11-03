@@ -1,5 +1,9 @@
 # Huawei SUN2000 Prometheus scraper
 
+> **Experimental — work in progress.** The whole pv-suite is still under
+> active development: interfaces, file formats and behavior can still change
+> at any time.
+
 A dependency-free (Python stdlib only) Prometheus exporter that polls a Huawei
 SUN2000 inverter over **Modbus TCP** and exposes the `huawei_*_watts` metrics
 the [dashboard](../dashboard/README.md) expects, plus health gauges. It can poll the
@@ -94,6 +98,26 @@ Sign conventions and sanity caps:
   derived home load.
 - The caps assume `max-kwp ≤ max-grid-kw` (the line must carry the
   inverter's full output); a startup warning fires otherwise.
+
+## Device profile
+
+*Where* the primary values live comes from a **device profile** — the same
+shared schema the [fake inverter](../inverter/README.md) serves and the
+[cache](../cache/README.md) polls; the shipped profiles live in the suite's
+[`profiles/`](../profiles/) subproject (`sun2000.json` by default). WHICH entries feed the
+register-backed metrics comes from **`src/metrics.json`** itself: an entry
+carries a `profile` field naming the device-profile register it is read
+from (`"huawei_pv_generation_watts": {"profile": "pv-power", ...}`); the
+file is keyed by the exported metric name directly — no separate key layer.
+Entries without a `profile` field are derived by the poller (home,
+export/import split, ...). Each bound entry's `type`/`scale` drive the
+decode — a `scale: 1` SoC is read as plain percent, a `scale: 10` one as
+percent×10. A `profile` field pointing at a register the device profile
+does not define leaves the metric absent (logged at startup). Profile resolution: `--profile`
+flag, env `SCRAPER_PROFILE`, ini `profile`, then the bundled copy; re-read
+on `SIGHUP`. The explicit register flags (`--pv-register`,
+`--grid-register`, `--battery-register`, `--battery-soc-register`,
+`--scale`, `--grid-scale`) override the profile when set.
 
 Metric names, help texts and types live in **`scrape/src/metrics.json`**
 next to the script and are loaded at startup — edit it to rename metrics or

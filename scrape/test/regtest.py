@@ -5,6 +5,7 @@ Run from anywhere: python3 scrape/test/regtest.py
 Starts its own fake inverter + scraper instances on scratch ports and
 cleans up after itself.
 """
+import json as _json
 import os
 import random
 import signal
@@ -63,6 +64,15 @@ def wait_metrics(port, tries=30):
         except (OSError, urllib.error.URLError):
             time.sleep(0.2)
     raise SystemExit('scraper on %d never came up' % port)
+
+
+def read3(addr, count, port):
+    """Raw Modbus FC3 read: returns the PDU (the MBAP header stripped)."""
+    s = socket.create_connection(('127.0.0.1', port), timeout=5)
+    s.sendall(struct.pack('>HHHB', 9, 0, 6, 1) + struct.pack('>BHH', 3, addr, count))
+    r = s.recv(512)
+    s.close()
+    return r[7:]
 
 
 def _recvn(sock, n):
@@ -184,6 +194,93 @@ try:
     check('cache diag auto-detected (fake serves the block)', m.get('huawei_cache_device_up') == 1
           and m.get('huawei_cache_age_seconds') == 7 and m.get('huawei_cache_uptime_seconds') == 4242,
           str({k: v for k, v in m.items() if 'cache' in k}))
+
+    # 1a. scraper profile: the scrape-marked entries feed the metric registers
+    prof = '/tmp/scr_scraper_profile.json'
+    _json.dump({'description': 'remapped device',
+                'registers': [
+                    {'name': 'pv-power', 'register': 40001, 'type': 'i32', 'scale': 1, 'scrape': True},
+                    {'name': 'grid-power', 'register': 40003, 'type': 'i32', 'scale': 1, 'scrape': True},
+                    {'name': 'battery-power', 'register': 40005, 'type': 'i32', 'scale': 1, 'scrape': True},
+                    {'name': 'battery-soc', 'register': 40123, 'type': 'u16', 'scale': 1, 'scrape': True},
+                ]}, open(prof, 'w'))
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', '15590',
+                                   '--control-port', '0', '--profile', prof],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(0.7)
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
+                                   '--host', '127.0.0.1', '--modbus-port', '15590',
+                                   '--listen', '127.0.0.1:9361', '--battery', '--profile', prof],
+                                  stdout=open('/tmp/scr_prof_scraper.log', 'w'), stderr=subprocess.STDOUT))
+    for _ in range(30):
+        status, m = wait_metrics(9361)
+        if 'huawei_pv_generation_watts' in m:
+            break
+        time.sleep(0.3)
+    check('scraper profile: pv metric follows the remapped register',
+          m.get('huawei_pv_generation_watts') == 4000, str(m.get('huawei_pv_generation_watts')))
+    check('scraper profile: grid metric follows (static -1500)',
+          m.get('huawei_grid_net_watts') == -1500, str(m.get('huawei_grid_net_watts')))
+    check('scraper profile: soc scale honored (profile says x1)',
+          m.get('huawei_battery_soc_percent') == 65, str(m.get('huawei_battery_soc_percent')))
+
+    # 1b. the shipped Deye profile end-to-end: real Deye addresses (SG03LP1
+    # family), SoC reported as plain percent (gain 1), omitted registers = 0
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', '15596',
+                                   '--control-port', '0', '--profile', 'deye-sg03lp1'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(0.7)
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
+                                   '--host', '127.0.0.1', '--modbus-port', '15596',
+                                   '--listen', '127.0.0.1:9363', '--battery', '--profile', 'deye-sg03lp1'],
+                                  stdout=open('/tmp/scr_deye.log', 'w'), stderr=subprocess.STDOUT))
+    for _ in range(30):
+        status, m = wait_metrics(9363)
+        if 'huawei_pv_generation_watts' in m:
+            break
+        time.sleep(0.3)
+    check('deye-sg03lp1: pv metric from register 186',
+          m.get('huawei_pv_generation_watts') == 4000, str(m.get('huawei_pv_generation_watts')))
+    check('deye-sg03lp1: soc gain 1 (plain percent)', m.get('huawei_battery_soc_percent') == 65,
+          str(m.get('huawei_battery_soc_percent')))
+    check('deye-sg03lp1: grid from register 169', m.get('huawei_grid_net_watts') == -1500,
+          str(m.get('huawei_grid_net_watts')))
+
+    # 1c. the Deye three-phase profile (SG04LP3): 6xx registers, SoC gain 1
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', '15598',
+                                   '--control-port', '0', '--profile', 'deye-sg04lp3'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(0.7)
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
+                                   '--host', '127.0.0.1', '--modbus-port', '15598',
+                                   '--listen', '127.0.0.1:9365', '--battery', '--profile', 'deye-sg04lp3'],
+                                  stdout=open('/tmp/scr_deye3.log', 'w'), stderr=subprocess.STDOUT))
+    for _ in range(30):
+        status, m = wait_metrics(9365)
+        if 'huawei_pv_generation_watts' in m:
+            break
+        time.sleep(0.3)
+    check('deye-sg04lp3: pv metric from register 672',
+          m.get('huawei_pv_generation_watts') == 4000, str(m.get('huawei_pv_generation_watts')))
+    check('deye-sg04lp3: soc gain 1 from register 588', m.get('huawei_battery_soc_percent') == 65,
+          str(m.get('huawei_battery_soc_percent')))
+    check('deye-sg04lp3: grid from register 625', m.get('huawei_grid_net_watts') == -1500,
+          str(m.get('huawei_grid_net_watts')))
+    b = read3(500, 1, 15598)
+    check('deye-sg04lp3: real status codes served (500 = 2 normal)',
+          b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 2, b.hex())
+
+    # 1d. the SUN-12K-SG05LP3-EU profile (shares the SG04LP3 map)
+    r = subprocess.run([sys.executable, F, '--dry-run', '--static', '--battery',
+                        '--profile', 'deye-sg05lp3'], capture_output=True, text=True)
+    check('deye-sg05lp3: profile loads (dry-run rc 0)', r.returncode == 0
+          and 'Deye SUN-12K-SG05LP3-EU' in r.stderr, r.stderr.strip()[-80:])
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15593',
+                                   '--control-port', '0', '--profile', 'deye-sg05lp3'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(0.7)
+    b = read3(672, 2, 15593)
+    check('deye-sg05lp3: pv at 672', b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 4000, b.hex())
     status, root = get('/', PORT_A)
     check('root path answers', status == 200 and b'modbus-scraper' in root.encode())
     status, _ = get('/nope', PORT_A)
@@ -296,9 +393,19 @@ try:
           m.get('huawei_battery') == 1 and m.get('huawei_battery_net_watts') == 0
           and m.get('huawei_pv_generation_watts') == 4000, str(m.get('huawei_battery_net_watts')))
     subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'battery', 'on'], capture_output=True)
-    check('fake audit: control commands logged at INFO (status too)',
-          'control: set pv nan -> err' in ctl_log and 'control: set soc 30 -> ok' in ctl_log
-          and 'control: status -> pv=' in ctl_log)
+    check('fake audit: control commands quiet at INFO',
+          'control: set pv nan -> err' not in ctl_log and 'control: set soc 30 -> ok' not in ctl_log)
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15588', '--control-port', '15589',
+                                   '--log-level', 'DEBUG'],
+                                  stdout=open('/tmp/scr_ctl_dbg.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(0.8)
+    ctl('set soc 30', 15589)
+    ctl('status', 15589)
+    subprocess.run([sys.executable, C, '--control-port', '15589', 'shutdown'], capture_output=True, text=True)
+    time.sleep(1)
+    ctl_debug = open('/tmp/scr_ctl_dbg.log').read()
+    check('fake audit: control commands logged at DEBUG (status too)',
+          'control: set soc 30 -> ok' in ctl_debug and 'control: status -> pv=' in ctl_debug)
 
     # 2f. FAKE_CTL environment (short name) drives both tools when the flag is unset
     r = subprocess.run([sys.executable, C, 'set', 'pv', '2200'], capture_output=True, text=True,
@@ -385,7 +492,7 @@ try:
 
     r = cli('set pv 3000\n')
     check('fake_cli: set prints only the confirmation', r.returncode == 0
-          and r.stdout.rstrip() == 'fake-inverter:15571 > ok\nfake-inverter:15571 >', repr(r.stdout))
+          and r.stdout.rstrip() == '\nfake-inverter:15571 > ok\n\nfake-inverter:15571 >', repr(r.stdout))
     check('fake_cli: set reply really carried no status tail',
           'load=' not in r.stdout and 'pinned' not in r.stdout, repr(r.stdout))
     time.sleep(1.5)
@@ -402,7 +509,7 @@ try:
           and '3000' in lines and any(l.startswith('pv=3000W') for l in lines), repr(r.stdout))
     r = cli('help soc\n')
     check('fake_cli: help <setting> describes it (shared registry)', r.returncode == 0
-          and r.stdout.startswith('fake-inverter:15571 > ok soc - pin the state of charge'), repr(r.stdout))
+          and r.stdout.startswith('\nfake-inverter:15571 > ok soc - pin the state of charge'), repr(r.stdout))
     r = cli('show settings\nquit\n')
     rows = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
     check('fake_cli: show settings prints one setting per line', r.returncode == 0
@@ -412,6 +519,18 @@ try:
     check('fake_cli: ? lists the options for the position', r.returncode == 0
           and 'scenario' in r.stdout and 'max-kwp' in r.stdout
           and 'ok' not in r.stdout, repr(r.stdout))
+    p = subprocess.Popen([sys.executable, K, '--control-port', '15571'],
+                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True, env={**os.environ, 'FAKE_CLI_KEEPALIVE': '0.2'})
+    time.sleep(1.2)          # the CLI idles, pinging every 0.2s
+    p.stdin.write('show max-kwp\n')
+    p.stdin.flush()
+    time.sleep(0.4)
+    p.stdin.write('quit\n')
+    p.stdin.flush()
+    out, _ = p.communicate(timeout=15)
+    check('fake_cli: keepalive keeps an idle session alive (pongs absorbed)',
+          p.returncode == 0 and 'fake-inverter:15571 > 6' in out and 'ok pong' not in out, repr(out[-120:]))
     fake_k = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15586',
                                '--control-port', '15587'],
                               stdout=open('/tmp/scr_cli.log', 'w'), stderr=subprocess.STDOUT)
@@ -441,6 +560,116 @@ try:
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'bogus'], capture_output=True, text=True)
     check('control: unset of an unknown setting is rejected', r.returncode == 0
           and r.stdout.startswith('err unknown setting bogus'), r.stdout.strip())
+
+    # 2f. register-map profiles: the fake serves the SUN2000 layout from
+    # profiles/sun2000.json by default; a custom profile remaps names onto
+    # different registers (with per-entry type/scale) to emulate other devices
+    import json as _json
+    prof = '/tmp/scr_prof_custom.json'
+    _json.dump({'description': 'remapped device',
+                'registers': [
+                    {'name': 'pv-power', 'register': 40001, 'type': 'i32', 'scale': 1},
+                    {'name': 'device-temperature', 'register': 33136, 'type': 'i16', 'scale': 10},
+                    {'name': 'battery-soc', 'register': 40123, 'type': 'u16', 'scale': 1},
+                ]}, open(prof, 'w'))
+
+    fake_prof = subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', '15592',
+                                  '--control-port', '0', '--profile', prof],
+                                 stdout=open('/tmp/scr_prof.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(fake_prof)
+    time.sleep(0.8)
+    r = read3(40001, 2, 15592)
+    check('profile: pv-power remapped to 40001', r[0] == 3 and struct.unpack('>i', r[2:6])[0] == 4000, r.hex())
+    r = read3(33136, 1, 15592)
+    check('profile: temperature remapped to 33136 (x10)', r[0] == 3 and struct.unpack('>H', r[2:4])[0] == 280, r.hex())
+    r = read3(40123, 1, 15592)
+    check('profile: battery-soc retyped (scale 1, not x10)', r[0] == 3 and struct.unpack('>H', r[2:4])[0] == 65, r.hex())
+    r = read3(32064, 2, 15592)
+    check('profile: unmapped default register is undefined (strict 02)', r[0] == 0x83 and r[1] == 2, r.hex())
+    # the device-status VALUE MAP in the profile's desc drives the serving
+    stmap = '/tmp/scr_prof_status.json'
+    _json.dump({'mappings': [{'register': 'device-status',
+                               'values': {'7': 'on-grid', '9': 'standby'}}],
+                'registers': [{'name': 'device-status', 'register': 32089, 'type': 'u16', 'scale': 1,
+                               'desc': 'running status code'}]}, open(stmap, 'w'))
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15595',
+                                   '--control-port', '0', '--profile', stmap],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(0.7)
+    b = read3(32089, 1, 15595)
+    check('profile: the status map serves the profile codes (7 = on-grid)',
+          b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 7, b.hex())
+
+    badprof = '/tmp/scr_prof_bad.json'
+    _json.dump({'registers': [{'name': 'mystery-value', 'register': 32064, 'type': 'i32', 'scale': 1}]},
+               open(badprof, 'w'))
+    r = subprocess.run([sys.executable, F, '--dry-run', '--profile', badprof], capture_output=True, text=True)
+    check('profile: a name the fake cannot simulate is accepted but never served', r.returncode == 0
+          and 'mystery-value' in open(badprof).read(), r.stderr.strip()[-90:])
+
+    fake_env = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15594',
+                                 '--control-port', '0'],
+                                stdout=open('/tmp/scr_prof2.log', 'w'), stderr=subprocess.STDOUT,
+                                env={**os.environ, 'FAKE_PROFILE': prof})
+    procs.append(fake_env)
+    time.sleep(0.8)
+    r = read3(40001, 2, 15594)
+    check('profile: FAKE_PROFILE env selects the map', r[0] == 3 and struct.unpack('>i', r[2:6])[0] == 4000, r.hex())
+    prof2 = '/tmp/scr_prof_custom2.json'
+    _json.dump({'registers': [{'name': 'pv-power', 'register': 40003, 'type': 'i32', 'scale': 1}]},
+               open(prof2, 'w'))
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'profile', prof2],
+                       capture_output=True, text=True)
+    check('control: set profile swaps the map live', r.returncode == 0
+          and r.stdout.startswith('ok profile=unnamed profile (%s)' % prof2), r.stdout.strip())
+    r1, r2 = read3(40001, 2, 15570), read3(40003, 2, 15570)
+    check('control: the swapped map serves the new addresses', r2[0] == 3
+          and struct.unpack('>i', r2[2:6])[0] == 4000 and struct.unpack('>i', r1[2:6])[0] == 0, (r1 + r2).hex())
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'profile'],
+                       capture_output=True, text=True)
+    check('control: show profile reports description + path', r.stdout.strip() == 'ok profile=unnamed profile (%s)' % prof2, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'profile', '/tmp/scr_nope.json'],
+                       capture_output=True, text=True)
+    check('control: set profile of a bad file is rejected', r.returncode == 0
+          and r.stdout.startswith('err '), r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'profile'],
+                       capture_output=True, text=True)
+    check('control: unset profile restores the configured map (its description shows)', r.returncode == 0
+          and 'profile=SUN2000 with optional LUNA2000 battery and meter' in r.stdout
+          and 'pv=4000W' in r.stdout, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'profile', 'sun2000'],
+                       capture_output=True, text=True)
+    check('control: the built-in profile answers to its name (sun2000)', r.returncode == 0
+          and r.stdout.startswith('ok profile=SUN2000 with optional LUNA2000 battery and meter (sun2000)'),
+          r.stdout.strip())
+    r = subprocess.run([sys.executable, F, '--dry-run', '--profile', 'sun2000'], capture_output=True, text=True)
+    check('profile: --profile sun2000 resolves the built-in (dry-run rc 0)', r.returncode == 0, r.stderr[-80:])
+    r = read3(32064, 2, 15570)
+    check('profile: the default map is back', r[0] == 3 and struct.unpack('>i', r[2:6])[0] == 4000, r.hex())
+    os.kill(fake_env.pid, signal.SIGTERM)
+
+    # 2g. cloud machines: autumn/winter wander the cloud factor over the
+    # simulated clock (time-lapse moves them, a frozen clock freezes them)
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'cloud', 'autumn'],
+                       capture_output=True, text=True)
+    check('cloud: autumn machine engages', r.returncode == 0 and 'cloud=autumn(' in r.stdout, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'cloud', '0'],
+                       capture_output=True, text=True)
+    check('cloud: a pinned factor overrides the machine', r.returncode == 0
+          and 'cloud=0' in r.stdout, r.stdout.strip())
+    subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'cloud'], capture_output=True)
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'status'], capture_output=True, text=True)
+    check('cloud: unset returns to a clear sky', 'cloud=auto' in r.stdout, r.stdout.strip())
+    subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'cloud', 'winter'], capture_output=True)
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'time', '12:00'],
+                       capture_output=True, text=True)
+    winter_pv = r.stdout
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'cloud', 'autumn'], capture_output=True, text=True)
+    check('cloud: machines differ under the same seed', 'cloud=autumn(' in r.stdout
+          and r.stdout != winter_pv, r.stdout.strip())
+    subprocess.run([sys.executable, C, '--control-port', '15571', 'reset'], capture_output=True)
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'status'], capture_output=True, text=True)
+    check('cloud: reset releases the machine', 'cloud=auto' in r.stdout, r.stdout.strip())
 
     # 2e. signals, mirroring the scraper/cache family: SIGHUP = FAKE_* env reload,
     # SIGUSR1 = scenario reset (pins + write overlay), SIGTERM = summary + exit 0

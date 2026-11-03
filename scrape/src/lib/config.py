@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Configuration for modbus-scraper: ini/env/CLI resolution (stdlib only)."""
 import configparser
+import json
 import logging
 import math
 import os
 import re
+
+from .metrics import Metrics
 
 logger = logging.getLogger('scraper')
 
@@ -108,8 +111,89 @@ def validate_config(cfg):
     check_hostname(parse_listen(cfg['listen'])[0], 'listen')
 
 
+def _profile_candidates(name):
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return [os.path.join(here, 'profiles', name),
+            os.path.join(os.path.dirname(os.path.dirname(here)), 'profiles', name)]
+
+
+def default_profile_path(name='sun2000.json'):
+    """The bundled device profile (packaged two levels up) or the shared
+    profiles/ subproject at the repository root (dev tree)."""
+    for candidate in _profile_candidates(name):
+        if os.path.exists(candidate):
+            return candidate
+    return name
+
+
+def resolve_profile_file(text):
+    """A profile name (sun2000, deye -> the shared profiles/ subproject) or
+    a JSON path, passed through."""
+    t = (text or '').strip()
+    if os.path.exists(t):
+        return t
+    if '/' not in t and not t.endswith('.json'):
+        for candidate in _profile_candidates(t + '.json'):
+            if os.path.exists(candidate):
+                return candidate
+    return t
+
+
+def load_device_profile(path):
+    """Device profile (the shared profiles/ schema) -> {name: (register, type, scale)}."""
+    try:
+        with open(path, encoding='utf-8') as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as e:
+        raise SystemExit('cannot read device profile %s: %s' % (path, e))
+    entries = data.get('registers') if isinstance(data, dict) else data
+    if not isinstance(entries, list):
+        raise SystemExit('device profile %s must contain a "registers" list' % path)
+    out = {}
+    for i, entry in enumerate(entries):
+        label = 'device profile %s, entry %d' % (path, i + 1)
+        if not isinstance(entry, dict) or 'name' not in entry:
+            raise SystemExit('%s needs a "name"' % label)
+        try:
+            register = int(entry['register'])
+        except (KeyError, TypeError, ValueError):
+            raise SystemExit('%s (%s) needs an integer "register"' % (label, entry['name']))
+        typ = str(entry.get('type', 'i32'))
+        if typ not in ('i16', 'u16', 'i32', 'u32'):
+            raise SystemExit('%s (%s): unknown "type" %r (i16/u16/i32/u32)' % (label, entry['name'], typ))
+        scale = entry.get('scale', 1.0)
+        try:
+            scale = float(scale)
+        except (TypeError, ValueError):
+            raise SystemExit('%s (%s): bad "scale" %r' % (label, entry['name'], scale))
+        check_register(register, '%s (%s) register' % (label, entry['name']))
+        out[str(entry['name'])] = (register, typ, scale)
+    return out
+
+
+def load_mapping(path):
+    """mapping.json: profile register name -> metrics.json catalog key (the
+    four register-fed keys: pv, grid, batt_net, batt_soc)."""
+    try:
+        with open(path, encoding='utf-8') as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as e:
+        raise SystemExit('cannot read mapping spec %s: %s' % (path, e))
+    if not isinstance(data, dict):
+        raise SystemExit('mapping spec %s must be a JSON object' % path)
+    valid = ('pv', 'grid', 'batt_net', 'batt_soc')
+    out = {}
+    for name, key in data.items():
+        if key not in valid:
+            raise SystemExit('mapping spec %s: %r maps to %r (valid targets: %s)'
+                             % (path, name, key, ', '.join(valid)))
+        out[str(name)] = key
+    return out
+
+
 def resolve_config(args, script_dir):
-    """Effective settings: CLI flags > SCRAPER_* env > [scraper] ini > defaults."""
+    """Effective settings: CLI flags > SCRAPER_* env > [scraper] ini >
+    device profile (the shared profiles/ schema) > defaults."""
     cfg = load_config(args.config)
 
     def resolve(cli_value, env_name, cfg_key, default, conv):
@@ -126,24 +210,49 @@ def resolve_config(args, script_dir):
             logger.error('invalid %s = %r: %s (using %r)', cfg_key, raw, e, default)
             return default
 
+    profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'SCRAPER_PROFILE',
+                                                'profile', default_profile_path(), str))
+    profile = load_device_profile(profile_path)
+    spec = Metrics(os.path.join(script_dir, 'metrics.json'))
+
+    # the metrics spec's "profile" fields pick the device registers feeding
+    # the register-backed metrics; each source carries register/type/gain
+    # and the metric it feeds
+    sources = {}
+    for profile_name, metric in spec.by_profile.items():
+        entry = profile.get(profile_name)
+        if entry is None:
+            logger.warning('metrics: %r binds profile register %r, which the device profile %s does not define; the metric stays absent',
+                           metric, profile_name, profile_path)
+            continue
+        sources[profile_name] = {'register': entry[0], 'type': entry[1], 'gain': entry[2],
+                                 'metric': metric}
+    if 'pv-power' not in sources or 'grid-power' not in sources:
+        raise SystemExit('the metrics spec must bind huawei_pv_generation_watts and huawei_grid_net_watts '
+                         'to device-profile registers (the power math depends on them)')
+
     battery = resolve(args.battery, 'SCRAPER_BATTERY', 'battery', False, str_to_bool)
     cfg = {
+        'profile': profile_path,
         'host': resolve(args.host, 'SCRAPER_HOST', 'host', '127.0.0.1', str),
         'modbus_port': resolve(args.modbus_port, 'SCRAPER_MODBUS_PORT', 'modbus_port', 5502, int),
         'unit': resolve(args.unit, 'SCRAPER_UNIT', 'unit', 1, int),
         'modbus_offset': resolve(args.modbus_offset, 'SCRAPER_MODBUS_OFFSET', 'modbus_offset', 0, int),
         'timeout': resolve(args.timeout, 'SCRAPER_TIMEOUT', 'timeout', 3.0, float),
-        'pv_register': resolve(args.pv_register, 'SCRAPER_PV_REGISTER', 'pv_register', 32064, int),
-        'grid_register': resolve(args.grid_register, 'SCRAPER_GRID_REGISTER', 'grid_register', 37113, int),
+        'pv_register': resolve(args.pv_register, 'SCRAPER_PV_REGISTER', 'pv_register',
+                               sources['pv-power']['register'], int),
+        'grid_register': resolve(args.grid_register, 'SCRAPER_GRID_REGISTER', 'grid_register',
+                                 sources['grid-power']['register'], int),
         'scale': resolve(args.scale, 'SCRAPER_SCALE', 'scale', 1.0, float),
         'grid_scale': resolve(args.grid_scale, 'SCRAPER_GRID_SCALE', 'grid_scale', 1.0, float),
         'max_kwp': resolve(args.max_kwp, 'SCRAPER_MAX_KWP', 'max_kwp', 6.0, float),
         'max_grid_kw': resolve(args.max_grid_kw, 'SCRAPER_MAX_GRID_KW', 'max_grid_kw', 12.0, float),
         'battery': battery,
         'battery_register': resolve(args.battery_register, 'SCRAPER_BATTERY_REGISTER', 'battery_register',
-                                    37001, int),
+                                    sources.get('battery-power', {}).get('register', 37001), int),
         'battery_soc_register': resolve(args.battery_soc_register, 'SCRAPER_BATTERY_SOC_REGISTER',
-                                        'battery_soc_register', 37004, int),
+                                        'battery_soc_register',
+                                        sources.get('battery-soc', {}).get('register', 37004), int),
         'grid_positive_import': resolve(args.grid_positive_import, 'SCRAPER_GRID_POSITIVE_IMPORT',
                                         'grid_positive_import', False, str_to_bool),
         'listen': resolve(args.listen, 'SCRAPER_LISTEN', 'listen', '127.0.0.1:9350', str),
@@ -176,5 +285,10 @@ def resolve_config(args, script_dir):
         cfg['auth_token'] = token
     cfg['host'] = cfg['host'].strip()
     cfg['listen'] = cfg['listen'].strip()
+    for profile_name, reg_key in (('pv-power', 'pv_register'), ('grid-power', 'grid_register'),
+                                  ('battery-power', 'battery_register'), ('battery-soc', 'battery_soc_register')):
+        if profile_name in sources:
+            sources[profile_name]['register'] = cfg[reg_key]
+    cfg['sources'] = sources
     validate_config(cfg)
     return cfg

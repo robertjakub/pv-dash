@@ -58,7 +58,8 @@ class Handler(BaseHTTPRequestHandler):
     def exposition(self):
         spec = self.scraper.spec
         up, values, last_poll, errors = self.scraper.snapshot()
-        up_name, errors_name, last_name = spec.names['up'], spec.names['modbus_errors'], spec.names['last_poll']
+        up_name, errors_name, last_name = ('huawei_up', 'huawei_modbus_errors_total',
+                                          'huawei_last_poll_timestamp_seconds')
 
         def fmt(v):
             return '%d' % round(v) if float(v).is_integer() else '%.3f' % v

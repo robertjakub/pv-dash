@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-scraper";
-  version = "0.1.0";
+  version = "0.2.0";
 
   src = lib.cleanSource ./.;
 
@@ -24,6 +24,8 @@ stdenv.mkDerivation (finalAttrs: {
     install -dm755 $out/share/modbus-scraper/lib
     install -m644 src/lib/*.py $out/share/modbus-scraper/lib/
     install -Dm644 src/metrics.json $out/share/modbus-scraper/metrics.json
+    install -dm755 $out/share/modbus-scraper/profiles
+    install -m644 ${../profiles}/*.json $out/share/modbus-scraper/profiles/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper \
       --add-flags "$out/share/modbus-scraper/scraper.py"
 

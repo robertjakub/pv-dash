@@ -48,14 +48,29 @@ class Scraper:
                 logger.warning('inverter %s:%d unreachable: %s', self.cfg['host'],
                                self.cfg['modbus_port'], err)
 
+    def _read(self, profile_name):
+        """Read one source: the profile-declared type on the wire, decoded
+        by the profile's gain (wire value = physical x gain)."""
+        src = self.cfg['sources'][profile_name]
+        reg, typ = src['register'], src['type']
+        if typ in ('i32', 'u32'):
+            raw = self.client.read_i32(reg)
+            if typ == 'u32' and raw < 0:
+                raw += 0x100000000
+        else:
+            raw = self.client.read_registers(reg, 1)[0]
+            if typ == 'i16' and raw >= 0x8000:
+                raw -= 0x10000
+        return raw / src['gain']
+
     def poll_once(self):
         cfg = self.cfg
         try:
-            pv_raw = self.client.read_i32(cfg['pv_register'])
-            grid_raw = self.client.read_i32(cfg['grid_register'])
+            pv_raw = self._read('pv-power')
+            grid_raw = self._read('grid-power')
             battery = cfg['battery']
-            batt_raw = self.client.read_i32(cfg['battery_register']) if battery else 0
-            soc = self.client.read_registers(cfg['battery_soc_register'], 1)[0] / 10.0 if battery else None
+            batt_raw = self._read('battery-power') if battery else 0
+            soc = self._read('battery-soc') if battery else None
             diag = self._read_diag()
         except Exception as e:
             self.client.close()
@@ -66,7 +81,7 @@ class Scraper:
         grid = grid_raw * cfg['grid_scale']
         if cfg['grid_positive_import']:
             grid = -grid
-        batt = batt_raw * cfg['scale']
+        batt = batt_raw
         home = pv - batt - grid
         cap = cfg['max_kwp'] * 1000.0
         grid_cap = cfg['max_grid_kw'] * 1000.0
@@ -94,24 +109,24 @@ class Scraper:
         with self.lock:
             self.error = err
             if err is None:
-                names = self.spec.names
+                metric = {pn: src['metric'] for pn, src in cfg['sources'].items()}
                 self.values = {
-                    names['pv']: pv,
-                    names['grid']: grid,
-                    names['export']: max(grid, 0.0),
-                    names['import']: max(-grid, 0.0),
-                    names['home']: home,
-                    names['battery']: 1 if battery else 0,
+                    metric['pv-power']: pv,
+                    metric['grid-power']: grid,
+                    'huawei_grid_export_watts': max(grid, 0.0),
+                    'huawei_grid_import_watts': max(-grid, 0.0),
+                    'huawei_home_consumption_watts': home,
+                    'huawei_battery': 1 if battery else 0,
                 }
-                if battery:
-                    self.values[names['batt_net']] = batt
-                    self.values[names['batt_charge']] = max(batt, 0.0)
-                    self.values[names['batt_discharge']] = max(-batt, 0.0)
-                    self.values[names['batt_soc']] = soc
+                if battery and 'battery-power' in metric:
+                    self.values[metric['battery-power']] = batt
+                    self.values['huawei_battery_charge_watts'] = max(batt, 0.0)
+                    self.values['huawei_battery_discharge_watts'] = max(-batt, 0.0)
+                    self.values[metric['battery-soc']] = soc
                 if diag is not None:
-                    self.values[names['cache_device_up']] = diag[1]
-                    self.values[names['cache_age']] = min(diag[2], DIAG_MAX)
-                    self.values[names['cache_uptime']] = diag[3]
+                    self.values['huawei_cache_device_up'] = diag[1]
+                    self.values['huawei_cache_age_seconds'] = min(diag[2], DIAG_MAX)
+                    self.values['huawei_cache_uptime_seconds'] = diag[3]
                 self.last_poll = time.time()
             else:
                 self.errors += 1

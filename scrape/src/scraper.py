@@ -38,7 +38,9 @@ def parse_args():
     ap.add_argument('--unit', type=int, help='Modbus unit id (default: config, $SCRAPER_UNIT or 1)')
     ap.add_argument('--modbus-offset', type=int, help='added to register addresses (default: config, $SCRAPER_MODBUS_OFFSET or 0)')
     ap.add_argument('--timeout', type=float, help='Modbus timeout in seconds (default: config, $SCRAPER_TIMEOUT or 3)')
-    ap.add_argument('--pv-register', type=int, help='PV power register, signed I32 watts (default: config, $SCRAPER_PV_REGISTER or 32064)')
+    ap.add_argument('--profile', dest='profile',
+                    help='device profile JSON (the shared profiles/ schema; scrape-marked entries feed the metric registers) (default: config, $SCRAPER_PROFILE or the bundled sun2000 profile)')
+    ap.add_argument('--pv-register', type=int, help='PV power register, signed I32 watts (default: config, $SCRAPER_PV_REGISTER, the profile or 32064)')
     ap.add_argument('--grid-register', type=int, help='grid power register, signed I32 watts (default: config, $SCRAPER_GRID_REGISTER or 37113)')
     ap.add_argument('--scale', type=float, help='PV register multiplier (default: config, $SCRAPER_SCALE or 1)')
     ap.add_argument('--grid-scale', type=float, help='grid register multiplier (default: config, $SCRAPER_GRID_SCALE or 1)')

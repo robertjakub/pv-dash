@@ -1,0 +1,27 @@
+{
+  "description": "The essential SUN2000 monitoring set (the classic 13-range map)",
+  "registers": [
+    "pv-power",
+    "pv-limit",
+    "device-temperature",
+    "grid-frequency",
+    "yield-total",
+    "yield-day",
+    "grid-power",
+    "string-1-voltage",
+    "string-1-current",
+    "string-2-voltage",
+    "string-2-current",
+    "output-voltage-a",
+    "output-voltage-b",
+    "output-voltage-c",
+    "meter-export",
+    "meter-import",
+    "battery-power",
+    "battery-soc",
+    "battery-charge-total",
+    "battery-discharge-total",
+    "battery-charge-today",
+    "battery-discharge-today"
+  ]
+}

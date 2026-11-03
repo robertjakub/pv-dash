@@ -4,6 +4,7 @@
 Run from anywhere: python3 cache/test/regtest.py
 Starts its own fake inverter + proxy on scratch ports and cleans up.
 """
+import json as _json
 import os
 import socket
 import struct
@@ -17,33 +18,12 @@ CACHE_DIR = os.path.dirname(TEST_DIR)
 REPO = os.path.dirname(CACHE_DIR)
 P = os.path.join(CACHE_DIR, 'src', 'modbus_cache.py')
 F = os.path.join(REPO, 'inverter', 'src', 'fake_inverter.py')
-R = os.path.join(CACHE_DIR, 'src', 'registers.json')
+R = os.path.join(os.path.dirname(CACHE_DIR), 'profiles', 'sun2000.json')
 
 CACHE_PORT = 15505
 INV_PORT = 15501
 
 failures = []
-
-
-def sync_check():
-    """The module's inline default must equal cache/src/registers.json."""
-    import json as _json
-    r = subprocess.run(['nix', 'eval', '--impure', '--json', '--expr', """
-let
-  flake = builtins.getFlake "%s";
-  nixos = flake.inputs.nixpkgs.lib.nixosSystem {
-    system = builtins.currentSystem;
-    modules = [ flake.nixosModules.modbus-cache { services.modbus-cache.enable = true; } ];
-  };
-in nixos.config.services.modbus-cache.registers
-""" % REPO], capture_output=True, text=True)
-    if r.returncode != 0:
-        check('registers.json <-> module.nix sync', False, 'nix eval failed')
-        return
-    default = _json.loads(r.stdout)
-    shipped = _json.load(open(R))['registers']
-    check('registers.json <-> module.nix sync', default == shipped,
-          'keep the inline default in cache/module.nix in sync with cache/src/registers.json')
 
 
 def check(name, cond, detail=''):
@@ -173,7 +153,7 @@ try:
     start([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(INV_PORT)])
     time.sleep(0.7)
     start([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT), '--listen', '127.0.0.1:%d' % CACHE_PORT,
-           '--interval', '1', '--cache-ttl', '3', '--allow-write', '--registers-file', R], log='/tmp/reg_cache.log')
+           '--interval', '1', '--cache-ttl', '3', '--allow-write', '--profile', R], log='/tmp/reg_cache.log')
     time.sleep(2.5)
 
     # cached reads served with correct values
@@ -189,16 +169,28 @@ try:
     w = struct.unpack('>8H', b[2:18])
     check('cached battery energy block', b[0] == 3 and struct.unpack('>I', struct.pack('>HH', w[0], w[1]))[0] == 25000)
 
-    # forwarded (uncached) read: forwarded, cached, then served from cache
-    log_before = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache.log'],
-                                capture_output=True, text=True).stdout.strip()
-    b = rd(32089, 1)
-    check('passthrough read ok (32089 = on-grid)', b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 512, b.hex())
-    b2 = rd(32089, 1)
-    log_after = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache.log'],
-                               capture_output=True, text=True).stdout.strip()
-    check('repeat read served from cache', b2[0] == 3 and int(log_after) == int(log_before) + 1,
-          'forwards: %s -> %s' % (log_before, log_after))
+    # forwarded (uncached) read: a mini profile (only pv+grid marked) proves
+    # the marks: 32089 is not in it -> forwarded once, cached, then served
+    mini = '/tmp/reg_mini_profile.json'
+    _json.dump({'description': 'mini device (marks test)',
+                'registers': [
+                    {'name': 'pv-power', 'register': 32064, 'type': 'i32', 'scale': 1, 'cache': True},
+                    {'name': 'grid-power', 'register': 37113, 'type': 'i32', 'scale': 1, 'cache': True},
+                ]}, open(mini, 'w'))
+    c3 = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
+                           '--listen', '127.0.0.1:15517', '--interval', '1', '--cache-ttl', '3',
+                           '--profile', mini], stdout=open('/tmp/reg_mini.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(c3)
+    time.sleep(1.5)
+    b = rd(32089, 1, port=15517)
+    check('profile marks: unmarked register forwarded (32089 = on-grid)',
+          b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 512, b.hex())
+    b2 = rd(32089, 1, port=15517)
+    forwards = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_mini.log'],
+                              capture_output=True, text=True).stdout.strip()
+    check('profile marks: repeat read served from cache', b2[0] == 3
+          and struct.unpack('>H', b2[2:4])[0] == 512 and forwards == '1',
+          'forwards: %s' % forwards)
 
     # undefined register (strict fake): client gets the device's failure
     b = rd(32100, 1)
@@ -224,7 +216,7 @@ try:
     # write support disabled by default: refused with illegal function, upstream untouched
     procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
                                    '--listen', '127.0.0.1:15507', '--interval', '1',
-                                   '--registers-file', R],
+                                   '--profile', R],
                                   stdout=open('/tmp/reg_cache_nowrite.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(1.5)
     s = socket.create_connection(('127.0.0.1', 15507), timeout=5)
@@ -287,18 +279,18 @@ try:
     check('device dead: diag still served, flags down, age grows',
           b[0] == 3 and w[:2] == (0xCAFE, 0) and w[2] >= 3, str(w))
 
-    # 3. poll status caching: registers.json variant with an undefined register
+    # 3. poll status caching: profile variant with a register the device rejects
     procs[0] = subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(INV_PORT)],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(0.7)
     import json as _json
     map_ = _json.load(open(R))
-    map_["registers"].append({'name': 'undefined test register', 'start': 32100, 'count': 1})
+    map_["registers"].append({'name': 'undefined test register', 'register': 32100, 'type': 'u16', 'cache': True})
     badmap = '/tmp/reg_badmap.json'
     _json.dump(map_, open(badmap, 'w'))
     c2 = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
                            '--listen', '127.0.0.1:15506', '--interval', '1', '--cache-ttl', '3',
-                           '--registers-file', badmap], stdout=open('/tmp/reg_cache2.log', 'w'),
+                           '--profile', badmap], stdout=open('/tmp/reg_cache2.log', 'w'),
                           stderr=subprocess.STDOUT)
     procs.append(c2)
     time.sleep(2.5)
@@ -319,7 +311,7 @@ try:
     evil.mode = 'garbage'  # cold from the start: no fine-mode poll can fill the cache
     start([sys.executable, P, '--host', '127.0.0.1', '--port', '15509',
            '--listen', '127.0.0.1:15508', '--interval', '1', '--cache-ttl', '3',
-           '--registers-file', R], log='/tmp/reg_evil.log')
+           '--profile', R], log='/tmp/reg_evil.log')
     time.sleep(2)
     for mode in ('garbage', 'short', 'lying', 'txn', 'unit', 'stall'):
         evil.mode = mode
@@ -343,11 +335,126 @@ try:
     check('evil upstream: zero tracebacks, failures are one-liners',
           'Traceback' not in evil_log and 'poll of' in evil_log)
     evil.stop()
+
+    # 5. control server: show status/connections/cache, clear cache, restart,
+    #    cache_cli, shutdown (+ the default unix socket / MODBUS_CACHE_CTL)
+    K = os.path.join(CACHE_DIR, 'src', 'cache_cli.py')
+
+    def ctl_cmd(cmd, port):
+        s = socket.create_connection(('127.0.0.1', port), timeout=5)
+        s.sendall((cmd + '\n').encode())
+        buf = b''
+        while not buf.endswith(b'\n'):
+            b2 = s.recv(4096)
+            if not b2:
+                break
+            buf += b2
+        s.close()
+        return buf.decode().strip()
+
+    start([sys.executable, F, '--static', '--port', '15512', '--control-port', '0'])
+    # the shipped example selection: the essential set, by name
+    SEL = os.path.join(CACHE_DIR, 'src', 'selection.json')
+    start([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+           '--listen', '127.0.0.1:15518', '--interval', '1', '--profile', R,
+           '--selection', SEL], log='/tmp/reg_sel.log')
+    time.sleep(1.5)
+    plan = open('/tmp/reg_sel.log').read()
+    b = rd(32064, 2, port=15518)
+    check('selection: the essential set polls pv-power', b[0] == 3
+          and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
+    check('selection: 22 selected ranges, essentials in the plan',
+          'caching 22 range(s)' in plan and 'pv-power' in plan
+          and 'battery-soc' in plan and 'meter-export' in plan)
+    b = rd(32089, 1, port=15518)
+    check('selection: an unselected register forwards (device-status 512)',
+          b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 512, b.hex())
+
+    start([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+           '--listen', '127.0.0.1:15513', '--interval', '1', '--profile', R,
+           '--control-port', '15514'], log='/tmp/reg_ctl.log')
+    time.sleep(2)
+    r = ctl_cmd('show status', 15514)
+    check('control: show status one line', r.startswith('ok status upstream=127.0.0.1:15512 unit=1 listen=127.0.0.1:15513 clients=0')
+          and 'poll=' in r and 'hits=0' in r, r)
+    c1 = socket.create_connection(('127.0.0.1', 15513), timeout=5)
+    pdu = struct.pack('>BHH', 3, 32064, 2)
+    c1.sendall(struct.pack('>HHHB', 78, 0, len(pdu) + 1, 1) + pdu)
+    c1.recv(512)
+    r = ctl_cmd('show connections', 15514)
+    check('control: show connections lists peer + requests', 'connected' in r and 'requests 1' in r
+          and r.startswith('ok connections 127.0.0.1:'), r)
+    r = ctl_cmd('show cache', 15514)
+    check('control: show cache counters', 'hits 1' in r and 'range(s)' in r and 'map v0' in r, r)
+    r = ctl_cmd('clear cache', 15514)
+    check('control: clear cache', r.startswith('ok cache cleared (') and 'repolling now' in r, r)
+    b = rd(32064, 2, port=15513)
+    check('control: cache refills after clear', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
+    r = ctl_cmd('restart', 15514)
+    check('control: restart drops the upstream session', r.startswith('ok upstream session restarted'), r)
+    b = rd(32064, 2, port=15513)
+    check('control: upstream reconnects after restart', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
+    r = ctl_cmd('bogus', 15514)
+    check('control: unknown command', r.startswith('err unknown command'), r)
+    r = ctl_cmd('ping', 15514)
+    check('control: ping answers pong', r == 'ok pong', r)
+    c1.close()
+
+    def cli(stdin, port=15514, env_extra=None, use_flag=True):
+        env = dict(os.environ)
+        if env_extra:
+            env.update(env_extra)
+        args = [sys.executable, K]
+        if use_flag:
+            args += ['--control-port', str(port)]
+        return subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=30, env=env)
+
+    r = cli('show status\nquit\n')
+    check('cache_cli: show status prints the state line', r.returncode == 0
+          and '\ncache:15514 > status upstream=' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('clear cache\nquit\n')
+    check('cache_cli: clear cache confirms silently', r.returncode == 0
+          and '\ncache:15514 > ok\n' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('shutdown\nn\n')
+    check('cache_cli: shutdown refuses without confirming', r.returncode == 0
+          and 'Proceed with shutdown? [confirm]' in r.stdout and '% Aborted.' in r.stdout, repr(r.stdout))
+    p = subprocess.Popen([sys.executable, K, '--control-port', '15514'],
+                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True, env={**os.environ, 'CACHE_CLI_KEEPALIVE': '0.2'})
+    time.sleep(1.2)          # the CLI idles, pinging every 0.2s
+    p.stdin.write('show status\n')
+    p.stdin.flush()
+    time.sleep(0.4)
+    p.stdin.write('quit\n')
+    p.stdin.flush()
+    out, _ = p.communicate(timeout=15)
+    check('cache_cli: keepalive keeps an idle session alive (pongs absorbed)',
+          p.returncode == 0 and 'status upstream=127.0.0.1:15512' in out
+          and 'ok pong' not in out, repr(out[-120:]))
+    p_unix = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                               '--listen', '127.0.0.1:15515', '--interval', '1', '--profile', R],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    procs.append(p_unix)
+    time.sleep(1.5)
+    check('control: default unix socket for the listen port', os.path.exists('/tmp/modbus-cache-15515.socket'))
+    r = cli('show status\nquit\n', 15515, {'MODBUS_CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+    check('cache_cli: MODBUS_CACHE_CTL reaches the default socket', r.returncode == 0
+          and 'status upstream=127.0.0.1:15512' in r.stdout and 'cache:15515 > ' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('show status\nquit\n', 15515, {'CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+    check('cache_cli: short CACHE_CTL env works too', r.returncode == 0
+          and 'status upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('shutdown\n\n', 15515, {'MODBUS_CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+    time.sleep(1)
+    check('cache_cli: RETURN at [confirm] stops the proxy', r.returncode == 0
+          and 'bye shutdown' in r.stdout and p_unix.poll() == 0, repr(r.stdout))
+    check('control: unix socket unlinked on shutdown', not os.path.exists('/tmp/modbus-cache-15515.socket'))
+    r = cli('shutdown\n\n', 15514)
+    time.sleep(1)
+    check('cache_cli: confirm stops the TCP-control proxy', 'bye shutdown' in r.stdout, repr(r.stdout))
 finally:
     for p in procs:
         p.kill()
 
-sync_check()
 
 print('\n%s' % ('ALL PASS' if not failures else 'FAILURES: %s' % failures))
 sys.exit(1 if failures else 0)

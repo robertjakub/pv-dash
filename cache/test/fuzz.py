@@ -38,8 +38,8 @@ try:
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
                                    '--listen', '127.0.0.1:%d' % CACHE_PORT, '--interval', '1',
-                                   '--allow-write', '--registers-file',
-                                   os.path.join(CACHE_DIR, 'src', 'registers.json')],
+                                   '--allow-write', '--profile',
+                                   os.path.join(os.path.dirname(CACHE_DIR), 'profiles', 'sun2000.json')],
                                   stdout=open('/tmp/fuzz_cache.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)
 

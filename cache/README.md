@@ -1,5 +1,9 @@
 # modbus-cache
 
+> **Experimental — work in progress.** The whole pv-suite is still under
+> active development: interfaces, file formats and behavior can still change
+> at any time.
+
 A dependency-free (Python stdlib only) **Modbus TCP caching proxy** for devices
 that accept only a single client — Huawei SUN2000 inverters and their
 SDongle/EMMA radios are limited to one Modbus TCP connection, so the
@@ -54,17 +58,25 @@ Resilience:
   frames, fuzzing and soak-tested: a client cannot crash the proxy, only
   burn its own connection.
 
-## Register map
+## Register map (device profile)
 
-The proxy caches whatever the **register map** file lists — `registers.json`
-next to the script by default (override with `--registers-file`, env
-`MODBUS_CACHE_REGISTERS_FILE` or ini `registers_file`; re-read on `SIGHUP`).
-The shipped **`cache/src/registers.json` is an example** with the standard
-SUN2000 monitoring registers — the gains and sign conventions from Huawei's
-*Modbus Interface Definitions* are noted in the entry names. Edit it or write
-your own. The NixOS module does not use the example file: it renders its own
-`registers.json` into the Nix store from the `registers` option and runs the
-service with that file.
+The proxy caches the registers listed in the **device profile** — the same
+shared schema the [fake inverter](../inverter/README.md) serves and the
+[scraper](../scrape/README.md) scrapes; the shipped profiles live in the
+suite's [`profiles/`](../profiles/) subproject (`sun2000.json` by default).
+Resolution: `--profile` flag, env `MODBUS_CACHE_PROFILE`, ini `profile`,
+then the bundled copy; the file is re-read on `SIGHUP`. Entry `type`
+(i16/u16/i32/u32) gives the word width, `name` decorates the poll logs.
+
+Which registers are actually **fetched** comes from a selection file —
+`{"registers": ["pv-power", "grid-power", ...]}`, profile names only —
+resolved as `--selection` flag, env `MODBUS_CACHE_SELECTION`, ini
+`selection`; the default fetches **every** profile entry. The shipped
+**`src/selection.json`** is an example — the essential SUN2000 monitoring
+set (the classic 13-range map, by name). Reads outside the selected set are
+forwarded to the inverter. The 65000-65003 diagnostics
+block is not a device register — it never appears in a profile and is never
+fetched: the cache synthesizes it from its own poller state.
 
 The format:
 
@@ -127,7 +139,7 @@ Settings are resolved in this order (first hit wins), mirroring
 2. Environment variables — same names prefixed: `MODBUS_CACHE_HOST`,
    `MODBUS_CACHE_PORT`, `MODBUS_CACHE_UNIT`, `MODBUS_CACHE_TIMEOUT`,
    `MODBUS_CACHE_LISTEN`, `MODBUS_CACHE_INTERVAL`, `MODBUS_CACHE_READ_DELAY`,
-   `MODBUS_CACHE_MERGE_GAP`, `MODBUS_CACHE_REGISTERS_FILE`,
+   `MODBUS_CACHE_MERGE_GAP`, `MODBUS_CACHE_PROFILE`,
    `MODBUS_CACHE_TTL`, `MODBUS_CACHE_ALLOW_WRITE`, `MODBUS_CACHE_LOCAL_TIME`,
    `MODBUS_CACHE_LOG_ACCESS`, `MODBUS_CACHE_MAX_CLIENTS`,
    `MODBUS_CACHE_CLIENT_TIMEOUT`, `MODBUS_CACHE_CONNECT_ACL`,
@@ -149,7 +161,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--timeout` | `3` | Modbus connect/read timeout, seconds |
 | **Proxy** | | |
 | `--listen` | `127.0.0.1:15502` | proxy listen address `HOST:PORT` (loopback by default) |
-| `--registers-file` | `registers.json` next to the script | JSON register map to cache (see above) |
+| `--profile` | the bundled `sun2000` profile | device profile JSON to cache (see above) |
 | `--interval` | `10` | seconds between cache polls |
 | `--cache-ttl` | 3× `--interval` | per-register cache TTL in seconds: older entries are refetched from the inverter (`0` = never expire) |
 | `--read-delay` | `0.05` | seconds between consecutive inverter reads within a poll cycle (`0` = no wait) |
@@ -196,6 +208,55 @@ every forwarded request before anything is cached.
 ```bash
 kill -HUP  $(pgrep -f modbus_cache.py)   # reload config + register map
 kill -USR1 $(pgrep -f modbus_cache.py)   # clean the cache
+```
+
+## Runtime control (`--control-port`)
+
+A line-protocol control server runs **by default on the unix socket
+`/tmp/modbus-cache-<listen-port>.socket`** — short, determinable, stale
+files replaced, nothing ever lands in the working directory. Pass a TCP port
+number to bind `127.0.0.1:PORT` instead, or `0` to switch the control server
+off. Both the proxy and the CLI tool resolve the target the same way: flag >
+**`MODBUS_CACHE_CTL`** (or the short **`CACHE_CTL`**, like the fake
+inverter's `FAKE_CTL`) environment variable > default socket.
+
+One command per line, one reply per line (`ok …` / `err …` / `bye …`):
+
+| Command | Effect |
+|---|---|
+| `show status` | one-line effective state: upstream, listen address, client count, uptime, poll health, last poll age, interval, TTL, range/map counts, hit/miss counters |
+| `show connections` | connected clients: peer, connection age, requests served |
+| `show cache` | cache contents: ranges, cached words, oldest entry, TTL, map version, failed ranges, hit/miss counters |
+| `clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
+| `restart` | drop the upstream connection **and** the cache, repoll now — for recovering from a wedged inverter session |
+| `shutdown` | gracefully stop the proxy (same as SIGTERM: listener closed, control socket unlinked) |
+| `help` / `?` | one-line command reference |
+| `quit` | close the connection |
+
+### `cache_cli` — console-style session
+
+An interactive front-end on the same socket (same flag/env resolution): the
+prompt shows the connected port, TAB completes commands and their values
+(`show <TAB>` lists status/connections/cache with descriptions, `?` does the
+same in any position), `clear cache` and `restart` confirm with a plain
+`ok`, `show …` prints the state line, and `shutdown` asks
+`Proceed with shutdown? [confirm]` first — RETURN or `y` proceeds, anything
+else aborts with `% Aborted.`. While it idles the CLI sends wire pings
+(every 55 s, `CACHE_CLI_KEEPALIVE` to tune, `0` = off) so the control
+server's idle timeout never drops a live session.
+
+```
+$ python3 cache/src/cache_cli.py
+
+cache:15502 > show status
+status upstream=127.0.0.1:5502 unit=1 listen=127.0.0.1:15502 clients=1 uptime=3600s poll=ok last-poll=2s ago interval=10s ttl=30s ranges=13 map=v0 hits=412 misses=9
+
+cache:15502 > clear cache
+ok
+
+cache:15502 > shutdown
+Proceed with shutdown? [confirm] y
+bye shutdown
 ```
 
 ## Access control
@@ -273,14 +334,17 @@ lengths, wrong transaction/unit ids, stalls, junk tails) proves that per
 mode, including recovery when the device starts answering sanely again.
 
 The regression suite's last check compares the register map rendered by the
-NixOS module against `cache/src/registers.json` (needs `nix` on PATH) — keep
-the inline default in `module.nix` in sync.
+NixOS module against the shared `profiles/sun2000.json` (needs `nix` on
+PATH).
 
 ## Nix / NixOS
 
 ```bash
 nix run .#modbus-cache -- --host 192.168.1.100
 ```
+
+The package ships two binaries: `modbus-cache` (the proxy) and
+`modbus-cache-cli` (the console-style control session).
 
 ```nix
 imports = [ inputs.pv-dash.nixosModules.modbus-cache ];
@@ -299,12 +363,11 @@ services.modbus-scraper = {
 ```
 
 Options: `inverterHost`, `inverterPort`, `unitId`, `timeout`, `interval`,
-`readDelay`, `mergeGap`, `registers` (structured entries — the module renders
-them to a `registers.json` in the store, defaulting to the shipped map),
-`registersFile` (explicit JSON file replacing the rendered one), `cacheTtl`
-(unset = 3× `interval`), `listenHost`, `listenPort`, `allowWrite`,
-`connectAcl`, `writeAcl`, `maxClients`, `clientTimeout`, `logLevel`,
-`localTime`, `logAccess`, `openFirewall`. Unset options keep the proxy
+`readDelay`, `mergeGap`, `profile` (device-profile JSON path; null = the
+bundled `sun2000` profile), `cacheTtl` (unset = 3× `interval`),
+`listenHost`, `listenPort`, `allowWrite`, `connectAcl`, `writeAcl`,
+`maxClients`, `clientTimeout`, `logLevel`, `localTime`, `logAccess`,
+`openFirewall`. Unset options keep the proxy
 defaults. The service runs with a dynamic user and systemd hardening.
 
 The module renders the **config INI and the register map into the store**
@@ -336,14 +399,16 @@ closing; set `0` to disable either.
 ```
 cache/src/
 ├── modbus_cache.py      # CLI, logging setup, signal handling
+├── cache_cli.py         # console-style interactive control session
 ├── modbus_cache.ini     # sample config
-├── registers.json       # example register map (SUN2000 monitoring set)
+├── selection.json       # example selection: the essential monitoring set
 └── lib/
     ├── protocol.py      # wire format, errors, frame helpers
-    ├── config.py        # settings resolution + register map loading
+    ├── config.py        # settings resolution + device-profile loading
     ├── upstream.py      # the shared inverter connection
     ├── cache.py         # register cache + block planner
-    └── proxy.py         # poller + client handling
+    ├── proxy.py         # poller + client handling
+    └── control.py       # line-protocol control server (show/clear/restart/shutdown)
 ```
 
 ## License

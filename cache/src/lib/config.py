@@ -8,6 +8,35 @@ import os
 
 logger = logging.getLogger('modbus-cache')
 
+DEFAULT_LISTEN_PORT = 15502
+
+
+def parse_control_target(text, listen_port=DEFAULT_LISTEN_PORT):
+    """'' → the default unix socket for the listen port (/tmp is cleared on
+    reboot, nothing lands in a working directory); '0' → None (off); digits
+    → TCP port on 127.0.0.1; anything else → unix socket path."""
+    t = (text or '').strip()
+    if t == '0':
+        return None
+    if t.isdigit():
+        p = int(t)
+        if not 1 <= p <= 65535:
+            raise SystemExit('invalid control-port %d: use 1..65535, a unix socket path, or 0 to disable' % p)
+        return p
+    if t:
+        return t
+    return '/tmp/modbus-cache-%d.socket' % listen_port
+
+
+def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
+    """--control-port flag > MODBUS_CACHE_CTL / CACHE_CTL environment > default socket."""
+    if explicit is not None and str(explicit).strip():
+        return str(explicit).strip()
+    env = os.environ.get('MODBUS_CACHE_CTL') or os.environ.get('CACHE_CTL')
+    if env and env.strip():
+        return env.strip()
+    return '/tmp/modbus-cache-%d.socket' % listen_port
+
 
 def parse_acl(text, label):
     """'any'/empty/None -> None (allow all); 'IP, CIDR, ...' -> tuple of networks."""
@@ -40,37 +69,85 @@ def parse_range(text, label):
     return check_range(start, count, label)
 
 
-def load_registers_file(path):
-    """JSON register map: {"registers": [{"name": ..., "start": N, "count": N}, ...]}.
+def _profile_candidates(name):
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return [os.path.join(here, 'profiles', name),
+            os.path.join(os.path.dirname(os.path.dirname(here)), 'profiles', name)]
 
-    List entries may also be plain "START:COUNT" strings. Returns
-    (ranges, names) with names keyed by (start, count).
-    """
+
+def default_profile_path(name='sun2000.json'):
+    """The bundled device profile (packaged two levels up) or the shared
+    profiles/ subproject at the repository root (dev tree)."""
+    for candidate in _profile_candidates(name):
+        if os.path.exists(candidate):
+            return candidate
+    return name
+
+
+def resolve_profile_file(text):
+    """A profile name (sun2000, deye -> the shared profiles/ subproject) or
+    a JSON path, passed through."""
+    t = (text or '').strip()
+    if os.path.exists(t):
+        return t
+    if '/' not in t and not t.endswith('.json'):
+        for candidate in _profile_candidates(t + '.json'):
+            if os.path.exists(candidate):
+                return candidate
+    return t
+
+
+def load_registers_file(path):
+    """Device profile: {"registers": [{"name", "register", "type", ...}]} —
+    the shared schema from the profiles/ subproject. Returns the full
+    (ranges, names) map; which entries are actually fetched is the
+    selection file's job (load_selection). "type" gives the word width
+    (i16/u16 = 1 register word, i32/u32 = 2)."""
     try:
         with open(path, encoding='utf-8') as fh:
             data = json.load(fh)
     except (OSError, ValueError) as e:
-        raise SystemExit('cannot read ranges file %s: %s' % (path, e))
+        raise SystemExit('cannot read device profile %s: %s' % (path, e))
     entries = data.get('registers') if isinstance(data, dict) else data
     if not isinstance(entries, list):
-        raise SystemExit('ranges file %s must contain a "registers" list' % path)
+        raise SystemExit('device profile %s must contain a "registers" list' % path)
     ranges, names = [], {}
     for i, entry in enumerate(entries):
-        label = 'ranges file %s, entry %d' % (path, i + 1)
-        if isinstance(entry, str):
-            ranges.append(parse_range(entry, label))
-        elif isinstance(entry, dict):
-            try:
-                start, count = int(entry['start']), int(entry['count'])
-            except (KeyError, TypeError, ValueError):
-                raise SystemExit('%s needs integer "start" and "count"' % label)
-            start_count = check_range(start, count, label)
-            ranges.append(start_count)
-            if entry.get('name'):
-                names[start_count] = str(entry['name'])
-        else:
-            raise SystemExit('%s must be a string or an object' % label)
+        label = 'device profile %s, entry %d' % (path, i + 1)
+        if not isinstance(entry, dict) or 'name' not in entry:
+            raise SystemExit('%s needs a "name"' % label)
+        try:
+            start = int(entry['register'])
+        except (KeyError, TypeError, ValueError):
+            raise SystemExit('%s (%s) needs an integer "register"' % (label, entry['name']))
+        typ = str(entry.get('type', 'i32'))
+        count = {'i16': 1, 'u16': 1, 'i32': 2, 'u32': 2}.get(typ)
+        if count is None:
+            raise SystemExit('%s (%s): unknown "type" %r (i16/u16/i32/u32)' % (label, entry['name'], typ))
+        if not 0 <= start <= 65536 - count:
+            raise SystemExit('%s (%s): register %d out of range' % (label, entry['name'], start))
+        ranges.append((start, count))
+        names[(start, count)] = str(entry['name'])
     return ranges, names
+
+
+def load_selection(path, names):
+    """A selection file: {"registers": ["pv-power", ...]} — profile NAMES to
+    fetch. Returns (ranges, names) filtered to the selected entries."""
+    try:
+        with open(path, encoding='utf-8') as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as e:
+        raise SystemExit('cannot read selection file %s: %s' % (path, e))
+    wanted = data.get('registers') if isinstance(data, dict) else data
+    if not isinstance(wanted, list) or not all(isinstance(w, str) for w in wanted):
+        raise SystemExit('selection file %s must be a "registers" list of names' % path)
+    by_name = {v: k for k, v in names.items()}
+    missing = [w for w in wanted if w not in by_name]
+    if missing:
+        raise SystemExit('selection file %s: not in the device profile: %s' % (path, ', '.join(missing)))
+    ranges = [by_name[w] for w in wanted]
+    return ranges, {by_name[w]: w for w in wanted}
 
 
 def parse_listen(text):
@@ -132,7 +209,7 @@ def load_config(path):
     return cfg['cache']
 
 
-def resolve_config(args, script_dir):
+def resolve_config(args, script_dir=None):
     """Effective settings: CLI flags > MODBUS_CACHE_* env > [cache] ini > defaults."""
     cfg = load_config(args.config)
 
@@ -171,8 +248,9 @@ def resolve_config(args, script_dir):
         'read_delay': resolve(args.read_delay, 'MODBUS_CACHE_READ_DELAY', 'read_delay', 0.05, float),
         'merge_gap': resolve(args.merge_gap, 'MODBUS_CACHE_MERGE_GAP', 'merge_gap', 8, int),
         'allow_write': resolve_bool(args.allow_write or None, 'MODBUS_CACHE_ALLOW_WRITE', 'allow_write', False),
-        'registers_file': resolve(args.registers_file, 'MODBUS_CACHE_REGISTERS_FILE', 'registers_file',
-                                  os.path.join(script_dir, 'registers.json'), str),
+        'profile': resolve_profile_file(resolve(getattr(args, 'profile', None), 'MODBUS_CACHE_PROFILE',
+                                                'profile', default_profile_path(), str)),
+        'selection': resolve(getattr(args, 'selection', None), 'MODBUS_CACHE_SELECTION', 'selection', '', str),
         'cache_ttl': resolve(args.cache_ttl, 'MODBUS_CACHE_TTL', 'cache_ttl', 3 * interval, float),
         'local_time': resolve_bool(args.local_time, 'MODBUS_CACHE_LOCAL_TIME', 'local_time', False),
         'log_access': resolve_bool(args.log_access, 'MODBUS_CACHE_LOG_ACCESS', 'log_access', False),
@@ -183,6 +261,8 @@ def resolve_config(args, script_dir):
         'write_acl': parse_acl(resolve(args.write_acl, 'MODBUS_CACHE_WRITE_ACL', 'write_acl', 'any', str),
                                'write-acl'),
         'level': resolve(args.log_level, 'MODBUS_CACHE_LOG_LEVEL', 'log_level', 'INFO', str).upper(),
+        'control_port': resolve(getattr(args, 'control_port', None), 'MODBUS_CACHE_CTL', 'control_port', '', str)
+                        or (os.environ.get('CACHE_CTL', '').strip() or ''),
     }
     validate_config(cfg)
     return cfg

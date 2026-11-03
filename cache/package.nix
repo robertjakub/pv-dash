@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-cache";
-  version = "0.1.0";
+  version = "0.2.0";
 
   src = lib.cleanSource ./.;
 
@@ -21,12 +21,17 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
 
     install -Dm755 src/modbus_cache.py $out/share/modbus-cache/modbus_cache.py
+    install -Dm755 src/cache_cli.py $out/share/modbus-cache/cache_cli.py
     install -dm755 $out/share/modbus-cache/lib
     install -m644 src/lib/*.py $out/share/modbus-cache/lib/
     install -Dm644 src/modbus_cache.ini $out/share/modbus-cache/modbus_cache.ini
-    install -Dm644 src/registers.json $out/share/modbus-cache/registers.json
+    install -Dm644 src/selection.json $out/share/modbus-cache/selection.json
+    install -dm755 $out/share/modbus-cache/profiles
+    install -m644 ${../profiles}/*.json $out/share/modbus-cache/profiles/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-cache \
       --add-flags "$out/share/modbus-cache/modbus_cache.py"
+    makeWrapper ${lib.getExe python3} $out/bin/modbus-cache-cli \
+      --add-flags "$out/share/modbus-cache/cache_cli.py"
 
     runHook postInstall
   '';
@@ -37,7 +42,7 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   meta = {
-    description = "Modbus TCP caching proxy for single-client devices like Huawei SUN2000 inverters (stdlib only, experimental)";
+    description = "Modbus TCP caching proxy for single-client devices like Huawei SUN2000 inverters (stdlib only, experimental) + console-style control CLI";
     longDescription = ''
       Owns the one Modbus TCP connection the inverter allows and multiplexes
       it: a background loop polls the configured register ranges at a fixed

@@ -29,8 +29,9 @@ def raise_fds():
     resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
 
 starts = [32000 + i * 18 for i in range(50)]              # 50 x 2 = 100 registers, gaps 16 > merge-gap 8
-map_file = '/tmp/stress_registers.json'
-json.dump({'registers': [{'start': s, 'count': 2} for s in starts]}, open(map_file, 'w'))
+map_file = '/tmp/stress_profile.json'
+json.dump({'registers': [{'name': 'r%d' % s, 'register': s, 'type': 'u32', 'cache': True}
+                         for s in starts]}, open(map_file, 'w'))
 
 procs = []
 stop = threading.Event()
@@ -53,7 +54,7 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
                                    '--listen', '127.0.0.1:%d' % CACHE_PORT, '--interval', '1',
                                    '--cache-ttl', '3', '--allow-write', '--max-clients', '0',
-                                   '--client-timeout', '0', '--registers-file', map_file],
+                                   '--client-timeout', '0', '--profile', map_file],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, preexec_fn=raise_fds))
     for _ in range(50):                                        # wait until the listener is up
         try:

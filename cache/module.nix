@@ -8,12 +8,6 @@
 let
   cfg = config.services.modbus-cache;
 
-  renderRegisters = r:
-    { inherit (r) start count; } // lib.optionalAttrs (r.name != null) { inherit (r) name; };
-
-  registersJson = pkgs.writeText "modbus-cache-registers.json" (
-    builtins.toJSON { registers = map renderRegisters cfg.registers; });
-
   configIni = pkgs.writeText "modbus_cache.ini" (lib.generators.toINI { } {
     cache = {
       host = cfg.inverterHost;
@@ -24,8 +18,8 @@ let
       interval = toString cfg.interval;
       read_delay = toString cfg.readDelay;
       merge_gap = toString cfg.mergeGap;
-      registers_file =
-        if cfg.registersFile != null then toString cfg.registersFile else registersJson;
+    } // lib.optionalAttrs (cfg.profile != null) {
+      profile = toString cfg.profile;
     } // lib.optionalAttrs (cfg.cacheTtl != null) {
       cache_ttl = toString cfg.cacheTtl;
     } // lib.optionalAttrs (cfg.maxClients != null) {
@@ -102,55 +96,16 @@ in
       '';
     };
 
-    registers = lib.mkOption {
-      type = lib.types.listOf (lib.types.submodule {
-        options = {
-          name = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            description = "Entry name for the logs (null = log the bare range).";
-          };
-          start = lib.mkOption {
-            type = lib.types.int;
-            description = "First register of the range.";
-          };
-          count = lib.mkOption {
-            type = lib.types.int;
-            description = "Number of registers.";
-          };
-        };
-      });
-      default = [
-        { name = "PV1/PV2 voltage (/10 V) + current (/100 A)"; start = 32016; count = 4; }
-        { name = "Input power DC (int32, /1000 kW)"; start = 32064; count = 2; }
-        { name = "Phase A/B/C voltage (/10 V)"; start = 32069; count = 3; }
-        { name = "Active power (int32, /1000 kW)"; start = 32080; count = 2; }
-        { name = "Grid frequency (/100 Hz)"; start = 32085; count = 1; }
-        { name = "Inverter temperature (/10 degC)"; start = 32087; count = 1; }
-        { name = "Accumulated energy yield (uint32, /100 kWh)"; start = 32106; count = 2; }
-        { name = "Daily energy yield (uint32, /100 kWh)"; start = 32114; count = 2; }
-        { name = "Active grid power (int32, W, + = export)"; start = 37113; count = 2; }
-        { name = "Grid energy: exported + imported (2 x int32, /100 kWh)"; start = 37119; count = 4; }
-        { name = "Battery SOC (/10 %)"; start = 37004; count = 1; }
-        { name = "Battery power, unit 1 (int32, W, + = charging)"; start = 37001; count = 2; }
-        { name = "Battery energy: total charged/discharged + today (4 x uint32, /100 kWh)"; start = 37780; count = 8; }
-      ];
-      description = ''
-        Register map the module renders to registers.json and passes via
-        --registers-file. The defaults are the standard SUN2000 monitoring
-        registers (same as the registers.json shipped with the package); reads
-        outside these ranges are forwarded to the inverter.
-      '';
-    };
-
-    registersFile = lib.mkOption {
+    profile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
       description = ''
-        Explicit JSON register map file, replacing the rendered registers option:
-        { "registers": [ { "name": "PV power", "start": 32064, "count": 2 }, ... ] }
-        Names only decorate the logs; reads outside the cached ranges are
-        forwarded to the inverter.
+        Device-profile JSON selecting the registers to cache (the shared
+        profiles/sun2000.json format: {"registers": [{"name", "register",
+        "type", "scale", "cache", ...}]}, only entries marked "cache": true
+        are polled). null = the profile bundled with the package (the SUN2000
+        monitoring set); reads outside the profile are forwarded to the
+        inverter.
       '';
     };
 

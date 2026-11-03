@@ -26,13 +26,13 @@ DIAG_MAX = 0xFFFF
 
 
 class Proxy:
-    def __init__(self, upstream, cache, read_delay=0.0, merge_gap=0, interval=10.0, registers_file=None, config=None):
+    def __init__(self, upstream, cache, read_delay=0.0, merge_gap=0, interval=10.0, profile=None, config=None):
         self.upstream = upstream
         self.cache = cache
         self.read_delay = read_delay
         self.merge_gap = merge_gap
         self.interval = interval
-        self.registers_file = registers_file
+        self.profile = profile
         self.config = config or {}
         self.allow_write = bool(self.config.get('allow_write', False))
         self.log_access = bool(self.config.get('log_access', False))
@@ -42,6 +42,9 @@ class Proxy:
         self.write_acl = self.config.get('write_acl')
         self.client_count = 0
         self.client_lock = threading.Lock()
+        self.clients = {}          # 'ip:port' -> {'since': monotonic, 'requests': n}
+        self.cache_hits = 0
+        self.cache_misses = 0
         self.started = time.monotonic()
         self.last_ok = None
         self.poll_ok = False
@@ -49,6 +52,8 @@ class Proxy:
         self.generation = 0
         self.poll_wake = threading.Event()
         self.listen_sock = None
+        self.listen_addr = None
+        self.stopping = False
 
     def poll_loop(self):
         while True:
@@ -74,7 +79,7 @@ class Proxy:
         self.upstream.timeout = self.config['timeout']
         with self.upstream.lock:
             self.upstream.close()
-        ranges, names = load_registers_file(self.config['registers_file'])
+        ranges, names = load_registers_file(self.config['profile'])
         self.read_delay = self.config['read_delay']
         self.merge_gap = self.config['merge_gap']
         self.interval = self.config['interval']
@@ -89,7 +94,7 @@ class Proxy:
         self.generation += 1
         self.blocks = build_blocks(ranges, self.config['merge_gap'])
         logger.info('SIGHUP: reloaded %d range(s) from %s (upstream %s:%d unit %d, interval %gs, cache ttl %gs, merge gap %d)',
-                    len(ranges), self.config['registers_file'], self.upstream.host, self.upstream.port,
+                    len(ranges), self.config['profile'], self.upstream.host, self.upstream.port,
                     self.upstream.unit, self.interval, self.cache.cache_ttl, self.merge_gap)
         self.log_map()
         self.poll_wake.set()
@@ -122,15 +127,17 @@ class Proxy:
         done = []
         ok = {}
         first = True
+        paced = True   # the read delay paces a healthy device; failures sweep unpaced
         while pending:
             start, count, leaves = pending.popleft()
             if first:
                 first = False
-            elif self.read_delay:
+            elif self.read_delay and paced:
                 time.sleep(self.read_delay)
             try:
                 with self.upstream.lock:
                     words = self.upstream.read(start, count)
+                paced = True
                 self.cache.store(start, words, version)
                 self.last_ok = time.monotonic()
                 for leaf in leaves:
@@ -138,6 +145,7 @@ class Proxy:
                     ok[leaf] = True
                 done.append((start, count, leaves))
             except (ModbusError, OSError) as e:
+                paced = False
                 self.upstream.close()
                 if len(leaves) > 1:
                     mid = len(leaves) // 2
@@ -168,6 +176,7 @@ class Proxy:
         srv.bind((host, port))
         srv.listen(128)
         self.listen_sock = srv
+        self.listen_addr = (host, port)
         logger.info('modbus-cache listening on %s:%d (client limit %s, client timeout %s)',
                     host, port,
                     self.max_clients or 'none', '%gs' % self.client_timeout if self.client_timeout else 'none')
@@ -200,6 +209,9 @@ class Proxy:
     def handle(self, client, addr):
         access = logger.info if self.log_access else logger.debug
         access('client connected: %s:%d', *addr[:2])
+        key = '%s:%d' % addr[:2]
+        with self.client_lock:
+            self.clients[key] = {'since': time.monotonic(), 'requests': 0}
         try:
             while True:
                 head = recv_exact(client, 7)
@@ -207,6 +219,10 @@ class Proxy:
                 if not 2 <= length <= MAX_PDU + 2:
                     break
                 pdu = recv_exact(client, length - 1)
+                with self.client_lock:
+                    entry = self.clients.get(key)
+                    if entry:
+                        entry['requests'] += 1
                 client.sendall(self.respond(txn, proto, unit, pdu, addr))
         except (ConnectionError, OSError) as e:
             access('client %s:%d disconnected (%s)', *addr[:2], e)
@@ -215,6 +231,7 @@ class Proxy:
         finally:
             with self.client_lock:
                 self.client_count -= 1
+                self.clients.pop(key, None)
             client.close()
 
     def respond(self, txn, proto, unit, pdu, addr):
@@ -248,10 +265,12 @@ class Proxy:
                             addr, count, code)
                 return exception_frame(txn, proto, unit, func, code)
             if self.cache.covers(addr, count):
+                self.cache_hits += 1
                 logger.debug('read: registers %d:%d served from cache', addr, count)
                 words = self.cache.words(addr, count)
                 body = struct.pack('>BB', func, count * 2) + struct.pack('>%dH' % count, *words)
                 return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
+            self.cache_misses += 1
         return self.forward(txn, proto, unit, pdu)
 
     def _diag(self, txn, proto, unit, addr, count):

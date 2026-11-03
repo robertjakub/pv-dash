@@ -10,7 +10,8 @@ cached ranges and every other function code are forwarded to the inverter
 
 Layout: lib/protocol (wire format), lib/config (settings + register map),
 lib/upstream (inverter connection), lib/cache (register cache + block plan),
-lib/proxy (poller + client handling), this file (CLI, logging, signals).
+lib/proxy (poller + client handling), lib/control (control server), this
+file (CLI, logging, signals).
 """
 import argparse
 import logging
@@ -20,10 +21,11 @@ import threading
 import time
 
 from lib.protocol import exception_frame
-from lib.config import load_registers_file, parse_listen, resolve_config
+from lib.config import default_profile_path, load_registers_file, load_selection, parse_listen, resolve_config, parse_control_target
 from lib.upstream import Upstream
 from lib.cache import Cache
 from lib.proxy import Proxy
+from lib.control import ControlServer
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -46,7 +48,10 @@ def parse_args():
     ap.add_argument('--interval', type=float, help='seconds between cache polls (default: config, $MODBUS_CACHE_INTERVAL or 10)')
     ap.add_argument('--read-delay', type=float, help='seconds between consecutive inverter reads within a poll cycle, 0 = no delay (default: config, $MODBUS_CACHE_READ_DELAY or 0.05)')
     ap.add_argument('--merge-gap', type=int, help='max register gap when merging ranges into block reads, 0 = read ranges separately (default: config, $MODBUS_CACHE_MERGE_GAP or 8)')
-    ap.add_argument('--registers-file', help='JSON register map {"registers": [{"name": ..., "start": N, "count": N}, ...]} (default: config, $MODBUS_CACHE_REGISTERS_FILE or registers.json next to this script)')
+    ap.add_argument('--profile', dest='profile',
+                    help='device profile JSON (the shared profiles/ schema) (default: config, $MODBUS_CACHE_PROFILE or the bundled sun2000 profile)')
+    ap.add_argument('--selection', dest='selection',
+                    help='selection JSON: {"registers": ["pv-power", ...]} — the profile names to fetch (default: config, $MODBUS_CACHE_SELECTION or every profile entry)')
     ap.add_argument('--cache-ttl', type=float, help='per-register cache TTL: cached registers older than this are refetched from the inverter, 0 = never expire, serve last known values forever (default: config, $MODBUS_CACHE_TTL or 3x interval)')
     ap.add_argument('--allow-write', action='store_true', help='forward write requests (FC05/06/15/16) to the inverter; default: refuse them with a Modbus illegal-function exception')
     ap.add_argument('--local-time', action='store_true', help='log timestamps in the system time zone instead of UTC')
@@ -55,6 +60,8 @@ def parse_args():
     ap.add_argument('--client-timeout', type=float, help='disconnect clients silent for this many seconds, 0 = never (default: config, $MODBUS_CACHE_CLIENT_TIMEOUT or 300)')
     ap.add_argument('--connect-acl', help='clients allowed to connect: "any" or comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16 (default: config, $MODBUS_CACHE_CONNECT_ACL or any)')
     ap.add_argument('--write-acl', help='clients allowed to write (requires --allow-write): "any" or comma-separated IPs/prefixes (default: config, $MODBUS_CACHE_WRITE_ACL or any)')
+    ap.add_argument('--control-port', dest='control_port',
+                    help='control server target: unix socket path or TCP port on 127.0.0.1 (default: config, $MODBUS_CACHE_CTL or /tmp/modbus-cache-<listen-port>.socket); 0 = off')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration and register map, print the effective settings and exit (nothing is bound or connected)')
     ap.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                     help='log level (default: config, $MODBUS_CACHE_LOG_LEVEL or INFO)')
@@ -72,6 +79,21 @@ def setup_logging(cfg):
 
 
 def install_signal_handlers(proxy, cache, args):
+    def graceful_stop(reason):
+        logger.info('shutdown: %s, closing the listener', reason)
+        proxy.stopping = True
+        ctl = getattr(proxy, 'control', None)
+        if ctl:
+            ctl.cleanup()
+        try:
+            proxy.listen_sock.close()
+        except OSError:
+            pass
+        for h in logging.getLogger().handlers:
+            h.flush()
+        time.sleep(0.2)   # let the serve loop log 'stopped' ...
+        os._exit(0)       # ... as a backstop if it somehow didn't
+
     if hasattr(signal, 'SIGHUP'):
         reload_requested = threading.Event()
 
@@ -116,35 +138,31 @@ def install_signal_handlers(proxy, cache, args):
         def watch_stop():
             while not stop_signal:
                 time.sleep(0.2)
-            sig = signal.Signals(stop_signal[0]).name
-            logger.info('shutdown: %s received, closing the listener', sig)
-            try:
-                proxy.listen_sock.close()
-            except OSError:
-                pass
-            for h in logging.getLogger().handlers:
-                h.flush()
-            os._exit(0)
+            graceful_stop('%s received' % signal.Signals(stop_signal[0]).name)
 
         signal.signal(signal.SIGTERM, on_stop)
         signal.signal(signal.SIGINT, on_stop)
         threading.Thread(target=watch_stop, daemon=True).start()
+    return graceful_stop
 
 
 def main():
     args = parse_args()
     cfg = resolve_config(args, SCRIPT_DIR)
-    ranges, range_names = load_registers_file(cfg['registers_file'])
+    ranges, range_names = load_registers_file(cfg['profile'])
+    if cfg['selection']:
+        ranges, range_names = load_selection(cfg['selection'], range_names)
 
     setup_logging(cfg)
 
     listen_host, listen_port = parse_listen(cfg['listen'])
+    control_target = parse_control_target(cfg['control_port'], listen_port)
     upstream = Upstream(cfg['host'], cfg['port'], cfg['unit'], cfg['timeout'])
     cache = Cache(ranges, cfg['cache_ttl'], range_names)
     proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
-                  cfg['registers_file'], cfg)
+                  cfg['profile'], cfg)
     logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s)',
-                len(ranges), cfg['registers_file'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
+                len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if cfg['allow_write'] else 'disabled (write requests are refused)',
                 'INFO' if cfg['log_access'] else 'DEBUG',
@@ -156,15 +174,23 @@ def main():
                 'any' if cfg['write_acl'] is None else '%d network(s)' % len(cfg['write_acl']))
     proxy.log_map()
     if args.dry_run:
-        logger.info('dry-run: configuration and register map are valid, nothing was bound or connected')
+        logger.info('dry-run: configuration and register map are valid, nothing was bound or connected (control server would listen on %s)',
+                    'off' if control_target is None else
+                    ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target))
         return
-    install_signal_handlers(proxy, cache, args)
+    stop = install_signal_handlers(proxy, cache, args)
+    if control_target is not None:
+        proxy.control = ControlServer(proxy, control_target, stop)
+        proxy.control.start()
     try:
         threading.Thread(target=proxy.poll_loop, daemon=True).start()
         proxy.serve(listen_host, listen_port)
     except KeyboardInterrupt:
         logger.info('stopped')
     except OSError as e:
+        if proxy.stopping:
+            logger.info('stopped')
+            return
         logger.error('cannot serve on %s:%d: %s', listen_host, listen_port, e)
         raise SystemExit(1)
     finally:

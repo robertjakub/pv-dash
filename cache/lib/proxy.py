@@ -11,7 +11,7 @@ from collections import deque
 from .protocol import (MAX_COUNT, MAX_PDU, WRITE_FUNCS, GATEWAY_FAILED, ILLEGAL_FUNCTION,
                        ILLEGAL_VALUE, ILLEGAL_ADDRESS, ModbusError, DeviceError, recv_exact,
                        exception_frame, describe_write)
-from .config import load_registers_file
+from .config import load_registers_file, load_selection
 from .cache import build_blocks, span
 from .statics import DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX, READS_AUDIT_S
 
@@ -96,6 +96,32 @@ class Proxy:
                     ' '.join('%s%d:%d' % ('' if fc == 3 else 'fc%d ' % fc, start, count)
                              for fc, start, count, _ in self.blocks))
 
+    def load_map(self):
+        """The register map from the current config: the profile + the
+        selection filter (SIGHUP and the control's set profile/selection share
+        this path). Raises ValueError on a bad file (never SystemExit)."""
+        try:
+            ranges, names = load_registers_file(self.config['profile'])
+            if self.config.get('selection'):
+                ranges, names = load_selection(self.config['selection'], names)
+        except SystemExit as e:
+            raise ValueError(str(e))
+        return ranges, names
+
+    def apply_map(self):
+        """Swap the register map to the config's profile (+ selection)
+        atomically: the poll plan rebuilds, the poller repopulates."""
+        ranges, names = self.load_map()
+        self.cache.update_map(ranges, names)
+        self.generation += 1
+        self.blocks = build_blocks(ranges, self.merge_gap)
+        logger.info('map reloaded: %d range(s) from %s%s, merge gap %d',
+                    len(ranges), self.config['profile'],
+                    ' (selection: %s)' % self.config['selection'] if self.config.get('selection') else '',
+                    self.merge_gap)
+        self.log_map()
+        self.poll_wake.set()
+
     def reload(self):
         """Apply a freshly resolved config + register map (SIGHUP)."""
         self.upstream.host = self.config['host']
@@ -104,7 +130,7 @@ class Proxy:
         self.upstream.timeout = self.config['timeout']
         with self.upstream.lock:
             self.upstream.close()
-        ranges, names = load_registers_file(self.config['profile'])
+        ranges, names = self.load_map()
         self.read_delay = self.config['read_delay']
         self.merge_gap = self.config['merge_gap']
         self.interval = self.config['interval']
@@ -396,6 +422,18 @@ class Proxy:
                                    fc, addr, count, body[2] if len(body) > 2 else -1)
                 else:
                     logger.warning('read: fc%d registers %d:%d unexpected response', fc, addr, count)
+            elif desc and body and body[0] == pdu[0] and pdu[0] in (6, 16, 22, 23):
+                # write-through invalidation: the device took the write, so the
+                # cached words of the touched range are stale — drop exactly
+                # them (per-register) and let the poller refill promptly
+                target = _write_target(pdu)
+                if target:
+                    waddr, wcount = target
+                    dropped = self.cache.invalidate(3, waddr, wcount)
+                    if dropped:
+                        self.poll_wake.set()
+                        logger.info('write: invalidated %d cached word(s) at registers %d:%d, repolling',
+                                    dropped, waddr, wcount)
             return resp
         except (ModbusError, OSError) as e:
             self.upstream.close()

@@ -230,6 +230,18 @@ try:
           'AUDIT CACHE START' in audit_txt and 'AUDIT CACHE WRITE' in audit_txt
           and 'register 47415 = 5' in audit_txt, audit_txt[-200:])
 
+    # write-through invalidation: the written range serves the NEW value immediately
+    b = rd(47415, 1)
+    old = struct.unpack('>H', b[2:4])[0]
+    wr6(47415, 99)
+    b = rd(47415, 1)
+    check('write-through invalidation: the read right after a write is not stale',
+          struct.unpack('>H', b[2:4])[0] == 99 and old != 99, 'old=%d resp=%s' % (old, b.hex()))
+    wr6(47415, 5)
+    b = rd(47415, 1)
+    check('write-through: the device value is served again after the restore',
+          struct.unpack('>H', b[2:4])[0] == 5, b.hex())
+
     # write support disabled by default: refused with illegal function, upstream untouched
     procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
                                    '--listen', '127.0.0.1:15507', '--interval', '1',
@@ -541,13 +553,17 @@ try:
           and 'poll=' in r and 'hits=' in r, r[:120])
     r = ctl_cmd('show status', 15514)
     check('set: show status reflects the new interval', 'interval=2s' in r, r[:120])
+    r = ctl_cmd('show settings', 15514)
+    check('set: the live override carries the * marker', 'interval=2s*' in r, r[:160])
+    r = ctl_cmd('show status', 15514)
+    check('set: the overridden row lists the setting', 'overridden=interval' in r, r[-160:])
     r = ctl_cmd('set interval bogus', 15514)
     check('set: a bogus value is a clean err', r.startswith('err interval must be seconds'), r[:100])
     r = ctl_cmd('set bogus 1', 15514)
     check('set: unknown setting', r.startswith('err unknown setting'), r[:100])
     r = ctl_cmd('show settings', 15514)
     check('show settings: every tunable, one per line', r.startswith('ok settings\n')
-          and 'interval=2s' in r and '\nttl=' in r and '\nmerge-gap=' in r
+          and 'interval=2s*' in r and '\nttl=' in r and '\nmerge-gap=' in r
           and '\nlog-level=INFO' in r, r[:160])
     r = ctl_cmd('show interval', 15514)
     check('show <setting>: the bare value', r == 'ok interval=2s', r)
@@ -555,6 +571,13 @@ try:
     check('help <setting>: the registry description', r.startswith('ok ttl - per-register cache TTL'), r[:110])
     r = ctl_cmd('unset interval', 15514)
     check('unset: restores the configured value', r.startswith('ok interval=1s'), r[:110])
+    r = ctl_cmd('show status', 15514)
+    check('unset: the override marker clears', 'overridden=none' in r, r[-160:])
+    r = ctl_cmd('show cache all', 15514)
+    check('show cache all: per-entry rows with age, expiry and status', r.startswith('ok cache all\n')
+          and 'pv-power' in r and 'expires' in r and 'fc3' in r and '2/2' in r, r[:200])
+    r = ctl_cmd('show cache', 15514)
+    check('show cache: the summary still works beside the dump', r.startswith('ok cache '), r[:80])
 
     r_before = ctl_cmd('inspect', 15514)
     ctl_cmd('set merge-gap 0', 15514)
@@ -634,7 +657,7 @@ try:
     r = ctl_cmd('inspect', 15522)
     check('control: inspect dumps state, map, write gate',
           r.startswith('ok inspect') and 'modbus-cache' in r and 'upstream  127.0.0.1:15512'
-          and 'allow-list 47400:100' in r and 'fc4' in r, repr(r[:160]))
+          and 'write-registers 47400:100' in r and 'fc4' in r, repr(r[:160]))
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     check('audit: WRITE + WRITE-REFUSED (allow-list) events',
           'AUDIT CACHE WRITE ' in fc4_audit and 'WRITE-REFUSED' in fc4_audit

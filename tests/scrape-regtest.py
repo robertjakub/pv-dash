@@ -712,16 +712,17 @@ try:
     ctl('show status', 15571)
     r = cli('show pv\nshow status\nquit\n')
     lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
-    check('fake_cli: show prints the bare value, show status the % ok report', r.returncode == 0
-          and '3000' in lines and any(l.startswith('% ok status') for l in lines)
-          and any(l == 'pv=3000' for l in lines) and any(l == 'pinned=pv=3000.0' for l in lines), repr(r.stdout))
+    check('fake_cli: show prints the bare value, show status the bare report rows', r.returncode == 0
+          and '3000' in lines
+          and any(l == 'pv=3000' for l in lines) and any(l == 'pinned=pv=3000.0' for l in lines)
+          and not any(l.startswith('% ok status') for l in lines), repr(r.stdout))
     r = cli('help soc\nshow registers\ninspect\nquit\n')
     lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
     check('fake_cli: the help is bare, the tables ride under % ok, inspect dumps', r.returncode == 0
           and any(l == 'soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' for l in lines)
           and any(l == '% ok registers (49)' for l in lines) and 'pv-power' in ''.join(lines)
-          and any(l.startswith('% ok inspect') for l in lines)
-          and any('version' in l and '0.2.1' in l for l in lines), repr(r.stdout[:120]))
+          and any('0.2.1' in l and 'version' in l for l in lines)
+          and not any(l.startswith('% ok inspect') for l in lines), repr(r.stdout[:120]))
 
     # 2g3. the audit trail: the UTC stamp, the CLI/CTL prefix, the who-when-what,
     # ping/pong never logged, --no-audit-log switches it off

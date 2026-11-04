@@ -99,10 +99,31 @@ class ControlServer:
             return '%s:%d' % (addr[0], addr[1])
         return 'unix socket'
 
+    def announce_exit(self, reason):
+        """The daemon is going down: send every connected control client a
+        bye frame (the consoles print the notice and exit instead of trying
+        to reconnect to a dead fake) and close their sockets."""
+        frame = (json.dumps({'status': 'bye',
+                             'text': 'daemon-exit: the fake inverter is shutting down (%s)' % reason})
+                 + '\n').encode()
+        with self.clients_lock:
+            clients, self.clients = list(self.clients), set()
+        for client in clients:
+            try:
+                client.sendall(frame)
+            except OSError:
+                pass
+            try:
+                client.close()
+            except OSError:
+                pass
+
     def handle(self, client, addr):
         who = self.peer(addr)
         logger.debug('control client connected from %s', who)
         authed = False
+        with self.clients_lock:
+            self.clients.add(client)
         try:
             client.settimeout(CONTROL_IDLE_TIMEOUT_S)
             buf = b''
@@ -141,6 +162,8 @@ class ControlServer:
             logger.error('control handler crashed (%s)', e)
         finally:
             logger.debug('control client from %s disconnected', who)
+            with self.clients_lock:
+                self.clients.discard(client)
             client.close()
 
     # every configurable of the fake: the shared registry (lib.settings)
@@ -161,6 +184,8 @@ class ControlServer:
         self.shutdown_pending = False
         self.scenario = None        # last applied preset, or None = 'custom'
         self.defaults = defaults or {}   # setting -> configured startup value ('unset')
+        self.clients = set()             # the live control sockets (announce_exit)
+        self.clients_lock = threading.Lock()
         self.target = str(target)
         self.started = time.monotonic()
         self.is_unix = not self.target.isdigit()
@@ -265,7 +290,7 @@ class ControlServer:
             sim.peak_w = PEAK_RATIO * v * 1000.0
             return '%g' % v
         if key == 'profile':
-            path = 'sun2000' if val in ('default', 'auto', 'none') else resolve_profile(value.strip())
+            path = resolve_profile('sun2000' if val in ('default', 'auto', 'none') else value.strip())
             try:
                 m = load_profile(path)
             except SystemExit as e:

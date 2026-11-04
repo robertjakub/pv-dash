@@ -47,6 +47,15 @@ SETTINGS = (
              'INFO': 'lifecycle, control commands, writes',
              'WARNING': 'problems only',
              'ERROR': 'quietest'}),
+    Setting('profile', 'device profile JSON: the register ranges to cache (a bare name resolves in profiles/)', ('default',), '<file>',
+            {'default': 'the bundled sun2000 profile'}),
+    Setting('selection', 'selection JSON: which profile names to fetch ("all" = every profile entry)', ('all',), '<file>|all',
+            {'all': 'every profile entry (the default)'}),
+    Setting('connect-acl', 'clients allowed to connect: "any" or comma-separated IPs/prefixes', ('any',), 'any|IP,...',
+            {'any': 'every client may connect (the default)'}),
+    Setting('write-acl', 'clients allowed to write (requires allow-write): "any" or comma-separated IPs/prefixes', ('any',), 'any|IP,...',
+            {'any': 'the write gate is allow-write alone (the default)'}),
+    Setting('timeout', 'upstream Modbus connect/read timeout in seconds', (), 's', {}),
 )
 
 SETTING_BY_NAME = {s.name: s for s in SETTINGS}

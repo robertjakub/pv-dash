@@ -106,6 +106,9 @@ def main():
                 raise SystemExit(1)
         for cmd in commands:
             st, tx = exchange(s, cmd)
+            if st == 'bye' and tx.startswith('daemon-exit'):
+                print('%% %s — done' % tx.replace('daemon-exit', 'daemon exit', 1))
+                break
             print(('%s %s' % (st, tx)).rstrip())
     except OSError as e:
         print('control error: %s' % e, file=sys.stderr)

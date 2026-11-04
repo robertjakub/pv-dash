@@ -50,20 +50,37 @@ from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNEC
 KEEPALIVE_ENV = 'FAKE_CLI_KEEPALIVE'    # ping interval in seconds; 0 = off
 DEFAULT_KEEPALIVE = CLI_KEEPALIVE_S     # well under the control server's idle timeout
 
-HELP = """commands (TAB completes, ? lists the options + descriptions in any position):
-""" + ''.join('  %-10s %s\n' % (n, d) for n, d in
-              (('set', 'configure a setting (set soc auto, set scenario noon)'),
-               ('unset', 'restore a setting to its configured value (unset pv, unset seed)'),
-               ('show', 'print a setting, the status line, or all of them'),
-               ('reset', 'clear all pins + the write overlay'),
-               ('shutdown', 'stop the fake inverter (asks to confirm)'),
-               ('quit', 'close the session'),
-               ('?', 'this help'))) + '  help <setting>  the setting\'s description'
+HELP_ROWS = (
+    ('set', 'configure a setting (set soc auto, set scenario noon)'),
+    ('unset', 'restore a setting to its configured value (unset pv, unset seed)'),
+    ('show', 'print a setting, the status line, or all of them'),
+    ('reset', 'clear all pins + the write overlay'),
+    ('shutdown', 'stop the fake inverter (asks to confirm)'),
+    ('quit', 'close the session'),
+    ('?', 'this help'),
+    ('help <setting>', "the setting's description"),
+)
+HELP = 'commands (TAB completes, ? lists the options + descriptions in any position):\n' \
+     + '\n'.join('    %-*s %s' % (max(len(n) for n, _ in HELP_ROWS) + 1, n, d)
+                 for n, d in HELP_ROWS)
 
 
 class ConnectionLost(Exception):
     """The control connection is gone: EOF without a bye, a reset, a send
     failure or a reply timeout. The session decides: reconnect or exit."""
+
+
+class DaemonExit(Exception):
+    """The daemon sent its bye daemon-exit frame: print the notice and leave —
+    there is nothing on the other end to reconnect to."""
+
+
+def daemon_exit_notice(text):
+    """The '% daemon exit: ... — console closing' line, from the wire's JSON
+    frame or the internal 'bye daemon-exit: ...' form."""
+    m = re.search(r'daemon-exit: ([^"\n]*)', text or '')
+    print('\n%% daemon exit: %s — console closing' % (m.group(1).rstrip() if m else 'the daemon is gone'))
+    sys.stdout.flush()
 
 
 def prompt_for(target, is_unix):
@@ -80,7 +97,8 @@ def prompt_for(target, is_unix):
 
 def candidates(buf):
     """Valid next words for the buffer being completed or questioned:
-    (matches, hint about the following word, describer of each word)."""
+    (matches, hint about the following word, describer of each word, the
+    [settings]/[values]/[system] groups for the listing)."""
     end_space = buf.endswith(' ')
     parts = buf.split()
     text = '' if end_space else (parts[-1] if parts else '')
@@ -99,8 +117,40 @@ def candidates(buf):
         pool, hint = (s.values if s else []), (s.hint if s else None)
         desc = (lambda w, _n=done[1].lower(): describe_value(_n, w))
     else:
-        return [], None, None
-    return sorted(w for w in pool if w.startswith(text.lower())), hint, desc
+        return [], None, None, []
+    matches = sorted(w for w in pool if w.startswith(text.lower()))
+    return matches, hint, desc, _sections(head, len(done), matches)
+
+
+def _sections(head, done_len, matches):
+    """The listing groups: the real tunables ([settings]), the values of one
+    setting ([values]), everything else ([system]: the report words, the
+    commands, the register pseudo-setting)."""
+    if done_len >= 2 and head in ('set', 'unset'):
+        return [('values', matches)]
+    if head in ('set', 'unset') and done_len == 1:
+        return [('settings', [w for w in matches if w in SETTING_BY_NAME]),
+                ('system', [w for w in matches if w not in SETTING_BY_NAME])]
+    if head == 'show' and done_len == 1:
+        return [('settings', [w for w in matches if w in SETTING_BY_NAME]),
+                ('system', [w for w in matches if w not in SETTING_BY_NAME])]
+    return [('system', matches)]
+
+
+def sectioned_rows(sections, desc, hint):
+    """The listing: a blank line, then the [settings]/[values]/[system]
+    header, its entries padded two spaces under it, descriptions aligned
+    among themselves."""
+    rows = []
+    for label, words in sections:
+        if not words:
+            continue
+        rows.append('')
+        rows.append('  [%s]' % label)
+        rows.extend('  ' + r for r in aligned_rows(words, desc, None))
+    if hint:
+        rows.append('    ' + hint)
+    return rows
 
 
 def describe_word(w):
@@ -124,6 +174,21 @@ def describe_word(w):
     return None
 
 
+def aligned_rows(matches, desc, hint):
+    """One candidate per line with the descriptions aligned to the longest
+    described word (a fixed pad goes ragged past 12 characters:
+    battery-state, battery-kwh, grid-frequency). The hint line keeps its own
+    indent."""
+    width = max((len(w) for w in matches if desc(w)), default=0)
+    rows = []
+    for w in matches:
+        d = desc(w)
+        rows.append('  %-*s %s' % (width, w, d) if d else '  %s' % w)
+    if hint:
+        rows.append('  ' + hint)
+    return rows
+
+
 _last_listed = None   # the completer is called several times per attempt;
                       # list each distinct buffer only once
 _prompt = 'fake-inverter > '   # the session's prompt; the completer re-echoes it after the list
@@ -132,15 +197,34 @@ _send_lock = threading.Lock()   # the keepalive thread and exchange() share the 
 _stop_ping = threading.Event()
 
 
-def keepalive(sock, interval):
+def keepalive(sock, interval, audit=None):
     """Send pings while the user thinks, so the control server's idle timeout
-    never drops a live session; any traffic resets that timer."""
+    never drops a live session; any traffic resets that timer. A dead wire
+    while the console sits at the prompt: if the daemon announced its exit,
+    the bye frame is still pending — print the notice and leave (no reconnect
+    against a dead fake); an unannounced death is the main loop's business."""
     while not _stop_ping.wait(interval):
         try:
             with _send_lock:
                 sock.sendall(b'{"cmd": "ping"}\n')
         except OSError:
-            return   # session is gone; the main thread will notice too
+            try:
+                sock.setblocking(False)
+                data = sock.recv(4096).decode('utf-8', 'replace')
+            except OSError:
+                data = ''
+            finally:
+                try:
+                    sock.settimeout(CLI_TIMEOUT_S)
+                except OSError:
+                    pass
+            if 'daemon-exit' in data:
+                daemon_exit_notice(data)
+                if audit:
+                    audit.event('DISCONNECT', 'daemon exit')
+                    audit.close()
+                os._exit(0)
+            return   # unannounced: the main loop notices on the next command
 
 
 def complete(text, state):
@@ -151,7 +235,7 @@ def complete(text, state):
     column-packs or skips its own listings) — and yield no match so the
     editor just redraws the line."""
     global _last_listed
-    matches, hint, desc = candidates(readline.get_line_buffer())
+    matches, hint, desc, sections = candidates(readline.get_line_buffer())
     if state >= len(matches):
         return None
     if len(matches) > 1:
@@ -161,15 +245,10 @@ def complete(text, state):
         buf = readline.get_line_buffer()
         if state == 0 and _last_listed != buf:
             _last_listed = buf
-            rows = []
-            for w in matches:
-                d = desc(w) if desc else None
-                rows.append('  %-12s %s' % (w, d) if d else '  %s' % w)
-            if hint:
-                rows.append('  ' + hint)
+            rows = sectioned_rows(sections, desc, hint)
             # the list, a blank line, then the prompt + line again — editline
             # does NOT redraw after the completer, so we do it ourselves
-            print('\n' + '\n'.join(rows) + '\n')
+            print('\n'.join(rows) + '\n')
             sys.stdout.write(_prompt + buf)
             sys.stdout.flush()
         return None
@@ -177,16 +256,14 @@ def complete(text, state):
 
 
 def print_options(buf):
-    """console ?`: one candidate per line, with the short description."""
-    matches, hint, desc = candidates(buf)
+    """console ?`: one candidate per line, grouped into the [settings] /
+    [values] / [system] sections."""
+    matches, hint, desc, sections = candidates(buf)
     if not matches:
         print('% Invalid input.')
         return
-    for w in matches:
-        d = desc(w) if desc else None
-        print('  %-12s %s' % (w, d) if d else '  %s' % w)
-    if hint:
-        print('  ' + hint)
+    for row in sectioned_rows(sections, desc, hint):
+        print(row)
 
 
 def main():
@@ -295,8 +372,13 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
                 interval = float(os.environ.get(KEEPALIVE_ENV, '') or DEFAULT_KEEPALIVE)
                 if interval > 0:
                     _stop_ping.clear()
-                    threading.Thread(target=keepalive, args=(sock, interval), daemon=True).start()
+                    threading.Thread(target=keepalive, args=(sock, interval, audit), daemon=True).start()
                 return _loop(sock, prompt, audit)
+            except DaemonExit as e:
+                daemon_exit_notice(str(e))
+                if audit:
+                    audit.event('DISCONNECT', 'daemon exit')
+                return
             except ConnectionLost:
                 try:
                     sock.close()
@@ -383,6 +465,14 @@ def _loop(sock, prompt, audit=None):
                 print(row)
         elif cmd.lower().startswith('show ') and reply.startswith('ok ') and '=' in reply and '\n' not in reply:
             print(reply.split(' ', 1)[1].split('=', 1)[1])   # the bare value
+        elif cmd.lower().startswith('show ') and reply.startswith('ok ') and '\n' in reply:
+            head, _, rest = reply[3:].partition('\n')
+            if ' ' not in head and '=' not in head:
+                print(rest)         # the report rows (the command already said the name)
+            else:
+                display(reply)
+        elif cmd.lower() == 'inspect' and reply.startswith('ok inspect\n'):
+            print('\n'.join(reply.splitlines()[1:]))   # the dump itself is the answer
         else:
             display(reply)
 
@@ -485,6 +575,8 @@ def exchange(sock, wire):
             except ValueError:
                 continue
             text = '%s %s' % (obj.get('status', 'err'), str(obj.get('text', '')))
+            if obj.get('status') == 'bye' and str(obj.get('text', '')).startswith('daemon-exit'):
+                raise DaemonExit(text)
             if text.strip() == 'ok pong':
                 continue
             if text.strip():

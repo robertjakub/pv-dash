@@ -236,21 +236,32 @@ permissions instead.
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `interval`, `ttl`, `read-delay`, `merge-gap` (the poll plan rebuilds), `allow-write`, `write-registers`, `max-clients`, `client-timeout`, `reads-audit`, `log-level` — the reply carries the compact state summary |
+| `set <setting> <value>` | configure a setting **live**: `interval`, `ttl`, `read-delay`, `merge-gap` (the poll plan rebuilds), `allow-write`, `write-registers`, `max-clients`, `client-timeout`, `reads-audit`, `log-level`, `profile`/`selection` (the register map swaps atomically), `connect-acl`, `write-acl`, `timeout` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
 | `show <setting>` | the bare live value of one tunable |
-| `show settings` | every tunable with its live value — one stable `key=value` line per setting (scriptable) |
+| `show settings` | every tunable with its live value — one stable `key=value` line per setting (scriptable); a value set live carries a `*`, and a SIGHUP re-applies the config (the file always wins) and clears the markers — see [Live settings](#live-settings) |
 | `help <setting>` | the registry description of one setting |
 | `inspect` | one pretty multi-line dump of everything — version, upstream, listen/control, profile, cache state, poll plan, counters, the write gate, the audit sink: the baton for a bug report |
 | `show status` | the **effective state report**: one stable `key=value` line per field (`upstream`, `unit`, `listen`, `control`, `uptime`, `poll`, `last_poll`, `interval`, `ttl`, `merge_gap`, `ranges`, `fc4_ranges`, `map_version`, `hits`, `misses`, `clients`, `writes`, `write_allow_list`, `reads_audit`, `profile`, `selection`) — scriptable |
 | `show connections` | connected clients: peer, connection age, requests served |
 | `show cache` | cache contents: ranges, cached words, oldest entry, TTL, map version, failed ranges, hit/miss counters |
+| `show cache all` | every cached entry, one row per profile range: name, words cached, age of the oldest, when it expires, poll status (`ok`/`partial`/`empty`/`failed (ex N)`) |
 | `show version` | the modbus-cache version |
 | `clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
 | `restart` | drop the upstream connection **and** the cache, repoll now — for recovering from a wedged inverter session |
 | `shutdown` | gracefully stop the proxy (same as SIGTERM: listener closed, control socket unlinked) |
 | `help` / `?` | one-line command reference |
 | `quit` | close the connection |
+
+### Live settings
+
+Every `set` applies immediately and keeps working until the daemon stops —
+**or** the next `SIGHUP`, which re-resolves the config (flags, env, ini) and
+re-applies it wholesale: the file always wins on reload. A setting changed
+live is marked with a `*` in `show settings` (`interval=5s*`) and listed in
+`show status`'s `overridden=` row; `unset <setting>` restores the configured
+value and clears the mark. This makes the policy explicit: live settings are
+runtime nudges, the config files stay the source of truth.
 
 ### `cache_ctl` — one-shot commands
 
@@ -348,6 +359,14 @@ are `connect_acl`/`write_acl` (NixOS `connectAcl`/`writeAcl`).
 
 ACLs re-resolve on `SIGHUP` like every other setting; a malformed list keeps
 the previous one.
+
+## Write-through invalidation
+
+A forwarded write lands on the device, and the cache immediately drops the
+cached words it touched (per-register — the rest of the cache stays warm)
+and wakes the poller. The next read of the written range goes to the device
+instead of serving the pre-write value until the TTL expires. Coils (FC05/15)
+are not cached and need no invalidation.
 
 ## Audit logging
 

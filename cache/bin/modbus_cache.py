@@ -122,6 +122,7 @@ def install_signal_handlers(proxy, cache, args):
         proxy.stopping = True
         ctl = getattr(proxy, 'control', None)
         if ctl:
+            ctl.announce_exit(reason)   # the consoles print the notice and exit
             ctl.cleanup()
         try:
             proxy.listen_sock.close()
@@ -146,6 +147,9 @@ def install_signal_handlers(proxy, cache, args):
                 try:
                     proxy.config = resolve_config(args, SCRIPT_DIR)
                     proxy.reload()
+                    ctl = getattr(proxy, 'control', None)
+                    if ctl:
+                        ctl.clear_overrides()   # the config won: nothing is live-overridden
                     if proxy.audit:
                         proxy.audit.event('RELOAD', '%d range(s) from %s' % (len(proxy.cache.ranges),
                                                                              proxy.config['profile']))
@@ -257,7 +261,14 @@ def main():
                     'max-clients': '%d' % cfg['max_clients'],
                     'client-timeout': '%g' % cfg['client_timeout'],
                     'reads-audit': 'off' if not cfg['reads_audit_s'] else '%g' % cfg['reads_audit_s'],
-                    'log-level': cfg['level']}
+                    'log-level': cfg['level'],
+                    'profile': cfg['profile'],
+                    'selection': cfg['selection'] or 'all',
+                    'connect-acl': 'any' if cfg['connect_acl'] is None
+                                   else ','.join(str(n) for n in cfg['connect_acl']),
+                    'write-acl': 'any' if cfg['write_acl'] is None
+                                 else ','.join(str(n) for n in cfg['write_acl']),
+                    'timeout': '%g' % cfg['timeout']}
         proxy.control = ControlServer(proxy, control_target, stop, audit=audit,
                                       token=control_token, defaults=defaults)
         proxy.control.start()

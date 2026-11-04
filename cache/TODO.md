@@ -18,19 +18,20 @@
   field (the cache polls/caches FC4 independently); the scraper still reads
   everything with FC3 — a profile that marks an FC4 entry `scrape` needs
   the scraper to follow the field.
-- **live-setting persistence policy** — a `set interval 5` survives until
-  the next SIGHUP (which re-applies the config); `show settings` could mark
-  the overridden settings, or SIGHUP could keep them (a policy decision,
-  worth making explicitly).
-- **write-through invalidation** — a forwarded write lands on the device,
-  but the cache keeps serving the pre-write values of the touched range
-  until the TTL expires; after a successful write the proxy should drop
-  and repoll the affected rows (per-register, not the whole cache).
 - **the poll-latency gauges** — the last/mean poll cycle duration on the
   metrics endpoint once it lands (the control's `show status` carries the
   health; the trend belongs in Prometheus).
 
 ## Done (the highlights; the git history has the details)
+
+The live-setting persistence policy, made explicit: a live `set` survives
+until the next SIGHUP (the config file always wins on reload); `show
+settings` marks the overridden values with a `*`, `show status` carries the
+`overridden=` row, and the SIGHUP clears the markers. The write-through
+invalidation: a forwarded FC06/16/22/23 write drops exactly the cached
+words it touched (per-register, `Cache.invalidate`), wakes the poller, and
+the next read goes to the device instead of serving the pre-write value
+until the TTL.
 
 The control surface: the JSON-lines transport, the TCP token auth (token
 or token file), the audit trail (CACHE/CLI/CTL prefixes, XDG state home,

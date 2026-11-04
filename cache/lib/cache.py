@@ -114,6 +114,18 @@ class Cache:
             self.leaf_errors = {}
             return dropped
 
+    def invalidate(self, fc, addr, count):
+        """Write-through: drop exactly the cached words a write touched
+        (per-register, not the whole cache); the next read of them goes to
+        the device and the poller refills them. Returns the dropped count."""
+        with self.lock:
+            dropped = 0
+            for a in range(addr, addr + count):
+                if self.regs.pop((fc, a), None) is not None:
+                    dropped += 1
+                self.ts.pop((fc, a), None)
+            return dropped
+
     def set_leaf_error(self, leaf, code):
         with self.lock:
             self.leaf_errors[leaf] = code
@@ -129,3 +141,17 @@ class Cache:
                 if lf == fc and start < addr + count and addr < start + length:
                     return code
         return None
+
+    def entries(self):
+        """Per-range dump for `show cache all`: (fc, start, count, cached word
+        count, oldest age in s or None, poll error code or None)."""
+        with self.lock:
+            now = time.time()
+            out = []
+            for (fc, start, count) in self.ranges:
+                words = sum(1 for a in range(start, start + count) if (fc, a) in self.regs)
+                ages = [now - self.ts[(fc, a)] for a in range(start, start + count)
+                        if (fc, a) in self.ts]
+                oldest = max(ages) if ages else None
+                out.append((fc, start, count, words, oldest, self.leaf_errors.get((fc, start, count))))
+            return out

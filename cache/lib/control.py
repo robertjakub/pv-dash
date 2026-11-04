@@ -20,7 +20,7 @@ from .version import version_string
 from .statics import CONTROL_IDLE_TIMEOUT_S
 from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .cache import build_blocks
-from .config import parse_write_registers
+from .config import parse_write_registers, parse_acl, resolve_profile_file, default_profile_path
 
 logger = logging.getLogger('modbus-cache')
 
@@ -47,6 +47,9 @@ class ControlServer:
         self.stopper = stopper
         self.shutdown_pending = False
         self.defaults = defaults or {}   # setting -> configured startup value (what `unset` restores)
+        self.overridden = set()          # settings changed live (`show settings` marks them with *)
+        self.clients = set()             # the live control sockets (announce_exit)
+        self.clients_lock = threading.Lock()
 
     def start(self):
         threading.Thread(target=self.serve, daemon=True).start()
@@ -76,7 +79,7 @@ class ControlServer:
         except OSError as e:
             logger.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
             return
-        logger.info('control server listening on %s (show status/connections/cache, clear cache, restart, shutdown)%s',
+        logger.info('control server listening on %s%s',
                     self.describe(), ', token auth required on TCP' if self.token and not self.is_unix else '')
         while True:
             try:
@@ -120,10 +123,31 @@ class ControlServer:
         status, _, text = reply.partition(' ')
         return cmd, {'status': status, 'text': text}, reply
 
+    def announce_exit(self, reason):
+        """The daemon is going down: send every connected control client a
+        bye frame (the consoles print the notice and exit instead of trying
+        to reconnect to a dead proxy) and close their sockets."""
+        frame = (json.dumps({'status': 'bye',
+                             'text': 'daemon-exit: the modbus-cache proxy is shutting down (%s)' % reason})
+                 + '\n').encode()
+        with self.clients_lock:
+            clients, self.clients = list(self.clients), set()
+        for client in clients:
+            try:
+                client.sendall(frame)
+            except OSError:
+                pass
+            try:
+                client.close()
+            except OSError:
+                pass
+
     def handle(self, client, addr):
         who = self.peer(addr)
         logger.debug('control client connected from %s', who)
         authed = False
+        with self.clients_lock:
+            self.clients.add(client)
         try:
             client.settimeout(CONTROL_IDLE_TIMEOUT_S)
             buf = b''
@@ -160,6 +184,8 @@ class ControlServer:
             logger.error('control handler crashed (%s)', e)
         finally:
             logger.debug('control client from %s disconnected', who)
+            with self.clients_lock:
+                self.clients.discard(client)
             client.close()
 
     def command(self, cmd):
@@ -189,6 +215,7 @@ class ControlServer:
                 shown = self._apply(key, self.defaults[key])
             except ValueError as e:
                 return 'err %s' % e
+            self.overridden.discard(key)
             logger.info('control: unset %s -> ok %s=%s', key, key, shown)
             return 'ok %s=%s %s' % (key, shown, self.summary())
         if cmd.startswith('set'):
@@ -203,12 +230,15 @@ class ControlServer:
                 shown = self._apply(key, value)
             except ValueError as e:
                 return 'err %s' % e
+            self.overridden.add(key)
             logger.info('control: set %s=%s', key, shown)
             return 'ok %s=%s %s' % (key, shown, self.summary())
         if low == 'show status':
             return self.status_report()
         if low == 'show connections':
             return 'ok connections ' + self.connections_line()
+        if low == 'show cache all':
+            return self.cache_all_report()
         if low == 'show cache':
             return 'ok ' + self.cache_line()
         if low == 'show settings':
@@ -324,7 +354,62 @@ class ControlServer:
                 raise ValueError('log-level must be DEBUG, INFO, WARNING or ERROR')
             logging.getLogger().setLevel(getattr(logging, lvl))
             return lvl
+        if key == 'timeout':
+            v = num(val, 'timeout', 'seconds')
+            if not 0 < v <= 60:
+                raise ValueError('timeout must be 0 < N <= 60 seconds')
+            p.upstream.timeout = v
+            p.config['timeout'] = v
+            return '%gs' % v
+        if key == 'connect-acl':
+            acl = self._acl(val, 'connect-acl')
+            p.connect_acl = acl
+            p.config['connect_acl'] = acl
+            return self._acl_text(acl)
+        if key == 'write-acl':
+            acl = self._acl(val, 'write-acl')
+            p.write_acl = acl
+            p.config['write_acl'] = acl
+            return self._acl_text(acl)
+        if key in ('profile', 'selection'):
+            cfg = self._live_cfg()
+            if key == 'profile':
+                cfg['profile'] = default_profile_path() if val in ('default', 'auto') \
+                    else resolve_profile_file(val)
+            else:
+                cfg['selection'] = '' if val in ('all', 'none', '-') else val
+            saved = p.config
+            p.config = cfg
+            try:
+                p.apply_map()      # ValueError on a bad file: swap and config roll back
+            except Exception:
+                p.config = saved
+                raise
+            return cfg['profile'] if key == 'profile' else (cfg['selection'] or 'all')
         raise ValueError('unknown setting %s' % key)
+
+    def _live_cfg(self):
+        """The startup config overlaid with every live setting value, so a map
+        reload never undoes what the control surface already applied."""
+        p = self.proxy
+        cfg = dict(p.config)
+        cfg.update(interval=p.interval, read_delay=p.read_delay, merge_gap=p.merge_gap,
+                   cache_ttl=p.cache.cache_ttl, allow_write=p.allow_write,
+                   write_registers=p.write_ranges, max_clients=p.max_clients,
+                   client_timeout=p.client_timeout, reads_audit_s=p.reads_audit_s,
+                   connect_acl=p.connect_acl, write_acl=p.write_acl, timeout=p.upstream.timeout)
+        return cfg
+
+    @staticmethod
+    def _acl_text(acl):
+        """'any' or the normalized network list (what `unset` re-parses)."""
+        return 'any' if acl is None else ','.join(str(n) for n in acl)
+
+    def _acl(self, val, label):
+        try:
+            return parse_acl(val, label)
+        except SystemExit as e:
+            raise ValueError(str(e))
 
     def _get(self, key):
         p = self.proxy
@@ -348,6 +433,16 @@ class ControlServer:
             return 'off' if not p.reads_audit_s else '%gs' % p.reads_audit_s
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
+        if key == 'timeout':
+            return '%gs' % p.upstream.timeout
+        if key == 'connect-acl':
+            return self._acl_text(p.connect_acl)
+        if key == 'write-acl':
+            return self._acl_text(p.write_acl)
+        if key == 'profile':
+            return p.config.get('profile') or p.profile
+        if key == 'selection':
+            return p.config.get('selection') or 'all'
         return '?'
 
     def status_report(self):
@@ -361,6 +456,7 @@ class ControlServer:
         rows = [
             'upstream=%s:%d' % (p.upstream.host, p.upstream.port),
             'unit=%d' % p.upstream.unit,
+            'timeout=%gs' % p.upstream.timeout,
             'listen=%s:%d' % (p.listen_addr[0], p.listen_addr[1]),
             'control=%s' % self.describe(),
             'uptime=%d' % int(now - p.started),
@@ -377,19 +473,27 @@ class ControlServer:
             'clients=%d' % p.client_count,
             'max_clients=%s' % (p.max_clients or 'none'),
             'client_timeout=%s' % ('%gs' % p.client_timeout if p.client_timeout else 'none'),
+            'connect_acl=%s' % ('any' if p.connect_acl is None else '%d network(s)' % len(p.connect_acl)),
             'writes=%s' % ('enabled' if p.allow_write else 'disabled'),
             'write_acl=%s' % ('any' if p.write_acl is None else '%d network(s)' % len(p.write_acl)),
             'write_allow_list=%s' % p.describe_write_ranges(),
             'reads_audit=%s' % ('off' if not p.reads_audit_s else '%gs' % p.reads_audit_s),
             'profile=%s' % (cfg.get('profile') or p.profile),
             'selection=%s' % (cfg.get('selection') or 'all'),
+            'overridden=%s' % (','.join(sorted(self.overridden)) or 'none'),
         ]
         return 'ok status\n' + '\n'.join(rows)
 
     def settings_report(self):
         """Every tunable setting with its live value: one key=value per line
-        (scriptable)."""
-        return 'ok settings\n' + '\n'.join('%s=%s' % (k, self._get(k)) for k in SETTING_NAMES)
+        (scriptable). A live-overridden setting carries a `*` on the value —
+        a SIGHUP re-applies the config and clears the markers."""
+        return 'ok settings\n' + '\n'.join('%s=%s%s' % (k, self._get(k), '*' if k in self.overridden else '')
+                                           for k in SETTING_NAMES)
+
+    def clear_overrides(self):
+        """The config was re-applied (SIGHUP): nothing is live-overridden anymore."""
+        self.overridden.clear()
 
     def summary(self):
         """The compact state summary appended to the set/unset replies."""
@@ -419,10 +523,12 @@ class ControlServer:
         cfg = p.config or {}
         rows = [
             'version   modbus-cache %s' % version_string(),
-            'upstream  %s:%d unit %d, last poll %s%s' % (p.upstream.host, p.upstream.port,
-                                                         p.upstream.unit, age,
-                                                         '' if p.poll_ok else ' (FAILING)'),
-            'listen    %s:%d, control %s' % (p.listen_addr[0], p.listen_addr[1], self.describe()),
+            'upstream  %s:%d unit %d, timeout %gs, last poll %s%s' % (p.upstream.host, p.upstream.port,
+                                                                     p.upstream.unit, p.upstream.timeout, age,
+                                                                     '' if p.poll_ok else ' (FAILING)'),
+            'listen    %s:%d, control %s, connect-acl %s'
+            % (p.listen_addr[0], p.listen_addr[1], self.describe(),
+               'any' if p.connect_acl is None else '%d network(s)' % len(p.connect_acl)),
             'profile   %s%s, map v%d' % (cfg.get('profile') or p.profile,
                                          ' (selection: %s)' % cfg['selection'] if cfg.get('selection') else '',
                                          p.cache.map_version),
@@ -436,7 +542,7 @@ class ControlServer:
             'counters  hits %d, misses %d, clients %d (limit %s, timeout %s)'
             % (p.cache_hits, p.cache_misses, p.client_count,
                p.max_clients or 'none', '%gs' % p.client_timeout if p.client_timeout else 'none'),
-            'writes    %s, acl %s, allow-list %s'
+            'writes    %s, write-acl %s, write-registers %s'
             % ('ENABLED' if p.allow_write else 'disabled',
                'any' if p.write_acl is None else '%d network(s)' % len(p.write_acl),
                p.describe_write_ranges()),
@@ -461,3 +567,36 @@ class ControlServer:
                 % (len(c.ranges), ' (fc4 %d)' % fc4 if fc4 else '', words,
                    ', oldest %s' % (self._oldest() or 'n/a'),
                    c.cache_ttl, c.map_version, failed, self.proxy.cache_hits, self.proxy.cache_misses))
+
+    def cache_all_report(self):
+        """Every cached entry, one row per profile range: the words cached,
+        the age of the oldest, when it expires and the poll status."""
+        c = self.proxy.cache
+        names = c.names
+        cells = []
+        for fc, start, count, words, oldest, err in c.entries():
+            age = 'n/a' if oldest is None else '%gs' % oldest
+            if not c.cache_ttl:
+                exp = 'never'
+            elif oldest is None:
+                exp = 'n/a'
+            else:
+                left = c.cache_ttl - oldest
+                exp = '%gs' % left if left > 0 else 'expired'
+            if err is not None:
+                status = 'failed (ex %d)' % err
+            elif not words:
+                status = 'empty'
+            elif words < count:
+                status = 'partial'
+            else:
+                status = 'ok'
+            name = names.get((fc, start, count), '')
+            cells.append(('fc%d' % fc, '%d:%d' % (start, count), '%d/%d' % (words, count),
+                          age, exp, status, name))
+        head = ('fc', 'range', 'words', 'age', 'expires', 'status', 'name')
+        widths = [max(len(h), max((len(r[i]) for r in cells), default=0)) for i, h in enumerate(head)]
+        rows = ['  '.join(h.ljust(w) for h, w in zip(head, widths))]
+        for r in cells:
+            rows.append('  '.join(v.ljust(w) for v, w in zip(r, widths)))
+        return 'ok cache all\n' + '\n'.join(rows)

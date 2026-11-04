@@ -7,10 +7,11 @@ import random
 import threading
 import time
 
-from .battery import BATT_DISCHARGE_CAP, BATT_GRID_MARGIN_W, BATT_MAX_W, BATT_STANDBY_W, BatteryMachine
+from .battery import BATT_DISCHARGE_CAP, BATT_GRID_MARGIN_W, BATT_MAX_TICK_H, BATT_MAX_W, \
+    BATT_STANDBY_W, BatteryMachine
 from .profile import load_profile, resolve_profile
-from .statics import (CLOUD_MACHINES, METER_EXPORT_KWH, METER_IMPORT_KWH, MPPT_WINDOWS,
-                      SUNRISE, SUNSET)
+from .statics import (CLOUD_MACHINES, GRID_OUTAGE_FAIL_H, GRID_OUTAGE_REPAIR_MIN, METER_EXPORT_KWH,
+                      METER_IMPORT_KWH, MPPT_WINDOWS, SUNRISE, SUNSET)
 
 # Runtime-controllable knobs (see the control server): None = follow the
 # simulation, a number = pinned. `cloud` scales PV (0 = clear, 1 = dark);
@@ -20,6 +21,13 @@ OVERRIDE_KEYS = ('pv', 'load', 'batt', 'grid', 'soc', 'cloud')
 
 def bell(t, center, width):
     return math.exp(-((t - center) ** 2) / (2.0 * width * width))
+
+
+def format_clock(t):
+    """HH:MM of the simulated clock t (fractional hours), wrap-safe (a
+    second-resolution t can round up to the next minute and hour)."""
+    m = round(t * 60.0) % (24 * 60)
+    return '%02d:%02d' % divmod(m, 60)
 
 
 class Simulator:
@@ -40,6 +48,9 @@ class Simulator:
         self.grid_voltage = 230.0       # nominal phase voltage (V); the machine wanders +-10 %
         self.grid_frequency = 50.0      # nominal grid frequency (Hz); the machine wanders +-0.2
         self.utc = True                 # the state machines integrate over the UTC clock (configurable)
+        self.time_scale = 1.0           # the time-lapse factor: the simulated clock runs N× real time
+        self._v_anchor = time.time()    # the virtual epoch at the anchor point
+        self._real_anchor = self._v_anchor   # the real epoch at the anchor point
         self._cloud_rng = random.Random(seed)
         self._cloud_value = 0.0
         self._cloud_t = None
@@ -50,6 +61,10 @@ class Simulator:
         self._home_t = None
         self._freq_dev = 0.0            # the frequency deviation from the nominal (Hz)
         self._freq_t = None             # the frequency machine's own clock anchor
+        self.grid_outage = 'off'        # off | on (the machine runs) | outage (forced)
+        self._outage_state = False      # the machine's live state: True = the grid is down
+        self._outage_t = None           # the outage machine's own clock anchor
+        self._outage_rng = random.Random(seed)
 
     def set_profile(self, profile_map):
         """Swap the inverter profile (SIGHUP); clients serving from the old map
@@ -119,21 +134,40 @@ class Simulator:
             return dict(self._overrides)
 
     def reset_overrides(self):
-        """Release every pin, leave the cloud machine and re-seed the battery
-        from the simulated day."""
+        """Release every pin, drop the cloud and the outage machines, and
+        re-seed the battery from the simulated day."""
         with self._lock:
             n = sum(1 for v in self._overrides.values() if v is not None)
             for k in self._overrides:
                 self._overrides[k] = None
         self.cloud_mode = None
         self._cloud_t = None
+        self.grid_outage = 'off'
+        self._outage_state = False
+        self._outage_t = None
         self.batt_machine.reset()
         return n
 
+    def set_time_scale(self, scale):
+        """The time-lapse factor: the simulated clock runs N× real time
+        (1.0 = real time). Re-anchors the clock so the change applies from
+        now on — the virtual time stays continuous."""
+        with self._lock:
+            now = time.time()
+            v_now = self._v_anchor + (now - self._real_anchor) * self.time_scale
+            self._real_anchor = now    # the readers see the new pair or the old — both continuous
+            self._v_anchor = v_now
+            self.time_scale = float(scale)
+
     def freeze(self, t):
-        """Pin the simulated clock (HH:MM float hours) or None for the real clock."""
+        """Pin the simulated clock (HH:MM float hours) or None for the real
+        clock (re-anchored: `set time auto` returns to the wall clock)."""
         with self._lock:
             self.frozen_time = t
+            if t is None:
+                now = time.time()
+                self._v_anchor = now
+                self._real_anchor = now
 
     # ---- curves
 
@@ -193,13 +227,67 @@ class Simulator:
                     for w in self._grid_v]
             return [self.grid_voltage * (1.0 + w) for w in self._grid_v]
 
+    def set_outage_machine(self, mode):
+        """Arm the grid-outage machine ('on') or switch it off ('off'); a
+        fresh anchor — the machine always starts connected."""
+        if mode not in ('on', 'off'):
+            raise KeyError(mode)
+        with self._lock:
+            self.grid_outage = mode
+            self._outage_state = False
+            self._outage_t = None
+
+    def outage_display(self):
+        """What `grid_outage=` shows in status: off, on(ok) / on(outage), or
+        the forced outage."""
+        if self.grid_outage == 'outage':
+            return 'outage'
+        if self.grid_outage == 'on':
+            return 'on(outage)' if self._outage_state else 'on(ok)'
+        return 'off'
+
+    def outage_active(self):
+        """True when the grid is down right now: the forced outage, or the
+        machine's last ticked state."""
+        return self.grid_outage == 'outage' or (self.grid_outage == 'on' and self._outage_state)
+
+    def _outage(self, t):
+        """The grid-outage machine: a two-state Markov chain over the
+        simulated clock (connected --fail--> outage --repair--> connected;
+        the hazards live in static.json). 'outage' forces the down state
+        (the demo switch); a frozen clock holds the state, the time-lapse
+        factor speeds the machine up like everything else."""
+        if self.grid_outage == 'outage':
+            return True
+        if self.grid_outage != 'on':
+            return False
+        with self._lock:
+            if self._outage_t is None:
+                self._outage_t = t
+            dt_h = t - self._outage_t
+            self._outage_t = t          # re-anchor even on a backward jump
+            if dt_h > 0:
+                if self._outage_state:
+                    p = 1.0 - math.exp(-GRID_OUTAGE_REPAIR_MIN * dt_h * 60.0)
+                    if self._outage_rng.random() < p:
+                        self._outage_state = False
+                else:
+                    p = 1.0 - math.exp(-GRID_OUTAGE_FAIL_H * dt_h)
+                    if self._outage_rng.random() < p:
+                        self._outage_state = True
+            return self._outage_state
+
     def clock(self):
         """The simulated clock the state machines integrate over: UTC by
-        default (--timezone / set timezone local for the wall clock)."""
+        default (--timezone / set timezone local for the wall clock), at
+        `time_scale`× real speed (--time-scale / set time-scale — the
+        anchored virtual clock sweeps the day at a constant rate however
+        rarely it is read)."""
         if self.frozen_time is not None:
             return self.frozen_time
-        lt = time.gmtime() if self.utc else time.localtime()
-        return lt.tm_hour + lt.tm_min / 60.0
+        v = self._v_anchor + (time.time() - self._real_anchor) * self.time_scale
+        lt = time.gmtime(v) if self.utc else time.localtime(v)
+        return lt.tm_hour + lt.tm_min / 60.0 + lt.tm_sec / 3600.0
 
     def pv_string(self, t, which):
         """One string's sine bell over the simulated clock: the east array
@@ -265,6 +353,7 @@ class Simulator:
         the grid setpoint balance > the machine's own decision."""
         ov = self.overrides()
         t = self.clock()
+        outage = self._outage(t)     # one tick per read (the anchor dedupes)
         cloud = ov['cloud'] if ov['cloud'] is not None else self._cloud(t)
         if self.static:
             pv = ov['pv'] if ov['pv'] is not None else 4000.0 * (1.0 - cloud) * (
@@ -280,10 +369,15 @@ class Simulator:
         else:
             pv = ov['pv'] if ov['pv'] is not None else self.pv(t) * (1.0 - cloud)
             load = ov['load'] if ov['load'] is not None else self.home(t)
-            soc = ov['soc'] if ov['soc'] is not None else self._tick_soc(t, pv, load, ov)
+            soc = ov['soc'] if ov['soc'] is not None else self._tick_soc(t, pv, load, ov, hold=outage)
             batt = ov['batt'] if ov['batt'] is not None else (
                 0.0 if not self.battery or soc is None else
                 self._batt_clamp(self._forced_batt(self._grid_balanced(pv, load, ov, soc)), t))
+        if outage:
+            # the grid is down: the inverter is standby — no harvest, no
+            # battery flow, no export (the machines keep their state; the
+            # outage wins over the pins until the grid returns)
+            pv, batt = 0.0, 0.0
         return pv, load, batt, soc, cloud, ov
 
     def _grid_balanced(self, pv_w, load_w, ov, soc=None):
@@ -329,15 +423,19 @@ class Simulator:
             return -BATT_MAX_W
         return decided
 
-    def _tick_soc(self, t, pv_w, load_w, ov):
+    def _tick_soc(self, t, pv_w, load_w, ov, hold=False):
         """Stateful SoC: seed from the curve on first use, then integrate the
         effective battery power (the pin integrates the pin, the state force
-        and the grid balance too — the SoC always follows what is served)."""
+        and the grid balance too — the SoC always follows what is served).
+        hold = the grid outage: the battery stands by (0 W; the self-discharge
+        keeps ticking)."""
         m = self.batt_machine
         if m.soc is None and self.battery:
             m.seed(self.curve_soc(t))
         forced = None
-        if self.batt_state:
+        if hold:
+            forced = 0.0
+        elif self.batt_state:
             forced = self._forced_batt()
         elif ov['batt'] is not None:
             forced = ov['batt']
@@ -345,7 +443,10 @@ class Simulator:
             forced = self._grid_balanced(pv_w, load_w, ov, m.soc)
         if forced is not None:
             forced = self._batt_clamp(forced, t)
-        return m.tick(t, pv_w, load_w, self.battery_kwh, self.battery, forced)
+        # the laptop-sleep guard stays on REAL time: the time-lapse factor
+        # widens the allowed virtual step (24 h at x1, 24 h × N at xN)
+        return m.tick(t, pv_w, load_w, self.battery_kwh, self.battery, forced,
+                      max_dt_h=BATT_MAX_TICK_H * self.time_scale)
 
     def values(self):
         """Named physical values for the current tick — the profile decides
@@ -353,6 +454,7 @@ class Simulator:
         the battery block with --battery off) is simply not served."""
         pv_w, home_w, batt_w, soc, _cloud, ov = self.effective()
         t = self.clock()
+        outage = self._outage(t)       # dt = 0 while effective() just ticked: dedup
         # the device-status codes come from the profile's value map (the
         # entry's desc); the default profile keeps the classic semantics
         sm = self.profile.status_map or {'on-grid': 512, 'standby': 40960}
@@ -423,6 +525,23 @@ class Simulator:
                       'battery-soc': soc, 'battery-soc-reserve': soc,
                       'battery-charge-total': charge_t, 'battery-discharge-total': discharge_t,
                       'battery-charge-today': charge_d, 'battery-discharge-today': discharge_d})
+        if outage:
+            # the grid is down: no flow, no measurement — the phases collapse,
+            # the inverter stands by (the strings keep their open-circuit
+            # voltage, the SoC holds, the counters keep their totals)
+            v.update({
+                'device-status': float(sm.get('standby', 40960)),
+                'device-power-factor': 0.0,
+                'grid-power': 0.0, 'grid-frequency': 0.0,
+                'string-1-current': 0.0, 'string-2-current': 0.0,
+                'output-power-a': 0.0, 'output-power-b': 0.0, 'output-power-c': 0.0,
+                'output-voltage-a': 0.0, 'output-voltage-b': 0.0, 'output-voltage-c': 0.0,
+                'output-current-a': 0.0, 'output-current-b': 0.0, 'output-current-c': 0.0,
+                'meter-voltage-a': 0.0, 'meter-voltage-b': 0.0, 'meter-voltage-c': 0.0,
+                'meter-current-a': 0.0, 'meter-current-b': 0.0, 'meter-current-c': 0.0,
+                'meter-power-a': 0.0, 'meter-power-b': 0.0, 'meter-power-c': 0.0,
+                'meter-frequency': 0.0, 'meter-power-factor': 0.0,
+            })
         return v
 
     def registers(self):

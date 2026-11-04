@@ -16,6 +16,8 @@
   "meter_export_kwh": 12500.0,
   "meter_import_kwh": 9800.0,
 
+  "grid_outage": { "fail_per_h": 0.75, "repair_per_min": 3.0 },
+
   "batt_max_w": 2500.0,
   "batt_reserve_soc": 10.0,
   "batt_grid_margin_w": 300.0,

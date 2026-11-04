@@ -35,7 +35,11 @@ python3 inverter/bin/fake_inverter.py --port 15502 --log-level DEBUG
 
 All the state machines integrate with a **simulated clock: UTC by default**
 (`--timezone local` / `set timezone local` for the host wall clock; the
-frozen `--time`/`set time` clock is zone-independent).
+frozen `--time`/`set time` clock is zone-independent). The clock can also
+run at **N× real speed** (`--time-scale N` / `set time-scale N`): every
+machine — the battery, the clouds, the voltages, the day counters —
+integrates over it, so a full simulated day takes 24/N real hours
+(x1 = real time; `set time-scale auto` returns there).
 
 By default it simulates a sunny day: bell-curve PV between 06:00 and 18:00
 (peak 75 % of `--max-kwp`), home load with morning and evening peaks — so the
@@ -117,6 +121,18 @@ it, a frozen clock freezes it). The nominal comes from `--grid-voltage`
 power) and `set grid-voltage 120|230` at runtime; the output- and
 meter-voltage/current registers follow per phase.
 
+**Grid outages.** `set grid-outage on` arms a two-state machine over the
+simulated clock: the grid randomly drops (the phases collapse to 0 V, the
+frequency and the meter read 0, the inverter stands by — no harvest, no
+battery flow, no export, the SoC holds, the strings keep their
+open-circuit voltage) and comes back after a few moments. The hazards
+(fail per simulated hour, repair per simulated minute) live in
+`lib/static.json`; the machine is seeded like everything else and the
+time-lapse factor speeds it up. `set grid-outage outage` forces a blackout
+right now (the demo switch — the outage wins over the pins);
+`set grid-outage off` restores plain operation (`auto` = the machine
+decides, like `on`); `reset` and SIGUSR1 drop the machine like the clouds.
+
 **The unbalanced home.** The home load is not split into symmetric thirds:
 three slow mean-reverting walks around 1/3 per phase (each clamped to
 22–44 %, renormalised) distribute the load asymmetrically — the per-phase
@@ -192,7 +208,7 @@ filesystem permissions are the auth). The clients take `--control-token`
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
 | `show settings` | every setting and its value |
-| `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `uptime`, `chaos`, `chaos_hits`, `pinned`, `profile`, `timezone`) — scriptable |
+| `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `chaos`, `chaos_hits`, `pinned`, `profile`, `timezone`) — scriptable |
 | `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins — the baton for a bug report |
 | `show registers` | the loaded profile's register map, one register per line: `name \| register \| type \| value`, columns aligned; the value = what the registers serve right now, `NaN` = not calculated (e.g. the battery block with the battery off) |
 | `show version` | the fake-inverter version (`0.2.1`, or `0.2.1-<short git>` from a checkout) |
@@ -211,11 +227,13 @@ filesystem permissions are the auth). The clients take `--control-token`
 | `batt` | `W` \| `auto` | pin the battery power, +charge/−discharge (the state machine integrates it into the SoC) |
 | `grid` | `W` \| `auto` | pin the **grid setpoint** (+export/−import): the battery balances to hold it (`set grid 0` = zero-export) |
 | `grid-voltage` | `120` \| `230` | nominal grid phase voltage (V); the per-phase machine wanders ±10 % around it |
+| `grid-outage` | `on` \| `off` \| `outage` | the grid-outage machine: random blackouts over the simulated clock (the phases collapse, the inverter stands by); `outage` forces one now |
 | `soc` | `%` \| `auto` | pin the state of charge (also seeds the machine) |
 | `mppt` | `both` \| `east` \| `west` \| `none` | enabled PV strings: string-1 = the east array (the morning peak), string-2 = the west array (the afternoon peak); `both` = the default, `none` = PV 0 |
 | `cloud` | `0..1` \| `clear` \| `autumn` \| `spring` \| `winter` | scale the PV: a pinned factor, a clear sky (the default), or a cloud state machine |
 | `timezone` | `utc` \| `local` | clock the state machines integrate over: UTC (the default) or the host wall clock |
 | `time` | `HH:MM` \| `auto` | freeze / unfreeze the clock — clock jumps integrate the battery and move the clouds (time-lapse) |
+| `time-scale` | `N` \| `1` \| `auto` | the time-lapse factor: the simulated clock runs N× real time — the battery, the clouds, the voltages and the day counters all integrate over it (a full simulated day takes 24/N real hours); `auto` = x1 |
 | `scenario` | `morning` \| `noon` \| `evening` \| `night` \| `custom` | freeze the clock at a typical moment **and release the value pins** (08:30 / 12:00 / 19:30 / 23:00); manual pins turn it `custom`, `set scenario custom` releases everything again |
 | `chaos` | `0..1` \| `off` | tune chaos injection live |
 | `seed` | `N` | re-seed the chaos RNG |
@@ -316,7 +334,8 @@ The fake mirrors the family (`modbus-scraper` / `modbus-cache`):
 
 Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 `FAKE_PROFILE` (register-map profile path), `FAKE_BATTERY`, `FAKE_STRICT`,
-`FAKE_TIME` (`HH:MM` or `auto`), `FAKE_LOG_LEVEL` — boolean values accept
+`FAKE_TIME` (`HH:MM` or `auto`), `FAKE_TIME_SCALE` (N× real time),
+`FAKE_LOG_LEVEL` — boolean values accept
 `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 
 ## Flags
@@ -336,6 +355,7 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--max-kwp` | `6` | PV array size in kWp, peak = 75 % of it |
 | `--timezone` | `utc` | clock the state machines integrate over (`utc` or `local`) |
 | `--time` | real clock | freeze simulated time `HH:MM` (zone-independent) |
+| `--time-scale` | `1` | the simulated clock speed: N× real time — a full simulated day takes 24/N real hours (`set time-scale` tunes it live) |
 | `--static` | off | constant demo values instead of the day simulation |
 | `--battery` | on | simulate a battery (the battery state machine runs; on by default) |
 | `--no-battery` | | no battery values |

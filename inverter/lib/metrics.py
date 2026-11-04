@@ -31,10 +31,12 @@ class MetricsServer:
         t = sim.clock()
         v_phases = sim._grid_voltages(t)
         return {
-            'pv_w': pv_w, 'load_w': load_w, 'grid_w': pv_w - batt_w - load_w,
+            'pv_w': pv_w, 'load_w': load_w,
+            'grid_w': 0.0 if sim.outage_active() else pv_w - batt_w - load_w,
             'batt_w': batt_w, 'soc': soc, 'cloud': sim.cloud_display(),
             'mppt': sim.mppt, 'grid_voltage': sim.grid_voltage,
             'grid_frequency': sim.grid_frequency_value(t),
+            'time_scale': sim.time_scale, 'grid_outage': 1.0 if sim.outage_active() else 0.0,
             'v_phases': v_phases,
             'conns': self.fake.conns, 'requests': self.fake.requests,
             'chaos_hits': self.chaos.hits, 'strict': self.fake.strict,
@@ -46,6 +48,12 @@ class MetricsServer:
             '# HELP fake_inverter_uptime_seconds The fake-inverter process uptime.',
             '# TYPE fake_inverter_uptime_seconds gauge',
             'fake_inverter_uptime_seconds %d' % int(self._uptime()),
+            '# HELP fake_inverter_time_scale The simulated clock speed (N× real time).',
+            '# TYPE fake_inverter_time_scale gauge',
+            'fake_inverter_time_scale %g' % st['time_scale'],
+            '# HELP fake_inverter_grid_outage 1 = the simulated grid is down (the outage machine).',
+            '# TYPE fake_inverter_grid_outage gauge',
+            'fake_inverter_grid_outage %g' % st['grid_outage'],
             '# HELP fake_inverter_power_watts The simulated powers: pv, load, grid (+export), battery (+charge).',
             '# TYPE fake_inverter_power_watts gauge',
             'fake_inverter_power_watts{kind="pv"} %g' % st['pv_w'],

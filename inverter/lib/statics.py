@@ -24,6 +24,13 @@ CLOUD_MACHINES = {k: tuple(v) for k, v in STATIC['cloud_machines'].items()}
 METER_EXPORT_KWH = STATIC['meter_export_kwh']
 METER_IMPORT_KWH = STATIC['meter_import_kwh']
 
+# the grid-outage machine: a connected->outage hazard per simulated hour and
+# an outage->connected hazard per simulated minute (a two-state Markov chain
+# over the simulated clock — the time-lapse factor speeds it up like
+# everything else)
+GRID_OUTAGE_FAIL_H = STATIC['grid_outage']['fail_per_h']
+GRID_OUTAGE_REPAIR_MIN = STATIC['grid_outage']['repair_per_min']
+
 # the battery limits (battery.py's constants)
 BATT_MAX_W = STATIC['batt_max_w']
 BATT_RESERVE_SOC = STATIC['batt_reserve_soc']

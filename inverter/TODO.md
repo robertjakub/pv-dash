@@ -8,17 +8,14 @@
 - **the user-defined scenarios** — scene files (the time + the pins + the
   machines) loadable with `set scenario <file>`; the audit trail of a
   manual session could *record* one.
-- **the fake's own metrics** — DONE (`--metrics-port`, the /metrics with
-  the bearer auth like the scraper's; the frequency-based derate and the
-  SoH gauges are still to come).
+- **the frequency-based derate** — the machine already wanders ±0.2 Hz
+  around `--grid-frequency`; beyond a deviation bound the output power
+  should derate (exposed on /metrics too).
+- **the battery ageing** — the SoH drift over the simulated days (the
+  capacity shrinks a %/week of the simulated time) + the `battery_soh`
+  gauge on /metrics.
 - **the multi-unit serve** — one process serving two Modbus units (the
   inverter + the meter as separate unit ids) for the gateway-style setups.
-- **the battery ageing** — the SoH drift over the simulated days (the
-  capacity shrinks a %/week of the simulated time).
-- **the grid-frequency machine** — DONE as the machine + the base setting
-  (`--grid-frequency`, the ±0.2 Hz wander); the frequency-based derate is
-  still open.
-- **`inspect` command** — DONE (`inspect` = the pretty dump of everything).
 - **the CI** — GitHub Actions: the six suites + `nix flake check` on the
   push; the release workflow on the tag.
 
@@ -30,4 +27,11 @@ the UTC clock, the per-phase loads, `set register` overlay writes, the
 status report, the registers table with the live values, the INV/CLI/CTL
 audit trail with the rotation, the battery realism (the efficiency, the
 self-discharge, the 80 % discharge cap, the temperature derate), the
-Docker + compose setup, the bin/ lib/ split, the fuzz suite.
+Docker + compose setup, the bin/ lib/ split, the fuzz suite. Also the own
+metrics endpoint (`--metrics-port`, the /metrics with the bearer auth
+like the scraper's), the grid-frequency machine (`--grid-frequency`, the
+±0.2 Hz wander), the `inspect` dump, the time-lapse factor
+(`--time-scale` / `set time-scale` — the simulated clock at N× real
+speed, so a demo watches a full day in minutes) and the grid-outage
+machine (`set grid-outage on|off|outage` — random blackouts: the phases
+collapse, the inverter stands by, the meter goes dark).

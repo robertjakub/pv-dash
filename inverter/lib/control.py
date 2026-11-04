@@ -22,7 +22,7 @@ from .audit import AuditLog
 from .profile import load_profile, profile_label, resolve_profile
 from .version import version_string
 from .settings import SETTING_NAMES, SETTING_BY_NAME, describe_setting
-from .simulator import CLOUD_MACHINES
+from .simulator import CLOUD_MACHINES, format_clock
 
 logger = logging.getLogger('fake-inverter')
 
@@ -191,7 +191,16 @@ class ControlServer:
                 return 'auto'
             t = self._parse_hour(val)
             sim.freeze(t)
-            return '%02d:%02d' % (int(t), round((t % 1.0) * 60))
+            return format_clock(t)
+        if key == 'time-scale':
+            if auto:
+                sim.set_time_scale(1.0)
+                return 'x1 (real time)'
+            v = float(val)
+            if not math.isfinite(v) or v <= 0 or v > 1440:
+                raise ValueError('time-scale must be 0 < N <= 1440 (a day per minute)')
+            sim.set_time_scale(v)
+            return 'x%g' % v
         if key == 'chaos':
             if val in ('off', 'none'):
                 chaos.set_probability(0.0)
@@ -231,6 +240,17 @@ class ControlServer:
                 raise ValueError('grid-frequency must be a sane nominal frequency (1-500 Hz)')
             sim.grid_frequency = v
             return '%g' % v
+        if key == 'grid-outage':
+            if val in ('outage', 'down', 'blackout'):
+                sim.grid_outage = 'outage'
+                return 'outage'
+            if val in ('off', 'none', 'ok', 'up'):
+                sim.set_outage_machine('off')
+                return 'off'
+            if auto or val == 'on':        # auto = let the machine decide
+                sim.set_outage_machine('on')
+                return sim.outage_display()
+            raise ValueError('grid-outage must be on|off|outage')
         if key == 'strict':
             fake.strict = val in ('on', 'true', '1', 'yes')
             return 'on' if fake.strict else 'off'
@@ -295,7 +315,9 @@ class ControlServer:
         if key == 'timezone':
             return 'utc' if sim.utc else 'local'
         if key == 'time':
-            return 'auto' if sim.frozen_time is None else '%02d:%02d' % (int(sim.frozen_time), round((sim.frozen_time % 1.0) * 60))
+            return 'auto' if sim.frozen_time is None else format_clock(sim.frozen_time)
+        if key == 'time-scale':
+            return 'x%g' % sim.time_scale
         if key == 'chaos':
             return '%.2f' % chaos.p
         if key == 'seed':
@@ -310,6 +332,8 @@ class ControlServer:
             return '%g' % sim.grid_voltage
         if key == 'grid-frequency':
             return '%g' % sim.grid_frequency
+        if key == 'grid-outage':
+            return sim.outage_display()
         if key == 'strict':
             return 'on' if fake.strict else 'off'
         if key == 'static':
@@ -450,18 +474,21 @@ class ControlServer:
             'profile   %s' % sim.profile.description,
             'registers %d served, overlay %d: %s' % (len(sim.profile.entries), len(overlay),
                 ', '.join('%d=%d' % kv for kv in sorted(overlay.items())[:8]) or 'empty'),
-            'now       %02d:%02d %s, uptime %d s' % (int(t), round((t % 1.0) * 60),
-                'utc' if sim.utc else 'local', int(time.monotonic() - self.started)),
-            'power     pv %g W, load %g W, grid %g W' % (pv_w, load_w, pv_w - batt_w - load_w),
+            'now       %s %s%s, uptime %d s' % (format_clock(t),
+                'utc' if sim.utc else 'local',
+                ' x%g' % sim.time_scale if sim.time_scale != 1.0 else '',
+                int(time.monotonic() - self.started)),
+            'power     pv %g W, load %g W, grid %g W' % (pv_w, load_w,
+                0.0 if sim.outage_active() else pv_w - batt_w - load_w),
             'battery   %s' % ('%g W, SoC %s, state %s' % (batt_w,
                 '%.1f %%' % soc if soc is not None else 'n/a', sim.batt_state or 'auto')
                 if sim.battery else 'off'),
             'mppt      %s (string-1 = the east array, string-2 = the west)' % sim.mppt,
             'cloud     %s' % sim.cloud_display(),
-            'grid      %g V nominal, %g Hz nominal; machines: %s V/phase, %.2f Hz now'
+            'grid      %g V nominal, %g Hz nominal; machines: %s V/phase, %.2f Hz now; outage %s'
             % (sim.grid_voltage, sim.grid_frequency,
                '/'.join('%g' % v for v in sim._grid_voltages(t)),
-               sim.grid_frequency_value(t)),
+               sim.grid_frequency_value(t), sim.outage_display()),
             'chaos     p=%.2f, %d hit(s)' % (self.chaos.p, self.chaos.hits),
             'pinned    %s' % ('; '.join('%s=%s' % (k, ov[k]) for k in
                               ('pv', 'load', 'batt', 'grid', 'soc', 'cloud') if ov[k] is not None) or 'nothing'),
@@ -473,19 +500,20 @@ class ControlServer:
         per line (scriptable)."""
         sim = self.simulator
         pv_w, load_w, batt_w, soc, cloud, ov = sim.effective()
-        grid_w = pv_w - batt_w - load_w
+        grid_w = 0.0 if sim.outage_active() else pv_w - batt_w - load_w
         t = sim.clock()
         pinned = ','.join('%s=%s' % (k, ov[k]) for k in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud')
                           if ov[k] is not None) or 'none'
         rows = ['pv=%d' % round(pv_w), 'load=%d' % round(load_w), 'grid=%d' % round(grid_w),
                 'mppt=%s' % sim.mppt, 'grid_voltage=%g' % sim.grid_voltage,
+                'grid_outage=%s' % sim.outage_display(),
                 'timezone=%s' % ('utc' if sim.utc else 'local')]
         if sim.battery:
             rows += ['battery=%d' % round(batt_w),
                      'soc=%s' % ('%.1f' % soc if soc is not None else 'n/a'),
                      'battery_state=%s' % (sim.batt_state or 'auto')]
         rows += ['cloud=%s' % sim.cloud_display(),
-                 'clock=%02d:%02d' % (int(t), round((t % 1.0) * 60)),
+                 'clock=%s' % format_clock(t), 'time_scale=x%g' % sim.time_scale,
                  'uptime=%d' % int(time.monotonic() - self.started),
                  'chaos=%.2f' % self.chaos.p, 'chaos_hits=%d' % self.chaos.hits,
                  'pinned=%s' % pinned, 'profile=%s' % sim.profile.description]
@@ -497,9 +525,11 @@ class ControlServer:
         t = sim.clock()
         pinned = ' '.join('%s=%s' % (k, ov[k]) for k in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud') if ov[k] is not None)
         extra = ' batt-state=%s' % sim.batt_state if sim.batt_state else ''
-        return ('pv=%.0fW load=%.0fW batt=%.0fW soc=%s cloud=%s mppt=%s t=%02d:%02d chaos=%.2f hits=%d%s%s'
+        scale = 'x%g' % sim.time_scale if sim.time_scale != 1.0 else ''
+        outage = '' if sim.grid_outage == 'off' else ' outage=%s' % sim.outage_display()
+        return ('pv=%.0fW load=%.0fW batt=%.0fW soc=%s cloud=%s mppt=%s t=%s%s chaos=%.2f hits=%d%s%s%s'
                 % (pv_w, load_w, batt_w,
                    '%.1f%%' % soc if soc is not None else 'n/a',
                    sim.cloud_display(), sim.mppt,
-                   int(t), round((t % 1.0) * 60), self.chaos.p, self.chaos.hits, extra,
+                   format_clock(t), scale, self.chaos.p, self.chaos.hits, outage, extra,
                    (' pinned: ' + pinned) if pinned else ''))

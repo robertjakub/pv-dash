@@ -88,6 +88,12 @@ class SignalBox:
                     plan.append(('time=live', lambda: self.simulator.freeze(None)))
                 else:
                     plan.append(('time=%s' % v.strip(), lambda v=v: self.simulator.freeze(parse_time(v))))
+            v = env.get('FAKE_TIME_SCALE')
+            if v:
+                x = float(v)
+                if not 0 < x <= 1440:
+                    raise ValueError('FAKE_TIME_SCALE must be 0 < N <= 1440, got %r' % v)
+                plan.append(('time-scale=x%g' % x, lambda x=x: self.simulator.set_time_scale(x)))
             v = env.get('FAKE_PROFILE')
             if v:
                 path = v.strip()

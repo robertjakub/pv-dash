@@ -20,9 +20,9 @@ Optional extras for demos and testing: a JSON-lines control server
 values / freeze time / tune chaos at runtime, and
 seeded chaos injection (--chaos) that answers requests hostile. Signals
 mirror the family: SIGHUP re-applies the FAKE_* environment layer
-(FAKE_CHAOS/FAKE_MAX_KWP/FAKE_BATTERY/FAKE_STRICT/FAKE_TIME/FAKE_LOG_LEVEL,
-keep-last-good), SIGUSR1 resets the scenario (releases pins + write
-overlay), SIGTERM/SIGINT shut down with a session summary.
+(FAKE_CHAOS/FAKE_MAX_KWP/FAKE_BATTERY/FAKE_STRICT/FAKE_TIME/FAKE_TIME_SCALE/
+FAKE_LOG_LEVEL, keep-last-good), SIGUSR1 resets the scenario (releases pins
++ write overlay), SIGTERM/SIGINT shut down with a session summary.
 """
 import os
 import sys
@@ -70,6 +70,8 @@ def validate(args):
         problems.append('--max-kwp must be a positive kW value, got %r' % args.max_kwp)
     if not (math.isfinite(args.battery_kwh) and args.battery_kwh > 0):
         problems.append('--battery-kwh must be a positive kWh value, got %r' % args.battery_kwh)
+    if not (math.isfinite(args.time_scale) and 0 < args.time_scale <= 1440):
+        problems.append('--time-scale must be 0 < N <= 1440 (a day per minute), got %r' % args.time_scale)
     if not 0.0 <= args.chaos <= 1.0:
         problems.append('--chaos must be a probability 0..1, got %r' % args.chaos)
     return problems
@@ -80,6 +82,7 @@ def configured_defaults(args, frozen, profile_text):
     return {
         'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'grid': 'auto', 'soc': 'auto', 'cloud': 'clear',
         'time': '%02d:%02d' % (int(frozen), round((frozen % 1.0) * 60)) if frozen is not None else 'auto',
+        'time-scale': '%g' % args.time_scale,
         'scenario': 'custom',
         'chaos': '%.2f' % args.chaos,
         'seed': 'random' if args.seed is None else str(args.seed),
@@ -88,6 +91,7 @@ def configured_defaults(args, frozen, profile_text):
         'mppt': 'both',
         'grid-voltage': '%g' % args.grid_voltage,
         'grid-frequency': '%g' % args.grid_frequency,
+        'grid-outage': 'off',
         'timezone': args.timezone,
         'strict': 'on' if args.strict else 'off',
         'static': 'on' if args.static else 'off',
@@ -112,6 +116,7 @@ def main():
     p.add_argument('--grid-frequency', type=float, default=50.0, help='nominal grid frequency in Hz (the machine wanders ±0.2 Hz around it, default %(default)s)')
     p.add_argument('--max-kwp', type=float, default=6.0, help='PV array size in kWp, peak = 75%% of it (default %(default)s)')
     p.add_argument('--time', help='freeze simulated time HH:MM (default: real clock)')
+    p.add_argument('--time-scale', type=float, default=1.0, help='the simulated clock speed: N× real time — every machine (the battery, the clouds, the voltages, the day counters) integrates over it, so a full simulated day takes 24/N real hours (default: 1 = real time)')
     p.add_argument('--static', action='store_true', help='constant demo values instead of the day simulation')
     p.add_argument('--battery', action='store_true', default=True, help='simulate a battery (the default)')
     p.add_argument('--no-battery', dest='battery', action='store_false', help='no battery values')
@@ -152,12 +157,15 @@ def main():
     simulator = Simulator(0.75 * args.max_kwp * 1000.0, args.static, frozen,
                           battery=args.battery, battery_kwh=args.battery_kwh,
                           profile=load_profile(profile_path), seed=args.seed)
+    simulator.set_time_scale(args.time_scale)   # validated above; before any machine reads the clock
     chaos = Chaos(args.chaos, seed=args.seed)
     target = resolve_control_target(args.control_port, args.port)
     if args.dry_run:
+        mode = 'static values' if args.static else (
+            'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')
         logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, profile %s: %s, %d register(s), control server %s)',
                     args.host, args.port, args.unit, 0.75 * args.max_kwp * 1000.0,
-                    'static values' if args.static else 'day simulation',
+                    mode,
                     'on' if args.battery else 'off',
                     ' (%g kWh)' % args.battery_kwh if args.battery else '',
                     args.strict, args.chaos,

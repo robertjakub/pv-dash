@@ -35,6 +35,10 @@ let
       local_time = lib.boolToString cfg.localTime;
       log_access = lib.boolToString cfg.logAccess;
       log_level = cfg.logLevel;
+      audit_log = if cfg.auditLog == null then "-" else cfg.auditLog;
+      audit_max_mb = toString cfg.auditMaxMb;
+      audit_daily = lib.boolToString cfg.auditDaily;
+      audit_files = toString cfg.auditFiles;
     };
   });
 in
@@ -207,6 +211,35 @@ in
       default = false;
       description = "Open the listen port in the firewall (needed when clients run on another host).";
     };
+
+    auditLog = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The CACHE audit trail (who/when/what for the control commands, the
+        auth attempts and the forwarded/refused writes): a file path, or "-"
+        for stdout (default — journald captures it; the hardened service
+        cannot write the XDG state home). null = stdout.
+      '';
+    };
+
+    auditMaxMb = lib.mkOption {
+      type = lib.types.float;
+      default = 10.0;
+      description = "Rotate the audit log at this size in MB, keeping auditFiles backups; 0 = off.";
+    };
+
+    auditDaily = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Also rotate the audit log at UTC midnight.";
+    };
+
+    auditFiles = lib.mkOption {
+      type = lib.types.int;
+      default = 3;
+      description = "Rotated audit backups to keep.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -234,6 +267,8 @@ in
         ProtectKernelTunables = true;
         ProtectControlGroups = true;
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+      } // lib.optionalAttrs (cfg.auditLog != null && cfg.auditLog != "-") {
+        ReadWritePaths = [ (dirOf cfg.auditLog) ];
       };
     };
   };

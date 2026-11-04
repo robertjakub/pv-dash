@@ -10,15 +10,19 @@ cached ranges and every other function code are forwarded to the inverter
 
 Layout: lib/protocol (wire format), lib/config (settings + register map),
 lib/upstream (inverter connection), lib/cache (register cache + block plan),
-lib/proxy (poller + client handling), lib/control (control server), this
-file (CLI, logging, signals).
+lib/proxy (poller + client handling), lib/control (JSON-lines control
+server), lib/audit (the append-only audit trail), lib/version, this file
+(CLI, logging, signals).
 """
 import argparse
 import logging
 import os
 import signal
+import sys
 import threading
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the checkout — the lib/ lives next to bin/
 
 from lib.protocol import exception_frame
 from lib.config import default_profile_path, load_registers_file, load_selection, parse_listen, resolve_config, parse_control_target
@@ -26,8 +30,20 @@ from lib.upstream import Upstream
 from lib.cache import Cache
 from lib.proxy import Proxy
 from lib.control import ControlServer
+from lib.audit import AuditLog
+from lib.version import version_string
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def default_config_path():
+    """A user's ini next to the script (the flattened package layout) wins;
+    then the dev checkout's sample at the subproject root."""
+    for candidate in (os.path.join(SCRIPT_DIR, 'modbus_cache.ini'),
+                      os.path.join(os.path.dirname(SCRIPT_DIR), 'modbus_cache.ini')):
+        if os.path.exists(candidate):
+            return candidate
+    return os.path.join(SCRIPT_DIR, 'modbus_cache.ini')
 
 logger = logging.getLogger('modbus-cache')
 
@@ -38,8 +54,8 @@ class UtcFormatter(logging.Formatter):
 
 def parse_args():
     ap = argparse.ArgumentParser(description='Modbus TCP caching proxy for Huawei SUN2000 inverters.')
-    ap.add_argument('--config', default=os.path.join(SCRIPT_DIR, 'modbus_cache.ini'),
-                    help='config file (default: modbus_cache.ini next to this script)')
+    ap.add_argument('--config', default=default_config_path(),
+                    help='config file (default: modbus_cache.ini next to this script, then the subproject root)')
     ap.add_argument('--host', help='inverter Modbus TCP address (default: config, $MODBUS_CACHE_HOST or 127.0.0.1)')
     ap.add_argument('--port', type=int, help='inverter Modbus TCP port (default: config, $MODBUS_CACHE_PORT or 5502)')
     ap.add_argument('--unit', type=int, help='Modbus unit id (default: config, $MODBUS_CACHE_UNIT or 1)')
@@ -62,6 +78,18 @@ def parse_args():
     ap.add_argument('--write-acl', help='clients allowed to write (requires --allow-write): "any" or comma-separated IPs/prefixes (default: config, $MODBUS_CACHE_WRITE_ACL or any)')
     ap.add_argument('--control-port', dest='control_port',
                     help='control server target: unix socket path or TCP port on 127.0.0.1 (default: config, $MODBUS_CACHE_CTL or /tmp/modbus-cache-<listen-port>.socket); 0 = off')
+    ap.add_argument('--control-token', dest='control_token',
+                    help='require a token on TCP control connections: the client authenticates with {"cmd": "auth", "token": ...}; the unix socket needs no token (default: config, $MODBUS_CACHE_CONTROL_TOKEN or none)')
+    ap.add_argument('--audit-log', dest='audit_log',
+                    help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MODBUS_CACHE_AUDIT_LOG or %s — the XDG state home' % AuditLog.default_path())
+    ap.add_argument('--audit-max-mb', dest='audit_max_mb', type=float,
+                    help='rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation (default: config, $MODBUS_CACHE_AUDIT_MAX_MB or 10)')
+    ap.add_argument('--audit-daily', dest='audit_daily', action='store_true',
+                    help='also rotate the audit log at UTC midnight (default: config, $MODBUS_CACHE_AUDIT_DAILY)')
+    ap.add_argument('--audit-files', dest='audit_files', type=int,
+                    help='rotated audit backups to keep (default: config, $MODBUS_CACHE_AUDIT_FILES or 3)')
+    ap.add_argument('--no-audit-log', dest='no_audit_log', action='store_true',
+                    help='disable the CACHE audit trail (default: config, $MODBUS_CACHE_NO_AUDIT_LOG)')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration and register map, print the effective settings and exit (nothing is bound or connected)')
     ap.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                     help='log level (default: config, $MODBUS_CACHE_LOG_LEVEL or INFO)')
@@ -81,6 +109,10 @@ def setup_logging(cfg):
 def install_signal_handlers(proxy, cache, args):
     def graceful_stop(reason):
         logger.info('shutdown: %s, closing the listener', reason)
+        if proxy.audit:
+            proxy.audit.event('SHUTDOWN', '%s: uptime=%ds clients=%d hits=%d misses=%d'
+                              % (reason, int(time.monotonic() - proxy.started), proxy.client_count,
+                                 proxy.cache_hits, proxy.cache_misses))
         proxy.stopping = True
         ctl = getattr(proxy, 'control', None)
         if ctl:
@@ -108,8 +140,13 @@ def install_signal_handlers(proxy, cache, args):
                 try:
                     proxy.config = resolve_config(args, SCRIPT_DIR)
                     proxy.reload()
+                    if proxy.audit:
+                        proxy.audit.event('RELOAD', '%d range(s) from %s' % (len(proxy.cache.ranges),
+                                                                             proxy.config['profile']))
                 except (Exception, SystemExit) as e:
                     logger.error('SIGHUP: reload failed (%s), keeping the previous settings', e)
+                    if proxy.audit:
+                        proxy.audit.event('RELOAD', 'failed: %s' % e)
 
         signal.signal(signal.SIGHUP, on_hup)
         threading.Thread(target=watch_reload, daemon=True).start()
@@ -126,6 +163,8 @@ def install_signal_handlers(proxy, cache, args):
                 dropped = cache.clear()
                 proxy.poll_wake.set()
                 logger.info('SIGUSR1: cache cleared (%d register(s) dropped), repolling now', dropped)
+                if proxy.audit:
+                    proxy.audit.event('RESET', 'SIGUSR1: %d register(s) dropped' % dropped)
 
         signal.signal(signal.SIGUSR1, on_usr1)
         threading.Thread(target=watch_clean, daemon=True).start()
@@ -157,11 +196,17 @@ def main():
 
     listen_host, listen_port = parse_listen(cfg['listen'])
     control_target = parse_control_target(cfg['control_port'], listen_port)
+    if cfg['no_audit_log']:
+        audit_display = 'off'
+    elif cfg['audit_log'] == '-':
+        audit_display = 'stdout'
+    else:
+        audit_display = cfg['audit_log'] or AuditLog.default_path()
     upstream = Upstream(cfg['host'], cfg['port'], cfg['unit'], cfg['timeout'])
     cache = Cache(ranges, cfg['cache_ttl'], range_names)
     proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
                   cfg['profile'], cfg)
-    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s)',
+    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s, control token: %s, audit trail: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if cfg['allow_write'] else 'disabled (write requests are refused)',
@@ -171,16 +216,29 @@ def main():
                 'local' if cfg['local_time'] else 'UTC',
                 cfg['max_clients'] or 'none', '%gs' % cfg['client_timeout'] if cfg['client_timeout'] else 'none',
                 'any' if cfg['connect_acl'] is None else '%d network(s)' % len(cfg['connect_acl']),
-                'any' if cfg['write_acl'] is None else '%d network(s)' % len(cfg['write_acl']))
+                'any' if cfg['write_acl'] is None else '%d network(s)' % len(cfg['write_acl']),
+                'required on TCP' if cfg['control_token'] else 'none',
+                audit_display)
     proxy.log_map()
     if args.dry_run:
         logger.info('dry-run: configuration and register map are valid, nothing was bound or connected (control server would listen on %s)',
                     'off' if control_target is None else
                     ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target))
         return
+    audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'] or None, 'CACHE',
+                                                      cfg['audit_max_mb'], cfg['audit_daily'],
+                                                      cfg['audit_files'])
+    proxy.audit = audit
+    if audit:
+        audit.event('START', 'version=%s upstream=%s:%d unit=%d listen=%s:%d control=%s profile=%s'
+                    % (version_string(), cfg['host'], cfg['port'], cfg['unit'], listen_host, listen_port,
+                       'off' if control_target is None else
+                       ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target),
+                       cfg['selection'] or cfg['profile']))
     stop = install_signal_handlers(proxy, cache, args)
     if control_target is not None:
-        proxy.control = ControlServer(proxy, control_target, stop)
+        proxy.control = ControlServer(proxy, control_target, stop, audit=audit,
+                                      token=cfg['control_token'] or None)
         proxy.control.start()
     try:
         threading.Thread(target=proxy.poll_loop, daemon=True).start()
@@ -195,6 +253,8 @@ def main():
         raise SystemExit(1)
     finally:
         upstream.close()
+        if audit:
+            audit.close()
 
 
 if __name__ == '__main__':

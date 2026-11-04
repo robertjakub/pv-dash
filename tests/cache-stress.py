@@ -19,7 +19,7 @@ import time
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(REPO, 'cache')
 
-P = os.path.join(CACHE_DIR, 'src', 'modbus_cache.py')
+P = os.path.join(CACHE_DIR, 'bin', 'modbus_cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
 INV_PORT, CACHE_PORT = 15601, 15602
 CLIENTS, DURATION = 100, 15.0
@@ -65,10 +65,20 @@ try:
 
     def txn(s, pdu):
         s.sendall(struct.pack('>HHHB', 77, 0, len(pdu) + 1, 1) + pdu)
-        r = s.recv(4096)
-        txn_, proto, length, unit = struct.unpack('>HHHB', r[:7])
-        assert length - 1 == len(r) - 7, 'MBAP mismatch'
-        return r[7:7 + length - 1]
+        head = b''
+        while len(head) < 7:                      # TCP is a stream: read the
+            chunk = s.recv(7 - len(head))         # MBAP header exactly, then
+            if not chunk:
+                raise ConnectionError('eof')
+            head += chunk
+        txn_, proto, length, unit = struct.unpack('>HHHB', head)
+        body = b''
+        while len(body) < length - 1:             # ... the body exactly
+            chunk = s.recv(length - 1 - len(body))
+            if not chunk:
+                raise ConnectionError('eof')
+            body += chunk
+        return body
 
     def client(k):
         s = socket.create_connection(('127.0.0.1', CACHE_PORT), timeout=10)

@@ -1,0 +1,37 @@
+# modbus-cache in an alpine container — stdlib-only, no pip.
+# Runs as the unprivileged user `pvsuite`; the profiles come from the shared
+# profiles/ directory via a named build context.
+#
+# Build (the context = ../cache, the profiles = ../profiles):
+#   cd docker
+#   docker build -t modbus-cache --build-context profiles=../profiles ../cache
+#   # or: docker compose up -d modbus-cache
+#
+# Run:
+#   docker run --rm -p 15502:15502 modbus-cache    # upstream defaults to the
+#                                                  # fake-inverter service name
+#   docker run --rm -it modbus-cache bash          # poke around as pvsuite
+#   docker run --rm -p 15502:15502 modbus-cache \
+#       modbus-cache --host 192.168.1.100          # any flags via the CMD override
+#
+# The inverter image (Dockerfile.inverter) is the pattern; the cache swaps
+# the COPY/symlink/CMD lines for its bin/ + lib/ trees.
+FROM alpine:3.20
+
+RUN apk add --no-cache python3 bash \
+    && adduser -D pvsuite
+
+WORKDIR /pv-suite
+COPY --chown=pvsuite --from=profiles profiles/ profiles/
+COPY --chown=pvsuite bin/ cache/bin/
+COPY --chown=pvsuite lib/ cache/lib/
+COPY --chown=pvsuite modbus_cache.ini selection.json cache/
+RUN chmod +x cache/bin/*.py \
+    && ln -s /pv-suite/cache/bin/modbus_cache.py /usr/local/bin/modbus-cache \
+    && ln -s /pv-suite/cache/bin/cache_ctl.py /usr/local/bin/modbus-cache-ctl \
+    && ln -s /pv-suite/cache/bin/cache_cli.py /usr/local/bin/modbus-cache-cli
+
+USER pvsuite
+
+EXPOSE 15502
+CMD ["modbus-cache", "--host", "fake-inverter", "--listen", "0.0.0.0:15502", "--audit-log", "-"]

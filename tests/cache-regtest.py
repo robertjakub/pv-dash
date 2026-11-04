@@ -16,7 +16,7 @@ import time
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(REPO, 'cache')
 
-P = os.path.join(CACHE_DIR, 'src', 'modbus_cache.py')
+P = os.path.join(CACHE_DIR, 'bin', 'modbus_cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
 R = os.path.join(REPO, 'profiles', 'sun2000.json')
 
@@ -32,15 +32,24 @@ def check(name, cond, detail=''):
         failures.append(name)
 
 
-def txn(pdu, port=CACHE_PORT, expect_len=True):
+def txn(pdu, port=CACHE_PORT):
     s = socket.create_connection(('127.0.0.1', port), timeout=10)
     s.sendall(struct.pack('>HHHB', 77, 0, len(pdu) + 1, 1) + pdu)
-    r = s.recv(512)
+    head = b''
+    while len(head) < 7:                          # TCP is a stream: read the
+        chunk = s.recv(7 - len(head))             # MBAP header exactly, then
+        if not chunk:
+            raise ConnectionError('eof')
+        head += chunk
+    txn_, proto, length, unit = struct.unpack('>HHHB', head)
+    body = b''
+    while len(body) < length - 1:                 # ... the body exactly
+        chunk = s.recv(length - 1 - len(body))
+        if not chunk:
+            raise ConnectionError('eof')
+        body += chunk
     s.close()
-    txn_, proto, length, unit = struct.unpack('>HHHB', r[:7])
-    if expect_len:
-        assert length - 1 == len(r) - 7, 'MBAP length %d vs %d body bytes' % (length, len(r) - 7)
-    return r[7:7 + length - 1]
+    return body
 
 
 def rd(addr, n, port=CACHE_PORT):
@@ -153,7 +162,8 @@ try:
     start([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(INV_PORT)])
     time.sleep(0.7)
     start([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT), '--listen', '127.0.0.1:%d' % CACHE_PORT,
-           '--interval', '1', '--cache-ttl', '3', '--allow-write', '--profile', R], log='/tmp/reg_cache.log')
+           '--interval', '1', '--cache-ttl', '3', '--allow-write', '--profile', R,
+           '--audit-log', '/tmp/reg_audit.log'], log='/tmp/reg_cache.log')
     time.sleep(2.5)
 
     # cached reads served with correct values
@@ -212,6 +222,10 @@ try:
     check('fc16 echo', b[0] == 16 and struct.unpack('>HH', b[1:5]) == (47416, 2), b.hex())
     b = rd(47416, 2)
     check('fc16 readback', struct.unpack('>2H', b[2:6]) == (2, 6000))
+    audit_txt = open('/tmp/reg_audit.log').read()
+    check('audit: START + forwarded writes land in the trail',
+          'AUDIT CACHE START' in audit_txt and 'AUDIT CACHE WRITE' in audit_txt
+          and 'register 47415 = 5' in audit_txt, audit_txt[-200:])
 
     # write support disabled by default: refused with illegal function, upstream untouched
     procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
@@ -338,11 +352,12 @@ try:
 
     # 5. control server: show status/connections/cache, clear cache, restart,
     #    cache_cli, shutdown (+ the default unix socket / MODBUS_CACHE_CTL)
-    K = os.path.join(CACHE_DIR, 'src', 'cache_cli.py')
+    K = os.path.join(CACHE_DIR, 'bin', 'cache_cli.py')
 
     def ctl_cmd(cmd, port):
+        """One JSON-lines control exchange: send {"cmd": ...}, return 'status text'."""
         s = socket.create_connection(('127.0.0.1', port), timeout=5)
-        s.sendall((cmd + '\n').encode())
+        s.sendall(_json.dumps({'cmd': cmd}).encode() + b'\n')
         buf = b''
         while not buf.endswith(b'\n'):
             b2 = s.recv(4096)
@@ -350,11 +365,12 @@ try:
                 break
             buf += b2
         s.close()
-        return buf.decode().strip()
+        obj = _json.loads(buf.decode())
+        return '%s %s' % (obj.get('status'), obj.get('text', ''))
 
     start([sys.executable, F, '--static', '--port', '15512', '--control-port', '0'])
     # the shipped example selection: the essential set, by name
-    SEL = os.path.join(CACHE_DIR, 'src', 'selection.json')
+    SEL = os.path.join(CACHE_DIR, 'selection.json')
     start([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
            '--listen', '127.0.0.1:15518', '--interval', '1', '--profile', R,
            '--selection', SEL], log='/tmp/reg_sel.log')
@@ -400,6 +416,58 @@ try:
     check('control: ping answers pong', r == 'ok pong', r)
     c1.close()
 
+    # 5b. JSON framing + token auth: malformed frames are answered cleanly,
+    #     TCP control needs the token, the unix socket does not
+    def ctl_raw(wire_bytes, port, reads=1):
+        s = socket.create_connection(('127.0.0.1', port), timeout=5)
+        s.sendall(wire_bytes)
+        buf = b''
+        for _ in range(reads):
+            while not buf.endswith(b'\n'):
+                b2 = s.recv(4096)
+                if not b2:
+                    break
+                buf += b2
+        s.close()
+        return _json.loads(buf.decode())
+
+    r = ctl_raw(b'not json at all\n', 15514)
+    check('control: malformed frame rejected cleanly', r.get('status') == 'err'
+          and 'malformed request' in r.get('text', ''), str(r))
+
+    start([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+           '--listen', '127.0.0.1:15519', '--interval', '1', '--profile', R,
+           '--control-port', '15520', '--control-token', 'sekrit',
+           '--audit-log', '/tmp/reg_audit_ctl.log'], log='/tmp/reg_ctl_tok.log')
+    time.sleep(1.5)
+    r = ctl_raw(b'{"cmd": "show status"}\n', 15520)
+    check('control: token server rejects the unauthenticated', r.get('status') == 'err'
+          and 'authenticate first' in r.get('text', ''), str(r))
+    ok = True
+    for i in range(3):
+        r = ctl_raw(_json.dumps({'cmd': 'auth', 'token': 'guess-%d' % i}).encode() + b'\n', 15520)
+        ok = ok and r.get('status') == 'err' and 'bad token' in r.get('text', '')
+    check('control: wrong tokens rejected', ok)
+    s = socket.create_connection(('127.0.0.1', 15520), timeout=5)
+    s.sendall(_json.dumps({'cmd': 'auth', 'token': 'sekrit'}).encode() + b'\n')
+    buf = b''
+    while not buf.endswith(b'\n'):
+        buf += s.recv(4096)
+    auth = _json.loads(buf.decode())
+    s.sendall(b'{"cmd": "show status"}\n')
+    buf = b''
+    while not buf.endswith(b'\n'):
+        buf += s.recv(4096)
+    st = _json.loads(buf.decode())
+    s.close()
+    check('control: the right token authenticates, commands work after it',
+          auth.get('status') == 'ok' and st.get('status') == 'ok'
+          and 'upstream=127.0.0.1:15512' in st.get('text', ''), '%s %s' % (auth, st))
+    tok_audit = open('/tmp/reg_audit_ctl.log').read()
+    check('audit: AUTH-FAIL + COMMAND events with the peer',
+          'AUTH-FAIL' in tok_audit and 'AUDIT CACHE COMMAND peer=127.0.0.1:' in tok_audit
+          and "'show status' -> ok" in tok_audit, tok_audit[-200:])
+
     def cli(stdin, port=15514, env_extra=None, use_flag=True):
         env = dict(os.environ)
         if env_extra:
@@ -443,6 +511,24 @@ try:
     r = cli('show status\nquit\n', 15515, {'CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
     check('cache_cli: short CACHE_CTL env works too', r.returncode == 0
           and 'status upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('show status\nquit\n', 15520, {'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+    check('cache_cli: token env authenticates the TCP control session', r.returncode == 0
+          and 'status upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('show status\nquit\n', 15520)
+    check('cache_cli: token server refuses the token-less CLI', r.returncode == 0
+          and 'err authenticate first' in r.stdout, repr(r.stdout[-160:]))
+
+    # 5c. cache_ctl: the one-shot client (args, piped batches, token)
+    ctl = os.path.join(CACHE_DIR, 'bin', 'cache_ctl.py')
+    r = subprocess.run([sys.executable, ctl, '--control-port', '15514', 'show', 'status'],
+                       capture_output=True, text=True, timeout=30)
+    check('cache_ctl: one-shot show status', r.returncode == 0
+          and r.stdout.startswith('ok status upstream=127.0.0.1:15512'), repr(r.stdout[:120]))
+    r = subprocess.run([sys.executable, ctl, '--control-port', '15520'],
+                       input='show cache\nclear cache\n', capture_output=True, text=True,
+                       timeout=30, env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+    check('cache_ctl: piped batch with the token env', r.returncode == 0
+          and r.stdout.startswith('ok cache ') and 'ok cache cleared' in r.stdout, repr(r.stdout[:160]))
     r = cli('shutdown\n\n', 15515, {'MODBUS_CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
     time.sleep(1)
     check('cache_cli: RETURN at [confirm] stops the proxy', r.returncode == 0

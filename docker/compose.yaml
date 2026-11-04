@@ -1,6 +1,7 @@
-# The Fake Inverter Simulator as a compose service. The build context is
-# ../inverter; the shared profiles/ directory rides in as a named context.
-# Run only this service: docker compose up -d fake-inverter
+# The pv-suite Modbus tools as compose services. The build contexts are
+# ../inverter and ../cache; the shared profiles/ directory rides in as a
+# named context. Run one service: docker compose up -d fake-inverter
+# Run the stack:         docker compose up -d (inverter + cache + CLI image)
 services:
   fake-inverter:
     build:
@@ -10,4 +11,16 @@ services:
     image: fake-inverter
     ports:
       - "5502:5502"
+    restart: unless-stopped
+
+  modbus-cache:
+    build:
+      context: ../cache
+      additional_contexts:
+        profiles: ../profiles
+    image: modbus-cache
+    ports:
+      - "15502:15502"
+    depends_on:
+      - fake-inverter
     restart: unless-stopped

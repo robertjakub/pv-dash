@@ -47,20 +47,23 @@ pv-suite/
 
 The suite is stdlib-only, so the containers are trivial: `alpine` + `apk add
 python3`, no pip, no venv, ~50 MB images. `docker/` holds the files
-(`Dockerfile.inverter`, `compose.yaml`) — the pattern:
+(`Dockerfile.inverter`, `Dockerfile.cache`, `compose.yaml`) — the pattern:
 
 - an unprivileged **`pvsuite`** user (`adduser -D`, `COPY --chown`, `USER`)
-- the three inverter tools symlinked onto `PATH`
-  (`fake-inverter`, `fake-ctl`, `fake-cli`), `bash` for interactive runs
+- the tools symlinked onto `PATH` (the inverter image:
+  `fake-inverter`, `fake-ctl`, `fake-cli`; the cache image:
+  `modbus-cache`, `modbus-cache-ctl`, `modbus-cache-cli`),
+  `bash` for interactive runs
 - the shared [`profiles/`](profiles/README.md) directory copied alongside —
   the profile resolution finds it relative to the checkout layout
-- the build context = `inverter/`, the profiles ride in as a named
+- the build context = the subproject, the profiles ride in as a named
   build context (`additional_contexts` in the compose, `--build-context`
   for plain docker builds)
 
 ```bash
 cd docker
 docker compose up -d fake-inverter              # build + serve on 0.0.0.0:5502
+docker compose up -d modbus-cache               # + the cache proxy on 0.0.0.0:15502 (upstream: fake-inverter)
 docker compose exec fake-inverter fake-cli      # a console session on the control server
 docker compose down
 ```
@@ -72,10 +75,13 @@ cd docker
 docker build -t fake-inverter --build-context profiles=../profiles ../inverter
 docker run --rm -p 5502:5502 fake-inverter
 docker run --rm -it fake-inverter bash          # poke around as pvsuite
+
+docker build -t modbus-cache --build-context profiles=../profiles ../cache
+docker run --rm -p 15502:15502 modbus-cache     # upstream defaults to the fake-inverter service name
 ```
 
-The same pattern extends to the scraper and the cache: swap the `COPY`/`CMD`
-lines for their `src/` trees. The version reports as `0.2.1` inside the
+The same pattern extends to the scraper: swap the `COPY`/`CMD`
+lines for its `src/` tree. The version reports as `0.2.1` inside the
 image (no git metadata; a checkout shows `0.2.1-<short git>`).
 
 ## License

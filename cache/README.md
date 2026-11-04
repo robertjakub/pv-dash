@@ -74,7 +74,8 @@ Which registers are actually **fetched** comes from a selection file —
 `{"registers": ["pv-power", "grid-power", ...]}`, profile names only —
 resolved as `--selection` flag, env `MODBUS_CACHE_SELECTION`, ini
 `selection`; the default fetches **every** profile entry. The shipped
-**`src/selection.json`** is an example — the essential SUN2000 monitoring
+**`selection.json`** (in the subproject root) is an example — the essential
+SUN2000 monitoring
 set (the classic 13-range map, by name). Reads outside the selected set are
 forwarded to the inverter. The 65000-65003 diagnostics
 block is not a device register — it never appears in a profile and is never
@@ -108,7 +109,7 @@ the plan converges to the largest blocks the device actually answers.
 ## Usage
 
 ```bash
-python3 cache/src/modbus_cache.py --host 192.168.1.100
+python3 cache/bin/modbus_cache.py --host 192.168.1.100
 ```
 
 By default the proxy **binds to 127.0.0.1:15502** (loopback only) — pass
@@ -127,7 +128,6 @@ inverter:
 ```bash
 python3 scrape/src/scraper.py --host 127.0.0.1 --modbus-port 15502
 ```
-
 The scraper auto-detects the diagnostics block and exports it as
 `huawei_cache_*` Prometheus gauges — device-down-behind-cache becomes visible
 downstream instead of flowing through as fresh data.
@@ -145,9 +145,13 @@ Settings are resolved in this order (first hit wins), mirroring
    `MODBUS_CACHE_TTL`, `MODBUS_CACHE_ALLOW_WRITE`, `MODBUS_CACHE_LOCAL_TIME`,
    `MODBUS_CACHE_LOG_ACCESS`, `MODBUS_CACHE_MAX_CLIENTS`,
    `MODBUS_CACHE_CLIENT_TIMEOUT`, `MODBUS_CACHE_CONNECT_ACL`,
-   `MODBUS_CACHE_WRITE_ACL`, `MODBUS_CACHE_LOG_LEVEL`
+   `MODBUS_CACHE_WRITE_ACL`, `MODBUS_CACHE_LOG_LEVEL`,
+   `MODBUS_CACHE_CONTROL_TOKEN`, `MODBUS_CACHE_AUDIT_LOG`,
+   `MODBUS_CACHE_AUDIT_MAX_MB`, `MODBUS_CACHE_AUDIT_DAILY`,
+   `MODBUS_CACHE_AUDIT_FILES`, `MODBUS_CACHE_NO_AUDIT_LOG`
 3. Config file (snake_case keys, `[cache]` section) — `--config` picks the
-   file (default: `modbus_cache.ini` next to `modbus_cache.py`; missing file
+   file (default: `modbus_cache.ini` next to `modbus_cache.py` — the
+   packaged layout — then the subproject root's sample; a missing file
    is fine)
 
 Every setting is validated before use — nonsense values (negative intervals,
@@ -172,6 +176,13 @@ with a clean one-line error instead of failing later at runtime.
 | `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (ini `allow_write`, env `MODBUS_CACHE_ALLOW_WRITE` accept `true`/`false`) |
 | `--connect-acl` | `any` | clients allowed to connect: `any` or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `any` | clients allowed to write — still requires `--allow-write` — see [Access control](#access-control) |
+| `--control-token` | none | require a token on **TCP** control connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; the unix socket needs no token (ini `control_token`, env `MODBUS_CACHE_CONTROL_TOKEN`) |
+| **Audit trail** | | |
+| `--audit-log` | XDG state | the CACHE audit trail: a file path or `-` for stdout (docker logs / journald); default `~/.local/state/modbus-cache/audit.log` — see [Audit logging](#audit-logging) |
+| `--audit-max-mb` | `10` | rotate the audit log at this size, keeping `--audit-files` backups; `0` = off |
+| `--audit-daily` | off | also rotate the audit log at UTC midnight |
+| `--audit-files` | `3` | rotated audit backups to keep |
+| `--no-audit-log` | off | disable the audit trail |
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect clients silent for this many seconds — sheds connections from clients that died without closing (`0` = never) |
@@ -180,7 +191,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--log-access` | `DEBUG` | log client connects/disconnects at `INFO` instead of `DEBUG` |
 | `--local-time` | UTC | log timestamps in the system time zone instead of UTC |
 
-`cache/src/modbus_cache.ini` is a sample with the defaults. Boolean ini/env
+`cache/modbus_cache.ini` is a sample with the defaults. Boolean ini/env
 values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 
 ## Diagnostics registers
@@ -214,7 +225,7 @@ kill -USR1 $(pgrep -f modbus_cache.py)   # clean the cache
 
 ## Runtime control (`--control-port`)
 
-A line-protocol control server runs **by default on the unix socket
+A JSON-lines control server runs **by default on the unix socket
 `/tmp/modbus-cache-<listen-port>.socket`** — short, determinable, stale
 files replaced, nothing ever lands in the working directory. Pass a TCP port
 number to bind `127.0.0.1:PORT` instead, or `0` to switch the control server
@@ -222,36 +233,55 @@ off. Both the proxy and the CLI tool resolve the target the same way: flag >
 **`MODBUS_CACHE_CTL`** (or the short **`CACHE_CTL`**, like the fake
 inverter's `FAKE_CTL`) environment variable > default socket.
 
-One command per line, one reply per line (`ok …` / `err …` / `bye …`):
+One command per line, one reply per line. Every request and reply is one
+JSON object: the request = `{"cmd": "<command>"}`, the reply =
+`{"status": "ok|err|bye", "text": "…"}`. **TCP connections require the
+token when `--control-token` is set** — the first command must be
+`{"cmd": "auth", "token": "..."}`; the unix socket relies on filesystem
+permissions instead.
 
 | Command | Effect |
 |---|---|
 | `show status` | one-line effective state: upstream, listen address, client count, uptime, poll health, last poll age, interval, TTL, range/map counts, hit/miss counters |
 | `show connections` | connected clients: peer, connection age, requests served |
 | `show cache` | cache contents: ranges, cached words, oldest entry, TTL, map version, failed ranges, hit/miss counters |
+| `show version` | the modbus-cache version |
 | `clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
 | `restart` | drop the upstream connection **and** the cache, repoll now — for recovering from a wedged inverter session |
 | `shutdown` | gracefully stop the proxy (same as SIGTERM: listener closed, control socket unlinked) |
 | `help` / `?` | one-line command reference |
 | `quit` | close the connection |
 
+### `cache_ctl` — one-shot commands
+
+A small client for scripts and quick pokes: one command as arguments (or a
+batch piped on stdin), the replies on stdout, done.
+
+```bash
+python3 cache/bin/cache_ctl.py --control-port 15509 show status
+python3 cache/bin/cache_ctl.py --control-port 15509 clear cache
+printf 'show cache\nclear cache\n' | python3 cache/bin/cache_ctl.py --control-port 15509
+```
+
+Same `--control-port` flag / `MODBUS_CACHE_CTL` env as the proxy itself; the
+TCP token comes from `--control-token` or `MODBUS_CACHE_CONTROL_TOKEN`.
+Exit codes: `0` = ok, `1` = connection/control error, `2` = CLI misuse.
+Every invocation lands in the audit log (below, prefix `CTL`).
+
 ### `cache_cli` — console-style session
 
-An interactive front-end on the same socket (same flag/env resolution): the
-prompt shows the connected port, TAB completes commands and their values
-(`show <TAB>` lists status/connections/cache with descriptions, `?` does the
-same in any position), `clear cache` and `restart` confirm with a plain
-`ok`, `show …` prints the state line, and `shutdown` asks
-`Proceed with shutdown? [confirm]` first — RETURN or `y` proceeds, anything
-else aborts with `% Aborted.`. While it idles the CLI sends wire pings
-(every 55 s, `CACHE_CLI_KEEPALIVE` to tune, `0` = off) so the control
-server's idle timeout never drops a live session.
+An interactive front-end on the same socket (same flag/env resolution): on
+the first connect (a TTY) it probes the status and greets you —
 
 ```
-$ python3 cache/src/cache_cli.py
+$ python3 cache/bin/cache_cli.py
+
+% Welcome to the modbus-cache console
+%   192.168.1.100:5502 upstream | poll ok, last poll 2s | running for 5m | 1 client(s)
+%   TAB completes, ? lists the commands, quit leaves
 
 cache:15502 > show status
-status upstream=127.0.0.1:5502 unit=1 listen=127.0.0.1:15502 clients=1 uptime=3600s poll=ok last-poll=2s ago interval=10s ttl=30s ranges=13 map=v0 hits=412 misses=9
+status upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 clients=1 uptime=3600s poll=ok last-poll=2s ago interval=10s ttl=30s ranges=13 map=v0 hits=412 misses=9
 
 cache:15502 > clear cache
 ok
@@ -260,6 +290,25 @@ cache:15502 > shutdown
 Proceed with shutdown? [confirm] y
 bye shutdown
 ```
+
+The prompt shows the connected port, TAB completes commands with their
+descriptions (`show <TAB>` lists status/connections/cache/version, `?` does
+the same in any position), `clear cache` and `restart` confirm with a plain
+`ok`, and `shutdown` asks `Proceed with shutdown? [confirm]` first — RETURN
+or `y` proceeds, anything else aborts with `% Aborted.`. While it idles the
+CLI sends wire pings (every 55 s, `CACHE_CLI_KEEPALIVE` to tune, `0` = off)
+so the control server's idle timeout never drops a live session. When the
+connection dies anyway (the proxy was killed, the socket went dark), the
+CLI retries **`--reconnect` times (default 3)** with **`--reconnect-wait`
+seconds (default 10)** between the attempts, printing the progress and
+resuming the session on the first success; every attempt lands in the audit
+trail (`RECONNECT`). `--reconnect 0` restores the old die-on-loss behaviour.
+The session itself (connect/disconnect, the local commands, an aborted
+shutdown) is appended to the CLI's own audit trail (prefix `CLI`,
+`--audit-log` / `--no-audit-log`); the commands themselves are audited by
+the server (prefix `CACHE`, with the client peer). TCP targets authenticate
+with `--control-token` or the `MODBUS_CACHE_CONTROL_TOKEN` env — the same
+token the proxy was started with.
 
 ## Access control
 
@@ -316,18 +365,69 @@ journalctl -u modbus-cache | grep -E 'SIGHUP|shutdown'        # lifecycle
 journalctl -u modbus-cache | grep -i 'not on'                 # ACL rejections
 ```
 
+### The audit trail
+
+On top of the operational log, the proxy and the CLI append to an
+**append-only audit file** — one line per event, who/when/what/result, on
+by default at the **XDG state home**
+(`~/.local/state/modbus-cache/audit.log`, NOT the working directory: a
+packaged install has a read-only one). `--audit-log <file>` renames it,
+`--no-audit-log` turns it off. **`--audit-log -` sends the trail to
+stdout, not stderr** — the audit is data, not an error, and stdout keeps it
+in the single ordered stream the service manager captures (docker logs,
+journald); the NixOS module ships with it (a hardened service cannot write
+the state home anyway). `--audit-files N` (the default 3) sets how many
+rotated backups the file sink keeps; the stdout sink never rotates. If the
+audit file cannot be opened, the trail falls back to stdout rather than
+vanishing. **Rotation is gated**: `--audit-max-mb 10` (the default) rotates
+at 10 MB keeping 3 backups (`audit.log.1..3`), `--audit-daily` additionally
+rotates at UTC midnight, `--audit-max-mb 0` = unbounded.
+
+The prefix names the writer — `CACHE` (the proxy), `CLI` (cache_cli) and
+`CTL` (cache_ctl):
+
+```
+2026-11-04T07:16:40Z AUDIT CACHE START version=0.2.1 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
+2026-11-04T07:16:43Z AUDIT CACHE WRITE register 47415 = 5 (single register, unit 1)
+2026-11-04T07:17:02Z AUDIT CACHE AUTH-FAIL peer=127.0.0.1:54425
+2026-11-04T07:17:12Z AUDIT CACHE COMMAND peer=127.0.0.1:54426 'clear cache' -> ok
+2026-11-04T07:17:30Z AUDIT CLI CONNECT target=127.0.0.1:15502 user=oom
+2026-11-04T07:17:45Z AUDIT CACHE SHUTDOWN SIGTERM received: uptime=65s clients=1 hits=412 misses=9
+2026-11-04T07:18:02Z AUDIT CTL CONNECT target=unix:/tmp/modbus-cache-15502.socket user=oom
+```
+
+UTC stamps, the command as entered and its outcome — the structured
+who-when-what evidence trail. **Every wire command is audited once, by the
+server** (`AUDIT CACHE COMMAND`, with the client peer — it knows the who);
+the CLI audits its session (CONNECT/DISCONNECT, the local-only events like
+an aborted `shutdown`, RECONNECT attempts). The proxy audits its lifecycle
+too: `START`, `RELOAD` (SIGHUP), `RESET` (SIGUSR1), `SHUTDOWN` — and, most
+important for a write-forwarding gate, every forwarded `WRITE` plus the
+refusals (`WRITE-REFUSED` when disabled or off the write ACL,
+`WRITE-REJECTED`/`WRITE-FAILED` when the device says no or the session
+died) and the TCP control `AUTH-FAIL`s. ping/pong keepalives are never
+logged; the file is flushed per event, so a crash keeps everything up to
+the last command. The trail is **thread-safe** (one writer lock around the
+write+flush+rotate cycle) — the proxy's client threads audit every
+forwarded write concurrently.
+
+The operational log above keeps mirroring the events at INFO; the audit
+file is the structured evidence trail, not a duplicate of it.
+
 ## Testing
 
 Three standalone suites live in the suite-root [`tests/`](../tests/) — stdlib only, each starts its
 own fake inverter + proxy on scratch ports and cleans up after itself:
 
 ```bash
-python3 tests/cache-regtest.py    # 59 functional checks (cache, forwarding,
-                                 #   writes/refusals, diagnostics registers,
-                                 #   device death, poll status, reloads,
-                                 #   hostile-upstream phase)
+python3 tests/cache-regtest.py    # 69 functional checks (cache, forwarding,
+                                  #   writes/refusals, diagnostics registers,
+                                  #   device death, poll status, reloads,
+                                  #   hostile-upstream phase, JSON control +
+                                  #   token auth + audit trail + ctl/cli clients)
 python3 tests/cache-stress.py     # 100 clients / 15 s load + latency report
 python3 tests/cache-fuzz.py [n]   # n client-garbage frames (default 3000)
+python3 tests/cache-control-fuzz.py   # hostile JSON against the control server
 ```
 
 Every scenario must end with the proxy alive and **zero tracebacks** in the
@@ -335,18 +435,15 @@ logs — the hostile-upstream phase (garbage replies, short bodies, lying
 lengths, wrong transaction/unit ids, stalls, junk tails) proves that per
 mode, including recovery when the device starts answering sanely again.
 
-The regression suite's last check compares the register map rendered by the
-NixOS module against the shared `profiles/sun2000.json` (needs `nix` on
-PATH).
-
 ## Nix / NixOS
 
 ```bash
 nix run .#modbus-cache -- --host 192.168.1.100
 ```
 
-The package ships two binaries: `modbus-cache` (the proxy) and
-`modbus-cache-cli` (the console-style control session).
+The package ships three binaries: `modbus-cache` (the proxy),
+`modbus-cache-ctl` (one-shot control commands) and `modbus-cache-cli` (the
+console-style control session).
 
 ```nix
 imports = [ inputs.pv-dash.nixosModules.modbus-cache ];
@@ -369,7 +466,9 @@ Options: `inverterHost`, `inverterPort`, `unitId`, `timeout`, `interval`,
 bundled `sun2000` profile), `cacheTtl` (unset = 3× `interval`),
 `listenHost`, `listenPort`, `allowWrite`, `connectAcl`, `writeAcl`,
 `maxClients`, `clientTimeout`, `logLevel`, `localTime`, `logAccess`,
-`openFirewall`. Unset options keep the proxy
+`openFirewall`, `auditLog` (null = the trail goes to **stdout**, which
+journald captures — the hardened service cannot write the XDG state home),
+`auditMaxMb`, `auditDaily`, `auditFiles`. Unset options keep the proxy
 defaults. The service runs with a dynamic user and systemd hardening.
 
 The module renders the **config INI and the register map into the store**
@@ -394,15 +493,20 @@ Python is memory-safe (no buffer overflows, all request sizes bounds-checked
 and fuzzed), but connection resources are not unlimited:
 `maxClients` (default **64**) caps simultaneous clients (each is a thread)
 and `clientTimeout` (default **300 s**) reaps clients that died without
-closing; set `0` to disable either.
+closing; set `0` to disable either. The control server binds loopback
+(TCP) or a world-0600 unix socket; a TCP control port can additionally
+require the token handshake (`--control-token`, see
+[Runtime control](#runtime-control---control-port)).
 
 ## Source layout
 
 ```
-cache/src/
-├── modbus_cache.py      # CLI, logging setup, signal handling
-├── cache_cli.py         # console-style interactive control session
-├── modbus_cache.ini     # sample config
+cache/
+├── bin/
+│   ├── modbus_cache.py  # CLI, logging setup, signal handling
+│   ├── cache_ctl.py     # one-shot control client (args / piped commands)
+│   └── cache_cli.py     # console-style interactive control session
+├── modbus_cache.ini     # sample config (the default --config target)
 ├── selection.json       # example selection: the essential monitoring set
 └── lib/
     ├── protocol.py      # wire format, errors, frame helpers
@@ -410,7 +514,9 @@ cache/src/
     ├── upstream.py      # the shared inverter connection
     ├── cache.py         # register cache + block planner
     ├── proxy.py         # poller + client handling
-    └── control.py       # line-protocol control server (show/clear/restart/shutdown)
+    ├── control.py       # JSON-lines control server (show/clear/restart/shutdown, token auth)
+    ├── audit.py         # the append-only audit trail (AUDIT CACHE/CLI/CTL lines)
+    └── version.py       # the suite version
 ```
 
 ## License

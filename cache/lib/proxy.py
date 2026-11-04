@@ -26,7 +26,8 @@ DIAG_MAX = 0xFFFF
 
 
 class Proxy:
-    def __init__(self, upstream, cache, read_delay=0.0, merge_gap=0, interval=10.0, profile=None, config=None):
+    def __init__(self, upstream, cache, read_delay=0.0, merge_gap=0, interval=10.0, profile=None, config=None,
+                 audit=None):
         self.upstream = upstream
         self.cache = cache
         self.read_delay = read_delay
@@ -34,6 +35,7 @@ class Proxy:
         self.interval = interval
         self.profile = profile
         self.config = config or {}
+        self.audit = audit   # the CACHE audit trail (lib.audit), None = off
         self.allow_write = bool(self.config.get('allow_write', False))
         self.log_access = bool(self.config.get('log_access', False))
         self.max_clients = max(0, int(self.config.get('max_clients') or 0))
@@ -242,10 +244,14 @@ class Proxy:
             if not self.allow_write:
                 desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
                 logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)
+                if self.audit:
+                    self.audit.event('WRITE-REFUSED', '%s (write support disabled)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
             if not self._allowed(self.write_acl, addr[0]):
                 desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
                 logger.info('write: refused %s (client %s not on the write ACL)', desc, addr[0])
+                if self.audit:
+                    self.audit.event('WRITE-REFUSED', '%s (client %s not on the write ACL)' % (desc, addr[0]))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
         if func == 3:
             if len(pdu) < 5:
@@ -292,6 +298,8 @@ class Proxy:
         desc = describe_write(pdu, unit)
         if desc:
             logger.info('write: %s', desc)
+            if self.audit:
+                self.audit.event('WRITE', desc)
         is_read = bool(pdu) and pdu[0] == 3 and len(pdu) >= 5
         if is_read:
             addr, count = struct.unpack('>HH', pdu[1:5])
@@ -307,6 +315,8 @@ class Proxy:
                 code = body[1] if len(body) > 1 else -1
                 if desc:
                     logger.warning('write rejected by the device: %s (modbus exception %d)', desc, code)
+                    if self.audit:
+                        self.audit.event('WRITE-REJECTED', '%s (modbus exception %d)' % (desc, code))
                 elif not is_read:
                     logger.info('forwarded FC%d rejected by the device (modbus exception %d)', pdu[0], code)
             if is_read:
@@ -323,6 +333,8 @@ class Proxy:
             self.upstream.close()
             if desc:
                 logger.warning('write failed: %s (%s)', desc, e)
+                if self.audit:
+                    self.audit.event('WRITE-FAILED', '%s (%s)' % (desc, e))
             elif is_read:
                 logger.warning('read: registers %d:%d failed (%s)', addr, count, e)
             return exception_frame(txn, proto, unit, pdu[0], GATEWAY_FAILED)

@@ -72,7 +72,7 @@ def parse_range(text, label):
 def _profile_candidates(name):
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return [os.path.join(here, 'profiles', name),
-            os.path.join(os.path.dirname(os.path.dirname(here)), 'profiles', name)]
+            os.path.join(os.path.dirname(here), 'profiles', name)]
 
 
 def default_profile_path(name='sun2000.json'):
@@ -192,6 +192,10 @@ def validate_config(cfg):
         fail('client_timeout', 'must be >= 0')
     if cfg['level'] not in ('DEBUG', 'INFO', 'WARNING', 'ERROR'):
         fail('log-level', 'must be DEBUG, INFO, WARNING or ERROR')
+    if cfg['audit_max_mb'] < 0:
+        fail('audit_max_mb', 'must be >= 0 (0 = no size rotation)')
+    if cfg['audit_files'] < 1:
+        fail('audit_files', 'must be >= 1')
     parse_listen(cfg['listen'])
     if not cfg['host']:
         fail('host', 'must not be empty')
@@ -263,6 +267,17 @@ def resolve_config(args, script_dir=None):
         'level': resolve(args.log_level, 'MODBUS_CACHE_LOG_LEVEL', 'log_level', 'INFO', str).upper(),
         'control_port': resolve(getattr(args, 'control_port', None), 'MODBUS_CACHE_CTL', 'control_port', '', str)
                         or (os.environ.get('CACHE_CTL', '').strip() or ''),
+        'control_token': resolve(getattr(args, 'control_token', None), 'MODBUS_CACHE_CONTROL_TOKEN',
+                                 'control_token', '', str),
+        'audit_log': resolve(getattr(args, 'audit_log', None), 'MODBUS_CACHE_AUDIT_LOG', 'audit_log', '', str),
+        'audit_max_mb': resolve(getattr(args, 'audit_max_mb', None), 'MODBUS_CACHE_AUDIT_MAX_MB',
+                                'audit_max_mb', 10.0, float),
+        'audit_daily': resolve_bool(getattr(args, 'audit_daily', False), 'MODBUS_CACHE_AUDIT_DAILY',
+                                    'audit_daily', False),
+        'audit_files': resolve(getattr(args, 'audit_files', None), 'MODBUS_CACHE_AUDIT_FILES',
+                               'audit_files', 3, int),
+        'no_audit_log': resolve_bool(getattr(args, 'no_audit_log', False), 'MODBUS_CACHE_NO_AUDIT_LOG',
+                                     'no_audit_log', False),
     }
     validate_config(cfg)
     return cfg

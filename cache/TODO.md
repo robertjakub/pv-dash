@@ -40,7 +40,18 @@ settings` marks the overridden values with a `*`, `show status` carries the
 invalidation: a forwarded FC06/16/22/23 write drops exactly the cached
 words it touched (per-register, `Cache.invalidate`), wakes the poller, and
 the next read goes to the device instead of serving the pre-write value
-until the TTL.
+until the TTL. The registry grew to 15 tunables (profile/selection live
+map swaps, the ACLs, the upstream timeout) — `--selection none` empties
+the map: every read forwards, nothing is stored. The reports: `show cache
+all` (per-entry age/expires/status), the `connect-acl`/`timeout`/
+`overridden=` rows in `show status`, the `selection`/`write-registers` rows
+in `inspect`; the SIGHUP reload honors the selection file, and `set
+profile default` resolves again. The console: the TAB/? listings split
+into [settings]/[values]/[system] with the descriptions aligned, `set`/
+`unset` confirm `% ok` (errors `% err`), `show <setting>` prints the bare
+value, the reports print without the `ok` header, and the daemon
+announces its exit (`bye daemon-exit`) so the console closes instead of
+reconnecting.
 
 The control surface: the JSON-lines transport, the TCP token auth (token
 or token file), the audit trail (CACHE/CLI/CTL prefixes, XDG state home,

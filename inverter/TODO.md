@@ -49,4 +49,8 @@ collapse, the inverter stands by, the meter goes dark). The statics redo
 `--metrics-token-file` options. The reports: `show status` and now
 `show settings` as multi-line key=value tables; the fake inverter serves
 the same register map over FC3 and FC4 (the cache's FC4 path has a
-device-side counterpart).
+device-side counterpart). The console: the TAB/? listings split into
+[settings]/[values]/[system] with the descriptions aligned, `set`/`unset`
+confirm `% ok`, `show <setting>` prints the bare value — and the daemon
+announces its exit (`bye daemon-exit`) so the console closes instead of
+reconnecting.

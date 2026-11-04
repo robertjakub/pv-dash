@@ -2,10 +2,6 @@
 
 ## Open
 
-- **the native metrics endpoint** — `--metrics-port` with the bearer token,
-  like the fake inverter's: the cache's own hit/miss counters, poll health,
-  cache age and client count as Prometheus gauges, without depending on the
-  scraper's `huawei_cache_*` export path.
 - **the CI** — GitHub Actions: the four suites + `nix flake check` on the
   push; the release workflow on the tag. (Family-wide, see the inverter's
   TODO.)
@@ -18,20 +14,25 @@
   field (the cache polls/caches FC4 independently); the scraper still reads
   everything with FC3 — a profile that marks an FC4 entry `scrape` needs
   the scraper to follow the field.
-- **the per-entry TTL** — the profile entries could carry a `ttl` (the fast
-  power registers 5s, the slow nameplate words 1h): one poll cadence, but
-  `covers()` honors the per-entry expiry instead of the global factor.
 - **the read-only control role** — a second token granting only the
   show/clear verbs (no `set`, no `shutdown`): the ops shift versus the
   admin key, both audited.
 - **the peer-cred auth on the unix control socket** — SO_PEERCRED: a local
   systemd unit connects without a token, the socket name already does half
   the job.
-- **the poll-latency gauges** — the last/mean poll cycle duration on the
-  metrics endpoint once it lands (the control's `show status` carries the
-  health; the trend belongs in Prometheus).
 
 ## Done (the highlights; the git history has the details)
+
+The per-entry TTL: the profile entries carry an optional `ttl` (seconds,
+`0` = never expire) — `covers()` honors it per word, the global TTL stays
+the fallback, the selection filter carries it, and `show cache all` marks
+the entries (`[ttl 5s]`).
+
+The native metrics endpoint: `--metrics-port` with the bearer token (the
+scraper's scheme) serving the `modbus_cache_*` gauges — the hit/miss
+counters, the poll health + age, the cache age, the words/ranges/clients,
+and the last/mean/max poll-cycle durations — plus `--metrics-token-file`,
+the `metrics=` rows in `show status`/`inspect`.
 
 The live-setting persistence policy, made explicit: a live `set` survives
 until the next SIGHUP (the config file always wins on reload); `show

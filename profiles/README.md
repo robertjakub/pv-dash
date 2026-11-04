@@ -40,6 +40,9 @@ One JSON object per device:
     `3` (holding registers, the default) or `4` (input registers). The
     fake serves the same map on both codes; the cache polls and caches the
     two spaces independently.
+  - `ttl` — optional, the cache TTL override for the entry in seconds
+    (`0` = never expire); absent = the cache's global TTL. A fast power
+    word at 5s next to a nameplate word at 1h — one poll cadence for both.
   - `scale` — the wire gain: wire = value × scale (e.g. the sun2000
     temperatures ×10, the currents ×100)
   - `desc` — what the register holds

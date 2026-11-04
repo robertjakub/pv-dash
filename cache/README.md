@@ -72,12 +72,20 @@ then the bundled copy; the file is re-read on `SIGHUP`. Entry `type`
 the optional **`fc`** field picks the address space: `3` (holding
 registers, the default) or `4` (input registers) — the two spaces are
 cached and polled independently, and both are served from the cache on
-their own function code.
+their own function code. The optional **`ttl`** field overrides the cache
+TTL per entry (seconds; `0` = never expire) — a fast power word at 5s next
+to a nameplate word at 1h, one poll cadence for both; `show cache all`
+marks the entries carrying one (`[ttl 5s]`). The entry TTL **replaces** the
+global one in both directions: a lower entry TTL shortens the freshness, a
+higher one lengthens it — the global TTL is only the fallback for the
+entries without their own, never a floor.
 
 Which registers are actually **fetched** comes from a selection file —
 `{"registers": ["pv-power", "grid-power", ...]}`, profile names only —
 resolved as `--selection` flag, env `MODBUS_CACHE_SELECTION`, ini
-`selection`; the default fetches **every** profile entry. The shipped
+`selection`; the default fetches **every** profile entry (`all`), and
+**`none`** empties the map: every read forwards to the inverter and nothing
+is stored (a pass-through proxy, the cache gauges go quiet). The shipped
 **`selection.json`** (in the subproject root) is an example — the essential
 SUN2000 monitoring
 set (the classic 13-range map, by name). Reads outside the selected set are
@@ -177,6 +185,10 @@ with a clean one-line error instead of failing later at runtime.
 | `--audit-files` | `3` | rotated audit backups to keep |
 | `--no-audit-log` | off | disable the audit trail |
 | `--reads-audit` | `300` | audit one `READS` tally per client per this many seconds (who is hammering the cache), `0` = off (ini `reads_audit_s`, env `MODBUS_CACHE_READS_AUDIT`) |
+| **Metrics** | | |
+| `--metrics-port` | off | serve the cache's own Prometheus `/metrics` on `127.0.0.1:PORT` (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `huawei_cache_*` path) |
+| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`) |
+| `--metrics-token-file` | off | the metrics bearer token from a file (the first line); instead of `--metrics-token`, giving both is an error |
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect clients silent for this many seconds — sheds connections from clients that died without closing (`0` = never) |
@@ -367,6 +379,20 @@ cached words it touched (per-register — the rest of the cache stays warm)
 and wakes the poller. The next read of the written range goes to the device
 instead of serving the pre-write value until the TTL expires. Coils (FC05/15)
 are not cached and need no invalidation.
+
+## Metrics
+
+`--metrics-port` (off by default) serves the cache's own Prometheus
+`/metrics` on `127.0.0.1:PORT` — the self-observability without the
+scraper's `huawei_cache_*` export path: `modbus_cache_hits_total` /
+`modbus_cache_misses_total`, `modbus_cache_poll_up` +
+`modbus_cache_last_poll_age_seconds`, `modbus_cache_age_seconds` (the
+oldest cached word), `modbus_cache_words` / `modbus_cache_ranges` (the
+`fc` labels), `modbus_cache_clients`, the uptime and the poll-cycle
+durations (`modbus_cache_poll_duration_seconds{,_mean,_max}`). With
+`--metrics-token` / `--metrics-token-file` set, requests need
+`Authorization: Bearer <token>` — the same scheme the scraper's exporter
+speaks; anything but `/metrics` answers 404, an unauthenticated read 401.
 
 ## Audit logging
 

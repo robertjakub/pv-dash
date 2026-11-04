@@ -50,18 +50,23 @@ def build_blocks(ranges, merge_gap):
 
 
 class Cache:
-    def __init__(self, ranges, cache_ttl, names=None):
+    def __init__(self, ranges, cache_ttl, names=None, ttls=None):
         self.ranges = ranges
         self.cache_ttl = cache_ttl
         self.lock = threading.Lock()
         self.regs = {}     # (fc, addr) -> word
         self.ts = {}       # (fc, addr) -> stamp
         self.names = names or {}   # (fc, start, count) -> name
+        self.ttls = ttls or {}     # (fc, start, count) -> per-entry ttl override
+        self.word_ttl = {}         # (fc, addr) -> the entry ttl (absent = the global ttl)
+        for (fc, start, count), ttl in self.ttls.items():
+            for a in range(start, start + count):
+                self.word_ttl[(fc, a)] = ttl
         self.range_ok = {r: None for r in ranges}
         self.leaf_errors = {}      # (fc, start, count) -> exception code
         self.map_version = 0
 
-    def update_map(self, ranges, names):
+    def update_map(self, ranges, names, ttls=None):
         """Swap the register map: prune removed entries, reset poll status."""
         with self.lock:
             allowed = set()
@@ -71,18 +76,25 @@ class Cache:
             self.ts = {a: t for a, t in self.ts.items() if a in allowed}
             self.ranges = ranges
             self.names = names
+            self.ttls = ttls or {}
+            self.word_ttl = {(fc, a): ttl for (fc, start, count), ttl in self.ttls.items()
+                             for a in range(start, start + count)}
             self.range_ok = {r: None for r in ranges}
             self.leaf_errors = {}
             self.map_version += 1
 
     def covers(self, fc, addr, count):
-        """True when every requested register is cached and not expired."""
+        """True when every requested register is cached and not expired —
+        the entry's own ttl when the profile set one, the global otherwise."""
         with self.lock:
             now = time.time()
             for a in range(addr, addr + count):
                 if (fc, a) not in self.regs:
                     return False
-                if self.cache_ttl and now - self.ts[(fc, a)] > self.cache_ttl:
+                ttl = self.word_ttl.get((fc, a))
+                if ttl is None:
+                    ttl = self.cache_ttl
+                if ttl and now - self.ts[(fc, a)] > ttl:
                     return False
             return True
 
@@ -144,7 +156,8 @@ class Cache:
 
     def entries(self):
         """Per-range dump for `show cache all`: (fc, start, count, cached word
-        count, oldest age in s or None, poll error code or None)."""
+        count, oldest age in s or None, poll error code or None, the entry's
+        effective ttl)."""
         with self.lock:
             now = time.time()
             out = []
@@ -153,5 +166,7 @@ class Cache:
                 ages = [now - self.ts[(fc, a)] for a in range(start, start + count)
                         if (fc, a) in self.ts]
                 oldest = max(ages) if ages else None
-                out.append((fc, start, count, words, oldest, self.leaf_errors.get((fc, start, count))))
+                ttl = self.ttls.get((fc, start, count))
+                out.append((fc, start, count, words, oldest,
+                            self.leaf_errors.get((fc, start, count)), ttl))
             return out

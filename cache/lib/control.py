@@ -20,7 +20,7 @@ from .version import version_string
 from .statics import CONTROL_IDLE_TIMEOUT_S
 from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .cache import build_blocks
-from .config import parse_write_registers, parse_acl, resolve_profile_file, default_profile_path
+from .config import parse_write_registers, parse_acl, parse_selection, resolve_profile_file, default_profile_path
 
 logger = logging.getLogger('modbus-cache')
 
@@ -377,7 +377,7 @@ class ControlServer:
                 cfg['profile'] = default_profile_path() if val in ('default', 'auto') \
                     else resolve_profile_file(val)
             else:
-                cfg['selection'] = '' if val in ('all', 'none', '-') else val
+                cfg['selection'] = parse_selection(val)
             saved = p.config
             p.config = cfg
             try:
@@ -462,6 +462,8 @@ class ControlServer:
             'uptime=%d' % int(now - p.started),
             'poll=%s' % ('ok' if p.poll_ok else 'down'),
             'last_poll=%s' % age,
+            'poll_duration=%gs' % p.poll_secs_last,
+            'poll_duration_mean=%gs' % (p.poll_secs_sum / p.poll_count if p.poll_count else 0),
             'interval=%gs' % p.interval,
             'ttl=%gs' % p.cache.cache_ttl,
             'merge_gap=%d' % p.merge_gap,
@@ -480,6 +482,7 @@ class ControlServer:
             'reads_audit=%s' % ('off' if not p.reads_audit_s else '%gs' % p.reads_audit_s),
             'profile=%s' % (cfg.get('profile') or p.profile),
             'selection=%s' % (cfg.get('selection') or 'all'),
+            'metrics=%s' % getattr(p, 'metrics_desc', 'off'),
             'overridden=%s' % (','.join(sorted(self.overridden)) or 'none'),
         ]
         return 'ok status\n' + '\n'.join(rows)
@@ -529,9 +532,11 @@ class ControlServer:
             'listen    %s:%d, control %s, connect-acl %s'
             % (p.listen_addr[0], p.listen_addr[1], self.describe(),
                'any' if p.connect_acl is None else '%d network(s)' % len(p.connect_acl)),
-            'profile   %s%s, map v%d' % (cfg.get('profile') or p.profile,
-                                         ' (selection: %s)' % cfg['selection'] if cfg.get('selection') else '',
-                                         p.cache.map_version),
+            'profile   %s, map v%d' % (cfg.get('profile') or p.profile,
+                                       p.cache.map_version),
+            'selection %s' % (cfg.get('selection') or 'all'),
+            'metrics   %s' % getattr(p, 'metrics_desc', 'off'),
+            'selection %s' % (cfg.get('selection') or 'all'),
             'cache     %d range(s) (fc3 %d, fc4 %d), %d word(s), oldest %s, ttl %gs, failed range(s) %d'
             % (len(p.cache.ranges), fc3, fc4, len(p.cache.regs),
                self._oldest() or 'n/a', p.cache.cache_ttl,
@@ -539,6 +544,9 @@ class ControlServer:
             'poll plan %d block(s): %s' % (len(p.blocks),
                                            ' '.join('%s%d:%d' % ('' if fc == 3 else 'fc%d ' % fc, s, c)
                                                     for fc, s, c, _ in p.blocks)),
+            'poll cyc  last %gs, mean %gs, max %gs'
+            % (p.poll_secs_last,
+               p.poll_secs_sum / p.poll_count if p.poll_count else 0, p.poll_secs_max),
             'counters  hits %d, misses %d, clients %d (limit %s, timeout %s)'
             % (p.cache_hits, p.cache_misses, p.client_count,
                p.max_clients or 'none', '%gs' % p.client_timeout if p.client_timeout else 'none'),
@@ -574,15 +582,16 @@ class ControlServer:
         c = self.proxy.cache
         names = c.names
         cells = []
-        for fc, start, count, words, oldest, err in c.entries():
-            age = 'n/a' if oldest is None else '%gs' % oldest
-            if not c.cache_ttl:
+        for fc, start, count, words, oldest, err, entry_ttl in c.entries():
+            ttl = entry_ttl if entry_ttl is not None else c.cache_ttl
+            age = 'n/a' if oldest is None else '%.2fs' % oldest
+            if not ttl:
                 exp = 'never'
             elif oldest is None:
                 exp = 'n/a'
             else:
-                left = c.cache_ttl - oldest
-                exp = '%gs' % left if left > 0 else 'expired'
+                left = ttl - oldest
+                exp = '%.2fs' % left if left > 0 else 'expired'
             if err is not None:
                 status = 'failed (ex %d)' % err
             elif not words:
@@ -592,6 +601,8 @@ class ControlServer:
             else:
                 status = 'ok'
             name = names.get((fc, start, count), '')
+            if entry_ttl is not None:
+                name = ('%s [ttl %gs]' % (name, entry_ttl)).strip()
             cells.append(('fc%d' % fc, '%d:%d' % (start, count), '%d/%d' % (words, count),
                           age, exp, status, name))
         head = ('fc', 'range', 'words', 'age', 'expires', 'status', 'name')

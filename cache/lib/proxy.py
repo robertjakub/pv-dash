@@ -57,6 +57,11 @@ class Proxy:
         self.reads_audit_s = max(0.0, float(self.config.get('reads_audit_s', READS_AUDIT_S)))
         self.connect_acl = self.config.get('connect_acl')
         self.write_acl = self.config.get('write_acl')
+        self.no_cache = self.config.get('selection') == 'none'   # selection none: forward only
+        self.poll_secs_last = 0.0        # the poll-cycle durations for /metrics
+        self.poll_secs_max = 0.0
+        self.poll_secs_sum = 0.0
+        self.poll_count = 0
         self.client_count = 0
         self.client_lock = threading.Lock()
         self.clients = {}          # 'ip:port' -> {'since': monotonic, 'requests': n, 'audited': n}
@@ -75,10 +80,16 @@ class Proxy:
     def poll_loop(self):
         next_reads_audit = time.monotonic() + self.reads_audit_s
         while True:
+            t0 = time.monotonic()
             try:
                 self.poll_once()
             except Exception as e:
                 logger.error('poll cycle crashed (%s), retrying next cycle', e)
+            dur = time.monotonic() - t0
+            self.poll_secs_last = dur
+            self.poll_secs_max = max(self.poll_secs_max, dur)
+            self.poll_secs_sum += dur
+            self.poll_count += 1
             if self.reads_audit_s and self.audit:
                 now = time.monotonic()
                 if now >= next_reads_audit:
@@ -101,18 +112,22 @@ class Proxy:
         selection filter (SIGHUP and the control's set profile/selection share
         this path). Raises ValueError on a bad file (never SystemExit)."""
         try:
-            ranges, names = load_registers_file(self.config['profile'])
-            if self.config.get('selection'):
-                ranges, names = load_selection(self.config['selection'], names)
+            sel = self.config.get('selection')
+            if sel == 'none':
+                return [], {}, {}      # cache nothing: an empty map
+            ranges, names, ttls = load_registers_file(self.config['profile'])
+            if sel:
+                ranges, names, ttls = load_selection(sel, names, ttls)
         except SystemExit as e:
             raise ValueError(str(e))
-        return ranges, names
+        return ranges, names, ttls
 
     def apply_map(self):
         """Swap the register map to the config's profile (+ selection)
         atomically: the poll plan rebuilds, the poller repopulates."""
-        ranges, names = self.load_map()
-        self.cache.update_map(ranges, names)
+        ranges, names, ttls = self.load_map()
+        self.no_cache = self.config.get('selection') == 'none'
+        self.cache.update_map(ranges, names, ttls)
         self.generation += 1
         self.blocks = build_blocks(ranges, self.merge_gap)
         logger.info('map reloaded: %d range(s) from %s%s, merge gap %d',
@@ -130,7 +145,8 @@ class Proxy:
         self.upstream.timeout = self.config['timeout']
         with self.upstream.lock:
             self.upstream.close()
-        ranges, names = self.load_map()
+        ranges, names, ttls = self.load_map()
+        self.no_cache = self.config.get('selection') == 'none'
         self.read_delay = self.config['read_delay']
         self.merge_gap = self.config['merge_gap']
         self.interval = self.config['interval']
@@ -143,7 +159,7 @@ class Proxy:
         self.connect_acl = self.config.get('connect_acl')
         self.write_acl = self.config.get('write_acl')
         self.cache.cache_ttl = self.config['cache_ttl']
-        self.cache.update_map(ranges, names)
+        self.cache.update_map(ranges, names, ttls)
         self.generation += 1
         self.blocks = build_blocks(ranges, self.config['merge_gap'])
         logger.info('SIGHUP: reloaded %d range(s) from %s (upstream %s:%d unit %d, interval %gs, cache ttl %gs, merge gap %d)',
@@ -414,9 +430,10 @@ class Proxy:
                     logger.info('forwarded FC%d rejected by the device (modbus exception %d)', pdu[0], code)
             if is_read:
                 if body and body[0] == fc and len(body) >= 2 and body[1] == count * 2:
-                    self.cache.store(fc, addr, struct.unpack('>%dH' % count, body[2:2 + count * 2]))
-                    logger.info('read: fc%d registers %d:%d ok, cached %s', fc, addr, count,
-                                self.cache.describe_ttl())
+                    if not self.no_cache:
+                        self.cache.store(fc, addr, struct.unpack('>%dH' % count, body[2:2 + count * 2]))
+                    logger.info('read: fc%d registers %d:%d ok%s', fc, addr, count,
+                                '' if not self.no_cache else ' (not cached: selection none)')
                 elif body and body[0] == fc | 0x80:
                     logger.warning('read: fc%d registers %d:%d rejected by the device (modbus exception %d)',
                                    fc, addr, count, body[2] if len(body) > 2 else -1)

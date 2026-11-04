@@ -579,6 +579,111 @@ try:
     r = ctl_cmd('show cache', 15514)
     check('show cache: the summary still works beside the dump', r.startswith('ok cache '), r[:80])
 
+    # selection none: the map empties, every read forwards, nothing is stored
+    r = ctl_cmd('set selection none', 15514)
+    check('set selection none: accepted', r.startswith('ok selection=none'), r[:100])
+    r = ctl_cmd('show status', 15514)
+    check('set selection none: the map empties', 'ranges=0' in r and 'selection=none' in r, r[:160])
+    m1 = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache.log'],
+                        capture_output=True, text=True).stdout.strip()
+    rd(47415, 1)
+    rd(47415, 1)
+    m2 = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache.log'],
+                        capture_output=True, text=True).stdout.strip()
+    check('selection none: repeat reads forward, nothing is stored', int(m2) == int(m1) + 2,
+          '%s -> %s' % (m1, m2))
+    ctl_cmd('unset selection', 15514)
+    r = ctl_cmd('show status', 15514)
+    check('unset selection: the map refills', 'ranges=49' in r and 'selection=all' in r, r[:160])
+
+    # --selection none at startup: the same, straight from the command line
+    p_none = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                               '--listen', '127.0.0.1:15526', '--interval', '1', '--profile', R,
+                               '--selection', 'none', '--control-port', '15527'],
+                              stdout=open('/tmp/reg_cache_none.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(p_none)
+    time.sleep(1.5)
+    b = rd(47415, 1, port=15526)
+    check('selection none at startup: the read forwards', b[0] == 3, b.hex())
+    r = ctl_cmd('show status', 15527)
+    check('selection none at startup: 0 range(s), nothing cached',
+          'ranges=0' in r and 'selection=none' in r, r[:160])
+    ctl_cmd('shutdown', 15527)
+
+    # the poll-cycle durations ride in show status + inspect
+    r = ctl_cmd('show status', 15514)
+    check('show status: the poll-cycle durations', 'poll_duration=' in r
+          and 'poll_duration_mean=' in r, r[:200])
+    r = ctl_cmd('inspect', 15514)
+    check('inspect: the poll-cycle durations', 'poll cyc  last ' in r and 'mean ' in r, r[:300])
+
+    # per-entry ttl: the profile entry expires early, the global-ttl one stays
+    ttlmap = '/tmp/reg_ttl_profile.json'
+    _json.dump({'description': 'per-entry ttl',
+                'registers': [
+                    {'name': 'pv-power', 'register': 32064, 'type': 'i32', 'ttl': 2},
+                    {'name': 'device-status', 'register': 32089, 'type': 'u16'},
+                ]}, open(ttlmap, 'w'))
+    p_ttl = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                              '--listen', '127.0.0.1:15533', '--interval', '5', '--cache-ttl', '30',
+                              '--profile', ttlmap, '--control-port', '15534'],
+                             stdout=open('/tmp/reg_cache_ttl.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(p_ttl)
+    time.sleep(1.5)
+    rd(32064, 2, port=15533)
+    rd(32089, 1, port=15533)
+    f1 = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache_ttl.log'],
+                        capture_output=True, text=True).stdout.strip()
+    time.sleep(2.0)          # pv-power (ttl 2s) expires mid-cycle; device-status (global 30s) stays
+    rd(32064, 2, port=15533)
+    rd(32089, 1, port=15533)
+    f2 = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache_ttl.log'],
+                        capture_output=True, text=True).stdout.strip()
+    check('per-entry ttl: the fast entry re-forwards, the global one stays cached',
+          int(f2) == int(f1) + 1, '%s -> %s' % (f1, f2))
+    r = ctl_cmd('show cache all', 15534)
+    check('show cache all: the entry ttl is marked', 'pv-power' in r and '[ttl 2s]' in r, r[:200])
+    p_ttl.send_signal(signal.SIGTERM)
+    p_ttl.wait(timeout=10)
+
+    # the native metrics endpoint: bearer auth + the cache gauges
+    p_metrics = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                                  '--listen', '127.0.0.1:15528', '--interval', '1', '--profile', R,
+                                  '--control-port', '15530',
+                                  '--metrics-port', '15529', '--metrics-token', 'sekrit'],
+                                 stdout=open('/tmp/reg_cache_metrics.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(p_metrics)
+    time.sleep(1.5)
+    import urllib.request, urllib.error
+
+    def get_metrics(tok=None):
+        req = urllib.request.Request('http://127.0.0.1:15529/metrics')
+        if tok:
+            req.add_header('Authorization', 'Bearer ' + tok)
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                return resp.status, resp.read().decode()
+        except urllib.error.HTTPError as e:
+            return e.code, e.read().decode()
+    st, body = get_metrics()
+    check('metrics: unauthenticated read is a 401', st == 401, '%s %r' % (st, body[:40]))
+    st, body = get_metrics('wrong')
+    check('metrics: a wrong token is a 401', st == 401, str(st))
+    st, body = get_metrics('sekrit')
+    check('metrics: the token reads the gauges', st == 200
+          and all(n in body for n in ('modbus_cache_hits_total', 'modbus_cache_misses_total',
+                                      'modbus_cache_poll_up', 'modbus_cache_age_seconds',
+                                      'modbus_cache_words', 'modbus_cache_clients',
+                                      'modbus_cache_poll_duration_seconds',
+                                      'modbus_cache_poll_duration_mean_seconds',
+                                      'modbus_cache_last_poll_age_seconds')), '%s %r' % (st, body[:120]))
+    check('metrics: the poll is up and the words are cached', 'modbus_cache_poll_up 1' in body
+          and 'modbus_cache_words 91' in body, repr(body[:200]))
+    r = ctl_cmd('show status', 15530)
+    check('metrics: show status carries the endpoint', 'metrics=127.0.0.1:15529 (bearer token)' in r, r[:160])
+    p_metrics.send_signal(signal.SIGTERM)
+    p_metrics.wait(timeout=10)
+
     r_before = ctl_cmd('inspect', 15514)
     ctl_cmd('set merge-gap 0', 15514)
     r_after = ctl_cmd('inspect', 15514)

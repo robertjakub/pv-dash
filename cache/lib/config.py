@@ -138,7 +138,7 @@ def load_registers_file(path):
     entries = data.get('registers') if isinstance(data, dict) else data
     if not isinstance(entries, list):
         raise SystemExit('device profile %s must contain a "registers" list' % path)
-    ranges, names = [], {}
+    ranges, names, ttls = [], {}, {}
     for i, entry in enumerate(entries):
         label = 'device profile %s, entry %d' % (path, i + 1)
         if not isinstance(entry, dict) or 'name' not in entry:
@@ -156,14 +156,23 @@ def load_registers_file(path):
             raise SystemExit('%s (%s): "fc" must be 3 (holding) or 4 (input), got %r' % (label, entry['name'], fc))
         if not 0 <= start <= MAX_REGISTERS - count:
             raise SystemExit('%s (%s): register %d out of range' % (label, entry['name'], start))
+        ttl = entry.get('ttl')
+        if ttl is not None:
+            try:
+                ttl = float(ttl)
+            except (TypeError, ValueError):
+                raise SystemExit('%s (%s): "ttl" must be seconds, got %r' % (label, entry['name'], ttl))
+            if ttl < 0:
+                raise SystemExit('%s (%s): "ttl" must be >= 0' % (label, entry['name']))
+            ttls[(fc, start, count)] = ttl
         ranges.append((fc, start, count))
         names[(fc, start, count)] = str(entry['name'])
-    return ranges, names
+    return ranges, names, ttls
 
 
-def load_selection(path, names):
+def load_selection(path, names, ttls=None):
     """A selection file: {"registers": ["pv-power", ...]} — profile NAMES to
-    fetch. Returns (ranges, names) filtered to the selected entries."""
+    fetch. Returns (ranges, names, ttls) filtered to the selected entries."""
     try:
         with open(path, encoding='utf-8') as fh:
             data = json.load(fh)
@@ -177,7 +186,19 @@ def load_selection(path, names):
     if missing:
         raise SystemExit('selection file %s: not in the device profile: %s' % (path, ', '.join(missing)))
     ranges = [by_name[w] for w in wanted]
-    return ranges, {by_name[w]: w for w in wanted}
+    return ranges, {by_name[w]: w for w in wanted}, {by_name[w]: ttls[by_name[w]] for w in wanted
+                                                     if ttls and by_name[w] in ttls}
+
+
+def parse_selection(text):
+    """''/'all' -> '' (every profile entry); 'none' -> 'none' (cache nothing,
+    every read forwards); else the selection file path."""
+    t = (text or '').strip()
+    if t.lower() in ('', 'all', '-'):
+        return ''
+    if t.lower() == 'none':
+        return 'none'
+    return t
 
 
 def parse_listen(text):
@@ -305,7 +326,8 @@ def resolve_config(args, script_dir=None):
                     'write_registers', 'any', str)),
         'profile': resolve_profile_file(resolve(getattr(args, 'profile', None), 'MODBUS_CACHE_PROFILE',
                                                 'profile', default_profile_path(), str)),
-        'selection': resolve(getattr(args, 'selection', None), 'MODBUS_CACHE_SELECTION', 'selection', '', str),
+        'selection': parse_selection(resolve(getattr(args, 'selection', None), 'MODBUS_CACHE_SELECTION',
+                                            'selection', '', str)),
         'cache_ttl': resolve(args.cache_ttl, 'MODBUS_CACHE_TTL', 'cache_ttl',
                              DEFAULTS['cache_ttl_factor'] * interval, float),
         'local_time': resolve_bool(args.local_time, 'MODBUS_CACHE_LOCAL_TIME', 'local_time', False),

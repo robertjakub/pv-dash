@@ -31,6 +31,7 @@ from lib.cache import Cache
 from lib.proxy import Proxy
 from lib.control import ControlServer
 from lib.audit import AuditLog
+from lib.metrics import MetricsServer
 from lib.version import version_string
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -86,6 +87,12 @@ def parse_args():
                     help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file) — takes the place of --control-token; giving both is an error (default: config, $MODBUS_CACHE_CONTROL_TOKEN_FILE)')
     ap.add_argument('--reads-audit', dest='reads_audit', type=float,
                     help='audit one READS tally per client per this many seconds, 0 = off (default: config, $MODBUS_CACHE_READS_AUDIT or 300)')
+    ap.add_argument('--metrics-port', dest='metrics_port', type=int, default=0,
+                    help="serve the cache's own Prometheus /metrics on 127.0.0.1:PORT; 0 = off (the default)")
+    ap.add_argument('--metrics-token', dest='metrics_token',
+                    help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
+    ap.add_argument('--metrics-token-file', dest='metrics_token_file',
+                    help='the metrics bearer token from a file (the first line) — takes the place of --metrics-token; giving both is an error (env MODBUS_CACHE_METRICS_TOKEN_FILE)')
     ap.add_argument('--audit-log', dest='audit_log',
                     help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MODBUS_CACHE_AUDIT_LOG or %s — the XDG state home' % AuditLog.default_path())
     ap.add_argument('--audit-max-mb', dest='audit_max_mb', type=float,
@@ -198,9 +205,12 @@ def install_signal_handlers(proxy, cache, args):
 def main():
     args = parse_args()
     cfg = resolve_config(args, SCRIPT_DIR)
-    ranges, range_names = load_registers_file(cfg['profile'])
-    if cfg['selection']:
-        ranges, range_names = load_selection(cfg['selection'], range_names)
+    if cfg['selection'] == 'none':
+        ranges, range_names, range_ttls = [], {}, {}   # cache nothing: every read forwards
+    else:
+        ranges, range_names, range_ttls = load_registers_file(cfg['profile'])
+        if cfg['selection']:
+            ranges, range_names, range_ttls = load_selection(cfg['selection'], range_names, range_ttls)
 
     setup_logging(cfg)
 
@@ -209,6 +219,18 @@ def main():
     control_token = cfg['control_token'] or None
     if cfg['control_token_file']:
         control_token = load_token_file(cfg['control_token_file'])
+    if args.metrics_token and args.metrics_token_file:
+        logger.error('--metrics-token and --metrics-token-file are mutually exclusive')
+        raise SystemExit(2)
+    metrics_token = args.metrics_token or os.environ.get('MODBUS_CACHE_METRICS_TOKEN')
+    if args.metrics_token_file:
+        metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
+    metrics_desc = 'off'
+    if args.metrics_port:
+        if not 0 < args.metrics_port <= 65535:
+            logger.error('--metrics-port out of range: %d', args.metrics_port)
+            raise SystemExit(2)
+        metrics_desc = '127.0.0.1:%d%s' % (args.metrics_port, ' (bearer token)' if metrics_token else '')
     if cfg['no_audit_log']:
         audit_display = 'off'
     elif cfg['audit_log'] == '-':
@@ -216,10 +238,11 @@ def main():
     else:
         audit_display = cfg['audit_log'] or AuditLog.default_path()
     upstream = Upstream(cfg['host'], cfg['port'], cfg['unit'], cfg['timeout'])
-    cache = Cache(ranges, cfg['cache_ttl'], range_names)
+    cache = Cache(ranges, cfg['cache_ttl'], range_names, range_ttls)
     proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
                   cfg['profile'], cfg)
-    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, audit trail: %s, reads audit: %s)',
+    proxy.metrics_desc = metrics_desc
+    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, audit trail: %s, reads audit: %s, metrics: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if cfg['allow_write'] else 'disabled (write requests are refused)',
@@ -233,7 +256,8 @@ def main():
                 proxy.describe_write_ranges(),
                 'required on TCP' if control_token else 'none',
                 audit_display,
-                '%gs' % cfg['reads_audit_s'] if cfg['reads_audit_s'] else 'off')
+                '%gs' % cfg['reads_audit_s'] if cfg['reads_audit_s'] else 'off',
+                metrics_desc)
     proxy.log_map()
     if args.dry_run:
         logger.info('dry-run: configuration and register map are valid, nothing was bound or connected (control server would listen on %s)',
@@ -272,6 +296,9 @@ def main():
         proxy.control = ControlServer(proxy, control_target, stop, audit=audit,
                                       token=control_token, defaults=defaults)
         proxy.control.start()
+    if args.metrics_port:
+        MetricsServer(proxy, args.metrics_port, token=metrics_token,
+                      started=time.monotonic()).start()
     try:
         threading.Thread(target=proxy.poll_loop, daemon=True).start()
         proxy.serve(listen_host, listen_port)

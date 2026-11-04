@@ -16,6 +16,11 @@
   gauge on /metrics.
 - **the multi-unit serve** — one process serving two Modbus units (the
   inverter + the meter as separate unit ids) for the gateway-style setups.
+- **the FC06/FC16 write path** — accept real write-single/write-multiple
+  requests from the cache's write allow-list: apply them to the model
+  (a `set register`-style overlay), audit the writer, and let a `clear
+  cache`-style control reset the overlay — the end-to-end exercise for
+  the proxy's gated writes.
 - **the CI** — GitHub Actions: the six suites + `nix flake check` on the
   push; the release workflow on the tag.
 
@@ -34,4 +39,9 @@ like the scraper's), the grid-frequency machine (`--grid-frequency`, the
 (`--time-scale` / `set time-scale` — the simulated clock at N× real
 speed, so a demo watches a full day in minutes) and the grid-outage
 machine (`set grid-outage on|off|outage` — random blackouts: the phases
-collapse, the inverter stands by, the meter goes dark).
+collapse, the inverter stands by, the meter goes dark). The statics redo
+(the grouped lib/static.json) and the `--control-token-file` /
+`--metrics-token-file` options. The reports: `show status` and now
+`show settings` as multi-line key=value tables; the fake inverter serves
+the same register map over FC3 and FC4 (the cache's FC4 path has a
+device-side counterpart).

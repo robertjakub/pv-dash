@@ -22,6 +22,13 @@
   the next SIGHUP (which re-applies the config); `show settings` could mark
   the overridden settings, or SIGHUP could keep them (a policy decision,
   worth making explicitly).
+- **write-through invalidation** — a forwarded write lands on the device,
+  but the cache keeps serving the pre-write values of the touched range
+  until the TTL expires; after a successful write the proxy should drop
+  and repoll the affected rows (per-register, not the whole cache).
+- **the poll-latency gauges** — the last/mean poll cycle duration on the
+  metrics endpoint once it lands (the control's `show status` carries the
+  health; the trend belongs in Prometheus).
 
 ## Done (the highlights; the git history has the details)
 
@@ -40,8 +47,13 @@ status (no device hammering), the on-demand forwarding cache with the TTL,
 the synthesized 65000-65003 diagnostics block, SIGHUP hot reload + SIGUSR1
 cache clean, the connect/write ACLs, the per-register write allow-list
 (`--write-registers START:COUNT,...`), the audit of every
-forwarded/refused write + the per-client READS tallies. The ops: the bin/
-lib/ split (static constants in lib/static.json), the Docker image + the
-compose service, the NixOS module with the rendered config, the control
-options (`controlPort`/`controlToken`/`controlTokenFile` via
-LoadCredential), the stress + fuzz suites.
+forwarded/refused write + the per-client READS tallies. The reports: the
+multi-line `show status`/`show settings` (one stable key=value per line,
+the inverter's shape) and the CLI that strips the header word. The ops:
+the bin/ lib/ split (static constants in lib/static.json), the Docker
+image + the compose service, the NixOS module with the rendered config,
+the control options (`controlPort`/`controlToken`/`controlTokenFile` via
+LoadCredential), the stress + fuzz suites. The console: the settings in
+the TAB/? completion (set/unset/show all list the tunables, the value
+positions show the shapes and hints), the libedit tab-tab fix and the
+welcome banner parsing the report.

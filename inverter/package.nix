@@ -24,7 +24,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -Dm755 bin/fake_ctl.py $out/share/modbus-fake-inverter/fake_ctl.py
     install -Dm755 bin/fake_cli.py $out/share/modbus-fake-inverter/fake_cli.py
     install -dm755 $out/share/modbus-fake-inverter/lib
-    install -m644 lib/*.py $out/share/modbus-fake-inverter/lib/
+    install -m644 lib/*.py lib/static.json $out/share/modbus-fake-inverter/lib/
     install -dm755 $out/share/modbus-fake-inverter/profiles
     install -m644 ${../profiles}/*.json $out/share/modbus-fake-inverter/profiles/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-fake-inverter \

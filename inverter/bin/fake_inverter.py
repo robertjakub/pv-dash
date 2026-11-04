@@ -15,7 +15,7 @@ yields (32106/32114), plus the modbus-cache diagnostics block (65000+).
 Raw register values are watts and kWh*100, matching the default profile's gain
 convention.
 
-Optional extras for demos and testing: a line-protocol control server
+Optional extras for demos and testing: a JSON-lines control server
 (--control-port, default unix socket /tmp/fake-inverter-<port>.socket; 0 = off) to pin
 values / freeze time / tune chaos at runtime, and
 seeded chaos injection (--chaos) that answers requests hostile. Signals
@@ -40,8 +40,10 @@ from lib.paths import resolve_control_target
 from lib.control import ControlServer
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
+from lib.statics import DEFAULT_MODBUS_PORT
 from lib.version import version_string
 from lib.signals import SignalBox, parse_time
+from lib.metrics import MetricsServer
 from lib.simulator import Simulator
 
 logger = logging.getLogger('fake-inverter')
@@ -85,6 +87,7 @@ def configured_defaults(args, frozen, profile_text):
         'battery-state': 'auto',
         'mppt': 'both',
         'grid-voltage': '%g' % args.grid_voltage,
+        'grid-frequency': '%g' % args.grid_frequency,
         'timezone': args.timezone,
         'strict': 'on' if args.strict else 'off',
         'static': 'on' if args.static else 'off',
@@ -102,10 +105,11 @@ def main():
         raise SystemExit(0)
     p = argparse.ArgumentParser(description='Fake Inverter Simulator: a Modbus TCP server with demo values. Simulates different inverter/battery/meter devices through inverter profiles — the shipped default is the Huawei SUN2000 map, a Deye hybrid map is included as well.')
     p.add_argument('--host', default='127.0.0.1', help='bind address (default %(default)s)')
-    p.add_argument('--port', type=int, default=5502, help='Modbus TCP port (default %(default)s)')
+    p.add_argument('--port', type=int, default=DEFAULT_MODBUS_PORT, help='Modbus TCP port (default %(default)s)')
     p.add_argument('--unit', type=int, default=1, help='Modbus unit id served (default %(default)s)')
     p.add_argument('--timezone', default='utc', choices=['utc', 'local'], help='clock the state machines integrate over (the PV bell, the home load, the clouds, the battery, the grid voltage): UTC (the default) or the local wall clock')
     p.add_argument('--grid-voltage', type=float, default=230.0, help='nominal grid phase voltage in V (120 or 230; the per-phase machine wanders ±10 %% around it, default %(default)s)')
+    p.add_argument('--grid-frequency', type=float, default=50.0, help='nominal grid frequency in Hz (the machine wanders ±0.2 Hz around it, default %(default)s)')
     p.add_argument('--max-kwp', type=float, default=6.0, help='PV array size in kWp, peak = 75%% of it (default %(default)s)')
     p.add_argument('--time', help='freeze simulated time HH:MM (default: real clock)')
     p.add_argument('--static', action='store_true', help='constant demo values instead of the day simulation')
@@ -114,6 +118,8 @@ def main():
     p.add_argument('--strict', action='store_true', help='reject reads of undefined registers with exception 02 (like the real device)')
     p.add_argument('--battery-kwh', type=float, default=6.9, help='usable battery capacity in kWh (default %(default)s)')
     p.add_argument('--control-log-replies', action='store_true', help='DEBUG-log the full output of every control command (the default logs the command only)')
+    p.add_argument('--metrics-port', type=int, default=0, help='serve the fake\'s own Prometheus /metrics on 127.0.0.1:PORT; 0 = off (the default)')
+    p.add_argument('--metrics-token', default=None, help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path (default: /tmp/fake-inverter-<modbus-port>.socket) or TCP port number on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with fake_ctl.py')
     p.add_argument('--profile', default=None, help='inverter profile JSON: name -> register (+ optional type/scale), e.g. profiles/sun2000.json (the default); FAKE_PROFILE when unset')
     p.add_argument('--chaos', type=float, default=0.0, help='probability 0..1 that a request is answered hostile and dropped (default: off); seed with --seed for reproducibility')
@@ -170,6 +176,9 @@ def main():
                                 log_replies=args.control_log_replies, audit=audit,
                                 token=args.control_token)
         threading.Thread(target=control.serve, daemon=True).start()
+    if args.metrics_port:
+        MetricsServer(simulator, chaos, fake, control, args.metrics_port,
+                      token=args.metrics_token).start()
     box = SignalBox(simulator, chaos, fake, control=control, audit=audit)
     if control:
         control.signalbox = box

@@ -1,0 +1,27 @@
+{
+  "default_modbus_port": 5502,
+
+  "sun": { "sunrise": 6.0, "sunset": 18.0 },
+  "mppt": {
+    "east": { "sunrise": 6.0, "sunset": 16.0 },
+    "west": { "sunrise": 8.0, "sunset": 18.0 }
+  },
+
+  "cloud_machines": {
+    "autumn": [0.45, 2.5, 0.60, 0.05, 0.95],
+    "spring": [0.25, 2.0, 0.50, 0.02, 0.80],
+    "winter": [0.75, 0.8, 0.35, 0.10, 1.00]
+  },
+
+  "meter_export_kwh": 12500.0,
+  "meter_import_kwh": 9800.0,
+
+  "batt_max_w": 2500.0,
+  "batt_reserve_soc": 10.0,
+  "batt_grid_margin_w": 300.0,
+  "batt_standby_w": 150.0,
+  "batt_max_tick_h": 24.0,
+  "batt_charge_eff": 0.95,
+  "batt_self_disch_h": 0.01,
+  "batt_discharge_cap": 0.8
+}

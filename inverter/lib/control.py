@@ -225,6 +225,12 @@ class ControlServer:
                 raise ValueError('grid-voltage must be a sane nominal voltage (1-500 V)')
             sim.grid_voltage = v
             return '%g' % v
+        if key == 'grid-frequency':
+            v = float(val)
+            if not 1 <= v <= 500:
+                raise ValueError('grid-frequency must be a sane nominal frequency (1-500 Hz)')
+            sim.grid_frequency = v
+            return '%g' % v
         if key == 'strict':
             fake.strict = val in ('on', 'true', '1', 'yes')
             return 'on' if fake.strict else 'off'
@@ -302,6 +308,8 @@ class ControlServer:
             return sim.batt_state or 'auto'
         if key == 'grid-voltage':
             return '%g' % sim.grid_voltage
+        if key == 'grid-frequency':
+            return '%g' % sim.grid_frequency
         if key == 'strict':
             return 'on' if fake.strict else 'off'
         if key == 'static':
@@ -354,6 +362,8 @@ class ControlServer:
             self.scenario = None
             logger.info('control: reset cleared %d pin(s) + %d overlay register(s)', pins, overlay)
             return 'ok reset (%d pin(s), %d overlay register(s) cleared) %s' % (pins, overlay, self.status())
+        if cmd == 'inspect':
+            return self.inspect()
         if cmd == 'shutdown':
             self.shutdown_pending = True
             logger.info('control: shutdown requested')
@@ -427,6 +437,36 @@ class ControlServer:
                 self.scenario = None   # a manual pin turns the state 'custom'
             return 'ok %s=%s %s' % (key, shown, self.status())
         return 'err unknown command %s (try help)' % cmd
+
+    def inspect(self):
+        """One pretty dump of everything — the status, the machines' states,
+        the write overlay, the version: the baton for a bug report."""
+        sim = self.simulator
+        pv_w, load_w, batt_w, soc, cloud, ov = sim.effective()
+        t = sim.clock()
+        overlay = dict(self.fake.overlay) if self.fake else {}
+        rows = [
+            'version   %s' % version_string(),
+            'profile   %s' % sim.profile.description,
+            'registers %d served, overlay %d: %s' % (len(sim.profile.entries), len(overlay),
+                ', '.join('%d=%d' % kv for kv in sorted(overlay.items())[:8]) or 'empty'),
+            'now       %02d:%02d %s, uptime %d s' % (int(t), round((t % 1.0) * 60),
+                'utc' if sim.utc else 'local', int(time.monotonic() - self.started)),
+            'power     pv %g W, load %g W, grid %g W' % (pv_w, load_w, pv_w - batt_w - load_w),
+            'battery   %s' % ('%g W, SoC %s, state %s' % (batt_w,
+                '%.1f %%' % soc if soc is not None else 'n/a', sim.batt_state or 'auto')
+                if sim.battery else 'off'),
+            'mppt      %s (string-1 = the east array, string-2 = the west)' % sim.mppt,
+            'cloud     %s' % sim.cloud_display(),
+            'grid      %g V nominal, %g Hz nominal; machines: %s V/phase, %.2f Hz now'
+            % (sim.grid_voltage, sim.grid_frequency,
+               '/'.join('%g' % v for v in sim._grid_voltages(t)),
+               sim.grid_frequency_value(t)),
+            'chaos     p=%.2f, %d hit(s)' % (self.chaos.p, self.chaos.hits),
+            'pinned    %s' % ('; '.join('%s=%s' % (k, ov[k]) for k in
+                              ('pv', 'load', 'batt', 'grid', 'soc', 'cloud') if ov[k] is not None) or 'nothing'),
+        ]
+        return 'ok inspect\n' + '\n'.join(rows)
 
     def status_report(self):
         """The status as a compact multi-field report: one stable key=value

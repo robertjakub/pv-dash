@@ -63,6 +63,8 @@ SETTINGS = (
              'charging': 'charge at full power', 'discharging': 'discharge at full power'}),
     Setting('grid-voltage', 'nominal grid phase voltage; the machine wanders ±10 % per phase', ('120', '230'), 'V',
             {'120': '120 V nominal (split-phase)', '230': '230 V nominal (the default)'}),
+    Setting('grid-frequency', 'nominal grid frequency; the machine wanders around it', (), 'Hz',
+            {'50': 'the European/IEC nominal (the default)', '60': 'the American/IEEE nominal'}),
     Setting('strict', 'reject undefined registers with exception 02', ('on', 'off'), None,
             {'on': 'exception 02 on undefined registers', 'off': 'read them as 0'}),
     Setting('static', 'constant demo values instead of the day simulation', ('on', 'off'), None,
@@ -91,6 +93,7 @@ COMMANDS = (
     ('quit', 'close the session'),
     ('exit', 'close the session'),
     ('logout', 'close the session'),
+    ('inspect', 'one pretty dump of everything: the status, the machines, the overlay'),
     ('?', 'this help'),
 )
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """console-style interactive CLI for the fake inverter's control server.
 
-A session front-end on top of the line-protocol control socket: prompt with
+A session front-end on top of the JSON-lines control socket: prompt with
 the connected port, TAB completion and `?` in every position (with the short
 descriptions from the shared command registry), `set` commands print only
 the confirmation (never the status tail), `show <setting>` prints the bare
@@ -12,7 +12,9 @@ The session itself (connect/disconnect, the local commands like quit and
 the aborted shutdown) is appended to an audit log (default audit.log in
 the current directory, prefix CLI; --audit-log to rename, --no-audit-log
 to turn it off); the commands themselves are audited by the server (the
-peer is on its side) — ping/pong keepalives are never logged.
+peer is on its side) — ping/pong keepalives are never logged. When the
+connection dies mid-session (an unanswered ping, the server gone), the
+CLI retries: --reconnect attempts, --reconnect-wait seconds apart.
 
   python3 fake_cli.py --control-port 15599
   FAKE_CTL=15599 python3 fake_cli.py
@@ -31,6 +33,7 @@ import re
 import socket
 import sys
 import threading
+import time
 
 from lib.audit import AuditLog
 
@@ -54,6 +57,11 @@ HELP = """commands (TAB completes, ? lists the options + descriptions in any pos
                ('shutdown', 'stop the fake inverter (asks to confirm)'),
                ('quit', 'close the session'),
                ('?', 'this help'))) + '  help <setting>  the setting\'s description'
+
+
+class ConnectionLost(Exception):
+    """The control connection is gone: EOF without a bye, a reset, a send
+    failure or a reply timeout. The session decides: reconnect or exit."""
 
 
 def prompt_for(target, is_unix):
@@ -103,6 +111,8 @@ def describe_word(w):
         return 'every setting, one per line'
     if w == 'register':
         return 'write a raw register (the same overlay as the FC16 writes)'
+    if w == 'inspect':
+        return 'one pretty dump of everything (the status, the machines, the overlay)'
     if w == 'status':
         return 'the effective state report (key=value lines)'
     if w == 'registers':
@@ -181,6 +191,8 @@ def main():
     p = argparse.ArgumentParser(description='console-style CLI for the fake inverter control server (TCP or unix socket).')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/fake-inverter-5502.socket; env FAKE_CTL when unset) — same flag as the fake itself')
     p.add_argument('--timeout', type=float, default=5.0, help='socket timeout in seconds (default %(default)s)')
+    p.add_argument('--reconnect', type=int, default=3, help='when the connection dies (an unanswered ping, a reset, a timeout), retry this many times before giving up; 0 = off (default %(default)s)')
+    p.add_argument('--reconnect-wait', type=float, default=10.0, help='seconds between the reconnect attempts (default %(default)s)')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env FAKE_CONTROL_TOKEN)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
     p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = off (default %(default)s)')
@@ -199,9 +211,7 @@ def main():
     else:
         addr, label = target, 'unix:%s' % target
     try:
-        s = socket.socket(socket.AF_UNIX if isinstance(addr, str) else socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(args.timeout)
-        s.connect(addr)
+        s = connect_once(addr, isinstance(addr, str), args.timeout)
     except OSError as e:
         print('cannot reach control server at %s: %s' % (label, e), file=sys.stderr)
         raise SystemExit(1)
@@ -215,32 +225,87 @@ def main():
         else:
             readline.parse_and_bind('tab: complete')         # GNU readline
     try:
-        session(s, prompt_for(target, isinstance(addr, str)), audit, token, isinstance(addr, str))
+        rc = session(s, prompt_for(target, isinstance(addr, str)), audit, token,
+                     isinstance(addr, str), addr, args)
     finally:
         if audit:
             audit.event('DISCONNECT', 'target=%s' % label)
             audit.close()
-        s.close()
+    if rc:
+        raise SystemExit(rc)
 
 
-def session(sock, prompt, audit=None, token=None, is_unix=False):
-    """Read-execute loop: local commands first, everything else goes to the fake."""
+def connect_once(addr, is_unix, timeout):
+    """One fresh socket to the control target; the caller owns the close."""
+    s = socket.socket(socket.AF_UNIX if isinstance(addr, str) else socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(timeout)
+    s.connect(addr)
+    return s
+
+
+def reconnect(addr, is_unix, args, audit=None):
+    """The wire died mid-session: retry up to --reconnect times with
+    --reconnect-wait seconds between the attempts; every attempt is
+    audited. Returns the new socket, or exits 1 when the tries run out."""
+    for attempt in range(1, args.reconnect + 1):
+        print('%% connection lost, reconnecting in %gs (attempt %d of %d)'
+              % (args.reconnect_wait, attempt, args.reconnect))
+        try:
+            time.sleep(args.reconnect_wait)
+            s = connect_once(addr, is_unix, args.timeout)
+        except OSError as e:
+            print('%% reconnect attempt %d failed: %s' % (attempt, e))
+            if audit:
+                audit.event('RECONNECT', 'attempt %d of %d failed: %s' % (attempt, args.reconnect, e))
+            continue
+        if audit:
+            audit.event('RECONNECT', 'attempt %d of %d ok' % (attempt, args.reconnect))
+        print('% reconnected to the fake inverter')
+        return s
+    print('control server unreachable after %d reconnect attempts' % args.reconnect, file=sys.stderr)
+    if audit:
+        audit.event('RECONNECT', 'gave up after %d attempts' % args.reconnect)
+    return None
+
+
+def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args=None):
+    """Read-execute loop: local commands first, everything else goes to the
+    fake. A dead connection raises ConnectionLost out of the loop and is
+    met with the reconnect cycle (--reconnect); --reconnect 0 exits."""
     global _prompt
     _prompt = prompt
-    if token and not is_unix:
-        reply = exchange(sock, json.dumps({'cmd': 'auth', 'token': token}, ensure_ascii=False))
-        if not reply or not reply.startswith('ok'):
-            print('control auth failed: %s' % (reply or 'no reply'), file=sys.stderr)
-            raise SystemExit(1)
-    if sys.stdin.isatty():
-        welcome(sock)
-    interval = float(os.environ.get(KEEPALIVE_ENV, '') or DEFAULT_KEEPALIVE)
-    if interval > 0:
-        threading.Thread(target=keepalive, args=(sock, interval), daemon=True).start()
     try:
-        _loop(sock, prompt, audit)
+        while True:
+            try:
+                if token and not is_unix:
+                    reply = exchange(sock, json.dumps({'cmd': 'auth', 'token': token}, ensure_ascii=False))
+                    if not reply or not reply.startswith('ok'):
+                        print('control auth failed: %s' % (reply or 'no reply'), file=sys.stderr)
+                        return 1
+                if sys.stdin.isatty():
+                    welcome(sock)
+                interval = float(os.environ.get(KEEPALIVE_ENV, '') or DEFAULT_KEEPALIVE)
+                if interval > 0:
+                    _stop_ping.clear()
+                    threading.Thread(target=keepalive, args=(sock, interval), daemon=True).start()
+                return _loop(sock, prompt, audit)
+            except ConnectionLost:
+                try:
+                    sock.close()
+                except OSError:
+                    pass
+                if not args.reconnect:
+                    print('connection lost', file=sys.stderr)
+                    return 1
+                sock = reconnect(addr, is_unix, args, audit)
+                if sock is None:
+                    return 1
     finally:
         _stop_ping.set()
+        try:
+            sock.close()
+        except OSError:
+            pass
 
 
 def human_uptime(seconds):
@@ -263,7 +328,7 @@ def welcome(sock):
     if not reply or not reply.startswith('ok status'):
         return
     st = dict(row.split('=', 1) for row in reply.split('\n')[1:] if '=' in row)
-    print('% Welcome to the Fake Inverter console —')
+    print('% Welcome to the Fake Inverter console')
     print('%%   %s' % st.get('profile', 'unknown profile'))
     print('%%   running for %s | %s clock | %s V grid | battery %s'
           % (human_uptime(st.get('uptime', '0')), st.get('timezone', 'utc'), st.get('grid_voltage', '230'),
@@ -278,6 +343,9 @@ def wire(cmd):
 
 
 def _loop(sock, prompt, audit=None):
+    """The typed-command loop. A dead connection (an exchange that returns
+    None or raises ConnectionLost) surfaces as ConnectionLost so the session
+    can run its reconnect cycle; the clean exits return."""
     while True:
         try:
             print()                     # breathing room: every prompt on a fresh line
@@ -288,71 +356,78 @@ def _loop(sock, prompt, audit=None):
         cmd = line.strip()
         if not cmd:
             continue
-        low = cmd.lower()
-        if low == 'ping':               # local: the wire pings belong to the keepalive thread
-            print('ok pong')
-            continue                    # (and the audit skips ping/pong by design)
-        if low in ('quit', 'exit', 'logout'):
-            if audit:
-                audit.command(cmd, 'local')
+        try:
+            reply = _dispatch(sock, cmd, audit)
+        except ConnectionLost:
+            raise
+        if reply is _DONE:
             return
-        if low in ('?', 'help'):
-            if audit:
-                audit.command(cmd, 'local')
-            print(HELP)
-            continue
-        if low.split()[0] == 'help' and len(low.split()) > 1:
-            reply = exchange(sock, wire(cmd))     # help <setting>: the registry answer
-            if reply is None:
-                return
-            display(reply)
-            continue
-        if low.endswith('?'):
-            if audit:
-                audit.command(cmd, 'local')
-            print_options(low[:-1])
-            continue
-        if low == 'shutdown':
-            if not confirm_shutdown(sock):
-                if audit:
-                    audit.command('shutdown', 'aborted')
-                continue
-            if audit:
-                audit.command('shutdown', 'ok')
-            return
-        reply = exchange(sock, wire(cmd))
         if reply is None:
-            return
-        # the wire commands are the server's audit trail (it knows the peer)
-        if low.startswith(('set ', 'unset ')) and reply.startswith('ok'):
+            raise ConnectionLost('the control connection closed without a bye')
+        if not reply:
+            continue                 # a local command: _dispatch already printed
+        if cmd.lower().startswith(('set ', 'unset ')) and reply.startswith('ok'):
             print('% ok')           # set/unset confirm silently
-        elif low == 'show version' and reply.startswith('ok fake-inverter'):
+        elif cmd.lower() == 'show version' and reply.startswith('ok fake-inverter'):
             print(reply.split(' ', 1)[1])   # the bare version line
-        elif low in ('show settings', 'show all') and reply.startswith('ok '):
+        elif cmd.lower() in ('show settings', 'show all') and reply.startswith('ok '):
             for row in format_settings(reply):
                 print(row)
-        elif low.startswith('show ') and reply.startswith('ok ') and '=' in reply and '\n' not in reply:
+        elif cmd.lower().startswith('show ') and reply.startswith('ok ') and '=' in reply and '\n' not in reply:
             print(reply.split(' ', 1)[1].split('=', 1)[1])   # the bare value
         else:
             display(reply)
 
 
+_DONE = object()    # a local command handled inside _dispatch: leave the loop
+
+
+def _dispatch(sock, cmd, audit=None):
+    """One typed command: the local ones handled here, the wire ones sent to
+    the fake. Returns the reply text, _DONE (leave the loop) or None (the
+    connection is gone)."""
+    low = cmd.lower()
+    if low == 'ping':               # local: the wire pings belong to the keepalive thread
+        print('ok pong')
+        return ''
+    if low in ('quit', 'exit', 'logout'):
+        if audit:
+            audit.command(cmd, 'local')
+        return _DONE
+    if low in ('?', 'help'):
+        if audit:
+            audit.command(cmd, 'local')
+        print(HELP)
+        return ''
+    if low.split()[0] == 'help' and len(low.split()) > 1:
+        reply = exchange(sock, wire(cmd))     # help <setting>: the registry answer
+        if reply is not None:
+            print(reply.split(' ', 1)[1] if reply.startswith('ok ') else reply)
+        return reply
+    if low.endswith('?'):
+        if audit:
+            audit.command(cmd, 'local')
+        print_options(low[:-1])
+        return ''
+    if low == 'shutdown':
+        if not confirm_shutdown(sock):
+            if audit:
+                audit.command('shutdown', 'aborted')
+            return ''
+        if audit:
+            audit.command('shutdown', 'ok')
+        return _DONE
+    return exchange(sock, wire(cmd))
+
+
 def display(text):
-    """console-style: the ok data speaks for itself (the rows/the tables/the
-    values printed bare — no '% ok' noise); the error lines keep the '% '
-    prefix so they are visible."""
-    lines = text.splitlines()
-    if not lines:
-        return
-    first = lines[0]
-    if first.startswith('err'):
-        print('\n'.join('% ' + l for l in lines))
-        return
-    if first.startswith('ok '):
-        rest = lines[1:] if len(lines) > 1 else [first[3:]]
-        print('\n'.join(rest))
-        return
-    print(text)
+    """console-style: every ok/err reply line gets the '% ' prefix (the
+    multi-line tables keep their raw continuation lines — only the reply's
+    status line is prefixed)."""
+    out = []
+    for line in text.splitlines():
+        out.append(('% ' + line) if line.startswith(('ok ', 'ok', 'err ', 'err')) else line)
+    print('\n'.join(out))
 
 
 def format_settings(reply):
@@ -382,8 +457,10 @@ def confirm_shutdown(sock):
 def exchange(sock, wire):
     """Send one JSON request (the wire = the JSON text), read one JSON reply;
     returns the internal 'ok ...'/'err ...' string; None = the connection is
-    gone. Keep-alive pongs are absorbed: they can land before or after the
-    reply we are actually waiting for (replies are strictly ordered)."""
+    gone (EOF without a bye). Raises ConnectionLost on a send failure or a
+    reply timeout. Keep-alive pongs are absorbed: they can land before or
+    after the reply we are actually waiting for (replies are strictly
+    ordered)."""
     try:
         with _send_lock:
             sock.sendall((wire + '\n').encode())
@@ -404,9 +481,10 @@ def exchange(sock, wire):
                 continue
             if text.strip():
                 return text.strip()
-    except OSError as e:
-        print('control error: %s' % e, file=sys.stderr)
-        raise SystemExit(1)
+    except socket.timeout:
+        raise ConnectionLost('no reply within the socket timeout')
+    except OSError:
+        raise ConnectionLost('the control connection failed')
 
 
 if __name__ == '__main__':

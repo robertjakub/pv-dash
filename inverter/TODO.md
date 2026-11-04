@@ -8,17 +8,17 @@
 - **the user-defined scenarios** — scene files (the time + the pins + the
   machines) loadable with `set scenario <file>`; the audit trail of a
   manual session could *record* one.
-- **the fake's own metrics** — a small Prometheus endpoint (the polls, the
-  clients, the chaos hits, the SoC) so the fake can be scraped itself.
+- **the fake's own metrics** — DONE (`--metrics-port`, the /metrics with
+  the bearer auth like the scraper's; the frequency-based derate and the
+  SoH gauges are still to come).
 - **the multi-unit serve** — one process serving two Modbus units (the
   inverter + the meter as separate unit ids) for the gateway-style setups.
 - **the battery ageing** — the SoH drift over the simulated days (the
   capacity shrinks a %/week of the simulated time).
-- **the grid-frequency machine** — the 49.8–50.2 Hz wander next to the
-  voltage machine, and the frequency-based power derate (the grid-code
-  behaviour).
-- **`inspect` command** — one pretty dump of everything (the status, the
-  pins, the machines' states, the overlay) for the bug reports.
+- **the grid-frequency machine** — DONE as the machine + the base setting
+  (`--grid-frequency`, the ±0.2 Hz wander); the frequency-based derate is
+  still open.
+- **`inspect` command** — DONE (`inspect` = the pretty dump of everything).
 - **the CI** — GitHub Actions: the six suites + `nix flake check` on the
   push; the release workflow on the tag.
 

@@ -141,26 +141,33 @@ map.
 ## Served registers (the default profile)
 
 - **32064** / **32080** — PV power / power limit (I32 W)
+- **32016+** — the string block: per-string voltage/current (the MPPT
+  strings; a dark string serves 0/0)
 - **37113** — grid power (I32 W, positive = feed-in)
-- **37100+** — smart meter block: status, per-phase voltages/currents,
-  reactive power, power factor, grid frequency, and 37119 exported /
-  37121 imported kWh totals that grow through the simulated day
+- **37100+** — smart meter block: status, per-phase voltages/currents (the
+  unbalanced home), reactive power, power factor, grid frequency (the
+  frequency machine), and 37119 exported / 37121 imported kWh totals that
+  grow through the simulated day
 - **32089** — device status (512 on-grid / 40960 standby at night)
 - **32087** — temperature (I16, °C×10); **32114** daily and **32106** total
   yield (U32, kWh×100)
 - **37001+** — battery block when the battery is on (the default; power, SoC, lifetime totals)
-- **65000–65003** — modbus-cache diagnostics block (magic `0xCAFE`, always
-  mocked — not in the profile), so the scraper's `huawei_cache_*`
-  auto-detection can be exercised without a cache
 
 All of the above addresses come from the profile — remap them freely. Other
 function codes get a Modbus exception; writes (FC06/FC16) stick in an
 overlay: computed registers are recomputed per poll, overlay values win
-until cleared (`reset`, SIGUSR1 or shutdown).
+until cleared (`reset`, SIGUSR1, `set register`, or shutdown).
+
+## Internal registers (not in the profile)
+
+**65000–65003** — the modbus-cache diagnostics block (magic `0xCAFE`,
+version, uptime, id): always mocked by the fake, never part of the profile —
+it exists so the scraper's `huawei_cache_*` auto-detection can be exercised
+without a cache. It is also the only address range the fake hardcodes.
 
 ## Runtime control
 
-A line-protocol control server runs **by default on the unix socket
+A JSON-lines control server runs **by default on the unix socket
 `/tmp/fake-inverter-<modbus-port>.socket`** — short, determinable, one
 instance per Modbus port, stale files replaced, unlinked on shutdown, nothing
 ever lands in the working directory. Pass a TCP port number to bind
@@ -185,7 +192,8 @@ filesystem permissions are the auth). The clients take `--control-token`
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
 | `show settings` | every setting and its value |
-| `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `uptime`, `chaos`, `chaos_hits`, `pinned`, `profile`, `timezone`), `.`-terminated — scriptable |
+| `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `uptime`, `chaos`, `chaos_hits`, `pinned`, `profile`, `timezone`) — scriptable |
+| `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins — the baton for a bug report |
 | `show registers` | the loaded profile's register map, one register per line: `name \| register \| type \| value`, columns aligned; the value = what the registers serve right now, `NaN` = not calculated (e.g. the battery block with the battery off) |
 | `show version` | the fake-inverter version (`0.2.1`, or `0.2.1-<short git>` from a checkout) |
 | `set scenario <name>` | apply a scenario preset (below) |
@@ -244,7 +252,7 @@ An interactive front-end on the same socket (same flag/env resolution): on
 the first connect it probes the status and greets you —
 
 ```
-% Welcome to the Fake Inverter console —
+% Welcome to the Fake Inverter console
 %   SUN2000 with optional LUNA2000 battery and meter
 %   running for 30 s | utc clock | 230 V grid | battery on
 %   TAB completes, ? lists the commands, help <setting> explains one, quit leaves
@@ -256,7 +264,12 @@ one setting per line, and `shutdown` asks `Proceed with shutdown? [confirm]`
 first — RETURN or `y` proceeds, anything else aborts with `% Aborted.`.
 While it idles the CLI sends wire pings (every 55 s, `FAKE_CLI_KEEPALIVE` to
 tune, `0` = off) so the control server's idle timeout never drops a live
-session.
+session. When the connection dies anyway (the fake was killed, the port went
+dark), the CLI doesn't fold: it retries **`--reconnect` times (default 3)**
+with **`--reconnect-wait` seconds (default 10)** between the attempts,
+printing the progress and resuming the session on the first success; every
+attempt lands in the audit trail (`RECONNECT`). `--reconnect 0` restores the
+old die-on-loss behaviour.
 
 TAB completes commands, settings **and their values**, console-style: the word
 is extended silently while the common prefix grows; once exhausted, the
@@ -314,6 +327,9 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--port` | `5502` | Modbus TCP port |
 | `--unit` | `1` | Modbus unit id served |
 | `--grid-voltage` | `230` | nominal grid phase voltage (V, 120 or 230); the per-phase machine wanders ±10 % around it |
+| `--grid-frequency` | `50` | nominal grid frequency (Hz); the machine wanders ±0.2 Hz around it |
+| `--metrics-port` | off | serve the fake's own Prometheus `/metrics` on `127.0.0.1:PORT` |
+| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`) |
 | `--audit-log` | XDG state | the audit trail: a file path or `-` for stdout (docker logs / journald) |
 | `--audit-max-mb` | `10` | rotate the audit log at this size, keeping 3 backups; `0` = off |
 | `--audit-daily` | off | also rotate the audit log at UTC midnight |
@@ -370,17 +386,17 @@ cannot be opened, the trail falls back to stdout rather than vanishing. **Rotati
 
 ```
 2026-11-03T20:10:06Z INV START version=0.2.1 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
-2026-11-03T20:10:07Z INV COMMAND peer=127.0.0.1:54425 'set soc 40' -> ok
+2026-11-03T20:10:07Z AUDIT INV COMMAND peer=127.0.0.1:54425 'set soc 40' -> ok
 2026-11-03T20:10:08Z INV RESET SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
 2026-11-03T20:10:08Z INV SHUTDOWN SIGTERM: uptime=2s conns=0 requests=0 chaos_hits=0
 2026-11-03T18:44:10Z CLI CONNECT target=127.0.0.1:15731 user=oom
-2026-11-03T18:44:10Z CLI COMMAND 'quit' -> local
+2026-11-03T18:44:10Z AUDIT CLI COMMAND 'quit' -> local
 2026-11-03T18:44:10Z CLI DISCONNECT target=127.0.0.1:15731
 ```
 
 UTC stamps, the command as entered and its outcome (`ok` / `err`) — the
-NIS2/DORA-style who-when-what evidence trail. **Every wire command is
-audited once, by the server** (`INV COMMAND`, with the client peer — it
+structured who-when-what evidence trail. **Every wire command is
+audited once, by the server** (`AUDIT INV COMMAND`, with the client peer — it
 knows the who); the clients audit their session (the CONNECT/the
 DISCONNECT) and the local-only events (`quit`, an aborted `shutdown`).
 The fake logs its lifecycle too: `START`, `RELOAD` (SIGHUP), `RESET`
@@ -394,7 +410,7 @@ trail, not a duplicate of it.
 
 ## Security
 
-Honest scope of a demo device, with the NIS2/DORA arguments where they hold:
+Honest scope of a demo device:
 
 - **Minimal supply chain.** Every tool is Python standard library only — the
   SBOM is two lines (python + alpine in the container). No pip, no vendored
@@ -405,8 +421,8 @@ Honest scope of a demo device, with the NIS2/DORA arguments where they hold:
   `FAKE_CONTROL_TOKEN`); the unix socket relies on filesystem permissions.
   The container runs as the unprivileged `pvsuite` user. Do not expose the
   control port to untrusted networks.
-- **Auditable by default.** The CLIs keep the append-only audit trail above
-  (who, when, what, result) — the NIS2/DORA-style logging evidence, on
+- **Auditable by default.** The fake and the CLIs keep the append-only
+  audit trail above (who, when, what, result) — the logging evidence on
   unless explicitly disabled.
 - **Synthetic data only.** Nothing served is measured from a real device;
   there is no PII and no production telemetry to protect.
@@ -434,10 +450,14 @@ inverter/bin/
     ├── simulator.py    # day curves, runtime overrides, named values, cloud machines
     ├── battery.py      # the battery state machine (SoC state, decision, integration)
     ├── inverter.py     # Modbus TCP server: FC3/FC06/FC16, strict mode, chaos
-    ├── control.py      # line-protocol control server (set/unset/show, scenarios)
+    ├── control.py      # JSON-lines control server (set/unset/show, scenarios)
+    ├── metrics.py      # the fake's own Prometheus /metrics endpoint
+    ├── audit.py        # the append-only audit trail (AUDIT INV/CLI/CTL lines)
     ├── protocol.py     # wire helpers (recv_exact)
     ├── chaos.py        # seeded hostile-reply dice layer
     ├── signals.py      # SIGHUP/SIGUSR1/SIGTERM handling
+    ├── statics.py      # static configuration loader (lib/static.json)
+    ├── static.json     # the statics: solar times, cloud machines, battery limits
     └── paths.py        # default control-socket path
 ```
 

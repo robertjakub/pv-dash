@@ -57,13 +57,18 @@ def metrics_dict(body):
     return out
 
 
-def wait_metrics(port, tries=30):
+def wait_metrics(port, tries=30, want='huawei_pv_generation_watts'):
+    """The HTTP endpoint can bind before the first Modbus poll lands — wait
+    for the first value metric, not just for a 200."""
     for _ in range(tries):
         try:
             status, body = get('/metrics', port)
-            return status, metrics_dict(body)
+            d = metrics_dict(body)
+            if want is None or want in d:
+                return status, d
         except (OSError, urllib.error.URLError):
-            time.sleep(0.2)
+            pass
+        time.sleep(0.2)
     raise SystemExit('scraper on %d never came up' % port)
 
 
@@ -321,7 +326,8 @@ try:
                                    '--listen', '127.0.0.1:19455', '--battery'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     status, m = wait_metrics(19455)
-    check('control: baseline static values', m.get('huawei_pv_generation_watts') == 4000)
+    check('control: baseline static values', m.get('huawei_pv_generation_watts') == 4000,
+          str(sorted(m))[:120])   # the detail = what the first pull served
     ctl('set pv 2500', 15571)
     time.sleep(1.5)
     m = metrics_dict(get('/metrics', 19455)[1])
@@ -567,6 +573,80 @@ try:
     cur = [float(regs[k]) for k in ('meter-current-a', 'meter-current-b', 'meter-current-c')]
     check('per-phase loads: the meter currents really differ', len(set(cur)) == 3, str(cur))
 
+    # 2g2e. grid frequency: the base setting + the +-0.2 Hz machine
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'show', 'grid-frequency'],
+                       capture_output=True, text=True)
+    check('grid frequency: the nominal defaults to 50 Hz', r.returncode == 0
+          and 'ok grid-frequency=50' in r.stdout, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'set', 'grid-frequency', '60'],
+                       capture_output=True, text=True)
+    check('grid frequency: set to the 60 Hz base', 'ok grid-frequency=60' in r.stdout, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'show', 'registers'],
+                       capture_output=True, text=True)
+    regs = {l.split(' | ')[0].strip(): l.split(' | ')[-1].strip()
+            for l in r.stdout.splitlines() if ' | ' in l}
+    hz = float(regs.get('grid-frequency', '0'))
+    check('grid frequency: the machine wanders inside 60 +-0.2 Hz', 59.8 <= hz <= 60.2, str(hz))
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'unset', 'grid-frequency'],
+                       capture_output=True, text=True)
+    check('grid frequency: unset restores 50 Hz', 'ok grid-frequency=50' in r.stdout, r.stdout.strip())
+
+    # 2g2f. inspect: the pretty dump of everything
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'inspect'],
+                       capture_output=True, text=True)
+    check('inspect: the version, the profile, the machines, the overlay, the pins',
+          r.returncode == 0 and r.stdout.startswith('ok inspect')
+          and '\nversion   0.2.1' in r.stdout and '\nprofile   SUN2000' in r.stdout
+          and '\nmppt      both' in r.stdout and '\npinned    ' in r.stdout
+          and 'V nominal, 50 Hz nominal' in r.stdout, r.stdout.strip()[:120])
+
+    # 2g2g. the fake's own metrics: the gated Prometheus endpoint + the bearer auth
+    r = subprocess.run([sys.executable, F, '--dry-run'], capture_output=True, text=True)
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15901',
+                                   '--control-port', '15902', '--metrics-port', '15903'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(1.2)
+    status, body = None, None
+    for _ in range(25):
+        try:
+            status, body = get('/metrics', 15903)
+            break
+        except (OSError, urllib.error.URLError):
+            time.sleep(0.2)
+    check('fake metrics: ungated (no --metrics-token) serves the gauges',
+          status == 200 and 'fake_inverter_power_watts{kind="pv"} 4000' in body, str(status))
+    subprocess.run([sys.executable, C, '--control-port', '15902', 'shutdown'], capture_output=True)
+    time.sleep(0.8)
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15904',
+                                   '--control-port', '15905', '--metrics-port', '15906',
+                                   '--metrics-token', 'sekrit'],
+                                  stdout=open('/tmp/scr_metrics.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(1.2)
+    status, body = None, None
+    for _ in range(25):
+        try:
+            status, body = get('/metrics', 15906)
+            break
+        except (OSError, urllib.error.URLError):
+            time.sleep(0.2)
+    check('fake metrics: no token = 401 + the WWW-Authenticate challenge',
+          status == 401, str(status))
+    req = urllib.request.Request('http://127.0.0.1:15906/metrics')
+    req.add_header('Authorization', 'Bearer sekrit')
+    body = None
+    for _ in range(25):
+        try:
+            body = urllib.request.urlopen(req, timeout=5).read().decode()
+            break
+        except urllib.error.URLError:
+            time.sleep(0.2)
+    check('fake metrics: the bearer pulls the gauges',
+          body is not None and 'fake_inverter_power_watts{kind="pv"} 4000' in body
+          and 'fake_inverter_grid_phase_volts{phase="a"}' in body
+          and 'fake_inverter_modbus_requests_total' in body, (body or '')[:120])
+    subprocess.run([sys.executable, C, '--control-port', '15905', 'shutdown'], capture_output=True)
+    time.sleep(0.8)
+
     # 2g2d. the state machines integrate over the UTC clock (configurable);
     # the clock is frozen from the mppt/grid-voltage blocks — unfreeze first
     ctl('set time auto', 15583)
@@ -632,14 +712,16 @@ try:
     ctl('show status', 15571)
     r = cli('show pv\nshow status\nquit\n')
     lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
-    check('fake_cli: show prints the bare value, show status the report bare', r.returncode == 0
-          and '3000' in lines and '% ok status' not in r.stdout
+    check('fake_cli: show prints the bare value, show status the % ok report', r.returncode == 0
+          and '3000' in lines and any(l.startswith('% ok status') for l in lines)
           and any(l == 'pv=3000' for l in lines) and any(l == 'pinned=pv=3000.0' for l in lines), repr(r.stdout))
-    r = cli('help soc\nshow registers\nquit\n')
+    r = cli('help soc\nshow registers\ninspect\nquit\n')
     lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
-    check('fake_cli: the ok data prints bare (the help, the register table)', r.returncode == 0
-          and 'soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' in lines
-          and 'pv-power' in ''.join(lines) and '% ok' not in r.stdout, repr(r.stdout[:80]))
+    check('fake_cli: the help is bare, the tables ride under % ok, inspect dumps', r.returncode == 0
+          and any(l == 'soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' for l in lines)
+          and any(l == '% ok registers (49)' for l in lines) and 'pv-power' in ''.join(lines)
+          and any(l.startswith('% ok inspect') for l in lines)
+          and any('version' in l and '0.2.1' in l for l in lines), repr(r.stdout[:120]))
 
     # 2g3. the audit trail: the UTC stamp, the CLI/CTL prefix, the who-when-what,
     # ping/pong never logged, --no-audit-log switches it off
@@ -652,8 +734,9 @@ try:
                     'show', 'pv'], capture_output=True, text=True)
     rows = open(AUD).read().strip().split('\n')
     check('audit: ctl logs CONNECT/DISCONNECT; the commands belong to the server trail',
-          len(rows) == 2 and rows[0].split(' ')[1] == 'CTL' and rows[0].split(' ')[2] == 'CONNECT'
-          and rows[1].split(' ')[2] == 'DISCONNECT', '\n'.join(rows))
+          len(rows) == 2 and rows[0].split(' ')[1] == 'AUDIT' and rows[0].split(' ')[2] == 'CTL'
+          and rows[0].split(' ')[3] == 'CONNECT'
+          and rows[1].split(' ')[3] == 'DISCONNECT', '\n'.join(rows))
     AUD2 = '/tmp/scr_audit_cli.log'
     if os.path.exists(AUD2):
         os.unlink(AUD2)
@@ -693,6 +776,44 @@ try:
     time.sleep(1)
     check('fake_cli: RETURN at [confirm] stops the fake', r.returncode == 0
           and 'bye shutdown' in r.stdout and fake_k.poll() == 0, repr(r.stdout))
+
+    def wait_ctl(port, tries=50):
+        for _ in range(tries):
+            try:
+                ctl('ping', port)
+                return
+            except OSError:
+                time.sleep(0.2)
+        raise SystemExit('control on %d never came up' % port)
+
+    # 2g3c. the reconnect: the server dies mid-session, the CLI retries
+    # (--reconnect attempts, --reconnect-wait apart) and resumes the session
+    fake_r = subprocess.Popen([sys.executable, F, '--static', '--port', '15901', '--control-port', '15902'],
+                              stdout=open('/tmp/scr_recon.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(fake_r)
+    wait_ctl(15902)   # the cold python start can outrun a fixed sleep
+    p = subprocess.Popen([sys.executable, K, '--control-port', '15902', '--reconnect', '3',
+                          '--reconnect-wait', '0.5'],
+                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    time.sleep(0.6)
+    fake_r.kill()
+    fake_r.wait()
+    time.sleep(0.3)
+    fake_r2 = subprocess.Popen([sys.executable, F, '--static', '--port', '15901', '--control-port', '15902'],
+                               stdout=open('/tmp/scr_recon2.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(fake_r2)
+    p.stdin.write('show pv\n')       # the loss is noticed on the first wire command
+    p.stdin.flush()
+    time.sleep(2.2)                  # the reconnect cycle: the attempt 1 refused, the attempt 2 ok
+    p.stdin.write('show pv\n')       # the resumed session answers again
+    p.stdin.flush()
+    time.sleep(0.6)
+    p.stdin.write('quit\n')
+    p.stdin.flush()
+    out, _ = p.communicate(timeout=20)
+    check('fake_cli: reconnects after the server death (3 tries, 0.5 s apart)',
+          p.returncode == 0 and 'reconnecting' in out and 'reconnected' in out
+          and 'auto' in out, repr(out[-200:]))   # the resumed session answers show pv (bare value)
 
     # 2g3b. the INV audit trail: the server side logs the lifecycle + the commands
     AUDD = '/tmp/scr_audit_inv.log'

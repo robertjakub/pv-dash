@@ -7,15 +7,8 @@ clock is the time-lapse control and the %SoC really moves while the battery
 charges/discharges."""
 import threading
 
-BATT_MAX_W = 2500.0         # max charge/discharge power
-BATT_RESERVE_SOC = 10.0     # discharge floor
-BATT_GRID_MARGIN_W = 300.0  # keep this much export before charging
-BATT_STANDBY_W = 150.0      # home baseline the battery won't cover
-BATT_MAX_TICK_H = 24.0      # integration cap per clock step
-BATT_CHARGE_EFF = 0.95      # charge efficiency (5 % losses on the way in)
-BATT_SELF_DISCH_H = 0.01    # self-discharge, %/h
-BATT_DISCHARGE_CAP = 0.8    # only 80 % of the rating reaches the home: a
-                            # 10 kW battery can output at most 8 kW
+from .statics import BATT_CHARGE_EFF, BATT_DISCHARGE_CAP, BATT_GRID_MARGIN_W, \
+    BATT_MAX_TICK_H, BATT_MAX_W, BATT_RESERVE_SOC, BATT_SELF_DISCH_H, BATT_STANDBY_W
 
 
 class BatteryMachine:

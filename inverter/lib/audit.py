@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Append-only audit trail for the fake and its control CLIs: one line per
-event — who, when, what, result — the NIS2/DORA-style evidence trail.
-ping/pong keepalives are never logged. The file is opened append-only and
-flushed per event, so a crash keeps everything up to the last command.
+event — who, when, what, result. Every line carries the AUDIT level between
+the stamp and the writer prefix ('<stamp> AUDIT <PREFIX> <EVENT> ...') so the
+trail filters cleanly out of a mixed log. ping/pong keepalives are never
+logged. The file is opened append-only and flushed per event, so a crash
+keeps everything up to the last command.
 
 The default location is the user's XDG state directory
 (~/.local/state/fake-inverter/audit.log), NOT the current directory: a
@@ -20,9 +22,9 @@ import time
 
 
 class AuditLog:
-    """'<UTC stamp> <PREFIX> <EVENT> [detail]' per line. PREFIX distinguishes
-    the writer (INV / CLI / CTL). Opening failure = fatal: an audit trail that
-    silently vanishes is worse than no session."""
+    """'<UTC stamp> AUDIT <PREFIX> <EVENT> [detail]' per line. PREFIX
+    distinguishes the writer (INV / CLI / CTL). Opening failure = fatal: an
+    audit trail that silently vanishes is worse than no session."""
 
     @staticmethod
     def default_path():
@@ -79,8 +81,8 @@ class AuditLog:
     def event(self, event, detail=''):
         self._maybe_rotate()
         stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-        self._f.write('%s %s %s%s\n' % (stamp, self.prefix, event,
-                                        (' ' + detail) if detail else ''))
+        self._f.write('%s AUDIT %s %s%s\n' % (stamp, self.prefix, event,
+                                              (' ' + detail) if detail else ''))
         self._f.flush()
 
     def command(self, cmd, result):

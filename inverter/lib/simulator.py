@@ -9,21 +9,8 @@ import time
 
 from .battery import BATT_DISCHARGE_CAP, BATT_GRID_MARGIN_W, BATT_MAX_W, BATT_STANDBY_W, BatteryMachine
 from .profile import load_profile, resolve_profile
-
-SUNRISE, SUNSET = 6.0, 18.0
-
-# Cloud state machines (Ornstein-Uhlenbeck: mean-reverting random walk over
-# the simulated clock — time-lapse jumps move the clouds, a frozen clock
-# freezes them): mode -> (mean, theta/h, sigma/sqrt(h), lo, hi)
-CLOUD_MACHINES = {
-    'autumn': (0.45, 2.5, 0.60, 0.05, 0.95),   # passing clouds, quick swings
-    'spring': (0.25, 2.0, 0.50, 0.02, 0.80),   # fair-weather cumulus, brief dips
-    'winter': (0.75, 0.8, 0.35, 0.10, 1.00),   # heavy overcast spells, slow breaks
-}
-
-# lifetime meter totals the demo starts from (kWh)
-METER_EXPORT_KWH = 12500.0
-METER_IMPORT_KWH = 9800.0
+from .statics import (CLOUD_MACHINES, METER_EXPORT_KWH, METER_IMPORT_KWH, MPPT_WINDOWS,
+                      SUNRISE, SUNSET)
 
 # Runtime-controllable knobs (see the control server): None = follow the
 # simulation, a number = pinned. `cloud` scales PV (0 = clear, 1 = dark);
@@ -51,6 +38,7 @@ class Simulator:
         self.batt_state = None          # None = the machine decides; 'charging'/'discharging' = forced
         self.mppt = 'both'              # which PV strings feed the MPPTs: both | east | west | none
         self.grid_voltage = 230.0       # nominal phase voltage (V); the machine wanders +-10 %
+        self.grid_frequency = 50.0      # nominal grid frequency (Hz); the machine wanders +-0.2
         self.utc = True                 # the state machines integrate over the UTC clock (configurable)
         self._cloud_rng = random.Random(seed)
         self._cloud_value = 0.0
@@ -60,6 +48,8 @@ class Simulator:
         self._grid_v_t = None
         self._home_shares = [1 / 3, 1 / 3, 1 / 3]   # the unbalanced home: the per-phase load shares
         self._home_t = None
+        self._freq_dev = 0.0            # the frequency deviation from the nominal (Hz)
+        self._freq_t = None             # the frequency machine's own clock anchor
 
     def set_profile(self, profile_map):
         """Swap the inverter profile (SIGHUP); clients serving from the old map
@@ -164,6 +154,22 @@ class Simulator:
                 self._home_shares = [s / total for s in sh]
             return list(self._home_shares)
 
+    def grid_frequency_value(self, t):
+        """The grid frequency state machine: one system-wide mean-reverting
+        walk around the nominal (the grid frequency is a net-wide quantity,
+        not per-phase), clamped to ±0.2 Hz. Integrates with the simulated
+        clock like everything else (its own anchor: the voltage machine's
+        tick already advances the shared one)."""
+        with self._lock:
+            if self._freq_t is None:
+                self._freq_t = t
+            dt = t - self._freq_t
+            self._freq_t = t
+            if dt > 0:
+                self._freq_dev = min(0.2, max(-0.2, self._freq_dev + 2.0 * (0.0 - self._freq_dev) * dt
+                                              + 0.08 * math.sqrt(dt) * self._grid_v_rng.gauss(0.0, 1.0)))
+            return self.grid_frequency + self._freq_dev
+
     def home_phases(self, t, home_w):
         """The per-phase home power: the load split by the asymmetric shares."""
         return [home_w * sh for sh in self._home_phase_shares(t)]
@@ -198,9 +204,10 @@ class Simulator:
     def pv_string(self, t, which):
         """One string's sine bell over the simulated clock: the east array
         (string-1) peaks late morning (06:00-16:00), the west array (string-2)
-        early afternoon (08:00-18:00). Each carries half the array."""
+        early afternoon (08:00-18:00). Each carries half the array; the
+        windows come from the static configuration (lib/static.json)."""
         half = self.peak_w / 2.0
-        lo, hi = (6.0, 16.0) if which == 'east' else (8.0, 18.0)
+        lo, hi = MPPT_WINDOWS[which]
         if lo < t < hi:
             return half * math.sin(math.pi * (t - lo) / (hi - lo))
         return 0.0
@@ -393,7 +400,7 @@ class Simulator:
             'device-status': status,
             'device-temperature': self.temperature(t),
             'device-reactive-power': 0.0, 'device-power-factor': 1.0,
-            'device-insulation': 970.0, 'grid-frequency': 50.0,
+            'device-insulation': 970.0, 'grid-frequency': self.grid_frequency_value(t),
             'yield-total': total_kwh, 'yield-day': day_kwh,
             'grid-power': grid_w,
             'string-1-voltage': v_string if east_on else 0.0,

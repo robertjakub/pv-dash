@@ -359,6 +359,8 @@ scrape/src/
 │   ├── chaos.py        # seeded hostile-reply dice layer
 │   └── server.py       # Modbus server + line-protocol control server
 └── lib/
+    ├── static.json     # the static constants: protocol limits, diagnostics block, defaults
+    ├── statics.py      # its loader (the STATIC dict + the named aliases)
     ├── protocol.py     # Modbus TCP client (hardened framing)
     ├── config.py       # settings resolution + validation
     ├── metrics.py      # metrics.json loader

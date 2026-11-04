@@ -8,6 +8,7 @@ import threading
 import time
 
 from .protocol import recv_exact
+from .statics import MAX_PDU
 from .version import version_string
 
 logger = logging.getLogger('fake-inverter')
@@ -76,7 +77,7 @@ class FakeInverter:
             while True:
                 self.requests += 1
                 txn, proto, length, unit = struct.unpack('>HHHB', recv_exact(client, 7))
-                if not 2 <= length <= 260:
+                if not 2 <= length <= MAX_PDU + 2:
                     logger.info('malformed frame from %s:%d (MBAP length %d), closing', addr[0], addr[1], length)
                     break
                 pdu = recv_exact(client, length - 1)
@@ -85,19 +86,19 @@ class FakeInverter:
                     logger.debug('request for unit %d, serving %d', unit, self.unit)
                 if self.chaos and self.chaos.hit():
                     self._chaos_fault(client, txn, self.unit)
-                if func == 3:
+                if func in (3, 4):   # the same map over holding (FC3) and input (FC4) registers
                     regs = self.simulator.registers()
                     regs.update(self.overlay)
                     if self.strict and any(addr_ + i not in regs for i in range(count)):
-                        body = struct.pack('>BB', 3 + 0x80, 2)
+                        body = struct.pack('>BB', func + 0x80, 2)
                         client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
-                        logger.debug('read %d regs @%d -> exception 02 (undefined register)', count, addr_)
+                        logger.debug('fc%d read %d regs @%d -> exception 02 (undefined register)', func, count, addr_)
                         continue
                     words = [regs.get(addr_ + i, 0) & 0xFFFF for i in range(count)]
                     data = struct.pack('>%dH' % count, *words) if words else b''
                     body = struct.pack('>BB', func, count * 2) + data
                     client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
-                    logger.debug('read %d regs @%d -> %s', count, addr_, words)
+                    logger.debug('fc%d read %d regs @%d -> %s', func, count, addr_, words)
                 elif func == 6 and len(pdu) == 5:
                     self.overlay[addr_] = struct.unpack('>H', pdu[3:5])[0]
                     client.sendall(struct.pack('>HHHB', txn, 0, len(pdu) + 1, unit) + pdu)

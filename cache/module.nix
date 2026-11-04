@@ -30,6 +30,8 @@ let
       connect_acl = cfg.connectAcl;
     } // lib.optionalAttrs (cfg.writeAcl != null) {
       write_acl = cfg.writeAcl;
+    } // lib.optionalAttrs (cfg.writeRegisters != null) {
+      write_registers = cfg.writeRegisters;
     } // {
       allow_write = lib.boolToString cfg.allowWrite;
       local_time = lib.boolToString cfg.localTime;
@@ -39,6 +41,14 @@ let
       audit_max_mb = toString cfg.auditMaxMb;
       audit_daily = lib.boolToString cfg.auditDaily;
       audit_files = toString cfg.auditFiles;
+      reads_audit_s = toString cfg.readsAudit;
+    } // lib.optionalAttrs (cfg.controlPort != null) {
+      control_port = toString cfg.controlPort;
+    } // lib.optionalAttrs (cfg.controlToken != null) {
+      control_token = cfg.controlToken;
+    } // lib.optionalAttrs (cfg.controlTokenFile != null) {
+      # systemd LoadCredential mounts the file here (see serviceConfig below)
+      control_token_file = "/run/credentials/modbus-cache/control-token";
     };
   });
 in
@@ -206,6 +216,57 @@ in
       '';
     };
 
+    writeRegisters = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Register ranges a forwarded write may touch: a comma-separated
+        START:COUNT list (e.g. "47400:100,47600:100"). Writes outside the
+        ranges are refused with a Modbus illegal-function exception.
+        null = any register writable (the default).
+      '';
+    };
+
+    controlPort = lib.mkOption {
+      type = lib.types.nullOr (lib.types.either lib.types.int lib.types.str);
+      default = null;
+      description = ''
+        The JSON-lines control server target: a TCP port (bound to
+        127.0.0.1) or a unix socket path. The service has PrivateTmp — a
+        socket under /tmp is unreachable from outside; use a path under
+        /run/modbus-cache/ (created for the service). null = the proxy
+        default (a /tmp unix socket, private to the service).
+      '';
+    };
+
+    controlToken = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Require a token on TCP control connections. WARNING: it is rendered
+        into the world-readable ini in the nix store — prefer controlTokenFile.
+      '';
+    };
+
+    controlTokenFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        The control token from a file (the first line is the token),
+        mounted via systemd LoadCredential — the hardened way to pass the
+        secret. Mutually exclusive with controlToken.
+      '';
+    };
+
+    readsAudit = lib.mkOption {
+      type = lib.types.nullOr lib.types.number;
+      default = null;
+      description = ''
+        Audit one READS tally per client per this many seconds (who is
+        hammering the cache); null = the proxy default (300 s). 0 = off.
+      '';
+    };
+
     openFirewall = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -243,8 +304,18 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    warnings = lib.optional (cfg.openFirewall && cfg.listenHost == "127.0.0.1")
-      "services.modbus-cache: openFirewall is set but the proxy binds to 127.0.0.1 — the firewall hole is unreachable; set listenHost to 0.0.0.0 (or the external IP) if Modbus clients live on other hosts.";
+    warnings =
+      lib.optional (cfg.openFirewall && cfg.listenHost == "127.0.0.1")
+        "services.modbus-cache: openFirewall is set but the proxy binds to 127.0.0.1 — the firewall hole is unreachable; set listenHost to 0.0.0.0 (or the external IP) if Modbus clients live on other hosts."
+      ++ lib.optional (cfg.controlToken != null)
+        "services.modbus-cache: controlToken is rendered into the world-readable ini in the nix store — prefer controlTokenFile."
+      ++ lib.optionals (cfg.controlPort != null
+          && lib.isString cfg.controlPort
+          && lib.hasPrefix "/tmp/" cfg.controlPort)
+        [
+          "services.modbus-cache: the control socket is under /tmp, which the service's PrivateTmp makes private — the CLI outside cannot reach it; use a path under /run/modbus-cache/ instead."
+        ];
+
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.listenPort ];
 
     systemd.services.modbus-cache = {
@@ -269,6 +340,14 @@ in
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
       } // lib.optionalAttrs (cfg.auditLog != null && cfg.auditLog != "-") {
         ReadWritePaths = [ (dirOf cfg.auditLog) ];
+      } // lib.optionalAttrs (cfg.controlTokenFile != null) {
+        LoadCredential = [ "control-token:${toString cfg.controlTokenFile}" ];
+      } // lib.optionalAttrs (cfg.controlPort != null
+          && lib.isString cfg.controlPort
+          && lib.hasPrefix "/run/modbus-cache/" cfg.controlPort) {
+        # the control socket's directory, owned by the dynamic user
+        RuntimeDirectory = "modbus-cache";
+        RuntimeDirectoryMode = "0755";
       };
     };
   };

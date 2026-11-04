@@ -6,9 +6,10 @@ import json
 import logging
 import os
 
-logger = logging.getLogger('modbus-cache')
+from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, MAX_COUNT, MAX_REGISTERS, \
+    REGISTER_TYPES, UNIT_ID_RANGE
 
-DEFAULT_LISTEN_PORT = 15502
+logger = logging.getLogger('modbus-cache')
 
 
 def parse_control_target(text, listen_port=DEFAULT_LISTEN_PORT):
@@ -54,8 +55,32 @@ def parse_acl(text, label):
     return tuple(nets)
 
 
+def parse_write_registers(text, label='write-registers'):
+    """'any'/empty/None -> None (any register writable); 'START:COUNT,...'
+    (comma-separated) -> tuple of (start, count) ranges. A write is allowed
+    only when every register it touches lands inside one of the ranges."""
+    if text is None or str(text).strip() in ('', 'any', '*'):
+        return None
+    ranges = []
+    for part in str(text).split(','):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            start, count = (int(x) for x in part.split(':'))
+        except ValueError:
+            raise SystemExit('%s entries must be START:COUNT, got %r' % (label, part))
+        if start < 0 or count < 1 or start + count > MAX_REGISTERS or count > MAX_COUNT:
+            raise SystemExit('%s: range %d:%d out of bounds (0..%d, max %d registers)'
+                             % (label, start, count, MAX_REGISTERS - 1, MAX_COUNT))
+        ranges.append((start, count))
+    if not ranges:
+        return None
+    return tuple(ranges)
+
+
 def check_range(start, count, label):
-    if start < 0 or start + count > 65536 or not 0 < count <= 125:
+    if start < 0 or start + count > MAX_REGISTERS or not 0 < count <= MAX_COUNT:
         raise SystemExit('%s out of bounds' % label)
     return (start, count)
 
@@ -98,11 +123,13 @@ def resolve_profile_file(text):
 
 
 def load_registers_file(path):
-    """Device profile: {"registers": [{"name", "register", "type", ...}]} —
+    """Device profile: {"registers": [{"name", "register", "type", "fc", ...}]} —
     the shared schema from the profiles/ subproject. Returns the full
     (ranges, names) map; which entries are actually fetched is the
     selection file's job (load_selection). "type" gives the word width
-    (i16/u16 = 1 register word, i32/u32 = 2)."""
+    (i16/u16 = 1 register word, i32/u32 = 2). "fc" is the function code the
+    device answers for the entry: 3 (holding registers, the default) or 4
+    (input registers); the two address spaces are cached separately."""
     try:
         with open(path, encoding='utf-8') as fh:
             data = json.load(fh)
@@ -121,13 +148,16 @@ def load_registers_file(path):
         except (KeyError, TypeError, ValueError):
             raise SystemExit('%s (%s) needs an integer "register"' % (label, entry['name']))
         typ = str(entry.get('type', 'i32'))
-        count = {'i16': 1, 'u16': 1, 'i32': 2, 'u32': 2}.get(typ)
+        count = REGISTER_TYPES.get(typ)
         if count is None:
             raise SystemExit('%s (%s): unknown "type" %r (i16/u16/i32/u32)' % (label, entry['name'], typ))
-        if not 0 <= start <= 65536 - count:
+        fc = entry.get('fc', 3)
+        if fc not in (3, 4):
+            raise SystemExit('%s (%s): "fc" must be 3 (holding) or 4 (input), got %r' % (label, entry['name'], fc))
+        if not 0 <= start <= MAX_REGISTERS - count:
             raise SystemExit('%s (%s): register %d out of range' % (label, entry['name'], start))
-        ranges.append((start, count))
-        names[(start, count)] = str(entry['name'])
+        ranges.append((fc, start, count))
+        names[(fc, start, count)] = str(entry['name'])
     return ranges, names
 
 
@@ -163,6 +193,20 @@ def parse_listen(text):
     return host.strip('[]'), port
 
 
+def load_token_file(path, label='control-token-file'):
+    """The token from a file: the first line, whitespace-stripped (a systemd
+    LoadCredential or a plain key file — anything but the rendered ini,
+    which lands world-readable in the store)."""
+    try:
+        with open(path, encoding='utf-8') as fh:
+            token = fh.readline().strip()
+    except OSError as e:
+        raise SystemExit('cannot read %s %s: %s' % (label, path, e))
+    if not token:
+        raise SystemExit('%s %s: the file is empty' % (label, path))
+    return token
+
+
 def validate_config(cfg):
     """Fail fast on nonsensical settings.
 
@@ -174,8 +218,8 @@ def validate_config(cfg):
 
     if not 1 <= cfg['port'] <= 65535:
         fail('port', 'must be 1..65535')
-    if not 1 <= cfg['unit'] <= 247:
-        fail('unit', 'must be 1..247 (Modbus unit id)')
+    if not UNIT_ID_RANGE[0] <= cfg['unit'] <= UNIT_ID_RANGE[1]:
+        fail('unit', 'must be %d..%d (Modbus unit id)' % UNIT_ID_RANGE)
     if cfg['timeout'] <= 0:
         fail('timeout', 'must be > 0')
     if cfg['interval'] <= 0:
@@ -196,6 +240,10 @@ def validate_config(cfg):
         fail('audit_max_mb', 'must be >= 0 (0 = no size rotation)')
     if cfg['audit_files'] < 1:
         fail('audit_files', 'must be >= 1')
+    if cfg['reads_audit_s'] < 0:
+        fail('reads_audit', 'must be >= 0 (0 = off)')
+    if cfg['control_token'] and cfg['control_token_file']:
+        fail('control-token', 'set --control-token or --control-token-file, not both')
     parse_listen(cfg['listen'])
     if not cfg['host']:
         fail('host', 'must not be empty')
@@ -241,43 +289,52 @@ def resolve_config(args, script_dir=None):
             raise ValueError('expected true/false, got %r' % raw)
         return resolve(cli_value, env_name, cfg_key, default, parse_bool)
 
-    interval = resolve(args.interval, 'MODBUS_CACHE_INTERVAL', 'interval', 10.0, float)
+    interval = resolve(args.interval, 'MODBUS_CACHE_INTERVAL', 'interval', DEFAULTS['interval_s'], float)
     cfg = {
-        'host': resolve(args.host, 'MODBUS_CACHE_HOST', 'host', '127.0.0.1', str),
-        'port': resolve(args.port, 'MODBUS_CACHE_PORT', 'port', 5502, int),
-        'unit': resolve(args.unit, 'MODBUS_CACHE_UNIT', 'unit', 1, int),
-        'timeout': resolve(args.timeout, 'MODBUS_CACHE_TIMEOUT', 'timeout', 3.0, float),
-        'listen': resolve(args.listen, 'MODBUS_CACHE_LISTEN', 'listen', '127.0.0.1:15502', str),
+        'host': resolve(args.host, 'MODBUS_CACHE_HOST', 'host', DEFAULTS['host'], str),
+        'port': resolve(args.port, 'MODBUS_CACHE_PORT', 'port', DEFAULTS['modbus_port'], int),
+        'unit': resolve(args.unit, 'MODBUS_CACHE_UNIT', 'unit', DEFAULTS['unit'], int),
+        'timeout': resolve(args.timeout, 'MODBUS_CACHE_TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
+        'listen': resolve(args.listen, 'MODBUS_CACHE_LISTEN', 'listen', DEFAULTS['listen'], str),
         'interval': interval,
-        'read_delay': resolve(args.read_delay, 'MODBUS_CACHE_READ_DELAY', 'read_delay', 0.05, float),
-        'merge_gap': resolve(args.merge_gap, 'MODBUS_CACHE_MERGE_GAP', 'merge_gap', 8, int),
+        'read_delay': resolve(args.read_delay, 'MODBUS_CACHE_READ_DELAY', 'read_delay', DEFAULTS['read_delay_s'], float),
+        'merge_gap': resolve(args.merge_gap, 'MODBUS_CACHE_MERGE_GAP', 'merge_gap', DEFAULTS['merge_gap'], int),
         'allow_write': resolve_bool(args.allow_write or None, 'MODBUS_CACHE_ALLOW_WRITE', 'allow_write', False),
+        'write_registers': parse_write_registers(
+            resolve(getattr(args, 'write_registers', None), 'MODBUS_CACHE_WRITE_REGISTERS',
+                    'write_registers', 'any', str)),
         'profile': resolve_profile_file(resolve(getattr(args, 'profile', None), 'MODBUS_CACHE_PROFILE',
                                                 'profile', default_profile_path(), str)),
         'selection': resolve(getattr(args, 'selection', None), 'MODBUS_CACHE_SELECTION', 'selection', '', str),
-        'cache_ttl': resolve(args.cache_ttl, 'MODBUS_CACHE_TTL', 'cache_ttl', 3 * interval, float),
+        'cache_ttl': resolve(args.cache_ttl, 'MODBUS_CACHE_TTL', 'cache_ttl',
+                             DEFAULTS['cache_ttl_factor'] * interval, float),
         'local_time': resolve_bool(args.local_time, 'MODBUS_CACHE_LOCAL_TIME', 'local_time', False),
         'log_access': resolve_bool(args.log_access, 'MODBUS_CACHE_LOG_ACCESS', 'log_access', False),
-        'max_clients': resolve(args.max_clients, 'MODBUS_CACHE_MAX_CLIENTS', 'max_clients', 64, int),
-        'client_timeout': resolve(args.client_timeout, 'MODBUS_CACHE_CLIENT_TIMEOUT', 'client_timeout', 300.0, float),
+        'max_clients': resolve(args.max_clients, 'MODBUS_CACHE_MAX_CLIENTS', 'max_clients', DEFAULTS['max_clients'], int),
+        'client_timeout': resolve(args.client_timeout, 'MODBUS_CACHE_CLIENT_TIMEOUT', 'client_timeout',
+                                  DEFAULTS['client_timeout_s'], float),
         'connect_acl': parse_acl(resolve(args.connect_acl, 'MODBUS_CACHE_CONNECT_ACL', 'connect_acl', 'any', str),
                                  'connect-acl'),
         'write_acl': parse_acl(resolve(args.write_acl, 'MODBUS_CACHE_WRITE_ACL', 'write_acl', 'any', str),
                                'write-acl'),
-        'level': resolve(args.log_level, 'MODBUS_CACHE_LOG_LEVEL', 'log_level', 'INFO', str).upper(),
+        'level': resolve(args.log_level, 'MODBUS_CACHE_LOG_LEVEL', 'log_level', DEFAULTS['log_level'], str).upper(),
         'control_port': resolve(getattr(args, 'control_port', None), 'MODBUS_CACHE_CTL', 'control_port', '', str)
                         or (os.environ.get('CACHE_CTL', '').strip() or ''),
         'control_token': resolve(getattr(args, 'control_token', None), 'MODBUS_CACHE_CONTROL_TOKEN',
                                  'control_token', '', str),
+        'control_token_file': resolve(getattr(args, 'control_token_file', None), 'MODBUS_CACHE_CONTROL_TOKEN_FILE',
+                                      'control_token_file', '', str),
         'audit_log': resolve(getattr(args, 'audit_log', None), 'MODBUS_CACHE_AUDIT_LOG', 'audit_log', '', str),
         'audit_max_mb': resolve(getattr(args, 'audit_max_mb', None), 'MODBUS_CACHE_AUDIT_MAX_MB',
-                                'audit_max_mb', 10.0, float),
+                                'audit_max_mb', DEFAULTS['audit_max_mb'], float),
         'audit_daily': resolve_bool(getattr(args, 'audit_daily', False), 'MODBUS_CACHE_AUDIT_DAILY',
                                     'audit_daily', False),
         'audit_files': resolve(getattr(args, 'audit_files', None), 'MODBUS_CACHE_AUDIT_FILES',
-                               'audit_files', 3, int),
+                               'audit_files', DEFAULTS['audit_files'], int),
         'no_audit_log': resolve_bool(getattr(args, 'no_audit_log', False), 'MODBUS_CACHE_NO_AUDIT_LOG',
                                      'no_audit_log', False),
+        'reads_audit_s': resolve(getattr(args, 'reads_audit', None), 'MODBUS_CACHE_READS_AUDIT',
+                                 'reads_audit_s', DEFAULTS['reads_audit_s'], float),
     }
     validate_config(cfg)
     return cfg

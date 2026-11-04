@@ -42,11 +42,13 @@ try:
 except ImportError:
     readline = None
 
-from lib.paths import resolve_control_target
+from lib.paths import load_token_file, resolve_control_target
 from lib.settings import COMMAND_HELP, SETTING_BY_NAME, SETTING_NAMES, describe_value
+from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, \
+    CLI_TIMEOUT_S
 
 KEEPALIVE_ENV = 'FAKE_CLI_KEEPALIVE'    # ping interval in seconds; 0 = off
-DEFAULT_KEEPALIVE = 55.0                # well under the control server's idle timeout
+DEFAULT_KEEPALIVE = CLI_KEEPALIVE_S     # well under the control server's idle timeout
 
 HELP = """commands (TAB completes, ? lists the options + descriptions in any position):
 """ + ''.join('  %-10s %s\n' % (n, d) for n, d in
@@ -190,19 +192,25 @@ def print_options(buf):
 def main():
     p = argparse.ArgumentParser(description='console-style CLI for the fake inverter control server (TCP or unix socket).')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/fake-inverter-5502.socket; env FAKE_CTL when unset) — same flag as the fake itself')
-    p.add_argument('--timeout', type=float, default=5.0, help='socket timeout in seconds (default %(default)s)')
-    p.add_argument('--reconnect', type=int, default=3, help='when the connection dies (an unanswered ping, a reset, a timeout), retry this many times before giving up; 0 = off (default %(default)s)')
-    p.add_argument('--reconnect-wait', type=float, default=10.0, help='seconds between the reconnect attempts (default %(default)s)')
+    p.add_argument('--timeout', type=float, default=CLI_TIMEOUT_S, help='socket timeout in seconds (default %(default)s)')
+    p.add_argument('--reconnect', type=int, default=CLI_RECONNECT, help='when the connection dies (an unanswered ping, a reset, a timeout), retry this many times before giving up; 0 = off (default %(default)s)')
+    p.add_argument('--reconnect-wait', type=float, default=CLI_RECONNECT_WAIT_S, help='seconds between the reconnect attempts (default %(default)s)')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env FAKE_CONTROL_TOKEN)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line); not for use with --control-token (env FAKE_CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
-    p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = off (default %(default)s)')
-    p.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
+    p.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = off (default %(default)s)')
+    p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
     p.add_argument('--no-audit-log', action='store_true', help='disable the audit trail')
     args = p.parse_args()
 
     audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CLI')
 
-    token = args.control_token or os.environ.get('FAKE_CONTROL_TOKEN')
+    if args.control_token and args.control_token_file:
+        p.error('--control-token and --control-token-file are mutually exclusive')
+    if args.control_token_file:
+        token = load_token_file(args.control_token_file)
+    else:
+        token = args.control_token or os.environ.get('FAKE_CONTROL_TOKEN')
     target = resolve_control_target(args.control_port)
     if target.isdigit():
         if not 1 <= int(target) <= 65535:

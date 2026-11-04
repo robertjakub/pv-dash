@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""Modbus TCP wire format: constants, errors and frame helpers (stdlib only)."""
+"""Modbus TCP wire format: constants, errors and frame helpers (stdlib only).
+The limits and codes come from lib/static.json (see statics.py)."""
 import struct
 
-MAX_PDU = 253
-MAX_COUNT = 125
-WRITE_FUNCS = frozenset((5, 6, 15, 16, 22, 23))
-ILLEGAL_FUNCTION = 0x01
-ILLEGAL_ADDRESS = 0x02
-ILLEGAL_VALUE = 0x03
-GATEWAY_FAILED = 0x0B
+from .statics import MAX_PDU, MAX_COUNT, WRITE_FUNCS, ILLEGAL_FUNCTION, \
+    ILLEGAL_ADDRESS, ILLEGAL_VALUE, GATEWAY_FAILED
 
 
 class ModbusError(Exception):

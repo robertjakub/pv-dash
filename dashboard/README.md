@@ -15,6 +15,8 @@ and packaging overview live in the [suite root](../README.md).
 | File | Purpose |
 |---|---|
 | `src/static/index.html` | markup only — links `style.css`, loads `boot.js`, `app.js`, `config.js`, `i18n.js` |
+| `src/lib/static.json` | the static constants: the shipped server defaults (port, bind, upstream, proxy prefix/timeout) |
+| `src/lib/statics.py` | its loader (the STATIC dict + the named aliases) |
 | `src/static/vendor/echarts.min.js` | vendored ECharts 5.5.1 (Apache-2.0) — no CDN needed |
 | `src/static/style.css` | all styling (dark/light themes, layout, flow diagram) |
 | `src/static/boot.js` | config/i18n loader — must stay in `<head>`; sets `window.__boot` |

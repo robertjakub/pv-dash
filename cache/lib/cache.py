@@ -1,36 +1,51 @@
 #!/usr/bin/env python3
-"""The in-memory register cache and the poll block planner (stdlib only)."""
+"""The in-memory register cache and the poll block planner (stdlib only).
+
+Registers live in two Modbus address spaces — FC3 (holding registers) and
+FC4 (input registers) — cached separately: every address in this module is
+an (fc, addr) tuple and every range an (fc, start, count) tuple. Blocks
+never merge across function codes (a read can only serve one)."""
 import threading
 import time
 
+from .statics import MAX_COUNT
+
 
 def span(leaves):
-    return leaves[-1][0] + leaves[-1][1] - leaves[0][0]
+    """The register count a group of ranges spans (same address space; the
+    leaves are (fc, start, count) ranges)."""
+    return leaves[-1][2] + leaves[-1][1] - leaves[0][1]
 
 
 def build_blocks(ranges, merge_gap):
-    """Merge sorted register ranges into as few read blocks as possible.
+    """Merge sorted register ranges into as few read blocks as possible,
+    per function code.
 
-    Ranges are merged when the gap between them is at most merge_gap
-    registers and the block stays within the Modbus read limit; 0 disables
-    merging. Blocks may cover registers between the listed ranges — those
-    are cached too.
-    """
+    Ranges are merged when they share the function code, the gap between
+    them is at most merge_gap registers and the block stays within the
+    Modbus read limit; 0 disables merging. Blocks may cover registers
+    between the listed ranges — those are cached too. Returns
+    (fc, start, count, leaves) tuples; the leaves are the (fc, start,
+    count) ranges the block covers."""
     blocks = []
-    start = end = None
-    group = []
-    for s, c in sorted(set(ranges)):
-        e = s + c
-        if start is None:
-            start, end, group = s, e, [(s, c)]
-        elif s - end <= merge_gap and e - start <= 125:
-            end = e
-            group.append((s, c))
-        else:
-            blocks.append((start, end - start, tuple(group)))
-            start, end, group = s, e, [(s, c)]
-    if start is not None:
-        blocks.append((start, end - start, tuple(group)))
+    for fc in (3, 4):
+        fc_ranges = sorted(set(r for r in ranges if r[0] == fc))
+        if not fc_ranges:
+            continue
+        start = end = None
+        group = []
+        for _, s, c in fc_ranges:
+            e = s + c
+            if start is None:
+                start, end, group = s, e, [(fc, s, c)]
+            elif s - end <= merge_gap and e - start <= MAX_COUNT:
+                end = e
+                group.append((fc, s, c))
+            else:
+                blocks.append((fc, start, end - start, tuple(group)))
+                start, end, group = s, e, [(fc, s, c)]
+        if start is not None:
+            blocks.append((fc, start, end - start, tuple(group)))
     return blocks
 
 
@@ -39,19 +54,19 @@ class Cache:
         self.ranges = ranges
         self.cache_ttl = cache_ttl
         self.lock = threading.Lock()
-        self.regs = {}
-        self.ts = {}
-        self.names = names or {}
+        self.regs = {}     # (fc, addr) -> word
+        self.ts = {}       # (fc, addr) -> stamp
+        self.names = names or {}   # (fc, start, count) -> name
         self.range_ok = {r: None for r in ranges}
-        self.leaf_errors = {}
+        self.leaf_errors = {}      # (fc, start, count) -> exception code
         self.map_version = 0
 
     def update_map(self, ranges, names):
         """Swap the register map: prune removed entries, reset poll status."""
         with self.lock:
             allowed = set()
-            for start, count in ranges:
-                allowed.update(range(start, start + count))
+            for fc, start, count in ranges:
+                allowed.update((fc, a) for a in range(start, start + count))
             self.regs = {a: w for a, w in self.regs.items() if a in allowed}
             self.ts = {a: t for a, t in self.ts.items() if a in allowed}
             self.ranges = ranges
@@ -60,14 +75,14 @@ class Cache:
             self.leaf_errors = {}
             self.map_version += 1
 
-    def covers(self, addr, count):
+    def covers(self, fc, addr, count):
         """True when every requested register is cached and not expired."""
         with self.lock:
             now = time.time()
             for a in range(addr, addr + count):
-                if a not in self.regs:
+                if (fc, a) not in self.regs:
                     return False
-                if self.cache_ttl and now - self.ts[a] > self.cache_ttl:
+                if self.cache_ttl and now - self.ts[(fc, a)] > self.cache_ttl:
                     return False
             return True
 
@@ -76,18 +91,18 @@ class Cache:
             return 'never expires'
         return 'for %gs' % self.cache_ttl
 
-    def words(self, addr, count):
+    def words(self, fc, addr, count):
         with self.lock:
-            return [self.regs[a] for a in range(addr, addr + count)]
+            return [self.regs[(fc, a)] for a in range(addr, addr + count)]
 
-    def store(self, addr, words, map_version=None):
+    def store(self, fc, addr, words, map_version=None):
         with self.lock:
             if map_version is not None and map_version != self.map_version:
                 return False
             now = time.time()
             for i, w in enumerate(words):
-                self.regs[addr + i] = w
-                self.ts[addr + i] = now
+                self.regs[(fc, addr + i)] = w
+                self.ts[(fc, addr + i)] = now
             return True
 
     def clear(self):
@@ -107,10 +122,10 @@ class Cache:
         with self.lock:
             self.leaf_errors.pop(leaf, None)
 
-    def failed_leaf(self, addr, count):
+    def failed_leaf(self, fc, addr, count):
         """Modbus exception code of a failed poll covering any requested register."""
         with self.lock:
-            for (start, length), code in self.leaf_errors.items():
-                if start < addr + count and addr < start + length:
+            for (lf, start, length), code in self.leaf_errors.items():
+                if lf == fc and start < addr + count and addr < start + length:
                     return code
         return None

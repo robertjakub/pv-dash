@@ -27,7 +27,8 @@ import socket
 import sys
 
 from lib.audit import AuditLog
-from lib.paths import resolve_control_target
+from lib.paths import load_token_file, resolve_control_target
+from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S
 
 
 
@@ -38,11 +39,12 @@ def main():
     p = argparse.ArgumentParser(description='Send commands to the fake inverter control server (TCP or unix socket).')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/fake-inverter-5502.socket; env FAKE_CTL when unset) — same flag as the fake itself')
     p.add_argument('command', nargs='*', help='control command, e.g. set pv 2500, set scenario noon, show settings, status, reset, shutdown')
-    p.add_argument('--timeout', type=float, default=5.0, help='socket timeout in seconds (default %(default)s)')
+    p.add_argument('--timeout', type=float, default=CLI_TIMEOUT_S, help='socket timeout in seconds (default %(default)s)')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env FAKE_CONTROL_TOKEN)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line); not for use with --control-token (env FAKE_CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
-    p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size, 0 = off')
-    p.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
+    p.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB, help='rotate the audit log at this size, 0 = off')
+    p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
     p.add_argument('--no-audit-log', action='store_true', help='disable the audit trail')
     args = p.parse_args()
 
@@ -56,7 +58,12 @@ def main():
         if not commands:
             p.error('no commands on stdin')
 
-    token = args.control_token or os.environ.get('FAKE_CONTROL_TOKEN')
+    if args.control_token and args.control_token_file:
+        p.error('--control-token and --control-token-file are mutually exclusive')
+    if args.control_token_file:
+        token = load_token_file(args.control_token_file)
+    else:
+        token = args.control_token or os.environ.get('FAKE_CONTROL_TOKEN')
     target = resolve_control_target(args.control_port)
     if target.isdigit():
         if not 1 <= int(target) <= 65535:

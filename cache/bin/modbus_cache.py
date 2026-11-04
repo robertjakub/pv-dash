@@ -25,7 +25,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the checkout — the lib/ lives next to bin/
 
 from lib.protocol import exception_frame
-from lib.config import default_profile_path, load_registers_file, load_selection, parse_listen, resolve_config, parse_control_target
+from lib.config import default_profile_path, load_registers_file, load_selection, load_token_file, parse_listen, resolve_config, parse_control_target
 from lib.upstream import Upstream
 from lib.cache import Cache
 from lib.proxy import Proxy
@@ -70,6 +70,8 @@ def parse_args():
                     help='selection JSON: {"registers": ["pv-power", ...]} — the profile names to fetch (default: config, $MODBUS_CACHE_SELECTION or every profile entry)')
     ap.add_argument('--cache-ttl', type=float, help='per-register cache TTL: cached registers older than this are refetched from the inverter, 0 = never expire, serve last known values forever (default: config, $MODBUS_CACHE_TTL or 3x interval)')
     ap.add_argument('--allow-write', action='store_true', help='forward write requests (FC05/06/15/16) to the inverter; default: refuse them with a Modbus illegal-function exception')
+    ap.add_argument('--write-registers', dest='write_registers',
+                    help='register ranges a (forwarded) write may touch: comma-separated START:COUNT, e.g. 47400:100,47600:100; "any" = unrestricted (default: config, $MODBUS_CACHE_WRITE_REGISTERS or any)')
     ap.add_argument('--local-time', action='store_true', help='log timestamps in the system time zone instead of UTC')
     ap.add_argument('--log-access', action='store_true', help='log client connects/disconnects at INFO instead of DEBUG')
     ap.add_argument('--max-clients', type=int, help='refuse further connections past this many simultaneous clients, 0 = no limit (default: config, $MODBUS_CACHE_MAX_CLIENTS or 64)')
@@ -80,6 +82,10 @@ def parse_args():
                     help='control server target: unix socket path or TCP port on 127.0.0.1 (default: config, $MODBUS_CACHE_CTL or /tmp/modbus-cache-<listen-port>.socket); 0 = off')
     ap.add_argument('--control-token', dest='control_token',
                     help='require a token on TCP control connections: the client authenticates with {"cmd": "auth", "token": ...}; the unix socket needs no token (default: config, $MODBUS_CACHE_CONTROL_TOKEN or none)')
+    ap.add_argument('--control-token-file', dest='control_token_file',
+                    help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file) — takes the place of --control-token; giving both is an error (default: config, $MODBUS_CACHE_CONTROL_TOKEN_FILE)')
+    ap.add_argument('--reads-audit', dest='reads_audit', type=float,
+                    help='audit one READS tally per client per this many seconds, 0 = off (default: config, $MODBUS_CACHE_READS_AUDIT or 300)')
     ap.add_argument('--audit-log', dest='audit_log',
                     help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MODBUS_CACHE_AUDIT_LOG or %s — the XDG state home' % AuditLog.default_path())
     ap.add_argument('--audit-max-mb', dest='audit_max_mb', type=float,
@@ -196,6 +202,9 @@ def main():
 
     listen_host, listen_port = parse_listen(cfg['listen'])
     control_target = parse_control_target(cfg['control_port'], listen_port)
+    control_token = cfg['control_token'] or None
+    if cfg['control_token_file']:
+        control_token = load_token_file(cfg['control_token_file'])
     if cfg['no_audit_log']:
         audit_display = 'off'
     elif cfg['audit_log'] == '-':
@@ -206,7 +215,7 @@ def main():
     cache = Cache(ranges, cfg['cache_ttl'], range_names)
     proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
                   cfg['profile'], cfg)
-    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s, control token: %s, audit trail: %s)',
+    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, audit trail: %s, reads audit: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if cfg['allow_write'] else 'disabled (write requests are refused)',
@@ -217,8 +226,10 @@ def main():
                 cfg['max_clients'] or 'none', '%gs' % cfg['client_timeout'] if cfg['client_timeout'] else 'none',
                 'any' if cfg['connect_acl'] is None else '%d network(s)' % len(cfg['connect_acl']),
                 'any' if cfg['write_acl'] is None else '%d network(s)' % len(cfg['write_acl']),
-                'required on TCP' if cfg['control_token'] else 'none',
-                audit_display)
+                proxy.describe_write_ranges(),
+                'required on TCP' if control_token else 'none',
+                audit_display,
+                '%gs' % cfg['reads_audit_s'] if cfg['reads_audit_s'] else 'off')
     proxy.log_map()
     if args.dry_run:
         logger.info('dry-run: configuration and register map are valid, nothing was bound or connected (control server would listen on %s)',
@@ -237,8 +248,18 @@ def main():
                        cfg['selection'] or cfg['profile']))
     stop = install_signal_handlers(proxy, cache, args)
     if control_target is not None:
+        defaults = {'interval': '%g' % cfg['interval'],
+                    'ttl': 'off' if not cfg['cache_ttl'] else '%g' % cfg['cache_ttl'],
+                    'read-delay': '%g' % cfg['read_delay'],
+                    'merge-gap': '%d' % cfg['merge_gap'],
+                    'allow-write': 'on' if cfg['allow_write'] else 'off',
+                    'write-registers': proxy.describe_write_ranges(),
+                    'max-clients': '%d' % cfg['max_clients'],
+                    'client-timeout': '%g' % cfg['client_timeout'],
+                    'reads-audit': 'off' if not cfg['reads_audit_s'] else '%g' % cfg['reads_audit_s'],
+                    'log-level': cfg['level']}
         proxy.control = ControlServer(proxy, control_target, stop, audit=audit,
-                                      token=cfg['control_token'] or None)
+                                      token=control_token, defaults=defaults)
         proxy.control.start()
     try:
         threading.Thread(target=proxy.poll_loop, daemon=True).start()

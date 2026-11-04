@@ -1,0 +1,30 @@
+{
+  "protocol": {
+    "max_pdu": 253,
+    "max_count": 125,
+    "max_registers": 65535,
+    "unit_id_range": [1, 247]
+  },
+  "diagnostics": {
+    "base": 65000,
+    "count": 4,
+    "magic": 51966,
+    "max_age": 65535
+  },
+  "log_levels": ["DEBUG", "INFO", "WARNING", "ERROR"],
+  "defaults": {
+    "host": "127.0.0.1",
+    "modbus_port": 5502,
+    "unit": 1,
+    "timeout_s": 3.0,
+    "listen": "127.0.0.1:9350",
+    "interval_s": 5.0,
+    "scale": 1.0,
+    "grid_scale": 1.0,
+    "max_kwp": 6.0,
+    "max_grid_kw": 12.0,
+    "max_clients": 64,
+    "client_timeout_s": 300.0,
+    "log_level": "INFO"
+  }
+}

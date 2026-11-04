@@ -23,6 +23,7 @@ from .profile import load_profile, profile_label, resolve_profile
 from .version import version_string
 from .settings import SETTING_NAMES, SETTING_BY_NAME, describe_setting
 from .simulator import CLOUD_MACHINES, format_clock
+from .statics import CONTROL_IDLE_TIMEOUT_S, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
 
 logger = logging.getLogger('fake-inverter')
 
@@ -103,7 +104,7 @@ class ControlServer:
         logger.debug('control client connected from %s', who)
         authed = False
         try:
-            client.settimeout(300)
+            client.settimeout(CONTROL_IDLE_TIMEOUT_S)
             buf = b''
             while True:
                 if b'\n' not in buf:      # buffered reads: a 1 MB frame must not
@@ -197,8 +198,8 @@ class ControlServer:
                 sim.set_time_scale(1.0)
                 return 'x1 (real time)'
             v = float(val)
-            if not math.isfinite(v) or v <= 0 or v > 1440:
-                raise ValueError('time-scale must be 0 < N <= 1440 (a day per minute)')
+            if not math.isfinite(v) or v <= 0 or v > TIME_SCALE_MAX:
+                raise ValueError('time-scale must be 0 < N <= %g (a day per minute)' % TIME_SCALE_MAX)
             sim.set_time_scale(v)
             return 'x%g' % v
         if key == 'chaos':
@@ -261,7 +262,7 @@ class ControlServer:
             v = float(val)
             if not math.isfinite(v) or v <= 0:
                 raise ValueError('max-kwp must be a positive kW value')
-            sim.peak_w = 0.75 * v * 1000.0
+            sim.peak_w = PEAK_RATIO * v * 1000.0
             return '%g' % v
         if key == 'profile':
             path = 'sun2000' if val in ('default', 'auto', 'none') else resolve_profile(value.strip())
@@ -339,7 +340,7 @@ class ControlServer:
         if key == 'static':
             return 'on' if sim.static else 'off'
         if key == 'max-kwp':
-            return '%g' % (sim.peak_w / 750.0)
+            return '%g' % (sim.peak_w / (1000.0 * PEAK_RATIO))
         if key == 'battery-kwh':
             return '%g' % sim.battery_kwh
         if key == 'profile':
@@ -351,7 +352,8 @@ class ControlServer:
         return '?'
 
     def settings(self):
-        return ' '.join('%s=%s' % (k, self._get(k)) for k in self.SETTING_KEYS)
+        """Every setting with its value: one key=value per line (scriptable)."""
+        return 'ok settings\n' + '\n'.join('%s=%s' % (k, self._get(k)) for k in self.SETTING_KEYS)
 
     def command(self, line):
         if not line:
@@ -446,8 +448,8 @@ class ControlServer:
                     addr, val = int(args[1]), int(args[2])
                 except ValueError:
                     return 'err register address and value must be integers'
-                if not 0 <= addr <= 65535 or not 0 <= val <= 65535:
-                    return 'err register address/value out of range (0..65535)'
+                if not 0 <= addr <= MAX_REGISTERS - 1 or not 0 <= val <= MAX_REGISTERS - 1:
+                    return 'err register address/value out of range (0..%d)' % (MAX_REGISTERS - 1)
                 self.fake.overlay[addr] = val
                 logger.info('control: set register %d=%d (write overlay)', addr, val)
                 return 'ok register %d=%d (the write overlay, the scrapers read it)' % (addr, val)

@@ -68,7 +68,11 @@ The profile JSON format is documented in
 [profiles/README.md](../profiles/README.md).
 Resolution: `--profile` flag, env `MODBUS_CACHE_PROFILE`, ini `profile`,
 then the bundled copy; the file is re-read on `SIGHUP`. Entry `type`
-(i16/u16/i32/u32) gives the word width, `name` decorates the poll logs.
+(i16/u16/i32/u32) gives the word width, `name` decorates the poll logs, and
+the optional **`fc`** field picks the address space: `3` (holding
+registers, the default) or `4` (input registers) — the two spaces are
+cached and polled independently, and both are served from the cache on
+their own function code.
 
 Which registers are actually **fetched** comes from a selection file —
 `{"registers": ["pv-power", "grid-power", ...]}`, profile names only —
@@ -77,34 +81,19 @@ resolved as `--selection` flag, env `MODBUS_CACHE_SELECTION`, ini
 **`selection.json`** (in the subproject root) is an example — the essential
 SUN2000 monitoring
 set (the classic 13-range map, by name). Reads outside the selected set are
-forwarded to the inverter. The 65000-65003 diagnostics
+forwarded to the inverter (FC3 and FC4 alike — a forwarded FC4 read is
+cached on its way through, under its own function code). The 65000-65003
+diagnostics
 block is not a device register — it never appears in a profile and is never
-fetched: the cache synthesizes it from its own poller state.
-
-The format:
-
-```json
-{
-  "registers": [
-    { "name": "PV input power (int32, /1000 kW)", "start": 32064, "count": 2 },
-    { "start": 37113, "count": 2 }
-  ]
-}
-```
-
-- `start` — first register of the range; `count` — number of registers
-  (1–125, the Modbus read limit)
-- `name` is optional and only decorates the logs
-- entries may also be plain `"START:COUNT"` strings
-- reads outside the cached ranges are forwarded to the inverter live — an
-  empty list turns the proxy into a pure pass-through
+fetched: the cache synthesizes it from its own poller state (FC3 only).
 
 For slow dongles the poller reads the map in as **few transactions as
 possible**: ranges closer together than `--merge-gap` registers (default 8)
 are merged into one block read, which may also cover registers between the
-listed ones (those are cached too). A block that fails — e.g. because it
-spans an unmapped register — is split in halves and the pieces are retried;
-the plan converges to the largest blocks the device actually answers.
+listed ones (those are cached too) — never across the FC3/FC4 boundary. A
+block that fails — e.g. because it spans an unmapped register — is split in
+halves and the pieces are retried; the plan converges to the largest blocks
+the device actually answers.
 
 ## Usage
 
@@ -145,10 +134,12 @@ Settings are resolved in this order (first hit wins), mirroring
    `MODBUS_CACHE_TTL`, `MODBUS_CACHE_ALLOW_WRITE`, `MODBUS_CACHE_LOCAL_TIME`,
    `MODBUS_CACHE_LOG_ACCESS`, `MODBUS_CACHE_MAX_CLIENTS`,
    `MODBUS_CACHE_CLIENT_TIMEOUT`, `MODBUS_CACHE_CONNECT_ACL`,
-   `MODBUS_CACHE_WRITE_ACL`, `MODBUS_CACHE_LOG_LEVEL`,
-   `MODBUS_CACHE_CONTROL_TOKEN`, `MODBUS_CACHE_AUDIT_LOG`,
+   `MODBUS_CACHE_WRITE_ACL`, `MODBUS_CACHE_WRITE_REGISTERS`,
+   `MODBUS_CACHE_LOG_LEVEL`, `MODBUS_CACHE_CONTROL_TOKEN`,
+   `MODBUS_CACHE_CONTROL_TOKEN_FILE`, `MODBUS_CACHE_AUDIT_LOG`,
    `MODBUS_CACHE_AUDIT_MAX_MB`, `MODBUS_CACHE_AUDIT_DAILY`,
-   `MODBUS_CACHE_AUDIT_FILES`, `MODBUS_CACHE_NO_AUDIT_LOG`
+   `MODBUS_CACHE_AUDIT_FILES`, `MODBUS_CACHE_NO_AUDIT_LOG`,
+   `MODBUS_CACHE_READS_AUDIT`
 3. Config file (snake_case keys, `[cache]` section) — `--config` picks the
    file (default: `modbus_cache.ini` next to `modbus_cache.py` — the
    packaged layout — then the subproject root's sample; a missing file
@@ -174,15 +165,18 @@ with a clean one-line error instead of failing later at runtime.
 | `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Behaviour toggles** | | |
 | `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (ini `allow_write`, env `MODBUS_CACHE_ALLOW_WRITE` accept `true`/`false`) |
+| `--write-registers` | `any` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception (ini `write_registers`, env `MODBUS_CACHE_WRITE_REGISTERS`) |
 | `--connect-acl` | `any` | clients allowed to connect: `any` or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `any` | clients allowed to write — still requires `--allow-write` — see [Access control](#access-control) |
 | `--control-token` | none | require a token on **TCP** control connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; the unix socket needs no token (ini `control_token`, env `MODBUS_CACHE_CONTROL_TOKEN`) |
+| `--control-token-file` | none | the token from a file (the first line; a systemd `LoadCredential` or a key file) — instead of `--control-token`, giving both is an error (ini `control_token_file`, env `MODBUS_CACHE_CONTROL_TOKEN_FILE`) |
 | **Audit trail** | | |
 | `--audit-log` | XDG state | the CACHE audit trail: a file path or `-` for stdout (docker logs / journald); default `~/.local/state/modbus-cache/audit.log` — see [Audit logging](#audit-logging) |
 | `--audit-max-mb` | `10` | rotate the audit log at this size, keeping `--audit-files` backups; `0` = off |
 | `--audit-daily` | off | also rotate the audit log at UTC midnight |
 | `--audit-files` | `3` | rotated audit backups to keep |
 | `--no-audit-log` | off | disable the audit trail |
+| `--reads-audit` | `300` | audit one `READS` tally per client per this many seconds (who is hammering the cache), `0` = off (ini `reads_audit_s`, env `MODBUS_CACHE_READS_AUDIT`) |
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect clients silent for this many seconds — sheds connections from clients that died without closing (`0` = never) |
@@ -242,7 +236,13 @@ permissions instead.
 
 | Command | Effect |
 |---|---|
-| `show status` | one-line effective state: upstream, listen address, client count, uptime, poll health, last poll age, interval, TTL, range/map counts, hit/miss counters |
+| `set <setting> <value>` | configure a setting **live**: `interval`, `ttl`, `read-delay`, `merge-gap` (the poll plan rebuilds), `allow-write`, `write-registers`, `max-clients`, `client-timeout`, `reads-audit`, `log-level` — the reply carries the compact state summary |
+| `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
+| `show <setting>` | the bare live value of one tunable |
+| `show settings` | every tunable with its live value — one stable `key=value` line per setting (scriptable) |
+| `help <setting>` | the registry description of one setting |
+| `inspect` | one pretty multi-line dump of everything — version, upstream, listen/control, profile, cache state, poll plan, counters, the write gate, the audit sink: the baton for a bug report |
+| `show status` | the **effective state report**: one stable `key=value` line per field (`upstream`, `unit`, `listen`, `control`, `uptime`, `poll`, `last_poll`, `interval`, `ttl`, `merge_gap`, `ranges`, `fc4_ranges`, `map_version`, `hits`, `misses`, `clients`, `writes`, `write_allow_list`, `reads_audit`, `profile`, `selection`) — scriptable |
 | `show connections` | connected clients: peer, connection age, requests served |
 | `show cache` | cache contents: ranges, cached words, oldest entry, TTL, map version, failed ranges, hit/miss counters |
 | `show version` | the modbus-cache version |
@@ -281,7 +281,26 @@ $ python3 cache/bin/cache_cli.py
 %   TAB completes, ? lists the commands, quit leaves
 
 cache:15502 > show status
-status upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 clients=1 uptime=3600s poll=ok last-poll=2s ago interval=10s ttl=30s ranges=13 map=v0 hits=412 misses=9
+ok status
+upstream=192.168.1.100:5502
+unit=1
+listen=127.0.0.1:15502
+control=unix:/tmp/modbus-cache-15502.socket
+uptime=3600
+poll=ok
+last_poll=2s
+interval=10s
+ttl=30s
+merge_gap=8
+ranges=13
+fc4_ranges=0
+map_version=0
+hits=412
+misses=9
+clients=1
+writes=disabled
+write_allow_list=any
+reads_audit=300s
 
 cache:15502 > clear cache
 ok
@@ -292,8 +311,9 @@ bye shutdown
 ```
 
 The prompt shows the connected port, TAB completes commands with their
-descriptions (`show <TAB>` lists status/connections/cache/version, `?` does
-the same in any position), `clear cache` and `restart` confirm with a plain
+descriptions (`show <TAB>` lists the tunables plus status/connections/cache/
+settings/version, `?` does the same in any position), `clear cache` and
+`restart` confirm with a plain
 `ok`, and `shutdown` asks `Proceed with shutdown? [confirm]` first — RETURN
 or `y` proceeds, anything else aborts with `% Aborted.`. While it idles the
 CLI sends wire pings (every 55 s, `CACHE_CLI_KEEPALIVE` to tune, `0` = off)
@@ -391,7 +411,9 @@ The prefix names the writer — `CACHE` (the proxy), `CLI` (cache_cli) and
 2026-11-04T07:16:43Z AUDIT CACHE WRITE register 47415 = 5 (single register, unit 1)
 2026-11-04T07:17:02Z AUDIT CACHE AUTH-FAIL peer=127.0.0.1:54425
 2026-11-04T07:17:12Z AUDIT CACHE COMMAND peer=127.0.0.1:54426 'clear cache' -> ok
+2026-11-04T07:17:30Z AUDIT CACHE READS peer=127.0.0.1:54425 requests=412 (last 300s: 380)
 2026-11-04T07:17:30Z AUDIT CLI CONNECT target=127.0.0.1:15502 user=oom
+2026-11-04T07:17:45Z AUDIT CACHE READS peer=127.0.0.1:54425 requests=412 connected=342s
 2026-11-04T07:17:45Z AUDIT CACHE SHUTDOWN SIGTERM received: uptime=65s clients=1 hits=412 misses=9
 2026-11-04T07:18:02Z AUDIT CTL CONNECT target=unix:/tmp/modbus-cache-15502.socket user=oom
 ```
@@ -401,15 +423,16 @@ who-when-what evidence trail. **Every wire command is audited once, by the
 server** (`AUDIT CACHE COMMAND`, with the client peer — it knows the who);
 the CLI audits its session (CONNECT/DISCONNECT, the local-only events like
 an aborted `shutdown`, RECONNECT attempts). The proxy audits its lifecycle
-too: `START`, `RELOAD` (SIGHUP), `RESET` (SIGUSR1), `SHUTDOWN` — and, most
-important for a write-forwarding gate, every forwarded `WRITE` plus the
-refusals (`WRITE-REFUSED` when disabled or off the write ACL,
-`WRITE-REJECTED`/`WRITE-FAILED` when the device says no or the session
-died) and the TCP control `AUTH-FAIL`s. ping/pong keepalives are never
+(`START`, `RELOAD`, `RESET`, `SHUTDOWN`), every forwarded/refused/rejected
+write, the per-client READS
+tallies and the TCP control `AUTH-FAIL`s. ping/pong keepalives are never
 logged; the file is flushed per event, so a crash keeps everything up to
 the last command. The trail is **thread-safe** (one writer lock around the
 write+flush+rotate cycle) — the proxy's client threads audit every
-forwarded write concurrently.
+forwarded write concurrently. The per-client **read accounting** runs on
+the same trail: one `READS` event per client per `--reads-audit` period (default 300 s —
+who is hammering the cache) plus a final tally on every disconnect
+(`READS peer=… requests=812 connected=342s`).
 
 The operational log above keeps mirroring the events at INFO; the audit
 file is the structured evidence trail, not a duplicate of it.
@@ -420,11 +443,12 @@ Three standalone suites live in the suite-root [`tests/`](../tests/) — stdlib 
 own fake inverter + proxy on scratch ports and cleans up after itself:
 
 ```bash
-python3 tests/cache-regtest.py    # 69 functional checks (cache, forwarding,
-                                  #   writes/refusals, diagnostics registers,
-                                  #   device death, poll status, reloads,
-                                  #   hostile-upstream phase, JSON control +
-                                  #   token auth + audit trail + ctl/cli clients)
+python3 tests/cache-regtest.py    # 98 functional checks (cache + FC4, forwarding,
+                                  #   writes/refusals/allow-list, diagnostics registers,
+                                  #   device death, poll status, reloads, live
+                                  #   set/unset settings, inspect, hostile-upstream
+                                  #   phase, JSON control + token auth/token-file +
+                                  #   audit trail + ctl/cli clients)
 python3 tests/cache-stress.py     # 100 clients / 15 s load + latency report
 python3 tests/cache-fuzz.py [n]   # n client-garbage frames (default 3000)
 python3 tests/cache-control-fuzz.py   # hostile JSON against the control server
@@ -464,12 +488,18 @@ services.modbus-scraper = {
 Options: `inverterHost`, `inverterPort`, `unitId`, `timeout`, `interval`,
 `readDelay`, `mergeGap`, `profile` (device-profile JSON path; null = the
 bundled `sun2000` profile), `cacheTtl` (unset = 3× `interval`),
-`listenHost`, `listenPort`, `allowWrite`, `connectAcl`, `writeAcl`,
-`maxClients`, `clientTimeout`, `logLevel`, `localTime`, `logAccess`,
-`openFirewall`, `auditLog` (null = the trail goes to **stdout**, which
-journald captures — the hardened service cannot write the XDG state home),
-`auditMaxMb`, `auditDaily`, `auditFiles`. Unset options keep the proxy
-defaults. The service runs with a dynamic user and systemd hardening.
+`listenHost`, `listenPort`, `allowWrite`, `writeRegisters` (the
+comma-separated START:COUNT allow-list; null = any), `connectAcl`,
+`writeAcl`, `maxClients`, `clientTimeout`, `logLevel`, `localTime`,
+`logAccess`, `openFirewall`, `auditLog` (null = the trail goes to
+**stdout**, which journald captures — the hardened service cannot write
+the XDG state home), `auditMaxMb`, `auditDaily`, `auditFiles`, `readsAudit`
+(null = 300 s), `controlPort` (a TCP port on 127.0.0.1 or a unix socket
+path — use one under `/run/modbus-cache/`, `/tmp` is private to the
+service), `controlToken` (**world-readable in the store ini** — prefer the
+file), `controlTokenFile` (mounted via systemd `LoadCredential`). Unset
+options keep the proxy defaults. The service runs with a dynamic user and
+systemd hardening.
 
 The module renders the **config INI and the register map into the store**
 and runs the service with `--config`. A `nixos-rebuild switch` applies
@@ -509,12 +539,14 @@ cache/
 ├── modbus_cache.ini     # sample config (the default --config target)
 ├── selection.json       # example selection: the essential monitoring set
 └── lib/
+    ├── static.json      # the static constants: protocol limits, diagnostics block, defaults
+    ├── statics.py       # its loader (the STATIC dict + the named aliases)
     ├── protocol.py      # wire format, errors, frame helpers
     ├── config.py        # settings resolution + device-profile loading
     ├── upstream.py      # the shared inverter connection
     ├── cache.py         # register cache + block planner
     ├── proxy.py         # poller + client handling
-    ├── control.py       # JSON-lines control server (show/clear/restart/shutdown, token auth)
+    ├── control.py       # JSON-lines control server (inspect/show/clear/restart/shutdown, token auth)
     ├── audit.py         # the append-only audit trail (AUDIT CACHE/CLI/CTL lines)
     └── version.py       # the suite version
 ```

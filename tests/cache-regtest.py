@@ -6,6 +6,7 @@ Starts its own fake inverter + proxy on scratch ports and cleans up.
 """
 import json as _json
 import os
+import signal
 import socket
 import struct
 import subprocess
@@ -56,22 +57,24 @@ def rd(addr, n, port=CACHE_PORT):
     return txn(struct.pack('>BHH', 3, addr, n), port)
 
 
-def wr6(addr, value):
-    return txn(struct.pack('>BHH', 6, addr, value))
+def wr6(addr, value, port=CACHE_PORT):
+    return txn(struct.pack('>BHH', 6, addr, value), port)
 
 
-def wr16(addr, values):
-    return txn(struct.pack('>BHHB', 16, addr, len(values), len(values) * 2) + struct.pack('>%dH' % len(values), *values))
+def wr16(addr, values, port=CACHE_PORT):
+    return txn(struct.pack('>BHHB', 16, addr, len(values), len(values) * 2)
+               + struct.pack('>%dH' % len(values), *values), port)
 
 
 procs = []
 
 
-def start(cmd, log=None):
+def start(cmd, log=None, env_extra=None):
+    env = {**os.environ, **(env_extra or {})}
     if log:
-        p = subprocess.Popen(cmd, stdout=open(log, 'w'), stderr=subprocess.STDOUT)
+        p = subprocess.Popen(cmd, stdout=open(log, 'w'), stderr=subprocess.STDOUT, env=env)
     else:
-        p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
     procs.append(p)
     return p
 
@@ -391,7 +394,9 @@ try:
            '--control-port', '15514'], log='/tmp/reg_ctl.log')
     time.sleep(2)
     r = ctl_cmd('show status', 15514)
-    check('control: show status one line', r.startswith('ok status upstream=127.0.0.1:15512 unit=1 listen=127.0.0.1:15513 clients=0')
+    check('control: show status multi-line report', r.startswith('ok status\n')
+          and 'upstream=127.0.0.1:15512' in r and 'listen=127.0.0.1:15513' in r
+          and 'poll=ok' in r and 'hits=0' in r
           and 'poll=' in r and 'hits=0' in r, r)
     c1 = socket.create_connection(('127.0.0.1', 15513), timeout=5)
     pdu = struct.pack('>BHH', 3, 32064, 2)
@@ -478,8 +483,8 @@ try:
         return subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=30, env=env)
 
     r = cli('show status\nquit\n')
-    check('cache_cli: show status prints the state line', r.returncode == 0
-          and '\ncache:15514 > status upstream=' in r.stdout, repr(r.stdout[-120:]))
+    check('cache_cli: show status prints the report', r.returncode == 0
+          and '\ncache:15514 > upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-160:]))
     r = cli('clear cache\nquit\n')
     check('cache_cli: clear cache confirms silently', r.returncode == 0
           and '\ncache:15514 > ok\n' in r.stdout, repr(r.stdout[-120:]))
@@ -497,7 +502,7 @@ try:
     p.stdin.flush()
     out, _ = p.communicate(timeout=15)
     check('cache_cli: keepalive keeps an idle session alive (pongs absorbed)',
-          p.returncode == 0 and 'status upstream=127.0.0.1:15512' in out
+          p.returncode == 0 and 'upstream=127.0.0.1:15512' in out
           and 'ok pong' not in out, repr(out[-120:]))
     p_unix = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
                                '--listen', '127.0.0.1:15515', '--interval', '1', '--profile', R],
@@ -507,13 +512,13 @@ try:
     check('control: default unix socket for the listen port', os.path.exists('/tmp/modbus-cache-15515.socket'))
     r = cli('show status\nquit\n', 15515, {'MODBUS_CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
     check('cache_cli: MODBUS_CACHE_CTL reaches the default socket', r.returncode == 0
-          and 'status upstream=127.0.0.1:15512' in r.stdout and 'cache:15515 > ' in r.stdout, repr(r.stdout[-120:]))
+          and 'upstream=127.0.0.1:15512' in r.stdout and 'cache:15515 > ' in r.stdout, repr(r.stdout[-120:]))
     r = cli('show status\nquit\n', 15515, {'CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
     check('cache_cli: short CACHE_CTL env works too', r.returncode == 0
-          and 'status upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
+          and 'upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
     r = cli('show status\nquit\n', 15520, {'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     check('cache_cli: token env authenticates the TCP control session', r.returncode == 0
-          and 'status upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
+          and 'upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
     r = cli('show status\nquit\n', 15520)
     check('cache_cli: token server refuses the token-less CLI', r.returncode == 0
           and 'err authenticate first' in r.stdout, repr(r.stdout[-160:]))
@@ -523,17 +528,173 @@ try:
     r = subprocess.run([sys.executable, ctl, '--control-port', '15514', 'show', 'status'],
                        capture_output=True, text=True, timeout=30)
     check('cache_ctl: one-shot show status', r.returncode == 0
-          and r.stdout.startswith('ok status upstream=127.0.0.1:15512'), repr(r.stdout[:120]))
+          and r.stdout.startswith('ok status\nupstream=127.0.0.1:15512'), repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15520'],
                        input='show cache\nclear cache\n', capture_output=True, text=True,
                        timeout=30, env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     check('cache_ctl: piped batch with the token env', r.returncode == 0
           and r.stdout.startswith('ok cache ') and 'ok cache cleared' in r.stdout, repr(r.stdout[:160]))
+
+    # 5d. set/unset/show settings: the live settings registry (the inverter's pattern)
+    r = ctl_cmd('set interval 2', 15514)
+    check('set: interval applied with the state summary', r.startswith('ok interval=2s upstream=127.0.0.1:15512')
+          and 'poll=' in r and 'hits=' in r, r[:120])
+    r = ctl_cmd('show status', 15514)
+    check('set: show status reflects the new interval', 'interval=2s' in r, r[:120])
+    r = ctl_cmd('set interval bogus', 15514)
+    check('set: a bogus value is a clean err', r.startswith('err interval must be seconds'), r[:100])
+    r = ctl_cmd('set bogus 1', 15514)
+    check('set: unknown setting', r.startswith('err unknown setting'), r[:100])
+    r = ctl_cmd('show settings', 15514)
+    check('show settings: every tunable, one per line', r.startswith('ok settings\n')
+          and 'interval=2s' in r and '\nttl=' in r and '\nmerge-gap=' in r
+          and '\nlog-level=INFO' in r, r[:160])
+    r = ctl_cmd('show interval', 15514)
+    check('show <setting>: the bare value', r == 'ok interval=2s', r)
+    r = ctl_cmd('help ttl', 15514)
+    check('help <setting>: the registry description', r.startswith('ok ttl - per-register cache TTL'), r[:110])
+    r = ctl_cmd('unset interval', 15514)
+    check('unset: restores the configured value', r.startswith('ok interval=1s'), r[:110])
+
+    r_before = ctl_cmd('inspect', 15514)
+    ctl_cmd('set merge-gap 0', 15514)
+    r_after = ctl_cmd('inspect', 15514)
+    n_before = r_before.split('poll plan ')[1].split(' block(s)')[0]
+    n_after = r_after.split('poll plan ')[1].split(' block(s)')[0]
+    check('set merge-gap: the poll plan rebuilds live', int(n_after) > int(n_before),
+          '%s -> %s' % (n_before, n_after))
+    ctl_cmd('unset merge-gap', 15514)
+
+    r = ctl_cmd('set allow-write on', 15514)
+    check('set allow-write: the gate opens', r.startswith('ok allow-write=on'), r[:100])
+    b = wr6(47415, 3, port=15513)
+    check('set allow-write: the forwarded write passes', b == bytes.fromhex('06b9370003'), b.hex())
+    ctl_cmd('unset allow-write', 15514)
+    b = wr6(47415, 4, port=15513)
+    check('unset allow-write: the gate closes again', b[0] == 0x86 and b[1] == 1, b.hex())
     r = cli('shutdown\n\n', 15515, {'MODBUS_CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
     time.sleep(1)
     check('cache_cli: RETURN at [confirm] stops the proxy', r.returncode == 0
           and 'bye shutdown' in r.stdout and p_unix.poll() == 0, repr(r.stdout))
     check('control: unix socket unlinked on shutdown', not os.path.exists('/tmp/modbus-cache-15515.socket'))
+    # 6. FC4 input-register caching, the write allow-list, inspect,
+    #    per-client READS accounting, the control token file
+    fc4map = '/tmp/reg_fc4_profile.json'
+    _json.dump({'description': 'fc4 device (mixed spaces)',
+                'registers': [
+                    {'name': 'pv-power', 'register': 32064, 'type': 'i32', 'fc': 3, 'cache': True},
+                    {'name': 'meter-live', 'register': 40001, 'type': 'u32', 'fc': 4, 'cache': True},
+                ]}, open(fc4map, 'w'))
+    # the allow-list rides the ini (the reloadable source: the env is frozen at start)
+    ini4 = '/tmp/reg_fc4.ini'
+    open(ini4, 'w').write(open(os.path.join(CACHE_DIR, 'modbus_cache.ini')).read()
+                          .replace('write_registers = any', 'write_registers = 47400:100'))
+
+    def rd4(addr, n, port=CACHE_PORT):
+        return txn(struct.pack('>BHH', 4, addr, n), port)
+
+    p_fc4 = start([sys.executable, P, '--config', ini4,
+                   '--host', '127.0.0.1', '--port', '15512',
+                   '--listen', '127.0.0.1:15521', '--interval', '1', '--cache-ttl', '3',
+                   '--allow-write', '--control-port', '15522',
+                   '--profile', fc4map, '--audit-log', '/tmp/reg_audit_fc4.log'],
+                  log='/tmp/reg_fc4.log', env_extra={'MODBUS_CACHE_READS_AUDIT': '1'})
+    time.sleep(2.5)
+    b = rd(32064, 2, port=15521)
+    check('fc3 range polled and served', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
+    b = rd4(40001, 2, port=15521)
+    check('fc4 range polled and served from cache', b[0] == 4 and struct.unpack('>i', b[2:6])[0] == 0, b.hex())
+    b = rd4(31000, 1, port=15521)
+    check('fc4 uncached register forwarded (device answers 0)', b[0] == 4 and struct.unpack('>H', b[2:4])[0] == 0, b.hex())
+    forwards = subprocess.run(['grep', '-c', 'fc4 registers 31000:1 not cached', '/tmp/reg_fc4.log'],
+                              capture_output=True, text=True).stdout.strip()
+    b = rd4(31000, 1, port=15521)
+    forwards2 = subprocess.run(['grep', '-c', 'fc4 registers 31000:1 not cached', '/tmp/reg_fc4.log'],
+                               capture_output=True, text=True).stdout.strip()
+    check('fc4 forward cached on first pass', forwards == '1' and forwards2 == '1', '%s/%s' % (forwards, forwards2))
+    b = rd4(65000, 1, port=15521)
+    forwards = subprocess.run(['grep', '-c', 'fc4 registers 65000:1 not cached', '/tmp/reg_fc4.log'],
+                              capture_output=True, text=True).stdout.strip()
+    check('fc4 65000 not synthetic -> forwarded to the device', b[0] == 4 and forwards == '1',
+          '%s forwards=%s' % (b.hex(), forwards))
+    b = rd(65000, 4, port=15521)
+    check('fc3 diagnostics block still synthesized', b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 0xCAFE, b.hex())
+
+    # the write allow-list: inside passes, outside refuses, a spanning write refuses
+    b = wr6(47415, 7, port=15521)
+    check('write allow-list: register inside the range passes', b == bytes.fromhex('06b9370007'), b.hex())
+    b = rd(47415, 1, port=15521)
+    check('write allow-list: value landed (fc06 readback)', struct.unpack('>H', b[2:4])[0] == 7)
+    b = wr6(47999, 9, port=15521)
+    check('write allow-list: register outside refused (0x86/01)', b[0] == 0x86 and b[1] == 1, b.hex())
+    b = wr16(47498, [1, 2, 3, 4], port=15521)
+    check('write allow-list: fc16 spanning the edge refused', b[0] == 0x90 and b[1] == 1, b.hex())
+
+    # inspect: the pretty multi-line dump
+    r = ctl_cmd('inspect', 15522)
+    check('control: inspect dumps state, map, write gate',
+          r.startswith('ok inspect') and 'modbus-cache' in r and 'upstream  127.0.0.1:15512'
+          and 'allow-list 47400:100' in r and 'fc4' in r, repr(r[:160]))
+    fc4_audit = open('/tmp/reg_audit_fc4.log').read()
+    check('audit: WRITE + WRITE-REFUSED (allow-list) events',
+          'AUDIT CACHE WRITE ' in fc4_audit and 'WRITE-REFUSED' in fc4_audit
+          and 'outside the write allow-list' in fc4_audit, fc4_audit[-160:])
+
+    # SIGHUP reloads the allow-list from the ini
+    ini_txt = open(ini4).read().replace('write_registers = 47400:100', 'write_registers = 47600:100')
+    open(ini4, 'w').write(ini_txt)
+    os.kill(p_fc4.pid, signal.SIGHUP)
+    time.sleep(1)
+    b = wr6(47415, 8, port=15521)
+    check('SIGHUP: the reloaded allow-list refuses the old range', b[0] == 0x86 and b[1] == 1, b.hex())
+    b = wr6(47615, 9, port=15521)
+    check('SIGHUP: the reloaded allow-list accepts the new range', b == bytes.fromhex('06b9ff0009'), b.hex())
+
+    # per-client READS accounting: the periodic tally + the disconnect line
+    s = socket.create_connection(('127.0.0.1', 15521), timeout=5)
+    for _ in range(3):
+        s.sendall(struct.pack('>HHHB', 77, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 1))
+        s.recv(64)
+    time.sleep(1.2)          # > the 1s READS audit period: the periodic tally fires
+    s.close()
+    time.sleep(0.5)
+    fc4_audit = open('/tmp/reg_audit_fc4.log').read()
+    check('audit: per-client READS tallies (periodic + disconnect)',
+          'READS peer=127.0.0.1:' in fc4_audit and '(last 1s:' in fc4_audit
+          and 'connected=' in fc4_audit, fc4_audit[-160:])
+
+    # the control token from a file (the LoadCredential pattern)
+    tokfile = '/tmp/reg_token_file'
+    open(tokfile, 'w').write('tokensecret\n')
+    r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                        '--listen', '127.0.0.1:15523', '--interval', '1', '--profile', fc4map,
+                        '--control-port', '15524', '--control-token', 'a', '--control-token-file', tokfile],
+                       capture_output=True, text=True, timeout=15)
+    check('token file: both token sources is a clean error', r.returncode != 0
+          and 'not both' in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
+    p_tok = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                              '--listen', '127.0.0.1:15523', '--interval', '1', '--profile', fc4map,
+                              '--control-port', '15524', '--control-token-file', tokfile],
+                             stdout=open('/tmp/reg_tok.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(p_tok)
+    time.sleep(1.5)
+    r = subprocess.run([sys.executable, ctl, '--control-port', '15524',
+                        '--control-token-file', tokfile, 'show', 'version'],
+                       capture_output=True, text=True, timeout=15)
+    check('token file: cache_ctl authenticates with the file token', r.returncode == 0
+          and r.stdout.startswith('ok modbus-cache'), repr(r.stdout[:80]))
+    r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'show', 'version'],
+                       capture_output=True, text=True, timeout=15)
+    check('token file: token-less ctl refused', r.returncode == 0
+          and 'err authenticate first' in r.stdout, repr(r.stdout[:80]))
+    r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512', '--listen', '127.0.0.1:15525',
+                        '--control-token-file', '/tmp/reg_no_such_token_file', '--dry-run'],
+                       capture_output=True, text=True, timeout=15)
+    check('token file: a missing file fails fast, one line', r.returncode != 0
+          and 'cannot read control-token-file' in (r.stderr + r.stdout)
+          and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
+
+    # 7. clean shutdowns
     r = cli('shutdown\n\n', 15514)
     time.sleep(1)
     check('cache_cli: confirm stops the TCP-control proxy', 'bye shutdown' in r.stdout, repr(r.stdout))

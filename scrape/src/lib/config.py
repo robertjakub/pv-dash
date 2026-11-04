@@ -8,16 +8,16 @@ import os
 import re
 
 from .metrics import Metrics
+from .statics import DEFAULTS, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
 logger = logging.getLogger('scraper')
 
-LOG_LEVELS = ('DEBUG', 'INFO', 'WARNING', 'ERROR')
 HOST_RE = re.compile(r'[A-Za-z0-9._:\[\]-]+')
 
 
 def check_register(value, label):
-    if not 0 <= value <= 65535:
-        raise SystemExit('invalid %s = %d: must be 0..65535' % (label, value))
+    if not 0 <= value <= MAX_REGISTERS:
+        raise SystemExit('invalid %s = %d: must be 0..%d' % (label, MAX_REGISTERS))
     return value
 
 
@@ -78,8 +78,8 @@ def validate_config(cfg):
 
     if not 1 <= cfg['modbus_port'] <= 65535:
         fail('modbus_port', 'must be 1..65535')
-    if not 1 <= cfg['unit'] <= 247:
-        fail('unit', 'must be 1..247 (Modbus unit id)')
+    if not UNIT_ID_RANGE[0] <= cfg['unit'] <= UNIT_ID_RANGE[1]:
+        fail('unit', 'must be %d..%d (Modbus unit id)' % UNIT_ID_RANGE)
     if not -100000 <= cfg['modbus_offset'] <= 100000:
         fail('modbus_offset', 'must be within +/-100000')
     for key in ('pv_register', 'grid_register', 'battery_register', 'battery_soc_register'):
@@ -234,19 +234,20 @@ def resolve_config(args, script_dir):
     battery = resolve(args.battery, 'SCRAPER_BATTERY', 'battery', False, str_to_bool)
     cfg = {
         'profile': profile_path,
-        'host': resolve(args.host, 'SCRAPER_HOST', 'host', '127.0.0.1', str),
-        'modbus_port': resolve(args.modbus_port, 'SCRAPER_MODBUS_PORT', 'modbus_port', 5502, int),
-        'unit': resolve(args.unit, 'SCRAPER_UNIT', 'unit', 1, int),
+        'host': resolve(args.host, 'SCRAPER_HOST', 'host', DEFAULTS['host'], str),
+        'modbus_port': resolve(args.modbus_port, 'SCRAPER_MODBUS_PORT', 'modbus_port',
+                               DEFAULTS['modbus_port'], int),
+        'unit': resolve(args.unit, 'SCRAPER_UNIT', 'unit', DEFAULTS['unit'], int),
         'modbus_offset': resolve(args.modbus_offset, 'SCRAPER_MODBUS_OFFSET', 'modbus_offset', 0, int),
-        'timeout': resolve(args.timeout, 'SCRAPER_TIMEOUT', 'timeout', 3.0, float),
+        'timeout': resolve(args.timeout, 'SCRAPER_TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
         'pv_register': resolve(args.pv_register, 'SCRAPER_PV_REGISTER', 'pv_register',
                                sources['pv-power']['register'], int),
         'grid_register': resolve(args.grid_register, 'SCRAPER_GRID_REGISTER', 'grid_register',
                                  sources['grid-power']['register'], int),
-        'scale': resolve(args.scale, 'SCRAPER_SCALE', 'scale', 1.0, float),
-        'grid_scale': resolve(args.grid_scale, 'SCRAPER_GRID_SCALE', 'grid_scale', 1.0, float),
-        'max_kwp': resolve(args.max_kwp, 'SCRAPER_MAX_KWP', 'max_kwp', 6.0, float),
-        'max_grid_kw': resolve(args.max_grid_kw, 'SCRAPER_MAX_GRID_KW', 'max_grid_kw', 12.0, float),
+        'scale': resolve(args.scale, 'SCRAPER_SCALE', 'scale', DEFAULTS['scale'], float),
+        'grid_scale': resolve(args.grid_scale, 'SCRAPER_GRID_SCALE', 'grid_scale', DEFAULTS['grid_scale'], float),
+        'max_kwp': resolve(args.max_kwp, 'SCRAPER_MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float),
+        'max_grid_kw': resolve(args.max_grid_kw, 'SCRAPER_MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float),
         'battery': battery,
         'battery_register': resolve(args.battery_register, 'SCRAPER_BATTERY_REGISTER', 'battery_register',
                                     sources.get('battery-power', {}).get('register', 37001), int),
@@ -255,16 +256,19 @@ def resolve_config(args, script_dir):
                                         sources.get('battery-soc', {}).get('register', 37004), int),
         'grid_positive_import': resolve(args.grid_positive_import, 'SCRAPER_GRID_POSITIVE_IMPORT',
                                         'grid_positive_import', False, str_to_bool),
-        'listen': resolve(args.listen, 'SCRAPER_LISTEN', 'listen', '127.0.0.1:9350', str),
-        'interval': resolve(args.interval, 'SCRAPER_INTERVAL', 'interval', 5.0, float),
-        'max_clients': resolve(args.max_clients, 'SCRAPER_MAX_CLIENTS', 'max_clients', 64, int),
-        'client_timeout': resolve(args.client_timeout, 'SCRAPER_CLIENT_TIMEOUT', 'client_timeout', 300.0, float),
+        'listen': resolve(args.listen, 'SCRAPER_LISTEN', 'listen', DEFAULTS['listen'], str),
+        'interval': resolve(args.interval, 'SCRAPER_INTERVAL', 'interval', DEFAULTS['interval_s'], float),
+        'max_clients': resolve(args.max_clients, 'SCRAPER_MAX_CLIENTS', 'max_clients',
+                               DEFAULTS['max_clients'], int),
+        'client_timeout': resolve(args.client_timeout, 'SCRAPER_CLIENT_TIMEOUT', 'client_timeout',
+                                  DEFAULTS['client_timeout_s'], float),
         'local_time': resolve(args.local_time, 'SCRAPER_LOCAL_TIME', 'local_time', False, str_to_bool),
         'log_access': resolve(args.log_access, 'SCRAPER_LOG_ACCESS', 'log_access', False, str_to_bool),
         'auth_token': (resolve(args.auth_token, 'SCRAPER_AUTH_TOKEN', 'auth_token', None, str) or '').strip() or None,
         'auth_token_file': resolve(args.auth_token_file, 'SCRAPER_AUTH_TOKEN_FILE', 'auth_token_file',
                                    None, str),
-        'level': resolve(args.log_level, 'SCRAPER_LOG_LEVEL', 'log_level', 'INFO', str).strip().upper(),
+        'level': resolve(args.log_level, 'SCRAPER_LOG_LEVEL', 'log_level',
+                         DEFAULTS['log_level'], str).strip().upper(),
     }
     if cfg['auth_token'] and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in cfg['auth_token']):
         raise SystemExit('invalid auth_token: must not contain whitespace or control characters')

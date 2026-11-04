@@ -16,6 +16,9 @@ from urllib.parse import urlsplit
 logger = logging.getLogger('pv-server')
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+from lib.statics import DEFAULTS, DEFAULT_PORT, DEFAULT_BIND, DEFAULT_UPSTREAM, \
+    DEFAULT_PROM_PREFIX, DEFAULT_LOG_LEVEL, PROXY_TIMEOUT_S
+
 
 class Server(ThreadingHTTPServer):
     daemon_threads = True
@@ -31,11 +34,11 @@ class Server(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
-    upstream = 'http://localhost:9090'
+    upstream = DEFAULT_UPSTREAM
     log_queries = False
     static_dir = os.path.join(SCRIPT_DIR, 'static')
     config_js = os.path.join(SCRIPT_DIR, 'config.js')
-    prom_prefix = '/prom'
+    prom_prefix = DEFAULT_PROM_PREFIX
     upstream_ok = True
     _upstream_lock = threading.Lock()
 
@@ -66,7 +69,7 @@ class Handler(BaseHTTPRequestHandler):
         t0 = time.time()
         try:
             req = urllib.request.Request(url, headers={'Accept': 'application/json'})
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=PROXY_TIMEOUT_S) as r:
                 status, body, ctype = r.status, r.read(), r.headers.get('Content-Type', 'application/json')
             self._mark_upstream(True, None)
         except urllib.error.HTTPError as e:
@@ -158,12 +161,12 @@ def main():
     ap = argparse.ArgumentParser(description='Static file server with a Prometheus proxy at /prom')
     ap.add_argument('--config', default=os.path.join(SCRIPT_DIR, 'server.ini'),
                     help='server config file (default: server.ini next to this script)')
-    ap.add_argument('--port', type=int, help='listen port (default: config file, $PORT or 8080)')
-    ap.add_argument('--bind', help='address to bind (default: config file, $BIND or 0.0.0.0)')
+    ap.add_argument('--port', type=int, help='listen port (default: config file, $PORT or %d)' % DEFAULT_PORT)
+    ap.add_argument('--bind', help='address to bind (default: config file, $BIND or %s)' % DEFAULT_BIND)
     ap.add_argument('--static-dir', help='directory to serve (default: config file or the script directory)')
     ap.add_argument('--config-js', help='config.js to serve at /config.js (default: config file, $CONFIG_JS or config.js next to this script)')
-    ap.add_argument('--prom-prefix', help='path under which Prometheus is proxied (default: config file or /prom); empty string proxies everything')
-    ap.add_argument('--upstream', help='upstream Prometheus URL (default: config file, $PROM_URL or http://localhost:9090)')
+    ap.add_argument('--prom-prefix', help='path under which Prometheus is proxied (default: config file or %s); empty string proxies everything' % DEFAULT_PROM_PREFIX)
+    ap.add_argument('--upstream', help='upstream Prometheus URL (default: config file, $PROM_URL or %s)' % DEFAULT_UPSTREAM)
     ap.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                     help='log level (default: config file or INFO); DEBUG logs every request')
     ap.add_argument('--log-queries', action='store_true', default=None,
@@ -174,11 +177,11 @@ def main():
 
     cfg = load_config(args.config)
     try:
-        port = args.port or int(cfg.get('port', os.environ.get('PORT', 8080)))
+        port = args.port or int(cfg.get('port', os.environ.get('PORT', DEFAULT_PORT)))
     except ValueError as e:
-        logger.error('invalid port in config: %s (using 8080)', e)
-        port = 8080
-    bind = args.bind or os.environ.get('BIND') or cfg.get('bind', '0.0.0.0')
+        logger.error('invalid port in config: %s (using %d)', e, DEFAULT_PORT)
+        port = DEFAULT_PORT
+    bind = args.bind or os.environ.get('BIND') or cfg.get('bind', DEFAULT_BIND)
     static_dir = args.static_dir or cfg.get('static_dir') or os.environ.get('STATIC_DIR') or os.path.join(SCRIPT_DIR, 'static')
     if not os.path.isabs(static_dir):
         static_dir = os.path.join(SCRIPT_DIR, static_dir)
@@ -186,9 +189,9 @@ def main():
     config_js = args.config_js or os.environ.get('CONFIG_JS') or cfg.get('config_js') or os.path.join(SCRIPT_DIR, 'config.js')
     config_js = os.path.realpath(config_js if os.path.isabs(config_js) else os.path.join(SCRIPT_DIR, config_js))
     prom_prefix = (args.prom_prefix if args.prom_prefix is not None
-                   else os.environ.get('PROM_PREFIX', cfg.get('prom_prefix', '/prom'))).rstrip('/')
-    upstream = args.upstream or os.environ.get('PROM_URL') or cfg.get('upstream', 'http://localhost:9090')
-    level = (args.log_level or cfg.get('log_level', 'INFO')).upper()
+                   else os.environ.get('PROM_PREFIX', cfg.get('prom_prefix', DEFAULT_PROM_PREFIX))).rstrip('/')
+    upstream = args.upstream or os.environ.get('PROM_URL') or cfg.get('upstream', DEFAULT_UPSTREAM)
+    level = (args.log_level or cfg.get('log_level', DEFAULT_LOG_LEVEL)).upper()
     try:
         log_queries = args.log_queries if args.log_queries is not None else cfg.getboolean('log_queries', fallback=False)
     except ValueError as e:

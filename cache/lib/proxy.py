@@ -13,16 +13,29 @@ from .protocol import (MAX_COUNT, MAX_PDU, WRITE_FUNCS, GATEWAY_FAILED, ILLEGAL_
                        exception_frame, describe_write)
 from .config import load_registers_file
 from .cache import build_blocks, span
+from .statics import DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX, READS_AUDIT_S
 
 logger = logging.getLogger('modbus-cache')
 
-# Diagnostics registers synthesized by the cache (never forwarded, never cached):
+# Diagnostics registers synthesized by the cache (never forwarded, never cached;
+# FC3 only — the input-register space has no synthetic block):
 # 65000 magic, 65001 device flag, 65002 cache age in s (0xFFFF = no read yet),
 # 65003 cache uptime in s.
-DIAG_BASE = 65000
-DIAG_COUNT = 4
-DIAG_MAGIC = 0xCAFE
-DIAG_MAX = 0xFFFF
+
+
+def _write_target(pdu):
+    """The register span a write request touches: (addr, count) for the
+    known write function codes, None when the frame is too short to tell."""
+    if len(pdu) < 5:
+        return None
+    func = pdu[0]
+    if func in (5, 6, 22):          # single register (coil / register / mask-write)
+        addr = struct.unpack('>H', pdu[1:3])[0]
+        return addr, 1
+    if func in (15, 16, 23):        # multiple registers/coils
+        addr, count = struct.unpack('>HH', pdu[1:5])
+        return addr, count
+    return None
 
 
 class Proxy:
@@ -37,14 +50,16 @@ class Proxy:
         self.config = config or {}
         self.audit = audit   # the CACHE audit trail (lib.audit), None = off
         self.allow_write = bool(self.config.get('allow_write', False))
+        self.write_ranges = self.config.get('write_registers')   # None = any register
         self.log_access = bool(self.config.get('log_access', False))
         self.max_clients = max(0, int(self.config.get('max_clients') or 0))
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
+        self.reads_audit_s = max(0.0, float(self.config.get('reads_audit_s', READS_AUDIT_S)))
         self.connect_acl = self.config.get('connect_acl')
         self.write_acl = self.config.get('write_acl')
         self.client_count = 0
         self.client_lock = threading.Lock()
-        self.clients = {}          # 'ip:port' -> {'since': monotonic, 'requests': n}
+        self.clients = {}          # 'ip:port' -> {'since': monotonic, 'requests': n, 'audited': n}
         self.cache_hits = 0
         self.cache_misses = 0
         self.started = time.monotonic()
@@ -58,20 +73,28 @@ class Proxy:
         self.stopping = False
 
     def poll_loop(self):
+        next_reads_audit = time.monotonic() + self.reads_audit_s
         while True:
             try:
                 self.poll_once()
             except Exception as e:
                 logger.error('poll cycle crashed (%s), retrying next cycle', e)
+            if self.reads_audit_s and self.audit:
+                now = time.monotonic()
+                if now >= next_reads_audit:
+                    next_reads_audit = now + self.reads_audit_s
+                    self.audit_reads()
             self.poll_wake.wait(self.interval)
             self.poll_wake.clear()
 
     def log_map(self):
-        for start, count in self.cache.ranges:
-            name = self.cache.names.get((start, count))
-            logger.info('caching %d:%d%s', start, count, ' ' + name if name else '')
+        for fc, start, count in self.cache.ranges:
+            name = self.cache.names.get((fc, start, count))
+            logger.info('caching %s%d:%d%s', '' if fc == 3 else 'fc%d ' % fc, start, count,
+                        ' ' + name if name else '')
         logger.info('poll plan: %d block(s): %s', len(self.blocks),
-                    ' '.join('%d:%d' % (b[0], b[1]) for b in self.blocks))
+                    ' '.join('%s%d:%d' % ('' if fc == 3 else 'fc%d ' % fc, start, count)
+                             for fc, start, count, _ in self.blocks))
 
     def reload(self):
         """Apply a freshly resolved config + register map (SIGHUP)."""
@@ -86,9 +109,11 @@ class Proxy:
         self.merge_gap = self.config['merge_gap']
         self.interval = self.config['interval']
         self.allow_write = bool(self.config.get('allow_write', False))
+        self.write_ranges = self.config.get('write_registers')
         self.log_access = bool(self.config.get('log_access', False))
         self.max_clients = max(0, int(self.config.get('max_clients') or 0))
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
+        self.reads_audit_s = max(0.0, float(self.config.get('reads_audit_s', READS_AUDIT_S)))
         self.connect_acl = self.config.get('connect_acl')
         self.write_acl = self.config.get('write_acl')
         self.cache.cache_ttl = self.config['cache_ttl']
@@ -102,7 +127,8 @@ class Proxy:
         self.poll_wake.set()
 
     def _name(self, leaf):
-        return self.cache.names.get(leaf, '%d:%d' % leaf)
+        return self.cache.names.get(leaf, '%s%d:%d' % ('' if leaf[0] == 3 else 'fc%d ' % leaf[0],
+                                                       leaf[1], leaf[2]))
 
     def _leaf_ok(self, leaf):
         if leaf not in self.cache.range_ok:
@@ -131,37 +157,51 @@ class Proxy:
         first = True
         paced = True   # the read delay paces a healthy device; failures sweep unpaced
         while pending:
-            start, count, leaves = pending.popleft()
+            fc, start, count, leaves = pending.popleft()
             if first:
                 first = False
             elif self.read_delay and paced:
                 time.sleep(self.read_delay)
             try:
                 with self.upstream.lock:
-                    words = self.upstream.read(start, count)
+                    words = self.upstream.read(fc, start, count)
                 paced = True
-                self.cache.store(start, words, version)
+                self.cache.store(fc, start, words, version)
                 self.last_ok = time.monotonic()
                 for leaf in leaves:
                     self._leaf_ok(leaf)
                     ok[leaf] = True
-                done.append((start, count, leaves))
+                done.append((fc, start, count, leaves))
             except (ModbusError, OSError) as e:
                 paced = False
                 self.upstream.close()
                 if len(leaves) > 1:
                     mid = len(leaves) // 2
                     left, right = leaves[:mid], leaves[mid:]
-                    logger.debug('splitting block %d:%d after failure (%s)', start, count, e)
-                    pending.appendleft((right[0][0], span(right), right))
-                    pending.appendleft((left[0][0], span(left), left))
+                    logger.debug('splitting block %s%d:%d after failure (%s)',
+                                 '' if fc == 3 else 'fc%d ' % fc, start, count, e)
+                    pending.appendleft((fc, right[0][1], span(right), right))
+                    pending.appendleft((fc, left[0][1], span(left), left))
                 else:
                     self._leaf_fail(leaves[0], e)
                     ok[leaves[0]] = False
-                    done.append((start, count, leaves))
+                    done.append((fc, start, count, leaves))
         if generation == self.generation:
             self.blocks = done
         self.poll_ok = any(ok.values())
+
+    def audit_reads(self):
+        """The per-client read tally, rate-limited: one READS event per
+        client per period (the 'who is hammering the cache' evidence)."""
+        now = time.monotonic()
+        with self.client_lock:
+            for key, entry in self.clients.items():
+                delta = entry['requests'] - entry['audited']
+                if delta <= 0:
+                    continue
+                entry['audited'] = entry['requests']
+                self.audit.event('READS', 'peer=%s requests=%d (last %ds: %d)'
+                                 % (key, entry['requests'], int(self.reads_audit_s), delta))
 
     def _allowed(self, acl, ip):
         if acl is None:
@@ -171,6 +211,14 @@ class Proxy:
         except ValueError:
             return False
         return any(a.version == n.version and a in n for n in acl)
+
+    def _write_allowed(self, target):
+        """The register-range allow-list: every touched register must land
+        inside one of the configured ranges (None = any register)."""
+        if self.write_ranges is None or target is None:
+            return True
+        addr, count = target
+        return any(rs <= addr and addr + count <= rs + rc for rs, rc in self.write_ranges)
 
     def serve(self, host, port):
         srv = socket.socket()
@@ -213,7 +261,7 @@ class Proxy:
         access('client connected: %s:%d', *addr[:2])
         key = '%s:%d' % addr[:2]
         with self.client_lock:
-            self.clients[key] = {'since': time.monotonic(), 'requests': 0}
+            self.clients[key] = {'since': time.monotonic(), 'requests': 0, 'audited': 0}
         try:
             while True:
                 head = recv_exact(client, 7)
@@ -233,14 +281,18 @@ class Proxy:
         finally:
             with self.client_lock:
                 self.client_count -= 1
-                self.clients.pop(key, None)
+                entry = self.clients.pop(key, None)
             client.close()
+            if self.audit and entry:
+                self.audit.event('READS', 'peer=%s requests=%d connected=%ds'
+                                 % (key, entry['requests'], int(time.monotonic() - entry['since'])))
 
     def respond(self, txn, proto, unit, pdu, addr):
         if proto != 0 or not pdu:
             return exception_frame(txn, proto, unit, pdu[0] if pdu else 3, ILLEGAL_VALUE)
         func = pdu[0]
         if func in WRITE_FUNCS:
+            target = _write_target(pdu)
             if not self.allow_write:
                 desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
                 logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)
@@ -253,31 +305,44 @@ class Proxy:
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (client %s not on the write ACL)' % (desc, addr[0]))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
-        if func == 3:
+            if not self._write_allowed(target):
+                desc = describe_write(pdu, unit) or 'FC%d (unit %d)' % (func, unit)
+                logger.info('write: refused %s (registers outside the write allow-list %s)',
+                            desc, self.describe_write_ranges())
+                if self.audit:
+                    self.audit.event('WRITE-REFUSED', '%s (registers outside the write allow-list)' % desc)
+                return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
+        if func == 3 or func == 4:
             if len(pdu) < 5:
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
-            addr, count = struct.unpack('>HH', pdu[1:5])
-            if not 1 <= count <= MAX_COUNT or addr + count > 65536:
+            addr_, count = struct.unpack('>HH', pdu[1:5])
+            if not 1 <= count <= MAX_COUNT or addr_ + count > 65536:
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
-            if addr >= DIAG_BASE:
-                if addr + count <= DIAG_BASE + DIAG_COUNT:
-                    return self._diag(txn, proto, unit, addr, count)
+            if func == 3 and addr_ >= DIAG_BASE:
+                if addr_ + count <= DIAG_BASE + DIAG_COUNT:
+                    return self._diag(txn, proto, unit, addr_, count)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_ADDRESS)
-            if addr < DIAG_BASE and addr + count > DIAG_BASE:
+            if func == 3 and addr_ < DIAG_BASE and addr_ + count > DIAG_BASE:
                 return exception_frame(txn, proto, unit, func, ILLEGAL_ADDRESS)
-            code = self.cache.failed_leaf(addr, count)
+            code = self.cache.failed_leaf(func, addr_, count)
             if code is not None:
                 logger.info('read: registers %d:%d served from last poll: the device rejects them (modbus exception %d)',
-                            addr, count, code)
+                            addr_, count, code)
                 return exception_frame(txn, proto, unit, func, code)
-            if self.cache.covers(addr, count):
+            if self.cache.covers(func, addr_, count):
                 self.cache_hits += 1
-                logger.debug('read: registers %d:%d served from cache', addr, count)
-                words = self.cache.words(addr, count)
+                logger.debug('read: fc%d registers %d:%d served from cache', func, addr_, count)
+                words = self.cache.words(func, addr_, count)
                 body = struct.pack('>BB', func, count * 2) + struct.pack('>%dH' % count, *words)
                 return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
             self.cache_misses += 1
         return self.forward(txn, proto, unit, pdu)
+
+    def describe_write_ranges(self):
+        """The allow-list for humans: 'any' or the configured ranges."""
+        if self.write_ranges is None:
+            return 'any'
+        return ','.join('%d:%d' % r for r in self.write_ranges)
 
     def _diag(self, txn, proto, unit, addr, count):
         """Answer a diagnostics read from live poller state (no device contact)."""
@@ -300,10 +365,12 @@ class Proxy:
             logger.info('write: %s', desc)
             if self.audit:
                 self.audit.event('WRITE', desc)
-        is_read = bool(pdu) and pdu[0] == 3 and len(pdu) >= 5
+        is_read = bool(pdu) and pdu[0] in (3, 4) and len(pdu) >= 5
+        fc = addr = count = None
         if is_read:
+            fc = pdu[0]
             addr, count = struct.unpack('>HH', pdu[1:5])
-            logger.info('read: registers %d:%d not cached, polling the device', addr, count)
+            logger.info('read: fc%d registers %d:%d not cached, polling the device', fc, addr, count)
         frame = struct.pack('>HHHB', txn, proto, len(pdu) + 1, unit) + pdu
         try:
             with self.upstream.lock:
@@ -320,14 +387,15 @@ class Proxy:
                 elif not is_read:
                     logger.info('forwarded FC%d rejected by the device (modbus exception %d)', pdu[0], code)
             if is_read:
-                if body and body[0] == 3 and len(body) >= 2 and body[1] == count * 2:
-                    self.cache.store(addr, struct.unpack('>%dH' % count, body[2:2 + count * 2]))
-                    logger.info('read: registers %d:%d ok, cached %s', addr, count, self.cache.describe_ttl())
-                elif body and body[0] == 3 | 0x80:
-                    logger.warning('read: registers %d:%d rejected by the device (modbus exception %d)',
-                                   addr, count, body[2] if len(body) > 2 else -1)
+                if body and body[0] == fc and len(body) >= 2 and body[1] == count * 2:
+                    self.cache.store(fc, addr, struct.unpack('>%dH' % count, body[2:2 + count * 2]))
+                    logger.info('read: fc%d registers %d:%d ok, cached %s', fc, addr, count,
+                                self.cache.describe_ttl())
+                elif body and body[0] == fc | 0x80:
+                    logger.warning('read: fc%d registers %d:%d rejected by the device (modbus exception %d)',
+                                   fc, addr, count, body[2] if len(body) > 2 else -1)
                 else:
-                    logger.warning('read: registers %d:%d unexpected response', addr, count)
+                    logger.warning('read: fc%d registers %d:%d unexpected response', fc, addr, count)
             return resp
         except (ModbusError, OSError) as e:
             self.upstream.close()
@@ -336,5 +404,5 @@ class Proxy:
                 if self.audit:
                     self.audit.event('WRITE-FAILED', '%s (%s)' % (desc, e))
             elif is_read:
-                logger.warning('read: registers %d:%d failed (%s)', addr, count, e)
+                logger.warning('read: fc%d registers %d:%d failed (%s)', fc, addr, count, e)
             return exception_frame(txn, proto, unit, pdu[0], GATEWAY_FAILED)

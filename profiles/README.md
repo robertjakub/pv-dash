@@ -36,6 +36,10 @@ One JSON object per device:
     fake, the cache and the scraper; e.g. `pv-power`, `battery-soc`)
   - `register` — the start address (decimal)
   - `type` — `i16` / `u16` / `i32` / `u32` (a 32-bit type spans two registers)
+  - `fc` — optional, the Modbus function code the entry is read with:
+    `3` (holding registers, the default) or `4` (input registers). The
+    fake serves the same map on both codes; the cache polls and caches the
+    two spaces independently.
   - `scale` — the wire gain: wire = value × scale (e.g. the sun2000
     temperatures ×10, the currents ×100)
   - `desc` — what the register holds

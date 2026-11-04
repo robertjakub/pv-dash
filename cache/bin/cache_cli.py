@@ -37,15 +37,20 @@ except ImportError:
     readline = None
 
 from lib.audit import AuditLog
-from lib.config import resolve_control_target
+from lib.config import load_token_file, resolve_control_target
+from lib.settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
+from lib.statics import CLI_KEEPALIVE_S, CLI_TIMEOUT_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S
 
 KEEPALIVE_ENV = 'CACHE_CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
-DEFAULT_KEEPALIVE = 55.0                # well under the control server's idle timeout
+DEFAULT_KEEPALIVE = CLI_KEEPALIVE_S     # well under the control server's idle timeout
 
-COMMANDS = ('show', 'clear', 'restart', 'shutdown', 'quit')
+COMMANDS = ('set', 'unset', 'show', 'inspect', 'clear', 'restart', 'shutdown', 'quit')
 
 COMMAND_HELP = {
-    'show': 'runtime state: show status | connections | cache | version',
+    'set': 'configure a setting live: set <setting> <value>',
+    'unset': 'restore a setting to its configured value: unset <setting>',
+    'inspect': 'one pretty dump of everything (the status, the map, the counters, the write gate)',
+    'show': 'runtime state: show <setting|status|connections|cache|settings|version>',
     'clear': 'drop the cached registers, repoll now (clear cache)',
     'restart': 'restart the upstream session: connection + cache dropped, repoll',
     'shutdown': 'stop the proxy gracefully (asks to confirm)',
@@ -53,9 +58,10 @@ COMMAND_HELP = {
 }
 
 SHOW_VALUES = (
-    ('status', 'one-line effective state: upstream, listen, clients, poll, counters'),
+    ('status', 'multi-line effective state report: one key=value per field'),
     ('connections', 'connected clients: peer, age, requests served'),
     ('cache', 'cache contents: ranges, words, freshness, hits/misses'),
+    ('settings', 'every tunable setting with its live value, one per line'),
     ('version', 'the modbus-cache version'),
 )
 
@@ -92,18 +98,36 @@ def candidates(buf):
     head = done[0].lower() if done else ''
     if not done:
         pool, hint, desc = COMMANDS, None, describe_word
+    elif head in ('set', 'unset') and len(done) == 1:
+        pool, hint, desc = SETTING_NAMES, None, setting_help
+    elif head == 'set' and len(done) == 2 and done[1].lower() in SETTING_BY_NAME:
+        s = SETTING_BY_NAME[done[1].lower()]
+        pool, hint = tuple(s.values), s.value_shape
+        desc = lambda w, s=s: s.value_help.get(w, s.value_help.get(w.lower(), '')) or None
     elif head == 'show' and len(done) == 1:
-        pool, hint, desc = tuple(SHOW_DESC), None, describe_word
+        pool, hint, desc = SETTING_NAMES + ('status', 'connections', 'cache', 'settings', 'version'), None, describe_word
     elif head == 'clear' and len(done) == 1:
         pool, hint, desc = ('cache',), None, describe_word
     else:
         return [], None, None
+    if pool is None:                      # a value shape with no completable words
+        return [], hint, desc
     return [w for w in pool if w.startswith(text.lower())], hint, desc
 
 
 def describe_word(w):
     """The short description from the registry, if there is one."""
-    return COMMAND_HELP.get(w) or SHOW_DESC.get(w)
+    return COMMAND_HELP.get(w) or SHOW_DESC.get(w) or setting_help(w)
+
+
+def describe_setting(name):
+    s = SETTING_BY_NAME.get(name)
+    return '%s - %s (values: %s)' % (name, s.help, s.value_shape) if s else None
+
+
+def setting_help(name):
+    s = SETTING_BY_NAME.get(name)
+    return s.help if s else None
 
 
 _last_listed = None   # the completer is called several times per attempt;
@@ -155,29 +179,37 @@ def complete(text, state):
             sys.stdout.write(_prompt + buf)
             sys.stdout.flush()
         return None
-    return matches[0]
+    # a single match: insert it with the trailing space so the NEXT tab moves
+    # into the following word — editline does not add the space itself, and
+    # without it tab-tab just re-completes the same word and never lists
+    return matches[0] + ' '
 
 
 def print_options(buf):
-    """console ?`: one candidate per line, with the short description."""
+    """console ?`: one candidate per line, with the short description; a
+    value shape with no completable words still shows its hint."""
     matches, hint, desc = candidates(buf)
-    if not matches:
-        print('% Invalid input.')
-        return
+    rows = []
     for w in matches:
         d = desc(w) if desc else None
-        print('  %-10s %s' % (w, d) if d else '  %s' % w)
+        rows.append('  %-10s %s' % (w, d) if d else '  %s' % w)
     if hint:
-        print('  ' + hint)
+        rows.append('  ' + hint)
+    if not rows:
+        print('% Invalid input.')
+        return
+    for row in rows:
+        print(row)
 
 
 def main():
     p = argparse.ArgumentParser(description='console-style CLI for the modbus-cache control server (TCP or unix socket).')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/modbus-cache-15502.socket; env MODBUS_CACHE_CTL or CACHE_CTL when unset) — same flag as the proxy itself')
-    p.add_argument('--timeout', type=float, default=5.0, help='socket timeout in seconds (default %(default)s)')
-    p.add_argument('--reconnect', type=int, default=3, help='when the connection dies (an unanswered ping, a reset, a timeout), retry this many times before giving up; 0 = off (default %(default)s)')
-    p.add_argument('--reconnect-wait', type=float, default=10.0, help='seconds between the reconnect attempts (default %(default)s)')
+    p.add_argument('--timeout', type=float, default=CLI_TIMEOUT_S, help='socket timeout in seconds (default %(default)s)')
+    p.add_argument('--reconnect', type=int, default=CLI_RECONNECT, help='when the connection dies (an unanswered ping, a reset, a timeout), retry this many times before giving up; 0 = off (default %(default)s)')
+    p.add_argument('--reconnect-wait', type=float, default=CLI_RECONNECT_WAIT_S, help='seconds between the reconnect attempts (default %(default)s)')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env MODBUS_CACHE_CONTROL_TOKEN)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line); not for use with --control-token (env MODBUS_CACHE_CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
     p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = off (default %(default)s)')
     p.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
@@ -186,7 +218,12 @@ def main():
 
     audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CLI',
                                                     args.audit_max_mb, files=args.audit_files)
-    token = args.control_token or os.environ.get('MODBUS_CACHE_CONTROL_TOKEN')
+    if args.control_token and args.control_token_file:
+        p.error('--control-token and --control-token-file are mutually exclusive')
+    if args.control_token_file:
+        token = load_token_file(args.control_token_file, 'control-token-file')
+    else:
+        token = args.control_token or os.environ.get('MODBUS_CACHE_CONTROL_TOKEN')
     target = resolve_control_target(args.control_port)
     if target.isdigit():
         if not 1 <= int(target) <= 65535:
@@ -316,15 +353,15 @@ def welcome(sock):
     reply = exchange(sock, wire('show status'))
     if not reply or not reply.startswith('ok status'):
         return
-    st = dict(p.split('=', 1)[0:2] for p in reply.split()[1:] if '=' in p)
-    try:
-        up = float(st.get('uptime', '0').rstrip('s'))
-    except ValueError:
-        up = 0.0
+    st = {}
+    for line in reply.splitlines()[1:]:          # the key=value report rows
+        if '=' in line:
+            k, v = line.split('=', 1)
+            st[k] = v
     print('% Welcome to the modbus-cache console')
     print('%%   %s upstream | poll %s, last poll %s | running for %s | %s client(s)'
-          % (st.get('upstream', '?'), st.get('poll', '?'), st.get('last-poll', '?'),
-             human_uptime(up), st.get('clients', '?')))
+          % (st.get('upstream', '?'), st.get('poll', '?'), st.get('last_poll', '?'),
+             human_uptime(float(st.get('uptime', '0') or 0)), st.get('clients', '?')))
     print('%   TAB completes, ? lists the commands, quit leaves')
 
 
@@ -377,7 +414,13 @@ def _loop(sock, prompt, audit=None):
         if low.startswith(('clear ', 'restart')) and reply.startswith('ok'):
             print('ok')                 # confirm silently
         elif low.startswith('show ') and reply.startswith('ok '):
-            print(reply.split(' ', 1)[1])
+            body = reply.split(' ', 1)[1]
+            # the multi-line reports open with their own name ('status'/'settings'):
+            # the command already said that — print just the key=value rows
+            head, _, rest = body.partition('\n')
+            if rest and ' ' not in head and '=' not in head:
+                body = rest
+            print(body)
         else:
             print(reply)
 

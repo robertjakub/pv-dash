@@ -22,6 +22,7 @@ stdenv.mkDerivation (finalAttrs: {
 
     mkdir -p $out/share/dashboard $out/bin
     cp -r static $out/share/dashboard/static
+    cp -r lib $out/share/dashboard/lib
     install -Dm755 server.py $out/share/dashboard/server.py
     install -Dm644 config.js $out/share/dashboard/config.js
 

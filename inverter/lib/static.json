@@ -1,11 +1,21 @@
 {
-  "default_modbus_port": 5502,
+  "protocol": {
+    "max_pdu": 260,
+    "max_registers": 65536
+  },
+
+  "diagnostics": {
+    "base": 65000,
+    "count": 4,
+    "magic": 51966
+  },
 
   "sun": { "sunrise": 6.0, "sunset": 18.0 },
   "mppt": {
     "east": { "sunrise": 6.0, "sunset": 16.0 },
     "west": { "sunrise": 8.0, "sunset": 18.0 }
   },
+  "peak_ratio": 0.75,
 
   "cloud_machines": {
     "autumn": [0.45, 2.5, 0.60, 0.05, 0.95],
@@ -13,17 +23,54 @@
     "winter": [0.75, 0.8, 0.35, 0.10, 1.00]
   },
 
+  "load_curve": {
+    "base_w": 250.0,
+    "bells": [
+      [700.0, 7.5, 1.0],
+      [400.0, 13.0, 1.5],
+      [1400.0, 19.0, 1.8]
+    ]
+  },
+
+  "grid": {
+    "voltage_v": 230.0,
+    "voltage_wander": 0.10,
+    "frequency_hz": 50.0,
+    "frequency_wander": 0.2
+  },
+
   "meter_export_kwh": 12500.0,
   "meter_import_kwh": 9800.0,
 
   "grid_outage": { "fail_per_h": 0.75, "repair_per_min": 3.0 },
 
-  "batt_max_w": 2500.0,
-  "batt_reserve_soc": 10.0,
-  "batt_grid_margin_w": 300.0,
-  "batt_standby_w": 150.0,
-  "batt_max_tick_h": 24.0,
-  "batt_charge_eff": 0.95,
-  "batt_self_disch_h": 0.01,
-  "batt_discharge_cap": 0.8
+  "battery": {
+    "max_w": 2500.0,
+    "reserve_soc": 10.0,
+    "grid_margin_w": 300.0,
+    "standby_w": 150.0,
+    "max_tick_h": 24.0,
+    "charge_eff": 0.95,
+    "self_disch_h": 0.01,
+    "discharge_cap": 0.8
+  },
+
+  "defaults": {
+    "host": "127.0.0.1",
+    "modbus_port": 5502,
+    "unit": 1,
+    "max_kwp": 6.0,
+    "battery_kwh": 6.9,
+    "time_scale": 1.0,
+    "time_scale_max": 1440.0,
+    "chaos": 0.0,
+    "log_level": "INFO",
+    "audit_max_mb": 10.0,
+    "audit_files": 3,
+    "cli_keepalive_s": 55.0,
+    "cli_timeout_s": 5.0,
+    "cli_reconnect": 3,
+    "cli_reconnect_wait_s": 10.0,
+    "control_idle_timeout_s": 300
+  }
 }

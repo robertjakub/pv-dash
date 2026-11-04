@@ -27,15 +27,16 @@ import socket
 import sys
 
 from lib.audit import AuditLog
-from lib.config import resolve_control_target
+from lib.config import load_token_file, resolve_control_target
 
 
 def main():
     p = argparse.ArgumentParser(description='Send commands to the modbus-cache control server (TCP or unix socket).')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/modbus-cache-15502.socket; env MODBUS_CACHE_CTL or CACHE_CTL when unset) — same flag as the proxy itself')
-    p.add_argument('command', nargs='*', help='control command, e.g. show status, show cache, clear cache, restart, shutdown')
+    p.add_argument('command', nargs='*', help='control command, e.g. inspect, show status, show cache, clear cache, restart, shutdown')
     p.add_argument('--timeout', type=float, default=5.0, help='socket timeout in seconds (default %(default)s)')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env MODBUS_CACHE_CONTROL_TOKEN)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line); not for use with --control-token (env MODBUS_CACHE_CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
     p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size, 0 = off')
     p.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
@@ -52,7 +53,12 @@ def main():
         if not commands:
             p.error('no commands on stdin')
 
-    token = args.control_token or os.environ.get('MODBUS_CACHE_CONTROL_TOKEN')
+    if args.control_token and args.control_token_file:
+        p.error('--control-token and --control-token-file are mutually exclusive')
+    if args.control_token_file:
+        token = load_token_file(args.control_token_file, 'control-token-file')
+    else:
+        token = args.control_token or os.environ.get('MODBUS_CACHE_CONTROL_TOKEN')
     target = resolve_control_target(args.control_port)
     if target.isdigit():
         if not 1 <= int(target) <= 65535:

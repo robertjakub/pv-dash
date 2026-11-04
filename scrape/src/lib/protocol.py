@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
-"""Modbus TCP wire format and the single-client poller connection (stdlib only)."""
+"""Modbus TCP wire format and the single-client poller connection (stdlib only).
+The limits come from lib/static.json (see statics.py)."""
 import socket
 import struct
 
-MAX_PDU = 253
-MAX_COUNT = 125
+from .statics import MAX_PDU, MAX_COUNT, DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX
 
-# Diagnostics registers served by modbus-cache: magic, device flag,
-# cache age in seconds (0xFFFF = no successful read yet), cache uptime in seconds.
-DIAG_BASE = 65000
-DIAG_COUNT = 4
-DIAG_MAGIC = 0xCAFE
-DIAG_MAX = 0xFFFF
+# Diagnostics registers served by modbus-cache (see static.json): magic,
+# device flag, cache age in seconds (0xFFFF = no successful read yet),
+# cache uptime in seconds.
 
 
 class ModbusError(Exception):

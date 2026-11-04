@@ -200,14 +200,16 @@ multi-line reply (`show status`, `show registers`) keeps its newlines inside
 token when `--control-token <secret>` is set**: the first request must be
 `{"cmd": "auth", "token": "..."}`; the unix socket needs no token (the
 filesystem permissions are the auth). The clients take `--control-token`
-/ **`FAKE_CONTROL_TOKEN`** and authenticate automatically:
+/ **`FAKE_CONTROL_TOKEN`** — or the hardened way, `--control-token-file`
+/ **`FAKE_CONTROL_TOKEN_FILE`** (the first line of a key file or a systemd
+`LoadCredential`) — and authenticate automatically:
 
 | Command | Effect |
 |---|---|
 | `set <setting> <value>` | configure a setting (below) |
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
-| `show settings` | every setting and its value |
+| `show settings` | every setting and its value — one stable `key=value` line per setting (scriptable) |
 | `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `chaos`, `chaos_hits`, `pinned`, `profile`, `timezone`) — scriptable |
 | `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins — the baton for a bug report |
 | `show registers` | the loaded profile's register map, one register per line: `name \| register \| type \| value`, columns aligned; the value = what the registers serve right now, `NaN` = not calculated (e.g. the battery block with the battery off) |
@@ -349,6 +351,7 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--grid-frequency` | `50` | nominal grid frequency (Hz); the machine wanders ±0.2 Hz around it |
 | `--metrics-port` | off | serve the fake's own Prometheus `/metrics` on `127.0.0.1:PORT` |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`) |
+| `--metrics-token-file` | off | the metrics bearer token from a file (the first line); instead of `--metrics-token`, giving both is an error |
 | `--audit-log` | XDG state | the audit trail: a file path or `-` for stdout (docker logs / journald) |
 | `--audit-max-mb` | `10` | rotate the audit log at this size, keeping 3 backups; `0` = off |
 | `--audit-daily` | off | also rotate the audit log at UTC midnight |
@@ -363,6 +366,8 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--profile` | `sun2000` | register-map profile: the built-in name or a JSON path (name → register + optional type/scale); `FAKE_PROFILE` when unset |
 | `--strict` | off | reject undefined registers with exception 02 |
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
+| `--control-token` | off | require the token auth handshake on TCP control connections (the clients take `--control-token` / `FAKE_CONTROL_TOKEN`) |
+| `--control-token-file` | off | the control token from a file (the first line; a key file or a systemd `LoadCredential`), instead of `--control-token`; giving both is an error |
 | `--control-log-replies` | off | DEBUG-log the full output of every control command, not just the command |
 | `--chaos` | `0` | probability 0..1 that a request is answered hostile and dropped |
 | `--seed` | random | chaos/cloud RNG seed for reproducible runs |
@@ -438,9 +443,10 @@ Honest scope of a demo device:
 - **The control surface is plain-text by design** — a demo harness: the TCP
   control server binds `127.0.0.1` only, and `--control-token` adds a
   token-auth handshake for TCP (the clients authenticate with
-  `FAKE_CONTROL_TOKEN`); the unix socket relies on filesystem permissions.
-  The container runs as the unprivileged `pvsuite` user. Do not expose the
-  control port to untrusted networks.
+  `FAKE_CONTROL_TOKEN`, or `--control-token-file` / `FAKE_CONTROL_TOKEN_FILE`
+  — the first line of a key file or a `LoadCredential`); the unix socket
+  relies on filesystem permissions. The container runs as the unprivileged
+  `pvsuite` user. Do not expose the control port to untrusted networks.
 - **Auditable by default.** The fake and the CLIs keep the append-only
   audit trail above (who, when, what, result) — the logging evidence on
   unless explicitly disabled.

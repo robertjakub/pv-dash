@@ -155,6 +155,46 @@ def main():
         except (OSError, ValueError) as e:
             check('fuzz: the right token authenticates', False, str(e))
 
+        # 6b. the token from a file: the fake reads it, the ctl authenticates with it
+        open('/tmp/ctl_fuzz_token', 'w').write('filesecret\n')
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15965',
+                                       '--control-port', '15964', '--control-token-file',
+                                       '/tmp/ctl_fuzz_token'],
+                                      stdout=open('/tmp/ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(0.9)
+        st, tx = roundtrip(15964, b'{"cmd": "show version"}\n')
+        check('fuzz: token-file server rejects the unauthenticated', st == 'err' and 'authenticate' in tx,
+              '%s %s' % (st, tx))
+        try:
+            c = connect(15964)
+            c.sendall(_json.dumps({'cmd': 'auth', 'token': 'filesecret'}).encode() + b'\n')
+            buf = b''
+            while not buf.endswith(b'\n'):
+                buf += c.recv(4096)
+            auth = _json.loads(buf.decode())
+            check('fuzz: the file token authenticates', auth.get('status') == 'ok', str(auth))
+            c.close()
+        except (OSError, ValueError) as e:
+            check('fuzz: the file token authenticates', False, str(e))
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py'),
+                            '--control-port', '15964', '--control-token-file', '/tmp/ctl_fuzz_token',
+                            'show', 'version'], capture_output=True, text=True, timeout=15)
+        check('fuzz: fake_ctl authenticates with the file token', r.returncode == 0
+              and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py'),
+                            '--port', '15962', '--dry-run', '--control-token', 'a',
+                            '--control-token-file', '/tmp/ctl_fuzz_token'],
+                           capture_output=True, text=True, timeout=15)
+        check('fuzz: both token sources is a clean error', r.returncode != 0
+              and 'mutually exclusive' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py'),
+                            '--control-port', '15963', '--control-token-file', '/tmp/ctl_fuzz_no_file',
+                            'status'], capture_output=True, text=True, timeout=15)
+        check('fuzz: a missing token file fails fast, one line', r.returncode != 0
+              and 'cannot read control-token-file' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
+
         # 7. twenty parallel clients: garbage and real commands interleaved
         results = []
 

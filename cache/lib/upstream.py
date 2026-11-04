@@ -50,17 +50,18 @@ class Upstream:
             raise ModbusError('unexpected protocol id %d' % proto)
         return txn, proto, length, unit, body
 
-    def read(self, addr, count):
+    def read(self, fc, addr, count):
+        """One FC3/FC4 read; the caller serializes on .lock."""
         self.txn = (self.txn + 1) & 0xFFFF
-        pdu = struct.pack('>BHH', 3, addr, count)
+        pdu = struct.pack('>BHH', fc, addr, count)
         _, _, _, unit, body = self._exchange(struct.pack('>HHHB', self.txn, 0, len(pdu) + 1, self.unit) + pdu, self.txn)
         if unit != self.unit:
             raise ModbusError('reply from unit id %d, expected %d' % (unit, self.unit))
         func = body[0]
-        if func == 3 + 0x80:
+        if func == fc + 0x80:
             raise DeviceError('modbus exception, code %d' % (body[1] if len(body) > 1 else -1),
                               body[1] if len(body) > 1 else -1)
-        if func != 3:
+        if func != fc:
             raise ModbusError('unexpected function byte 0x%02x' % func)
         if len(body) < 2:
             raise ModbusError('short response: function byte only')

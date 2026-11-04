@@ -10,8 +10,10 @@ import time
 from .battery import BATT_DISCHARGE_CAP, BATT_GRID_MARGIN_W, BATT_MAX_TICK_H, BATT_MAX_W, \
     BATT_STANDBY_W, BatteryMachine
 from .profile import load_profile, resolve_profile
-from .statics import (CLOUD_MACHINES, GRID_OUTAGE_FAIL_H, GRID_OUTAGE_REPAIR_MIN, METER_EXPORT_KWH,
-                      METER_IMPORT_KWH, MPPT_WINDOWS, SUNRISE, SUNSET)
+from .statics import (CLOUD_MACHINES, DEFAULT_BATTERY_KWH, DIAG_BASE, DIAG_MAGIC, GRID_FREQUENCY_HZ,
+                      GRID_FREQUENCY_WANDER, GRID_OUTAGE_FAIL_H, GRID_OUTAGE_REPAIR_MIN, GRID_VOLTAGE_V,
+                      GRID_VOLTAGE_WANDER, LOAD_BASE_W, LOAD_BELLS, METER_EXPORT_KWH, METER_IMPORT_KWH,
+                      MPPT_WINDOWS, SUNRISE, SUNSET)
 
 # Runtime-controllable knobs (see the control server): None = follow the
 # simulation, a number = pinned. `cloud` scales PV (0 = clear, 1 = dark);
@@ -31,7 +33,7 @@ def format_clock(t):
 
 
 class Simulator:
-    def __init__(self, peak_w, static, frozen_time, battery=False, battery_kwh=6.9,
+    def __init__(self, peak_w, static, frozen_time, battery=False, battery_kwh=DEFAULT_BATTERY_KWH,
                  profile=None, seed=None):
         self.peak_w = peak_w
         self.static = static
@@ -45,8 +47,8 @@ class Simulator:
         self.cloud_mode = None          # None = clear sky; 'autumn'/'spring'/'winter' = the machine
         self.batt_state = None          # None = the machine decides; 'charging'/'discharging' = forced
         self.mppt = 'both'              # which PV strings feed the MPPTs: both | east | west | none
-        self.grid_voltage = 230.0       # nominal phase voltage (V); the machine wanders +-10 %
-        self.grid_frequency = 50.0      # nominal grid frequency (Hz); the machine wanders +-0.2
+        self.grid_voltage = GRID_VOLTAGE_V   # nominal phase voltage (V); the machine wanders +-10 %
+        self.grid_frequency = GRID_FREQUENCY_HZ   # nominal grid frequency (Hz); the machine wanders +-0.2
         self.utc = True                 # the state machines integrate over the UTC clock (configurable)
         self.time_scale = 1.0           # the time-lapse factor: the simulated clock runs N× real time
         self._v_anchor = time.time()    # the virtual epoch at the anchor point
@@ -200,8 +202,9 @@ class Simulator:
             dt = t - self._freq_t
             self._freq_t = t
             if dt > 0:
-                self._freq_dev = min(0.2, max(-0.2, self._freq_dev + 2.0 * (0.0 - self._freq_dev) * dt
-                                              + 0.08 * math.sqrt(dt) * self._grid_v_rng.gauss(0.0, 1.0)))
+                self._freq_dev = min(GRID_FREQUENCY_WANDER, max(-GRID_FREQUENCY_WANDER,
+                    self._freq_dev + 2.0 * (0.0 - self._freq_dev) * dt
+                    + 0.08 * math.sqrt(dt) * self._grid_v_rng.gauss(0.0, 1.0)))
             return self.grid_frequency + self._freq_dev
 
     def home_phases(self, t, home_w):
@@ -222,8 +225,9 @@ class Simulator:
             if dt > 0:
                 self._grid_v_t = t
                 self._grid_v = [
-                    min(0.10, max(-0.10, w + 1.0 * (0.0 - w) * dt
-                                  + 0.03 * math.sqrt(dt) * self._grid_v_rng.gauss(0.0, 1.0)))
+                    min(GRID_VOLTAGE_WANDER, max(-GRID_VOLTAGE_WANDER,
+                        w + 1.0 * (0.0 - w) * dt
+                        + 0.03 * math.sqrt(dt) * self._grid_v_rng.gauss(0.0, 1.0)))
                     for w in self._grid_v]
             return [self.grid_voltage * (1.0 + w) for w in self._grid_v]
 
@@ -307,7 +311,10 @@ class Simulator:
         return east + west
 
     def home(self, t):
-        return 250.0 + 700.0 * bell(t, 7.5, 1.0) + 400.0 * bell(t, 13.0, 1.5) + 1400.0 * bell(t, 19.0, 1.8)
+        w = LOAD_BASE_W
+        for amp, center, width in LOAD_BELLS:
+            w += amp * bell(t, center, width)
+        return w
 
     def batt(self, t):
         """The simulated day's battery plan (drives the day energy counters)."""
@@ -515,7 +522,7 @@ class Simulator:
             'meter-status': 1.0, 'meter-mode': 1.0,
             'meter-voltage-a': v_phases[0], 'meter-voltage-b': v_phases[1], 'meter-voltage-c': v_phases[2],
             'meter-current-a': i_meter[0], 'meter-current-b': i_meter[1], 'meter-current-c': i_meter[2],
-            'meter-reactive-power': 0.0, 'meter-power-factor': 1.0, 'meter-frequency': 50.0,
+            'meter-reactive-power': 0.0, 'meter-power-factor': 1.0, 'meter-frequency': GRID_FREQUENCY_HZ,
             'meter-export': METER_EXPORT_KWH + export_day,
             'meter-import': METER_IMPORT_KWH + import_day,
             'meter-power-a': grid_w / 3.0, 'meter-power-b': grid_w / 3.0, 'meter-power-c': grid_w / 3.0,
@@ -551,6 +558,6 @@ class Simulator:
         device family by the 0xCAFE magic — so the fake always mocks it."""
         regs = {}
         self.profile.encode(regs, self.values())
-        for i, w in enumerate((0xCAFE, 1, 7, 4242)):
-            regs[65000 + i] = w
+        for i, w in enumerate((DIAG_MAGIC, 1, 7, 4242)):
+            regs[DIAG_BASE + i] = w
         return regs

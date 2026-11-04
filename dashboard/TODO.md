@@ -15,6 +15,11 @@
 - **the auth story** — the proxy endpoints are open on the LAN; a
   reverse-proxy doc (or a bearer check mirroring the scraper's) before
   exposing anything beyond localhost.
+- **the write console** — a guarded panel issuing single-register writes
+  through the cache's allow-list (the write-through lands the value in the
+  charts instantly): the ops poke, audited with the writer's identity.
+- **the event feed** — the audit vocabulary (writes, refusals, outages,
+  reloads) as a dashboard side panel, instead of the journalctl detour.
 
 ## Done (the highlights; the git history has the details)
 

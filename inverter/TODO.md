@@ -16,15 +16,20 @@
   gauge on /metrics.
 - **the multi-unit serve** — one process serving two Modbus units (the
   inverter + the meter as separate unit ids) for the gateway-style setups.
-- **the FC06/FC16 write path** — accept real write-single/write-multiple
-  requests from the cache's write allow-list: apply them to the model
-  (a `set register`-style overlay), audit the writer, and let a `clear
-  cache`-style control reset the overlay — the end-to-end exercise for
-  the proxy's gated writes.
+- **the fault/alarm registers** — device health words driven by the
+  machines (an outage raises a fault, the derate a warning, the battery
+  cap a SoC notice): the cache/scrape export them and the dashboard can
+  banner a fault, not just a blackout.
+- **the forecast curve** — the PV/cloud machines follow a day-ahead
+  forecast file, so a demo runs repeatable weather instead of the RNG.
 - **the CI** — GitHub Actions: the six suites + `nix flake check` on the
   push; the release workflow on the tag.
 
 ## Done (the highlights; the git history has the details)
+
+The FC06/FC16 write path: the fake accepts real write requests (the echo
++ the overlay the scrapers see, audited with the writer), which the
+cache's gated writes exercise end-to-end.
 
 The control surface: the JSON-lines transport, the TCP token auth, the
 grid setpoint, the MPPT strings (the east/west), the grid-voltage machine,

@@ -13,6 +13,10 @@
 - **the poll-latency gauges** — last/max poll cycle duration as Prometheus
   gauges, so a slow dongle shows up in dashboards before the freshness
   gap does.
+- **the alert rules pack** — a shipped Prometheus rules file next to the
+  exporter: the freshness gap, the poll down, the exception-code spikes,
+  the write-refusal bursts — the pages write themselves from the audit
+  vocabulary.
 - **the hardware soak** — everything is verified against the fake inverter
   and the fuzzers; a real SDongle week (reconnect storms, the dongle's
   single-client behaviour, real exception codes) is the last mile.

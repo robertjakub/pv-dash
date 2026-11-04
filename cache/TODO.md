@@ -18,6 +18,15 @@
   field (the cache polls/caches FC4 independently); the scraper still reads
   everything with FC3 — a profile that marks an FC4 entry `scrape` needs
   the scraper to follow the field.
+- **the per-entry TTL** — the profile entries could carry a `ttl` (the fast
+  power registers 5s, the slow nameplate words 1h): one poll cadence, but
+  `covers()` honors the per-entry expiry instead of the global factor.
+- **the read-only control role** — a second token granting only the
+  show/clear verbs (no `set`, no `shutdown`): the ops shift versus the
+  admin key, both audited.
+- **the peer-cred auth on the unix control socket** — SO_PEERCRED: a local
+  systemd unit connects without a token, the socket name already does half
+  the job.
 - **the poll-latency gauges** — the last/mean poll cycle duration on the
   metrics endpoint once it lands (the control's `show status` carries the
   health; the trend belongs in Prometheus).

@@ -18,6 +18,7 @@ stdout, rotation is disabled by definition. The rotation depth is
 configurable: --audit-files N (the default 3)."""
 import os
 import sys
+import threading
 import time
 
 
@@ -41,6 +42,7 @@ class AuditLog:
         self.daily = daily
         self.keep = max(1, int(files))   # the rotated backups kept (audit.log.1 .. .N)
         self._day = time.strftime('%Y-%m-%d', time.gmtime())
+        self._lock = threading.Lock()
         if self.path == '-':    # the stdout sink: no rotation by definition
             self._f = sys.stdout
         else:
@@ -79,20 +81,22 @@ class AuditLog:
             self._rotate()
 
     def event(self, event, detail=''):
-        self._maybe_rotate()
-        stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-        self._f.write('%s AUDIT %s %s%s\n' % (stamp, self.prefix, event,
-                                              (' ' + detail) if detail else ''))
-        self._f.flush()
+        with self._lock:
+            self._maybe_rotate()
+            stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+            self._f.write('%s AUDIT %s %s%s\n' % (stamp, self.prefix, event,
+                                                  (' ' + detail) if detail else ''))
+            self._f.flush()
 
     def command(self, cmd, result):
         """A command the user entered and its outcome (ok/err/bye/local/aborted)."""
         self.event('COMMAND', "'%s' -> %s" % (cmd, result))
 
     def close(self):
-        if self.path == '-':
-            return
-        try:
-            self._f.close()
-        except OSError:
-            pass
+        with self._lock:
+            if self.path == '-':
+                return
+            try:
+                self._f.close()
+            except OSError:
+                pass

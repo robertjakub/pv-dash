@@ -1,4 +1,4 @@
-# Security audit — modbus-cache, modbus-scraper & modbus-fake-inverter (rev. 3)
+# Security audit — modbus-cache, modbus-scraper & modbus-fake-inverter (rev. 4)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
@@ -7,8 +7,8 @@ rev. 2 re-audited at main after `84b4387` — the tree that carried the
 state-persistence wave (`--dump-path`/restore, `lib/persist.py`), the
 peer-cred control auth (`common/cred.py`, `--control-trust-uids`), the
 F2–F8 fixes, the audit-vocabulary rename (`READS` → `REQUESTS`) and the
-scraper's profile-`fc` awareness. **Rev. 3 re-audits the tree that adds
-three waves on top of that:**
+scraper's profile-`fc` awareness. **Rev. 3** re-audited the tree that added
+three waves:
 
 - the **demo-stack hardening and completion** (finding F7): the compose
   stack publishes nothing and wires the services onto one `internal: true`
@@ -19,34 +19,50 @@ three waves on top of that:**
   the quick-test form (they land in `ps`), token files enforced owner-only
   (0600) at every loader;
 - the **write-default hardening** (a posture change, not a finding): the
-  cache's `write-acl` and `write-registers` now default to **`none`** —
+  cache's `write-acl` and `write-registers` default to **`none`** —
   the write path is closed even after `--allow-write` until the operator
   opens the ACL and the register allow-list — and both ACLs and the
   allow-list grew a `none` (restrict all) mode; `connect-acl` grew `none`
   too (its default stays `any`). The default poll/scrape cadence across
-  the family is 10 s;
+  the family is 10 s.
+
+**Rev. 4 re-audits the tree that adds the caps-and-integrity waves on top:**
+
 - the **fake's surface capped** (finding F11, closed as recommended): the
   inverter's Modbus listener got the cache's `--max-clients` /
   `--client-timeout` (both live-tunable, `show connections` to watch
   them), the read-count gate (exception 03 past the 125-register cap) and
   the trusted-LAN / not-security-first documentation;
-- the **trail integrity and the endpoint caps** (findings F10 and F13,
-  closed as recommended): every audit entry carries a short chained hash
-  (verified by `scripts/audit_verify.py`), the scraper refuses a
-  non-loopback `/metrics` listen without a token, and every serving
-  surface — the Modbus listeners and all three `/metrics` endpoints —
-  grew per-IP and total connection caps.
+- the **connection caps everywhere** (findings F11 and F13): every serving
+  surface — the two Modbus listeners and all three `/metrics` endpoints —
+  grew per-IP and total connection caps (`common/connlimit.py`, one
+  implementation; the metrics masters are the live-settable
+  `metrics-server`, the bind address `--metrics-listen HOST:PORT`); the
+  scraper refuses a non-loopback `/metrics` listen without a token (F13);
+- the **trail integrity** (finding F10): every audit entry carries a short
+  chained hash — per writer prefix, restart-seeded, rotation-spanning —
+  verified by `scripts/audit_verify.py`;
+- the **dump trust** (finding F18): the cache's state dump is created 0600
+  explicitly and integrity-hashed; the restore fails closed (a tampered,
+  unsigned or group-writable dump refuses); the dump itself splits by
+  content — settings only by default, the cached words on
+  `request dump with-cache` / `--dump-with-cache`.
 
 Method is unchanged: manual code review of every module (wire handling,
 control servers, CLIs, config/token/dump loading, audit trail, metrics
 endpoints, Nix/Docker deployment), against the NIS2 (EU 2022/2555, art.
 21.2) and DORA (EU 2022/2554, art. 8–14) control checklists plus targeted
-offline verification of the suspicious paths found. This is a
-design-and-code audit, not a penetration test. The `inverter/` tool is a
-test device simulator: its risk class is "developer/demo infrastructure",
-not production OT — findings there are weighted accordingly. Findings keep
-their numbers across revisions; the ones closed stay listed in §3.1 with
-their fix and verification, open ones in §3.2 (next number: F19).
+offline verification of the suspicious paths found. This rev. 4 pass added
+a focused review of the new shared surfaces (`common/connlimit.py`, the
+audit chain in `common/audit.py`, the hardened `cache/lib/persist.py`, the
+gated HTTP servers) — no new findings; the removed `--metrics-port` flags
+fail loudly at argparse (a silently-ignored flag would drop config). This
+is a design-and-code audit, not a penetration test. The `inverter/` tool
+is a test device simulator: its risk class is "developer/demo
+infrastructure", not production OT — findings there are weighted
+accordingly. Findings keep their numbers across revisions; the ones closed
+stay listed in §3.1 with their fix and verification, open ones in §3.2
+(next number: F19).
 
 ## 1. Assets and trust boundaries
 
@@ -173,7 +189,7 @@ control-server access only.
 
 ### 3.1 Closed (F2–F10, F11–F13, F18; fixes verified, see §4)
 
-Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12, F13, F10, F18.
+Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed in rev. 4: F11, F13, F10, F18.
 
 | # | Module | Was | Fix (where) |
 |---|---|---|---|
@@ -186,10 +202,10 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12, F1
 | F8 | cache, inverter | LOW — the unix control socket's file mode was never set explicitly (rev. 2): `bind()` created it with the umask-derived mode, and a permissive umask (002/000) made it group/world-connectable, i.e. control access without a token. | Both control servers `chmod 0600` immediately after `bind()`; the cache takes `--control-socket-group` for `0660` — an opt-in, documented delegation to a local group (`cache/lib/control.py:78-86`, `inverter/lib/control.py:71-79`). Verified: the modes are observed `0600`/`0660` on the live sockets. |
 | F9 | cache, inverter, scrape | INFO — tokens passed as `--control-token` / `--metrics-token` / `--auth-token` flags are visible in `ps` / `/proc/*/cmdline` to other local users. The token-file / env-var paths existed; nothing said the flag was the weak way. Closed rev. 3. | Documented in all three READMEs and the token-flag man pages: the flag form is for quick tests, prefer `--control-token-file` / `--metrics-token-file` / `--auth-token-file` (LoadCredential) or the env vars — and every `-file` help says the file must be owner-only 0600. The file path got hard in the same wave (F12). Verified: the README/man wording, `mandoc -Tlint` clean (§4). |
 | F12 | cache, inverter, scrape | INFO — token files were not permission-checked: the shared `load_token_file` (`common/config.py`) accepted a group/world-readable token file silently. Closed rev. 3. (The `/tmp` control-socket half of the original finding stays covered by the Nix module's `PrivateTmp`; use `/run/<tool>/` under systemd.) | Fail closed: `check_token_file_mode` (`common/config.py`) stats the path before the read — any group/world bit (`0600` is the documented form) refuses to start with a one-liner (`chmod 0600`), on the daemons and the ctl/cli clients alike; the scraper's SIGHUP-reread loader runs the same check on every reload. The docker entrypoint seeds generated `*.token` files 0600. Verified: 0644/0640 refused, 0600 accepted, the regtests assert the refusal (§4). |
-| F11 | inverter | INFO — the fake's Modbus surface had no client limit, no client timeout and no ACL — any LAN peer could hold threads or flood requests when bound beyond localhost — and a declared read count far above the payload (e.g. `0xFFFF` with a truncated frame) made the fake assemble an oversized reply / scan the range. Closed rev. 3, as the audit recommended: the mitigations + the honest docs, not a security redesign — a test instrument stays a test instrument (the metrics endpoint still serves without a token by design; no connect ACL — that is the deployment's segmentation job). | The cache's knobs, mirrored: **`--max-clients`** (refuse past the limit at accept, `inverter/lib/inverter.py`) and **`--client-timeout`** (shed silent clients) — both tunable live (`set max-clients` / `set client-timeout`, `unset` restores the configured value), **`show connections`** on the control server (peer, age, requests — plus `clients=` in the status report and the modbus row in `inspect`), and the **read-count gate** (count `0` or past the 125-register cap, or a span past the 16-bit space → exception 03, the cache's shape). Documented: the README's Security section and the man page's SECURITY block say the fake is a development tool, not security-first — run it on a trusted, LAN-isolated network. Verified: the new `tests/inverter-regtest.py` (§4). |
-| F13 | scrape | MEDIUM — `/metrics` was unauthenticated by default (`--auth-token` unset → every request authorized): the loopback bind was the only control, and one flag exposed every register value; the rate limiter counted connections, not peers. Closed rev. 3: the refusal ships and the caps ship. | **Fail closed beyond loopback**: a non-loopback listen without `--auth-token`/`--auth-token-file` refuses to start with a one-liner (`refusing to expose /metrics beyond loopback without a token`, F13 in docs/AUDIT.md) — the SIGHUP reload runs the same check and keeps the previous settings; the loopback default needs no token (localhost dev stays friction-free). The demo stack has carried the token since F7. **Per-peer caps**: `--max-conn-per-ip` (0 = no limit) caps concurrent connections per peer IP with the immediate 503, next to the existing `--max-clients`/`--client-timeout`. Documented in the README (the refusal + the Prometheus `authorization.credentials_file` scrape example) and the man page. Verified: the refusal matrix and the per-IP 503 in `tests/scrape-regtest.py` (§4). |
-| F10 | cache, scrape, inverter | INFO — the audit trail was append-only but not integrity-protected (no hash chain): a local administrator could rewrite it unnoticed. Closed rev. 3 with the honest boundary: the trail is now tamper-EVIDENT (any edited, reordered or deleted middle entry breaks the chain at verification); a determined local admin holding the algorithm can rechain, and trailing deletion leaves nothing to verify — journald forwarding stays the strong answer for the retention/immutability requirement. | **A chained hash per entry**: every line carries a short hash right after the event name — `<stamp> AUDIT <PREFIX> <EVENT> <12 hex> [detail]`, `sha256(prev | stamp | prefix | event + detail)` truncated, chained **per writer prefix** (CACHE / INV / CLI / CTL each chain their own lines, so interleaved writers in one file verify independently and a restarted writer seeds from its own tail, `common/audit.py`). **The verifier**: `scripts/audit_verify.py [FILE|-]...` (default: the family's XDG trails) walks a file and its rotated backups oldest-first, recomputes every chain, anchors at each prefix's first surviving entry, reports unsigned (pre-chain) lines and names the line where a chain breaks; exit 1 on any break. Documented: the trail's README sections + `common/audit.py`'s docstring. Verified: the new `tests/audit-chain.py` (§4). |
-| F18 | cache | LOW — **the state dump was config-equivalent trust at rest, with an umask-derived mode**: `--dump-path`'s JSON carries the cached register values (production data) *and* the live setting overrides, and a restore re-applies any registered setting through the live validation — `allow-write` included. Whoever could write the dump file effectively held config trust; whoever could read it saw the values. Closed rev. 3. | **Fail closed, the F8/F12 pattern**: the dump is created **`0600` explicitly** (`os.open` + `fchmod` on the tmp before `os.replace` — never the umask, `cache/lib/persist.py`), and every dump carries a **sha256 integrity hash** of its canonical content — a restore recomputes it (`hmac.compare_digest`) and refuses an edited/truncated/foreign dump (`fails its integrity hash — nothing restored`) and an unsigned pre-hash dump (`dump again`); a **group/world-writable dump refuses outright** (`the dump holds config trust, chmod 0600`) — shrink the writer set to the owner. The exposure itself shrank too: by default the dump now carries **settings only** — the words ride along only on `request dump with-cache` or `--dump-with-cache` (the words are production data; keep them out unless the write-behind/restart story needs them). Documented as config-trust: own the dump like the ini; the hash catches corruption and casual tampering, not a local admin who rechashes (the F10 boundary). Verified: the mode/hash/tamper/unsigned/writable-refusal checks in `tests/cache-regtest.py` (§4). |
+| F11 | inverter | INFO — the fake's Modbus surface had no client limit, no client timeout and no ACL — any LAN peer could hold threads or flood requests when bound beyond localhost — and a declared read count far above the payload (e.g. `0xFFFF` with a truncated frame) made the fake assemble an oversized reply / scan the range. Closed rev. 4, as the audit recommended: the mitigations + the honest docs, not a security redesign — a test instrument stays a test instrument (the metrics endpoint still serves without a token by design; no connect ACL — that is the deployment's segmentation job). | The cache's knobs, mirrored: **`--max-clients`** (refuse past the limit at accept, `inverter/lib/inverter.py`) and **`--client-timeout`** (shed silent clients) — both tunable live (`set max-clients` / `set client-timeout`, `unset` restores the configured value), **`show connections`** on the control server (peer, age, requests — plus `clients=` in the status report and the modbus row in `inspect`), and the **read-count gate** (count `0` or past the 125-register cap, or a span past the 16-bit space → exception 03, the cache's shape). Documented: the README's Security section and the man page's SECURITY block say the fake is a development tool, not security-first — run it on a trusted, LAN-isolated network. Verified: the new `tests/inverter-regtest.py` (§4). |
+| F13 | scrape | MEDIUM — `/metrics` was unauthenticated by default (`--auth-token` unset → every request authorized): the loopback bind was the only control, and one flag exposed every register value; the rate limiter counted connections, not peers. Closed rev. 4: the refusal ships and the caps ship. | **Fail closed beyond loopback**: a non-loopback listen without `--auth-token`/`--auth-token-file` refuses to start with a one-liner (`refusing to expose /metrics beyond loopback without a token`, F13 in docs/AUDIT.md) — the SIGHUP reload runs the same check and keeps the previous settings; the loopback default needs no token (localhost dev stays friction-free). The demo stack has carried the token since F7. **Per-peer caps**: `--max-conn-per-ip` (0 = no limit) caps concurrent connections per peer IP with the immediate 503, next to the existing `--max-clients`/`--client-timeout`. Documented in the README (the refusal + the Prometheus `authorization.credentials_file` scrape example) and the man page. Verified: the refusal matrix and the per-IP 503 in `tests/scrape-regtest.py` (§4). |
+| F10 | cache, scrape, inverter | INFO — the audit trail was append-only but not integrity-protected (no hash chain): a local administrator could rewrite it unnoticed. Closed rev. 4 with the honest boundary: the trail is now tamper-EVIDENT (any edited, reordered or deleted middle entry breaks the chain at verification); a determined local admin holding the algorithm can rechain, and trailing deletion leaves nothing to verify — journald forwarding stays the strong answer for the retention/immutability requirement. | **A chained hash per entry**: every line carries a short hash right after the event name — `<stamp> AUDIT <PREFIX> <EVENT> <12 hex> [detail]`, `sha256(prev | stamp | prefix | event + detail)` truncated, chained **per writer prefix** (CACHE / INV / CLI / CTL each chain their own lines, so interleaved writers in one file verify independently and a restarted writer seeds from its own tail, `common/audit.py`). **The verifier**: `scripts/audit_verify.py [FILE|-]...` (default: the family's XDG trails) walks a file and its rotated backups oldest-first, recomputes every chain, anchors at each prefix's first surviving entry, reports unsigned (pre-chain) lines and names the line where a chain breaks; exit 1 on any break. Documented: the trail's README sections + `common/audit.py`'s docstring. Verified: the new `tests/audit-chain.py` (§4). |
+| F18 | cache | LOW — **the state dump was config-equivalent trust at rest, with an umask-derived mode**: `--dump-path`'s JSON carries the cached register values (production data) *and* the live setting overrides, and a restore re-applies any registered setting through the live validation — `allow-write` included. Whoever could write the dump file effectively held config trust; whoever could read it saw the values. Closed rev. 4. | **Fail closed, the F8/F12 pattern**: the dump is created **`0600` explicitly** (`os.open` + `fchmod` on the tmp before `os.replace` — never the umask, `cache/lib/persist.py`), and every dump carries a **sha256 integrity hash** of its canonical content — a restore recomputes it (`hmac.compare_digest`) and refuses an edited/truncated/foreign dump (`fails its integrity hash — nothing restored`) and an unsigned pre-hash dump (`dump again`); a **group/world-writable dump refuses outright** (`the dump holds config trust, chmod 0600`) — shrink the writer set to the owner. The exposure itself shrank too: by default the dump now carries **settings only** — the words ride along only on `request dump with-cache` or `--dump-with-cache` (the words are production data; keep them out unless the write-behind/restart story needs them). Documented as config-trust: own the dump like the ini; the hash catches corruption and casual tampering, not a local admin who rechashes (the F10 boundary). Verified: the mode/hash/tamper/unsigned/writable-refusal checks in `tests/cache-regtest.py` (§4). |
 
 ### 3.2 Open findings
 
@@ -228,7 +244,7 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12, F1
 - **F8 (socket modes)** — the regtest `os.stat`s the live unix control
   sockets: `0600` by default, `0660` with `--control-socket-group`.
 
-### Rev. 3 (this revision)
+### Rev. 3 (rev. 3's tree: the demo stack, the token discipline, the write defaults)
 
 - **F7 (no host ports + the demo token)** — verified at the config level
   (the file review + a YAML parse; no docker host in the audit sandbox):
@@ -258,6 +274,21 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12, F1
   traceback); the fuzz suite exercises the fake + ctl path with a 0600
   file. The SIGHUP-reread scraper loader re-runs the check on every
   reload.
+
+- **The write-default hardening** (posture, not a finding) — the cache
+  regtest's `none`-modes block asserts the new defaults end-to-end: the
+  start log reads `connect acl: any, write acl: none, write allow-list:
+  none`; with `--allow-write` on and everything else default, an FC6 write
+  is refused `0x86/01` with the trail naming the write ACL;
+  `set write-acl any` moves the refusal to the allow-list;
+  `set write-registers any` lets the write pass; `unset write-acl` restores
+  `none` and the refusal returns. `connect-acl none` rejects the connection
+  at accept; `set connect-acl any` lets the client back in. The scraper's
+  dry-run prints the 10 s default (`every 10s`); Prometheus's demo config
+  scrapes at 10 s.
+
+### Rev. 4 (this revision)
+
 - **F11 (the fake's soft edges → capped + documented)** — a new
   `tests/inverter-regtest.py` asserts the whole surface end-to-end: the
   count gate (a `0xFFFF` read, count 126, count 0 and a span past the
@@ -296,17 +327,12 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12, F1
   integrity hash — dump again`; a group/world-writable dump (mode 646)
   refuses outright with `chmod 0600`; and after all three refusals the
   untouched dump still restores cleanly (91 words + the override).
-- **The write-default hardening** (posture, not a finding) — the cache
-  regtest's `none`-modes block asserts the new defaults end-to-end: the
-  start log reads `connect acl: any, write acl: none, write allow-list:
-  none`; with `--allow-write` on and everything else default, an FC6 write
-  is refused `0x86/01` with the trail naming the write ACL;
-  `set write-acl any` moves the refusal to the allow-list;
-  `set write-registers any` lets the write pass; `unset write-acl` restores
-  `none` and the refusal returns. `connect-acl none` rejects the connection
-  at accept; `set connect-acl any` lets the client back in. The scraper's
-  dry-run prints the 10 s default (`every 10s`); Prometheus's demo config
-  scrapes at 10 s.
+- **The rev. 4 re-audit** — a focused review of the new shared surfaces
+  (`common/connlimit.py`, the audit chain, the hardened `persist.py`, the
+  gated HTTP servers) found no new findings; the removed
+  `--metrics-port` flags fail loudly (argparse, rc 2) rather than being
+  silently ignored; all nine suites pass on the re-audited tree.
+
 - The remaining open findings are established by code reading (file:line in
   the table), unchanged from rev. 2 where the cited files did not change.
 
@@ -364,19 +390,22 @@ itself (F2, F3) and three cheap control-channel gaps (F4/F5/F8); rev. 2
 fixed and re-verified all five, together with F6. Rev. 3 closed F7 (the
 compose stack publishes nothing — one internal network, plus the demo
 Prometheus service with the scrape/token story), F9 (the token-flag
-exposure documented everywhere), F12 (token files fail closed unless
-owner-only 0600), F11 (the fake's Modbus surface got the cache's
-client cap/timeout, the `show connections` view and the read-count gate —
-with the trusted-LAN posture documented instead of a security redesign),
-F13 (the scraper refuses a non-loopback metrics listen without a token;
-per-peer caps everywhere) and F10 (the audit trail is tamper-evident:
-a chained hash per entry, per writer prefix, with `scripts/audit_verify.py`
-— the honest boundary: a determined local admin holding the algorithm can
-rechain, so journald forwarding stays the strong answer where the
-retention requirement is strict), F18 (the state dump created `0600`
-explicitly and integrity-hashed — a restore fails closed on a tampered,
-unsigned or group-writable file), and hardened the write defaults on the
-way. The remaining open set is the documented trust decisions and the
+exposure documented everywhere) and F12 (token files fail closed unless
+owner-only 0600), and hardened the write defaults on the way. Rev. 4
+closed the rest of the actionable set: F11 (the fake's Modbus surface got
+the cache's client cap/timeout, the `show connections` view and the
+read-count gate — with the trusted-LAN posture documented instead of a
+security redesign), F13 (the scraper refuses a non-loopback metrics
+listen without a token; per-peer caps on every serving surface), F10 (the
+audit trail is tamper-evident: a chained hash per entry, per writer
+prefix, with `scripts/audit_verify.py` — the honest boundary: a
+determined local admin holding the algorithm can rechain, so journald
+forwarding stays the strong answer where the retention requirement is
+strict) and F18 (the state dump created `0600` explicitly and
+integrity-hashed — a restore fails closed on a tampered, unsigned or
+group-writable file; the dump itself now carries settings only by
+default, the words on `request dump with-cache` / `--dump-with-cache`).
+The remaining open set is the documented trust decisions and the
 deployment stories: the state-dump trust is owned now (F18 closed) — the
 dump file deserves the ini's care (the hash catches tampering, not a
 local admin who rechashes). The inverter fake remains a test instrument

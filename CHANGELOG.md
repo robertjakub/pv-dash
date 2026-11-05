@@ -74,6 +74,12 @@ before the repo restructured into one suite.
 - **tests** — the new `tests/audit-chain.py` asserts the hash chain and
   the verifier end-to-end (interleaved prefixes, the tamper matrix, the
   restart seeding, the rotation span, a live INV trail).
+- **docs** — the audit reissued as **rev. 4** (docs/AUDIT.md): the scope
+  tells the four waves, the closed table carries the per-revision
+  bookkeeping (rev. 2: F2–F8; rev. 3: F7/F9/F12; rev. 4: F10/F11/F13/F18),
+  the evidence splits accordingly and the re-audit note records the
+  focused review of the new shared surfaces (no new findings; the removed
+  `--metrics-port` flags fail loudly).
 
 ### Changed
 

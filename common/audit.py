@@ -101,9 +101,13 @@ def default_path(app):
 
 
 class AuditLog:
-    """'<UTC stamp> AUDIT <PREFIX> <EVENT> [detail]' per line. PREFIX
-    distinguishes the writer (CACHE / INV / CLI / CTL). Opening failure =
-    fatal: an audit trail that silently vanishes is worse than no session.
+    """'<UTC stamp> AUDIT <PREFIX> <EVENT> <chain hash> [detail]' per line —
+    the 12-hex hash chains the entry to this writer's previous one
+    (entry_hash), making any edit/reorder/middle-deletion evident to
+    scripts/audit_verify.py. PREFIX distinguishes the writer (CACHE / INV /
+    CLI / CTL) and each prefix chains its own lines, so interleaved writers
+    in one file verify independently. Opening failure = fatal: an audit
+    trail that silently vanishes is worse than no session.
     All writers share one process-wide file, so every write+flush+rotate
     cycle is serialized — without the lock, a rotation (size/daily) races a
     concurrent writer into an ENOENT and kills the caller's connection."""

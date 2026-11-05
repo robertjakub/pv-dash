@@ -28,6 +28,18 @@
         }
       );
 
+      checks = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        nixpkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          # the sandbox pass, verified in a VM: both units scored with
+          # systemd-analyze security (tests/hardening.nix)
+          hardening = pkgs.callPackage ./tests/hardening.nix { };
+        }
+      );
+
       apps = forAllSystems (system: {
         dashboard = {
           type = "app";

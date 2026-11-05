@@ -114,8 +114,8 @@ def main():
 
         # 8. the real end-to-end trail: the fake's INV prefix over a control session
         flog = os.path.join(tmp, 'fake.log')
-        fake = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
-        ctl = os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py')
+        fake = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+        ctl = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py')
         proc = subprocess.Popen([sys.executable, fake, '--static', '--port', '15977',
                                  '--control-port', '15978', '--audit-log', flog],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

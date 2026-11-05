@@ -19,8 +19,8 @@ import sys
 import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
-CTL = os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py')
+F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+CTL = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py')
 LOG = '/tmp/inv_regtest.log'
 FAILURES = []
 
@@ -380,7 +380,7 @@ def main():
 
         # ---- --man: every tool prints its generated roff page
         for tool, title in ((F, 'MODBUS-FAKE-INVERTER'), (CTL, 'MODBUS-FAKE-CTL'),
-                            (os.path.join(REPO, 'inverter', 'bin', 'fake_cli.py'), 'MODBUS-FAKE-CLI')):
+                            (os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'), 'MODBUS-FAKE-CLI')):
             r = subprocess.run([sys.executable, tool, '--man'], capture_output=True, text=True, timeout=30)
             check('--man: %s prints the page' % os.path.basename(tool),
                   r.returncode == 0 and r.stdout.startswith('.TH %s 1' % title), r.stdout[:40] or r.stderr[-80:])

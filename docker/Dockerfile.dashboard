@@ -16,8 +16,8 @@
 #
 # The config volume: the entrypoint seeds /config with the bundled defaults
 # on start (files the volume lacks are copied in, existing ones stay) — edit
-# /config/server.ini and /config/config.js there, they survive recreation.
-# The upstream Prometheus: PROM_URL (env) beats server.ini, so the compose
+# /config/server.conf and /config/config.js there, they survive recreation.
+# The upstream Prometheus: DSH_PROM_URL (env) beats server.conf, so the compose
 # stack points the proxy at the internal prometheus service without touching
 # the seeded file.
 FROM alpine:3.20
@@ -31,18 +31,18 @@ COPY --from=common *.py common/
 COPY --chown=pvsuite bin/ dashboard/bin/
 COPY --chown=pvsuite lib/ dashboard/lib/
 COPY --chown=pvsuite static/ dashboard/static/
-COPY --chown=pvsuite server.ini config.js config-defaults/
+COPY --chown=pvsuite server.conf config.js config-defaults/
 RUN chmod +x dashboard/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/dashboard/bin/dashboard.py /usr/local/bin/dashboard \
-    && ln -s /pv-suite/dashboard/bin/dashboard_ctl.py /usr/local/bin/dashboard-ctl \
-    && ln -s /pv-suite/dashboard/bin/dashboard_cli.py /usr/local/bin/dashboard-cli
+    && ln -s /pv-suite/dashboard/bin/dashboard-ctl.py /usr/local/bin/dashboard-ctl \
+    && ln -s /pv-suite/dashboard/bin/dashboard-cli.py /usr/local/bin/dashboard-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
-# CONFIG_JS points the served config.js at the volume copy; the listen
-# address comes from the seeded server.ini (0.0.0.0:8080).
-ENV CONFIG_JS=/config/config.js
+# DSH_CONFIG_JS points the served config.js at the volume copy; the listen
+# address comes from the seeded server.conf (0.0.0.0:8080).
+ENV DSH_CONFIG_JS=/config/config.js
 VOLUME /config
 ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 8080
-CMD ["dashboard", "--config", "/config/server.ini"]
+CMD ["dashboard", "--config", "/config/server.conf"]

@@ -19,8 +19,8 @@ import time
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(REPO, 'cache')
 
-P = os.path.join(CACHE_DIR, 'bin', 'modbus_cache.py')
-F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
+P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
+F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 R = os.path.join(REPO, 'profiles', 'profiles', 'sun2000.json')
 
 CACHE_PORT = 15505
@@ -301,7 +301,7 @@ try:
 
     # 2. inverter dies: cached values until cache-ttl, then client gets 0x0B
     for p in procs:
-        if 'fake_inverter' in ' '.join(p.args):
+        if 'modbus-fake-inverter' in ' '.join(p.args):
             p.kill()
     time.sleep(3.5)  # > cache-ttl 3
     b = rd(32064, 2)
@@ -369,8 +369,8 @@ try:
     evil.stop()
 
     # 5. control server: show status/connections/cache, clear cache, restart,
-    #    cache_cli, shutdown (+ the default unix socket / MODBUS_CACHE_CTL)
-    K = os.path.join(CACHE_DIR, 'bin', 'cache_cli.py')
+    #    cache_cli, shutdown (+ the default unix socket / MCH_CTL)
+    K = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py')
 
     def ctl_cmd(cmd, port):
         """One JSON-lines control exchange (the token handshake first — every
@@ -422,7 +422,7 @@ try:
            '--listen', '127.0.0.1:15513', '--interval', '1', '--profile', R,
            '--write-acl', 'any', '--write-registers', 'any',
            '--control-port', '15514'], log='/tmp/reg_ctl.log',
-          env_extra={'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+          env_extra={'MCH_CONTROL_TOKEN': 'sekrit'})
     time.sleep(2)
     r = ctl_cmd('show status', 15514)
     check('control: show status multi-line report', r.startswith('ok status\n')
@@ -536,7 +536,7 @@ try:
         s.close()
 
     def cli(stdin, port=15514, env_extra=None, use_flag=True):
-        env = {**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'}
+        env = {**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'}
         if env_extra:
             env.update(env_extra)
         args = [sys.executable, K]
@@ -556,7 +556,7 @@ try:
     p = subprocess.Popen([sys.executable, K, '--control-port', '15514'],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          text=True,
-                         env={**os.environ, 'CACHE_CLI_KEEPALIVE': '0.2', 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+                         env={**os.environ, 'MCH_CLI_KEEPALIVE': '0.2', 'MCH_CONTROL_TOKEN': 'sekrit'})
     time.sleep(1.2)          # the CLI idles, pinging every 0.2s
     p.stdin.write('show status\n')
     p.stdin.flush()
@@ -576,16 +576,16 @@ try:
     check('control: the unix socket mode is 0600 (not the umask)',
           os.stat('/tmp/modbus-cache-15515.socket').st_mode & 0o777 == 0o600,
           oct(os.stat('/tmp/modbus-cache-15515.socket').st_mode))
-    r = cli('show status\nquit\n', 15515, {'MODBUS_CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
-    check('cache_cli: MODBUS_CACHE_CTL reaches the default socket', r.returncode == 0
+    r = cli('show status\nquit\n', 15515, {'MCH_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+    check('cache_cli: MCH_CTL reaches the default socket', r.returncode == 0
           and 'upstream=127.0.0.1:15512' in r.stdout and 'cache:15515 > ' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show status\nquit\n', 15515, {'CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
-    check('cache_cli: short CACHE_CTL env works too', r.returncode == 0
+    r = cli('show status\nquit\n', 15515, {'MCH_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+    check('cache_cli: short MCH_CTL env works too', r.returncode == 0
           and 'upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show status\nquit\n', 15520, {'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+    r = cli('show status\nquit\n', 15520, {'MCH_CONTROL_TOKEN': 'sekrit'})
     check('cache_cli: token env authenticates the TCP control session', r.returncode == 0
           and 'upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show status\nquit\n', 15520, {'MODBUS_CACHE_CONTROL_TOKEN': ''})
+    r = cli('show status\nquit\n', 15520, {'MCH_CONTROL_TOKEN': ''})
     check('cache_cli: token server refuses the token-less CLI', r.returncode == 0
           and 'err authenticate first' in r.stdout, repr(r.stdout[-160:]))
 
@@ -599,20 +599,20 @@ try:
     gsock = '/tmp/modbus-cache-15516.socket'
     check('control: --control-socket-group chmods the socket 0660',
           os.stat(gsock).st_mode & 0o777 == 0o660, oct(os.stat(gsock).st_mode))
-    r = cli('show version\nquit\n', 15516, {'MODBUS_CACHE_CTL': gsock}, use_flag=False)
+    r = cli('show version\nquit\n', 15516, {'MCH_CTL': gsock}, use_flag=False)
     check('control: the group socket speaks (the owner, us)', r.returncode == 0
           and 'modbus-cache 0.3.0' in r.stdout, repr(r.stdout[-120:]))
 
     # 5c. cache_ctl: the one-shot client (args, piped batches, token)
-    ctl = os.path.join(CACHE_DIR, 'bin', 'cache_ctl.py')
+    ctl = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-ctl.py')
     r = subprocess.run([sys.executable, ctl, '--control-port', '15514', 'show', 'status'],
                        capture_output=True, text=True, timeout=30,
-                       env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+                       env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
     check('cache_ctl: one-shot show status', r.returncode == 0
           and r.stdout.startswith('ok status\nupstream=127.0.0.1:15512'), repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15520'],
                        input='show cache\nclear cache\n', capture_output=True, text=True,
-                       timeout=30, env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+                       timeout=30, env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
     check('cache_ctl: piped batch with the token env', r.returncode == 0
           and r.stdout.startswith('ok cache ') and 'ok cache cleared' in r.stdout, repr(r.stdout[:160]))
 
@@ -659,6 +659,13 @@ try:
     check('dump: show dump-interval without a path is a clean err', r.startswith('err dump-interval needs a dump path'), r[:80])
     r = ctl_cmd('help', 15514)
     check('dump: the help hides the dump commands without a path', 'request dump' not in r, r[:160])
+    r = ctl_cmd('show knobs', 15514)
+    check('show knobs: the dictionary of the registry — flag, env twin, section, how it changes',
+          r.startswith('ok knobs') and '--interval' in r and '$MCH_INTERVAL' in r
+          and 'set interval <value>' in r and 'control-ops-token-file' in r and ', secret' in r
+          and '# ---' in r, r[:200])
+    r = ctl_cmd('help knobs', 15514)
+    check('help knobs: the same dictionary under the help verb', r.startswith('ok knobs'), r[:80])
     r = ctl_cmd('show uplink', 15514)
     check('show uplink: session counters and per-block latency rows', r.startswith('ok uplink\n')
           and 'exchanges' in r and 'connects' in r and 'mean' in r and 'fails' in r
@@ -686,7 +693,7 @@ try:
                                '--listen', '127.0.0.1:15526', '--interval', '1', '--profile', R,
                                '--selection', 'none', '--control-port', '15527'],
                               stdout=open('/tmp/reg_cache_none.log', 'w'), stderr=subprocess.STDOUT,
-                              env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+                              env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
     procs.append(p_none)
     time.sleep(1.5)
     b = rd(47415, 1, port=15526)
@@ -714,7 +721,7 @@ try:
                               '--listen', '127.0.0.1:15533', '--interval', '5', '--cache-ttl', '30',
                               '--profile', ttlmap, '--control-port', '15534'],
                              stdout=open('/tmp/reg_cache_ttl.log', 'w'), stderr=subprocess.STDOUT,
-                             env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+                             env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
     procs.append(p_ttl)
     time.sleep(1.5)
     rd(32064, 2, port=15533)
@@ -759,7 +766,7 @@ try:
                                '--profile', R, '--control-port', '15537',
                                '--dump-path', dumpfile],
                               stdout=open('/tmp/reg_cache_dump.log', 'w'), stderr=subprocess.STDOUT,
-                              env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+                              env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
     procs.append(p_dump)
     time.sleep(1.5)
     r = ctl_cmd('request dump', 15537)
@@ -853,7 +860,7 @@ try:
                                '--profile', R, '--control-port', '15537', '--dump-with-cache',
                                '--dump-path', dumpfile],
                               stdout=open('/tmp/reg_cache_dump2.log', 'w'), stderr=subprocess.STDOUT,
-                              env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+                              env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
     procs.append(p_dump)
     time.sleep(1.5)
     log = open('/tmp/reg_cache_dump2.log').read()
@@ -878,7 +885,7 @@ try:
                                '--profile', R, '--control-port', '15537', '--dump-with-cache',
                                '--dump-path', dumpfile, '--restore-on-start'],
                               stdout=open('/tmp/reg_cache_dump2.log', 'w'), stderr=subprocess.STDOUT,
-                              env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+                              env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
     procs.append(p_dump)
     time.sleep(1.5)
     r = ctl_cmd('show cache', 15537)
@@ -898,7 +905,7 @@ try:
                                   '--metrics-listen', '127.0.0.1:15529', '--metrics-server', '--metrics-token', 'sekrit',
                                   '--metrics-max-clients', '1'],
                                  stdout=open('/tmp/reg_cache_metrics.log', 'w'), stderr=subprocess.STDOUT,
-                                 env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+                                 env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
     procs.append(p_metrics)
     time.sleep(1.5)
     import urllib.request, urllib.error
@@ -1008,7 +1015,7 @@ try:
     ctl_cmd('unset allow-write', 15514)
     b = wr6(47415, 4, port=15513)
     check('unset allow-write: the gate closes again', b[0] == 0x86 and b[1] == 1, b.hex())
-    r = cli('shutdown\n\n', 15515, {'MODBUS_CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+    r = cli('shutdown\n\n', 15515, {'MCH_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
     time.sleep(1)
     check('cache_cli: RETURN at [confirm] stops the proxy', r.returncode == 0
           and 'bye shutdown' in r.stdout and p_unix.poll() == 0, repr(r.stdout))
@@ -1021,11 +1028,11 @@ try:
                     {'name': 'pv-power', 'register': 32064, 'type': 'i32', 'fc': 3, 'cache': True},
                     {'name': 'meter-live', 'register': 40001, 'type': 'u32', 'fc': 4, 'cache': True},
                 ]}, open(fc4map, 'w'))
-    # the allow-list rides the ini (the reloadable source: the env is frozen at start)
-    ini4 = '/tmp/reg_fc4.ini'
-    open(ini4, 'w').write(open(os.path.join(CACHE_DIR, 'modbus_cache.ini')).read()
-                          .replace('write_registers = none', 'write_registers = 47400:100')
-                          .replace('write_acl = none', 'write_acl = any'))
+    # the allow-list rides the config script (the reloadable source: the env is frozen at start)
+    ini4 = '/tmp/reg_fc4.conf'
+    open(ini4, 'w').write('# the fc4 regtest config: the set grammar\n'
+                          'set write-registers 47400:100\n'
+                          'set write-acl any\n')
 
     def rd4(addr, n, port=CACHE_PORT):
         return txn(struct.pack('>BHH', 4, addr, n), port)
@@ -1035,8 +1042,8 @@ try:
                    '--listen', '127.0.0.1:15521', '--interval', '1', '--cache-ttl', '3',
                    '--allow-write', '--control-port', '15522',
                    '--profile', fc4map, '--audit-log', '/tmp/reg_audit_fc4.log'],
-                  log='/tmp/reg_fc4.log', env_extra={'MODBUS_CACHE_REQUESTS_AUDIT': '1',
-                                                     'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+                  log='/tmp/reg_fc4.log', env_extra={'MCH_REQUESTS_AUDIT': '1',
+                                                     'MCH_CONTROL_TOKEN': 'sekrit'})
     time.sleep(2.5)
     b = rd(32064, 2, port=15521)
     check('fc3 range polled and served', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
@@ -1078,9 +1085,9 @@ try:
           'AUDIT CACHE WRITE ' in fc4_audit and 'WRITE-REFUSED' in fc4_audit
           and 'outside the write allow-list' in fc4_audit, fc4_audit[-160:])
 
-    # SIGHUP reloads the allow-list from the ini
-    ini_txt = open(ini4).read().replace('write_registers = 47400:100', 'write_registers = 47600:100')
-    open(ini4, 'w').write(ini_txt)
+    # SIGHUP reloads the allow-list from the config script
+    conf_txt = open(ini4).read().replace('set write-registers 47400:100', 'set write-registers 47600:100')
+    open(ini4, 'w').write(conf_txt)
     os.kill(p_fc4.pid, signal.SIGHUP)
     time.sleep(1)
     b = wr6(47415, 8, port=15521)
@@ -1193,13 +1200,13 @@ try:
           and r.stdout.startswith('ok modbus-cache'), repr(r.stdout[:80]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'show', 'version'],
                        capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN_FILE': tokfile})
-    check('token file: cache_ctl honors MODBUS_CACHE_CONTROL_TOKEN_FILE', r.returncode == 0
+                       env={**os.environ, 'MCH_CONTROL_TOKEN_FILE': tokfile})
+    check('token file: cache_ctl honors MCH_CONTROL_TOKEN_FILE', r.returncode == 0
           and r.stdout.startswith('ok modbus-cache'), repr(r.stdout[:80]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'status'],
                        capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'x',
-                            'MODBUS_CACHE_CONTROL_TOKEN_FILE': tokfile})
+                       env={**os.environ, 'MCH_CONTROL_TOKEN': 'x',
+                            'MCH_CONTROL_TOKEN_FILE': tokfile})
     check('token file: the token env + the token-file env is a clean error', r.returncode != 0
           and 'mutually exclusive' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))

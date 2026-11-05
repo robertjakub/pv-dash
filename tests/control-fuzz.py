@@ -25,7 +25,7 @@ def wiremac(token, payload):
     return hmac.new(token.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
+F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 FAILURES = []
 
 
@@ -57,6 +57,41 @@ def roundtrip(port, wire_bytes, timeout=5.0):
         return str(obj.get('status')), str(obj.get('text', ''))
     except (OSError, ValueError) as e:
         return 'boom', str(e)
+
+
+def authed_roundtrip(port, token, cmd, timeout=5.0):
+    """Auth with the token, send the mac'd command, read one reply: a dict.
+    Asserts nothing — the caller checks the mac against the token it passed
+    (the ops sessions must be signed with the ops key, the admin ones with
+    the admin key)."""
+    try:
+        s = connect(port, timeout)
+        s.sendall(_json.dumps({'cmd': 'auth', 'token': token}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            chunk = s.recv(65536)
+            if not chunk:
+                s.close()
+                return {'status': 'dead', 'text': 'connection closed during auth'}
+            buf += chunk
+        auth = _json.loads(buf.decode('utf-8', 'replace'))
+        if auth.get('status') != 'ok':
+            s.close()
+            return {'status': 'auth-fail', 'text': str(auth.get('text', ''))}
+        s.sendall(_json.dumps({'cmd': cmd, 'mac': wiremac(token, cmd)}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            chunk = s.recv(65536)
+            if not chunk:
+                s.close()
+                return {'status': 'dead', 'text': 'connection closed without a reply'}
+            buf += chunk
+        s.close()
+        obj = _json.loads(buf.decode('utf-8', 'replace'))
+        obj['_mac_ok'] = obj.get('mac') == wiremac(token, '%s %s' % (obj.get('status'), obj.get('text', '')))
+        return obj
+    except (OSError, ValueError) as e:
+        return {'status': 'boom', 'text': str(e)}
 
 
 def main():
@@ -195,26 +230,26 @@ def main():
             c.close()
         except (OSError, ValueError) as e:
             check('fuzz: the file token authenticates', False, str(e))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
                             '--control-port', '15964', '--control-token-file', '/tmp/ctl_fuzz_token',
                             'show', 'version'], capture_output=True, text=True, timeout=15)
         check('fuzz: fake_ctl authenticates with the file token', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--port', '15962', '--dry-run', '--control-token', 'a',
                             '--control-token-file', '/tmp/ctl_fuzz_token'],
                            capture_output=True, text=True, timeout=15)
         check('fuzz: both token sources is a clean error', r.returncode != 0
               and 'mutually exclusive' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
                             '--control-port', '15963', '--control-token-file', '/tmp/ctl_fuzz_no_file',
                             'status'], capture_output=True, text=True, timeout=15)
         check('fuzz: a missing token file fails fast, one line', r.returncode != 0
               and 'cannot read control-token-file' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
         open('/tmp/ctl_fuzz_token_lax', 'w').write('laxsecret\n')          # the umask default (0644)
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--port', '15962', '--dry-run',
                             '--control-token-file', '/tmp/ctl_fuzz_token_lax'],
                            capture_output=True, text=True, timeout=15)
@@ -223,42 +258,112 @@ def main():
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
 
         # 6c. the token-file env vars the help promises: honored like the flags
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
                             '--control-port', '15964', 'show', 'version'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'FAKE_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
-        check('fuzz: fake_ctl honors FAKE_CONTROL_TOKEN_FILE', r.returncode == 0
+                           env={**os.environ, 'INV_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+        check('fuzz: fake_ctl honors INV_CONTROL_TOKEN_FILE', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
                             '--control-port', '15964', 'status'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'FAKE_CONTROL_TOKEN': 'x',
-                                'FAKE_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+                           env={**os.environ, 'INV_CONTROL_TOKEN': 'x',
+                                'INV_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
         check('fuzz: the token env + the token-file env is a clean error', r.returncode != 0
               and 'mutually exclusive' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--port', '15962', '--dry-run', '--control-token', 'a'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'FAKE_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+                           env={**os.environ, 'INV_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
         check('fuzz: flag token + the control token-file env is a clean error', r.returncode != 0
               and 'mutually exclusive' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--port', '15962', '--dry-run', '--metrics-server',
                             '--metrics-listen', '127.0.0.1:15967'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'FAKE_METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
-        check('fuzz: the fake honors FAKE_METRICS_TOKEN_FILE', r.returncode == 0
+                           env={**os.environ, 'INV_METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+        check('fuzz: the fake honors INV_METRICS_TOKEN_FILE', r.returncode == 0
               and 'bearer token' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--port', '15962', '--dry-run', '--metrics-token', 'a'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'FAKE_METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+                           env={**os.environ, 'INV_METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
         check('fuzz: flag metrics token + the metrics token-file env is a clean error', r.returncode != 0
               and 'mutually exclusive' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
+
+        # 6d. the read-only ops token: the show/clear verbs only, both audited
+        OPS_AUDIT = '/tmp/ctl_fuzz_ops_audit.log'
+        open(OPS_AUDIT, 'w').write('')
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15983',
+                                       '--control-port', '15982', '--control-token', 'admintok',
+                                       '--control-ops-token', 'opstok', '--audit-log', OPS_AUDIT],
+                                      stdout=open('/tmp/ctl_fuzz4.log', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(0.9)
+        r = authed_roundtrip(15982, 'opstok', 'show version')
+        check('ops: the ops token authenticates and the reply is mac\'d with the ops key',
+              r.get('status') == 'ok' and 'fake-inverter' in r.get('text', '') and r.get('_mac_ok'), str(r))
+        r = authed_roundtrip(15982, 'opstok', 'show status')
+        check('ops: show status honored', r.get('status') == 'ok' and r.get('_mac_ok'), str(r)[:120])
+        r = authed_roundtrip(15982, 'opstok', 'set pv 100')
+        check('ops: set is forbidden', r.get('status') == 'err' and 'forbidden' in r.get('text', '')
+              and 'admin' in r.get('text', '') and r.get('_mac_ok'), str(r))
+        r = authed_roundtrip(15982, 'opstok', 'shutdown')
+        check('ops: shutdown is forbidden', r.get('status') == 'err' and 'forbidden' in r.get('text', ''), str(r))
+        r = authed_roundtrip(15982, 'opstok', 'reset')
+        check('ops: reset is forbidden (no set, no shutdown)', r.get('status') == 'err'
+              and 'forbidden' in r.get('text', ''), str(r))
+        try:
+            s = connect(15982)
+            s.sendall(_json.dumps({'cmd': 'auth', 'token': 'opstok'}).encode() + b'\n')
+            buf = b''
+            while not buf.endswith(b'\n'):
+                buf += s.recv(4096)
+            s.sendall(_json.dumps({'cmd': 'show version'}).encode() + b'\n')   # no mac on purpose
+            buf = b''
+            while not buf.endswith(b'\n'):
+                buf += s.recv(4096)
+            reply = _json.loads(buf.decode())
+            s.close()
+            check('ops: an unsigned command is still refused on TCP', reply.get('status') == 'err'
+                  and 'unsigned command' in reply.get('text', ''), str(reply))
+        except (OSError, ValueError) as e:
+            check('ops: an unsigned command is still refused on TCP', False, str(e))
+        r = authed_roundtrip(15982, 'admintok', 'set pv 100')
+        check('ops: the admin token still steers the same server',
+              r.get('status') == 'ok' and r.get('_mac_ok'), str(r))
+        r = authed_roundtrip(15982, 'opstok', 'wrong-tokens')
+        check('ops: a bogus token is refused', r.get('status') in ('auth-fail', 'err'), str(r))
+        aud = open(OPS_AUDIT).read()
+        check('ops: both roles audited (role=ops show, role=admin set, the denials included)',
+              "role=ops 'show version'" in aud and "role=admin 'set pv 100'" in aud
+              and "role=ops 'shutdown'" in aud and '-> err' in aud, aud[-300:])
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
+                            '--control-port', '15982', '--control-token', 'opstok', 'show', 'version'],
+                           capture_output=True, text=True, timeout=15)
+        check('ops: fake_ctl reads with the ops token', r.returncode == 0
+              and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
+                            '--control-port', '15982', '--control-token', 'opstok', 'set', 'pv', '2000'],
+                           capture_output=True, text=True, timeout=15)
+        check('ops: fake_ctl cannot steer with the ops token', 'forbidden' in r.stdout
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stdout + r.stderr)[:120]))
+        r = subprocess.run([sys.executable, F, '--static', '--port', '15983', '--dry-run',
+                            '--control-port', '0', '--control-ops-token', 'opstok'],
+                           capture_output=True, text=True, timeout=15)
+        check('ops: an ops token without the admin token is a clean error', r.returncode != 0
+              and 'supplements' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
+        r = subprocess.run([sys.executable, F, '--static', '--port', '15983', '--dry-run',
+                            '--control-port', '0', '--control-token', 'same',
+                            '--control-ops-token', 'same'],
+                           capture_output=True, text=True, timeout=15)
+        check('ops: the ops token equal to the admin token is a clean error', r.returncode != 0
+              and 'differ' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
 
         # 7. twenty parallel clients: garbage and real commands interleaved
         results = []

@@ -54,7 +54,7 @@ docker compose down
 **Exactly one port is published on the host** — the dashboard's HTTP
 interface, loopback-only (`127.0.0.1:8080:8080`): the front for the stack's
 internal Prometheus, its `/prom` proxy aimed at `http://prometheus:9090` by
-the compose's `PROM_URL`. Everything else stays closed (the audit's F7): the
+the compose's `DSH_PROM_URL`. Everything else stays closed (the audit's F7): the
 services talk over one `internal: true` network (`pv-modbus` — no other host
 ports, no outbound route), so the Modbus listeners, the exporter's
 `/metrics` and the Prometheus UI are reachable only from inside that network.
@@ -65,7 +65,7 @@ Prometheus UI directly from the host as well, add
 
 **The scrape/token story ships in the stack** (the audit's F13 closed for
 the demo): the exporter never serves unauthenticated — the compose sets
-`SCRAPER_AUTH_TOKEN_FILE=/config/metrics.token`, and the entrypoint
+`SCR_AUTH_TOKEN_FILE=/config/metrics.token`, and the entrypoint
 generates that file into the volume on the first seed: a random value,
 **0600, owner pvsuite** (bundled `*.token` defaults are placeholders that
 are never copied — the generation is in `entrypoint.sh`; the token survives
@@ -157,11 +157,11 @@ every listener binds inside the network only:
   dashboard is the front.
 - **dashboard** — the single-page app + its stdlib proxy server: the only
   published surface, loopback `127.0.0.1:8080:8080`; `/prom` proxies the
-  internal Prometheus (`PROM_URL=http://prometheus:9090`), the static files
+  internal Prometheus (`DSH_PROM_URL=http://prometheus:9090`), the static files
   and the served `config.js` come from the image (the `/config` copies for
   the live edits).
 - **the `config` volume** — mounted by the three Modbus services and the
-  dashboard (prometheus reads it read-only): the ini files are editable
+  dashboard (prometheus reads it read-only): the config files are editable
   there; `/config/metrics.token` is the generated shared secret.
 - **the audit trails** — the tools audit to stdout in the demo, so `docker
   compose logs <service>` is the trail.
@@ -194,9 +194,9 @@ symmetry with the other two images and for future use.
 ### modbus-cache (`Dockerfile.cache`)
 
 The caching proxy multiplexing the inverter's single Modbus client — see the
-[cache](../cache/README.md). The live configs are `/config/modbus_cache.ini`
-and `/config/selection.json` (`MODBUS_CACHE_CONFIG` /
-`MODBUS_CACHE_SELECTION`):
+[cache](../cache/README.md). The live configs are `/config/modbus_cache.conf`
+and `/config/selection.json` (`MCH_CONFIG` /
+`MCH_SELECTION`):
 
 ```bash
 cd docker
@@ -216,7 +216,7 @@ named volume under all three tools keeps every config in one place.
 
 The Prometheus exporter — see the [scraper](../scrape/README.md). The live
 configs are `/config/scraper.ini` and `/config/metrics.json`
-(`SCRAPER_CONFIG` / `SCRAPER_METRICS_SPEC`):
+(`SCR_CONFIG` / `SCR_METRICS_SPEC`):
 
 ```bash
 cd docker
@@ -229,8 +229,8 @@ docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper \
 ```
 
 Standalone runs stay token-less by default — the compose stack is what
-wires the token (`SCRAPER_AUTH_TOKEN_FILE`); pass
-`-e SCRAPER_AUTH_TOKEN_FILE=/config/metrics.token` by hand to mirror it.
+wires the token (`SCR_AUTH_TOKEN_FILE`); pass
+`-e SCR_AUTH_TOKEN_FILE=/config/metrics.token` by hand to mirror it.
 
 ### prometheus (`Dockerfile.prometheus`)
 
@@ -252,21 +252,21 @@ network only — the dashboard's proxy is the way in from the host.
 
 The static single-page app with its stdlib Prometheus proxy — see the
 [dashboard](../dashboard/README.md). The live configs are
-`/config/server.ini` and `/config/config.js` (`--config /config/server.ini`,
-`CONFIG_JS`):
+`/config/server.conf` and `/config/config.js` (`--config /config/server.conf`,
+`DSH_CONFIG_JS`):
 
 ```bash
 cd docker
 docker build -t pv-dashboard --build-context scripts=../docker ../dashboard
 docker run --rm -p 127.0.0.1:8080:8080 pv-dashboard    # loopback-published, serves 0.0.0.0:8080 in the container
 docker run --rm -it pv-dashboard bash                  # poke around as pvsuite
-docker run --rm -p 127.0.0.1:8080:8080 -e PROM_URL=http://prometheus:9090 \
-    pv-dashboard                                       # the upstream via env (env beats server.ini)
+docker run --rm -p 127.0.0.1:8080:8080 -e DSH_PROM_URL=http://prometheus:9090 \
+    pv-dashboard                                       # the upstream via env (env beats server.conf)
 ```
 
-The upstream defaults to the bundled `server.ini`'s
-`upstream = http://localhost:9090`; `PROM_URL` (env) or a `--upstream` flag
-override it. In the compose stack the compose sets `PROM_URL` to the
+The upstream defaults to the bundled `server.conf`'s
+`upstream = http://localhost:9090`; `DSH_PROM_URL` (env) or a `--upstream` flag
+override it. In the compose stack the compose sets `DSH_PROM_URL` to the
 internal `prometheus` service — the dashboard is the stack's one published
 surface (`127.0.0.1:8080:8080`).
 

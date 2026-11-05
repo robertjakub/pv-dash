@@ -15,9 +15,9 @@ import urllib.request
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRAPE_DIR = os.path.join(REPO, 'scrape')
-P = os.path.join(SCRAPE_DIR, 'bin', 'modbus_scraper.py')
-F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
-FAKE_PORT, PORT = 15545, 19455
+P = os.path.join(SCRAPE_DIR, 'bin', 'modbus-scraper.py')
+F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+INV_PORT, PORT = 15545, 19455
 ROUNDS = 3000
 
 failures = []
@@ -52,13 +52,14 @@ import socket  # noqa: E402  (late import keeps the helpers above readable)
 
 procs = []
 try:
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--port', str(FAKE_PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--port', str(INV_PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     with open('/tmp/scr_fuzz.ini', 'w') as fh:
-        fh.write('[scraper]\ninterval = 1\ntimeout = 1\nclient_timeout = 2\nmax_clients = 16\nlog_level = DEBUG\n')
+        fh.write('# the set grammar (the ini format is gone)\nset interval 1\nset timeout 1\n'
+                 'set client-timeout 2\nset max-clients 16\nset log-level DEBUG\n')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_fuzz.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', str(FAKE_PORT),
+                                   '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
                                    '--listen', '127.0.0.1:%d' % PORT],
                                   stdout=open('/tmp/scr_fuzz.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)

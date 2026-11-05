@@ -14,18 +14,18 @@ ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 # (tool, bin relative to the repo root, shipped page relative to the repo root)
 TOOLS = (
-    ('modbus-cache',         'cache/bin/modbus_cache.py',     'cache/man/modbus-cache.1'),
-    ('modbus-cache-ctl',     'cache/bin/cache_ctl.py',        'cache/man/modbus-cache-ctl.1'),
-    ('modbus-cache-cli',     'cache/bin/cache_cli.py',        'cache/man/modbus-cache-cli.1'),
-    ('modbus-fake-inverter', 'inverter/bin/fake_inverter.py', 'inverter/man/modbus-fake-inverter.1'),
-    ('modbus-fake-ctl',      'inverter/bin/fake_ctl.py',      'inverter/man/modbus-fake-ctl.1'),
-    ('modbus-fake-cli',      'inverter/bin/fake_cli.py',      'inverter/man/modbus-fake-cli.1'),
-    ('modbus-scraper',       'scrape/bin/modbus_scraper.py',  'scrape/man/modbus-scraper.1'),
-    ('modbus-scraper-ctl',   'scrape/bin/scraper_ctl.py',     'scrape/man/modbus-scraper-ctl.1'),
-    ('modbus-scraper-cli',   'scrape/bin/scraper_cli.py',     'scrape/man/modbus-scraper-cli.1'),
+    ('modbus-cache',         'cache/bin/modbus-cache.py',     'cache/man/modbus-cache.1'),
+    ('modbus-cache-ctl',     'cache/bin/modbus-cache-ctl.py',        'cache/man/modbus-cache-ctl.1'),
+    ('modbus-cache-cli',     'cache/bin/modbus-cache-cli.py',        'cache/man/modbus-cache-cli.1'),
+    ('modbus-fake-inverter', 'inverter/bin/modbus-fake-inverter.py', 'inverter/man/modbus-fake-inverter.1'),
+    ('modbus-fake-ctl',      'inverter/bin/modbus-fake-ctl.py',      'inverter/man/modbus-fake-ctl.1'),
+    ('modbus-fake-cli',      'inverter/bin/modbus-fake-cli.py',      'inverter/man/modbus-fake-cli.1'),
+    ('modbus-scraper',       'scrape/bin/modbus-scraper.py',  'scrape/man/modbus-scraper.1'),
+    ('modbus-scraper-ctl',   'scrape/bin/modbus-scraper-ctl.py',     'scrape/man/modbus-scraper-ctl.1'),
+    ('modbus-scraper-cli',   'scrape/bin/modbus-scraper-cli.py',     'scrape/man/modbus-scraper-cli.1'),
     ('dashboard',            'dashboard/bin/dashboard.py',    'dashboard/man/dashboard.1'),
-    ('dashboard-ctl',        'dashboard/bin/dashboard_ctl.py', 'dashboard/man/dashboard-ctl.1'),
-    ('dashboard-cli',        'dashboard/bin/dashboard_cli.py', 'dashboard/man/dashboard-cli.1'),
+    ('dashboard-ctl',        'dashboard/bin/dashboard-ctl.py', 'dashboard/man/dashboard-ctl.1'),
+    ('dashboard-cli',        'dashboard/bin/dashboard-cli.py', 'dashboard/man/dashboard-cli.1'),
 )
 
 

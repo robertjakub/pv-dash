@@ -19,7 +19,7 @@
 # attached to the same network by name (see README.md).
 #
 # The scrape/token story ships in the stack: the exporter serves with a
-# bearer token (SCRAPER_AUTH_TOKEN_FILE -> /config/metrics.token — a random
+# bearer token (SCR_AUTH_TOKEN_FILE -> /config/metrics.token — a random
 # value the entrypoint generates on the first seed, 0600, owner pvsuite) and
 # the Prometheus service reads its copy of the same file from the config
 # volume. Read the token: docker compose exec modbus-scraper cat /config/metrics.token
@@ -65,7 +65,7 @@ services:
     environment:
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the demo exporter never serves unauthenticated (the audit's F13)
-      SCRAPER_AUTH_TOKEN_FILE: /config/metrics.token
+      SCR_AUTH_TOKEN_FILE: /config/metrics.token
     networks:
       - modbus
     depends_on:
@@ -96,7 +96,7 @@ services:
     environment:
       # the proxy target: the stack's internal Prometheus service (the
       # dashboard never needs the token — the scrape stays prometheus-side)
-      PROM_URL: http://prometheus:9090
+      DSH_PROM_URL: http://prometheus:9090
     volumes:
       - config:/config
     networks:

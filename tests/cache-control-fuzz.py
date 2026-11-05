@@ -8,6 +8,8 @@ afterwards.
 
 Checks: ALL PASS (or a FAILURES list; exit 1).
 """
+import hashlib
+import hmac
 import json as _json
 import os
 import socket
@@ -18,11 +20,13 @@ import threading
 import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-P = os.path.join(REPO, 'cache', 'bin', 'modbus_cache.py')
-F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
+P = os.path.join(REPO, 'cache', 'bin', 'modbus-cache.py')
+F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 FAILURES = []
 TOKEN = 'sekrit'
 AUTH_PORT = 15965   # the fuzz cache runs token'd (F5): roundtrip authenticates first there
+OPS_TOKEN = 'opssecret'
+OPS_PORT = 15969    # the ops-token'd cache (the read-only role, §6d)
 
 
 def wiremac(payload):
@@ -35,6 +39,47 @@ def wiremac(payload):
 def signed(cmd):
     """The signed wire form of one command (the token'd server refuses the unsigned)."""
     return _json.dumps({'cmd': cmd, 'mac': wiremac(cmd)}).encode() + b'\n'
+
+
+def ops_roundtrip(cmd, token=OPS_TOKEN, port=None, unsigned=False, timeout=5.0):
+    """Auth with the given token (the ops or the admin one), send the command,
+    read one reply: (status, text, mac-verifies-with-the-same-token) — the
+    ops sessions must be signed and answered with the ops key, the admin
+    ones with the admin key."""
+    port = port or OPS_PORT
+    try:
+        s = connect(port, timeout)
+        s.sendall(_json.dumps({'cmd': 'auth', 'token': token}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            chunk = s.recv(65536)
+            if not chunk:
+                s.close()
+                return 'dead', 'connection closed during auth', False
+            buf += chunk
+        auth = _json.loads(buf.decode('utf-8', 'replace'))
+        if auth.get('status') != 'ok':
+            s.close()
+            return 'auth-fail', str(auth.get('text', '')), False
+        if token and not unsigned:
+            mac = hmac.new(token.encode(), cmd.encode(), hashlib.sha256).hexdigest()
+            s.sendall(_json.dumps({'cmd': cmd, 'mac': mac}).encode() + b'\n')
+        else:
+            s.sendall(_json.dumps({'cmd': cmd}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            chunk = s.recv(65536)
+            if not chunk:
+                s.close()
+                return 'dead', 'connection closed without a reply', False
+            buf += chunk
+        s.close()
+        obj = _json.loads(buf.decode('utf-8', 'replace'))
+        want = hmac.new(token.encode(), ('%s %s' % (obj.get('status'), obj.get('text', ''))).encode(),
+                        hashlib.sha256).hexdigest()
+        return str(obj.get('status')), str(obj.get('text', '')), obj.get('mac') == want
+    except (OSError, ValueError) as e:
+        return 'boom', str(e), False
 
 
 def check(name, ok, detail=''):
@@ -190,6 +235,62 @@ def main():
         except (OSError, ValueError) as e:
             check('fuzz: the right token authenticates', False, str(e))
 
+        # 6d. the read-only ops token: show/clear allowed, everything that
+        #     steers the daemon forbidden; both roles audited, both mac keys
+        OPS_AUDIT = '/tmp/cache_ctl_fuzz_ops_audit.log'
+        open(OPS_AUDIT, 'w').write('')
+        procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15960',
+                                       '--listen', '127.0.0.1:15968', '--interval', '1',
+                                       '--control-port', str(OPS_PORT), '--control-token', 'admintok2',
+                                       '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
+                                      stdout=open('/tmp/cache_ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(1.5)
+        st, tx, macok = ops_roundtrip('show status')
+        check('ops: the ops token authenticates, show status honored, mac\'d with the ops key',
+              st == 'ok' and macok, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('show cache')
+        check('ops: show cache honored', st == 'ok' and macok, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('clear cache')
+        check('ops: clear cache honored (the read-only shift may flush)',
+              st == 'ok' and 'cache cleared' in tx and macok, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('set interval 5')
+        check('ops: set is forbidden', st == 'err' and 'forbidden' in tx and 'admin' in tx and macok,
+              '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('unset interval')
+        check('ops: unset is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('request restore')
+        check('ops: request restore is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('restart')
+        check('ops: restart is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('shutdown')
+        check('ops: shutdown is forbidden', st == 'err' and 'forbidden' in tx and macok, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('show status', unsigned=True)
+        check('ops: an unsigned command is still refused first', st == 'err' and 'unsigned command' in tx,
+              '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('set interval 5', token='admintok2')
+        check('ops: the admin token still steers the same server, mac\'d with the admin key',
+              st == 'ok' and macok, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('show version', token='nope')
+        check('ops: a bogus token is refused', st == 'auth-fail', '%s %s' % (st, tx))
+        aud = open(OPS_AUDIT).read()
+        check('ops: both roles audited (role=ops clear, role=admin set, the denials included)',
+              "role=ops 'clear cache'" in aud and "role=admin 'set interval 5'" in aud
+              and "role=ops 'shutdown'" in aud and "role=ops 'set interval 5' wire=h" in aud, aud[-300:])
+        r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15960',
+                            '--listen', '127.0.0.1:15968', '--control-port', str(OPS_PORT),
+                            '--control-ops-token', 'x', '--dry-run'],
+                           capture_output=True, text=True, timeout=15)
+        check('ops: an ops token without the admin token is a clean error', r.returncode != 0
+              and 'supplements' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
+        r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15960',
+                            '--listen', '127.0.0.1:15968', '--control-port', str(OPS_PORT),
+                            '--control-token', 'same', '--control-ops-token', 'same', '--dry-run'],
+                           capture_output=True, text=True, timeout=15)
+        check('ops: the ops token equal to the admin token is a clean error', r.returncode != 0
+              and 'differ' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
+
         # 7. twenty parallel clients: garbage and real commands interleaved
         results = []
 
@@ -228,7 +329,8 @@ def main():
         for p in procs:
             if p.poll() is None:
                 p.kill()
-    log = open('/tmp/cache_ctl_fuzz.log').read() + open('/tmp/cache_ctl_fuzz2.log').read()
+    log = open('/tmp/cache_ctl_fuzz.log').read() + open('/tmp/cache_ctl_fuzz2.log').read() \
+        + open('/tmp/cache_ctl_fuzz3.log').read()
     check('fuzz: no tracebacks in the logs', 'Traceback' not in log, log[-200:])
 
     print()

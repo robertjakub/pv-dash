@@ -31,9 +31,9 @@ COPY --from=common *.py common/
 COPY --chown=pvsuite bin/ inverter/bin/
 COPY --chown=pvsuite lib/ inverter/lib/
 RUN chmod +x inverter/bin/*.py /usr/local/bin/pv-entrypoint \
-    && ln -s /pv-suite/inverter/bin/fake_inverter.py /usr/local/bin/fake-inverter \
-    && ln -s /pv-suite/inverter/bin/fake_ctl.py /usr/local/bin/fake-ctl \
-    && ln -s /pv-suite/inverter/bin/fake_cli.py /usr/local/bin/fake-cli
+    && ln -s /pv-suite/inverter/bin/modbus-fake-inverter.py /usr/local/bin/fake-inverter \
+    && ln -s /pv-suite/inverter/bin/modbus-fake-ctl.py /usr/local/bin/fake-ctl \
+    && ln -s /pv-suite/inverter/bin/modbus-fake-cli.py /usr/local/bin/fake-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
 VOLUME /config

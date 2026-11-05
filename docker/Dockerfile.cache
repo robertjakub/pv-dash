@@ -18,7 +18,7 @@
 #
 # The config volume: the entrypoint seeds /config with the bundled defaults
 # on start (files the volume lacks are copied in, existing ones stay) — edit
-# /config/modbus_cache.ini and /config/selection.json there, they survive
+# /config/modbus_cache.conf and /config/selection.json there, they survive
 # recreation. The ENV vars below point the tool at the volume copies.
 FROM alpine:3.20
 
@@ -31,16 +31,16 @@ COPY --from=scripts entrypoint.sh /usr/local/bin/pv-entrypoint
 COPY --from=common *.py common/
 COPY --chown=pvsuite bin/ cache/bin/
 COPY --chown=pvsuite lib/ cache/lib/
-COPY --chown=pvsuite modbus_cache.ini selection.json cache/
-COPY --chown=pvsuite modbus_cache.ini selection.json config-defaults/
+COPY --chown=pvsuite modbus_cache.conf selection.json cache/
+COPY --chown=pvsuite modbus_cache.conf selection.json config-defaults/
 RUN chmod +x cache/bin/*.py /usr/local/bin/pv-entrypoint \
-    && ln -s /pv-suite/cache/bin/modbus_cache.py /usr/local/bin/modbus-cache \
-    && ln -s /pv-suite/cache/bin/cache_ctl.py /usr/local/bin/modbus-cache-ctl \
-    && ln -s /pv-suite/cache/bin/cache_cli.py /usr/local/bin/modbus-cache-cli
+    && ln -s /pv-suite/cache/bin/modbus-cache.py /usr/local/bin/modbus-cache \
+    && ln -s /pv-suite/cache/bin/modbus-cache-ctl.py /usr/local/bin/modbus-cache-ctl \
+    && ln -s /pv-suite/cache/bin/modbus-cache-cli.py /usr/local/bin/modbus-cache-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
-ENV MODBUS_CACHE_CONFIG=/config/modbus_cache.ini \
-    MODBUS_CACHE_SELECTION=/config/selection.json
+ENV MCH_CONFIG=/config/modbus_cache.conf \
+    MCH_SELECTION=/config/selection.json
 VOLUME /config
 ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 

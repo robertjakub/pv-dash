@@ -100,7 +100,8 @@ def validate_config(cfg):
 
 
 def load_device_profile(path):
-    """Device profile (the shared profiles/ schema) -> {name: (register, type, scale)}."""
+    """Device profile (the shared profiles/ schema) -> {name: (register, type, scale, fc)}.
+    The fc field is optional (the default 3 = holding registers); 4 = input registers."""
     try:
         with open(path, encoding='utf-8') as fh:
             data = json.load(fh)
@@ -121,13 +122,20 @@ def load_device_profile(path):
         typ = str(entry.get('type', 'i32'))
         if typ not in ('i16', 'u16', 'i32', 'u32'):
             raise SystemExit('%s (%s): unknown "type" %r (i16/u16/i32/u32)' % (label, entry['name'], typ))
+        try:
+            fc = int(entry.get('fc', 3))
+        except (TypeError, ValueError):
+            raise SystemExit('%s (%s): bad "fc" %r' % (label, entry['name'], entry.get('fc')))
+        if fc not in (3, 4):
+            raise SystemExit('%s (%s): "fc" must be 3 (holding) or 4 (input), got %d'
+                             % (label, entry['name'], fc))
         scale = entry.get('scale', 1.0)
         try:
             scale = float(scale)
         except (TypeError, ValueError):
             raise SystemExit('%s (%s): bad "scale" %r' % (label, entry['name'], scale))
         check_register(register, '%s (%s) register' % (label, entry['name']))
-        out[str(entry['name'])] = (register, typ, scale)
+        out[str(entry['name'])] = (register, typ, scale, fc)
     return out
 
 
@@ -187,7 +195,7 @@ def resolve_config(args, script_dir=None):
                            metric, profile_name, profile_path)
             continue
         sources[profile_name] = {'register': entry[0], 'type': entry[1], 'gain': entry[2],
-                                 'metric': metric}
+                                 'fc': entry[3], 'metric': metric}
     if 'pv-power' not in sources or 'grid-power' not in sources:
         raise SystemExit('the metrics spec must bind huawei_pv_generation_watts and huawei_grid_net_watts '
                          'to device-profile registers (the power math depends on them)')

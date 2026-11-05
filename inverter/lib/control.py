@@ -6,9 +6,10 @@ table / version / reset / shutdown. Speaks one command per line, one reply
 line. Every request and reply is one JSON object per line (the stdlib
 json module): the request = {"cmd": "<command>"}, the reply =
 {"status": "ok|err|bye", "text": "<reply text>"}. The target is a TCP port
-(bound to 127.0.0.1) or a unix socket path. TCP connections need a token
-auth handshake when --control-token is set ({"cmd": "auth", "token": ...});
-the unix socket relies on filesystem permissions instead."""
+(bound to 127.0.0.1) or a unix socket path. Connections need a token auth
+handshake when --control-token is set ({"cmd": "auth", "token": ...}); over
+the unix socket a kernel-vouched peer (root, the daemon's own user or
+--control-trust-uids — SO_PEERCRED) skips the handshake."""
 import hmac
 import json
 import logging
@@ -19,6 +20,7 @@ import threading
 import time
 
 from common.audit import AuditLog
+from common.cred import peer_uid
 from common.human import secs
 from .profile import load_profile, profile_label, resolve_profile
 from common.version import version_string
@@ -28,13 +30,16 @@ from .statics import CONTROL_IDLE_TIMEOUT_S, MAX_REGISTERS, PEAK_RATIO, TIME_SCA
 
 logger = logging.getLogger('fake-inverter')
 
+MAX_LINE = 1024 * 1024   # the pre-auth line-buffer cap (drop past it)
+
 
 class ControlServer:
     """JSON-lines control socket: pin values, freeze time, tune chaos — see
     the README for the command list. The target is either a TCP port (bound to
     127.0.0.1) or a unix socket path (stale files are replaced, unlinked on
-    shutdown). A TCP connection must authenticate with the token first when
-    one is configured; the unix socket relies on filesystem permissions."""
+    shutdown). A connection must authenticate with the token first when one
+    is configured — over the unix socket a kernel-vouched peer (root, the
+    daemon's own user or trust_uids — SO_PEERCRED) skips the handshake."""
 
     def describe(self):
         return 'unix:%s' % self.sockpath if self.is_unix else '127.0.0.1:%d' % self.port
@@ -46,6 +51,23 @@ class ControlServer:
             except OSError:
                 pass
 
+    def trusted_peer(self, client, who):
+        """The peer-cred auth on the unix control socket: with a token
+        configured, a peer the kernel vouches for — root, the daemon's own
+        user or one of trust_uids — is authenticated without the token (a
+        local systemd unit speaks without sharing the secret). TCP peers
+        always need the token."""
+        if not (self.token and self.is_unix):
+            return False
+        uid = peer_uid(client)
+        if uid is None:
+            return False
+        if uid == 0 or uid == os.getuid() or uid in self.trust_uids:
+            logger.debug('control client from %s: trusted peer uid %d, no token required', who, uid)
+            return True
+        logger.info('control client from %s: peer uid %d is not trusted, the token is required', who, uid)
+        return False
+
     def serve(self):
         srv = socket.socket(socket.AF_UNIX if self.is_unix else socket.AF_INET, socket.SOCK_STREAM)
         if self.is_unix:
@@ -53,6 +75,7 @@ class ControlServer:
                 logger.warning('control socket %s exists, replacing it', self.sockpath)
                 os.unlink(self.sockpath)
             srv.bind(self.sockpath)
+            os.chmod(self.sockpath, 0o600)   # the mode is not left to the umask
         else:
             srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             srv.bind(('127.0.0.1', self.port))
@@ -79,7 +102,7 @@ class ControlServer:
             return '', {'status': 'err',
                         'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request'
         cmd = obj['cmd']
-        if self.token and not self.is_unix and cmd.lower() != 'auth' and not authed:
+        if self.token and cmd.lower() != 'auth' and not authed:
             return cmd, {'status': 'err', 'text': 'authenticate first: {"cmd": "auth", "token": "..."}'}, \
                 'err authenticate first'
         if cmd.lower() == 'auth':
@@ -122,7 +145,7 @@ class ControlServer:
     def handle(self, client, addr):
         who = self.peer(addr)
         logger.debug('control client connected from %s', who)
-        authed = False
+        authed = self.trusted_peer(client, who)
         with self.clients_lock:
             self.clients.add(client)
         try:
@@ -136,6 +159,9 @@ class ControlServer:
                 else:
                     chunk = b''
                 buf += chunk
+                if len(buf) > MAX_LINE:   # no newline = no frame: drop the amplifier
+                    logger.warning('control client from %s: the line exceeded %d bytes, dropping it', who, MAX_LINE)
+                    break
                 if b'\n' not in buf:
                     continue
                 line, buf = buf.split(b'\n', 1)
@@ -174,10 +200,12 @@ class ControlServer:
     # value pins, so the day simulation (and the battery machine) take over
     SCENARIOS = {'morning': 8.5, 'noon': 12.0, 'evening': 19.5, 'night': 23.0}
 
-    def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None):
+    def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
+                 trust_uids=None):
         self.log_replies = log_replies   # DEBUG also logs the full command output
         self.audit = audit               # the INV audit trail (common.audit), None = off
-        self.token = token               # the TCP auth token; None = no auth (the unix = the perms)
+        self.token = token               # the control auth token; None = no auth (the unix = the perms)
+        self.trust_uids = trust_uids or frozenset()   # extra peer uids the unix socket trusts without the token
         self.simulator = simulator
         self.chaos = chaos
         self.fake = fake

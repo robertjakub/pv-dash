@@ -7,6 +7,7 @@ import logging
 import os
 
 from common.config import default_profile_path, parse_listen, resolve_profile_file
+from common.cred import parse_trust_uids
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, MAX_COUNT, MAX_REGISTERS, \
     REGISTER_TYPES, UNIT_ID_RANGE
 
@@ -207,8 +208,12 @@ def validate_config(cfg):
         fail('audit_max_mb', 'must be >= 0 (0 = no size rotation)')
     if cfg['audit_files'] < 1:
         fail('audit_files', 'must be >= 1')
-    if cfg['reads_audit_s'] < 0:
-        fail('reads_audit', 'must be >= 0 (0 = off)')
+    if cfg['requests_audit_s'] < 0:
+        fail('requests_audit', 'must be >= 0 (0 = off)')
+    if cfg['dump_interval'] < 0:
+        fail('dump_interval', 'must be >= 0 (0 = off)')
+    if cfg['dump_interval'] and not cfg['dump_path']:
+        fail('dump_interval', 'needs dump_path set (there is nothing to dump into)')
     if cfg['control_token'] and cfg['control_token_file']:
         fail('control-token', 'set --control-token or --control-token-file, not both')
     parse_listen(cfg['listen'])
@@ -301,8 +306,19 @@ def resolve_config(args, script_dir=None):
                                'audit_files', DEFAULTS['audit_files'], int),
         'no_audit_log': resolve_bool(getattr(args, 'no_audit_log', False), 'MODBUS_CACHE_NO_AUDIT_LOG',
                                      'no_audit_log', False),
-        'reads_audit_s': resolve(getattr(args, 'reads_audit', None), 'MODBUS_CACHE_READS_AUDIT',
-                                 'reads_audit_s', DEFAULTS['reads_audit_s'], float),
+        'requests_audit_s': resolve(getattr(args, 'requests_audit', None), 'MODBUS_CACHE_REQUESTS_AUDIT',
+                                    'requests_audit_s', DEFAULTS['requests_audit_s'], float),
+        'dump_path': resolve(getattr(args, 'dump_path', None), 'MODBUS_CACHE_DUMP_PATH',
+                             'dump_path', '', str),
+        'dump_interval': resolve(getattr(args, 'dump_interval', None), 'MODBUS_CACHE_DUMP_INTERVAL',
+                                 'dump_interval', 0.0, float),
+        'restore_on_start': resolve_bool(getattr(args, 'restore_on_start', False) or None,
+                                         'MODBUS_CACHE_RESTORE_ON_START', 'restore_on_start', False),
+        'control_trust_uids': parse_trust_uids(resolve(getattr(args, 'control_trust_uids', None),
+                                                       'MODBUS_CACHE_CONTROL_TRUST_UIDS',
+                                                       'control_trust_uids', '', str)),
+        'control_socket_group': resolve_bool(getattr(args, 'control_socket_group', False),
+                                             'MODBUS_CACHE_CONTROL_SOCKET_GROUP', 'control_socket_group', False),
     }
     validate_config(cfg)
     return cfg

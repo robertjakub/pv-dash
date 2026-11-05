@@ -8,11 +8,6 @@
   reverse-proxy example for anything beyond localhost), F15 a short "what
   /metrics leaks" privacy note in the README, F16 the alert rules pack
   below. See [AUDIT.md](../docs/AUDIT.md).
-- **the profile `fc` awareness** — the schema carries the `fc` field (the
-  cache polls/caches FC4 independently); the scraper still reads every
-  marked register with FC3 — a profile that marks an FC4 entry `scrape`
-  needs the scraper to follow the field (the read layer already knows
-  FC3/FC4, this is the plan + payload plumbing).
 - **the multi-target scrape** — one process polling several inverters
   (per-target metrics with a unit/host label) for the two-string-roof
   households; the metrics endpoint and the audit are already per-process.
@@ -39,6 +34,14 @@
   the root [TODO](../docs/TODO.md).)
 
 ## Done (the highlights; the git history has the details)
+
+The profile `fc` awareness: the scraper reads each spec-bound source with
+the profile entry's function code (`fc: 4` = input registers, the default
+3 = holding) — the wire layer packs and validates the code, and the
+regtest proves both directions (an `fc: 4` source works against the
+dual-code fake and fails against the FC3-only evil server). A shipped
+profile with real input-register data still waits for a hardware capture
+(the fake serves both codes, so nothing honest to ship there yet).
 
 The Prometheus exporter: the profile-driven selection with the metrics
 registry (the unit scaling, the string/phase splits), the static JSON

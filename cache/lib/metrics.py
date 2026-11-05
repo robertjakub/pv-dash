@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """The cache's own Prometheus endpoint: a small /metrics on its own port,
-gated (off by default). Serves the cache's self-observability in the
+gated (off by default, and the bearer token is mandatory when on).
+Serves the cache's self-observability in the
 Prometheus text format: the hit/miss counters, the poll health and age, the
 poll-cycle durations, the client count, the uplink session counters and the
 per-block poll latency/errors — without depending on the scraper's
-`huawei_cache_*` export path. With --metrics-token set, requests need
+`huawei_cache_*` export path. Requests need
 `Authorization: Bearer <token>` (the same scheme the scraper speaks)."""
 import hmac
 import http.server
@@ -152,6 +153,8 @@ class MetricsServer:
         return '\n'.join(rows) + '\n'
 
     class _Handler(http.server.BaseHTTPRequestHandler):
+        timeout = 5   # a silent peer cannot pin a handler thread (slowloris)
+
         def log_message(self, *a):
             pass   # the access logging = the scraper's job; the cache stays quiet
 

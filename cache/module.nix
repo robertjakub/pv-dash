@@ -8,6 +8,16 @@
 let
   cfg = config.services.modbus-cache;
 
+  # a name list is rendered into the selection JSON the --selection flag reads
+  selectionFile = pkgs.writeText "modbus-cache-selection.json"
+    (builtins.toJSON { registers = cfg.selection; });
+
+  # the dirs the service may write: the audit trail and the state dump
+  rwPaths = lib.filter (p: p != null) [
+    (if cfg.auditLog != null && cfg.auditLog != "-" then dirOf cfg.auditLog else null)
+    (if cfg.dumpPath != null then dirOf cfg.dumpPath else null)
+  ];
+
   configIni = pkgs.writeText "modbus_cache.ini" (lib.generators.toINI { } {
     cache = {
       host = cfg.inverterHost;
@@ -20,6 +30,8 @@ let
       merge_gap = toString cfg.mergeGap;
     } // lib.optionalAttrs (cfg.profile != null) {
       profile = toString cfg.profile;
+    } // lib.optionalAttrs (cfg.selection != null) {
+      selection = if lib.isList cfg.selection then toString selectionFile else toString cfg.selection;
     } // lib.optionalAttrs (cfg.cacheTtl != null) {
       cache_ttl = toString cfg.cacheTtl;
     } // lib.optionalAttrs (cfg.maxClients != null) {
@@ -41,7 +53,7 @@ let
       audit_max_mb = toString cfg.auditMaxMb;
       audit_daily = lib.boolToString cfg.auditDaily;
       audit_files = toString cfg.auditFiles;
-      reads_audit_s = toString cfg.readsAudit;
+      requests_audit_s = toString cfg.requestsAudit;
     } // lib.optionalAttrs (cfg.controlPort != null) {
       control_port = toString cfg.controlPort;
     } // lib.optionalAttrs (cfg.controlToken != null) {
@@ -49,6 +61,15 @@ let
     } // lib.optionalAttrs (cfg.controlTokenFile != null) {
       # systemd LoadCredential mounts the file here (see serviceConfig below)
       control_token_file = "/run/credentials/modbus-cache/control-token";
+    } // lib.optionalAttrs (cfg.controlTrustUids != null) {
+      control_trust_uids = cfg.controlTrustUids;
+    } // {
+      control_socket_group = lib.boolToString cfg.controlSocketGroup;
+    } // lib.optionalAttrs (cfg.dumpPath != null) {
+      dump_path = cfg.dumpPath;
+      restore_on_start = lib.boolToString cfg.restoreOnStart;
+    } // lib.optionalAttrs (cfg.dumpPath != null && cfg.dumpInterval != null) {
+      dump_interval = toString cfg.dumpInterval;
     };
   });
 in
@@ -114,12 +135,28 @@ in
       type = lib.types.nullOr lib.types.path;
       default = null;
       description = ''
-        Device-profile JSON selecting the registers to cache (the shared
-        profiles/sun2000.json format: {"registers": [{"name", "register",
-        "type", "scale", "cache", ...}]}, only entries marked "cache": true
-        are polled). null = the profile bundled with the package (the default
-        monitoring set); reads outside the profile are forwarded to the
-        inverter.
+        Device-profile JSON naming the registers to cache (the shared
+        profiles/ schema: {"registers": [{"name", "register", "type" —
+        i16/u16/i32/u32 word widths —, "fc" 3 (holding, the default) or
+        4 (input), an optional per-entry "ttl" in seconds, ...]}): every
+        listed entry is polled and cached; reads outside the profile are
+        forwarded to the inverter. null = the profile bundled with the
+        package (the default monitoring set). Which of the entries are
+        actually fetched is selection's job.
+      '';
+    };
+
+    selection = lib.mkOption {
+      type = lib.types.nullOr (lib.types.either (lib.types.enum [ "all" "none" ])
+        (lib.types.either (lib.types.listOf lib.types.str) lib.types.path));
+      default = null;
+      description = ''
+        Which profile entries are actually fetched: "all" (every profile
+        entry — the proxy default), "none" (cache nothing, every read
+        forwards), a list of profile names (the module renders it into
+        the selection JSON), or a path to such a JSON
+        ({"registers": ["pv-power", ...]}). The names must exist in the
+        profile. null = all.
       '';
     };
 
@@ -258,12 +295,66 @@ in
       '';
     };
 
-    readsAudit = lib.mkOption {
+    controlTrustUids = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Extra peer uids the unix control socket trusts without the token
+        (SO_PEERCRED): a comma-separated uid list — a local systemd unit
+        speaks without the secret. Root and the daemon's own user are
+        always trusted. null = the defaults only.
+      '';
+    };
+
+    dumpPath = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The state dump (write-behind): the cached words + their stamps and
+        the live setting overrides, as one JSON — written on shutdown, by
+        the request dump command and every dumpInterval seconds, restored
+        on start and by the request restore command; a daemon restart
+        serves last-known values instead of cold misses. null =
+        persistence off.
+      '';
+    };
+
+    dumpInterval = lib.mkOption {
       type = lib.types.nullOr lib.types.number;
       default = null;
       description = ''
-        Audit one READS tally per client per this many seconds (who is
+        Seconds between the automatic state dumps; 0 = on request (the
+        request dump command and the shutdown). Needs dumpPath. null = the
+        proxy default (0).
+      '';
+    };
+
+    restoreOnStart = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Load the state dump when the daemon starts (needs dumpPath) — a
+        restart serves last-known values instead of cold misses. Off by
+        default: start cold, load on demand (the request restore command).
+      '';
+    };
+
+    requestsAudit = lib.mkOption {
+      type = lib.types.nullOr lib.types.number;
+      default = null;
+      description = ''
+        Audit one REQUESTS tally per client per this many seconds (who is
         hammering the cache); null = the proxy default (300 s). 0 = off.
+      '';
+    };
+
+    controlSocketGroup = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Leave the unix control socket group-accessible (chmod 0660 instead
+        of the default 0600): a local group may speak to the control
+        without being the service user.
       '';
     };
 
@@ -338,8 +429,8 @@ in
         ProtectKernelTunables = true;
         ProtectControlGroups = true;
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
-      } // lib.optionalAttrs (cfg.auditLog != null && cfg.auditLog != "-") {
-        ReadWritePaths = [ (dirOf cfg.auditLog) ];
+      } // lib.optionalAttrs (rwPaths != [ ]) {
+        ReadWritePaths = rwPaths;
       } // lib.optionalAttrs (cfg.controlTokenFile != null) {
         LoadCredential = [ "control-token:${toString cfg.controlTokenFile}" ];
       } // lib.optionalAttrs (cfg.controlPort != null

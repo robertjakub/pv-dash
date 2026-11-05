@@ -128,6 +128,24 @@ class Cache:
             self.leaf_errors = {}
             return dropped
 
+    def snapshot(self):
+        """The cache contents for a state dump: ({(fc, addr): word},
+        {(fc, addr): stamp})."""
+        with self.lock:
+            return dict(self.regs), dict(self.ts)
+
+    def restore(self, words, stamps):
+        """Write-behind restore: put the dumped words (+ their original
+        stamps, so the freshness carries over) back into the cache as they
+        were — the poll ranges and the on-demand entries alike; their ttl
+        bounds any staleness and the next map swap prunes what the profile
+        no longer names. Returns the restored word count."""
+        with self.lock:
+            for key, word in words.items():
+                self.regs[key] = word
+                self.ts[key] = stamps.get(key, time.time())
+            return len(words)
+
     def invalidate(self, fc, addr, count):
         """Write-through: drop exactly the cached words a write touched
         (per-register, not the whole cache); the next read of them goes to

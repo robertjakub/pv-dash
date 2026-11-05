@@ -69,7 +69,8 @@ One JSON object per device:
   - `fc` — optional, the Modbus function code the entry is read with:
     `3` (holding registers, the default) or `4` (input registers). The
     fake serves the same map on both codes; the cache polls and caches the
-    two spaces independently.
+    two spaces independently, and the scraper reads a source-bound entry
+    with the entry's code.
   - `ttl` — optional, the cache TTL override for the entry in seconds
     (`0` = never expire); absent = the cache's global TTL. A fast power
     word at 5s next to a nameplate word at 1h — one poll cadence for both.
@@ -95,8 +96,9 @@ One JSON object per device:
 | `deye-sg05lp3` | Deye SUN three-phase hybrid (SUN-12K-SG05LP3-EU, full map) | 82 |
 
 All shipped entries read on FC3 (holding registers) — the `fc: 4` input
-space is supported by the schema, the linter and the cache, but no shipped
-profile exercises it yet.
+space is supported end to end (the schema, the linter, the cache and the
+scraper; the regtest exercises it), but no shipped profile carries real
+input-register data yet — that waits for a hardware capture.
 
 ## License
 

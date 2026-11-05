@@ -10,6 +10,27 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **cache** — the state persistence (the write-behind): `--dump-path` +
+  `dump-interval` (a live setting, `0` = on request) dump the cached words
+  (+ their stamps) and the live setting overrides as one atomic JSON — on
+  the interval, on the new `request dump` command and on every graceful
+  shutdown. Loading is gated: `--restore-on-start` opts in to loading the
+  dump on start (the default is starting cold; `request restore` loads on
+  demand) — a gated restart serves last-known values instead of cold
+  misses; the words return as they were — the ttl bounds any staleness,
+  the next map swap prunes. The dump commands (and the `dump-interval`
+  setting) show up in the listings only when a dump path is configured.
+  The NixOS module grew `dumpPath`/`dumpInterval`/`restoreOnStart` (the
+  dump dir joins `ReadWritePaths`).
+- **cache, fake-inverter** — the peer-cred auth on the unix control
+  sockets: with a token configured, the kernel-vouched peers (root, the
+  daemon's own user, `--control-trust-uids`) skip the token handshake
+  (`SO_PEERCRED`, shared `common/cred.py`; the NixOS module carries
+  `controlTrustUids`); TCP peers always authenticate.
+- **cache** — the NixOS module grew the `selection` option: "all"/"none",
+  a list of profile names (rendered into the selection JSON the
+  `--selection` flag reads) or a path to one; the `profile` option
+  description now speaks the current schema (no `"cache": true` marks).
 - **cache** — `show uplink`: the inverter-link report for analysing the
   upstream connection — the session counters (state, connects, exchanges,
   bytes in/out, errors, last error) and one row per poll block with its
@@ -28,6 +49,33 @@ before the repo restructured into one suite.
 - **cache** — `show cache all` carries the cached words' values too: a
   `values` column between `words` and `age` (`-` = the register is not
   cached yet).
+- **cache** — **breaking**: the per-client audit tally renamed — the event
+  is `REQUESTS` (it counts reads and writes alike, so `READS` lied), the
+  flag `--requests-audit`, the ini key `requests_audit_s`, the env
+  `MODBUS_CACHE_REQUESTS_AUDIT`, the live setting `requests-audit` (was
+  `reads-audit`), the `show status` field `requests_audit` and the NixOS
+  option `requestsAudit`. Anything grepping the trail for
+  `AUDIT CACHE READS` must follow.
+- **scrape** — the profile `fc` awareness: a spec-bound source is read
+  with its profile entry's function code (`fc: 4` = input registers, the
+  default 3 unchanged) — the schema field now flows profile → source →
+  wire (packed, and validated in the reply).
+
+### Security
+
+- **cache, inverter** — the audit findings F2–F8 (docs/AUDIT.md) closed:
+  the shared audit writer folds control characters, so an embedded `\n` in
+  a control command can no longer forge a trail line (F2); an unparseable
+  write frame (too short to carry an address) is refused with an
+  illegal-value exception instead of being forwarded past the allow-list —
+  fail closed (F3, cache); the pre-auth control line buffer drops the
+  connection past 1 MB instead of growing for the idle timeout (F4, both
+  control servers); a TCP control port without a token refuses to start —
+  the unix socket needs none (F5, cache); the metrics endpoint refuses to
+  start without a bearer token and its handler socket times out after 5 s
+  (F6, cache); the unix control socket is `chmod 0600` after bind (not the
+  umask), with `--control-socket-group` opting into `0660` (F8, the cache's
+  option; the inverter takes the default).
 
 ## 0.3.0 — 2026-11-05
 

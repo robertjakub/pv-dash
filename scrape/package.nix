@@ -45,7 +45,7 @@ stdenv.mkDerivation (finalAttrs: {
   meta = {
     description = "Prometheus exporter for Modbus TCP inverters (stdlib-only Modbus TCP poller)";
     longDescription = ''
-      Polls Modbus TCP inverters over FC3 holding registers and exposes the
+      Polls Modbus TCP inverters over FC3/FC4 registers and exposes the
       huawei_*_watts metrics the dashboard expects (the metric names follow
       the dashboard contract), plus health gauges, at /metrics in the
       Prometheus text format. Python standard library only, no third-party

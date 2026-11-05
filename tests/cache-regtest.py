@@ -370,8 +370,15 @@ try:
     K = os.path.join(CACHE_DIR, 'bin', 'cache_cli.py')
 
     def ctl_cmd(cmd, port):
-        """One JSON-lines control exchange: send {"cmd": ...}, return 'status text'."""
+        """One JSON-lines control exchange (the token handshake first — every
+        regtest TCP control speaks 'sekrit'): send {"cmd": ...}, return 'status text'."""
         s = socket.create_connection(('127.0.0.1', port), timeout=5)
+        s.sendall(_json.dumps({'cmd': 'auth', 'token': 'sekrit'}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            buf += s.recv(4096)
+        auth = _json.loads(buf.decode())
+        assert auth.get('status') == 'ok', auth
         s.sendall(_json.dumps({'cmd': cmd}).encode() + b'\n')
         buf = b''
         while not buf.endswith(b'\n'):
@@ -403,7 +410,8 @@ try:
 
     start([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
            '--listen', '127.0.0.1:15513', '--interval', '1', '--profile', R,
-           '--control-port', '15514'], log='/tmp/reg_ctl.log')
+           '--control-port', '15514'], log='/tmp/reg_ctl.log',
+          env_extra={'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     time.sleep(2)
     r = ctl_cmd('show status', 15514)
     check('control: show status multi-line report', r.startswith('ok status\n')
@@ -435,8 +443,14 @@ try:
 
     # 5b. JSON framing + token auth: malformed frames are answered cleanly,
     #     TCP control needs the token, the unix socket does not
-    def ctl_raw(wire_bytes, port, reads=1):
+    def ctl_raw(wire_bytes, port, reads=1, token=None):
         s = socket.create_connection(('127.0.0.1', port), timeout=5)
+        if token:
+            s.sendall(_json.dumps({'cmd': 'auth', 'token': token}).encode() + b'\n')
+            buf = b''
+            while not buf.endswith(b'\n'):
+                buf += s.recv(4096)
+            buf = b''
         s.sendall(wire_bytes)
         buf = b''
         for _ in range(reads):
@@ -448,7 +462,7 @@ try:
         s.close()
         return _json.loads(buf.decode())
 
-    r = ctl_raw(b'not json at all\n', 15514)
+    r = ctl_raw(b'not json at all\n', 15514, token='sekrit')
     check('control: malformed frame rejected cleanly', r.get('status') == 'err'
           and 'malformed request' in r.get('text', ''), str(r))
 
@@ -485,8 +499,24 @@ try:
           'AUTH-FAIL' in tok_audit and 'AUDIT CACHE COMMAND peer=127.0.0.1:' in tok_audit
           and "'show status' -> ok" in tok_audit, tok_audit[-200:])
 
+    # the pre-auth line buffer is capped: a newline-less stream is dropped, not buffered
+    s = socket.create_connection(('127.0.0.1', 15520), timeout=10)
+    try:
+        s.sendall(b'x' * (1024 * 1024 + 65536))   # > MAX_LINE, no newline: the server drops us
+        try:
+            s.shutdown(socket.SHUT_WR)
+        except OSError:
+            pass
+        try:
+            dropped = not s.recv(4096)            # the orderly drop: EOF
+        except ConnectionResetError:
+            dropped = True                        # the RST flavor: the server closed mid-stream
+        check('control: the uncapped pre-auth buffer is capped (connection dropped)', dropped)
+    finally:
+        s.close()
+
     def cli(stdin, port=15514, env_extra=None, use_flag=True):
-        env = dict(os.environ)
+        env = {**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'}
         if env_extra:
             env.update(env_extra)
         args = [sys.executable, K]
@@ -505,7 +535,8 @@ try:
           and 'Proceed with shutdown? [confirm]' in r.stdout and '% Aborted.' in r.stdout, repr(r.stdout))
     p = subprocess.Popen([sys.executable, K, '--control-port', '15514'],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                         text=True, env={**os.environ, 'CACHE_CLI_KEEPALIVE': '0.2'})
+                         text=True,
+                         env={**os.environ, 'CACHE_CLI_KEEPALIVE': '0.2', 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     time.sleep(1.2)          # the CLI idles, pinging every 0.2s
     p.stdin.write('show status\n')
     p.stdin.flush()
@@ -522,6 +553,9 @@ try:
     procs.append(p_unix)
     time.sleep(1.5)
     check('control: default unix socket for the listen port', os.path.exists('/tmp/modbus-cache-15515.socket'))
+    check('control: the unix socket mode is 0600 (not the umask)',
+          os.stat('/tmp/modbus-cache-15515.socket').st_mode & 0o777 == 0o600,
+          oct(os.stat('/tmp/modbus-cache-15515.socket').st_mode))
     r = cli('show status\nquit\n', 15515, {'MODBUS_CACHE_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
     check('cache_cli: MODBUS_CACHE_CTL reaches the default socket', r.returncode == 0
           and 'upstream=127.0.0.1:15512' in r.stdout and 'cache:15515 > ' in r.stdout, repr(r.stdout[-120:]))
@@ -531,14 +565,29 @@ try:
     r = cli('show status\nquit\n', 15520, {'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     check('cache_cli: token env authenticates the TCP control session', r.returncode == 0
           and 'upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show status\nquit\n', 15520)
+    r = cli('show status\nquit\n', 15520, {'MODBUS_CACHE_CONTROL_TOKEN': ''})
     check('cache_cli: token server refuses the token-less CLI', r.returncode == 0
           and 'err authenticate first' in r.stdout, repr(r.stdout[-160:]))
+
+    # the group-accessible unix socket (--control-socket-group): 0660
+    p_unix_g = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                                 '--listen', '127.0.0.1:15516', '--interval', '1', '--profile', R,
+                                 '--control-socket-group'],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    procs.append(p_unix_g)
+    time.sleep(1.5)
+    gsock = '/tmp/modbus-cache-15516.socket'
+    check('control: --control-socket-group chmods the socket 0660',
+          os.stat(gsock).st_mode & 0o777 == 0o660, oct(os.stat(gsock).st_mode))
+    r = cli('show version\nquit\n', 15516, {'MODBUS_CACHE_CTL': gsock}, use_flag=False)
+    check('control: the group socket speaks (the owner, us)', r.returncode == 0
+          and 'modbus-cache 0.3.0' in r.stdout, repr(r.stdout[-120:]))
 
     # 5c. cache_ctl: the one-shot client (args, piped batches, token)
     ctl = os.path.join(CACHE_DIR, 'bin', 'cache_ctl.py')
     r = subprocess.run([sys.executable, ctl, '--control-port', '15514', 'show', 'status'],
-                       capture_output=True, text=True, timeout=30)
+                       capture_output=True, text=True, timeout=30,
+                       env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     check('cache_ctl: one-shot show status', r.returncode == 0
           and r.stdout.startswith('ok status\nupstream=127.0.0.1:15512'), repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15520'],
@@ -582,6 +631,14 @@ try:
                                       for row in rows[2:]), r[:200])
     r = ctl_cmd('show cache', 15514)
     check('show cache: the summary still works beside the dump', r.startswith('ok cache '), r[:80])
+    r = ctl_cmd('request dump', 15514)
+    check('request dump: no dump path configured is a clean err', r.startswith('err no dump path configured'), r[:80])
+    r = ctl_cmd('show settings', 15514)
+    check('dump: the dump-interval setting hides without a dump path', 'dump-interval' not in r, r[:160])
+    r = ctl_cmd('show dump-interval', 15514)
+    check('dump: show dump-interval without a path is a clean err', r.startswith('err dump-interval needs a dump path'), r[:80])
+    r = ctl_cmd('help', 15514)
+    check('dump: the help hides the dump commands without a path', 'request dump' not in r, r[:160])
     r = ctl_cmd('show uplink', 15514)
     check('show uplink: session counters and per-block latency rows', r.startswith('ok uplink\n')
           and 'exchanges' in r and 'connects' in r and 'mean' in r and 'fails' in r
@@ -608,7 +665,8 @@ try:
     p_none = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
                                '--listen', '127.0.0.1:15526', '--interval', '1', '--profile', R,
                                '--selection', 'none', '--control-port', '15527'],
-                              stdout=open('/tmp/reg_cache_none.log', 'w'), stderr=subprocess.STDOUT)
+                              stdout=open('/tmp/reg_cache_none.log', 'w'), stderr=subprocess.STDOUT,
+                              env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     procs.append(p_none)
     time.sleep(1.5)
     b = rd(47415, 1, port=15526)
@@ -635,7 +693,8 @@ try:
     p_ttl = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
                               '--listen', '127.0.0.1:15533', '--interval', '5', '--cache-ttl', '30',
                               '--profile', ttlmap, '--control-port', '15534'],
-                             stdout=open('/tmp/reg_cache_ttl.log', 'w'), stderr=subprocess.STDOUT)
+                             stdout=open('/tmp/reg_cache_ttl.log', 'w'), stderr=subprocess.STDOUT,
+                             env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     procs.append(p_ttl)
     time.sleep(1.5)
     rd(32064, 2, port=15533)
@@ -654,12 +713,129 @@ try:
     p_ttl.send_signal(signal.SIGTERM)
     p_ttl.wait(timeout=10)
 
+    # the peer-cred auth on the unix control socket: a token gates both transports,
+    # but the kernel-vouched peers (root, the daemon's own user) skip the handshake
+    cred_sock = '/tmp/reg_cred.socket'
+    p_cred = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                               '--listen', '127.0.0.1:15538', '--interval', '1', '--profile', R,
+                               '--control-port', cred_sock, '--control-token', 'sekrit'],
+                              stdout=open('/tmp/reg_cache_cred.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(p_cred)
+    time.sleep(1.5)
+    r = subprocess.run([sys.executable, ctl, '--control-port', cred_sock, 'show', 'version'],
+                       capture_output=True, text=True, timeout=30)
+    check('peer-cred: the same-uid unix peer needs no token', r.returncode == 0
+          and r.stdout.startswith('ok modbus-cache'), repr(r.stdout[:120]))
+    r = subprocess.run([sys.executable, ctl, '--control-port', cred_sock, 'shutdown'],
+                       capture_output=True, text=True, timeout=30)
+    check('peer-cred: the trusted unix peer can also stop the proxy', r.stdout.startswith('bye'),
+          repr(r.stdout[:120]))
+    p_cred.wait(timeout=10)
+
+    # the state dump (write-behind): the cached words + the live setting overrides
+    dumpfile = '/tmp/reg_dump.json'
+    p_dump = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                               '--listen', '127.0.0.1:15536', '--interval', '1', '--cache-ttl', '30',
+                               '--profile', R, '--control-port', '15537',
+                               '--dump-path', dumpfile],
+                              stdout=open('/tmp/reg_cache_dump.log', 'w'), stderr=subprocess.STDOUT,
+                              env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+    procs.append(p_dump)
+    time.sleep(1.5)
+    r = ctl_cmd('request dump', 15537)
+    check('request dump: the state lands in the json', r.startswith('ok dumped ') and '91 word(s)' in r
+          and '0 setting(s)' in r, r[:120])
+    d = _json.load(open(dumpfile))
+    check('request dump: the format is the versioned modbus-cache-dump', d.get('format') == 'modbus-cache-dump'
+          and d.get('version') == 1 and len(d.get('registers', [])) == 91 and d.get('settings') == {},
+          str(d.get('saved')))
+    r = ctl_cmd('show settings', 15537)
+    check('request dump: the dump-interval setting shows with a dump path', 'dump-interval=off' in r, r[:160])
+    r = ctl_cmd('help', 15537)
+    check('request dump: the help lists the dump commands with a path', 'request dump' in r
+          and 'request restore' in r, r[:160])
+    r = ctl_cmd('request dump', 15537)
+    check('request dump: no path arg — the configured file is the target', r.startswith('ok dumped '), r[:80])
+    r = ctl_cmd('request restore', 15537)
+    check('request restore: the words are back without the device', r.startswith('ok restored 91 word(s)')
+          and '0 setting(s)' in r, r[:120])
+    ctl_cmd('set interval 2', 15537)
+    ctl_cmd('request dump', 15537)
+    ctl_cmd('clear cache', 15537)
+    r = ctl_cmd('show cache', 15537)
+    check('request restore: the clear emptied the cache first', '0 word(s) cached' in r, r[:80])
+    r = ctl_cmd('request restore', 15537)
+    check('request restore: the words and the override return', r.startswith('ok restored 91 word(s), 1 setting(s)'), r[:120])
+    r = ctl_cmd('show interval', 15537)
+    check('request restore: the setting override re-applied', r == 'ok interval=2.00s', r)
+    r = ctl_cmd('show settings', 15537)
+    check('request restore: the override is marked again', 'interval=2.00s*' in r, r[:120])
+    r = ctl_cmd('show status', 15537)
+    check('dump: the status carries the dump row', 'dump=%s every off' % dumpfile in r, r[-160:])
+    r = ctl_cmd('set dump-interval 1', 15537)
+    check('dump-interval: the live setting accepted', r.startswith('ok dump-interval=1.00s'), r[:120])
+    r = ctl_cmd('show status', 15537)
+    check('dump-interval: the live setting shows in the dump row', 'dump=%s every 1.00s' % dumpfile in r, r[-160:])
+    m1 = os.stat(dumpfile).st_mtime
+    time.sleep(2.5)
+    m2 = os.stat(dumpfile).st_mtime
+    check('dump-interval: the file refreshes by itself', m2 > m1, '%.2f -> %.2f' % (m1, m2))
+    r = ctl_cmd('set dump-interval off', 15537)
+    check('dump-interval: off again', r.startswith('ok dump-interval=off'), r[:80])
+    # the write-behind story: the shutdown dump restores into the next start
+    ctl_cmd('set interval 3', 15537)
+    r = ctl_cmd('shutdown', 15537)
+    check('shutdown dump: the stopper wrote the file', r.startswith('bye'), r[:40])
+    p_dump.wait(timeout=10)
+    d = _json.load(open(dumpfile))
+    check('shutdown dump: the words + the override are in it', len(d.get('registers', [])) == 91
+          and d.get('settings', {}).get('interval') == 3.0, repr(d.get('settings')))
+    p_dump = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                               '--listen', '127.0.0.1:15536', '--interval', '1', '--cache-ttl', '30',
+                               '--profile', R, '--control-port', '15537',
+                               '--dump-path', dumpfile],
+                              stdout=open('/tmp/reg_cache_dump2.log', 'w'), stderr=subprocess.STDOUT,
+                              env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+    procs.append(p_dump)
+    time.sleep(1.5)
+    log = open('/tmp/reg_cache_dump2.log').read()
+    check('restore-on-start: the gate defaults to off — the dump is not loaded', 'not loaded on start' in log
+          and 'restored the state dump' not in log.split('state dumps:')[1], log[-200:])
+    r = ctl_cmd('show interval', 15537)
+    check('restore-on-start: the override in the file did not leak in', r == 'ok interval=1.00s', r)
+    r = ctl_cmd('request restore', 15537)
+    check('restore-on-start: the manual request restore still works', r.startswith('ok restored 91 word(s), ')
+          and 'setting(s) from' in r, r[:120])
+    r = ctl_cmd('show cache', 15537)
+    check('restore-on-start: the manual restore loaded the words', '91 word(s) cached' in r, r[:80])
+    ctl_cmd('set interval 3', 15537)
+    ctl_cmd('shutdown', 15537)
+    p_dump.wait(timeout=10)
+    p_dump = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                               '--listen', '127.0.0.1:15536', '--interval', '1', '--cache-ttl', '30',
+                               '--profile', R, '--control-port', '15537',
+                               '--dump-path', dumpfile, '--restore-on-start'],
+                              stdout=open('/tmp/reg_cache_dump2.log', 'w'), stderr=subprocess.STDOUT,
+                              env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
+    procs.append(p_dump)
+    time.sleep(1.5)
+    r = ctl_cmd('show cache', 15537)
+    check('restore-on-start: the gate loads the dump', '91 word(s) cached' in r, r[:80])
+    r = ctl_cmd('show interval', 15537)
+    check('restore-on-start: the override came back with the gate', r == 'ok interval=3.00s', r)
+    r = ctl_cmd('show settings', 15537)
+    check('restore-on-start: the override is marked with the gate', 'interval=3.00s*' in r, r[:120])
+    ctl_cmd('unset interval', 15537)
+    ctl_cmd('shutdown', 15537)
+    p_dump.wait(timeout=10)
+
     # the native metrics endpoint: bearer auth + the cache gauges
     p_metrics = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
                                   '--listen', '127.0.0.1:15528', '--interval', '1', '--profile', R,
                                   '--control-port', '15530',
                                   '--metrics-port', '15529', '--metrics-token', 'sekrit'],
-                                 stdout=open('/tmp/reg_cache_metrics.log', 'w'), stderr=subprocess.STDOUT)
+                                 stdout=open('/tmp/reg_cache_metrics.log', 'w'), stderr=subprocess.STDOUT,
+                                 env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     procs.append(p_metrics)
     time.sleep(1.5)
     import urllib.request, urllib.error
@@ -719,7 +895,7 @@ try:
           and 'bye shutdown' in r.stdout and p_unix.poll() == 0, repr(r.stdout))
     check('control: unix socket unlinked on shutdown', not os.path.exists('/tmp/modbus-cache-15515.socket'))
     # 6. FC4 input-register caching, the write allow-list, inspect,
-    #    per-client READS accounting, the control token file
+    #    per-client REQUESTS accounting, the control token file
     fc4map = '/tmp/reg_fc4_profile.json'
     _json.dump({'description': 'fc4 device (mixed spaces)',
                 'registers': [
@@ -739,7 +915,8 @@ try:
                    '--listen', '127.0.0.1:15521', '--interval', '1', '--cache-ttl', '3',
                    '--allow-write', '--control-port', '15522',
                    '--profile', fc4map, '--audit-log', '/tmp/reg_audit_fc4.log'],
-                  log='/tmp/reg_fc4.log', env_extra={'MODBUS_CACHE_READS_AUDIT': '1'})
+                  log='/tmp/reg_fc4.log', env_extra={'MODBUS_CACHE_REQUESTS_AUDIT': '1',
+                                                     'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     time.sleep(2.5)
     b = rd(32064, 2, port=15521)
     check('fc3 range polled and served', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
@@ -791,17 +968,37 @@ try:
     b = wr6(47615, 9, port=15521)
     check('SIGHUP: the reloaded allow-list accepts the new range', b == bytes.fromhex('06b9ff0009'), b.hex())
 
-    # per-client READS accounting: the periodic tally + the disconnect line
+    # a write frame too short to carry an address fails CLOSED (the
+    # allow-list cannot vet what it cannot parse)
+    b = txn(b'\x06', port=15521)          # FC6 with no address: forwarded before the fix
+    check('write allow-list: an unparseable write frame is refused (fail closed)',
+          b == bytes.fromhex('8603'), b.hex())
+    fc4_audit = open('/tmp/reg_audit_fc4.log').read()
+    check('audit: the unparseable write is a WRITE-REFUSED event',
+          'WRITE-REFUSED' in fc4_audit and 'too short to carry a register address' in fc4_audit,
+          fc4_audit[-160:])
+
+    # the audit trail folds control characters: a \n inside a command cannot
+    # forge a second, attacker-crafted trail line
+    r = ctl_cmd('show status\n2026-01-01T00:00:00Z AUDIT CACHE WRITE forged line', 15522)
+    check('control: the injection attempt is a clean err', r.startswith('err unknown command'), r[:100])
+    fc4_audit = open('/tmp/reg_audit_fc4.log').read()
+    forged = [line for line in fc4_audit.splitlines() if 'AUDIT CACHE WRITE forged' in line]
+    check('audit: the trail injection folds to one physical line',
+          forged and all('COMMAND' in line and line.startswith('2026-11-') for line in forged),
+          str(forged[-1:]))
+
+    # per-client REQUESTS accounting: the periodic tally + the disconnect line
     s = socket.create_connection(('127.0.0.1', 15521), timeout=5)
     for _ in range(3):
         s.sendall(struct.pack('>HHHB', 77, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 1))
         s.recv(64)
-    time.sleep(1.2)          # > the 1s READS audit period: the periodic tally fires
+    time.sleep(1.2)          # > the 1s REQUESTS audit period: the periodic tally fires
     s.close()
     time.sleep(0.5)
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
-    check('audit: per-client READS tallies (periodic + disconnect)',
-          'READS peer=127.0.0.1:' in fc4_audit and '(last 1s:' in fc4_audit
+    check('audit: per-client REQUESTS tallies (periodic + disconnect)',
+          'REQUESTS peer=127.0.0.1:' in fc4_audit and '(last 1s:' in fc4_audit
           and 'connected=' in fc4_audit, fc4_audit[-160:])
 
     # the control token from a file (the LoadCredential pattern)
@@ -834,6 +1031,21 @@ try:
     check('token file: a missing file fails fast, one line', r.returncode != 0
           and 'cannot read control-token-file' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
+
+    # the audit-finding refusals (F5/F6 in docs/AUDIT.md): the token-less
+    # TCP control and the token-less metrics endpoint refuse to start
+    r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512', '--dry-run',
+                        '--listen', '127.0.0.1:15599', '--control-port', '15599', '--profile', R],
+                       capture_output=True, text=True, timeout=15)
+    check('control: a TCP control port without a token refuses to start',
+          r.returncode != 0 and 'TCP control port' in (r.stderr + r.stdout)
+          and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
+    r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512', '--dry-run',
+                        '--listen', '127.0.0.1:15599', '--metrics-port', '15598', '--profile', R],
+                       capture_output=True, text=True, timeout=15)
+    check('metrics: the metrics endpoint without a token refuses to start',
+          r.returncode != 0 and 'serves register values' in (r.stderr + r.stdout)
+          and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
 
     # 7. clean shutdowns
     r = cli('shutdown\n\n', 15514)

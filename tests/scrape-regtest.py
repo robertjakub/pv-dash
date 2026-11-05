@@ -230,6 +230,46 @@ try:
     check('scraper profile: soc scale honored (profile says x1)',
           m.get('huawei_battery_soc_percent') == 65, str(m.get('huawei_battery_soc_percent')))
 
+    # 1a-bis. the profile's fc field: an fc4-marked source is read with FC4.
+    # Positive half: the fake serves the map over both function codes.
+    prof4 = '/tmp/scr_fc4_profile.json'
+    _json.dump({'description': 'fc4-marked source',
+                'registers': [
+                    {'name': 'pv-power', 'register': 40001, 'type': 'i32', 'scale': 1, 'fc': 4, 'scrape': True},
+                    {'name': 'grid-power', 'register': 40003, 'type': 'i32', 'scale': 1, 'scrape': True},
+                ]}, open(prof4, 'w'))
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--strict', '--port', '15547',
+                                   '--control-port', '0', '--profile', prof4],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(0.7)
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
+                                   '--host', '127.0.0.1', '--modbus-port', '15547',
+                                   '--listen', '127.0.0.1:9362', '--profile', prof4],
+                                  stdout=open('/tmp/scr_fc4.log', 'w'), stderr=subprocess.STDOUT))
+    for _ in range(30):
+        status, m = wait_metrics(9362)
+        if m.get('huawei_pv_generation_watts') == 4000:
+            break
+        time.sleep(0.3)
+    check('profile fc: the fc4-marked pv-power is read over FC4',
+          m.get('huawei_pv_generation_watts') == 4000 and m.get('huawei_up') == 1,
+          str({k: m.get(k) for k in ('huawei_pv_generation_watts', 'huawei_up')}))
+    # Negative half: an FC3-only device cannot serve an fc4-marked source
+    # (the evil server drops FC4 requests) — the poll must fail, not silently
+    # succeed over FC3.
+    evil4 = EvilInverter(15592, {40001: 4000, 40003: 0})
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
+                                   '--host', '127.0.0.1', '--modbus-port', '15592',
+                                   '--listen', '127.0.0.1:9364', '--profile', prof4],
+                                  stdout=open('/tmp/scr_fc4_evil.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(1.5)          # a few failed polls at the 0.3s interval
+    status, m = wait_metrics(9364, want=None)
+    check('profile fc: an fc4 source on an FC3-only device fails the poll',
+          m.get('huawei_up') == 0 and m.get('huawei_modbus_errors_total', 0) >= 1
+          and 'huawei_pv_generation_watts' not in m,
+          str({k: m.get(k) for k in ('huawei_up', 'huawei_modbus_errors_total')}))
+    evil4.stop()
+
     # 1b. the shipped Deye profile end-to-end: real Deye addresses (SG03LP1
     # family), SoC reported as plain percent (gain 1), omitted registers = 0
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', '15596',
@@ -458,6 +498,23 @@ try:
     time.sleep(1)
     check('fake: env-socket unlinked on shutdown', not os.path.exists(SIG_SOCK2)
           and fake_env.poll() == 0)
+
+    # 2f2. the peer-cred auth on the fake's unix control socket: the token gates
+    # both transports, the kernel-vouched same-uid peer skips the handshake
+    CRED_SOCK = '/tmp/inv_cred.socket'
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15591',
+                                   '--control-port', CRED_SOCK, '--control-token', 'sekrit'],
+                                  stdout=open('/tmp/scr_cred.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(0.8)
+    r = subprocess.run([sys.executable, C, '--control-port', CRED_SOCK, 'show', 'version'],
+                       capture_output=True, text=True, timeout=30)
+    check('fake peer-cred: the same-uid unix peer needs no token', r.returncode == 0
+          and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:120]))
+    r = subprocess.run([sys.executable, C, '--control-port', CRED_SOCK, 'shutdown'],
+                       capture_output=True, text=True, timeout=30)
+    check('fake peer-cred: the trusted unix peer can also stop the fake', r.stdout.startswith('bye'),
+          repr(r.stdout[:120]))
+    procs[-1].wait(timeout=10)
 
     # 2g1. battery state machine: SoC integrates the effective battery power
     # with the simulated clock (clock jumps = time-lapse), reserve floor 10 %

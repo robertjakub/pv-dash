@@ -144,10 +144,12 @@ Settings are resolved in this order (first hit wins), mirroring
    `MODBUS_CACHE_CLIENT_TIMEOUT`, `MODBUS_CACHE_CONNECT_ACL`,
    `MODBUS_CACHE_WRITE_ACL`, `MODBUS_CACHE_WRITE_REGISTERS`,
    `MODBUS_CACHE_LOG_LEVEL`, `MODBUS_CACHE_CONTROL_TOKEN`,
-   `MODBUS_CACHE_CONTROL_TOKEN_FILE`, `MODBUS_CACHE_AUDIT_LOG`,
+   `MODBUS_CACHE_CONTROL_TOKEN_FILE`, `MODBUS_CACHE_CONTROL_TRUST_UIDS`,
+   `MODBUS_CACHE_DUMP_PATH`, `MODBUS_CACHE_DUMP_INTERVAL`,
+   `MODBUS_CACHE_AUDIT_LOG`,
    `MODBUS_CACHE_AUDIT_MAX_MB`, `MODBUS_CACHE_AUDIT_DAILY`,
    `MODBUS_CACHE_AUDIT_FILES`, `MODBUS_CACHE_NO_AUDIT_LOG`,
-   `MODBUS_CACHE_READS_AUDIT`
+   `MODBUS_CACHE_REQUESTS_AUDIT`
 3. Config file (snake_case keys, `[cache]` section) — `--config` picks the
    file (default: `modbus_cache.ini` next to `modbus_cache.py` — the
    packaged layout — then the subproject root's sample; a missing file
@@ -176,18 +178,23 @@ with a clean one-line error instead of failing later at runtime.
 | `--write-registers` | `any` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception (ini `write_registers`, env `MODBUS_CACHE_WRITE_REGISTERS`) |
 | `--connect-acl` | `any` | clients allowed to connect: `any` or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `any` | clients allowed to write — still requires `--allow-write` — see [Access control](#access-control) |
-| `--control-token` | none | require a token on **TCP** control connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; the unix socket needs no token (ini `control_token`, env `MODBUS_CACHE_CONTROL_TOKEN`) |
+| `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (ini `control_token`, env `MODBUS_CACHE_CONTROL_TOKEN`) |
 | `--control-token-file` | none | the token from a file (the first line; a systemd `LoadCredential` or a key file) — instead of `--control-token`, giving both is an error (ini `control_token_file`, env `MODBUS_CACHE_CONTROL_TOKEN_FILE`) |
+| `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user (ini `control_socket_group`, env `MODBUS_CACHE_CONTROL_SOCKET_GROUP`) |
+| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (ini `control_trust_uids`, env `MODBUS_CACHE_CONTROL_TRUST_UIDS`) |
+| **Persistence** | | |
+| `--dump-path` | off | the state dump (write-behind): the cached words + their stamps and the live setting overrides as one JSON — written on shutdown, by the `request dump` command and every `--dump-interval` seconds; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (ini `dump_path`, env `MODBUS_CACHE_DUMP_PATH`) |
+| `--dump-interval` | `0` | seconds between the automatic state dumps, `0` = on request (the `request dump` command and the shutdown); needs `--dump-path`; live-settable (`set dump-interval`, ini `dump_interval`, env `MODBUS_CACHE_DUMP_INTERVAL`) |
 | **Audit trail** | | |
 | `--audit-log` | XDG state | the CACHE audit trail: a file path or `-` for stdout (docker logs / journald); default `~/.local/state/modbus-cache/audit.log` — see [Audit logging](#audit-logging) |
 | `--audit-max-mb` | `10` | rotate the audit log at this size, keeping `--audit-files` backups; `0` = off |
 | `--audit-daily` | off | also rotate the audit log at UTC midnight |
 | `--audit-files` | `3` | rotated audit backups to keep |
 | `--no-audit-log` | off | disable the audit trail |
-| `--reads-audit` | `300` | audit one `READS` tally per client per this many seconds (who is hammering the cache), `0` = off (ini `reads_audit_s`, env `MODBUS_CACHE_READS_AUDIT`) |
+| `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds (who is hammering the cache), `0` = off (ini `requests_audit_s`, env `MODBUS_CACHE_REQUESTS_AUDIT`) |
 | **Metrics** | | |
-| `--metrics-port` | off | serve the cache's own Prometheus `/metrics` on `127.0.0.1:PORT` (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `huawei_cache_*` path) |
-| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`) |
+| `--metrics-port` | off | serve the cache's own Prometheus `/metrics` on `127.0.0.1:PORT` (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `huawei_cache_*` path); **refuses to start without `--metrics-token`/`--metrics-token-file`** |
+| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-port` is set |
 | `--metrics-token-file` | off | the metrics bearer token from a file (the first line); instead of `--metrics-token`, giving both is an error |
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
@@ -241,24 +248,29 @@ inverter's `FAKE_CTL`) environment variable > default socket.
 
 One command per line, one reply per line. Every request and reply is one
 JSON object: the request = `{"cmd": "<command>"}`, the reply =
-`{"status": "ok|err|bye", "text": "…"}`. **TCP connections require the
-token when `--control-token` is set** — the first command must be
-`{"cmd": "auth", "token": "..."}`; the unix socket relies on filesystem
-permissions instead.
+`{"status": "ok|err|bye", "text": "…"}`. **With `--control-token` set,
+connections must authenticate first** — `{"cmd": "auth", "token": "..."}` —
+on both transports. Over the unix socket the kernel vouches for the peer
+(`SO_PEERCRED`): root, the daemon's own user and the extra
+`--control-trust-uids` uids skip the handshake, so a local systemd unit
+speaks without sharing the secret; TCP peers always need the token. Without
+a token the unix socket relies on filesystem permissions.
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `interval`, `ttl`, `read-delay`, `merge-gap` (the poll plan rebuilds), `allow-write`, `write-registers`, `max-clients`, `client-timeout`, `reads-audit`, `log-level`, `profile`/`selection` (the register map swaps atomically), `connect-acl`, `write-acl`, `timeout` — the reply carries the compact state summary |
+| `set <setting> <value>` | configure a setting **live**: `interval`, `ttl`, `read-delay`, `merge-gap` (the poll plan rebuilds), `allow-write`, `write-registers`, `max-clients`, `client-timeout`, `requests-audit`, `dump-interval`, `log-level`, `profile`/`selection` (the register map swaps atomically), `connect-acl`, `write-acl`, `timeout` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
 | `show <setting>` | the bare live value of one tunable |
 | `show settings` | every tunable with its live value — one stable `key=value` line per setting (scriptable); a value set live carries a `*`, and a SIGHUP re-applies the config (the file always wins) and clears the markers — see [Live settings](#live-settings) |
 | `help <setting>` | the registry description of one setting |
 | `inspect` | one pretty multi-line dump of everything — version, upstream, listen/control, profile, cache state, poll plan, counters, the write gate, the audit sink: the baton for a bug report |
-| `show status` | the **effective state report**: one stable `key=value` line per field (`upstream`, `unit`, `listen`, `control`, `uptime`, `poll`, `last_poll`, `interval`, `ttl`, `merge_gap`, `ranges`, `fc4_ranges`, `map_version`, `hits`, `misses`, `clients`, `writes`, `write_allow_list`, `reads_audit`, `profile`, `selection`) — scriptable |
+| `show status` | the **effective state report**: one stable `key=value` line per field (`upstream`, `unit`, `listen`, `control`, `uptime`, `poll`, `last_poll`, `interval`, `ttl`, `merge_gap`, `ranges`, `fc4_ranges`, `map_version`, `hits`, `misses`, `clients`, `writes`, `write_allow_list`, `requests_audit`, `dump`, `profile`, `selection`) — scriptable |
 | `show connections` | connected clients: peer, connection age, requests served |
 | `show cache` | cache contents: ranges, cached words, oldest entry, TTL, map version, failed ranges, hit/miss counters |
 | `show cache all` | every cached entry, one row per profile range: name, words cached, their values (`-` = not cached), age of the oldest, when it expires, poll status (`ok`/`partial`/`empty`/`failed (ex N)`) |
 | `show uplink` | the inverter link: session counters (state, connects, exchanges, bytes in/out, errors, last error) plus one row per poll block — status (`ok`/`ex N`/`error`/`pending`), latency (last/mean/max), failure count, last error |
+| `request dump` | write the cached words (+ their stamps) and the live setting overrides to the `--dump-path` file — the write-behind state, see [Persistence](#persistence); the dump commands (and the `dump-interval` setting) show up in the listings only when a dump path is configured |
+| `request restore` | load the dump back: the words return with their original stamps (their TTL bounds any staleness) and the overrides re-apply — what the startup restore does automatically |
 | `show version` | the modbus-cache version |
 | `clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
 | `restart` | drop the upstream connection **and** the cache, repoll now — for recovering from a wedged inverter session |
@@ -324,7 +336,7 @@ misses=9
 clients=1
 writes=disabled
 write_allow_list=any
-reads_audit=5.00m
+requests_audit=5.00m
 
 cache:15502 > clear cache
 ok
@@ -380,6 +392,28 @@ cached words it touched (per-register — the rest of the cache stays warm)
 and wakes the poller. The next read of the written range goes to the device
 instead of serving the pre-write value until the TTL expires. Coils (FC05/15)
 are not cached and need no invalidation.
+
+## Persistence
+
+`--dump-path` turns on the **write-behind state dump**: the cached words
+(+ their original stamps, so freshness carries over — the poll ranges, the
+bridged gaps and the on-demand entries alike) and the live setting
+overrides, as one human-readable JSON — written atomically (tmp + rename).
+The dumps land in three ways: every `--dump-interval` seconds (live-settable
+`set dump-interval`, `0` = off — the default: on request), on the
+**`request dump`** command, and on every
+graceful shutdown. Loading is gated: **`--restore-on-start`** opts in to
+loading the dump when the daemon starts (a restart serves last-known
+values instead of cold misses); the default is starting cold — the
+**`request restore`** command loads it on demand. Either way the words
+return as they were —
+their TTL bounds any staleness, and the next map swap prunes what the
+profile no longer names — and the setting overrides re-apply through the
+same gate a `set` speaks (`interval=2.00s` survives the restart, a moved
+profile file is skipped with a note). With `selection none` the word-restore
+is a no-op (the cache stays empty by design). The dump commands (and the
+`dump-interval` setting) show up in the listings — the completions, `?`,
+`help`, `show settings` — only when a dump path is configured.
 
 ## Metrics
 
@@ -465,9 +499,9 @@ The prefix names the writer — `CACHE` (the proxy), `CLI` (cache_cli) and
 2026-11-04T07:16:43Z AUDIT CACHE WRITE register 47415 = 5 (single register, unit 1)
 2026-11-04T07:17:02Z AUDIT CACHE AUTH-FAIL peer=127.0.0.1:54425
 2026-11-04T07:17:12Z AUDIT CACHE COMMAND peer=127.0.0.1:54426 'clear cache' -> ok
-2026-11-04T07:17:30Z AUDIT CACHE READS peer=127.0.0.1:54425 requests=412 (last 300s: 380)
+2026-11-04T07:17:30Z AUDIT CACHE REQUESTS peer=127.0.0.1:54425 requests=412 (last 300s: 380)
 2026-11-04T07:17:30Z AUDIT CLI CONNECT target=127.0.0.1:15502 user=oom
-2026-11-04T07:17:45Z AUDIT CACHE READS peer=127.0.0.1:54425 requests=412 connected=342s
+2026-11-04T07:17:45Z AUDIT CACHE REQUESTS peer=127.0.0.1:54425 requests=412 connected=342s
 2026-11-04T07:17:45Z AUDIT CACHE SHUTDOWN SIGTERM received: uptime=65s clients=1 hits=412 misses=9
 2026-11-04T07:18:02Z AUDIT CTL CONNECT target=unix:/tmp/modbus-cache-15502.socket user=oom
 ```
@@ -478,15 +512,16 @@ server** (`AUDIT CACHE COMMAND`, with the client peer — it knows the who);
 the CLI audits its session (CONNECT/DISCONNECT, the local-only events like
 an aborted `shutdown`, RECONNECT attempts). The proxy audits its lifecycle
 (`START`, `RELOAD`, `RESET`, `SHUTDOWN`), every forwarded/refused/rejected
-write, the per-client READS
+write, the per-client REQUESTS
 tallies and the TCP control `AUTH-FAIL`s. ping/pong keepalives are never
 logged; the file is flushed per event, so a crash keeps everything up to
 the last command. The trail is **thread-safe** (one writer lock around the
 write+flush+rotate cycle) — the proxy's client threads audit every
-forwarded write concurrently. The per-client **read accounting** runs on
-the same trail: one `READS` event per client per `--reads-audit` period (default 300 s —
-who is hammering the cache) plus a final tally on every disconnect
-(`READS peer=… requests=812 connected=342s`).
+forwarded write concurrently. The per-client **request accounting** (reads
+and writes alike) runs on the same trail: one `REQUESTS` event per client
+per `--requests-audit` period (default 300 s — who is hammering the cache)
+plus a final tally on every disconnect (`REQUESTS peer=… requests=812
+connected=342s`).
 
 The operational log above keeps mirroring the events at INFO; the audit
 file is the structured evidence trail, not a duplicate of it.
@@ -548,7 +583,7 @@ comma-separated START:COUNT allow-list; null = any), `connectAcl`,
 `writeAcl`, `maxClients`, `clientTimeout`, `logLevel`, `localTime`,
 `logAccess`, `openFirewall`, `auditLog` (null = the trail goes to
 **stdout**, which journald captures — the hardened service cannot write
-the XDG state home), `auditMaxMb`, `auditDaily`, `auditFiles`, `readsAudit`
+the XDG state home), `auditMaxMb`, `auditDaily`, `auditFiles`, `requestsAudit`
 (null = 300 s), `controlPort` (a TCP port on 127.0.0.1 or a unix socket
 path — use one under `/run/modbus-cache/`, `/tmp` is private to the
 service), `controlToken` (**world-readable in the store ini** — prefer the

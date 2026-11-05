@@ -49,16 +49,17 @@ class Scraper:
                                self.cfg['modbus_port'], err)
 
     def _read(self, profile_name):
-        """Read one source: the profile-declared type on the wire, decoded
-        by the profile's gain (wire value = physical x gain)."""
+        """Read one source: the profile-declared type and function code on
+        the wire (fc 3 = holding, 4 = input), decoded by the profile's gain
+        (wire value = physical x gain)."""
         src = self.cfg['sources'][profile_name]
-        reg, typ = src['register'], src['type']
+        reg, typ, fc = src['register'], src['type'], src.get('fc', 3)
         if typ in ('i32', 'u32'):
-            raw = self.client.read_i32(reg)
+            raw = self.client.read_i32(reg, fc=fc)
             if typ == 'u32' and raw < 0:
                 raw += 0x100000000
         else:
-            raw = self.client.read_registers(reg, 1)[0]
+            raw = self.client.read_registers(reg, 1, fc=fc)[0]
             if typ == 'i16' and raw >= 0x8000:
                 raw -= 0x10000
         return raw / src['gain']

@@ -40,6 +40,7 @@ import threading
 
 from common.audit import AuditLog, default_path as default_audit_path
 from common.config import load_token_file
+from common.cred import parse_trust_uids
 from common.version import version_string
 from lib.chaos import Chaos
 from lib.paths import resolve_control_target
@@ -144,8 +145,9 @@ def main():
     p.add_argument('--audit-daily', action='store_true', help='also rotate the audit log at UTC midnight')
     p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
     p.add_argument('--no-audit-log', action='store_true', help='disable the INV audit trail')
-    p.add_argument('--control-token', default=None, help='require a token on TCP control connections: the client authenticates with {"cmd": "auth", "token": ...}; the unix socket needs no token')
+    p.add_argument('--control-token', default=None, help='require a token on control connections: the client authenticates with {"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s own user or --control-trust-uids — SO_PEERCRED) skips the token')
     p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file) — takes the place of --control-token; giving both is an error (env FAKE_CONTROL_TOKEN_FILE)')
+    p.add_argument('--control-trust-uids', default=None, help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (env FAKE_CONTROL_TRUST_UIDS)')
     args = p.parse_args()
     logging.basicConfig(level=getattr(logging, args.log_level),
                         format='%(levelname)-7s %(message)s' if os.environ.get('JOURNAL_STREAM')
@@ -175,6 +177,8 @@ def main():
     control_token = args.control_token
     if args.control_token_file:
         control_token = load_token_file(args.control_token_file)
+    trust_uids = parse_trust_uids(args.control_trust_uids or os.environ.get('FAKE_CONTROL_TRUST_UIDS'),
+                                  'control-trust-uids')
     if args.metrics_token and args.metrics_token_file:
         logger.error('--metrics-token and --metrics-token-file are mutually exclusive')
         raise SystemExit(1)
@@ -204,7 +208,7 @@ def main():
         control = ControlServer(simulator, chaos, target, fake=fake,
                                 defaults=configured_defaults(args, frozen, profile_text),
                                 log_replies=args.control_log_replies, audit=audit,
-                                token=control_token)
+                                token=control_token, trust_uids=trust_uids)
         threading.Thread(target=control.serve, daemon=True).start()
     if args.metrics_port:
         MetricsServer(simulator, chaos, fake, control, args.metrics_port,

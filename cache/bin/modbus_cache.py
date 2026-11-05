@@ -31,6 +31,7 @@ from common.logutil import UtcFormatter
 from common.protocol import exception_frame
 from common.version import version_string
 from lib.config import load_registers_file, load_selection, resolve_config, parse_control_target
+from lib import persist
 from lib.upstream import Upstream
 from lib.cache import Cache
 from lib.proxy import Proxy
@@ -85,11 +86,21 @@ def parse_args():
     ap.add_argument('--control-port', dest='control_port',
                     help='control server target: unix socket path or TCP port on 127.0.0.1 (default: config, $MODBUS_CACHE_CTL or /tmp/modbus-cache-<listen-port>.socket); 0 = off')
     ap.add_argument('--control-token', dest='control_token',
-                    help='require a token on TCP control connections: the client authenticates with {"cmd": "auth", "token": ...}; the unix socket needs no token (default: config, $MODBUS_CACHE_CONTROL_TOKEN or none)')
+                    help='require a token on control connections: the client authenticates with {"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s own user or --control-trust-uids — SO_PEERCRED) skips the token (default: config, $MODBUS_CACHE_CONTROL_TOKEN or none)')
     ap.add_argument('--control-token-file', dest='control_token_file',
                     help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file) — takes the place of --control-token; giving both is an error (default: config, $MODBUS_CACHE_CONTROL_TOKEN_FILE)')
-    ap.add_argument('--reads-audit', dest='reads_audit', type=float,
-                    help='audit one READS tally per client per this many seconds, 0 = off (default: config, $MODBUS_CACHE_READS_AUDIT or 300)')
+    ap.add_argument('--control-socket-group', dest='control_socket_group', action='store_true',
+                    help='leave the unix control socket group-accessible (chmod 0660 instead of the default 0600) (default: config, $MODBUS_CACHE_CONTROL_SOCKET_GROUP)')
+    ap.add_argument('--requests-audit', dest='requests_audit', type=float,
+                    help='audit one REQUESTS tally per client per this many seconds, 0 = off (default: config, $MODBUS_CACHE_REQUESTS_AUDIT or 300)')
+    ap.add_argument('--dump-path', dest='dump_path',
+                    help='the state dump (write-behind): the cached words + the live setting overrides as one JSON; dumped on shutdown, on the request dump command and every --dump-interval seconds; loaded on start only with --restore-on-start, on demand with the request restore command (default: config, $MODBUS_CACHE_DUMP_PATH or none)')
+    ap.add_argument('--dump-interval', dest='dump_interval', type=float,
+                    help='seconds between the automatic state dumps, 0 = on request (the request dump command and the shutdown) (default: config, $MODBUS_CACHE_DUMP_INTERVAL or 0)')
+    ap.add_argument('--restore-on-start', dest='restore_on_start', action='store_true',
+                    help='load the state dump when the daemon starts (needs --dump-path) — a restart serves last-known values instead of cold misses; default: start cold, load only on demand (env MODBUS_CACHE_RESTORE_ON_START, ini restore_on_start)')
+    ap.add_argument('--control-trust-uids', dest='control_trust_uids',
+                    help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (default: config, $MODBUS_CACHE_CONTROL_TRUST_UIDS or none)')
     ap.add_argument('--metrics-port', dest='metrics_port', type=int, default=0,
                     help="serve the cache's own Prometheus /metrics on 127.0.0.1:PORT; 0 = off (the default)")
     ap.add_argument('--metrics-token', dest='metrics_token',
@@ -125,6 +136,13 @@ def setup_logging(cfg):
 def install_signal_handlers(proxy, cache, args):
     def graceful_stop(reason):
         logger.info('shutdown: %s, closing the listener', reason)
+        if proxy.dump_path:
+            try:
+                n = persist.write_dump(proxy.dump_path, proxy.cache,
+                                       proxy.control.dump_settings() if getattr(proxy, 'control', None) else None)
+                logger.info('state dumped to %s (%d word(s))', proxy.dump_path, n)
+            except OSError as e:
+                logger.error('the shutdown dump to %s failed: %s', proxy.dump_path, e)
         if proxy.audit:
             proxy.audit.event('SHUTDOWN', '%s: uptime=%ds clients=%d hits=%d misses=%d'
                               % (reason, int(time.monotonic() - proxy.started), proxy.client_count,
@@ -222,12 +240,21 @@ def main():
     control_token = cfg['control_token'] or None
     if cfg['control_token_file']:
         control_token = load_token_file(cfg['control_token_file'])
+    if isinstance(control_target, int) and not control_token:
+        logger.error('the TCP control port %d without a token is open to every local process; '
+                     'set --control-token or --control-token-file (the default unix socket needs none), '
+                     'or disable it with --control-port 0', control_target)
+        raise SystemExit(2)
     if args.metrics_token and args.metrics_token_file:
         logger.error('--metrics-token and --metrics-token-file are mutually exclusive')
         raise SystemExit(2)
     metrics_token = args.metrics_token or os.environ.get('MODBUS_CACHE_METRICS_TOKEN')
     if args.metrics_token_file:
         metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
+    if args.metrics_port and not metrics_token:
+        logger.error('the metrics endpoint serves register values: set --metrics-token or '
+                     '--metrics-token-file when --metrics-port is on (or drop --metrics-port)')
+        raise SystemExit(2)
     metrics_desc = 'off'
     if args.metrics_port:
         if not 0 < args.metrics_port <= 65535:
@@ -245,7 +272,9 @@ def main():
     proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
                   cfg['profile'], cfg)
     proxy.metrics_desc = metrics_desc
-    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, audit trail: %s, reads audit: %s, metrics: %s)',
+    proxy.dump_path = cfg['dump_path'] or None
+    proxy.dump_interval = cfg['dump_interval']
+    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, audit trail: %s, requests audit: %s, metrics: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if cfg['allow_write'] else 'disabled (write requests are refused)',
@@ -259,8 +288,12 @@ def main():
                 proxy.describe_write_ranges(),
                 'required on TCP' if control_token else 'none',
                 audit_display,
-                '%gs' % cfg['reads_audit_s'] if cfg['reads_audit_s'] else 'off',
+                '%gs' % cfg['requests_audit_s'] if cfg['requests_audit_s'] else 'off',
                 metrics_desc)
+    logger.info('state dumps: %s',
+                'off' if not proxy.dump_path
+                else '%s every %s (plus request dump and the shutdown), restore on start'
+                % (proxy.dump_path, 'off' if not proxy.dump_interval else '%gs' % proxy.dump_interval))
     proxy.log_map()
     if args.dry_run:
         logger.info('dry-run: configuration and register map are valid, nothing was bound or connected (control server would listen on %s)',
@@ -287,7 +320,8 @@ def main():
                     'write-registers': proxy.describe_write_ranges(),
                     'max-clients': '%d' % cfg['max_clients'],
                     'client-timeout': '%g' % cfg['client_timeout'],
-                    'reads-audit': 'off' if not cfg['reads_audit_s'] else '%g' % cfg['reads_audit_s'],
+                    'requests-audit': 'off' if not cfg['requests_audit_s'] else '%g' % cfg['requests_audit_s'],
+                    'dump-interval': 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval'],
                     'log-level': cfg['level'],
                     'profile': cfg['profile'],
                     'selection': cfg['selection'] or 'all',
@@ -297,8 +331,49 @@ def main():
                                  else ','.join(str(n) for n in cfg['write_acl']),
                     'timeout': '%g' % cfg['timeout']}
         proxy.control = ControlServer(proxy, control_target, stop, audit=audit,
-                                      token=control_token, defaults=defaults)
+                                      token=control_token, defaults=defaults,
+                                      trust_uids=cfg['control_trust_uids'],
+                                      socket_group=cfg['control_socket_group'])
         proxy.control.start()
+    if proxy.dump_path:
+        if not cfg['restore_on_start']:
+            if os.path.exists(proxy.dump_path):
+                logger.info('the state dump %s exists, not loaded on start (restore-on-start is off; request restore loads it on demand)',
+                            proxy.dump_path)
+        elif os.path.exists(proxy.dump_path):
+            try:
+                words, stamps, settings = persist.read_dump(proxy.dump_path)
+                n = 0 if proxy.no_cache else cache.restore(words, stamps)
+                applied, failed = (proxy.control.apply_dump_settings(settings)
+                                   if getattr(proxy, 'control', None) else (0, ['no control server']))
+                logger.info('restored the state dump %s: %d word(s), %d setting(s)%s',
+                            proxy.dump_path, n, applied,
+                            (' (%d skipped: %s)' % (len(failed), ', '.join(failed))) if failed else '')
+                if audit:
+                    audit.event('RESTORE', '%s: %d word(s), %d setting(s)' % (proxy.dump_path, n, applied))
+            except ValueError as e:
+                logger.error('cannot restore the state dump %s: %s (starting cold)', proxy.dump_path, e)
+        else:
+            logger.info('no state dump at %s yet, starting cold', proxy.dump_path)
+        # the dumper thread always runs (it parks while dump-interval is off):
+        # a live `set dump-interval` wakes it without a restart
+        def watch_dump():
+            while not proxy.stopping:
+                if not proxy.dump_interval:
+                    proxy.dump_wake.wait()
+                    proxy.dump_wake.clear()
+                    continue
+                if proxy.dump_wake.wait(proxy.dump_interval):
+                    proxy.dump_wake.clear()
+                if proxy.stopping:
+                    break
+                try:
+                    n = persist.write_dump(proxy.dump_path, proxy.cache,
+                                           proxy.control.dump_settings() if getattr(proxy, 'control', None) else None)
+                    logger.debug('state dumped to %s (%d word(s))', proxy.dump_path, n)
+                except (OSError, ValueError) as e:
+                    logger.error('the periodic dump to %s failed: %s', proxy.dump_path, e)
+        threading.Thread(target=watch_dump, daemon=True, name='dump').start()
     if args.metrics_port:
         MetricsServer(proxy, args.metrics_port, token=metrics_token,
                       started=time.monotonic()).start()

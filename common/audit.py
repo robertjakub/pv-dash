@@ -88,6 +88,7 @@ class AuditLog:
         with self._lock:
             self._maybe_rotate()
             stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+            detail = ' '.join(detail.split())   # fold \n\r\t etc: one event = one physical line
             self._f.write('%s AUDIT %s %s%s\n' % (stamp, self.prefix, event,
                                                   (' ' + detail) if detail else ''))
             self._f.flush()

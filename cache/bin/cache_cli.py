@@ -55,6 +55,7 @@ COMMAND_HELP = {
     'unset': 'restore a setting to its configured value: unset <setting>',
     'inspect': 'one pretty dump of everything (the status, the map, the counters, the write gate)',
     'show': 'runtime state: show <setting|status|connections|cache|uplink|settings|version>',
+    'request': 'the state dumps (when the daemon has a dump path): request dump / request restore',
     'clear': 'drop the cached registers, repoll now (clear cache)',
     'restart': 'restart the upstream session: connection + cache dropped, repoll',
     'shutdown': 'stop the proxy gracefully (asks to confirm)',
@@ -72,10 +73,29 @@ SHOW_VALUES = (
 
 SHOW_DESC = dict(SHOW_VALUES)
 
-HELP_ROWS = tuple(COMMAND_HELP.items()) + (('?', 'this help'),)
-HELP = 'commands (TAB completes, ? lists the options + descriptions in any position):\n' \
-     + '\n'.join('    %-*s %s' % (max(len(n) for n, _ in HELP_ROWS) + 1, n, d)
-                 for n, d in HELP_ROWS)
+# the welcome probe learns the daemon's dump state: the state-dump commands
+# and the dump-interval setting are offered only when a dump path is configured
+SESSION = {'probed': False, 'dump': False}
+
+
+def command_pool():
+    """The first words the daemon offers right now."""
+    if SESSION['dump']:
+        return COMMANDS + ('request',)
+    return COMMANDS
+
+
+def setting_pool():
+    """The tunables the daemon offers right now."""
+    return tuple(n for n in SETTING_NAMES if n != 'dump-interval' or SESSION['dump'])
+
+
+def help_text():
+    """The `?` listing — the state-dump commands only when configured."""
+    rows = tuple(COMMAND_HELP.items()) + (('?', 'this help'),)
+    return 'commands (TAB completes, ? lists the options + descriptions in any position):\n' \
+         + '\n'.join('    %-*s %s' % (max(len(n) for n, _ in rows) + 1, n, d)
+                     for n, d in rows)
 
 
 class ConnectionLost(Exception):
@@ -118,15 +138,17 @@ def candidates(buf):
     done = parts if end_space else parts[:-1]
     head = done[0].lower() if done else ''
     if not done:
-        pool, hint, desc = COMMANDS, None, describe_word
+        pool, hint, desc = command_pool(), None, describe_word
     elif head in ('set', 'unset') and len(done) == 1:
-        pool, hint, desc = SETTING_NAMES, None, setting_help
+        pool, hint, desc = setting_pool(), None, setting_help
     elif head == 'set' and len(done) == 2 and done[1].lower() in SETTING_BY_NAME:
         s = SETTING_BY_NAME[done[1].lower()]
         pool, hint = tuple(s.values), s.value_shape
         desc = lambda w, s=s: s.value_help.get(w, s.value_help.get(w.lower(), '')) or None
+    elif head == 'request' and len(done) == 1:
+        pool, hint, desc = (('dump', 'restore') if SESSION['dump'] else ()), None, describe_word
     elif head == 'show' and len(done) == 1:
-        pool, hint, desc = SETTING_NAMES + ('status', 'connections', 'cache', 'uplink', 'settings', 'version'), None, describe_word
+        pool, hint, desc = setting_pool() + ('status', 'connections', 'cache', 'uplink', 'settings', 'version'), None, describe_word
     elif head == 'clear' and len(done) == 1:
         pool, hint, desc = ('cache',), None, describe_word
     else:
@@ -427,6 +449,8 @@ def welcome(sock):
         if '=' in line:
             k, v = line.split('=', 1)
             st[k] = v
+    SESSION['probed'] = True
+    SESSION['dump'] = st.get('dump', 'off') != 'off'
     print('% Welcome to the modbus-cache console')
     print('%%   %s upstream | poll %s, last poll %s | running for %s | %s client(s)'
           % (st.get('upstream', '?'), st.get('poll', '?'), st.get('last_poll', '?'),
@@ -459,7 +483,7 @@ def _loop(sock, prompt, audit=None):
         if low in ('?', 'help'):
             if audit:
                 audit.command(cmd, 'local')
-            print(HELP)
+            print(help_text())
             continue
         if low.endswith('?'):
             if audit:

@@ -9,7 +9,7 @@ from .statics import MAX_PDU, MAX_COUNT
 
 
 class ModbusTCP:
-    """FC3 holding-register client; connects lazily, reconnects on any error."""
+    """FC3/FC4 register client; connects lazily, reconnects on any error."""
 
     def __init__(self, host, port, unit, timeout, offset=0):
         self.host = host
@@ -50,13 +50,13 @@ class ModbusTCP:
         self.sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
         self.sock.settimeout(self.timeout)
 
-    def read_registers(self, addr, count):
+    def read_registers(self, addr, count, fc=3):
         if not 1 <= count <= MAX_COUNT:
             raise ModbusError('register count %d out of range' % count)
         if not self.sock:
             self._connect()
         self.txn = (self.txn + 1) & 0xFFFF
-        pdu = struct.pack('>BHH', 3, addr + self.offset, count)
+        pdu = struct.pack('>BHH', fc, addr + self.offset, count)
         self.sock.sendall(struct.pack('>HHHB', self.txn, 0, len(pdu) + 1, self.unit) + pdu)
         txn, proto, length, unit = struct.unpack('>HHHB', self._recv_exact(7))
         if not 2 <= length <= MAX_PDU + 2:
@@ -69,9 +69,9 @@ class ModbusTCP:
         if unit != self.unit:
             raise ModbusError('reply from unit id %d, expected %d' % (unit, self.unit))
         func = body[0]
-        if func == 3 + 0x80:
+        if func == fc + 0x80:
             raise ModbusError('modbus exception, code %d' % (body[1] if len(body) > 1 else -1))
-        if func != 3:
+        if func != fc:
             raise ModbusError('unexpected function byte 0x%02x' % func)
         if len(body) < 2:
             raise ModbusError('short response: function byte only')
@@ -80,6 +80,6 @@ class ModbusTCP:
             raise ModbusError('expected %d register bytes, got %d' % (count * 2, got))
         return struct.unpack('>%dH' % count, body[2:2 + got])
 
-    def read_i32(self, addr):
-        hi, lo = self.read_registers(addr, 2)
+    def read_i32(self, addr, fc=3):
+        hi, lo = self.read_registers(addr, 2, fc=fc)
         return struct.unpack('>i', struct.pack('>HH', hi, lo))[0]

@@ -13,21 +13,24 @@ import json
 import logging
 import os
 import socket
+import struct
 import threading
 import time
 
 from common.version import version_string
 from common.config import default_profile_path, resolve_profile_file
+from common.cred import peer_uid, parse_trust_uids
 from common.human import secs
+from common.protocol import ModbusError
 from .statics import CONTROL_IDLE_TIMEOUT_S
 from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .cache import build_blocks
 from .config import parse_write_registers, parse_acl, parse_selection
+from . import persist
 
 logger = logging.getLogger('modbus-cache')
 
-COMMAND_HELP = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|cache|'
-                'uplink|settings|version>, clear cache, restart, shutdown, quit; help <setting> describes it')
+MAX_LINE = 1024 * 1024   # the pre-auth line-buffer cap (drop past it)
 
 
 class ControlServer:
@@ -39,13 +42,16 @@ class ControlServer:
     with the signal handlers; it runs after the shutdown reply left the
     wire."""
 
-    def __init__(self, proxy, target, stopper=None, audit=None, token=None, defaults=None):
+    def __init__(self, proxy, target, stopper=None, audit=None, token=None, defaults=None, trust_uids=None,
+                 socket_group=False):
         self.proxy = proxy
         self.audit = audit               # the CACHE audit trail (common.audit), None = off
         self.token = token               # the TCP auth token; None = no auth (the unix = the perms)
         self.is_unix = not isinstance(target, int)
         self.port = None if self.is_unix else int(target)
         self.sockpath = str(target) if self.is_unix else None
+        self.socket_group = bool(socket_group)   # chmod 0660 instead of 0600 on the unix socket
+        self.trust_uids = trust_uids or frozenset()   # extra peer uids the unix socket trusts without the token
         self.stopper = stopper
         self.shutdown_pending = False
         self.defaults = defaults or {}   # setting -> configured startup value (what `unset` restores)
@@ -74,6 +80,9 @@ class ControlServer:
                     logger.warning('control socket %s exists, replacing it', self.sockpath)
                     os.unlink(self.sockpath)
                 srv.bind(self.sockpath)
+                # the mode is not left to the umask: 0600 = owner only,
+                # 0660 with --control-socket-group (a local group shares it)
+                os.chmod(self.sockpath, 0o660 if self.socket_group else 0o600)
             else:
                 srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 srv.bind(('127.0.0.1', self.port))
@@ -98,6 +107,24 @@ class ControlServer:
             return '%s:%d' % (addr[0], addr[1])
         return 'unix socket'
 
+    def trusted_peer(self, client, who):
+        """The peer-cred auth on the unix control socket: with a token
+        configured, a peer the kernel vouches for — root, the daemon's own
+        user or one of trust_uids — is authenticated without the token (a
+        local systemd unit speaks without sharing the secret). The kernel
+        answers for the socket's owner anyway; this only skips the token
+        handshake. TCP peers always need the token."""
+        if not (self.token and self.is_unix):
+            return False
+        uid = peer_uid(client)
+        if uid is None:
+            return False
+        if uid == 0 or uid == os.getuid() or uid in self.trust_uids:
+            logger.debug('control client from %s: trusted peer uid %d, no token required', who, uid)
+            return True
+        logger.info('control client from %s: peer uid %d is not trusted, the token is required', who, uid)
+        return False
+
     def framed(self, line, who, authed):
         """One wire frame in, one out: parse {"cmd": ...}, gate the TCP auth,
         run the command, return (cmd, reply-obj, internal-reply). The text of
@@ -111,7 +138,7 @@ class ControlServer:
             return '', {'status': 'err',
                         'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request'
         cmd = obj['cmd']
-        if self.token and not self.is_unix and cmd.lower() != 'auth' and not authed:
+        if self.token and cmd.lower() != 'auth' and not authed:
             return cmd, {'status': 'err', 'text': 'authenticate first: {"cmd": "auth", "token": "..."}'}, \
                 'err authenticate first'
         if cmd.lower() == 'auth':
@@ -147,7 +174,7 @@ class ControlServer:
     def handle(self, client, addr):
         who = self.peer(addr)
         logger.debug('control client connected from %s', who)
-        authed = False
+        authed = self.trusted_peer(client, who)
         with self.clients_lock:
             self.clients.add(client)
         try:
@@ -161,6 +188,9 @@ class ControlServer:
                 else:
                     chunk = b''
                 buf += chunk
+                if len(buf) > MAX_LINE:   # no newline = no frame: drop the amplifier
+                    logger.warning('control client from %s: the line exceeded %d bytes, dropping it', who, MAX_LINE)
+                    break
                 if b'\n' not in buf:
                     continue
                 line, buf = buf.split(b'\n', 1)
@@ -190,18 +220,31 @@ class ControlServer:
                 self.clients.discard(client)
             client.close()
 
+    def command_help(self):
+        """The one-line command reference: the state-dump commands appear
+        only when a dump path is configured (there is nothing to dump
+        into otherwise)."""
+        cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|cache|'
+                'uplink|settings|version>')
+        if self.proxy.dump_path:
+            cmds += ', request dump, request restore'
+        cmds += ', clear cache, restart, shutdown, quit; help <setting> describes it'
+        return cmds
+
     def command(self, cmd):
         cmd = cmd.strip()
         low = cmd.lower()
         if low.split()[0] in ('help', '?') and low != '?':
             what = cmd[4:].strip().lower()
             if what and what in SETTING_BY_NAME:
+                if what == 'dump-interval' and not self.proxy.dump_path:
+                    return 'err dump-interval needs a dump path (set --dump-path)'
                 return 'ok %s' % describe_setting(what)
             if what:
                 return 'err unknown setting %s (try help)' % what
-            return 'ok ' + COMMAND_HELP
+            return 'ok ' + self.command_help()
         if low == '?':
-            return 'ok ' + COMMAND_HELP
+            return 'ok ' + self.command_help()
         if low == 'quit':
             return 'bye'
         if low == 'ping':                 # keep-alive from cache_cli
@@ -252,6 +295,8 @@ class ControlServer:
         if low.startswith('show') and len(cmd.split()) == 2:
             what = cmd.split()[1].lower()
             if what in SETTING_BY_NAME:
+                if what == 'dump-interval' and not self.proxy.dump_path:
+                    return 'err dump-interval needs a dump path (set --dump-path)'
                 return 'ok %s=%s' % (what, self._get(what))
             return 'err unknown setting %s (try help)' % what
         if low == 'inspect':
@@ -261,6 +306,10 @@ class ControlServer:
             self.proxy.poll_wake.set()
             logger.info('control: cache cleared (%d register word(s) dropped), repolling now', dropped)
             return 'ok cache cleared (%d register word(s) dropped), repolling now' % dropped
+        if low == 'request dump':
+            return self.dump_state()
+        if low == 'request restore':
+            return self.restore_state()
         if low == 'restart':
             with self.proxy.upstream.lock:
                 self.proxy.upstream.close()
@@ -343,14 +392,27 @@ class ControlServer:
                 raise ValueError('client-timeout must be 0..86400 seconds')
             p.client_timeout = v
             return secs(v)
-        if key == 'reads-audit':
+        if key == 'requests-audit':
             if val in ('off', 'none', '0'):
-                p.reads_audit_s = 0
+                p.requests_audit_s = 0
                 return 'off'
-            v = num(val, 'reads-audit', 'seconds or off')
+            v = num(val, 'requests-audit', 'seconds or off')
             if not 1 <= v <= 86400:
-                raise ValueError('reads-audit must be 1..86400 seconds')
-            p.reads_audit_s = v
+                raise ValueError('requests-audit must be 1..86400 seconds')
+            p.requests_audit_s = v
+            return secs(v)
+        if key == 'dump-interval':
+            if not p.dump_path:
+                raise ValueError('dump-interval needs a dump path (set --dump-path)')
+            if val in ('off', 'none', '0'):
+                p.dump_interval = 0
+                p.dump_wake.set()
+                return 'off'
+            v = num(val, 'dump-interval', 'seconds or off')
+            if not 1 <= v <= 86400:
+                raise ValueError('dump-interval must be 1..86400 seconds')
+            p.dump_interval = v
+            p.dump_wake.set()
             return secs(v)
         if key == 'log-level':
             lvl = val.upper()
@@ -400,7 +462,7 @@ class ControlServer:
         cfg.update(interval=p.interval, read_delay=p.read_delay, merge_gap=p.merge_gap,
                    cache_ttl=p.cache.cache_ttl, allow_write=p.allow_write,
                    write_registers=p.write_ranges, max_clients=p.max_clients,
-                   client_timeout=p.client_timeout, reads_audit_s=p.reads_audit_s,
+                   client_timeout=p.client_timeout, requests_audit_s=p.requests_audit_s,
                    connect_acl=p.connect_acl, write_acl=p.write_acl, timeout=p.upstream.timeout)
         return cfg
 
@@ -433,8 +495,10 @@ class ControlServer:
             return '%d' % p.max_clients
         if key == 'client-timeout':
             return 'none' if not p.client_timeout else secs(p.client_timeout)
-        if key == 'reads-audit':
-            return 'off' if not p.reads_audit_s else secs(p.reads_audit_s)
+        if key == 'requests-audit':
+            return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
+        if key == 'dump-interval':
+            return 'off' if not p.dump_interval else secs(p.dump_interval)
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         if key == 'timeout':
@@ -483,7 +547,9 @@ class ControlServer:
             'writes=%s' % ('enabled' if p.allow_write else 'disabled'),
             'write_acl=%s' % ('any' if p.write_acl is None else '%d network(s)' % len(p.write_acl)),
             'write_allow_list=%s' % p.describe_write_ranges(),
-            'reads_audit=%s' % ('off' if not p.reads_audit_s else secs(p.reads_audit_s)),
+            'requests_audit=%s' % ('off' if not p.requests_audit_s else secs(p.requests_audit_s)),
+            'dump=%s' % ('off' if not p.dump_path else '%s every %s' % (
+                p.dump_path, 'off' if not p.dump_interval else secs(p.dump_interval))),
             'profile=%s' % (cfg.get('profile') or p.profile),
             'selection=%s' % (cfg.get('selection') or 'all'),
             'metrics=%s' % getattr(p, 'metrics_desc', 'off'),
@@ -494,9 +560,11 @@ class ControlServer:
     def settings_report(self):
         """Every tunable setting with its live value: one key=value per line
         (scriptable). A live-overridden setting carries a `*` on the value —
-        a SIGHUP re-applies the config and clears the markers."""
+        a SIGHUP re-applies the config and clears the markers. The
+        state-dump tunables show only when a dump path is configured."""
+        names = [k for k in SETTING_NAMES if k != 'dump-interval' or self.proxy.dump_path]
         return 'ok settings\n' + '\n'.join('%s=%s%s' % (k, self._get(k), '*' if k in self.overridden else '')
-                                           for k in SETTING_NAMES)
+                                           for k in names)
 
     def clear_overrides(self):
         """The config was re-applied (SIGHUP): nothing is live-overridden anymore."""
@@ -559,7 +627,9 @@ class ControlServer:
                'any' if p.write_acl is None else '%d network(s)' % len(p.write_acl),
                p.describe_write_ranges()),
             'audit     %s%s' % ('off' if p.audit is None else (p.audit.path if p.audit.path != '-' else 'stdout'),
-                                ', reads accounting every %s' % secs(p.reads_audit_s) if p.audit and p.reads_audit_s else ''),
+                                ', requests accounting every %s' % secs(p.requests_audit_s) if p.audit and p.requests_audit_s else ''),
+            'dump      %s' % ('off' if not p.dump_path else '%s, every %s (plus the dump command and the shutdown)'
+                              % (p.dump_path, 'off' if not p.dump_interval else secs(p.dump_interval))),
             'uptime    %s' % secs(now - p.started),
         ]
         return 'ok inspect\n' + '\n'.join(rows)
@@ -621,6 +691,75 @@ class ControlServer:
     @staticmethod
     def _bytes(n):
         return '%.1fkiB' % (n / 1024) if n >= 1024 else '%dB' % n
+
+    def dump_settings(self):
+        """The live-overridden settings as raw, re-appliable values (a
+        SIGHUP clears the override set — the dump follows)."""
+        p = self.proxy
+        raw = {
+            'interval': p.interval, 'ttl': p.cache.cache_ttl, 'read-delay': p.read_delay,
+            'merge-gap': p.merge_gap, 'allow-write': 'on' if p.allow_write else 'off',
+            'write-registers': p.describe_write_ranges(), 'max-clients': p.max_clients,
+            'client-timeout': p.client_timeout, 'requests-audit': p.requests_audit_s,
+            'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
+            'profile': p.config.get('profile'), 'selection': p.config.get('selection') or 'all',
+            'connect-acl': self._acl_text(p.connect_acl), 'write-acl': self._acl_text(p.write_acl),
+            'timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,
+        }
+        return {k: raw[k] for k in sorted(self.overridden)}
+
+    def apply_dump_settings(self, settings):
+        """Re-apply the dumped overrides; returns (applied, failed-name-list).
+        An unknown setting or a value the current config rejects (a moved
+        profile, a pruned ACL) is skipped, never fatal."""
+        applied, failed = 0, []
+        for name, value in (settings or {}).items():
+            if name not in SETTING_BY_NAME:
+                failed.append(name)
+                continue
+            try:
+                self._apply(name, str(value))
+                self.overridden.add(name)
+                applied += 1
+            except ValueError as e:
+                failed.append('%s (%s)' % (name, e))
+        return applied, failed
+
+    def dump_state(self):
+        """The write-behind: the cached words (+ stamps) and the live
+        setting overrides to the configured dump path — the same file the
+        dump-interval loop and the shutdown dump write."""
+        path = self.proxy.dump_path
+        if not path:
+            return 'err no dump path configured (set --dump-path)'
+        settings = self.dump_settings()
+        try:
+            n = persist.write_dump(path, self.proxy.cache, settings)
+        except (OSError, ValueError) as e:
+            logger.error('control: the dump to %s failed: %s', path, e)
+            return 'err dump failed: %s' % e
+        logger.info('control: state dumped to %s (%d word(s), %d setting(s))', path, n, len(settings))
+        return 'ok dumped %d word(s), %d setting(s) to %s' % (n, len(settings), path)
+
+    def restore_state(self):
+        """Load a dump back: the words (+ their original stamps, so the
+        freshness carries over) land in the cache — only what the current
+        register map still covers — and the setting overrides re-apply."""
+        path = self.proxy.dump_path
+        if not path:
+            return 'err no dump path configured (set --dump-path)'
+        if not os.path.exists(path):
+            return 'err no dump at %s yet (run dump first)' % path
+        try:
+            words, stamps, settings = persist.read_dump(path)
+            n = 0 if self.proxy.no_cache else self.proxy.cache.restore(words, stamps)
+            applied, failed = self.apply_dump_settings(settings)
+        except ValueError as e:
+            return 'err restore failed: %s' % e
+        self.proxy.poll_wake.set()
+        logger.info('control: state restored from %s (%d word(s), %d setting(s))', path, n, applied)
+        return 'ok restored %d word(s), %d setting(s) from %s%s' % (
+            n, applied, path, ' (%d skipped: %s)' % (len(failed), ', '.join(failed)) if failed else '')
 
     def uplink_report(self):
         """The inverter link: the session counters (connects, exchanges,

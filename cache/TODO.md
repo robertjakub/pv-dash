@@ -2,16 +2,6 @@
 
 ## Open
 
-- **the audit-finding fixes** — the cache owns the audit's prompt pair and
-  most of the cheap gaps: F2 the audit-trail injection (fold the control
-  characters — the writer is now the shared `common/audit.py`, the two
-  control servers fold their COMMAND echoes), F3 the write allow-list
-  failing open on unparseable frames (fail closed), F4 the uncapped
-  pre-auth control buffer, F5 the token-less TCP control (refuse or warn),
-  F6 the metrics endpoint (token mandatory when enabled + a handler
-  timeout), F8 the socket mode (`chmod 0600` after bind). See
-  [AUDIT.md](../docs/AUDIT.md); each closes in a few lines, then re-run the
-  audit.
 - **the CI** — GitHub Actions: the four suites + `nix flake check` on the
   push; the release workflow on the tag. (Family-wide, see the root
   [TODO](../docs/TODO.md).)
@@ -20,9 +10,6 @@
   (poll pacing, the dongle's single-client behaviour, real exception codes,
   the FC4 input registers on a real device) is the last mile. Also worth
   testing: the Deye profiles against the cache.
-- **the cache persistence** — an optional state file (write-behind) so a
-  daemon restart serves last-known values instead of cold misses: the
-  device-down story survives the restart, not just the reconnect.
 - **the scraper's FC4 awareness** — the profile schema now carries the `fc`
   field (the cache polls/caches FC4 independently); the scraper still reads
   everything with FC3 — a profile that marks an FC4 entry `scrape` needs
@@ -32,17 +19,34 @@
 - **the read-only control role** — a second token granting only the
   show/clear verbs (no `set`, no `shutdown`): the ops shift versus the
   admin key, both audited.
-- **the peer-cred auth on the unix control socket** — SO_PEERCRED: a local
-  systemd unit connects without a token, the socket name already does half
-  the job.
-- **the module gaps** — the NixOS module has no `selection` option (the
-  `--selection` flag/env exist), and its `profile` option description still
-  speaks of `"cache": true` marks from an older schema — refresh both.
 - **the alert rules** — the cache's own gauges (poll down, age spikes,
   write-refusal bursts) belong in the family's shipped Prometheus rules
   pack (the scraper's TODO grows the file; the cache contributes rules).
 
 ## Done (the highlights; the git history has the details)
+
+The state persistence (the write-behind): `--dump-path` turns on the state
+dump — the cached words (+ their original stamps) and the live setting
+overrides, one atomically-written JSON; the dumps land every
+`dump-interval` (a live setting, 0 = on request), on the `request dump`
+command and on every graceful shutdown; loading is gated —
+`--restore-on-start` opts in to loading the dump on start (the default is
+starting cold; the `request restore` command loads it on demand) — a
+gated restart serves last-known values instead of cold misses (the words
+return as they were: the ttl bounds any staleness, the next map swap
+prunes what the profile no longer names).
+
+The peer-cred auth on the unix control socket: with a token configured, a
+peer the kernel vouches for (root, the daemon's own user, or the extra
+`--control-trust-uids` — `SO_PEERCRED` on Linux, `LOCAL_PEERCRED` on the
+BSDs/macOS) skips the token handshake — a local systemd unit speaks
+without the secret; TCP peers always authenticate.
+
+The NixOS module caught up with the flag surface: a `selection` option
+("all"/"none", a list of profile names the module renders into the
+selection JSON, or a path to one) and the `profile` description speaking
+the current schema (name/register/type/fc/ttl — no `"cache": true`
+marks).
 
 The per-entry TTL: the profile entries carry an optional `ttl` (seconds,
 `0` = never expire) — `covers()` honors it per word, the global TTL stays
@@ -90,7 +94,7 @@ status (no device hammering), the on-demand forwarding cache with the TTL,
 the synthesized 65000-65003 diagnostics block, SIGHUP hot reload + SIGUSR1
 cache clean, the connect/write ACLs, the per-register write allow-list
 (`--write-registers START:COUNT,...`), the audit of every
-forwarded/refused write + the per-client READS tallies. The reports: the
+forwarded/refused write + the per-client REQUESTS tallies. The reports: the
 multi-line `show status`/`show settings` (one stable key=value per line,
 the inverter's shape) and the CLI that strips the header word. The ops:
 the bin/ lib/ split (static constants in lib/static.json), the Docker

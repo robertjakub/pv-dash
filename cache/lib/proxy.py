@@ -14,7 +14,7 @@ from .config import load_registers_file, load_selection
 from .cache import build_blocks, span
 from .statics import (MAX_COUNT, MAX_PDU, WRITE_FUNCS, GATEWAY_FAILED, ILLEGAL_FUNCTION,
                       ILLEGAL_VALUE, ILLEGAL_ADDRESS, DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX,
-                      READS_AUDIT_S)
+                      REQUESTS_AUDIT_S)
 
 logger = logging.getLogger('modbus-cache')
 
@@ -55,7 +55,7 @@ class Proxy:
         self.log_access = bool(self.config.get('log_access', False))
         self.max_clients = max(0, int(self.config.get('max_clients') or 0))
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
-        self.reads_audit_s = max(0.0, float(self.config.get('reads_audit_s', READS_AUDIT_S)))
+        self.requests_audit_s = max(0.0, float(self.config.get('requests_audit_s', REQUESTS_AUDIT_S)))
         self.connect_acl = self.config.get('connect_acl')
         self.write_acl = self.config.get('write_acl')
         self.no_cache = self.config.get('selection') == 'none'   # selection none: forward only
@@ -73,6 +73,9 @@ class Proxy:
         self.poll_ok = False
         self.blocks = build_blocks(cache.ranges, merge_gap)
         self.block_stats = {}    # (fc, start, count) -> the uplink tally: attempts, latency, errors
+        self.dump_path = None    # the state-dump file (write-behind); None = persistence off
+        self.dump_interval = 0.0 # seconds between the automatic dumps; 0 = only the command/shutdown dumps
+        self.dump_wake = threading.Event()
         self.generation = 0
         self.poll_wake = threading.Event()
         self.listen_sock = None
@@ -80,7 +83,7 @@ class Proxy:
         self.stopping = False
 
     def poll_loop(self):
-        next_reads_audit = time.monotonic() + self.reads_audit_s
+        next_requests_audit = time.monotonic() + self.requests_audit_s
         while True:
             t0 = time.monotonic()
             try:
@@ -92,11 +95,11 @@ class Proxy:
             self.poll_secs_max = max(self.poll_secs_max, dur)
             self.poll_secs_sum += dur
             self.poll_count += 1
-            if self.reads_audit_s and self.audit:
+            if self.requests_audit_s and self.audit:
                 now = time.monotonic()
-                if now >= next_reads_audit:
-                    next_reads_audit = now + self.reads_audit_s
-                    self.audit_reads()
+                if now >= next_requests_audit:
+                    next_requests_audit = now + self.requests_audit_s
+                    self.audit_requests()
             self.poll_wake.wait(self.interval)
             self.poll_wake.clear()
 
@@ -157,7 +160,7 @@ class Proxy:
         self.log_access = bool(self.config.get('log_access', False))
         self.max_clients = max(0, int(self.config.get('max_clients') or 0))
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
-        self.reads_audit_s = max(0.0, float(self.config.get('reads_audit_s', READS_AUDIT_S)))
+        self.requests_audit_s = max(0.0, float(self.config.get('requests_audit_s', REQUESTS_AUDIT_S)))
         self.connect_acl = self.config.get('connect_acl')
         self.write_acl = self.config.get('write_acl')
         self.cache.cache_ttl = self.config['cache_ttl']
@@ -258,9 +261,10 @@ class Proxy:
             self.block_stats = {k: v for k, v in self.block_stats.items() if k in live}
         self.poll_ok = any(ok.values())
 
-    def audit_reads(self):
-        """The per-client read tally, rate-limited: one READS event per
-        client per period (the 'who is hammering the cache' evidence)."""
+    def audit_requests(self):
+        """The per-client request tally (reads and writes alike), rate-limited:
+        one REQUESTS event per client per period (the 'who is hammering the
+        cache' evidence)."""
         now = time.monotonic()
         with self.client_lock:
             for key, entry in self.clients.items():
@@ -268,8 +272,8 @@ class Proxy:
                 if delta <= 0:
                     continue
                 entry['audited'] = entry['requests']
-                self.audit.event('READS', 'peer=%s requests=%d (last %ds: %d)'
-                                 % (key, entry['requests'], int(self.reads_audit_s), delta))
+                self.audit.event('REQUESTS', 'peer=%s requests=%d (last %ds: %d)'
+                                 % (key, entry['requests'], int(self.requests_audit_s), delta))
 
     def _allowed(self, acl, ip):
         if acl is None:
@@ -352,7 +356,7 @@ class Proxy:
                 entry = self.clients.pop(key, None)
             client.close()
             if self.audit and entry:
-                self.audit.event('READS', 'peer=%s requests=%d connected=%ds'
+                self.audit.event('REQUESTS', 'peer=%s requests=%d connected=%ds'
                                  % (key, entry['requests'], int(time.monotonic() - entry['since'])))
 
     def respond(self, txn, proto, unit, pdu, addr):
@@ -361,6 +365,12 @@ class Proxy:
         func = pdu[0]
         if func in WRITE_FUNCS:
             target = _write_target(pdu)
+            if target is None:
+                desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
+                logger.info('write: refused %s (the frame is too short to carry a register address)', desc)
+                if self.audit:
+                    self.audit.event('WRITE-REFUSED', '%s (the frame is too short to carry a register address)' % desc)
+                return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
             if not self.allow_write:
                 desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
                 logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)

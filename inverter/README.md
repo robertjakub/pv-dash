@@ -196,10 +196,13 @@ line, one reply object per line. The request is `{"cmd": "<command>"}`, the
 reply is `{"status": "ok" | "err" | "bye", "text": "<reply text>"}` — a
 multi-line reply (`show status`, `show registers`) keeps its newlines inside
 `text`, no framing terminator needed. `{"cmd": "ping"}` answers
-`{"status": "ok", "text": "pong"}` (the keepalive). **TCP connections need a
+`{"status": "ok", "text": "pong"}` (the keepalive). **Connections need a
 token when `--control-token <secret>` is set**: the first request must be
-`{"cmd": "auth", "token": "..."}`; the unix socket needs no token (the
-filesystem permissions are the auth). The clients take `--control-token`
+`{"cmd": "auth", "token": "..."}`. Over the unix socket the kernel vouches
+for the peer (`SO_PEERCRED`): root, the daemon's own user and the extra
+**`--control-trust-uids`** uids skip the handshake — a local systemd unit
+speaks without the secret; TCP peers always need the token. The clients
+take `--control-token`
 / **`FAKE_CONTROL_TOKEN`** — or the hardened way, **`--control-token-file`**
 (the first line of a key file or a systemd
 `LoadCredential`) — and authenticate automatically:
@@ -367,8 +370,9 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--profile` | `sun2000` | register-map profile: the built-in name or a JSON path (name → register + optional type/scale); `FAKE_PROFILE` when unset |
 | `--strict` | off | reject undefined registers with exception 02 |
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
-| `--control-token` | off | require the token auth handshake on TCP control connections (the clients take `--control-token` / `FAKE_CONTROL_TOKEN`) |
+| `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `FAKE_CONTROL_TOKEN`) |
 | `--control-token-file` | off | the control token from a file (the first line; a key file or a systemd `LoadCredential`), instead of `--control-token`; giving both is an error |
+| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `FAKE_CONTROL_TRUST_UIDS`) |
 | `--control-log-replies` | off | DEBUG-log the full output of every control command, not just the command |
 | `--chaos` | `0` | probability 0..1 that a request is answered hostile and dropped |
 | `--seed` | random | chaos/cloud RNG seed for reproducible runs |
@@ -437,11 +441,13 @@ Honest scope of a demo device:
   code, nothing to audit beyond the stdlib.
 - **The control surface is plain-text by design** — a demo harness: the TCP
   control server binds `127.0.0.1` only, and `--control-token` adds a
-  token-auth handshake for TCP (the clients authenticate with
+  token-auth handshake (the clients authenticate with
   `FAKE_CONTROL_TOKEN`, or `--control-token-file` / `FAKE_CONTROL_TOKEN_FILE`
-  — the first line of a key file or a `LoadCredential`); the unix socket
-  relies on filesystem permissions. The container runs as the unprivileged
-  `pvsuite` user. Do not expose the control port to untrusted networks.
+  — the first line of a key file or a `LoadCredential`); over the unix
+  socket a kernel-vouched peer (root, the daemon's own user or
+  `--control-trust-uids` — `SO_PEERCRED`) skips the token. The container
+  runs as the unprivileged `pvsuite` user. Do not expose the control port
+  to untrusted networks.
 - **Auditable by default.** The fake and the CLIs keep the append-only
   audit trail above (who, when, what, result) — the logging evidence on
   unless explicitly disabled.

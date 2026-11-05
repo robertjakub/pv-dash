@@ -82,8 +82,14 @@ the JSON-lines control server: a unix socket path or a TCP port. Default
 \fB/tmp/fake-inverter-\fR\fI<modbus-port>\fB.socket\fR; \fB0\fR = off.
 .TP
 .BI \-\-control-token " TOKEN" ", " \-\-control-token-file " FILE"
-require the token auth handshake on TCP control connections (mutually
-exclusive).
+require the token auth handshake on control connections (mutually
+exclusive). Over the unix socket a trusted peer (root, the daemon's own
+user or \fB--control-trust-uids\fR \(em \fBSO_PEERCRED\fR) skips the
+handshake.
+.TP
+.BI \-\-control-trust-uids " UIDS"
+extra peer uids the unix control socket trusts without the token: a
+comma-separated list (a local systemd unit speaks without the secret).
 .TP
 .B \-\-control-log-replies
 DEBUG-log the full reply of every control command.

@@ -94,20 +94,50 @@ the JSON-lines control server: a unix socket path or a TCP port (bound to
 \fB0\fR = off.
 .TP
 .BI \-\-control-token " TOKEN"
-require a token on TCP control connections (the first command must be
-\fB{"cmd": "auth", "token": "..."}\fR). The unix socket needs no token.
+require a token on control connections (the first command must be
+\fB{"cmd": "auth", "token": "..."}\fR). Over the unix socket a trusted
+peer (root, the daemon's own user or \fB--control-trust-uids\fR \(em
+\fBSO_PEERCRED\fR) skips the handshake. A TCP control port refuses to
+start without a token.
 .TP
 .BI \-\-control-token-file " FILE"
 the token from a file (the first line; a systemd \fBLoadCredential\fR) \(em
 instead of \fB--control-token\fR; giving both is an error.
 .TP
-.BI \-\-reads-audit " S"
-audit one READS tally per client per this many seconds (default
+.BI \-\-control-socket-group
+leave the unix control socket group-accessible (\fBchmod 0660\fR instead
+of the default \fB0600\fR): a local group may speak to the control
+without being the service user.
+.TP
+.BI \-\-control-trust-uids " UIDS"
+extra peer uids the unix control socket trusts without the token: a
+comma-separated list (a local systemd unit speaks without the secret);
+root and the daemon's own user are always trusted.
+.TP
+.BI \-\-dump-path " FILE"
+the state dump (write-behind): the cached words + their stamps and the
+live setting overrides, as one JSON \(em written on shutdown, by the
+\fBrequest dump\fR command and every \fB--dump-interval\fR seconds;
+loaded on start only with \fB--restore-on-start\fR, on demand by the
+\fBrequest restore\fR command. Off by default.
+.TP
+.B \-\-restore-on-start
+load the state dump when the daemon starts (needs \fB--dump-path\fR) \(em
+a restart serves last-known values instead of cold misses. Off by
+default: start cold, load on demand.
+.TP
+.BI \-\-dump-interval " S"
+seconds between the automatic state dumps (default \fB0\fR = on request:
+the \fBrequest dump\fR command and the shutdown); needs \fB--dump-path\fR.
+.TP
+.BI \-\-requests-audit " S"
+audit one REQUESTS tally per client per this many seconds (default
 \fB300\fR); \fB0\fR = off.
 .TP
 .BI \-\-metrics-port " N"
 serve the cache's own Prometheus \fB/metrics\fR on 127.0.0.1:\fIN\fR (the
-\fBmodbus_cache_*\fR gauges). Off by default.
+\fBmodbus_cache_*\fR gauges); refuses to start without
+\fB--metrics-token\fR. Off by default.
 .TP
 .BI \-\-metrics-token " TOKEN"
 require \fBAuthorization: Bearer\fR on the metrics endpoint.
@@ -181,14 +211,14 @@ The control server speaks JSON lines: one request
 the reports
 .BR inspect ", " "show status" ", " "show connections" ", " "show cache" " [all]" ", " "show uplink" ", " "show version" ,
 the ops
-.BR clear\ cache ", " restart ", " shutdown ", " quit .
+.BR "request dump" ", " "request restore" ", " clear\ cache ", " restart ", " shutdown ", " quit .
 .RS
 .IP \(bu 2
 .B set <setting> <value>
 changes a setting live (interval, ttl, read-delay, merge-gap,
-allow-write, write-registers, max-clients, client-timeout, reads-audit,
-log-level, profile, selection, connect-acl, write-acl, timeout); a
-SIGHUP re-applies the config (the file always wins).
+allow-write, write-registers, max-clients, client-timeout, requests-audit,
+dump-interval, log-level, profile, selection, connect-acl, write-acl,
+timeout); a SIGHUP re-applies the config (the file always wins).
 .IP \(bu 2
 .B show cache all
 prints every cached entry: name, words, values, age, expiry, poll status.
@@ -197,6 +227,13 @@ prints every cached entry: name, words, values, age, expiry, poll status.
 analyses the inverter link: session counters (connects, exchanges, bytes,
 errors) and one row per poll block with its status, latency (last/mean/max)
 and last error.
+.IP \(bu 2
+.B request dump
+/ \fBrequest restore\fR: the write-behind state (the cached words + stamps,
+the live setting overrides) to/from the \fB--dump-path\fR file; the startup
+restore and the shutdown dump run the same path automatically. The dump
+commands \(em and the \fBdump-interval\fR setting \(em show up in the
+listings only when a dump path is configured.
 .IP \(bu 2
 .B clear cache
 / SIGUSR1, \fBrestart\fR (drop the upstream + the cache, repoll),

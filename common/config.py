@@ -40,6 +40,24 @@ def parse_listen(text):
     return host.strip('[]'), port
 
 
+def is_loopback_host(host):
+    """True when the listen host is loopback: the loopback addresses
+    (127.0.0.0/8, ::1), 'localhost', or an empty bracket form of ::1. An
+    empty string = all interfaces = NOT loopback; an unresolvable hostname
+    is treated as not loopback (a name that resolves loopback is exotic —
+    bind the address instead)."""
+    t = (host or '').strip().strip('[]').lower()
+    if not t or t == '0.0.0.0' or t == '::' or t == '*':
+        return False
+    if t == 'localhost':
+        return True
+    try:
+        import ipaddress
+        return ipaddress.ip_address(t).is_loopback
+    except ValueError:
+        return False
+
+
 def load_token_file(path, label='control-token-file'):
     """The token from a file: the first line, whitespace-stripped (a systemd
     LoadCredential or a plain key file — anything but the rendered ini,

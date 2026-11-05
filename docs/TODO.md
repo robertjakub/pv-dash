@@ -14,10 +14,9 @@
   narrates.
 - **the remaining audit findings** — the actionable open ones are small:
   F18 (an explicit `0600` on the state-dump tmp — the F8/F12 pattern),
-  F13 (the scraper refusing a non-loopback listen without a token — the
-  cache's F5 pattern), F16 (the alert-rules pack), F17/F10/F15/F14
-  (documented trust decisions / deployment stories) — see
-  [AUDIT.md](AUDIT.md); F2–F9, F11 and F12 are closed and verified
+  F16 (the alert-rules pack), F17/F14/F15/F1 (documented trust decisions /
+  deployment stories) — see
+  [AUDIT.md](AUDIT.md); F2–F10, F11–F13 are closed and verified
   (§3.1/§4);
   re-run the audit after the scrape control surface, the TLS story or the
   dashboard service.

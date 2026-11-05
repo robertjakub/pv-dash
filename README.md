@@ -46,7 +46,7 @@ pv-suite/
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))
 ├── common/       # the shared Python package (version, audit, config, wire core; [docs](common/README.md))
 ├── tests/        # the test suites, one or more per Modbus tool
-├── scripts/      # release.py — the release orchestrator (bump, verify, tag, push, release)
+├── scripts/      # release.py — the release orchestrator; audit_verify.py — the audit trails' hash-chain verifier
 ├── docker/       # one alpine image per Modbus tool + the compose demo stack ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
 ├── docs/         # the family-level docs: the [security audit](docs/AUDIT.md), the
@@ -62,8 +62,9 @@ run them from the repo root:
 
 ```bash
 python3 tests/cache-regtest.py        # the cache: the full functional battery
-python3 tests/inverter-regtest.py    # the fake: the F11 surface (client cap/timeout, the count gate)
+python3 tests/inverter-regtest.py    # the fake: the F11/F13 surface (client caps, timeouts, per-IP, the count gate)
 python3 tests/scrape-regtest.py      # the scraper + the fake's machines
+python3 tests/audit-chain.py         # the audit trails' hash chains + scripts/audit_verify.py
 python3 tests/cache-stress.py        # the cache: 100 clients / 15 s load
 python3 tests/cache-fuzz.py [n]      # the cache: n hostile client frames
 python3 tests/scrape-fuzz.py [n]     # the scraper: n hostile HTTP frames
@@ -79,7 +80,12 @@ tracebacks** in the logs.
 The containers — one alpine image per Modbus tool, the Prometheus image,
 plus the compose demo stack (fake inverter → cache → scraper → Prometheus,
 internal-network only, nothing published on the host) — are documented in
-[`docker/README.md`](docker/README.md), topology diagram included.
+[`docker/README.md`](docker/README.md), topology diagram included. Every
+`/metrics` surface ships with the caps (`--metrics-max-clients`,
+`--metrics-client-timeout`, `--metrics-max-conn-per-ip`; the scraper's own
+are `--max-clients`/`--client-timeout`/`--max-conn-per-ip`), the scraper
+refuses a non-loopback listen without a token (F13), and the audit trails
+carry a per-writer hash chain verified by `scripts/audit_verify.py` (F10).
 
 ## License
 

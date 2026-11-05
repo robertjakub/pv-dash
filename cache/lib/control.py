@@ -392,6 +392,12 @@ class ControlServer:
                 raise ValueError('client-timeout must be 0..86400 seconds')
             p.client_timeout = v
             return secs(v)
+        if key == 'max-conn-per-ip':
+            v = numi(val, 'max-conn-per-ip', 'connections')
+            if not 0 <= v <= 4096:
+                raise ValueError('max-conn-per-ip must be 0..4096')
+            p.conn_gate.max_per_ip = v
+            return '%d' % v
         if key == 'requests-audit':
             if val in ('off', 'none', '0'):
                 p.requests_audit_s = 0
@@ -495,6 +501,8 @@ class ControlServer:
             return '%d' % p.max_clients
         if key == 'client-timeout':
             return 'none' if not p.client_timeout else secs(p.client_timeout)
+        if key == 'max-conn-per-ip':
+            return '%d' % p.conn_gate.max_per_ip
         if key == 'requests-audit':
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
         if key == 'dump-interval':
@@ -543,6 +551,7 @@ class ControlServer:
             'clients=%d' % p.client_count,
             'max_clients=%s' % (p.max_clients or 'none'),
             'client_timeout=%s' % (secs(p.client_timeout) if p.client_timeout else 'none'),
+            'max_conn_per_ip=%s' % (p.conn_gate.max_per_ip or 'none'),
             'connect_acl=%s' % acl_summary(p.connect_acl),
             'writes=%s' % ('enabled' if p.allow_write else 'disabled'),
             'write_acl=%s' % acl_summary(p.write_acl),
@@ -619,9 +628,10 @@ class ControlServer:
             'poll cyc  last %s, mean %s, max %s'
             % (secs(p.poll_secs_last),
                secs(p.poll_secs_sum / p.poll_count if p.poll_count else 0), secs(p.poll_secs_max)),
-            'counters  hits %d, misses %d, clients %d (limit %s, timeout %s)'
+            'counters  hits %d, misses %d, clients %d (limit %s, timeout %s, per-ip %s)'
             % (p.cache_hits, p.cache_misses, p.client_count,
-               p.max_clients or 'none', secs(p.client_timeout) if p.client_timeout else 'none'),
+               p.max_clients or 'none', secs(p.client_timeout) if p.client_timeout else 'none',
+               p.conn_gate.max_per_ip or 'none'),
             'writes    %s, write-acl %s, write-registers %s'
             % ('ENABLED' if p.allow_write else 'disabled',
                acl_summary(p.write_acl),
@@ -700,7 +710,8 @@ class ControlServer:
             'interval': p.interval, 'ttl': p.cache.cache_ttl, 'read-delay': p.read_delay,
             'merge-gap': p.merge_gap, 'allow-write': 'on' if p.allow_write else 'off',
             'write-registers': p.describe_write_ranges(), 'max-clients': p.max_clients,
-            'client-timeout': p.client_timeout, 'requests-audit': p.requests_audit_s,
+            'client-timeout': p.client_timeout, 'max-conn-per-ip': p.conn_gate.max_per_ip,
+            'requests-audit': p.requests_audit_s,
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'profile': p.config.get('profile'), 'selection': p.config.get('selection') or 'all',
             'connect-acl': self._acl_text(p.connect_acl), 'write-acl': self._acl_text(p.write_acl),

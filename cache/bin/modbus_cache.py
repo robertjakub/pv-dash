@@ -81,6 +81,8 @@ def parse_args():
     ap.add_argument('--log-access', action='store_true', help='log client connects/disconnects at INFO instead of DEBUG')
     ap.add_argument('--max-clients', type=int, help='refuse further connections past this many simultaneous clients, 0 = no limit (default: config, $MODBUS_CACHE_MAX_CLIENTS or 64)')
     ap.add_argument('--client-timeout', type=float, help='disconnect clients silent for this many seconds, 0 = never (default: config, $MODBUS_CACHE_CLIENT_TIMEOUT or 300)')
+    ap.add_argument('--max-conn-per-ip', dest='max_conn_per_ip', type=int,
+                    help='refuse further connections from one peer IP past this many simultaneous connections, 0 = no per-IP limit (default: config, $MODBUS_CACHE_MAX_CONN_PER_IP or 0)')
     ap.add_argument('--connect-acl', help='clients allowed to connect: "any", "none" (refuse everyone) or comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16 (default: config, $MODBUS_CACHE_CONNECT_ACL or any)')
     ap.add_argument('--write-acl', help='clients allowed to write (requires --allow-write): "any", "none" (refuse everyone) or comma-separated IPs/prefixes (default: config, $MODBUS_CACHE_WRITE_ACL or none)')
     ap.add_argument('--control-port', dest='control_port',
@@ -107,6 +109,12 @@ def parse_args():
                     help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
     ap.add_argument('--metrics-token-file', dest='metrics_token_file',
                     help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes the place of --metrics-token; giving both is an error (env MODBUS_CACHE_METRICS_TOKEN_FILE)')
+    ap.add_argument('--metrics-max-clients', dest='metrics_max_clients', type=int,
+                    help="maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited (default: config, $MODBUS_CACHE_METRICS_MAX_CLIENTS or 64)")
+    ap.add_argument('--metrics-client-timeout', dest='metrics_client_timeout', type=float,
+                    help="seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap (default: config, $MODBUS_CACHE_METRICS_CLIENT_TIMEOUT or 5)")
+    ap.add_argument('--metrics-max-conn-per-ip', dest='metrics_max_conn_per_ip', type=int,
+                    help="maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit (default: config, $MODBUS_CACHE_METRICS_MAX_CONN_PER_IP or 0)")
     ap.add_argument('--audit-log', dest='audit_log',
                     help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MODBUS_CACHE_AUDIT_LOG or %s — the XDG state home' % default_audit_path('modbus-cache'))
     ap.add_argument('--audit-max-mb', dest='audit_max_mb', type=float,
@@ -260,7 +268,9 @@ def main():
         if not 0 < args.metrics_port <= 65535:
             logger.error('--metrics-port out of range: %d', args.metrics_port)
             raise SystemExit(2)
-        metrics_desc = '127.0.0.1:%d%s' % (args.metrics_port, ' (bearer token)' if metrics_token else '')
+        metrics_desc = '127.0.0.1:%d%s, clients %s, per-ip %s' % (
+            args.metrics_port, ' (bearer token)' if metrics_token else '',
+            cfg['metrics_max_clients'] or 'none', cfg['metrics_max_conn_per_ip'] or 'none')
     if cfg['no_audit_log']:
         audit_display = 'off'
     elif cfg['audit_log'] == '-':
@@ -274,7 +284,7 @@ def main():
     proxy.metrics_desc = metrics_desc
     proxy.dump_path = cfg['dump_path'] or None
     proxy.dump_interval = cfg['dump_interval']
-    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, audit trail: %s, requests audit: %s, metrics: %s)',
+    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, audit trail: %s, requests audit: %s, metrics: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if cfg['allow_write'] else 'disabled (write requests are refused)',
@@ -283,6 +293,7 @@ def main():
                 listen_host, listen_port, args.config, cfg['level'],
                 'local' if cfg['local_time'] else 'UTC',
                 cfg['max_clients'] or 'none', '%gs' % cfg['client_timeout'] if cfg['client_timeout'] else 'none',
+                cfg['max_conn_per_ip'] or 'none',
                 acl_summary(cfg['connect_acl']),
                 acl_summary(cfg['write_acl']),
                 proxy.describe_write_ranges(),
@@ -374,6 +385,9 @@ def main():
         threading.Thread(target=watch_dump, daemon=True, name='dump').start()
     if args.metrics_port:
         MetricsServer(proxy, args.metrics_port, token=metrics_token,
+                      max_clients=cfg['metrics_max_clients'],
+                      client_timeout=cfg['metrics_client_timeout'],
+                      max_per_ip=cfg['metrics_max_conn_per_ip'],
                       started=time.monotonic()).start()
     try:
         threading.Thread(target=proxy.poll_loop, daemon=True).start()

@@ -199,6 +199,7 @@ with a clean one-line error instead of failing later at runtime.
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect clients silent for this many seconds — sheds connections from clients that died without closing (`0` = never) |
+| `--max-conn-per-ip` | `0` | refuse further connections from one peer IP past this many simultaneous connections (`0` = no per-IP limit) |
 | **Logging** | | |
 | `--log-level` | `INFO` | `DEBUG` adds per-client traffic and per-poll detail |
 | `--log-access` | `DEBUG` | log client connects/disconnects at `INFO` instead of `DEBUG` |
@@ -266,7 +267,7 @@ a token the unix socket relies on filesystem permissions.
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `interval`, `ttl`, `read-delay`, `merge-gap` (the poll plan rebuilds), `allow-write`, `write-registers`, `max-clients`, `client-timeout`, `requests-audit`, `dump-interval`, `log-level`, `profile`/`selection` (the register map swaps atomically), `connect-acl`, `write-acl`, `timeout` — the reply carries the compact state summary |
+| `set <setting> <value>` | configure a setting **live**: `interval`, `ttl`, `read-delay`, `merge-gap` (the poll plan rebuilds), `allow-write`, `write-registers`, `max-clients`, `client-timeout`, `max-conn-per-ip`, `requests-audit`, `dump-interval`, `log-level`, `profile`/`selection` (the register map swaps atomically), `connect-acl`, `write-acl`, `timeout` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
 | `show <setting>` | the bare live value of one tunable |
 | `show settings` | every tunable with its live value — one stable `key=value` line per setting (scriptable); a value set live carries a `*`, and a SIGHUP re-applies the config (the file always wins) and clears the markers — see [Live settings](#live-settings) |
@@ -458,6 +459,13 @@ the block fails) and `modbus_cache_uplink_block_fails_total` (see
 `--metrics-token` / `--metrics-token-file` set, requests need
 `Authorization: Bearer <token>` — the same scheme the scraper's exporter
 speaks; anything but `/metrics` answers 404, an unauthenticated read 401.
+The endpoint is **loopback-only** and capped: `--metrics-max-clients`
+(default 64; extras get an immediate `503 # rate limited`),
+`--metrics-client-timeout` (default 5 s; 0 = the same built-in cap) and
+`--metrics-max-conn-per-ip` (default 0 = no per-IP limit). A scrape job
+reads it like any bearer endpoint — `authorization: {type: Bearer,
+credentials_file: /etc/prometheus/metrics.token}` in the job config (the
+docker demo's `prometheus.yml` ships this wired).
 
 ## Audit logging
 

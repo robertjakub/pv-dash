@@ -3,8 +3,9 @@
 import hmac
 import logging
 import sys
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
+
+from common.connlimit import GatedHTTPServer
 
 logger = logging.getLogger('scraper')
 
@@ -98,35 +99,19 @@ class Handler(BaseHTTPRequestHandler):
         logger.debug('%s - %s', self.address_string(), fmt % args)
 
 
-class Server(ThreadingHTTPServer):
-    daemon_threads = True
-    allow_reuse_address = True
-    max_clients = 0  # 0 = unlimited
-    _active = 0
-    _lock = threading.Lock()
+class Server(GatedHTTPServer):
+    """The exposition server behind the connection caps (F13 round):
+    --max-clients (total) and --max-conn-per-ip — past either, an immediate
+    503; 0 = unlimited. setup_gate() runs before bind."""
 
-    def process_request(self, request, client_address):
-        with self._lock:
-            if self.max_clients and self._active >= self.max_clients:
-                over_limit = True
-            else:
-                over_limit = False
-                self._active += 1
-        if over_limit:
-            logger.info('rejected %s: too many concurrent clients (max %d)',
-                        client_address, self.max_clients)
-            try:
-                request.sendall(RATE_LIMIT_503)
-            except OSError:
-                pass
-            self.shutdown_request(request)
-            return
+    def gate_refused(self, request, client_address, why):
+        logger.info('rejected %s: too many concurrent clients (%s, max %d/%d)',
+                    client_address, why, self.gate.max_total, self.gate.max_per_ip)
         try:
-            super().process_request(request, client_address)
-        except Exception:
-            with self._lock:
-                self._active -= 1
-            raise
+            request.sendall(RATE_LIMIT_503)
+        except OSError:
+            pass
+        self.shutdown_request(request)
 
     def handle_error(self, request, client_address):
         """ThreadingMixIn's default prints a full traceback per reset client — one line instead."""
@@ -136,12 +121,3 @@ class Server(ThreadingHTTPServer):
         else:
             logger.error('unhandled error serving %s: %s: %s', client_address,
                          type(exc).__name__, exc)
-
-    def process_request_thread(self, request, client_address):
-        try:
-            super().process_request_thread(request, client_address)
-        except OSError as e:
-            logger.debug('client %s connection error: %s', client_address, e)
-        finally:
-            with self._lock:
-                self._active -= 1

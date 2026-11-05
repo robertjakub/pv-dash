@@ -1241,7 +1241,7 @@ try:
           repr(r.stderr[-140:]))
 
     # 3e. resource limits: --max-clients 503s the overflow, --client-timeout kicks idle keep-alives
-    write_ini('/tmp/scr_lim.ini', 'max_clients = 1\nclient_timeout = 1')
+    write_ini('/tmp/scr_lim.ini', 'max_clients = 1\nclient_timeout = 1\nmax_conn_per_ip = 1')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_lim.ini',
                                    '--host', '127.0.0.1', '--modbus-port', str(FAKE_PORT),
                                    '--listen', '127.0.0.1:19448'],
@@ -1271,6 +1271,37 @@ try:
     idle.settimeout(6)
     eof = idle.recv(64)  # blocks until the server closes the idle keep-alive socket (~1 s)
     check('client-timeout: idle keep-alive closed', eof == b'', repr(eof[:40]))
+
+    # 3e2. the per-IP cap: two simultaneous connections from 127.0.0.1, the second 503s
+    write_ini('/tmp/scr_pip.ini', 'max_conn_per_ip = 1\nmax_clients = 0')
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_pip.ini',
+                                   '--host', '127.0.0.1', '--modbus-port', str(FAKE_PORT),
+                                   '--listen', '127.0.0.1:19449'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(2)
+    parked = socket.create_connection(('127.0.0.1', 19449), timeout=5)
+    parked.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\n')  # incomplete: parks the peer's only slot
+    time.sleep(0.5)
+    s2 = socket.create_connection(('127.0.0.1', 19449), timeout=5)
+    s2.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\n\r\n')
+    reply = s2.recv(64)
+    check('max-conn-per-ip: the second connection from one IP -> 503', reply.startswith(b'HTTP/1.1 503'),
+          reply.split(b'\r\n')[0].decode())
+    s2.close()
+    parked.close()
+
+    # 3e3. the F13 refusal: /metrics beyond loopback refuses to start without a token
+    r = subprocess.run([sys.executable, P, '--dry-run', '--listen', '0.0.0.0:19450'],
+                       capture_output=True)
+    check('F13: non-loopback listen without a token refused', r.returncode == 1
+          and b'refusing to expose /metrics beyond loopback' in r.stderr and b'Traceback' not in r.stderr,
+          repr(r.stderr[-140:]))
+    r = subprocess.run([sys.executable, P, '--dry-run', '--listen', '0.0.0.0:19450', '--auth-token', 't'],
+                       capture_output=True)
+    check('F13: non-loopback listen with a token accepted', r.returncode == 0, repr(r.stderr[-140:]))
+    r = subprocess.run([sys.executable, P, '--dry-run', '--listen', '127.0.0.1:19450'],
+                       capture_output=True)
+    check('F13: the loopback default needs no token', r.returncode == 0, repr(r.stderr[-140:]))
 
     # 3f. arg/config sanitization: non-finite floats, host charset, malformed ini, token rules
     def dry(*flags):

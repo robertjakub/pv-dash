@@ -81,6 +81,8 @@ SETTINGS = (
             {'default': 'the shipped sun2000 profile'}),
     Setting('max-clients', 'simultaneous Modbus client limit', (), 'N',
             {'0': 'no limit'}),
+    Setting('max-conn-per-ip', 'simultaneous Modbus connections from one peer IP', (), 'N',
+            {'0': 'no per-IP limit (the default)'}),
     Setting('client-timeout', 'disconnect Modbus clients silent for this long', (), 's',
             {'0': 'never'}),
     Setting('log-level', 'log verbosity', ('DEBUG', 'INFO', 'WARNING', 'ERROR'), None,

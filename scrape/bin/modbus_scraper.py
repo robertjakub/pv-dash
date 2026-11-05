@@ -81,6 +81,9 @@ def parse_args():
                     '(default: config, $SCRAPER_MAX_CLIENTS or 64; 0 = unlimited)')
     ap.add_argument('--client-timeout', type=float, help='seconds an idle keep-alive HTTP client is kept before '
                     'being kicked (default: config, $SCRAPER_CLIENT_TIMEOUT or 300; 0 = off)')
+    ap.add_argument('--max-conn-per-ip', dest='max_conn_per_ip', type=int, help='maximum concurrent HTTP connections '
+                    'from one peer IP; extras get an immediate 503 '
+                    '(default: config, $SCRAPER_MAX_CONN_PER_IP or 0 = no per-IP limit)')
     ap.add_argument('--local-time', action='store_true', help='log timestamps in the system time zone instead of UTC')
     ap.add_argument('--log-access', action='store_true', default=None,
                     help='log every HTTP request at INFO (default: config, $SCRAPER_LOG_ACCESS or quiet)')
@@ -110,7 +113,8 @@ def describe(cfg, args):
     caps = (['pv cap %gW' % (cfg['max_kwp'] * 1000.0)] if cfg['max_kwp'] > 0 else []) + \
            (['grid cap %gW' % (cfg['max_grid_kw'] * 1000.0)] if cfg['max_grid_kw'] > 0 else [])
     limits = (['max-clients %d' % cfg['max_clients']] if cfg['max_clients'] else []) + \
-             (['client-timeout %gs' % cfg['client_timeout']] if cfg['client_timeout'] else [])
+             (['client-timeout %gs' % cfg['client_timeout']] if cfg['client_timeout'] else []) + \
+             (['max-conn-per-ip %d' % cfg['max_conn_per_ip']] if cfg['max_conn_per_ip'] else [])
     listen_host, listen_port = parse_listen(cfg['listen'])
     return ('polling %s:%d unit %d (registers pv=%d grid=%d, scale pv=%g grid=%g, positive=%s%s) every %gs; '
             '%s /metrics on %s:%d (config: %s, log level: %s, log time: %s, log access: %s, auth: %s, '
@@ -149,12 +153,13 @@ def install_signal_handlers(scraper, httpd, args, started):
                     Handler.log_access = cfg['log_access']
                     Handler.auth_token = cfg['auth_token']
                     Handler.timeout = cfg['client_timeout'] or None
-                    Server.max_clients = cfg['max_clients']
+                    httpd.gate.max_total = cfg['max_clients']
+                    httpd.gate.max_per_ip = cfg['max_conn_per_ip']
                     logger.info('SIGHUP: applied (upstream %s:%d unit %d, interval %gs, battery %s, '
-                                'caps pv=%g grid=%g, limits clients=%d idle=%gs, auth %s, log access %s)',
+                                'caps pv=%g grid=%g, limits clients=%d idle=%gs per-ip=%d, auth %s, log access %s)',
                                 cfg['host'], cfg['modbus_port'], cfg['unit'], cfg['interval'],
                                 'on' if cfg['battery'] else 'off', cfg['max_kwp'], cfg['max_grid_kw'],
-                                cfg['max_clients'], cfg['client_timeout'],
+                                cfg['max_clients'], cfg['client_timeout'], cfg['max_conn_per_ip'],
                                 'bearer' if cfg['auth_token'] else 'none',
                                 'on' if cfg['log_access'] else 'off')
                 except (Exception, SystemExit) as e:
@@ -201,13 +206,13 @@ def main():
     Handler.log_access = cfg['log_access']
     Handler.auth_token = cfg['auth_token']
     Handler.timeout = cfg['client_timeout'] or None
-    Server.max_clients = cfg['max_clients']
     logger.info('%s', describe(cfg, args))
     if args.dry_run:
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
     try:
         httpd = Server((listen_host, listen_port), Handler)
+        httpd.setup_gate(cfg['max_clients'], cfg['max_conn_per_ip'])
         install_signal_handlers(scraper, httpd, args, time.monotonic())
         threading.Thread(target=scraper.poll_loop, daemon=True).start()
         httpd.serve_forever()

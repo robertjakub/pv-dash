@@ -9,6 +9,7 @@ import time
 from collections import deque
 
 from common.protocol import ModbusError, exception_frame, recv_exact
+from common.connlimit import ConnGate
 from .protocol import DeviceError, describe_write
 from .config import load_registers_file, load_selection
 from .cache import build_blocks, span
@@ -55,6 +56,7 @@ class Proxy:
         self.log_access = bool(self.config.get('log_access', False))
         self.max_clients = max(0, int(self.config.get('max_clients') or 0))
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
+        self.conn_gate = ConnGate(0, max(0, int(self.config.get('max_conn_per_ip') or 0)))
         self.requests_audit_s = max(0.0, float(self.config.get('requests_audit_s', REQUESTS_AUDIT_S)))
         self.connect_acl = self.config.get('connect_acl')
         self.write_acl = self.config.get('write_acl')
@@ -160,6 +162,7 @@ class Proxy:
         self.log_access = bool(self.config.get('log_access', False))
         self.max_clients = max(0, int(self.config.get('max_clients') or 0))
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
+        self.conn_gate = ConnGate(0, max(0, int(self.config.get('max_conn_per_ip') or 0)))
         self.requests_audit_s = max(0.0, float(self.config.get('requests_audit_s', REQUESTS_AUDIT_S)))
         self.connect_acl = self.config.get('connect_acl')
         self.write_acl = self.config.get('write_acl')
@@ -311,9 +314,15 @@ class Proxy:
             try:
                 if self.client_timeout:
                     client.settimeout(self.client_timeout)
-                if not self._allowed(self.connect_acl, addr[0]):
+                ok, _why = self.conn_gate.admit(addr[0])   # counts always; enforces only when capped
+                if not ok:
+                    logger.info('connection refused: per-IP limit of %d reached (%s:%d)',
+                                self.conn_gate.max_per_ip, *addr[:2])
+                elif not self._allowed(self.connect_acl, addr[0]):
+                    self.conn_gate.release(addr[0])
                     logger.info('connection rejected: %s:%d not on the connect ACL', *addr[:2])
                 elif self.max_clients and self.client_count >= self.max_clients:
+                    self.conn_gate.release(addr[0])
                     logger.info('connection refused: client limit of %d reached (%s:%d)',
                                 self.max_clients, *addr[:2])
                 else:
@@ -326,6 +335,7 @@ class Proxy:
                 if admitted:
                     with self.client_lock:
                         self.client_count -= 1
+                    self.conn_gate.release(addr[0])
                     admitted = False
             finally:
                 if not admitted:
@@ -357,6 +367,7 @@ class Proxy:
             with self.client_lock:
                 self.client_count -= 1
                 entry = self.clients.pop(key, None)
+            self.conn_gate.release(addr[0])
             client.close()
             if self.audit and entry:
                 self.audit.event('REQUESTS', 'peer=%s requests=%d connected=%ds'

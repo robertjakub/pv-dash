@@ -25,6 +25,8 @@ FAILURES = []
 
 A_MODBUS, A_CTL = 15970, 15971        # --max-clients 1
 B_MODBUS, B_CTL = 15972, 15973        # --client-timeout 1
+C_MODBUS, C_CTL = 15974, 15975        # --max-conn-per-ip 1 --max-clients 0
+B_METRICS = 15979                     # instance B's /metrics (max-clients 1)
 UNIT = 1
 
 
@@ -88,8 +90,14 @@ def main():
                                        '--control-port', str(A_CTL), '--max-clients', '1'],
                                       stdout=open(LOG, 'w'), stderr=subprocess.STDOUT))
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(B_MODBUS),
-                                       '--control-port', str(B_CTL), '--client-timeout', '1'],
+                                       '--control-port', str(B_CTL), '--client-timeout', '1',
+                                       '--metrics-port', str(B_METRICS), '--metrics-token', 'tok',
+                                       '--metrics-max-clients', '1'],
                                       stdout=open(LOG + '.b', 'w'), stderr=subprocess.STDOUT))
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(C_MODBUS),
+                                       '--control-port', str(C_CTL), '--max-clients', '0',
+                                       '--max-conn-per-ip', '1'],
+                                      stdout=open(LOG + '.c', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.1)
 
         # ---- instance A: the read-count cap (F11) + the client limit
@@ -120,7 +128,7 @@ def main():
         st = dict(line.split('=', 1) for line in ctl(A_CTL, 'show status').splitlines()[1:])
         check('show status carries clients=', st.get('clients') == '1', str(st.get('clients')))
         ins = ctl(A_CTL, 'inspect')
-        check('inspect carries the modbus row', 'modbus    127.0.0.1:%d, clients 1 (limit 1, timeout 5.00m)' % A_MODBUS in ins,
+        check('inspect carries the modbus row', 'modbus    127.0.0.1:%d, clients 1 (limit 1, timeout 5.00m, per-ip none)' % A_MODBUS in ins,
               [l for l in ins.splitlines() if l.startswith('modbus')])
 
         # the second client is refused at accept (max-clients 1), the first keeps serving
@@ -170,12 +178,63 @@ def main():
         check('reads work under the timeout policy', txn == 2 and body[0] == 3, body.hex())
         s2.close()
 
+        # ---- instance C: the per-IP connection cap (F13 round)
+        p1 = connect(C_MODBUS)
+        exchange(p1, read_req(1, 3, 32064, 2), 1)
+        p2 = connect(C_MODBUS)
+        check('per-IP cap: the second connection from the same IP refused', eof_soon(p2))
+        txn, unit, body = exchange(p1, read_req(2, 3, 32064, 2), 2)
+        check('per-IP cap: the first connection keeps serving', txn == 2 and body[0] == 3, body.hex())
+        tx = ctl(C_CTL, 'set max-conn-per-ip 2')
+        check('per-IP cap raised live', tx.startswith('ok max-conn-per-ip=2'), tx)
+        p2 = connect(C_MODBUS)
+        exchange(p2, read_req(3, 3, 32064, 2), 3)
+        tx = ctl(C_CTL, 'show connections')
+        check('per-IP cap: both peers tracked after the raise', tx.count('127.0.0.1:') == 2, tx)
+        p1.close(); p2.close()
+        time.sleep(0.4)
+        logc = open(LOG + '.c').read()
+        check('per-IP refusal logged', 'connection refused: per-IP limit of 1 reached' in logc)
+
+        # ---- instance B's /metrics: the 503 cap, the token, the recovery
+        def http_get(port, token=None, timeout=5):
+            """Raw HTTP GET: (status-line, full reply bytes)."""
+            s = connect(port, timeout)
+            req = 'GET /metrics HTTP/1.1\r\nHost: t\r\n%s\r\n' % (
+                ('Authorization: Bearer %s\r\n' % token) if token else '')
+            s.sendall(req.encode())
+            buf = b''
+            try:
+                while True:
+                    chunk = s.recv(65536)
+                    if not chunk:
+                        break
+                    buf += chunk
+            except OSError:
+                pass
+            s.close()
+            return buf.split(b'\r\n', 1)[0].decode('utf-8', 'replace'), buf
+
+        st, _ = http_get(B_METRICS, token='tok')
+        check('metrics answers with the token', st.split()[1] == '200', st)
+        st, _ = http_get(B_METRICS)
+        check('metrics refuses the token-less (bearer gate)', st.split()[1] == '401', st)
+        # hold the single slot with a silent connection; the next request gets 503
+        s_hold = connect(B_METRICS)
+        st, _ = http_get(B_METRICS, token='tok')
+        check('metrics 503 past --metrics-max-clients 1', st.split()[1] == '503', st)
+        s_hold.close()
+        time.sleep(0.3)
+        st, _ = http_get(B_METRICS, token='tok')
+        check('metrics recovers after the slot frees', st.split()[1] == '200', st)
+
         # ---- the listening line documents the policy
         log = open(LOG).read()
         check('listening line names limit + timeout', 'client limit 1, client timeout 300s' in log)
         check('refusal logged', 'connection refused: client limit of 1 reached' in log)
         logb = open(LOG + '.b').read()
         check('listening line names timeout 1s', 'client limit 64, client timeout 1s' in logb)
+        check('metrics 503 logged', 'metrics: rejected' in logb and 'too many concurrent clients' in logb)
     finally:
         for p in procs:
             p.terminate()

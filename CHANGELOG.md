@@ -45,6 +45,34 @@ before the repo restructured into one suite.
   count and last error. The metrics endpoint exports the same state as
   `modbus_cache_uplink_*` gauges (session counters + per-block
   up/latency/fails with `fc`/`start`/`count` labels).
+- **common, scripts** — the audit trails are **tamper-evident** now (the
+  audit finding F10, docs/AUDIT.md): every entry ends with a short chained
+  hash — `h=<12 hex>`, `sha256(prev | stamp | prefix | text)`, chained **per
+  writer prefix** so the interleaved writers (CACHE/INV/CLI/CTL in one
+  file) verify independently and a restarted writer seeds from its own
+  trail. The new `scripts/audit_verify.py` walks a trail (default: the
+  family's XDG audit logs; `-` reads stdin) and its rotated backups
+  oldest-first, recomputes every chain, reports unsigned (pre-chain) lines
+  and names the line where an edit, a deletion or a reordering broke it
+  (exit 1). The honest boundary is documented with the finding: a
+  determined local admin holding the algorithm can rechain — journald
+  forwarding stays the strong answer where retention is strict.
+- **common** — the shared connection gate (`common/connlimit.py`):
+  `ConnGate` counts concurrent connections in total and per peer IP (both
+  caps 0 = off, refusals never count) and `GatedHTTPServer` is the HTTP
+  shape of it — one implementation behind the family's serving surfaces.
+- **cache, inverter** — the metrics endpoints grew the caps
+  (`--metrics-max-clients`, default 64, an immediate `503 # rate limited`
+  past it; `--metrics-client-timeout`, default 5 s, `0` = the built-in
+  cap; `--metrics-max-conn-per-ip`, default 0 = no per-IP limit) and both
+  Modbus listeners grew **`--max-conn-per-ip`** (default 0 = no per-IP
+  limit; a live setting next to `max-clients`/`client-timeout`).
+- **scrape** — **`--max-conn-per-ip`** (default 0 = no per-IP limit):
+  concurrent connections from one peer IP get the same immediate 503 as
+  the total `--max-clients` cap; applied live on SIGHUP like the rest.
+- **tests** — the new `tests/audit-chain.py` asserts the hash chain and
+  the verifier end-to-end (interleaved prefixes, the tamper matrix, the
+  restart seeding, the rotation span, a live INV trail).
 
 ### Changed
 
@@ -138,6 +166,16 @@ before the repo restructured into one suite.
   predates the F5 startup refusal) and the cache stress proxy opens its
   write path explicitly (`--write-acl any --write-registers any` — the
   write defaults are none).
+- **scrape** — the audit finding F13 (docs/AUDIT.md) closed: a non-loopback
+  `/metrics` listen without `--auth-token`/`--auth-token-file` **refuses to
+  start** with a one-liner (`refusing to expose /metrics beyond loopback
+  without a token`) — the SIGHUP reload runs the same check and keeps the
+  previous settings; the loopback default needs no token (localhost dev
+  stays friction-free) and the docker demo has carried the token since F7.
+  The README documents the refusal and the Prometheus scrape job with
+  `authorization.credentials_file`. (The cache's metrics endpoint already
+  refused to start without a token and binds loopback only — F6; the
+  fake's is loopback-only by construction with the optional token.)
 
 ## 0.3.0 — 2026-11-05
 

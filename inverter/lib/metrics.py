@@ -3,11 +3,23 @@
 gated (off by default). Serves the simulator's state and the server's
 counters in the Prometheus text format. With --metrics-token set, requests
 need `Authorization: Bearer <token>` (the same scheme the scraper speaks
-when it pulls token-protected exporters)."""
+when it pulls token-protected exporters). Caps (F13 round):
+--metrics-max-clients (immediate 503 past it), --metrics-client-timeout
+(0 = the built-in 5 s cap), --metrics-max-conn-per-ip (0 = no limit)."""
 import hmac
 import http.server
-import json
+import logging
 import threading
+
+from common.connlimit import GatedHTTPServer
+
+logger = logging.getLogger('fake-inverter')
+
+METRICS_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
+               b'Content-Type: text/plain; charset=utf-8\r\n'
+               b'Cache-Control: no-store\r\n'
+               b'Connection: close\r\n\r\n'
+               b'# rate limited: too many concurrent clients\n')
 
 
 class MetricsServer:
@@ -15,7 +27,8 @@ class MetricsServer:
     real-device semantics — the self-observability: the pv/load/grid/battery
     watts, the SoC, the machines' readings, the poll/connection counters."""
 
-    def __init__(self, simulator, chaos, fake, control, port, token=None, started=0.0):
+    def __init__(self, simulator, chaos, fake, control, port, token=None, started=0.0,
+                 max_clients=64, client_timeout=5.0, max_per_ip=0):
         self.simulator = simulator
         self.chaos = chaos
         self.fake = fake
@@ -23,6 +36,9 @@ class MetricsServer:
         self.port = port
         self.token = token
         self.started = started
+        self.max_clients = max(0, int(max_clients or 0))
+        self.client_timeout = max(0.0, float(client_timeout or 0.0))
+        self.max_per_ip = max(0, int(max_per_ip or 0))
         self._http = None
 
     def snapshot(self):
@@ -121,7 +137,20 @@ class MetricsServer:
     def serve(self):
         import time
         self.started = self.started or time.monotonic()
-        httpd = http.server.ThreadingHTTPServer(('127.0.0.1', self.port), self._Handler)
+        self._Handler.timeout = self.client_timeout or 5   # 0 = the built-in slowloris cap
+
+        class Server(GatedHTTPServer):
+            def gate_refused(httpd, request, client_address, why):
+                logger.info('metrics: rejected %s: too many concurrent clients (%s, max %d/%d)',
+                            client_address, why, httpd.gate.max_total, httpd.gate.max_per_ip)
+                try:
+                    request.sendall(METRICS_503)
+                except OSError:
+                    pass
+                httpd.shutdown_request(request)
+
+        httpd = Server(('127.0.0.1', self.port), self._Handler)
+        httpd.setup_gate(self.max_clients, self.max_per_ip)
         httpd.metrics_server = self
         self._http = httpd
         httpd.serve_forever()

@@ -29,7 +29,13 @@ three waves on top of that:**
   inverter's Modbus listener got the cache's `--max-clients` /
   `--client-timeout` (both live-tunable, `show connections` to watch
   them), the read-count gate (exception 03 past the 125-register cap) and
-  the trusted-LAN / not-security-first documentation.
+  the trusted-LAN / not-security-first documentation;
+- the **trail integrity and the endpoint caps** (findings F10 and F13,
+  closed as recommended): every audit entry carries a short chained hash
+  (verified by `scripts/audit_verify.py`), the scraper refuses a
+  non-loopback `/metrics` listen without a token, and every serving
+  surface — the Modbus listeners and all three `/metrics` endpoints —
+  grew per-IP and total connection caps.
 
 Method is unchanged: manual code review of every module (wire handling,
 control servers, CLIs, config/token/dump loading, audit trail, metrics
@@ -162,9 +168,9 @@ control-server access only.
 
 ## 3. Findings
 
-### 3.1 Closed (F2–F9, F11, F12; fixes verified, see §4)
+### 3.1 Closed (F2–F9, F11–F13; fixes verified, see §4)
 
-Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12.
+Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12, F13, F10.
 
 | # | Module | Was | Fix (where) |
 |---|---|---|---|
@@ -178,14 +184,14 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12.
 | F9 | cache, inverter, scrape | INFO — tokens passed as `--control-token` / `--metrics-token` / `--auth-token` flags are visible in `ps` / `/proc/*/cmdline` to other local users. The token-file / env-var paths existed; nothing said the flag was the weak way. Closed rev. 3. | Documented in all three READMEs and the token-flag man pages: the flag form is for quick tests, prefer `--control-token-file` / `--metrics-token-file` / `--auth-token-file` (LoadCredential) or the env vars — and every `-file` help says the file must be owner-only 0600. The file path got hard in the same wave (F12). Verified: the README/man wording, `mandoc -Tlint` clean (§4). |
 | F12 | cache, inverter, scrape | INFO — token files were not permission-checked: the shared `load_token_file` (`common/config.py`) accepted a group/world-readable token file silently. Closed rev. 3. (The `/tmp` control-socket half of the original finding stays covered by the Nix module's `PrivateTmp`; use `/run/<tool>/` under systemd.) | Fail closed: `check_token_file_mode` (`common/config.py`) stats the path before the read — any group/world bit (`0600` is the documented form) refuses to start with a one-liner (`chmod 0600`), on the daemons and the ctl/cli clients alike; the scraper's SIGHUP-reread loader runs the same check on every reload. The docker entrypoint seeds generated `*.token` files 0600. Verified: 0644/0640 refused, 0600 accepted, the regtests assert the refusal (§4). |
 | F11 | inverter | INFO — the fake's Modbus surface had no client limit, no client timeout and no ACL — any LAN peer could hold threads or flood requests when bound beyond localhost — and a declared read count far above the payload (e.g. `0xFFFF` with a truncated frame) made the fake assemble an oversized reply / scan the range. Closed rev. 3, as the audit recommended: the mitigations + the honest docs, not a security redesign — a test instrument stays a test instrument (the metrics endpoint still serves without a token by design; no connect ACL — that is the deployment's segmentation job). | The cache's knobs, mirrored: **`--max-clients`** (refuse past the limit at accept, `inverter/lib/inverter.py`) and **`--client-timeout`** (shed silent clients) — both tunable live (`set max-clients` / `set client-timeout`, `unset` restores the configured value), **`show connections`** on the control server (peer, age, requests — plus `clients=` in the status report and the modbus row in `inspect`), and the **read-count gate** (count `0` or past the 125-register cap, or a span past the 16-bit space → exception 03, the cache's shape). Documented: the README's Security section and the man page's SECURITY block say the fake is a development tool, not security-first — run it on a trusted, LAN-isolated network. Verified: the new `tests/inverter-regtest.py` (§4). |
+| F13 | scrape | MEDIUM — `/metrics` was unauthenticated by default (`--auth-token` unset → every request authorized): the loopback bind was the only control, and one flag exposed every register value; the rate limiter counted connections, not peers. Closed rev. 3: the refusal ships and the caps ship. | **Fail closed beyond loopback**: a non-loopback listen without `--auth-token`/`--auth-token-file` refuses to start with a one-liner (`refusing to expose /metrics beyond loopback without a token`, F13 in docs/AUDIT.md) — the SIGHUP reload runs the same check and keeps the previous settings; the loopback default needs no token (localhost dev stays friction-free). The demo stack has carried the token since F7. **Per-peer caps**: `--max-conn-per-ip` (0 = no limit) caps concurrent connections per peer IP with the immediate 503, next to the existing `--max-clients`/`--client-timeout`. Documented in the README (the refusal + the Prometheus `authorization.credentials_file` scrape example) and the man page. Verified: the refusal matrix and the per-IP 503 in `tests/scrape-regtest.py` (§4). |
+| F10 | cache, scrape, inverter | INFO — the audit trail was append-only but not integrity-protected (no hash chain): a local administrator could rewrite it unnoticed. Closed rev. 3 with the honest boundary: the trail is now tamper-EVIDENT (any edited, reordered or deleted middle entry breaks the chain at verification); a determined local admin holding the algorithm can rechain, and trailing deletion leaves nothing to verify — journald forwarding stays the strong answer for the retention/immutability requirement. | **A chained hash per entry**: every line ends with ` h=<12 hex>` — `sha256(prev | stamp | prefix | text)` truncated, chained **per writer prefix** (CACHE / INV / CLI / CTL each chain their own lines, so interleaved writers in one file verify independently and a restarted writer seeds from its own tail, `common/audit.py`). **The verifier**: `scripts/audit_verify.py [FILE|-]...` (default: the family's XDG trails) walks a file and its rotated backups oldest-first, recomputes every chain, anchors at each prefix's first surviving entry, reports unsigned (pre-chain) lines and names the line where a chain breaks; exit 1 on any break. Documented: the trail's README sections + `common/audit.py`'s docstring. Verified: the new `tests/audit-chain.py` (§4). |
 
 ### 3.2 Open findings
 
 | # | Module | Severity | Finding | Recommendation |
 |---|---|---|---|---|
 | F1 | cache, scrape, inverter | HIGH (accepted, protocol-inherent) | Modbus TCP carries no authentication and no encryption — listener and upstream alike. For the scraper this is outbound-only: it cannot be reached through the device, but a compromised inverter LAN segment can feed it bogus register values (sanity-capped by `--max-kwp` / `--max-grid-kw`). | Keep the listener off the WAN (the default binds 127.0.0.1), set the connect ACL on a LAN (`none` if no client should connect at all), keep `--allow-write` off unless needed — the write path now defaults fully closed (`write-acl`/`write-registers` none); the cache owning the device's single client slot is the mitigation. |
-| F10 | cache, scrape, inverter | INFO | The audit trail is append-only but not integrity-protected (no hash chain / signature); a local administrator can rewrite it (applies to all three modules — one shared writer). The F2 fix removed the remote-forgery vector; the local-admin trust assumption remains. | Forward to journald (sealed) or a remote collector for the retention/immutability requirement. |
-| F13 | scrape | MEDIUM | `/metrics` is unauthenticated by default (`--auth-token` unset → every request is authorized). The listener binds 127.0.0.1 by default, but one flag (`0.0.0.0`-style listen or a published port) exposes every register value — production data, not metadata. The demo stack now ships the token (F7), so exposing it unauthenticated is an explicit operator act; the tool default is unchanged. The rate limiter is per-connection, not per-IP. | Always set the token in the deployment (the demo stack does); consider refusing to start when the listen host is not loopback and no token is configured (the cache's F5 pattern). |
 | F14 | scrape | LOW | No TLS on the HTTP endpoint (plain HTTP): the bearer token and the metrics travel in clear text. | Terminate TLS in a reverse proxy when anything beyond localhost needs the endpoint. |
 | F15 | scrape | INFO | The metrics expose production values (generation, consumption, battery SoC) — a home-occupancy privacy consideration. | The bearer token (F13) + the localhost bind are the controls; treat the endpoint as internal. |
 | F16 | scrape | INFO | No automated alerting yet (freshness gap, poll down, exception spikes — the rules pack is pending). | Ship the alert rules file with the NixOS module; NIS2 21.2(d) wants detection wired, not just logged. |
@@ -260,6 +266,23 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12.
   limit 1, client timeout 300s`). The README's Security section and the
   man page's SECURITY block document the trusted-LAN / not-security-first
   posture.
+- **F10 (the trail → tamper-evident)** — `tests/audit-chain.py` verifies
+  the chain and the verifier: two interleaved prefixes verify OK; an
+  edited line, a deleted line and reordered lines are each detected at
+  the right line with the right prefix (exit 1); legacy unsigned lines
+  are reported, not failed; a restarted writer chains seamlessly from its
+  own trail; a chain spanning rotated backups (`.3..1` + live, verified
+  oldest-first) validates end to end; the fake's + ctl's real INV trail
+  verifies after a live control session.
+- **F13 (fail closed beyond loopback + the caps)** — the scraper's
+  refusal matrix: a `--listen 0.0.0.0:PORT` dry-run without a token exits
+  1 with the `refusing to expose /metrics beyond loopback without a
+  token` one-liner, with `--auth-token` it validates, and the loopback
+  default stays token-free; the per-IP cap answers 503 to a second
+  simultaneous connection from one address (`tests/scrape-regtest.py`);
+  the cache and the fake metrics 503 past `--metrics-max-clients`
+  (asserted in both regtests), and the cache's Modbus per-IP gate refuses
+  the second same-peer connection until `set max-conn-per-ip` raises it.
 - **The write-default hardening** (posture, not a finding) — the cache
   regtest's `none`-modes block asserts the new defaults end-to-end: the
   start log reads `connect acl: any, write acl: none, write allow-list:
@@ -279,26 +302,26 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12.
 | Requirement | Status | Where |
 |---|---|---|
 | NIS2 21.2(a) risk-management policies | yes (scoped) | defaults-as-security documented (writes quadruple-gated with the ACL/allow-list defaulting to none, localhost binds, tokens mandatory on the control/metrics surfaces, token files 0600, dry-run); this audit is the written analysis |
-| NIS2 21.2(b) incident handling | partial | audit trail + journald retention; no automated alerting yet (F16) |
+| NIS2 21.2(b) incident handling | yes (scoped) | audit trail + journald retention, the trail tamper-evident (the per-writer hash chain, `scripts/audit_verify.py` — F10 closed); no automated alerting yet (F16) |
 | NIS2 21.2(c) business continuity | yes | reconnect/backoff, per-leaf isolation, restart/reload/reset verbs, the gated write-behind dump for last-known values; daemons restart cleanly (regtests) |
 | NIS2 21.2(d) supply chain | yes | stdlib-only, no third-party code, pinned Nix builds; the demo Prometheus from the pinned alpine package; the shared `common/` core |
 | NIS2 21.2(f) effectiveness | partial | fuzz/stress/regression suites (self-contained); no CI enforcement yet |
 | NIS2 21.2(g) cyber hygiene / crypto | partial | constant-time token compares, LoadCredential, owner-only token files enforced, no secrets in logs; no TLS (F1 — protocol-inherent, F14 — proxy) |
-| NIS2 21.2(h) access control / MFA | yes (scoped) | the four write gates (two defaulting to none), ACLs with a restrict-all mode, token-mandatory control/metrics, peer-cred on the unix sockets; MFA not applicable to a machine protocol |
+| NIS2 21.2(h) access control / MFA | yes (scoped) | the four write gates (two defaulting to none), ACLs with a restrict-all mode, token-mandatory control/metrics, the refusal of a non-loopback metrics listen without a token (F13), per-IP + total connection caps on every serving surface, peer-cred on the unix sockets; MFA not applicable to a machine protocol |
 | DORA art. 8 ICT asset identification | yes | every option logged at start; `inspect` dumps the full state; the demo topology is documented (docker/README.md) |
-| DORA art. 9-10 protection/prevention | yes (cache; scrape: F13 pending) | write gates, ACLs, capped framing, capped buffers, fail-closed writes, token-mandatory surfaces, explicit socket + token-file modes, fail-fast validation |
-| DORA art. 11 detection | yes (integrity restored); wiring pending | the audit trail's integrity is defensible again (F2 closed, fold at the writer); auth-fail/refusal events; the alert rules pack is the remaining gap (F16) |
+| DORA art. 9-10 protection/prevention | yes | write gates, ACLs, capped framing, capped buffers, fail-closed writes, token-mandatory surfaces, the non-loopback refusal (F13), the per-IP + total connection caps, explicit socket + token-file modes, fail-fast validation |
+| DORA art. 11 detection | yes (integrity restored, now evidenced); wiring pending | the audit trail's integrity is defensible again (F2 closed, fold at the writer) and evident per entry (the hash chain, F10 closed); auth-fail/refusal events; the alert rules pack is the remaining gap (F16) |
 | DORA art. 12 BCP | partial | restart/reload/clear verbs, the dump/restore write-behind; no automated failover (single-device by design) |
 
 Scraper deltas against the table above (rows where scrape matches are omitted):
 
 | Requirement | Status | Where |
 |---|---|---|
-| NIS2 21.2(b) incident handling | partial | audit trail + unauthorized-request logging at WARNING; the alert pack is pending (F16) |
+| NIS2 21.2(b) incident handling | yes (scoped) | audit trail + unauthorized-request logging at WARNING; the alert pack is pending (F16) |
 | NIS2 21.2(f) effectiveness | partial | the fuzz suite is the technical check; no CI enforcement yet |
 | NIS2 21.2(g) crypto / hygiene | partial | constant-time bearer compare, owner-only token files, no secrets in logs; no TLS (F14 — terminate at a proxy) |
-| NIS2 21.2(h) access control | yes (scoped) | bearer gate on the only route set; MFA not applicable to a machine protocol |
-| DORA art. 9-10 protection/prevention | yes (F13 pending) | default localhost bind, token gate, two-route whitelist, DoS caps on both the HTTP and the poll side |
+| NIS2 21.2(h) access control | yes (scoped) | bearer gate on the only route set + the non-loopback refusal without one (F13 closed), the per-IP + total connection caps; MFA not applicable to a machine protocol |
+| DORA art. 9-10 protection/prevention | yes | default localhost bind (refusing to leave it without a token, F13), token gate, two-route whitelist, DoS caps on both the HTTP and the poll side |
 | DORA art. 11 detection | partial | audit trail + WARNING-level unauthorized logs + the error-state 503 |
 | DORA art. 12 BCP | yes | read-only, stateless, restart-clean; the data plane (Prometheus) holds the history |
 
@@ -308,11 +331,15 @@ The posture is sound for the deployment class all three tools target (an
 operational/home LAN behind segmentation): refuse-by-default writes — now
 closed by default even beyond `--allow-write`, since `write-acl` and
 `write-registers` default to `none` — localhost binds by default,
-token-mandatory control and metrics surfaces on the cache, constant-time
+token-mandatory control and metrics surfaces on the cache, the scraper
+refusing a non-loopback metrics listen without a token, per-IP and total
+connection caps on every serving surface, constant-time
 token checks, kernel-vouched peer-cred on the unix control sockets,
 length-disciplined wire parsing with capped buffers and fail-closed write
 parsing, a real audit trail whose integrity survives hostile control
-input, explicit socket modes and owner-only token files instead of umask
+input and is now tamper-evident per entry (the chained `h=` hashes and
+`scripts/audit_verify.py`), explicit socket modes and owner-only token
+files instead of umask
 hope, zero dependencies, hardened systemd units and unprivileged
 containers whose entrypoints drop root before exec, and a compose demo
 stack that publishes nothing on the host (one `internal: true` network;
@@ -325,20 +352,25 @@ fixed and re-verified all five, together with F6. Rev. 3 closed F7 (the
 compose stack publishes nothing — one internal network, plus the demo
 Prometheus service with the scrape/token story), F9 (the token-flag
 exposure documented everywhere), F12 (token files fail closed unless
-owner-only 0600) and F11 (the fake's Modbus surface got the cache's
+owner-only 0600), F11 (the fake's Modbus surface got the cache's
 client cap/timeout, the `show connections` view and the read-count gate —
 with the trusted-LAN posture documented instead of a security redesign),
-and hardened the write defaults on the way. The
-trust-boundary picture is otherwise stable — the state-dump surface stays
-the one newish weak spot (F18, small: an explicit `0600` on the dump closes
-it) beside one documented trust decision (a restored dump may re-apply
-setting overrides; the dump file deserves the ini's care). The inverter
-fake remains a test instrument with deliberately soft edges — now capped
-and documented as such (F11 closed); the
-scraper's material exposures stay operational, not architectural — set the
-token (F13), terminate TLS at a proxy when exposed (F14) and ship the
-alert rules (F16). The accepted exposure remains F1 (Modbus TCP itself) —
-mitigate with segmentation and the write gates.
+F13 (the scraper refuses a non-loopback metrics listen without a token;
+per-peer caps everywhere) and F10 (the audit trail is tamper-evident:
+a chained hash per entry, per writer prefix, with `scripts/audit_verify.py`
+— the honest boundary: a determined local admin holding the algorithm can
+rechain, so journald forwarding stays the strong answer where the
+retention requirement is strict), and hardened the write defaults on the
+way. The trust-boundary picture is otherwise stable — the state-dump
+surface stays the one newish weak spot (F18, small: an explicit `0600` on
+the dump closes it) beside one documented trust decision (a restored dump
+may re-apply setting overrides; the dump file deserves the ini's care).
+The inverter fake remains a test instrument with deliberately soft edges —
+now capped and documented as such (F11 closed); the scraper's remaining
+exposures stay operational, not architectural — terminate TLS at a proxy
+when exposed (F14) and ship the alert rules (F16). The accepted exposure
+remains F1 (Modbus TCP itself) — mitigate with segmentation and the write
+gates.
 
 Re-run this audit after the scrape control surface / multi-target
 evolutions, the TLS story, the dashboard service, or any new listener or

@@ -234,6 +234,14 @@ def validate_config(cfg):
         fail('max_clients', 'must be >= 0')
     if cfg['client_timeout'] < 0:
         fail('client_timeout', 'must be >= 0')
+    if cfg['max_conn_per_ip'] < 0:
+        fail('max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
+    if cfg['metrics_max_clients'] < 0:
+        fail('metrics_max_clients', 'must be >= 0 (0 = unlimited)')
+    if cfg['metrics_client_timeout'] < 0:
+        fail('metrics_client_timeout', 'must be >= 0 (0 = the built-in 5 s cap)')
+    if cfg['metrics_max_conn_per_ip'] < 0:
+        fail('metrics_max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
     if cfg['level'] not in ('DEBUG', 'INFO', 'WARNING', 'ERROR'):
         fail('log-level', 'must be DEBUG, INFO, WARNING or ERROR')
     if cfg['audit_max_mb'] < 0:
@@ -318,6 +326,16 @@ def resolve_config(args, script_dir=None):
         'max_clients': resolve(args.max_clients, 'MODBUS_CACHE_MAX_CLIENTS', 'max_clients', DEFAULTS['max_clients'], int),
         'client_timeout': resolve(args.client_timeout, 'MODBUS_CACHE_CLIENT_TIMEOUT', 'client_timeout',
                                   DEFAULTS['client_timeout_s'], float),
+        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MODBUS_CACHE_MAX_CONN_PER_IP',
+                                   'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
+        'metrics_max_clients': resolve(getattr(args, 'metrics_max_clients', None), 'MODBUS_CACHE_METRICS_MAX_CLIENTS',
+                                       'metrics_max_clients', DEFAULTS['metrics_max_clients'], int),
+        'metrics_client_timeout': resolve(getattr(args, 'metrics_client_timeout', None),
+                                          'MODBUS_CACHE_METRICS_CLIENT_TIMEOUT', 'metrics_client_timeout',
+                                          DEFAULTS['metrics_client_timeout_s'], float),
+        'metrics_max_conn_per_ip': resolve(getattr(args, 'metrics_max_conn_per_ip', None),
+                                           'MODBUS_CACHE_METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
+                                           DEFAULTS['metrics_max_conn_per_ip'], int),
         'connect_acl': parse_acl(resolve(args.connect_acl, 'MODBUS_CACHE_CONNECT_ACL', 'connect_acl', 'any', str),
                                  'connect-acl'),
         'write_acl': parse_acl(resolve(args.write_acl, 'MODBUS_CACHE_WRITE_ACL', 'write_acl', 'none', str),

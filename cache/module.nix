@@ -38,6 +38,14 @@ let
       max_clients = toString cfg.maxClients;
     } // lib.optionalAttrs (cfg.clientTimeout != null) {
       client_timeout = toString cfg.clientTimeout;
+    } // lib.optionalAttrs (cfg.maxConnPerIp != null) {
+      max_conn_per_ip = toString cfg.maxConnPerIp;
+    } // lib.optionalAttrs (cfg.metricsMaxClients != null) {
+      metrics_max_clients = toString cfg.metricsMaxClients;
+    } // lib.optionalAttrs (cfg.metricsClientTimeout != null) {
+      metrics_client_timeout = toString cfg.metricsClientTimeout;
+    } // lib.optionalAttrs (cfg.metricsMaxConnPerIp != null) {
+      metrics_max_conn_per_ip = toString cfg.metricsMaxConnPerIp;
     } // lib.optionalAttrs (cfg.connectAcl != null) {
       connect_acl = cfg.connectAcl;
     } // lib.optionalAttrs (cfg.writeAcl != null) {
@@ -231,6 +239,44 @@ in
         Disconnect clients silent for this many seconds (proxy default:
         300; 0 = never). Set it to shed connections from clients that
         died without closing (power cut, NAT drop).
+      '';
+    };
+
+    maxConnPerIp = lib.mkOption {
+      type = lib.types.nullOr lib.types.int;
+      default = null;
+      description = ''
+        Refuse further connections from one peer IP past this many
+        simultaneous connections (proxy default: 0 = no per-IP limit).
+        The NAT'd-household shape: one gateway IP, many clients — set it
+        above the client count you expect from a single site.
+      '';
+    };
+
+    metricsMaxClients = lib.mkOption {
+      type = lib.types.nullOr lib.types.int;
+      default = null;
+      description = ''
+        Maximum concurrent HTTP clients on the /metrics endpoint; extras
+        get an immediate 503 (default: 64; 0 = unlimited).
+      '';
+    };
+
+    metricsClientTimeout = lib.mkOption {
+      type = lib.types.nullOr lib.types.float;
+      default = null;
+      description = ''
+        Seconds an idle /metrics client is kept before the socket times
+        out (default: 5; 0 = the same built-in 5 s cap).
+      '';
+    };
+
+    metricsMaxConnPerIp = lib.mkOption {
+      type = lib.types.nullOr lib.types.int;
+      default = null;
+      description = ''
+        Maximum concurrent /metrics connections from one peer IP
+        (default: 0 = no per-IP limit).
       '';
     };
 

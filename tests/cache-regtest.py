@@ -835,7 +835,8 @@ try:
     p_metrics = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
                                   '--listen', '127.0.0.1:15528', '--interval', '1', '--profile', R,
                                   '--control-port', '15530',
-                                  '--metrics-port', '15529', '--metrics-token', 'sekrit'],
+                                  '--metrics-port', '15529', '--metrics-token', 'sekrit',
+                                  '--metrics-max-clients', '1'],
                                  stdout=open('/tmp/reg_cache_metrics.log', 'w'), stderr=subprocess.STDOUT,
                                  env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     procs.append(p_metrics)
@@ -871,9 +872,52 @@ try:
                                   'modbus_cache_uplink_block_up{fc="3"', 'modbus_cache_uplink_block_latency_seconds',
                                   'modbus_cache_uplink_block_fails_total')), repr(body[:200]))
     r = ctl_cmd('show status', 15530)
-    check('metrics: show status carries the endpoint', 'metrics=127.0.0.1:15529 (bearer token)' in r, r[:160])
+    check('metrics: show status carries the endpoint', 'metrics=127.0.0.1:15529 (bearer token), clients 1, per-ip none' in r, r[:400])
+    # the metrics caps: a parked (silent) connection holds the one slot, the next request gets 503
+    parked = socket.create_connection(('127.0.0.1', 15529), timeout=5)
+    time.sleep(0.3)
+    over = socket.create_connection(('127.0.0.1', 15529), timeout=5)
+    over.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\nAuthorization: Bearer sekrit\r\n\r\n')
+    reply = over.recv(64)
+    check('metrics: 503 past --metrics-max-clients 1', reply.startswith(b'HTTP/1.1 503'),
+          reply.split(b'\r\n')[0].decode() if reply else 'empty reply')
+    over.close()
+    parked.close()
     p_metrics.send_signal(signal.SIGTERM)
     p_metrics.wait(timeout=10)
+
+    # the Modbus per-IP gate: --max-conn-per-ip 1 refuses the second connection from one peer
+    p_pip = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+                              '--listen', '127.0.0.1:15533', '--interval', '1', '--profile', R,
+                              '--max-clients', '0', '--max-conn-per-ip', '1', '--control-port', '15534',
+                              '--control-token', 'sekrit'],
+                             stdout=open('/tmp/reg_cache_pip.log', 'w'), stderr=subprocess.STDOUT)
+    procs.append(p_pip)
+    time.sleep(1.5)
+    g1 = socket.create_connection(('127.0.0.1', 15533), timeout=5)
+    g1.sendall(struct.pack('>HHHB', 1, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 1))
+    g1r = g1.recv(512)
+    check('per-IP: the first connection serves', len(g1r) >= 10, g1r.hex() if g1r else 'empty')
+    g2 = socket.create_connection(('127.0.0.1', 15533), timeout=5)
+    g2.settimeout(2)
+    refused = False
+    try:
+        refused = g2.recv(64) == b''
+    except OSError:
+        refused = False
+    check('per-IP: the second connection from the same IP is refused (EOF)', refused)
+    check('per-IP: the first connection keeps serving', g1r[7:8] == b'\x03', g1r.hex())
+    r = ctl_cmd('set max-conn-per-ip 2', 15534)
+    check('per-IP: raised live', r.startswith('ok max-conn-per-ip=2'), r[:80])
+    g2 = socket.create_connection(('127.0.0.1', 15533), timeout=5)
+    g2.sendall(struct.pack('>HHHB', 2, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 1))
+    g2r = g2.recv(512)
+    check('per-IP: the second connection admitted after the raise', len(g2r) >= 10, g2r.hex() if g2r else 'empty')
+    r = ctl_cmd('show status', 15534)
+    check('per-IP: show status carries the cap', 'max_conn_per_ip=2' in r, r[:160])
+    g1.close(); g2.close()
+    p_pip.send_signal(signal.SIGTERM)
+    p_pip.wait(timeout=10)
 
     r_before = ctl_cmd('inspect', 15514)
     ctl_cmd('set merge-gap 0', 15514)

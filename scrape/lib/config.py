@@ -7,7 +7,7 @@ import math
 import os
 import re
 
-from common.config import check_token_file_mode, default_profile_path, parse_listen, resolve_profile_file
+from common.config import check_token_file_mode, default_profile_path, is_loopback_host, parse_listen, resolve_profile_file
 from .metrics import Metrics
 from .statics import DEFAULTS, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
@@ -86,6 +86,8 @@ def validate_config(cfg):
         fail('max_clients', 'must be >= 0 (0 = unlimited)')
     if cfg['client_timeout'] < 0:
         fail('client_timeout', 'must be >= 0 (0 = off)')
+    if cfg['max_conn_per_ip'] < 0:
+        fail('max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
     for key in ('timeout', 'interval', 'scale', 'grid_scale', 'max_kwp', 'max_grid_kw', 'client_timeout'):
         if not math.isfinite(cfg[key]):
             fail(key, 'must be a finite number (nan/inf are nonsense here)')
@@ -95,8 +97,11 @@ def validate_config(cfg):
     check_hostname(cfg['host'], 'host')
     if not cfg['host']:
         fail('host', 'must not be empty')
-    parse_listen(cfg['listen'])
-    check_hostname(parse_listen(cfg['listen'])[0], 'listen')
+    listen_host, _listen_port = parse_listen(cfg['listen'])
+    check_hostname(listen_host, 'listen')
+    if not is_loopback_host(listen_host) and not cfg['auth_token']:
+        raise SystemExit('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
+                         'listen = %r — set --auth-token/--auth-token-file or bind 127.0.0.1:PORT' % cfg['listen'])
 
 
 def load_device_profile(path):
@@ -231,6 +236,8 @@ def resolve_config(args, script_dir=None):
                                DEFAULTS['max_clients'], int),
         'client_timeout': resolve(args.client_timeout, 'SCRAPER_CLIENT_TIMEOUT', 'client_timeout',
                                   DEFAULTS['client_timeout_s'], float),
+        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'SCRAPER_MAX_CONN_PER_IP',
+                                   'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
         'local_time': resolve(args.local_time, 'SCRAPER_LOCAL_TIME', 'local_time', False, str_to_bool),
         'log_access': resolve(args.log_access, 'SCRAPER_LOG_ACCESS', 'log_access', False, str_to_bool),
         'auth_token': (resolve(args.auth_token, 'SCRAPER_AUTH_TOKEN', 'auth_token', None, str) or '').strip() or None,

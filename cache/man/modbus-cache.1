@@ -150,8 +150,13 @@ require \fBAuthorization: Bearer\fR on the metrics endpoint.
 .TP
 .BI \-\-metrics-token-file " FILE"
 the metrics bearer token from a file (the first line; owner-only \fB0600\fR,
-like the control token file); mutually exclusive
-with \fB--metrics-token\fR.
+like the control token file); mutually exclusive with \fB--metrics-token\fR.
+.TP
+.BI \-\-metrics-max-clients " N" ", " \-\-metrics-client-timeout " S" ", " \-\-metrics-max-conn-per-ip " N"
+cap concurrent HTTP clients on the metrics endpoint (default \fB64\fR;
+overflow answers 503), time out idle ones (default \fB5\fR s; \fB0\fR = the
+same built-in cap) and cap concurrent connections from one peer IP
+(default \fB0\fR = no per-IP limit).
 .TP
 .BI \-\-audit-log " FILE|\-"
 the append-only audit trail. Default the XDG state home
@@ -179,6 +184,10 @@ refuse further connections past this many simultaneous clients (default
 .BI \-\-client-timeout " S"
 disconnect clients silent for this many seconds (default \fB300\fR;
 \fB0\fR = never).
+.TP
+.BI \-\-max-conn-per-ip " N"
+refuse further connections from one peer IP past this many simultaneous
+connections (default \fB0\fR = no per-IP limit).
 .TP
 .BI \-\-log-level " LEVEL"
 \fBDEBUG\fR adds per-client traffic and per-poll detail. Default

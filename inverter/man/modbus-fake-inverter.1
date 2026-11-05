@@ -80,6 +80,11 @@ disconnect Modbus clients silent for this many seconds (\fB0\fR = never)
 \(em sheds connections from clients that died without closing. Default
 \fB300\fR. Tunable live (\fBset client-timeout\fR).
 .TP
+.BI \-\-max-conn-per-ip " N"
+refuse further Modbus connections from one peer IP past this many
+simultaneous connections (default \fB0\fR = no per-IP limit). Tunable live
+(\fBset max-conn-per-ip\fR).
+.TP
 .BI \-\-chaos " P"
 probability 0..1 that a request is answered hostile (garbage, short/lying
 lengths, wrong ids, stalls, dropouts, raw exceptions) and dropped.
@@ -114,6 +119,12 @@ by default.
 .BI \-\-metrics-token " TOKEN" ", " \-\-metrics-token-file " FILE"
 require \fBAuthorization: Bearer\fR on the metrics endpoint (mutually
 exclusive; the file must be owner-only \fB0600\fR).
+.TP
+.BI \-\-metrics-max-clients " N" ", " \-\-metrics-client-timeout " S" ", " \-\-metrics-max-conn-per-ip " N"
+cap concurrent HTTP clients on the metrics endpoint (default \fB64\fR;
+overflow answers 503), time out idle ones (default \fB5\fR s; \fB0\fR = the
+same built-in cap) and cap concurrent connections from one peer IP
+(default \fB0\fR = no per-IP limit).
 .TP
 .BI \-\-audit-log " FILE|\-"
 the audit trail (default

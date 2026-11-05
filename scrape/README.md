@@ -25,6 +25,9 @@ curl http://localhost:9350/metrics
 
 By default the exporter **binds to 127.0.0.1:9350** (loopback only) — pass
 `--listen 0.0.0.0:9350` when Prometheus scrapes from another host.
+**Beyond loopback a token is mandatory**: a non-loopback listen without
+`--auth-token`/`--auth-token-file` **refuses to start** (the audit's F13 —
+one clean line, no traceback); the loopback default needs no token.
 
 Add **`--dry-run`** to validate the configuration and print the effective
 settings without binding the port or contacting the inverter. Exit codes:
@@ -60,12 +63,13 @@ the file is re-read on every SIGHUP, so rotation is `rewrite file` +
 > group/world-accessible token files refuse to start (F12) — or the
 > `SCRAPER_AUTH_TOKEN` env var. The flag form is for quick tests.
 
-Pass the token to Prometheus with:
+Pass the token to Prometheus with — the file form is the shipped way (one
+secret per line, `0600`; `credentials:` with the literal secret works too):
 
 ```yaml
     authorization:
       type: Bearer
-      credentials: <the same secret>
+      credentials_file: /etc/prometheus/metrics.token
 ```
 
 ```bash
@@ -255,6 +259,7 @@ journald adds one.
 | `--auth-token-file` | disabled | read the bearer token from a file instead (single line, trimmed; **re-read on every SIGHUP** — rotate by rewriting the file and reloading; **owner-only `0600`** — a group/world-accessible token file refuses to start, F12); mutually exclusive with `--auth-token` |
 | `--max-clients` | `64` | cap concurrent HTTP clients; overflow gets an immediate `503 # rate limited` (0 = unlimited) |
 | `--client-timeout` | `300` | kick idle keep-alive clients after this many seconds (0 = off) |
+| `--max-conn-per-ip` | `0` | cap concurrent HTTP connections from one peer IP; overflow gets an immediate `503 # rate limited` (0 = no per-IP limit) |
 | `--local-time` | UTC | log timestamps in the system time zone |
 | `--dry-run` | off | validate the config, print the effective settings and exit (`0` = valid, `1` = invalid, `2` = CLI misuse) |
 

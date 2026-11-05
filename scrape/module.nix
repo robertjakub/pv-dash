@@ -34,6 +34,7 @@ let
       auth_token_file = if cfg.authTokenFile == null then "" else cfg.authTokenFile;
       max_clients = toString cfg.maxClients;
       client_timeout = toString cfg.clientTimeout;
+      max_conn_per_ip = toString cfg.maxConnPerIp;
     };
   });
 in
@@ -204,6 +205,12 @@ in
       type = lib.types.float;
       default = 300.0;
       description = "Seconds an idle keep-alive HTTP client is kept before being kicked (0 = off).";
+    };
+
+    maxConnPerIp = lib.mkOption {
+      type = lib.types.int;
+      default = 0;
+      description = "Maximum concurrent HTTP connections from one peer IP; extras get an immediate 503 (0 = no per-IP limit).";
     };
 
     authToken = lib.mkOption {

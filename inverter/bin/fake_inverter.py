@@ -48,9 +48,10 @@ from lib.control import ControlServer
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
 from lib.statics import (AUDIT_FILES, AUDIT_MAX_MB, DEFAULT_BATTERY_KWH, DEFAULT_CHAOS, DEFAULT_CLIENT_TIMEOUT_S,
-                         DEFAULT_HOST, DEFAULT_LOG_LEVEL, DEFAULT_MAX_CLIENTS, DEFAULT_MAX_KWP, DEFAULT_MODBUS_PORT,
-                         DEFAULT_TIME_SCALE, DEFAULT_UNIT, GRID_FREQUENCY_HZ, GRID_VOLTAGE_V, PEAK_RATIO,
-                         TIME_SCALE_MAX)
+                         DEFAULT_HOST, DEFAULT_LOG_LEVEL, DEFAULT_MAX_CLIENTS, DEFAULT_MAX_CONN_PER_IP,
+                         DEFAULT_MAX_KWP, DEFAULT_METRICS_CLIENT_TIMEOUT_S, DEFAULT_METRICS_MAX_CLIENTS,
+                         DEFAULT_METRICS_MAX_CONN_PER_IP, DEFAULT_MODBUS_PORT, DEFAULT_TIME_SCALE, DEFAULT_UNIT,
+                         GRID_FREQUENCY_HZ, GRID_VOLTAGE_V, PEAK_RATIO, TIME_SCALE_MAX)
 from lib.signals import SignalBox, parse_time
 from lib.metrics import MetricsServer
 from lib.simulator import Simulator
@@ -87,6 +88,14 @@ def validate(args):
         problems.append('--max-clients must be >= 0 (0 = no limit), got %d' % args.max_clients)
     if not (math.isfinite(args.client_timeout) and args.client_timeout >= 0):
         problems.append('--client-timeout must be >= 0 seconds (0 = never), got %r' % args.client_timeout)
+    if args.max_conn_per_ip < 0:
+        problems.append('--max-conn-per-ip must be >= 0 (0 = no per-IP limit), got %d' % args.max_conn_per_ip)
+    if args.metrics_max_clients < 0:
+        problems.append('--metrics-max-clients must be >= 0 (0 = unlimited), got %d' % args.metrics_max_clients)
+    if not (math.isfinite(args.metrics_client_timeout) and args.metrics_client_timeout >= 0):
+        problems.append('--metrics-client-timeout must be >= 0 seconds, got %r' % args.metrics_client_timeout)
+    if args.metrics_max_conn_per_ip < 0:
+        problems.append('--metrics-max-conn-per-ip must be >= 0 (0 = no per-IP limit), got %d' % args.metrics_max_conn_per_ip)
     return problems
 
 
@@ -112,6 +121,7 @@ def configured_defaults(args, frozen, profile_text):
         'battery-kwh': '%g' % args.battery_kwh,
         'max-clients': str(args.max_clients),
         'client-timeout': '%g' % args.client_timeout,
+        'max-conn-per-ip': str(args.max_conn_per_ip),
         'profile': profile_text,
         'log-level': args.log_level,
     }
@@ -139,10 +149,14 @@ def main():
     p.add_argument('--battery-kwh', type=float, default=DEFAULT_BATTERY_KWH, help='usable battery capacity in kWh (default %(default)s)')
     p.add_argument('--max-clients', type=int, default=DEFAULT_MAX_CLIENTS, help='refuse further Modbus connections past this many simultaneous clients, 0 = no limit (default %(default)s)')
     p.add_argument('--client-timeout', type=float, default=DEFAULT_CLIENT_TIMEOUT_S, help='disconnect Modbus clients silent for this many seconds, 0 = never (default %(default)s) — sheds connections from clients that died without closing')
+    p.add_argument('--max-conn-per-ip', type=int, default=DEFAULT_MAX_CONN_PER_IP, help='refuse further Modbus connections from one peer IP past this many simultaneous connections, 0 = no per-IP limit (default %(default)s)')
     p.add_argument('--control-log-replies', action='store_true', help='DEBUG-log the full output of every control command (the default logs the command only)')
     p.add_argument('--metrics-port', type=int, default=0, help='serve the fake\'s own Prometheus /metrics on 127.0.0.1:PORT; 0 = off (the default)')
     p.add_argument('--metrics-token', default=None, help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
     p.add_argument('--metrics-token-file', default=None, help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes the place of --metrics-token; giving both is an error (env FAKE_METRICS_TOKEN_FILE)')
+    p.add_argument('--metrics-max-clients', type=int, default=DEFAULT_METRICS_MAX_CLIENTS, help='maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited (default %(default)s)')
+    p.add_argument('--metrics-client-timeout', type=float, default=DEFAULT_METRICS_CLIENT_TIMEOUT_S, help='seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap (default %(default)s)')
+    p.add_argument('--metrics-max-conn-per-ip', type=int, default=DEFAULT_METRICS_MAX_CONN_PER_IP, help='maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit (default %(default)s)')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path (default: /tmp/fake-inverter-<modbus-port>.socket) or TCP port number on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with fake_ctl.py')
     p.add_argument('--profile', default=None, help='inverter profile JSON: name -> register (+ optional type/scale), e.g. profiles/profiles/sun2000.json (the default); FAKE_PROFILE when unset')
     p.add_argument('--chaos', type=float, default=DEFAULT_CHAOS, help='probability 0..1 that a request is answered hostile and dropped (default: off); seed with --seed for reproducibility')
@@ -197,7 +211,7 @@ def main():
     if args.dry_run:
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')
-        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, profile %s: %s, %d register(s), control server %s)',
+        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, per-ip limit %s, profile %s: %s, %d register(s), control server %s)',
                     args.host, args.port, args.unit, PEAK_RATIO * args.max_kwp * 1000.0,
                     mode,
                     'on' if args.battery else 'off',
@@ -206,6 +220,7 @@ def main():
                     args.seed if args.seed is not None else 'random',
                     args.max_clients or 'none',
                     '%gs' % args.client_timeout if args.client_timeout else 'never',
+                    args.max_conn_per_ip or 'none',
                     simulator.profile.description, profile_label(profile_path), len(simulator.profile.entries),
                     ('127.0.0.1:' + target) if target.isdigit() else ('unix:' + target) if target != '0' else 'off')
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
@@ -214,7 +229,8 @@ def main():
                                                     max_mb=args.audit_max_mb,
                                                     daily=args.audit_daily, files=args.audit_files)
     fake = FakeInverter(args.unit, simulator, strict=args.strict, chaos=chaos,
-                        max_clients=args.max_clients, client_timeout=args.client_timeout)
+                        max_clients=args.max_clients, client_timeout=args.client_timeout,
+                        max_conn_per_ip=args.max_conn_per_ip)
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,
@@ -224,7 +240,9 @@ def main():
         threading.Thread(target=control.serve, daemon=True).start()
     if args.metrics_port:
         MetricsServer(simulator, chaos, fake, control, args.metrics_port,
-                      token=metrics_token).start()
+                      token=metrics_token, max_clients=args.metrics_max_clients,
+                      client_timeout=args.metrics_client_timeout,
+                      max_per_ip=args.metrics_max_conn_per_ip).start()
     box = SignalBox(simulator, chaos, fake, control=control, audit=audit)
     if control:
         control.signalbox = box

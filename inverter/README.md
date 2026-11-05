@@ -260,6 +260,7 @@ take `--control-token`
 | `battery-kwh` | `kWh` | usable battery capacity |
 | `max-clients` | `N` (`0` = no limit) | the simultaneous Modbus client limit — refuse further connections past it (`--max-clients`/`FAKE`-flag startup value, tunable live) |
 | `client-timeout` | seconds (`0` = never) | disconnect Modbus clients silent for this long — sheds connections from clients that died without closing (`--client-timeout` startup value, tunable live) |
+| `max-conn-per-ip` | `N` (`0` = no limit) | the per-peer-IP Modbus connection limit (`--max-conn-per-ip` startup value, tunable live) |
 | `register` | `addr value` | `set register <addr> <value>` — write a raw register into the **write overlay** (the same store the FC06/FC16 writes use, so the scrapers read it); `reset` clears it, `show registers` marks the rows with `*` |
 | `profile` | `<file>` | swap the register-map profile live |
 | `log-level` | `DEBUG\|INFO\|WARNING\|ERROR` | live log level |
@@ -367,12 +368,16 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--metrics-port` | off | serve the fake's own Prometheus `/metrics` on `127.0.0.1:PORT` |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`) |
 | `--metrics-token-file` | off | the metrics bearer token from a file (the first line; owner-only `0600`, F12) — instead of `--metrics-token`, giving both is an error |
+| `--metrics-max-clients` | `64` | cap concurrent HTTP clients on the metrics endpoint; extras get an immediate `503 # rate limited` (`0` = unlimited) |
+| `--metrics-client-timeout` | `5` | seconds an idle metrics client is kept before the socket times out (`0` = the same built-in 5 s cap) |
+| `--metrics-max-conn-per-ip` | `0` | cap concurrent metrics connections from one peer IP (`0` = no per-IP limit) |
 | `--audit-log` | XDG state | the audit trail: a file path or `-` for stdout (docker logs / journald) |
 | `--audit-max-mb` | `10` | rotate the audit log at this size, keeping 3 backups; `0` = off |
 | `--audit-daily` | off | also rotate the audit log at UTC midnight |
 | `--max-kwp` | `6` | PV array size in kWp, peak = 75 % of it |
 | `--max-clients` | `64` | refuse further Modbus connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect Modbus clients silent for this many seconds (`0` = never) — sheds connections from clients that died without closing |
+| `--max-conn-per-ip` | `0` | refuse further Modbus connections from one peer IP past this many simultaneous connections (`0` = no per-IP limit) |
 | `--timezone` | `utc` | clock the state machines integrate over (`utc` or `local`) |
 | `--time` | real clock | freeze simulated time `HH:MM` (zone-independent) |
 | `--time-scale` | `1` | the simulated clock speed: N× real time — a full simulated day takes 24/N real hours (`set time-scale` tunes it live) |

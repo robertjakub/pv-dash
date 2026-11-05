@@ -8,6 +8,7 @@ import threading
 import time
 
 from common.protocol import recv_exact
+from common.connlimit import ConnGate
 from .statics import MAX_COUNT, MAX_PDU
 from common.version import version_string
 
@@ -15,7 +16,8 @@ logger = logging.getLogger('fake-inverter')
 
 
 class FakeInverter:
-    def __init__(self, unit, simulator, strict=False, chaos=None, max_clients=64, client_timeout=300.0):
+    def __init__(self, unit, simulator, strict=False, chaos=None, max_clients=64, client_timeout=300.0,
+                 max_conn_per_ip=0):
         self.unit = unit
         self.simulator = simulator
         self.strict = strict
@@ -28,6 +30,7 @@ class FakeInverter:
         self.requests = 0
         self.max_clients = max(0, int(max_clients))       # 0 = no limit
         self.client_timeout = max(0.0, float(client_timeout))   # 0 = never
+        self.conn_gate = ConnGate(0, max(0, int(max_conn_per_ip)))   # 0 = no per-IP limit
         self.client_lock = threading.Lock()
         self.client_count = 0
         self.clients = {}        # 'ip:port' -> {'since': monotonic, 'requests': n} (show connections)
@@ -39,10 +42,11 @@ class FakeInverter:
         srv.listen(16)
         self.srv = srv
         self.listen_addr = (host, port)
-        logger.info('fake inverter %s listening on %s:%d (unit %d, peak PV %gW, client limit %s, client timeout %s)%s',
+        logger.info('fake inverter %s listening on %s:%d (unit %d, peak PV %gW, client limit %s, client timeout %s, per-ip limit %s)%s',
                     version_string(), host, port, self.unit, self.simulator.peak_w,
                     self.max_clients or 'none',
                     '%gs' % self.client_timeout if self.client_timeout else 'none',
+                    self.conn_gate.max_per_ip or 'none',
                     ', chaos p=%.2f' % self.chaos.p if self.chaos and self.chaos.p else '')
         while True:
             try:
@@ -51,7 +55,12 @@ class FakeInverter:
                 try:
                     if self.client_timeout:
                         client.settimeout(self.client_timeout)
-                    if self.max_clients and self.client_count >= self.max_clients:
+                    ok, _why = self.conn_gate.admit(addr[0])   # counts always; enforces only when capped
+                    if not ok:
+                        logger.info('connection refused: per-IP limit of %d reached (%s:%d)',
+                                    self.conn_gate.max_per_ip, *addr[:2])
+                    elif self.max_clients and self.client_count >= self.max_clients:
+                        self.conn_gate.release(addr[0])
                         logger.info('connection refused: client limit of %d reached (%s:%d)',
                                     self.max_clients, *addr[:2])
                     else:
@@ -64,6 +73,7 @@ class FakeInverter:
                     if admitted:
                         with self.client_lock:
                             self.client_count -= 1
+                        self.conn_gate.release(addr[0])
                         admitted = False
                 finally:
                     if not admitted:
@@ -169,4 +179,5 @@ class FakeInverter:
             with self.client_lock:
                 self.clients.pop(key, None)
                 self.client_count -= 1
+            self.conn_gate.release(addr[0])
             client.close()

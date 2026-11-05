@@ -73,6 +73,8 @@ the grid register is positive on import (the default is export).
 .TP
 .BI \-\-listen " HOST:PORT"
 exporter bind address. Default \fB127.0.0.1:9350\fR (loopback only).
+Beyond loopback a token is mandatory: a non-loopback listen without
+\fB--auth-token\fR/\fB--auth-token-file\fR refuses to start (F13).
 .TP
 .BI \-\-interval " S"
 seconds between Modbus polls. Default \fB10\fR.
@@ -86,9 +88,11 @@ start; a token passed as \fB--auth-token\fR is visible in \fBps\fR /
 \fB/proc/*/cmdline\fR to every local user \(em prefer the file (or the
 env var); the flag form is for quick tests.
 .TP
-.BI \-\-max-clients " N" ", " \-\-client-timeout " S"
-cap concurrent HTTP clients (default \fB64\fR; overflow answers 503) and
-kick idle keep-alive connections (default \fB300\fR).
+.BI \-\-max-clients " N" ", " \-\-client-timeout " S" ", " \-\-max-conn-per-ip " N"
+cap concurrent HTTP clients (default \fB64\fR; overflow answers 503), kick
+idle keep-alive connections (default \fB300\fR) and cap concurrent
+connections from one peer IP (default \fB0\fR = no per-IP limit; overflow
+answers 503).
 .TP
 .BI \-\-log-level " LEVEL" ", " \-\-local-time ", " \-\-log-access
 logging: default \fBINFO\fR, UTC stamps, quiet HTTP (\fB--log-access\fR

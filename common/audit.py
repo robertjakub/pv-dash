@@ -5,6 +5,17 @@ so the trail filters cleanly out of a mixed log. ping/pong keepalives are
 never logged. The file is opened append-only and flushed per event, so a
 crash keeps everything up to the last command.
 
+Every entry ends with a short `h=` hash (12 hex chars) chaining to the
+writer's previous entry: h = sha256(prev | stamp | prefix | text) truncated.
+The chain is per writer prefix (CACHE, INV, CLI, CTL each chain their own
+lines), so several writers can interleave in one file and every chain stays
+verifiable on its own — scripts/audit_verify.py walks a file (and its
+rotated backups, oldest first), recomputes each prefix's chain and names the
+line where it breaks. The chain is tamper-EVIDENT: any edited, reordered or
+deleted middle entry breaks it; trailing deletion and a full rechain by
+someone holding the algorithm are outside its reach (journald forwarding
+stays the strong answer — docs/AUDIT.md F10).
+
 The default location is the tool's XDG state directory
 (~/.local/state/<app>/audit.log), NOT the current directory: a packaged
 install (nix store, container) has a read-only working directory. Rotation
@@ -15,10 +26,59 @@ not stderr: the audit is data, not an error, and it stays in the single
 ordered stream the service manager captures). When the sink is stdout,
 rotation is disabled by definition. The rotation depth is configurable:
 --audit-files N (the default 3)."""
+import hashlib
 import os
 import sys
 import threading
 import time
+
+HASH_LEN = 12                                   # hex chars per entry hash
+GENESIS = '0' * HASH_LEN                        # the chain's first prev
+
+
+def entry_hash(prev, stamp, prefix, body):
+    """The chained entry hash: sha256(prev | stamp | prefix | text), hex-truncated.
+    Shared by the writer and scripts/audit_verify.py — one implementation."""
+    material = '%s|%s|%s|%s' % (prev, stamp, prefix, body)
+    return hashlib.sha256(material.encode('utf-8')).hexdigest()[:HASH_LEN]
+
+
+def parse_entry_hash(line):
+    """The trailing `h=<hex>` of one audit line (None when absent/malformed).
+    The hash is always the line's last token, exactly HASH_LEN chars."""
+    tail = line.rstrip()
+    idx = tail.rfind(' h=')
+    if idx < 0 or idx + 3 + HASH_LEN != len(tail):
+        return None
+    h = tail[idx + 3:]
+    return h if all(c in '0123456789abcdef' for c in h) else None
+
+
+def tail_hash(path, prefix):
+    """The last `h=` this prefix left in an existing file (or its rotated
+    backups), so a restarted writer chains seamlessly from its own previous
+    entries. Reads each file's trailing 64 KB, live file first; GENESIS when
+    nothing is found."""
+    candidates = [path] + ['%s.%d' % (path, i) for i in range(1, 17)]
+    for p in candidates:
+        try:
+            size = os.path.getsize(p)
+        except OSError:
+            continue
+        try:
+            with open(p, 'rb') as fh:
+                if size > 65536:
+                    fh.seek(-65536, os.SEEK_END)
+                data = fh.read().decode('utf-8', 'replace')
+        except OSError:
+            continue
+        for line in reversed(data.splitlines()):
+            if (' AUDIT %s ' % prefix) not in line:
+                continue
+            h = parse_entry_hash(line)
+            if h:
+                return h   # this file's newest matching entry wins
+    return GENESIS
 
 
 def default_path(app):
@@ -47,11 +107,13 @@ class AuditLog:
         self.keep = max(1, int(files))   # the rotated backups kept (audit.log.1 .. .N)
         self._day = time.strftime('%Y-%m-%d', time.gmtime())
         self._lock = threading.Lock()
+        self._last = GENESIS             # this prefix's last entry hash (the chain)
         if self.path == '-':    # the stdout sink: no rotation by definition
             self._f = sys.stdout
         else:
             try:
                 self._f = open(self.path, 'a', encoding='utf-8')
+                self._last = tail_hash(self.path, self.prefix)   # chain from the writer's own trail
             except OSError:
                 # a read-only working directory (a container, a packaged install):
                 # the trail belongs in the service log rather than nowhere
@@ -89,8 +151,10 @@ class AuditLog:
             self._maybe_rotate()
             stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
             detail = ' '.join(detail.split())   # fold \n\r\t etc: one event = one physical line
-            self._f.write('%s AUDIT %s %s%s\n' % (stamp, self.prefix, event,
-                                                  (' ' + detail) if detail else ''))
+            body = '%s%s' % (event, (' ' + detail) if detail else '')
+            h = entry_hash(self._last, stamp, self.prefix, body)
+            self._last = h
+            self._f.write('%s AUDIT %s %s h=%s\n' % (stamp, self.prefix, body, h))
             self._f.flush()
 
     def command(self, cmd, result):

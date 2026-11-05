@@ -340,6 +340,14 @@ class ControlServer:
                 fake.max_clients = v
                 return str(v)
             raise ValueError('no modbus device attached')
+        if key == 'max-conn-per-ip':
+            v = int(float(val))
+            if not 0 <= v <= 4096:
+                raise ValueError('max-conn-per-ip must be 0..4096')
+            if fake:
+                fake.conn_gate.max_per_ip = v
+                return str(v)
+            raise ValueError('no modbus device attached')
         if key == 'client-timeout':
             v = float(val)
             if not (math.isfinite(v) and 0 <= v <= 86400):
@@ -415,6 +423,8 @@ class ControlServer:
             return '%g' % sim.battery_kwh
         if key == 'max-clients':
             return str(fake.max_clients) if fake else '?'
+        if key == 'max-conn-per-ip':
+            return str(fake.conn_gate.max_per_ip) if fake else '?'
         if key == 'client-timeout':
             return ('%gs' % fake.client_timeout if fake.client_timeout else 'never') if fake else '?'
         if key == 'profile':
@@ -585,9 +595,10 @@ class ControlServer:
         ]
         if self.fake:
             la = self.fake.listen_addr or ('?', '?')
-            rows.append('modbus    %s:%d, clients %d (limit %s, timeout %s)'
+            rows.append('modbus    %s:%d, clients %d (limit %s, timeout %s, per-ip %s)'
                         % (la[0], la[1], self.fake.client_count, self.fake.max_clients or 'none',
-                           secs(self.fake.client_timeout) if self.fake.client_timeout else 'none'))
+                           secs(self.fake.client_timeout) if self.fake.client_timeout else 'none',
+                           self.fake.conn_gate.max_per_ip or 'none'))
         return 'ok inspect\n' + '\n'.join(rows)
 
     def status_report(self):

@@ -28,51 +28,50 @@ hardware.
 .SH OPTIONS
 .TP
 .B \-\-config
-config file (default: $MODBUS_CACHE_CONFIG, then modbus_cache.ini next
+config file — the set grammar: every line a `set <name> <value>`,
+comments start with # (default: $MCH_CONFIG, then modbus_cache.conf next
 to this script, then the subproject root)
 .TP
 .B \-\-host
-inverter Modbus TCP address (default: config, $MODBUS_CACHE_HOST or
-127.0.0.1)
+inverter Modbus TCP address (default: config, $MCH_HOST or 127.0.0.1)
 .TP
 .BI \-\-port " N"
-inverter Modbus TCP port (default: config, $MODBUS_CACHE_PORT or 5502)
+inverter Modbus TCP port (default: config, $MCH_PORT or 5502)
 .TP
 .BI \-\-unit " N"
-Modbus unit id (default: config, $MODBUS_CACHE_UNIT or 1)
+Modbus unit id (default: config, $MCH_UNIT or 1)
 .TP
 .BI \-\-timeout " N"
-Modbus connect/read timeout in seconds (default: config,
-$MODBUS_CACHE_TIMEOUT or 3)
+Modbus connect/read timeout in seconds (default: config, $MCH_TIMEOUT or
+3)
 .TP
 .B \-\-listen
-listen address HOST:PORT (default: config, $MODBUS_CACHE_LISTEN or
+listen address HOST:PORT (default: config, $MCH_LISTEN or
 127.0.0.1:15502)
 .TP
 .BI \-\-interval " N"
-seconds between cache polls (default: config, $MODBUS_CACHE_INTERVAL or
-10)
+seconds between cache polls (default: config, $MCH_INTERVAL or 10)
 .TP
 .BI \-\-read\-delay " N"
 seconds between consecutive inverter reads within a poll cycle, 0 = no
-delay (default: config, $MODBUS_CACHE_READ_DELAY or 0.05)
+delay (default: config, $MCH_READ_DELAY or 0.05)
 .TP
 .BI \-\-merge\-gap " N"
 max register gap when merging ranges into block reads, 0 = read ranges
-separately (default: config, $MODBUS_CACHE_MERGE_GAP or 8)
+separately (default: config, $MCH_MERGE_GAP or 8)
 .TP
 .B \-\-profile
 device profile JSON (the shared profiles/ schema) (default: config,
-$MODBUS_CACHE_PROFILE or the bundled sun2000 profile)
+$MCH_PROFILE or the bundled sun2000 profile)
 .TP
 .B \-\-selection
 selection JSON: {"registers": ["pv\-power", ...]} — the profile names to
-fetch (default: config, $MODBUS_CACHE_SELECTION or every profile entry)
+fetch (default: config, $MCH_SELECTION or every profile entry)
 .TP
 .BI \-\-cache\-ttl " N"
 per\-register cache TTL: cached registers older than this are refetched
 from the inverter, 0 = never expire, serve last known values forever
-(default: config, $MODBUS_CACHE_TTL or 3x interval)
+(default: config, $MCH_TTL or 3x interval)
 .TP
 .B \-\-allow\-write
 forward write requests (FC05/06/15/16) to the inverter; default: refuse
@@ -81,8 +80,7 @@ them with a Modbus illegal\-function exception (default: off)
 .B \-\-write\-registers
 register ranges a (forwarded) write may touch: comma\-separated
 START:COUNT, e.g. 47400:100,47600:100; "any" = unrestricted; "none" = no
-register writable (default: config, $MODBUS_CACHE_WRITE_REGISTERS or
-none)
+register writable (default: config, $MCH_WRITE_REGISTERS or none)
 .TP
 .B \-\-local\-time
 log timestamps in the system time zone instead of UTC (default: off)
@@ -92,52 +90,68 @@ log client connects/disconnects at INFO instead of DEBUG (default: off)
 .TP
 .BI \-\-max\-clients " N"
 refuse further connections past this many simultaneous clients, 0 = no
-limit (default: config, $MODBUS_CACHE_MAX_CLIENTS or 64)
+limit (default: config, $MCH_MAX_CLIENTS or 64)
 .TP
 .BI \-\-client\-timeout " N"
 disconnect clients silent for this many seconds, 0 = never (default:
-config, $MODBUS_CACHE_CLIENT_TIMEOUT or 300)
+config, $MCH_CLIENT_TIMEOUT or 300)
 .TP
 .BI \-\-max\-conn\-per\-ip " N"
 refuse further connections from one peer IP past this many simultaneous
-connections, 0 = no per\-IP limit (default: config,
-$MODBUS_CACHE_MAX_CONN_PER_IP or 0)
+connections, 0 = no per\-IP limit (default: config, $MCH_MAX_CONN_PER_IP
+or 0)
 .TP
 .B \-\-connect\-acl
 clients allowed to connect: "any", "none" (refuse everyone) or
 comma\-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16 (default:
-config, $MODBUS_CACHE_CONNECT_ACL or any)
+config, $MCH_CONNECT_ACL or any)
 .TP
 .B \-\-write\-acl
 clients allowed to write (requires \-\-allow\-write): "any", "none"
 (refuse everyone) or comma\-separated IPs/prefixes (default: config,
-$MODBUS_CACHE_WRITE_ACL or none)
+$MCH_WRITE_ACL or none)
 .TP
 .B \-\-control\-port
 control server target: unix socket path or TCP port on 127.0.0.1
-(default: config, $MODBUS_CACHE_CTL or
+(default: config, $MCH_CTL or
 /tmp/modbus\-cache\-<listen\-port>.socket); 0 = off
 .TP
 .B \-\-control\-token
 require a token on control connections: the client authenticates with
 {"cmd": "auth", "token": ...}; over the unix socket a trusted peer
 (root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
-skips the token (default: config, $MODBUS_CACHE_CONTROL_TOKEN or none)
+skips the token (default: config, $MCH_CONTROL_TOKEN or none)
 .TP
 .B \-\-control\-token\-file
 the token from a file (the first line; e.g. a systemd LoadCredential or
 a key file; must be owner\-only 0600) — takes the place of
 \-\-control\-token; giving both is an error (default: config,
-$MODBUS_CACHE_CONTROL_TOKEN_FILE)
+$MCH_CONTROL_TOKEN_FILE)
+.TP
+.B \-\-control\-ops\-token
+a second, read\-only control token: sessions authenticating with it may
+run the show/clear verbs only (no set/unset, no request dump/restore, no
+restart, no shutdown) — the ops shift against the admin key, both
+audited (default: config, $MCH_CONTROL_OPS_TOKEN or none)
+.TP
+.B \-\-control\-ops\-token\-file
+the read\-only ops token from a file (the first line; must be
+owner\-only 0600) — takes the place of \-\-control\-ops\-token; giving
+both is an error (default: config, $MCH_CONTROL_OPS_TOKEN_FILE)
+.TP
+.B \-\-control\-ops\-verbs
+the read\-only ops role's RBAC policy: the verbs its sessions may run,
+comma\-separated (default: show,clear; validated against the control
+grammar at start)
 .TP
 .B \-\-control\-socket\-group
 leave the unix control socket group\-accessible (chmod 0660 instead of
-the default 0600) (default: config, $MODBUS_CACHE_CONTROL_SOCKET_GROUP)
-(default: off)
+the default 0600) (default: config, $MCH_CONTROL_SOCKET_GROUP) (default:
+off)
 .TP
 .BI \-\-requests\-audit " N"
 audit one REQUESTS tally per client per this many seconds, 0 = off
-(default: config, $MODBUS_CACHE_REQUESTS_AUDIT or 300)
+(default: config, $MCH_REQUESTS_AUDIT or 300)
 .TP
 .B \-\-dump\-path
 the state dump (write\-behind): the live setting overrides and — with
@@ -146,41 +160,41 @@ an integrity hash (a restore refuses a tampered, unsigned or
 group\-writable dump); dumped on shutdown, on the request dump command
 and every \-\-dump\-interval seconds; loaded on start only with
 \-\-restore\-on\-start, on demand with the request restore command
-(default: config, $MODBUS_CACHE_DUMP_PATH or none)
+(default: config, $MCH_DUMP_PATH or none)
 .TP
 .B \-\-dump\-with\-cache
 dump the cached words too: `request dump` and the \-\-dump\-interval
 loop write the words + the settings (the default off = settings only;
 `request dump with\-cache` always includes them; the restore takes
-either shape) (default: config, $MODBUS_CACHE_DUMP_WITH_CACHE or off)
-(default: off)
+either shape) (default: config, $MCH_DUMP_WITH_CACHE or off) (default:
+off)
 .TP
 .BI \-\-dump\-interval " N"
 seconds between the automatic state dumps, 0 = on request (the request
-dump command and the shutdown) (default: config,
-$MODBUS_CACHE_DUMP_INTERVAL or 0)
+dump command and the shutdown) (default: config, $MCH_DUMP_INTERVAL or
+0)
 .TP
 .B \-\-restore\-on\-start
 load the state dump when the daemon starts (needs \-\-dump\-path) — a
 restart serves last\-known values instead of cold misses; default: start
-cold, load only on demand (env MODBUS_CACHE_RESTORE_ON_START, ini
+cold, load only on demand (env MCH_RESTORE_ON_START, ini
 restore_on_start) (default: off)
 .TP
 .B \-\-control\-trust\-uids
 extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
 the daemon's own user are always trusted (default: config,
-$MODBUS_CACHE_CONTROL_TRUST_UIDS or none)
+$MCH_CONTROL_TRUST_UIDS or none)
 .TP
 .B \-\-metrics\-server
 serve the cache's own Prometheus /metrics endpoint (the live `set
 metrics\-server` toggle exists too); off by default (the default:
-config, $MODBUS_CACHE_METRICS_SERVER or off) (default: off)
+config, $MCH_METRICS_SERVER or off) (default: off)
 .TP
 .B \-\-metrics\-listen
 the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every
 interface, a token is mandatory regardless (default: config,
-$MODBUS_CACHE_METRICS_LISTEN or 127.0.0.1:9252)
+$MCH_METRICS_LISTEN or 127.0.0.1:9252)
 .TP
 .B \-\-metrics\-token
 require Authorization: Bearer <token> on the /metrics endpoint (the same
@@ -189,49 +203,48 @@ scheme the scraper speaks)
 .B \-\-metrics\-token\-file
 the metrics bearer token from a file (the first line; must be
 owner\-only 0600) — takes the place of \-\-metrics\-token; giving both
-is an error (env MODBUS_CACHE_METRICS_TOKEN_FILE)
+is an error (env MCH_METRICS_TOKEN_FILE)
 .TP
 .BI \-\-metrics\-max\-clients " N"
 maximum concurrent HTTP clients on the /metrics endpoint; extras get an
-immediate 503, 0 = unlimited (default: config,
-$MODBUS_CACHE_METRICS_MAX_CLIENTS or 64)
+immediate 503, 0 = unlimited (default: config, $MCH_METRICS_MAX_CLIENTS
+or 64)
 .TP
 .BI \-\-metrics\-client\-timeout " N"
 seconds an idle /metrics client is kept before the socket times out, 0 =
-the built\-in 5 s cap (default: config,
-$MODBUS_CACHE_METRICS_CLIENT_TIMEOUT or 5)
+the built\-in 5 s cap (default: config, $MCH_METRICS_CLIENT_TIMEOUT or
+5)
 .TP
 .BI \-\-metrics\-max\-conn\-per\-ip " N"
 maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
-limit (default: config, $MODBUS_CACHE_METRICS_MAX_CONN_PER_IP or 0)
+limit (default: config, $MCH_METRICS_MAX_CONN_PER_IP or 0)
 .TP
 .B \-\-audit\-log
 CACHE audit trail: a file path or \- for stdout (the docker/journald
-way); default: config, $MODBUS_CACHE_AUDIT_LOG or
+way); default: config, $MCH_AUDIT_LOG or
 ~/.local/state/modbus\-cache/audit.log — the XDG state home
 .TP
 .BI \-\-audit\-max\-mb " N"
 rotate the audit log at this size in MB, keeping N backups; 0 = no size
-rotation (default: config, $MODBUS_CACHE_AUDIT_MAX_MB or 10)
+rotation (default: config, $MCH_AUDIT_MAX_MB or 10)
 .TP
 .B \-\-audit\-daily
 also rotate the audit log at UTC midnight (default: config,
-$MODBUS_CACHE_AUDIT_DAILY) (default: off)
+$MCH_AUDIT_DAILY) (default: off)
 .TP
 .BI \-\-audit\-files " N"
-rotated audit backups to keep (default: config,
-$MODBUS_CACHE_AUDIT_FILES or 3)
+rotated audit backups to keep (default: config, $MCH_AUDIT_FILES or 3)
 .TP
 .B \-\-no\-audit\-log
-disable the CACHE audit trail (default: config,
-$MODBUS_CACHE_NO_AUDIT_LOG) (default: off)
+disable the CACHE audit trail (default: config, $MCH_NO_AUDIT_LOG)
+(default: off)
 .TP
 .B \-\-dry\-run
 validate the configuration and register map, print the effective
 settings and exit (nothing is bound or connected) (default: off)
 .TP
 .B \-\-log\-level
-log level (default: config, $MODBUS_CACHE_LOG_LEVEL or INFO)
+log level (default: config, $MCH_LOG_LEVEL or INFO)
 
 
 .SH SIGNALS
@@ -288,6 +301,11 @@ listings only when a dump path is configured.
 \fBshutdown\fR (the same as SIGTERM).
 .RE
 .PP
+A second, read-only token (\fB--control-ops-token\fR) authenticates
+sessions into the show/clear verbs only \(em no set/unset, no request
+dump/restore, no restart, no shutdown \(em the ops shift against the
+admin key, both roles audited.
+.PP
 See
 .BR modbus-cache-ctl (1)
 and
@@ -296,13 +314,13 @@ for the clients.
 
 .SH ENVIRONMENT
 .TP
-.B MODBUS_CACHE_CTL
+.B MCH_CTL
 default control target for the daemon's clients (flag \fB--control-port\fR
 wins).
 .TP
-.B MODBUS_CACHE_*
-every flag has an environment twin (\fBMODBUS_CACHE_HOST\fR,
-\fBMODBUS_CACHE_LISTEN\fR, \fBMODBUS_CACHE_ALLOW_WRITE\fR, ...); the flag
+.B MCH_*
+every flag has an environment twin (\fBMCH_HOST\fR,
+\fBMCH_LISTEN\fR, \fBMCH_ALLOW_WRITE\fR, ...); the flag
 wins over the env, the env over the ini.
 
 .SH FILES
@@ -313,7 +331,7 @@ the default control socket (stale files replaced, unlinked on shutdown).
 .I ~/.local/state/modbus-cache/audit.log
 the default audit trail.
 .TP
-.I cache/modbus_cache.ini ", " cache/selection.json
+.I cache/modbus_cache.conf ", " cache/selection.json
 the packaged sample config and the example selection.
 
 .SH EXIT STATUS

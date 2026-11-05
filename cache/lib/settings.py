@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Single source of truth for the cache's control grammar: every command and
+""""Single source of truth for the cache's control grammar: every command and
 setting with its short description and value hints. Both the control server
 (lib.control) and the console CLI (cache_cli) read from here, so the wire
 grammar, the help texts and the completions can never drift."""
+
+from .statics import LOG_LEVELS
 
 
 class Setting:
@@ -51,7 +53,7 @@ SETTINGS = (
             {'off': 'no per-client request tallies'}),
     Setting('dump-interval', 'seconds between the automatic state dumps (the cached words + the setting overrides)', ('off',), 's|off',
             {'off': 'only request dump and the shutdown dump'}),
-    Setting('log-level', 'log verbosity', ('DEBUG', 'INFO', 'WARNING', 'ERROR'), None,
+    Setting('log-level', 'log verbosity', LOG_LEVELS, None,
             {'DEBUG': 'client traffic + per-poll detail',
              'INFO': 'lifecycle, control commands, writes',
              'WARNING': 'problems only',

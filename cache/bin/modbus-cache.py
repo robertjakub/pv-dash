@@ -31,6 +31,8 @@ from common.logutil import UtcFormatter
 from common.protocol import exception_frame
 from common.version import version_string
 from lib.config import load_registers_file, load_selection, resolve_config, parse_control_target, acl_text, acl_summary
+from lib.statics import LOG_LEVELS
+from lib.options import KNOWN_VERBS
 from lib.metrics import MetricsServer, describe_metrics
 from lib import persist
 from lib.upstream import Upstream
@@ -43,17 +45,17 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def default_config_path():
-    """$MODBUS_CACHE_CONFIG wins (the docker config volume); then a user's
-    ini next to the script (the flattened package layout); then the dev
-    checkout's sample at the subproject root."""
-    env = os.environ.get('MODBUS_CACHE_CONFIG')
+    """$MCH_CONFIG wins (the docker config volume); then a user's
+    config script next to the script (the flattened package layout); then
+    the dev checkout's sample at the subproject root."""
+    env = os.environ.get('MCH_CONFIG')
     if env and env.strip():
         return env.strip()
-    for candidate in (os.path.join(SCRIPT_DIR, 'modbus_cache.ini'),
-                      os.path.join(os.path.dirname(SCRIPT_DIR), 'modbus_cache.ini')):
+    for candidate in (os.path.join(SCRIPT_DIR, 'modbus_cache.conf'),
+                      os.path.join(os.path.dirname(SCRIPT_DIR), 'modbus_cache.conf')):
         if os.path.exists(candidate):
             return candidate
-    return os.path.join(SCRIPT_DIR, 'modbus_cache.ini')
+    return os.path.join(SCRIPT_DIR, 'modbus_cache.conf')
 
 logger = logging.getLogger('modbus-cache')
 
@@ -61,78 +63,84 @@ logger = logging.getLogger('modbus-cache')
 def parse_args():
     ap = argparse.ArgumentParser(description='Modbus TCP caching proxy for Huawei SUN2000 inverters.')
     ap.add_argument('--config', default=None,
-                    help='config file (default: $MODBUS_CACHE_CONFIG, then modbus_cache.ini next to this script, then the subproject root)')
-    ap.add_argument('--host', help='inverter Modbus TCP address (default: config, $MODBUS_CACHE_HOST or 127.0.0.1)')
-    ap.add_argument('--port', type=int, help='inverter Modbus TCP port (default: config, $MODBUS_CACHE_PORT or 5502)')
-    ap.add_argument('--unit', type=int, help='Modbus unit id (default: config, $MODBUS_CACHE_UNIT or 1)')
-    ap.add_argument('--timeout', type=float, help='Modbus connect/read timeout in seconds (default: config, $MODBUS_CACHE_TIMEOUT or 3)')
-    ap.add_argument('--listen', help='listen address HOST:PORT (default: config, $MODBUS_CACHE_LISTEN or 127.0.0.1:15502)')
-    ap.add_argument('--interval', type=float, help='seconds between cache polls (default: config, $MODBUS_CACHE_INTERVAL or 10)')
-    ap.add_argument('--read-delay', type=float, help='seconds between consecutive inverter reads within a poll cycle, 0 = no delay (default: config, $MODBUS_CACHE_READ_DELAY or 0.05)')
-    ap.add_argument('--merge-gap', type=int, help='max register gap when merging ranges into block reads, 0 = read ranges separately (default: config, $MODBUS_CACHE_MERGE_GAP or 8)')
+                    help='config file — the set grammar: every line a `set <name> <value>`, comments start with # (default: $MCH_CONFIG, then modbus_cache.conf next to this script, then the subproject root)')
+    ap.add_argument('--host', help='inverter Modbus TCP address (default: config, $MCH_HOST or 127.0.0.1)')
+    ap.add_argument('--port', type=int, help='inverter Modbus TCP port (default: config, $MCH_PORT or 5502)')
+    ap.add_argument('--unit', type=int, help='Modbus unit id (default: config, $MCH_UNIT or 1)')
+    ap.add_argument('--timeout', type=float, help='Modbus connect/read timeout in seconds (default: config, $MCH_TIMEOUT or 3)')
+    ap.add_argument('--listen', help='listen address HOST:PORT (default: config, $MCH_LISTEN or 127.0.0.1:15502)')
+    ap.add_argument('--interval', type=float, help='seconds between cache polls (default: config, $MCH_INTERVAL or 10)')
+    ap.add_argument('--read-delay', type=float, help='seconds between consecutive inverter reads within a poll cycle, 0 = no delay (default: config, $MCH_READ_DELAY or 0.05)')
+    ap.add_argument('--merge-gap', type=int, help='max register gap when merging ranges into block reads, 0 = read ranges separately (default: config, $MCH_MERGE_GAP or 8)')
     ap.add_argument('--profile', dest='profile',
-                    help='device profile JSON (the shared profiles/ schema) (default: config, $MODBUS_CACHE_PROFILE or the bundled sun2000 profile)')
+                    help='device profile JSON (the shared profiles/ schema) (default: config, $MCH_PROFILE or the bundled sun2000 profile)')
     ap.add_argument('--selection', dest='selection',
-                    help='selection JSON: {"registers": ["pv-power", ...]} — the profile names to fetch (default: config, $MODBUS_CACHE_SELECTION or every profile entry)')
-    ap.add_argument('--cache-ttl', type=float, help='per-register cache TTL: cached registers older than this are refetched from the inverter, 0 = never expire, serve last known values forever (default: config, $MODBUS_CACHE_TTL or 3x interval)')
+                    help='selection JSON: {"registers": ["pv-power", ...]} — the profile names to fetch (default: config, $MCH_SELECTION or every profile entry)')
+    ap.add_argument('--cache-ttl', type=float, help='per-register cache TTL: cached registers older than this are refetched from the inverter, 0 = never expire, serve last known values forever (default: config, $MCH_TTL or 3x interval)')
     ap.add_argument('--allow-write', action='store_true', help='forward write requests (FC05/06/15/16) to the inverter; default: refuse them with a Modbus illegal-function exception')
     ap.add_argument('--write-registers', dest='write_registers',
-                    help='register ranges a (forwarded) write may touch: comma-separated START:COUNT, e.g. 47400:100,47600:100; "any" = unrestricted; "none" = no register writable (default: config, $MODBUS_CACHE_WRITE_REGISTERS or none)')
+                    help='register ranges a (forwarded) write may touch: comma-separated START:COUNT, e.g. 47400:100,47600:100; "any" = unrestricted; "none" = no register writable (default: config, $MCH_WRITE_REGISTERS or none)')
     ap.add_argument('--local-time', action='store_true', help='log timestamps in the system time zone instead of UTC')
     ap.add_argument('--log-access', action='store_true', help='log client connects/disconnects at INFO instead of DEBUG')
-    ap.add_argument('--max-clients', type=int, help='refuse further connections past this many simultaneous clients, 0 = no limit (default: config, $MODBUS_CACHE_MAX_CLIENTS or 64)')
-    ap.add_argument('--client-timeout', type=float, help='disconnect clients silent for this many seconds, 0 = never (default: config, $MODBUS_CACHE_CLIENT_TIMEOUT or 300)')
+    ap.add_argument('--max-clients', type=int, help='refuse further connections past this many simultaneous clients, 0 = no limit (default: config, $MCH_MAX_CLIENTS or 64)')
+    ap.add_argument('--client-timeout', type=float, help='disconnect clients silent for this many seconds, 0 = never (default: config, $MCH_CLIENT_TIMEOUT or 300)')
     ap.add_argument('--max-conn-per-ip', dest='max_conn_per_ip', type=int,
-                    help='refuse further connections from one peer IP past this many simultaneous connections, 0 = no per-IP limit (default: config, $MODBUS_CACHE_MAX_CONN_PER_IP or 0)')
-    ap.add_argument('--connect-acl', help='clients allowed to connect: "any", "none" (refuse everyone) or comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16 (default: config, $MODBUS_CACHE_CONNECT_ACL or any)')
-    ap.add_argument('--write-acl', help='clients allowed to write (requires --allow-write): "any", "none" (refuse everyone) or comma-separated IPs/prefixes (default: config, $MODBUS_CACHE_WRITE_ACL or none)')
+                    help='refuse further connections from one peer IP past this many simultaneous connections, 0 = no per-IP limit (default: config, $MCH_MAX_CONN_PER_IP or 0)')
+    ap.add_argument('--connect-acl', help='clients allowed to connect: "any", "none" (refuse everyone) or comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16 (default: config, $MCH_CONNECT_ACL or any)')
+    ap.add_argument('--write-acl', help='clients allowed to write (requires --allow-write): "any", "none" (refuse everyone) or comma-separated IPs/prefixes (default: config, $MCH_WRITE_ACL or none)')
     ap.add_argument('--control-port', dest='control_port',
-                    help='control server target: unix socket path or TCP port on 127.0.0.1 (default: config, $MODBUS_CACHE_CTL or /tmp/modbus-cache-<listen-port>.socket); 0 = off')
+                    help='control server target: unix socket path or TCP port on 127.0.0.1 (default: config, $MCH_CTL or /tmp/modbus-cache-<listen-port>.socket); 0 = off')
     ap.add_argument('--control-token', dest='control_token',
-                    help='require a token on control connections: the client authenticates with {"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s own user or --control-trust-uids — SO_PEERCRED) skips the token (default: config, $MODBUS_CACHE_CONTROL_TOKEN or none)')
+                    help='require a token on control connections: the client authenticates with {"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s own user or --control-trust-uids — SO_PEERCRED) skips the token (default: config, $MCH_CONTROL_TOKEN or none)')
     ap.add_argument('--control-token-file', dest='control_token_file',
-                    help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file; must be owner-only 0600) — takes the place of --control-token; giving both is an error (default: config, $MODBUS_CACHE_CONTROL_TOKEN_FILE)')
+                    help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file; must be owner-only 0600) — takes the place of --control-token; giving both is an error (default: config, $MCH_CONTROL_TOKEN_FILE)')
+    ap.add_argument('--control-ops-token', dest='control_ops_token',
+                    help='a second, read-only control token: sessions authenticating with it may run the show/clear verbs only (no set/unset, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited (default: config, $MCH_CONTROL_OPS_TOKEN or none)')
+    ap.add_argument('--control-ops-token-file', dest='control_ops_token_file',
+                    help='the read-only ops token from a file (the first line; must be owner-only 0600) — takes the place of --control-ops-token; giving both is an error (default: config, $MCH_CONTROL_OPS_TOKEN_FILE)')
+    ap.add_argument('--control-ops-verbs', dest='control_ops_verbs',
+                    help="the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated (default: show,clear; validated against the control grammar at start)")
     ap.add_argument('--control-socket-group', dest='control_socket_group', action='store_true',
-                    help='leave the unix control socket group-accessible (chmod 0660 instead of the default 0600) (default: config, $MODBUS_CACHE_CONTROL_SOCKET_GROUP)')
+                    help='leave the unix control socket group-accessible (chmod 0660 instead of the default 0600) (default: config, $MCH_CONTROL_SOCKET_GROUP)')
     ap.add_argument('--requests-audit', dest='requests_audit', type=float,
-                    help='audit one REQUESTS tally per client per this many seconds, 0 = off (default: config, $MODBUS_CACHE_REQUESTS_AUDIT or 300)')
+                    help='audit one REQUESTS tally per client per this many seconds, 0 = off (default: config, $MCH_REQUESTS_AUDIT or 300)')
     ap.add_argument('--dump-path', dest='dump_path',
-                    help='the state dump (write-behind): the live setting overrides and — with --dump-with-cache — the cached words, as one JSON, written 0600 with an integrity hash (a restore refuses a tampered, unsigned or group-writable dump); dumped on shutdown, on the request dump command and every --dump-interval seconds; loaded on start only with --restore-on-start, on demand with the request restore command (default: config, $MODBUS_CACHE_DUMP_PATH or none)')
+                    help='the state dump (write-behind): the live setting overrides and — with --dump-with-cache — the cached words, as one JSON, written 0600 with an integrity hash (a restore refuses a tampered, unsigned or group-writable dump); dumped on shutdown, on the request dump command and every --dump-interval seconds; loaded on start only with --restore-on-start, on demand with the request restore command (default: config, $MCH_DUMP_PATH or none)')
     ap.add_argument('--dump-with-cache', dest='dump_with_cache', action='store_true',
-                    help='dump the cached words too: `request dump` and the --dump-interval loop write the words + the settings (the default off = settings only; `request dump with-cache` always includes them; the restore takes either shape) (default: config, $MODBUS_CACHE_DUMP_WITH_CACHE or off)')
+                    help='dump the cached words too: `request dump` and the --dump-interval loop write the words + the settings (the default off = settings only; `request dump with-cache` always includes them; the restore takes either shape) (default: config, $MCH_DUMP_WITH_CACHE or off)')
     ap.add_argument('--dump-interval', dest='dump_interval', type=float,
-                    help='seconds between the automatic state dumps, 0 = on request (the request dump command and the shutdown) (default: config, $MODBUS_CACHE_DUMP_INTERVAL or 0)')
+                    help='seconds between the automatic state dumps, 0 = on request (the request dump command and the shutdown) (default: config, $MCH_DUMP_INTERVAL or 0)')
     ap.add_argument('--restore-on-start', dest='restore_on_start', action='store_true',
-                    help='load the state dump when the daemon starts (needs --dump-path) — a restart serves last-known values instead of cold misses; default: start cold, load only on demand (env MODBUS_CACHE_RESTORE_ON_START, ini restore_on_start)')
+                    help='load the state dump when the daemon starts (needs --dump-path) — a restart serves last-known values instead of cold misses; default: start cold, load only on demand (env MCH_RESTORE_ON_START, ini restore_on_start)')
     ap.add_argument('--control-trust-uids', dest='control_trust_uids',
-                    help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (default: config, $MODBUS_CACHE_CONTROL_TRUST_UIDS or none)')
+                    help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (default: config, $MCH_CONTROL_TRUST_UIDS or none)')
     ap.add_argument('--metrics-server', dest='metrics_server', action='store_true',
-                    help="serve the cache's own Prometheus /metrics endpoint (the live `set metrics-server` toggle exists too); off by default (the default: config, $MODBUS_CACHE_METRICS_SERVER or off)")
+                    help="serve the cache's own Prometheus /metrics endpoint (the live `set metrics-server` toggle exists too); off by default (the default: config, $MCH_METRICS_SERVER or off)")
     ap.add_argument('--metrics-listen', dest='metrics_listen',
-                    help="the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every interface, a token is mandatory regardless (default: config, $MODBUS_CACHE_METRICS_LISTEN or 127.0.0.1:9252)")
+                    help="the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every interface, a token is mandatory regardless (default: config, $MCH_METRICS_LISTEN or 127.0.0.1:9252)")
     ap.add_argument('--metrics-token', dest='metrics_token',
                     help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
     ap.add_argument('--metrics-token-file', dest='metrics_token_file',
-                    help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes the place of --metrics-token; giving both is an error (env MODBUS_CACHE_METRICS_TOKEN_FILE)')
+                    help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes the place of --metrics-token; giving both is an error (env MCH_METRICS_TOKEN_FILE)')
     ap.add_argument('--metrics-max-clients', dest='metrics_max_clients', type=int,
-                    help="maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited (default: config, $MODBUS_CACHE_METRICS_MAX_CLIENTS or 64)")
+                    help="maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited (default: config, $MCH_METRICS_MAX_CLIENTS or 64)")
     ap.add_argument('--metrics-client-timeout', dest='metrics_client_timeout', type=float,
-                    help="seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap (default: config, $MODBUS_CACHE_METRICS_CLIENT_TIMEOUT or 5)")
+                    help="seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap (default: config, $MCH_METRICS_CLIENT_TIMEOUT or 5)")
     ap.add_argument('--metrics-max-conn-per-ip', dest='metrics_max_conn_per_ip', type=int,
-                    help="maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit (default: config, $MODBUS_CACHE_METRICS_MAX_CONN_PER_IP or 0)")
+                    help="maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit (default: config, $MCH_METRICS_MAX_CONN_PER_IP or 0)")
     ap.add_argument('--audit-log', dest='audit_log',
-                    help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MODBUS_CACHE_AUDIT_LOG or ~/.local/state/modbus-cache/audit.log — the XDG state home')
+                    help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MCH_AUDIT_LOG or ~/.local/state/modbus-cache/audit.log — the XDG state home')
     ap.add_argument('--audit-max-mb', dest='audit_max_mb', type=float,
-                    help='rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation (default: config, $MODBUS_CACHE_AUDIT_MAX_MB or 10)')
+                    help='rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation (default: config, $MCH_AUDIT_MAX_MB or 10)')
     ap.add_argument('--audit-daily', dest='audit_daily', action='store_true',
-                    help='also rotate the audit log at UTC midnight (default: config, $MODBUS_CACHE_AUDIT_DAILY)')
+                    help='also rotate the audit log at UTC midnight (default: config, $MCH_AUDIT_DAILY)')
     ap.add_argument('--audit-files', dest='audit_files', type=int,
-                    help='rotated audit backups to keep (default: config, $MODBUS_CACHE_AUDIT_FILES or 3)')
+                    help='rotated audit backups to keep (default: config, $MCH_AUDIT_FILES or 3)')
     ap.add_argument('--no-audit-log', dest='no_audit_log', action='store_true',
-                    help='disable the CACHE audit trail (default: config, $MODBUS_CACHE_NO_AUDIT_LOG)')
+                    help='disable the CACHE audit trail (default: config, $MCH_NO_AUDIT_LOG)')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration and register map, print the effective settings and exit (nothing is bound or connected)')
-    ap.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
-                    help='log level (default: config, $MODBUS_CACHE_LOG_LEVEL or INFO)')
+    ap.add_argument('--log-level', choices=list(LOG_LEVELS),
+                    help='log level (default: config, $MCH_LOG_LEVEL or INFO)')
     ap.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-cache --man | man -l -)')
     args = ap.parse_args()
     if args.man:
@@ -263,6 +271,23 @@ def main():
     control_token = cfg['control_token'] or None
     if cfg['control_token_file']:
         control_token = load_token_file(cfg['control_token_file'])
+    control_ops_token = cfg['control_ops_token'] or None
+    if cfg['control_ops_token_file']:
+        control_ops_token = load_token_file(cfg['control_ops_token_file'], 'control-ops-token-file')
+    if control_ops_token and not control_token:
+        logger.error('the read-only ops token supplements the admin token: set --control-token or '
+                     '--control-token-file too (an ops token alone would leave the control plane unusable)')
+        raise SystemExit(2)
+    if control_ops_token and control_ops_token == control_token:
+        logger.error('the ops token must differ from the admin token (the same secret would hand '
+                     'every holder the role the server picks first)')
+        raise SystemExit(2)
+    ops_verbs = frozenset(v.strip().lower() for v in (cfg['control_ops_verbs'] or 'show,clear').split(',') if v.strip())
+    unknown = sorted(v for v in ops_verbs if v not in KNOWN_VERBS)
+    if not ops_verbs or unknown:
+        logger.error('--control-ops-verbs: %s (the ops policy needs at least one verb the grammar speaks: %s)',
+                     ', '.join(unknown) if unknown else 'empty', ', '.join(sorted(KNOWN_VERBS)))
+        raise SystemExit(2)
     if isinstance(control_target, int) and not control_token:
         logger.error('the TCP control port %d without a token is open to every local process; '
                      'set --control-token or --control-token-file (the default unix socket needs none), '
@@ -271,7 +296,7 @@ def main():
     if args.metrics_token and args.metrics_token_file:
         logger.error('--metrics-token and --metrics-token-file are mutually exclusive')
         raise SystemExit(2)
-    metrics_token = args.metrics_token or os.environ.get('MODBUS_CACHE_METRICS_TOKEN')
+    metrics_token = args.metrics_token or os.environ.get('MCH_METRICS_TOKEN')
     if args.metrics_token_file:
         metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
     metrics_listen = parse_listen(cfg['metrics_listen'])
@@ -306,7 +331,7 @@ def main():
     proxy.dump_path = cfg['dump_path'] or None
     proxy.dump_interval = cfg['dump_interval']
     proxy.dump_with_cache = cfg['dump_with_cache']
-    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, audit trail: %s, requests audit: %s, metrics: %s)',
+    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, ops token: %s, audit trail: %s, requests audit: %s, metrics: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if cfg['allow_write'] else 'disabled (write requests are refused)',
@@ -320,6 +345,7 @@ def main():
                 acl_summary(cfg['write_acl']),
                 proxy.describe_write_ranges(),
                 'required on TCP' if control_token else 'none',
+                'read-only ops token set' if control_ops_token else 'no ops token',
                 audit_display,
                 '%gs' % cfg['requests_audit_s'] if cfg['requests_audit_s'] else 'off',
                 metrics_desc)
@@ -366,7 +392,9 @@ def main():
         proxy.control = ControlServer(proxy, control_target, stop, audit=audit,
                                       token=control_token, defaults=defaults,
                                       trust_uids=cfg['control_trust_uids'],
-                                      socket_group=cfg['control_socket_group'])
+                                      socket_group=cfg['control_socket_group'],
+                                      ops_token=control_ops_token,
+                                      ops_verbs=ops_verbs)
         proxy.control.start()
     if proxy.dump_path:
         if not cfg['restore_on_start']:

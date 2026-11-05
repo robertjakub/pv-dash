@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Configuration for modbus-cache: ini/env/CLI resolution and the register map (stdlib only)."""
-import configparser
+"""Configuration for modbus-cache: the set-grammar config script, the env
+layer and the CLI flags, plus the register map (stdlib only). The config
+file speaks the control grammar (common/options.py): every line a
+`set <name> <value>`, every comment a `#` comment — the ini format is gone
+(the breaking wave in docs/TODO.md)."""
 import ipaddress
 import json
 import logging
 import os
 
+from common.options import parse_config_script
 from common.config import acl_summary, acl_text, default_profile_path, parse_acl, parse_listen, resolve_profile_file
 from common.cred import parse_trust_uids
-from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, MAX_COUNT, MAX_REGISTERS, \
+from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_COUNT, MAX_REGISTERS, \
     REGISTER_TYPES, UNIT_ID_RANGE
 
 logger = logging.getLogger('modbus-cache')
@@ -32,10 +36,10 @@ def parse_control_target(text, listen_port=DEFAULT_LISTEN_PORT):
 
 
 def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
-    """--control-port flag > MODBUS_CACHE_CTL / CACHE_CTL environment > default socket."""
+    """--control-port flag > MCH_CTL environment > default socket."""
     if explicit is not None and str(explicit).strip():
         return str(explicit).strip()
-    env = os.environ.get('MODBUS_CACHE_CTL') or os.environ.get('CACHE_CTL')
+    env = os.environ.get('MCH_CTL')
     if env and env.strip():
         return env.strip()
     return '/tmp/modbus-cache-%d.socket' % listen_port
@@ -201,8 +205,8 @@ def validate_config(cfg):
     if cfg['metrics_max_conn_per_ip'] < 0:
         fail('metrics_max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
     parse_listen(cfg['metrics_listen'])
-    if cfg['level'] not in ('DEBUG', 'INFO', 'WARNING', 'ERROR'):
-        fail('log-level', 'must be DEBUG, INFO, WARNING or ERROR')
+    if cfg['level'] not in LOG_LEVELS:
+        fail('log-level', 'must be one of %s' % ', '.join(LOG_LEVELS))
     if cfg['audit_max_mb'] < 0:
         fail('audit_max_mb', 'must be >= 0 (0 = no size rotation)')
     if cfg['audit_files'] < 1:
@@ -215,25 +219,50 @@ def validate_config(cfg):
         fail('dump_interval', 'needs dump_path set (there is nothing to dump into)')
     if cfg['control_token'] and cfg['control_token_file']:
         fail('control-token', 'set --control-token or --control-token-file, not both')
+    if cfg['control_ops_token'] and cfg['control_ops_token_file']:
+        fail('control-ops-token', 'set --control-ops-token or --control-ops-token-file, not both')
+    if cfg['control_ops_token']:
+        if not cfg['control_token']:
+            fail('control-ops-token', 'the read-only ops token supplements the admin token — '
+                 'set --control-token/--control-token-file too')
+        if cfg['control_ops_token'] == cfg['control_token']:
+            fail('control-ops-token', 'the ops token must differ from the admin token '
+                 '(the same secret would hand every holder the role the server picks first)')
     parse_listen(cfg['listen'])
     if not cfg['host']:
         fail('host', 'must not be empty')
 
 
 def load_config(path):
-    cfg = configparser.ConfigParser()
+    """The config script: every line a `set <name> <value>` (or the bare
+    `<name> <value>` shorthand), `#` comments stay comments — a config file
+    pipes through a ctl client unchanged. Returns {key: raw-string value}
+    with the dash names underscore-normalized (the resolver's keys). A
+    missing file is no config at all; an unreadable one or a legacy ini
+    file fails fast with the pointer to the new grammar."""
+    if not path or not os.path.isfile(path):
+        return {}
     try:
-        if os.path.isfile(path):
-            cfg.read(path)
-    except (configparser.Error, OSError) as e:
-        logger.error('cannot read config file %s: %s (using defaults)', path, e)
-    if not cfg.has_section('cache'):
-        cfg.add_section('cache')
-    return cfg['cache']
+        with open(path, encoding='utf-8') as fh:
+            text = fh.read()
+    except OSError as e:
+        raise SystemExit('cannot read config file %s: %s' % (path, e))
+    try:
+        rows = parse_config_script(text, path)
+    except ValueError as e:
+        raise SystemExit(str(e))
+    out = {}
+    for name, value in rows:
+        key = name.replace('-', '_')
+        if key in out:
+            raise SystemExit('%s: %s is set twice (the file applies top to bottom — say it once)'
+                             % (path, name))
+        out[key] = value
+    return out
 
 
 def resolve_config(args, script_dir=None):
-    """Effective settings: CLI flags > MODBUS_CACHE_* env > [cache] ini > defaults."""
+    """Effective settings: CLI flags > MCH_* env > [cache] ini > defaults."""
     cfg = load_config(args.config)
 
     def resolve(cli_value, env_name, cfg_key, default, conv):
@@ -260,80 +289,85 @@ def resolve_config(args, script_dir=None):
             raise ValueError('expected true/false, got %r' % raw)
         return resolve(cli_value, env_name, cfg_key, default, parse_bool)
 
-    interval = resolve(args.interval, 'MODBUS_CACHE_INTERVAL', 'interval', DEFAULTS['interval_s'], float)
+    interval = resolve(args.interval, 'MCH_INTERVAL', 'interval', DEFAULTS['interval_s'], float)
     cfg = {
-        'host': resolve(args.host, 'MODBUS_CACHE_HOST', 'host', DEFAULTS['host'], str),
-        'port': resolve(args.port, 'MODBUS_CACHE_PORT', 'port', DEFAULTS['modbus_port'], int),
-        'unit': resolve(args.unit, 'MODBUS_CACHE_UNIT', 'unit', DEFAULTS['unit'], int),
-        'timeout': resolve(args.timeout, 'MODBUS_CACHE_TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
-        'listen': resolve(args.listen, 'MODBUS_CACHE_LISTEN', 'listen', DEFAULTS['listen'], str),
+        'host': resolve(args.host, 'MCH_HOST', 'host', DEFAULTS['host'], str),
+        'port': resolve(args.port, 'MCH_PORT', 'port', DEFAULTS['modbus_port'], int),
+        'unit': resolve(args.unit, 'MCH_UNIT', 'unit', DEFAULTS['unit'], int),
+        'timeout': resolve(args.timeout, 'MCH_TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
+        'listen': resolve(args.listen, 'MCH_LISTEN', 'listen', DEFAULTS['listen'], str),
         'interval': interval,
-        'read_delay': resolve(args.read_delay, 'MODBUS_CACHE_READ_DELAY', 'read_delay', DEFAULTS['read_delay_s'], float),
-        'merge_gap': resolve(args.merge_gap, 'MODBUS_CACHE_MERGE_GAP', 'merge_gap', DEFAULTS['merge_gap'], int),
-        'allow_write': resolve_bool(args.allow_write or None, 'MODBUS_CACHE_ALLOW_WRITE', 'allow_write', False),
+        'read_delay': resolve(args.read_delay, 'MCH_READ_DELAY', 'read_delay', DEFAULTS['read_delay_s'], float),
+        'merge_gap': resolve(args.merge_gap, 'MCH_MERGE_GAP', 'merge_gap', DEFAULTS['merge_gap'], int),
+        'allow_write': resolve_bool(args.allow_write or None, 'MCH_ALLOW_WRITE', 'allow_write', False),
         'write_registers': parse_write_registers(
-            resolve(getattr(args, 'write_registers', None), 'MODBUS_CACHE_WRITE_REGISTERS',
+            resolve(getattr(args, 'write_registers', None), 'MCH_WRITE_REGISTERS',
                     'write_registers', 'none', str)),
-        'profile': resolve_profile_file(resolve(getattr(args, 'profile', None), 'MODBUS_CACHE_PROFILE',
+        'profile': resolve_profile_file(resolve(getattr(args, 'profile', None), 'MCH_PROFILE',
                                                 'profile', default_profile_path(), str)),
-        'selection': parse_selection(resolve(getattr(args, 'selection', None), 'MODBUS_CACHE_SELECTION',
+        'selection': parse_selection(resolve(getattr(args, 'selection', None), 'MCH_SELECTION',
                                             'selection', '', str)),
-        'cache_ttl': resolve(args.cache_ttl, 'MODBUS_CACHE_TTL', 'cache_ttl',
+        'cache_ttl': resolve(args.cache_ttl, 'MCH_TTL', 'cache_ttl',
                              DEFAULTS['cache_ttl_factor'] * interval, float),
-        'local_time': resolve_bool(args.local_time, 'MODBUS_CACHE_LOCAL_TIME', 'local_time', False),
-        'log_access': resolve_bool(args.log_access, 'MODBUS_CACHE_LOG_ACCESS', 'log_access', False),
-        'max_clients': resolve(args.max_clients, 'MODBUS_CACHE_MAX_CLIENTS', 'max_clients', DEFAULTS['max_clients'], int),
-        'client_timeout': resolve(args.client_timeout, 'MODBUS_CACHE_CLIENT_TIMEOUT', 'client_timeout',
+        'local_time': resolve_bool(args.local_time, 'MCH_LOCAL_TIME', 'local_time', False),
+        'log_access': resolve_bool(args.log_access, 'MCH_LOG_ACCESS', 'log_access', False),
+        'max_clients': resolve(args.max_clients, 'MCH_MAX_CLIENTS', 'max_clients', DEFAULTS['max_clients'], int),
+        'client_timeout': resolve(args.client_timeout, 'MCH_CLIENT_TIMEOUT', 'client_timeout',
                                   DEFAULTS['client_timeout_s'], float),
-        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MODBUS_CACHE_MAX_CONN_PER_IP',
+        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MCH_MAX_CONN_PER_IP',
                                    'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
-        'metrics_max_clients': resolve(getattr(args, 'metrics_max_clients', None), 'MODBUS_CACHE_METRICS_MAX_CLIENTS',
+        'metrics_max_clients': resolve(getattr(args, 'metrics_max_clients', None), 'MCH_METRICS_MAX_CLIENTS',
                                        'metrics_max_clients', DEFAULTS['metrics_max_clients'], int),
         'metrics_client_timeout': resolve(getattr(args, 'metrics_client_timeout', None),
-                                          'MODBUS_CACHE_METRICS_CLIENT_TIMEOUT', 'metrics_client_timeout',
+                                          'MCH_METRICS_CLIENT_TIMEOUT', 'metrics_client_timeout',
                                           DEFAULTS['metrics_client_timeout_s'], float),
         'metrics_max_conn_per_ip': resolve(getattr(args, 'metrics_max_conn_per_ip', None),
-                                           'MODBUS_CACHE_METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
+                                           'MCH_METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
                                            DEFAULTS['metrics_max_conn_per_ip'], int),
         'metrics_server': resolve_bool(getattr(args, 'metrics_server', False) or None,
-                                       'MODBUS_CACHE_METRICS_SERVER', 'metrics_server', False),
-        'metrics_listen': resolve(getattr(args, 'metrics_listen', None), 'MODBUS_CACHE_METRICS_LISTEN',
+                                       'MCH_METRICS_SERVER', 'metrics_server', False),
+        'metrics_listen': resolve(getattr(args, 'metrics_listen', None), 'MCH_METRICS_LISTEN',
                                   'metrics_listen', DEFAULTS['metrics_listen'], str),
-        'connect_acl': parse_acl(resolve(args.connect_acl, 'MODBUS_CACHE_CONNECT_ACL', 'connect_acl', 'any', str),
+        'connect_acl': parse_acl(resolve(args.connect_acl, 'MCH_CONNECT_ACL', 'connect_acl', 'any', str),
                                  'connect-acl'),
-        'write_acl': parse_acl(resolve(args.write_acl, 'MODBUS_CACHE_WRITE_ACL', 'write_acl', 'none', str),
+        'write_acl': parse_acl(resolve(args.write_acl, 'MCH_WRITE_ACL', 'write_acl', 'none', str),
                                'write-acl'),
-        'level': resolve(args.log_level, 'MODBUS_CACHE_LOG_LEVEL', 'log_level', DEFAULTS['log_level'], str).upper(),
-        'control_port': resolve(getattr(args, 'control_port', None), 'MODBUS_CACHE_CTL', 'control_port', '', str)
-                        or (os.environ.get('CACHE_CTL', '').strip() or ''),
-        'control_token': resolve(getattr(args, 'control_token', None), 'MODBUS_CACHE_CONTROL_TOKEN',
+        'level': resolve(args.log_level, 'MCH_LOG_LEVEL', 'log_level', DEFAULTS['log_level'], str).upper(),
+        'control_port': resolve(getattr(args, 'control_port', None), 'MCH_CTL', 'control_port', '', str),
+        'control_token': resolve(getattr(args, 'control_token', None), 'MCH_CONTROL_TOKEN',
                                  'control_token', '', str),
-        'control_token_file': resolve(getattr(args, 'control_token_file', None), 'MODBUS_CACHE_CONTROL_TOKEN_FILE',
+        'control_token_file': resolve(getattr(args, 'control_token_file', None), 'MCH_CONTROL_TOKEN_FILE',
                                       'control_token_file', '', str),
-        'audit_log': resolve(getattr(args, 'audit_log', None), 'MODBUS_CACHE_AUDIT_LOG', 'audit_log', '', str),
-        'audit_max_mb': resolve(getattr(args, 'audit_max_mb', None), 'MODBUS_CACHE_AUDIT_MAX_MB',
+        'control_ops_token': resolve(getattr(args, 'control_ops_token', None), 'MCH_CONTROL_OPS_TOKEN',
+                                     'control_ops_token', '', str),
+        'control_ops_token_file': resolve(getattr(args, 'control_ops_token_file', None),
+                                          'MCH_CONTROL_OPS_TOKEN_FILE', 'control_ops_token_file', '', str),
+        'control_ops_verbs': resolve(getattr(args, 'control_ops_verbs', None), 'MCH_CONTROL_OPS_VERBS',
+                                     'control_ops_verbs', 'show,clear', str),
+        'audit_log': resolve(getattr(args, 'audit_log', None), 'MCH_AUDIT_LOG', 'audit_log', '', str),
+        'audit_max_mb': resolve(getattr(args, 'audit_max_mb', None), 'MCH_AUDIT_MAX_MB',
                                 'audit_max_mb', DEFAULTS['audit_max_mb'], float),
-        'audit_daily': resolve_bool(getattr(args, 'audit_daily', False), 'MODBUS_CACHE_AUDIT_DAILY',
+        'audit_daily': resolve_bool(getattr(args, 'audit_daily', False), 'MCH_AUDIT_DAILY',
                                     'audit_daily', False),
-        'audit_files': resolve(getattr(args, 'audit_files', None), 'MODBUS_CACHE_AUDIT_FILES',
+        'audit_files': resolve(getattr(args, 'audit_files', None), 'MCH_AUDIT_FILES',
                                'audit_files', DEFAULTS['audit_files'], int),
-        'no_audit_log': resolve_bool(getattr(args, 'no_audit_log', False), 'MODBUS_CACHE_NO_AUDIT_LOG',
+        'no_audit_log': resolve_bool(getattr(args, 'no_audit_log', False), 'MCH_NO_AUDIT_LOG',
                                      'no_audit_log', False),
-        'requests_audit_s': resolve(getattr(args, 'requests_audit', None), 'MODBUS_CACHE_REQUESTS_AUDIT',
+        'requests_audit_s': resolve(getattr(args, 'requests_audit', None), 'MCH_REQUESTS_AUDIT',
                                     'requests_audit_s', DEFAULTS['requests_audit_s'], float),
-        'dump_path': resolve(getattr(args, 'dump_path', None), 'MODBUS_CACHE_DUMP_PATH',
+        'dump_path': resolve(getattr(args, 'dump_path', None), 'MCH_DUMP_PATH',
                              'dump_path', '', str),
-        'dump_interval': resolve(getattr(args, 'dump_interval', None), 'MODBUS_CACHE_DUMP_INTERVAL',
+        'dump_interval': resolve(getattr(args, 'dump_interval', None), 'MCH_DUMP_INTERVAL',
                                  'dump_interval', 0.0, float),
         'dump_with_cache': resolve_bool(getattr(args, 'dump_with_cache', False) or None,
-                                        'MODBUS_CACHE_DUMP_WITH_CACHE', 'dump_with_cache', False),
+                                        'MCH_DUMP_WITH_CACHE', 'dump_with_cache', False),
         'restore_on_start': resolve_bool(getattr(args, 'restore_on_start', False) or None,
-                                         'MODBUS_CACHE_RESTORE_ON_START', 'restore_on_start', False),
+                                         'MCH_RESTORE_ON_START', 'restore_on_start', False),
         'control_trust_uids': parse_trust_uids(resolve(getattr(args, 'control_trust_uids', None),
-                                                       'MODBUS_CACHE_CONTROL_TRUST_UIDS',
+                                                       'MCH_CONTROL_TRUST_UIDS',
                                                        'control_trust_uids', '', str)),
         'control_socket_group': resolve_bool(getattr(args, 'control_socket_group', False),
-                                             'MODBUS_CACHE_CONTROL_SOCKET_GROUP', 'control_socket_group', False),
+                                             'MCH_CONTROL_SOCKET_GROUP', 'control_socket_group', False),
     }
     validate_config(cfg)
     return cfg

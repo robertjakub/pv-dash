@@ -7,7 +7,9 @@ module): the request = {"cmd": "<command>"}, the reply =
 {"status": "ok|err|bye", "text": "<reply text>"}. The target is a TCP port
 (bound to 127.0.0.1) or a unix socket path. TCP connections need a token
 auth handshake when --control-token is set ({"cmd": "auth", "token": ...});
-the unix socket relies on filesystem permissions instead."""
+the unix socket relies on filesystem permissions instead. A second,
+read-only token (--control-ops-token) authenticates into the show/clear
+verbs only — the ops shift against the admin key, both audited."""
 import hmac
 import json
 import logging
@@ -22,8 +24,9 @@ from common.config import default_profile_path, resolve_profile_file
 from common.cred import peer_uid, parse_trust_uids
 from common.human import secs
 from common.protocol import ModbusError
-from common.wiresec import frame_mac, sign_reply, verify_request_mac, proof_tag
-from .statics import CONTROL_IDLE_TIMEOUT_S
+from common.wiresec import frame_mac, sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.options import control_command
+from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .cache import build_blocks
 from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection
@@ -32,7 +35,7 @@ from . import persist
 
 logger = logging.getLogger('modbus-cache')
 
-MAX_LINE = 1024 * 1024   # the pre-auth line-buffer cap (drop past it)
+MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
 
 
 class ControlServer:
@@ -40,15 +43,20 @@ class ControlServer:
     port (bound to 127.0.0.1) or a unix socket path (stale files are
     replaced, unlinked on shutdown). A TCP connection must authenticate with
     the token first when one is configured; the unix socket relies on
-    filesystem permissions. `stopper` is the graceful-stop callback shared
-    with the signal handlers; it runs after the shutdown reply left the
-    wire."""
+    filesystem permissions. A second, read-only token (ops_token) may be
+    configured beside the admin token: it authenticates into the show/clear
+    verbs only — no set/unset, no request dump/restore, no restart, no
+    shutdown (common/wiresec.py's roles). `stopper` is the graceful-stop
+    callback shared with the signal handlers; it runs after the shutdown
+    reply left the wire."""
 
     def __init__(self, proxy, target, stopper=None, audit=None, token=None, defaults=None, trust_uids=None,
-                 socket_group=False):
+                 socket_group=False, ops_token=None, ops_verbs=None):
         self.proxy = proxy
         self.audit = audit               # the CACHE audit trail (common.audit), None = off
-        self.token = token               # the TCP auth token; None = no auth (the unix = the perms)
+        self.token = token               # the TCP auth token (the admin role); None = no auth (the unix = the perms)
+        self.ops_token = ops_token       # the read-only ops token (the ops role); None = off
+        self.ops_verbs = frozenset(v.lower() for v in (ops_verbs or OPS_VERBS))   # the ops role's RBAC policy
         self.is_unix = not isinstance(target, int)
         self.port = None if self.is_unix else int(target)
         self.sockpath = str(target) if self.is_unix else None
@@ -93,7 +101,8 @@ class ControlServer:
             logger.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
             return
         logger.info('control server listening on %s%s',
-                    self.describe(), ', token auth required on TCP' if self.token and not self.is_unix else '')
+                    self.describe(), (', token auth required on TCP' if self.token and not self.is_unix else '')
+                    + (', read-only ops token accepted' if self.ops_token else ''))
         while True:
             try:
                 client, addr = srv.accept()
@@ -113,57 +122,87 @@ class ControlServer:
         """The peer-cred auth on the unix control socket: with a token
         configured, a peer the kernel vouches for — root, the daemon's own
         user or one of trust_uids — is authenticated without the token (a
-        local systemd unit speaks without sharing the secret). The kernel
-        answers for the socket's owner anyway; this only skips the token
-        handshake. TCP peers always need the token."""
+        local systemd unit speaks without sharing the secret) and holds the
+        admin role. TCP peers always need a token (admin or ops)."""
         if not (self.token and self.is_unix):
-            return False
+            return None
         uid = peer_uid(client)
         if uid is None:
-            return False
+            return None
         if uid == 0 or uid == os.getuid() or uid in self.trust_uids:
             logger.debug('control client from %s: trusted peer uid %d, no token required', who, uid)
-            return True
+            return ROLE_ADMIN
         logger.info('control client from %s: peer uid %d is not trusted, the token is required', who, uid)
-        return False
+        return None
 
-    def framed(self, line, who, authed):
+    def session_key(self, role):
+        """The hmac key of one session's role: the ops sessions sign and
+        verify with the ops token, everything else (admin, trusted peer,
+        pre-auth) with the admin token."""
+        return self.ops_token if role == ROLE_OPS else self.token
+
+    def auth_role(self, given):
+        """Which role a presented token authenticates into (hmac.compare_digest
+        against both keys): the admin token, the ops token, or None."""
+        if isinstance(given, str):
+            if self.token and hmac.compare_digest(given, self.token):
+                return ROLE_ADMIN
+            if self.ops_token and hmac.compare_digest(given, self.ops_token):
+                return ROLE_OPS
+        return None
+
+    def framed(self, line, who, role):
         """One wire frame in, one out: parse {"cmd": ...}, gate the TCP auth,
-        run the command, return (cmd, reply-obj, internal-reply). The text of
-        a multi-line reply keeps its embedded newlines; the '.' terminator of
-        the internal form is stripped (the JSON frame needs no framing)."""
+        gate the ops role (show/clear only), verify the frame mac keyed by
+        the session's token, run the command. Returns (cmd, reply-obj,
+        internal-reply, role) — the role so the auth reply can promote the
+        session. The text of a multi-line reply keeps its embedded newlines;
+        the '.' terminator of the internal form is stripped (the JSON frame
+        needs no framing)."""
         try:
             obj = json.loads(line) if line else {}
         except ValueError:
             obj = None
         if not isinstance(obj, dict) or not isinstance(obj.get('cmd'), str):
             return '', {'status': 'err',
-                        'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request'
+                        'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request', role
         cmd = obj['cmd']
-        if self.token and cmd.lower() != 'auth' and not authed:
+        if self.token and cmd.lower() != 'auth' and role is None:
             return cmd, {'status': 'err', 'text': 'authenticate first: {"cmd": "auth", "token": "..."}'}, \
-                'err authenticate first'
+                'err authenticate first', role
         if cmd.lower() == 'auth':
-            given = obj.get('token')
-            if self.token and isinstance(given, str) and hmac.compare_digest(given, self.token):
+            granted = self.auth_role(obj.get('token'))
+            if granted:
+                key = self.session_key(granted)
                 reply = 'ok authenticated'
-                return 'auth', {'status': 'ok', 'text': 'authenticated', 'mac': sign_reply(self.token, reply)}, reply
-            return 'auth', {'status': 'err', 'text': 'bad token'}, 'err bad token'
-        if self.token and obj.get('mac') is None and not self.is_unix:
+                return 'auth', {'status': 'ok', 'text': 'authenticated', 'mac': sign_reply(key, reply)}, reply, granted
+            return 'auth', {'status': 'err', 'text': 'bad token'}, 'err bad token', role
+        key = self.session_key(role)
+        if key and obj.get('mac') is None and not self.is_unix:
             return cmd, {'status': 'err',
                          'text': 'unsigned command rejected: TCP commands carry the hmac-sha256 of the command, keyed by the token'}, \
-                'err unsigned command'
-        if self.token and obj.get('mac') is not None and not verify_request_mac(self.token, cmd, obj.get('mac')):
+                'err unsigned command', role
+        if key and obj.get('mac') is not None and not verify_request_mac(key, cmd, obj.get('mac')):
             return cmd, {'status': 'err',
-                         'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac'
+                         'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac', role
+        if not role_allows(role, cmd, self.ops_verbs):
+            verb = command_verb(cmd) or cmd
+            text = ('forbidden: the ops token runs the %s verbs only (%s needs the admin token)'
+                    % ('/'.join(sorted(self.ops_verbs)), verb))
+            reply = 'err ' + text
+            reply_obj = {'status': 'err', 'text': text}
+            if key:
+                reply_obj['mac'] = sign_reply(key, reply)
+            logger.warning('control: ops session from %s denied %r (read-only role)', who, cmd)
+            return cmd, reply_obj, reply, role
         reply = self.command(cmd)
         if reply is None:              # quit: no reply, just close
-            return cmd, None, 'bye'
+            return cmd, None, 'bye', role
         status, _, text = reply.partition(' ')
         reply_obj = {'status': status, 'text': text}
-        if self.token:
-            reply_obj['mac'] = sign_reply(self.token, reply)
-        return cmd, reply_obj, reply
+        if key:
+            reply_obj['mac'] = sign_reply(key, reply)
+        return cmd, reply_obj, reply, role
 
     def announce_exit(self, reason):
         """The daemon is going down: send every connected control client a
@@ -187,7 +226,7 @@ class ControlServer:
     def handle(self, client, addr):
         who = self.peer(addr)
         logger.debug('control client connected from %s', who)
-        authed = self.trusted_peer(client, who)
+        role = self.trusted_peer(client, who)   # the peer-cred shortcut = the admin role; TCP starts unauthenticated
         with self.clients_lock:
             self.clients.add(client)
         try:
@@ -207,16 +246,14 @@ class ControlServer:
                 if b'\n' not in buf:
                     continue
                 line, buf = buf.split(b'\n', 1)
-                cmd, obj, reply = self.framed(line.decode('utf-8', 'replace').strip(), who, authed)
+                cmd, obj, reply, role = self.framed(line.decode('utf-8', 'replace').strip(), who, role)
                 if cmd == 'auth':
                     ok = reply.startswith('ok')
-                    if ok:
-                        authed = True
-                    elif self.audit:
+                    if not ok and self.audit:
                         self.audit.event('AUTH-FAIL', 'peer=%s' % who)
                 elif self.audit and cmd.lower() != 'ping':
-                    self.audit.event('COMMAND', "peer=%s '%s'%s -> %s"
-                                     % (who, cmd, proof_tag(obj), reply.split(' ', 1)[0]))
+                    self.audit.event('COMMAND', "peer=%s%s '%s'%s -> %s"
+                                     % (who, role_tag(role), cmd, proof_tag(obj), reply.split(' ', 1)[0]))
                 logger.debug('control from %s: %s -> %s', who, cmd, reply)
                 if obj is not None:
                     client.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())
@@ -239,17 +276,66 @@ class ControlServer:
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|cache|'
-                'uplink|settings|version>')
+                'uplink|settings|version|config|knobs>')
         if self.proxy.dump_path:
             cmds += ', request dump [with-cache], request restore'
-        cmds += ', clear cache, restart, shutdown, quit; help <setting> describes it'
+        cmds += ', clear cache, restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
         return cmds
+
+    def config_mapping(self):
+        """The knob -> control-command mapper (help config): every option of
+        the registry under its section, with the command that changes it on a
+        running daemon — or the restart note when the knob is startup-only."""
+        from .options import OPTIONS
+        from common.options import SECTIONS, section_title
+        lines = ['ok config mapping']
+        for section, _title in SECTIONS:
+            rows = [o for o in OPTIONS if o.section == section]
+            if not rows:
+                continue
+            lines.append('# --- %s ---' % section_title(section))
+            for o in rows:
+                lines.append('%-24s %s' % (o.name, control_command(o)))
+        return '\n'.join(lines)
+
+    def knobs_dictionary(self):
+        """The dictionary of all knobs (show knobs): every option of the
+        registry under its section, with its flag, its env twin(s), its home
+        section, the control command that changes it and the secret marker."""
+        from .options import OPTIONS
+        from common.options import knob_dictionary
+        return knob_dictionary(OPTIONS, who='the modbus-cache')
+
+    def show_config(self):
+        """The effective configuration as a set-grammar script: every line a
+        `set`, sectioned by the shared registry comments — the output pipes
+        straight back into a config file (or through a ctl client). Secrets
+        never render (the file/flag/env form is the documented way); the
+        live overrides ride in as their current values."""
+        from .options import OPTIONS, config_value
+        from common.options import render_config_script
+        cfg = dict(self.proxy.config or {})
+        values = {}
+        for o in OPTIONS:
+            v = config_value(o.name, cfg)
+            if v is not None:
+                values[o.name] = v
+            elif o.secret and (cfg.get(o.name.replace('-', '_')) or cfg.get(o.flag[2:].replace('-', '_') + '_file')):
+                values[o.name] = None   # skipped, and noted below
+        script = render_config_script(OPTIONS, values, comment='generated by show config — the secrets are hidden, pass them by flag/env/token-file')
+        if any(o.secret and (cfg.get(o.name.replace('-', '_'))) for o in OPTIONS):
+            script += '# (set <name> <secret> values are hidden here — the inline tokens do not render)\n'
+        return 'ok config\n' + script
 
     def command(self, cmd):
         cmd = cmd.strip()
         low = cmd.lower()
         if low.split()[0] in ('help', '?') and low != '?':
             what = cmd[4:].strip().lower()
+            if what == 'config':
+                return self.config_mapping()
+            if what == 'knobs':
+                return self.knobs_dictionary()
             if what and what in SETTING_BY_NAME:
                 if what == 'dump-interval' and not self.proxy.dump_path:
                     return 'err dump-interval needs a dump path (set --dump-path)'
@@ -306,6 +392,10 @@ class ControlServer:
             return self.settings_report()
         if low == 'show version':
             return 'ok modbus-cache %s' % version_string()
+        if low == 'show config':
+            return self.show_config()
+        if low == 'show knobs':
+            return self.knobs_dictionary()
         if low.startswith('show') and len(cmd.split()) == 2:
             what = cmd.split()[1].lower()
             if what in SETTING_BY_NAME:
@@ -460,8 +550,8 @@ class ControlServer:
             return secs(v)
         if key == 'log-level':
             lvl = val.upper()
-            if lvl not in ('DEBUG', 'INFO', 'WARNING', 'ERROR'):
-                raise ValueError('log-level must be DEBUG, INFO, WARNING or ERROR')
+            if lvl not in LOG_LEVELS:
+                raise ValueError('log-level must be one of %s' % ', '.join(LOG_LEVELS))
             logging.getLogger().setLevel(getattr(logging, lvl))
             return lvl
         if key == 'timeout':

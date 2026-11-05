@@ -4,8 +4,47 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[cache]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The rename + env-prefix wave: the bins carry the man-page names now
+(`modbus-cache.py`, `modbus-cache-ctl.py`, `modbus-cache-cli.py` — the
+docs and the package descriptions follow), and every env twin wears the
+tool's prefix (`MCH_*`), the control-port answering to the one short
+`MCH_CTL` for the daemon and the clients alike (the long/short duplicate
+reads are gone). The constants audit: `log_levels` joined
+`lib/static.json` and every consumer (the argparse choices, the config
+validation, the live `set log-level`) reads the ladder from there.
 
-The token-file env honored: `MODBUS_CACHE_CONTROL_TOKEN_FILE` does what
+The knob-dictionary wave: `show knobs` (the `help knobs` alias too) prints
+the dictionary of all knobs — every registry knob under its section with
+its flag, its env twin(s), its home section, the command that changes it
+live (or the restart note for the startup-only ones) and the secret marker
+on the tokens (`common/options.py` `knob_dictionary()`; the values stay in
+`show config`, the command mapping in `help config`). The cache_ctl/cli
+TAB completion and `show?` word-help offer the new `show` argument.
+
+The config-format wave: the ini is gone — the config file is a
+set-grammar script now (every line a `set <name> <value>`, `#` comments
+stay comments, the file pipes through cache_ctl unchanged), `show config`
+regenerates it from the running daemon (the secrets hidden), `help config`
+maps every knob to its control command, and the option registry
+(lib/options.py on common/options.py) files every knob under the shared
+sections — scripts/check_options.py gates the flags/env/nix/README
+surfaces against it. The RBAC verb set is live too: `--control-ops-verbs`
+(default show,clear, validated at start).
+
+The read-only control role: a second token
+(`--control-ops-token`/`--control-ops-token-file`, ini `control_ops_token`,
+env `MCH_CONTROL_OPS_TOKEN(_FILE)`) beside the admin one, and its
+sessions run the show/clear verbs only — `show status`/`show cache`/
+`clear cache` yes, `set`/`unset`/`request dump`/`restore`/`restart`/
+`shutdown` no (`err forbidden: … needs the admin token`): the ops shift
+versus the admin key, both audited (the CACHE trail's COMMAND entries
+carry `role=ops`/`role=admin`, the denials included) and each session's
+frames mac'd with the key it authenticated with. An ops token without the
+admin token (or equal to it) refuses to start; the NixOS module grew
+`controlOpsToken`/`controlOpsTokenFile` (the ini render, the
+LoadCredential mount, the warnings).
+
+The token-file env honored: `MCH_CONTROL_TOKEN_FILE` does what
 the clients' help always promised — the env form of
 `--control-token-file` on `cache_ctl`/`cache_cli` (the daemon's config
 resolved it from the start; flag over env, the file over the plain

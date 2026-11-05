@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Small client for modbus-cache's JSON-lines control server: sends one
 command (or a batch from stdin) over TCP or a unix socket (--control-port,
-env MODBUS_CACHE_CTL / CACHE_CTL) and prints the replies. TCP servers with
+env MCH_CTL) and prints the replies. TCP servers with
 --control-token require the token first ({"cmd": "auth", "token": ...}) —
-pass it with --control-token or the MODBUS_CACHE_CONTROL_TOKEN environment
+pass it with --control-token or the MCH_CONTROL_TOKEN environment
 variable.
 
-  python3 cache_ctl.py --control-port 15509 show status
-  python3 cache_ctl.py --control-port 15509 clear cache
-  printf 'show cache\\nclear cache\\n' | python3 cache_ctl.py --control-port 15509
+  python3 modbus-cache-ctl.py --control-port 15509 show status
+  python3 modbus-cache-ctl.py --control-port 15509 clear cache
+  printf 'show cache\\nclear cache\\n' | python3 modbus-cache-ctl.py --control-port 15509
 
 Commands (see the server's help): show <status|connections|cache|version>,
 clear cache, restart, shutdown, quit.
@@ -36,11 +36,11 @@ from lib.config import resolve_control_target
 
 def main():
     p = argparse.ArgumentParser(description='Send commands to the modbus-cache control server (TCP or unix socket).')
-    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/modbus-cache-15502.socket; env MODBUS_CACHE_CTL or CACHE_CTL when unset) — same flag as the proxy itself')
+    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/modbus-cache-15502.socket; env MCH_CTL when unset) — same flag as the proxy itself')
     p.add_argument('command', nargs='*', help='control command, e.g. inspect, show status, show cache, clear cache, restart, shutdown')
     p.add_argument('--timeout', type=float, default=5.0, help='socket timeout in seconds (default %(default)s)')
-    p.add_argument('--control-token', default=None, help='control auth token for TCP (env MODBUS_CACHE_CONTROL_TOKEN)')
-    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env MODBUS_CACHE_CONTROL_TOKEN_FILE)')
+    p.add_argument('--control-token', default=None, help='control auth token for TCP (env MCH_CONTROL_TOKEN)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env MCH_CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
     p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size, 0 = off')
     p.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
@@ -59,12 +59,14 @@ def main():
     if not commands:
         if sys.stdin.isatty():
             p.error('no command given (pass it as arguments or pipe commands on stdin)')
-        commands = [line.strip() for line in sys.stdin if line.strip()]
+        # the config scripts pipe through: comments (#) and blank lines stay comments
+        commands = [line.strip() for line in sys.stdin
+                    if line.strip() and not line.strip().startswith('#')]
         if not commands:
             p.error('no commands on stdin')
 
-    token_file = args.control_token_file or os.environ.get('MODBUS_CACHE_CONTROL_TOKEN_FILE')
-    token = args.control_token or os.environ.get('MODBUS_CACHE_CONTROL_TOKEN')
+    token_file = args.control_token_file or os.environ.get('MCH_CONTROL_TOKEN_FILE')
+    token = args.control_token or os.environ.get('MCH_CONTROL_TOKEN')
     if token and token_file:
         p.error('--control-token and --control-token-file are mutually exclusive')
     if token_file:

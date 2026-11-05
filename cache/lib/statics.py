@@ -21,6 +21,8 @@ ILLEGAL_FUNCTION = PROTOCOL['exceptions']['illegal_function']
 ILLEGAL_ADDRESS = PROTOCOL['exceptions']['illegal_address']
 ILLEGAL_VALUE = PROTOCOL['exceptions']['illegal_value']
 GATEWAY_FAILED = PROTOCOL['exceptions']['gateway_failed']
+LOG_LEVELS = tuple(STATIC['log_levels'])
+
 REGISTER_TYPES = STATIC['register_types']      # type name -> words per register
 UNIT_ID_RANGE = tuple(STATIC['unit_id_range'])
 
@@ -38,3 +40,4 @@ CLI_TIMEOUT_S = DEFAULTS['cli_timeout_s']
 CLI_RECONNECT = DEFAULTS['cli_reconnect']
 CLI_RECONNECT_WAIT_S = DEFAULTS['cli_reconnect_wait_s']
 CONTROL_IDLE_TIMEOUT_S = DEFAULTS['control_idle_timeout_s']
+CONTROL_LINE_CAP = int(STATIC['control']['line_cap_bytes'])

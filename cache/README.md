@@ -66,7 +66,7 @@ shared schema the [fake inverter](../inverter/README.md) serves and the
 suite's [`profiles/`](../profiles/) subproject (`sun2000.json` by default).
 The profile JSON format is documented in
 [profiles/README.md](../profiles/README.md).
-Resolution: `--profile` flag, env `MODBUS_CACHE_PROFILE`, ini `profile`,
+Resolution: `--profile` flag, env `MCH_PROFILE`, ini `profile`,
 then the bundled copy; the file is re-read on `SIGHUP`. Entry `type`
 (i16/u16/i32/u32) gives the word width, `name` decorates the poll logs, and
 the optional **`fc`** field picks the address space: `3` (holding
@@ -82,7 +82,7 @@ entries without their own, never a floor.
 
 Which registers are actually **fetched** comes from a selection file —
 `{"registers": ["pv-power", "grid-power", ...]}`, profile names only —
-resolved as `--selection` flag, env `MODBUS_CACHE_SELECTION`, ini
+resolved as `--selection` flag, env `MCH_SELECTION`, ini
 `selection`; the default fetches **every** profile entry (`all`), and
 **`none`** empties the map: every read forwards to the inverter and nothing
 is stored (a pass-through proxy, the cache gauges go quiet). The shipped
@@ -106,7 +106,7 @@ the device actually answers.
 ## Usage
 
 ```bash
-python3 cache/bin/modbus_cache.py --host 192.168.1.100
+python3 cache/bin/modbus-cache.py --host 192.168.1.100
 ```
 
 By default the proxy **binds to 127.0.0.1:15502** (loopback only) — pass
@@ -115,7 +115,7 @@ By default the proxy **binds to 127.0.0.1:15502** (loopback only) — pass
 Add **`--dry-run`** to validate the configuration and the register map and
 print the effective settings (poll plan, ACLs, limits) without binding the
 listen port or contacting the inverter — handy for checking NixOS-rendered
-config files (`--config /nix/store/…-modbus_cache.ini --dry-run`).
+config files (`--config /nix/store/…-modbus_cache.conf --dry-run`).
 Exit codes: `0` = valid; `1` = invalid (reason on stderr, stdout stays
 clean); `2` = command-line misuse.
 
@@ -123,7 +123,7 @@ Point the scraper (or any other Modbus client) at the proxy instead of the
 inverter:
 
 ```bash
-python3 scrape/bin/modbus_scraper.py --host 127.0.0.1 --modbus-port 15502
+python3 scrape/bin/modbus-scraper.py --host 127.0.0.1 --modbus-port 15502
 ```
 The scraper auto-detects the diagnostics block and exports it as
 `huawei_cache_*` Prometheus gauges — device-down-behind-cache becomes visible
@@ -135,23 +135,23 @@ Settings are resolved in this order (first hit wins), mirroring
 `modbus-scraper`:
 
 1. CLI flags (`--host`, `--listen`, …)
-2. Environment variables — same names prefixed: `MODBUS_CACHE_HOST`,
-   `MODBUS_CACHE_PORT`, `MODBUS_CACHE_UNIT`, `MODBUS_CACHE_TIMEOUT`,
-   `MODBUS_CACHE_LISTEN`, `MODBUS_CACHE_INTERVAL`, `MODBUS_CACHE_READ_DELAY`,
-   `MODBUS_CACHE_MERGE_GAP`, `MODBUS_CACHE_PROFILE`,
-   `MODBUS_CACHE_TTL`, `MODBUS_CACHE_ALLOW_WRITE`, `MODBUS_CACHE_LOCAL_TIME`,
-   `MODBUS_CACHE_LOG_ACCESS`, `MODBUS_CACHE_MAX_CLIENTS`,
-   `MODBUS_CACHE_CLIENT_TIMEOUT`, `MODBUS_CACHE_CONNECT_ACL`,
-   `MODBUS_CACHE_WRITE_ACL`, `MODBUS_CACHE_WRITE_REGISTERS`,
-   `MODBUS_CACHE_LOG_LEVEL`, `MODBUS_CACHE_CONTROL_TOKEN`,
-   `MODBUS_CACHE_CONTROL_TOKEN_FILE`, `MODBUS_CACHE_CONTROL_TRUST_UIDS`,
-   `MODBUS_CACHE_DUMP_PATH`, `MODBUS_CACHE_DUMP_INTERVAL`,
-   `MODBUS_CACHE_AUDIT_LOG`,
-   `MODBUS_CACHE_AUDIT_MAX_MB`, `MODBUS_CACHE_AUDIT_DAILY`,
-   `MODBUS_CACHE_AUDIT_FILES`, `MODBUS_CACHE_NO_AUDIT_LOG`,
-   `MODBUS_CACHE_REQUESTS_AUDIT`
+2. Environment variables — same names prefixed: `MCH_HOST`,
+   `MCH_PORT`, `MCH_UNIT`, `MCH_TIMEOUT`,
+   `MCH_LISTEN`, `MCH_INTERVAL`, `MCH_READ_DELAY`,
+   `MCH_MERGE_GAP`, `MCH_PROFILE`,
+   `MCH_TTL`, `MCH_ALLOW_WRITE`, `MCH_LOCAL_TIME`,
+   `MCH_LOG_ACCESS`, `MCH_MAX_CLIENTS`,
+   `MCH_CLIENT_TIMEOUT`, `MCH_CONNECT_ACL`,
+   `MCH_WRITE_ACL`, `MCH_WRITE_REGISTERS`,
+   `MCH_LOG_LEVEL`, `MCH_CONTROL_TOKEN`,
+   `MCH_CONTROL_TOKEN_FILE`, `MCH_CONTROL_TRUST_UIDS`,
+   `MCH_DUMP_PATH`, `MCH_DUMP_INTERVAL`,
+   `MCH_AUDIT_LOG`,
+   `MCH_AUDIT_MAX_MB`, `MCH_AUDIT_DAILY`,
+   `MCH_AUDIT_FILES`, `MCH_NO_AUDIT_LOG`,
+   `MCH_REQUESTS_AUDIT`
 3. Config file (snake_case keys, `[cache]` section) — `--config` picks the
-   file (default: `modbus_cache.ini` next to `modbus_cache.py` — the
+   file (default: `modbus_cache.conf` next to `modbus-cache.py` — the
    packaged layout — then the subproject root's sample; a missing file
    is fine)
 
@@ -174,28 +174,31 @@ with a clean one-line error instead of failing later at runtime.
 | `--read-delay` | `0.05` | seconds between consecutive inverter reads within a poll cycle (`0` = no wait) |
 | `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Behaviour toggles** | | |
-| `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (ini `allow_write`, env `MODBUS_CACHE_ALLOW_WRITE` accept `true`/`false`) |
-| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default) (ini `write_registers`, env `MODBUS_CACHE_WRITE_REGISTERS`) |
+| `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (ini `allow_write`, env `MCH_ALLOW_WRITE` accept `true`/`false`) |
+| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default) (ini `write_registers`, env `MCH_WRITE_REGISTERS`) |
 | `--connect-acl` | `any` | clients allowed to connect: `any`, `none` (refuse everyone) or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `none` | clients allowed to write — still requires `--allow-write`; `none` = no client writes (the default) — see [Access control](#access-control) |
-| `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (ini `control_token`, env `MODBUS_CACHE_CONTROL_TOKEN`) |
-| `--control-token-file` | none | the token from a file (the first line; a systemd `LoadCredential` or a key file, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12) — instead of `--control-token`, giving both is an error (ini `control_token_file`, env `MODBUS_CACHE_CONTROL_TOKEN_FILE`) |
-| `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user (ini `control_socket_group`, env `MODBUS_CACHE_CONTROL_SOCKET_GROUP`) |
-| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (ini `control_trust_uids`, env `MODBUS_CACHE_CONTROL_TRUST_UIDS`) |
+| `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (ini `control_token`, env `MCH_CONTROL_TOKEN`) |
+| `--control-token-file` | none | the token from a file (the first line; a systemd `LoadCredential` or a key file, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12) — instead of `--control-token`, giving both is an error (ini `control_token_file`, env `MCH_CONTROL_TOKEN_FILE`) |
+| `--control-ops-token` | none | a **second, read-only control token**: sessions authenticating with it may run the `show`/`clear` verbs only — no `set`/`unset`, no `request dump`/`restore`, no `restart`, no `shutdown` — the ops shift against the admin key, both audited (`role=ops`/`role=admin` in the CACHE trail); needs `--control-token`/`--control-token-file` and must differ from it — see [Runtime control](#runtime-control---control-port) (ini `control_ops_token`, env `MCH_CONTROL_OPS_TOKEN`) |
+| `--control-ops-token-file` | none | the read-only ops token from a file (the first line; **owner-only `0600`**, F12) — instead of `--control-ops-token`, giving both is an error (ini `control_ops_token_file`, env `MCH_CONTROL_OPS_TOKEN_FILE`) |
+| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (ini `control_ops_verbs`, env `MCH_CONTROL_OPS_VERBS`) |
+| `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user (ini `control_socket_group`, env `MCH_CONTROL_SOCKET_GROUP`) |
+| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (ini `control_trust_uids`, env `MCH_CONTROL_TRUST_UIDS`) |
 | **Persistence** | | |
-| `--dump-path` | off | the state dump (write-behind): the live setting overrides and — with `--dump-with-cache` — the cached words + their stamps, as one JSON, created `0600` with an integrity hash — written on shutdown, by the `request dump` command and every `--dump-interval` seconds; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (ini `dump_path`, env `MODBUS_CACHE_DUMP_PATH`) |
-| `--dump-with-cache` | off | dump the cached words too: the `request dump` command and the `--dump-interval` loop write the words + the settings (the default off = settings only; `request dump with-cache` always includes them; the restore takes either shape) (ini `dump_with_cache`, env `MODBUS_CACHE_DUMP_WITH_CACHE`) |
-| `--dump-interval` | `0` | seconds between the automatic state dumps, `0` = on request (the `request dump` command and the shutdown); needs `--dump-path`; live-settable (`set dump-interval`, ini `dump_interval`, env `MODBUS_CACHE_DUMP_INTERVAL`) |
+| `--dump-path` | off | the state dump (write-behind): the live setting overrides and — with `--dump-with-cache` — the cached words + their stamps, as one JSON, created `0600` with an integrity hash — written on shutdown, by the `request dump` command and every `--dump-interval` seconds; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (ini `dump_path`, env `MCH_DUMP_PATH`) |
+| `--dump-with-cache` | off | dump the cached words too: the `request dump` command and the `--dump-interval` loop write the words + the settings (the default off = settings only; `request dump with-cache` always includes them; the restore takes either shape) (ini `dump_with_cache`, env `MCH_DUMP_WITH_CACHE`) |
+| `--dump-interval` | `0` | seconds between the automatic state dumps, `0` = on request (the `request dump` command and the shutdown); needs `--dump-path`; live-settable (`set dump-interval`, ini `dump_interval`, env `MCH_DUMP_INTERVAL`) |
 | **Audit trail** | | |
 | `--audit-log` | XDG state | the CACHE audit trail: a file path or `-` for stdout (docker logs / journald); default `~/.local/state/modbus-cache/audit.log` — see [Audit logging](#audit-logging) |
 | `--audit-max-mb` | `10` | rotate the audit log at this size, keeping `--audit-files` backups; `0` = off |
 | `--audit-daily` | off | also rotate the audit log at UTC midnight |
 | `--audit-files` | `3` | rotated audit backups to keep |
 | `--no-audit-log` | off | disable the audit trail |
-| `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds (who is hammering the cache), `0` = off (ini `requests_audit_s`, env `MODBUS_CACHE_REQUESTS_AUDIT`) |
+| `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds (who is hammering the cache), `0` = off (ini `requests_audit_s`, env `MCH_REQUESTS_AUDIT`) |
 | **Metrics** | | |
-| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `huawei_cache_*` path); **live-settable** (`set metrics-server on/off`) and **refuses to start without `--metrics-token`/`--metrics-token-file`** (ini `metrics_server`, env `MODBUS_CACHE_METRICS_SERVER`) |
-| `--metrics-listen` | `127.0.0.1:9252` | the metrics bind address `HOST:PORT` — `0.0.0.0:PORT` serves every interface, **a token is mandatory regardless** (ini `metrics_listen`, env `MODBUS_CACHE_METRICS_LISTEN`) |
+| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `huawei_cache_*` path); **live-settable** (`set metrics-server on/off`) and **refuses to start without `--metrics-token`/`--metrics-token-file`** (ini `metrics_server`, env `MCH_METRICS_SERVER`) |
+| `--metrics-listen` | `127.0.0.1:9252` | the metrics bind address `HOST:PORT` — `0.0.0.0:PORT` serves every interface, **a token is mandatory regardless** (ini `metrics_listen`, env `MCH_METRICS_LISTEN`) |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-server` is on |
 | `--metrics-token-file` | off | the metrics bearer token from a file (the first line; owner-only `0600`, F12) — instead of `--metrics-token`, giving both is an error |
 | **Limits** | | |
@@ -208,7 +211,12 @@ with a clean one-line error instead of failing later at runtime.
 | `--log-access` | `DEBUG` | log client connects/disconnects at `INFO` instead of `DEBUG` |
 | `--local-time` | UTC | log timestamps in the system time zone instead of UTC |
 
-`cache/modbus_cache.ini` is a sample with the defaults. Boolean ini/env
+`cache/modbus_cache.conf` is a sample in the set grammar (every line a
+`set <name> <value>`, `#` comments stay comments — the config file pipes
+through `modbus-cache-ctl` unchanged, and `show config` regenerates it from the
+running daemon; `show knobs` prints the whole registry — every knob with
+its flag, its env twin, its section and how it changes, `help config` maps
+them to their control commands). Boolean config/env
 values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 
 ## Diagnostics registers
@@ -236,8 +244,8 @@ every forwarded request before anything is cached.
 | `SIGTERM` / `SIGINT` | **Graceful shutdown**: the listener is closed and the shutdown is logged. |
 
 ```bash
-kill -HUP  $(pgrep -f modbus_cache.py)   # reload config + register map
-kill -USR1 $(pgrep -f modbus_cache.py)   # clean the cache
+kill -HUP  $(pgrep -f modbus-cache.py)   # reload config + register map
+kill -USR1 $(pgrep -f modbus-cache.py)   # clean the cache
 ```
 
 ## Runtime control (`--control-port`)
@@ -247,8 +255,8 @@ A JSON-lines control server runs **by default on the unix socket
 files replaced, nothing ever lands in the working directory. Pass a TCP port
 number to bind `127.0.0.1:PORT` instead, or `0` to switch the control server
 off. Both the proxy and the CLI tool resolve the target the same way: flag >
-**`MODBUS_CACHE_CTL`** (or the short **`CACHE_CTL`**, like the fake
-inverter's `FAKE_CTL`) environment variable > default socket.
+**`MCH_CTL`** (or the short **`MCH_CTL`**, like the fake
+inverter's `INV_CTL`) environment variable > default socket.
 
 One command per line, one reply per line. Every request and reply is one
 JSON object: the request = `{"cmd": "<command>"}`, the reply =
@@ -271,13 +279,28 @@ peers keep speaking without the secret). The audit trail's COMMAND entries
 carry the frame's mac (`wire=h…`) — the command the server logs
 cryptographically matches the command the client sent.
 
+**The read-only ops role**: a daemon may carry a second token
+(`--control-ops-token`/`--control-ops-token-file`) beside the admin one.
+Sessions authenticating with the ops token may run the **`show`/`clear`
+verbs only** — no `set`/`unset`, no `request dump`/`restore`, no `restart`,
+no `shutdown` (the ops shift can look, flush the cache, and leave; steering
+needs the admin key). The gate is the command's head verb; a denied command
+answers `err forbidden: the ops token runs the show/clear verbs only (<verb>
+needs the admin token)`. Both tokens are audited: the CACHE trail's COMMAND
+entries name the session's role (`role=ops`/`role=admin`, the denials
+included), and each session's frames are mac'd with the key it
+authenticated with — an ops client verifies its own replies against the ops
+token, an admin client against the admin token. The peer-cred trusted peers
+(`SO_PEERCRED`) hold the admin role.
+
 > **A token flag lands in `ps`.** Tokens passed as `--control-token` /
-> `--metrics-token <secret>` are visible on the process command line — every
+> `--control-ops-token` / `--metrics-token <secret>` are visible on the
+> process command line — every
 > local user can read them in `ps` output or `/proc/*/cmdline` (the audit's
 > F9; the same applies to the ctl/cli clients). Prefer the **`-file`**
 > variants — the file must be **owner-only (`0600`)**: group/world-accessible
-> token files refuse to start (F12) — or the `MODBUS_CACHE_CONTROL_TOKEN` /
-> `MODBUS_CACHE_METRICS_TOKEN` env vars. The flag form is for quick tests.
+> token files refuse to start (F12) — or the `MCH_CONTROL_TOKEN` /
+> `MCH_METRICS_TOKEN` env vars. The flag form is for quick tests.
 
 | Command | Effect |
 |---|---|
@@ -295,6 +318,7 @@ cryptographically matches the command the client sent.
 | `request dump` | write the live setting overrides — and, with `--dump-with-cache` (or the `with-cache` suffix: `request dump with-cache`), the cached words (+ their stamps) — to the `--dump-path` file; the write-behind state, see [Persistence](#persistence); the dump commands (and the `dump-interval` setting) show up in the listings only when a dump path is configured |
 | `request restore` | load the dump back: the words return with their original stamps (their TTL bounds any staleness) and the overrides re-apply — what the startup restore does automatically |
 | `show version` | the modbus-cache version |
+| `show knobs` | the dictionary of all knobs: every registry knob under its section — its flag, its env twin(s), its home section, the command that changes it live (or the restart note), a `secret` marker on the tokens |
 | `clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
 | `restart` | drop the upstream connection **and** the cache, repoll now — for recovering from a wedged inverter session |
 | `shutdown` | gracefully stop the proxy (same as SIGTERM: listener closed, control socket unlinked) |
@@ -311,29 +335,31 @@ live is marked with a `*` in `show settings` (`interval=5s*`) and listed in
 value and clears the mark. This makes the policy explicit: live settings are
 runtime nudges, the config files stay the source of truth.
 
-### `cache_ctl` — one-shot commands
+### `modbus-cache-ctl` — one-shot commands
 
 A small client for scripts and quick pokes: one command as arguments (or a
 batch piped on stdin), the replies on stdout, done.
 
 ```bash
-python3 cache/bin/cache_ctl.py --control-port 15509 show status
-python3 cache/bin/cache_ctl.py --control-port 15509 clear cache
-printf 'show cache\nclear cache\n' | python3 cache/bin/cache_ctl.py --control-port 15509
+python3 cache/bin/modbus-cache-ctl.py --control-port 15509 show status
+python3 cache/bin/modbus-cache-ctl.py --control-port 15509 clear cache
+printf 'show cache\nclear cache\n' | python3 cache/bin/modbus-cache-ctl.py --control-port 15509
 ```
 
-Same `--control-port` flag / `MODBUS_CACHE_CTL` env as the proxy itself; the
-TCP token comes from `--control-token` or `MODBUS_CACHE_CONTROL_TOKEN`.
+Same `--control-port` flag / `MCH_CTL` env as the proxy itself; the
+TCP token comes from `--control-token` or `MCH_CONTROL_TOKEN` —
+the ops staff pass the **read-only ops token** the same way and the server
+assigns the `show`/`clear` role to what the token opens.
 Exit codes: `0` = ok, `1` = connection/control error, `2` = CLI misuse.
 Every invocation lands in the audit log (below, prefix `CTL`).
 
-### `cache_cli` — console-style session
+### `modbus-cache-cli` — console-style session
 
 An interactive front-end on the same socket (same flag/env resolution): on
 the first connect (a TTY) it probes the status and greets you —
 
 ```
-$ python3 cache/bin/cache_cli.py
+$ python3 cache/bin/modbus-cache-cli.py
 
 % Welcome to the modbus-cache console
 %   192.168.1.100:5502 upstream | poll ok, last poll 2.00s | running for 1.00h | 1 client(s)
@@ -375,7 +401,7 @@ settings/version, `?` does the same in any position), `clear cache` and
 `restart` confirm with a plain
 `ok`, and `shutdown` asks `Proceed with shutdown? [confirm]` first — RETURN
 or `y` proceeds, anything else aborts with `% Aborted.`. While it idles the
-CLI sends wire pings (every 55 s, `CACHE_CLI_KEEPALIVE` to tune, `0` = off)
+CLI sends wire pings (every 55 s, `MCH_CLI_KEEPALIVE` to tune, `0` = off)
 so the control server's idle timeout never drops a live session. When the
 connection dies anyway (the proxy was killed, the socket went dark), the
 CLI retries **`--reconnect` times (default 3)** with **`--reconnect-wait`
@@ -386,7 +412,7 @@ The session itself (connect/disconnect, the local commands, an aborted
 shutdown) is appended to the CLI's own audit trail (prefix `CLI`,
 `--audit-log` / `--no-audit-log`); the commands themselves are audited by
 the server (prefix `CACHE`, with the client peer). TCP targets authenticate
-with `--control-token` or the `MODBUS_CACHE_CONTROL_TOKEN` env — the same
+with `--control-token` or the `MCH_CONTROL_TOKEN` env — the same
 token the proxy was started with.
 
 ## Access control
@@ -481,7 +507,7 @@ scraper's `huawei_cache_*` export path: `modbus_cache_hits_total` /
 `modbus_cache_misses_total`, `modbus_cache_poll_up` +
 `modbus_cache_last_poll_age_seconds`, `modbus_cache_age_seconds` (the
 oldest cached word), `modbus_cache_words` / `modbus_cache_ranges` (the
-`fc` labels), `modbus_cache_clients`, the uptime and the poll-cycle
+`fc` labels), `modbus_modbus-cache-clients`, the uptime and the poll-cycle
 durations (`modbus_cache_poll_duration_seconds{,_mean,_max}`). The
 uplink exports the session state — `modbus_cache_uplink_up`,
 `modbus_cache_uplink_{connects,exchanges,errors}_total`,
@@ -556,14 +582,16 @@ vanishing. **Rotation is gated**: `--audit-max-mb 10` (the default) rotates
 at 10 MB keeping 3 backups (`audit.log.1..3`), `--audit-daily` additionally
 rotates at UTC midnight, `--audit-max-mb 0` = unbounded.
 
-The prefix names the writer — `CACHE` (the proxy), `CLI` (cache_cli) and
-`CTL` (cache_ctl):
+The prefix names the writer — `CACHE` (the proxy), `CLI` (modbus-cache-cli) and
+`CTL` (modbus-cache-ctl):
 
 ```
 2026-11-04T07:16:40Z AUDIT CACHE START 4e1b92f0c7a3 version=0.3.0 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
 2026-11-04T07:16:43Z AUDIT CACHE WRITE b2c4e17f90d8 register 47415 = 5 (single register, unit 1)
 2026-11-04T07:17:02Z AUDIT CACHE AUTH-FAIL 6f3d84a1e2c9 peer=127.0.0.1:54425
 2026-11-04T07:17:12Z AUDIT CACHE COMMAND 09ab57d3f4e1 peer=127.0.0.1:54426 'clear cache' -> ok
+2026-11-04T07:17:20Z AUDIT CACHE COMMAND 5c92f1b8d3a7 peer=127.0.0.1:54427 role=ops 'clear cache' wire=h1e6070592485 -> ok
+2026-11-04T07:17:24Z AUDIT CACHE COMMAND e7d04c62f9b1 peer=127.0.0.1:54428 role=ops 'shutdown' wire=h8b21cf6403de -> err
 2026-11-04T07:17:30Z AUDIT CACHE REQUESTS 71d0c93be8f5 peer=127.0.0.1:54425 requests=412 (last 300s: 380)
 2026-11-04T07:17:30Z AUDIT CLI CONNECT 3a8e5f1c2d94 target=127.0.0.1:15502 user=oom
 2026-11-04T07:17:45Z AUDIT CACHE REQUESTS cc17e5b2a4f8 peer=127.0.0.1:54425 requests=412 connected=342s
@@ -579,7 +607,9 @@ family's XDG trails, or a journald dump on stdin).
 
 UTC stamps, the command as entered and its outcome — the structured
 who-when-what evidence trail. **Every wire command is audited once, by the
-server** (`AUDIT CACHE COMMAND`, with the client peer — it knows the who);
+server** (`AUDIT CACHE COMMAND`, with the client peer — it knows the who,
+and the role — the ops shift against the admin key — plus the frame's mac
+when the wire is signed); the denied ops attempts are in the trail too.
 the CLI audits its session (CONNECT/DISCONNECT, the local-only events like
 an aborted `shutdown`, RECONNECT attempts). The proxy audits its lifecycle
 (`START`, `RELOAD`, `RESET`, `SHUTDOWN`), every forwarded/refused/rejected
@@ -697,9 +727,9 @@ require the token handshake (`--control-token`, see
 ```
 cache/
 ├── bin/
-│   ├── modbus_cache.py  # CLI, logging setup, signal handling
-│   ├── cache_ctl.py     # one-shot control client (args / piped commands)
-│   └── cache_cli.py     # console-style interactive control session
+│   ├── modbus-cache.py  # CLI, logging setup, signal handling
+│   ├── modbus-cache-ctl.py     # one-shot control client (args / piped commands)
+│   └── modbus-cache-cli.py     # console-style interactive control session
 ├── modbus_cache.ini     # sample config (the default --config target)
 ├── selection.json       # example selection: the essential monitoring set
 └── lib/
@@ -710,7 +740,7 @@ cache/
     ├── upstream.py      # the shared inverter connection
     ├── cache.py         # register cache + block planner
     ├── proxy.py         # poller + client handling
-    ├── control.py       # JSON-lines control server (inspect/show/clear/restart/shutdown, token auth)
+    ├── control.py       # JSON-lines control server (inspect/show/clear/restart/shutdown, token auth + the read-only ops role)
     ├── audit.py         # the append-only audit trail (AUDIT CACHE/CLI/CTL lines)
     └── version.py       # the suite version
 ```

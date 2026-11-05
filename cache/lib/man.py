@@ -83,6 +83,11 @@ listings only when a dump path is configured.
 \\fBshutdown\\fR (the same as SIGTERM).
 .RE
 .PP
+A second, read-only token (\\fB--control-ops-token\\fR) authenticates
+sessions into the show/clear verbs only \\(em no set/unset, no request
+dump/restore, no restart, no shutdown \\(em the ops shift against the
+admin key, both roles audited.
+.PP
 See
 .BR modbus-cache-ctl (1)
 and
@@ -90,13 +95,13 @@ and
 for the clients."""
     environment = """.SH ENVIRONMENT
 .TP
-.B MODBUS_CACHE_CTL
+.B MCH_CTL
 default control target for the daemon's clients (flag \\fB--control-port\\fR
 wins).
 .TP
-.B MODBUS_CACHE_*
-every flag has an environment twin (\\fBMODBUS_CACHE_HOST\\fR,
-\\fBMODBUS_CACHE_LISTEN\\fR, \\fBMODBUS_CACHE_ALLOW_WRITE\\fR, ...); the flag
+.B MCH_*
+every flag has an environment twin (\\fBMCH_HOST\\fR,
+\\fBMCH_LISTEN\\fR, \\fBMCH_ALLOW_WRITE\\fR, ...); the flag
 wins over the env, the env over the ini."""
     files = """.SH FILES
 .TP
@@ -106,7 +111,7 @@ the default control socket (stale files replaced, unlinked on shutdown).
 .I ~/.local/state/modbus-cache/audit.log
 the default audit trail.
 .TP
-.I cache/modbus_cache.ini ", " cache/selection.json
+.I cache/modbus_cache.conf ", " cache/selection.json
 the packaged sample config and the example selection."""
     exit_status = """.SH EXIT STATUS
 .TP
@@ -138,7 +143,8 @@ stdout, one per line. Every invocation lands in the audit trail (prefix
 The command grammar is the daemon's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
 \\fBhelp\\fR (the settings registry), \\fBinspect\\fR, \\fBshow status\\fR,
 \\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR], \\fBshow uplink\\fR,
-\\fBshow version\\fR, \\fBclear cache\\fR, \\fBrestart\\fR, \\fBshutdown\\fR,
+\\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
+\\fBclear cache\\fR, \\fBrestart\\fR, \\fBshutdown\\fR,
 \\fBquit\\fR. See
 .BR modbus-cache (1)
 CONTROL."""
@@ -189,10 +195,10 @@ audited with the \\fBCLI\\fR prefix; the wire commands are audited once, by
 the server."""
     environment = """.SH ENVIRONMENT
 .TP
-.B CACHE_CLI_KEEPALIVE
+.B MCH_CLI_KEEPALIVE
 idle ping interval, seconds (default \\fB55\\fR); \\fB0\\fR = off.
 .TP
-.B MODBUS_CACHE_CTL ", " MODBUS_CACHE_CONTROL_TOKEN
+.B MCH_CTL ", " MCH_CONTROL_TOKEN
 the default control target and TCP token."""
     exit_status = """.SH EXIT STATUS
 .TP

@@ -196,7 +196,7 @@ with a clean one-line error instead of failing later at runtime.
 | **Metrics** | | |
 | `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `huawei_cache_*` path); **live-settable** (`set metrics-server on/off`) and **refuses to start without `--metrics-token`/`--metrics-token-file`** (ini `metrics_server`, env `MODBUS_CACHE_METRICS_SERVER`) |
 | `--metrics-listen` | `127.0.0.1:9252` | the metrics bind address `HOST:PORT` — `0.0.0.0:PORT` serves every interface, **a token is mandatory regardless** (ini `metrics_listen`, env `MODBUS_CACHE_METRICS_LISTEN`) |
-| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-port` is set |
+| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-server` is on |
 | `--metrics-token-file` | off | the metrics bearer token from a file (the first line; owner-only `0600`, F12) — instead of `--metrics-token`, giving both is an error |
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |

@@ -199,6 +199,9 @@ battery_soc_register = 37004
 grid_positive_import = false
 listen = 127.0.0.1:9350
 interval = 10
+max_clients = 64
+client_timeout = 300
+max_conn_per_ip = 0
 log_level = INFO
 ```
 

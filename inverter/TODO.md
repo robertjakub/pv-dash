@@ -55,8 +55,9 @@ status report, the registers table with the live values, the INV/CLI/CTL
 audit trail with the rotation, the battery realism (the efficiency, the
 self-discharge, the 80 % discharge cap, the temperature derate), the
 Docker + compose setup, the bin/ lib/ split, the fuzz suite. Also the own
-metrics endpoint (`--metrics-port`, the /metrics with the bearer auth
-like the scraper's), the grid-frequency machine (`--grid-frequency`, the
+metrics endpoint (`--metrics-server` + `--metrics-listen`, the /metrics
+with the bearer auth like the scraper's), the grid-frequency machine
+(`--grid-frequency`, the
 ±0.2 Hz wander), the `inspect` dump, the time-lapse factor
 (`--time-scale` / `set time-scale` — the simulated clock at N× real
 speed, so a demo watches a full day in minutes) and the grid-outage

@@ -2,12 +2,12 @@
 
 ## Open
 
-- **the audit-finding fixes** — the scraper's own: F13 refuse to start when
-  the listen host is not loopback and no token is configured (and make the
-  rate limiter per-IP, not per-connection), F14 the TLS recipe (a shipped
-  reverse-proxy example for anything beyond localhost), F15 a short "what
+- **the remaining audit findings** — the scraper's own open ones: F14 the
+  TLS recipe (a shipped reverse-proxy example for anything beyond
+  localhost; the native-TLS family item may cover it), F15 a short "what
   /metrics leaks" privacy note in the README, F16 the alert rules pack
-  below. See [AUDIT.md](../docs/AUDIT.md).
+  below. F13 is closed (the non-loopback refusal + the per-IP cap shipped
+  — see the resource-limits block). See [AUDIT.md](../docs/AUDIT.md).
 - **the multi-target scrape** — one process polling several inverters
   (per-target metrics with a unit/host label) for the two-string-roof
   households; the metrics endpoint and the audit are already per-process.

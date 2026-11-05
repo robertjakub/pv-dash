@@ -2,23 +2,17 @@
 
 ## Open
 
-- **the rest of the demo stack** — the compose chain runs the three Modbus
-  tools (fake inverter → cache → scraper) with the seeded `/config` volume,
-  and a **Prometheus** service scrapes the exporter over the internal
-  network (the scrape/token story: a random bearer token generated into the
-  volume, 0600); what is missing is the front: a **dashboard** service
-  rendering the Prometheus — plus the demo config seeded into the volume
-  (the cache's `allow-write` demo pokes, the dashboard's `battery: true`),
-  so `docker compose up` and the whole story runs — the write-through pokes
-  land in the charts live, the outages banner themselves, the audit trail
-  narrates.
-- **the remaining audit findings** — the open ones are documented trust
-  decisions / deployment stories now:
-  F16 (the alert-rules pack), F17/F14/F15/F1 — see
-  [AUDIT.md](AUDIT.md); F2–F10, F11–F13 and F18 are closed and verified
-  (§3.1/§4);
-  re-run the audit after the scrape control surface, the TLS story or the
-  dashboard service.
+### The next breaking wave (the interface evolution)
+
+- **the config files will change format** — the ini format (`[cache]` +
+  `key = value`) is the legacy surface now: it can and will be replaced by
+  the **`set <setting> <value>` grammar** the control servers already
+  speak — one vocabulary from the CLI to the file (a config file becomes a
+  runnable script: every line is a `set`, every comment stays a comment).
+  The tools will read both for a transition window (ini keeps loading, the
+  `set`-format file is the documented form, `show config` writes it), then
+  the ini goes away. Breaking: every rendered ini (the NixOS modules, the
+  docker `/config` volume seeds) follows.
 - **the CLI redone: hierarchical commands, one grammar for the family** —
   the control vocabulary grew organically per tool and it shows: flatten
   it into namespaces and make every tool speak the same shape —
@@ -39,35 +33,124 @@
   closes the last unauthenticated corner (the audit-trail line: the
   command the server logs should cryptographically match the command the
   client sent).
-- **the CI** — GitHub Actions: the seven suites + `nix flake check` (all
-  four packages, all systems) on the push; the release workflow on the tag.
-  (Tracked per subproject too; it lands here once for all.)
+- **one knob, one source** — every option currently lives in four places
+  (`--help`, the ini keys, the NixOS module options, the README tables)
+  and they drift; the settings registry already knows name/default/help —
+  generate the `--help` text, the rendered config and the NixOS option
+  skeletons from it (or at least a CI check that all four agree). The
+  man pages join when the `--man` item below lands.
+- **the man pages** — every tool has `--help` and a README; the shipped
+  roff pages (11, in each subproject's `man/`, installed to
+  `share/man/man1/`) are the packaged-installs story — what is missing is
+  a **`--man` flag** (print the roff to stdout, `modbus-cache --man |
+  man -l -` works in a container with no man pages installed) and keeping
+  the pages generated from the registry rather than hand-edited.
+
+### The security wave (the audit follow-ups)
+
+- **the remaining audit findings** — the open ones are documented trust
+  decisions / deployment stories now:
+  F16 (the alert-rules pack), F17/F14/F15/F1 — see
+  [AUDIT.md](AUDIT.md); F2–F10, F11–F13 and F18 are closed and verified
+  (§3.1/§4);
+  re-run the audit after the scrape control surface, the TLS story or the
+  dashboard service.
+- **native TLS on the HTTP surfaces** — F14 says "terminate at a proxy";
+  an opt-in native path (`--metrics-cert`/`--metrics-key`, stdlib `ssl`)
+  would make a proxy-less LAN install defensible: the bearer token stops
+  travelling in clear text. The Modbus side stays F1 (accepted,
+  protocol-inherent).
+- **a connect ACL for the fake's Modbus** — F11 closed without one (a
+  test tool, trusted LAN); an opt-in `--connect-acl` mirroring the cache's
+  would let the paranoid demo the ACL story end to end without touching
+  the fake's soft-edge posture.
+- **the audit trail forwarding** — F10's strong answer implemented as an
+  option: `--audit-forward syslog` (stdlib `SysLogHandler`, journald picks
+  it up sealed) next to the file/stdout sinks; the hash chains + the
+  forwarding together close the retention/immutability story properly.
+- **the systemd unit hardening review** — the NixOS modules ship
+  `PrivateTmp`; a full sandbox pass (`ProtectSystem=strict`,
+  `PrivateDevices`, `ProtectHome`, `RestrictAddressFamilies`,
+  `CapabilityBoundingSet=`) per service, verified with
+  `systemd-analyze security` (a score per unit in the NixOS test).
+
+### The pipeline (CI, releases, supply chain)
+
+- **the CI** — GitHub Actions: the nine suites + `nix flake check` (all
+  four packages, all systems) on the push; the release workflow on the tag;
+  the man pages linted (`mandoc -Tlint`) as a job; `promtool check
+  metrics` on a sample exposition. (Tracked per subproject too; it lands
+  here once for all.)
+- **nightly long fuzz** — the fuzz suites run short on push; a nightly
+  workflow with big budgets (`cache-fuzz 10000`, `scrape-fuzz 10000`,
+  `control-fuzz`, the stress suite) plus a container smoke test (`docker
+  compose up`, `/metrics` answers, no tracebacks in the logs).
+- **the SBOM / supply-chain note** — [sbom/SBOM.md](sbom/SBOM.md) +
+  `sbom/sbom.cdx.json` state the stdlib-only claim per subproject (the
+  machine-readable CycloneDX copy rides along); what remains is the
+  automation: generate and check both in the release workflow, so the
+  claim stays audited, not asserted. Also: a check that the vendored
+  ECharts copy (the dashboard's one vendor) matches its recorded version.
+- **the release discipline** — **done**: `scripts/release.py` (the
+  orchestrator: the version sweep, the changelog rename, the flake.lock
+  refresh, the verification, the commit, the annotated tag, the push and
+  the `gh release` from the changelog section) plus the tag-triggered
+  workflow (`.github/workflows/release.yml`: the nine suites, the nix
+  build, the GitHub release). What remains is operational: watch the
+  first few flights, then retire the training wheels.
+
+### The product (what the tools do next)
+
+- **the rest of the demo stack** — the compose chain runs the three Modbus
+  tools (fake inverter → cache → scraper) with the seeded `/config` volume,
+  and a **Prometheus** service scrapes the exporter over the internal
+  network (the scrape/token story: a random bearer token generated into the
+  volume, 0600); what is missing is the front: a **dashboard** service
+  rendering the Prometheus — plus the demo config seeded into the volume
+  (the cache's `allow-write` demo pokes, the dashboard's `battery: true`),
+  so `docker compose up` and the whole story runs — the write-through pokes
+  land in the charts live, the outages banner themselves, the audit trail
+  narrates.
+- **the scraper's control surface** — the only family tool without one:
+  the JSON-lines control server + `scraper_ctl`/`scraper_cli` on the
+  cache's pattern (`set interval` live, `show status`, the poll state) —
+  the SIGHUP story is the blunt instrument today. It inherits the family
+  grammar (the CLI-redone item) from day one.
+- **the per-phase export** — the fake serves per-phase voltages/currents
+  and the unbalanced home already; the scraper exports none of it and the
+  dashboard shows none of it. A `phase` label on the metrics (or three
+  suffixed registers) would close the loop fake → scrape → dashboard.
+- **the poll-latency gauges** — last/max poll cycle duration as Prometheus
+  gauges, so a slow dongle shows up in dashboards before the freshness gap
+  does.
+- **an ops `doctor` command per tool** — one shot: validate the config,
+  check the token-file modes, probe the upstream (Modbus read), probe the
+  metrics endpoint (auth + scrape), stat the dump/audit files, print the
+  findings as one report — the "why is my scrape red" first stop.
+- **a Modbus capture/replay tool** — a `pv-suite` sidecar that sits on a
+  TCP connection and dumps the wire to a file (and replays it): debugging
+  the poll planning, the write-through and the chaos behavior against real
+  hardware traces without the hardware.
 - **the hardware verification** — everything is verified against the fake
   inverter, fuzzing and stress only; a real SUN2000/SDongle week (poll
   pacing, the dongle's single-client behaviour, real exception codes, the
   FC4 input registers, reconnect storms) is the last mile. (Split per
   subproject: cache / scrape.)
-- **the release discipline** — **done**: `scripts/release.py` (the
-  orchestrator: the version sweep, the changelog rename, the flake.lock
-  refresh, the verification, the commit, the annotated tag, the push and
-  the `gh release` from the changelog section) plus the tag-triggered
-  workflow (`.github/workflows/release.yml`: the seven suites, the nix
-  build, the GitHub release). What remains is operational: watch the
-  first few flights, then retire the training wheels.
-- **the per-phase export** — the fake serves per-phase voltages/currents
-  and the unbalanced home already; the scraper exports none of it and the
-  dashboard shows none of it. A `phase` label on the metrics (or three
-  suffixed registers) would close the loop fake → scrape → dashboard.
-- **the SBOM / supply-chain note** — [sbom/SBOM.md](sbom/SBOM.md) +
-  `sbom/sbom.cdx.json` state the stdlib-only claim per subproject (the
-  machine-readable CycloneDX copy rides along); what remains is the
-  automation: generate and check both in the release workflow, so the
-  claim stays audited, not asserted.
-- **the man pages** — every tool has `--help` and a README; a `--man` (or
-  plain roff in each subproject) would make the packaged installs complete.
+- **the docs site** — the family READMEs are the docs today; a static
+  render (mkdocs or mdBook on GH Pages) with the audit, the TODOs and the
+  per-tool pages would make them navigable. Low priority, but the
+  cross-links are already written.
 
 ## Done (the highlights; the git history has the details)
 
+- **the metrics endpoint wave** — the caps (max-clients/client-timeout/
+  max-conn-per-ip) on every HTTP + Modbus surface, the fake's and the
+  cache's endpoints live-togglable, the scraper refusing a non-loopback
+  listen without a token (F13 closed).
+- **the integrity wave** — the audit trails carry chained per-writer
+  hashes verified by `scripts/audit_verify.py` (F10); the state dump is
+  0600 + integrity-hashed with a fail-closed restore (F18); the dump
+  splits by content (settings by default, with-cache on request).
 - **the release tooling** — `scripts/release.py` + the tag-triggered
   release workflow: the Open item above is the operational follow-up.
 - **the man pages** — one roff page per tool in each subproject's `man/`

@@ -53,8 +53,8 @@ The per-entry TTL: the profile entries carry an optional `ttl` (seconds,
 the fallback, the selection filter carries it, and `show cache all` marks
 the entries (`[ttl 5s]`).
 
-The native metrics endpoint: `--metrics-port` with the bearer token (the
-scraper's scheme) serving the `modbus_cache_*` gauges — the hit/miss
+The native metrics endpoint: `--metrics-server` + `--metrics-listen` with
+the bearer token (the scraper's scheme) serving the `modbus_cache_*` gauges — the hit/miss
 counters, the poll health + age, the cache age, the words/ranges/clients,
 and the last/mean/max poll-cycle durations — plus `--metrics-token-file`,
 the `metrics=` rows in `show status`/`inspect`.

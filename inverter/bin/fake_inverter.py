@@ -123,6 +123,7 @@ def configured_defaults(args, frozen, profile_text):
         'max-clients': str(args.max_clients),
         'client-timeout': '%g' % args.client_timeout,
         'max-conn-per-ip': str(args.max_conn_per_ip),
+        'metrics-server': 'on' if args.metrics_server else 'off',
         'profile': profile_text,
         'log-level': args.log_level,
     }

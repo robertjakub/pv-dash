@@ -125,7 +125,10 @@ the state dump (write-behind): the cached words + their stamps and the
 live setting overrides, as one JSON \(em written on shutdown, by the
 \fBrequest dump\fR command and every \fB--dump-interval\fR seconds;
 loaded on start only with \fB--restore-on-start\fR, on demand by the
-\fBrequest restore\fR command. Off by default.
+\fBrequest restore\fR command. The file is created \fB0600\fR (never the
+umask) and carries a sha256 integrity hash \(em a restore refuses an
+edited, unsigned or group/world-writable dump (F18: the dump is
+config-equivalent trust; own it like the ini). Off by default.
 .TP
 .B \-\-restore-on-start
 load the state dump when the daemon starts (needs \fB--dump-path\fR) \(em

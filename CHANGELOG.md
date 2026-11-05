@@ -112,6 +112,16 @@ before the repo restructured into one suite.
 
 ### Security
 
+- **cache** — the audit finding F18 (docs/AUDIT.md) closed: the state
+  dump is owned trust at rest — created **`0600` explicitly** (never the
+  umask) and carrying a **sha256 integrity hash** of its canonical
+  content; a restore **fails closed**: an edited, truncated or unsigned
+  dump refuses with a one-liner, and a group/world-writable dump refuses
+  outright (whoever can write the dump holds config trust — own the file
+  like the ini, `chmod 0600`). The hash catches corruption and casual
+  tampering, not a local admin who rechashes (the same boundary as the
+  audit trail's chains). The regtest asserts the mode, the hash and all
+  three refusals.
 - **cache, inverter** — the audit findings F2–F8 (docs/AUDIT.md) closed:
   the shared audit writer folds control characters, so an embedded `\n` in
   a control command can no longer forge a trail line (F2); an unparseable

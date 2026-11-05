@@ -751,6 +751,9 @@ try:
     check('request dump: the format is the versioned modbus-cache-dump', d.get('format') == 'modbus-cache-dump'
           and d.get('version') == 1 and len(d.get('registers', [])) == 91 and d.get('settings') == {},
           str(d.get('saved')))
+    check('request dump: the file is 0600 (F18) and carries the integrity hash',
+          os.stat(dumpfile).st_mode & 0o777 == 0o600 and isinstance(d.get('hash'), str)
+          and len(d['hash']) == 64, '%03o %r' % (os.stat(dumpfile).st_mode & 0o777, d.get('hash'))[:80])
     r = ctl_cmd('show settings', 15537)
     check('request dump: the dump-interval setting shows with a dump path', 'dump-interval=off' in r, r[:160])
     r = ctl_cmd('help', 15537)
@@ -774,6 +777,28 @@ try:
     check('request restore: the override is marked again', 'interval=2.00s*' in r, r[:120])
     r = ctl_cmd('show status', 15537)
     check('dump: the status carries the dump row', 'dump=%s every off' % dumpfile in r, r[-160:])
+    # the F18 restore gates: tampering, a group-writable dump and an unsigned dump all refuse
+    good = open(dumpfile).read()
+    d = _json.loads(good); d['registers'][0][2] = 65535
+    open(dumpfile, 'w').write(_json.dumps(d))
+    r = ctl_cmd('request restore', 15537)
+    check('dump: a tampered dump refuses to restore (integrity hash)',
+          r.startswith('err restore failed: the dump') and 'integrity hash' in r, r[:140])
+    open(dumpfile, 'w').write(good)
+    d = _json.loads(good); d.pop('hash')
+    open(dumpfile, 'w').write(_json.dumps(d))
+    r = ctl_cmd('request restore', 15537)
+    check('dump: an unsigned (pre-hash) dump refuses to restore',
+          r.startswith('err restore failed: the dump') and 'predates the integrity hash' in r, r[:140])
+    open(dumpfile, 'w').write(good)
+    os.chmod(dumpfile, 0o646)
+    r = ctl_cmd('request restore', 15537)
+    check('dump: a group/world-writable dump refuses to restore',
+          r.startswith('err restore failed: the dump') and 'chmod 0600' in r, r[:140])
+    os.chmod(dumpfile, 0o600)
+    r = ctl_cmd('request restore', 15537)
+    check('dump: the restored dump still loads after the refused attempts',
+          r.startswith('ok restored 91 word(s)'), r[:120])
     r = ctl_cmd('set dump-interval 1', 15537)
     check('dump-interval: the live setting accepted', r.startswith('ok dump-interval=1.00s'), r[:120])
     r = ctl_cmd('show status', 15537)

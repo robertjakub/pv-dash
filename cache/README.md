@@ -438,6 +438,18 @@ is a no-op (the cache stays empty by design). The dump commands (and the
 `dump-interval` setting) show up in the listings — the completions, `?`,
 `help`, `show settings` — only when a dump path is configured.
 
+**The dump is config-equivalent trust at rest** (the audit's F18) — and it
+is treated that way: the file is created **`0600`** explicitly (never the
+umask; the words are production data and the settings re-apply through the
+live validation), every dump carries a **sha256 integrity hash** of its
+canonical content, and a restore **fails closed**: an edited, truncated or
+unsigned dump refuses with a one-liner (`fails its integrity hash` /
+`predates the integrity hash`), and a group/world-writable dump refuses
+outright — whoever can write the dump holds config trust, so own the file
+like the ini (`chmod 0600`). The honest boundary, same as the audit
+trail's: the hash catches corruption and casual tampering, not a local
+admin who rechashes.
+
 ## Metrics
 
 `--metrics-port` (off by default) serves the cache's own Prometheus

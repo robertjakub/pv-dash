@@ -12,11 +12,10 @@
   so `docker compose up` and the whole story runs — the write-through pokes
   land in the charts live, the outages banner themselves, the audit trail
   narrates.
-- **the remaining audit findings** — the actionable open ones are small:
-  F18 (an explicit `0600` on the state-dump tmp — the F8/F12 pattern),
-  F16 (the alert-rules pack), F17/F14/F15/F1 (documented trust decisions /
-  deployment stories) — see
-  [AUDIT.md](AUDIT.md); F2–F10, F11–F13 are closed and verified
+- **the remaining audit findings** — the open ones are documented trust
+  decisions / deployment stories now:
+  F16 (the alert-rules pack), F17/F14/F15/F1 — see
+  [AUDIT.md](AUDIT.md); F2–F10, F11–F13 and F18 are closed and verified
   (§3.1/§4);
   re-run the audit after the scrape control surface, the TLS story or the
   dashboard service.

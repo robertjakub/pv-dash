@@ -56,7 +56,7 @@ their fix and verification, open ones in §3.2 (next number: F19).
 | HTTP `/metrics` listener | n/a | `--listen`, default `127.0.0.1:9350` | n/a | bearer token, constant-time compare |
 | control server (JSON lines) | unix socket `/tmp/modbus-cache-<port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | none (no control surface) | unix socket, `chmod 0600` after bind; `--control-port` = TCP on 127.0.0.1 | token on TCP (`hmac.compare_digest`), refused without; on unix a kernel-vouched peer (peer-cred: root, the daemon's own user, `--control-trust-uids`) skips the handshake |
 | metrics endpoint | `--metrics-port`, off, 127.0.0.1, **refuses to start without `--metrics-token`** | the HTTP listener *is* the metrics surface | `--metrics-port`, off, 127.0.0.1 | bearer token (`hmac.compare_digest`); mandatory on the cache, optional on the fake (test tool) |
-| state dump | `--dump-path`: the cached words (+ stamps) and the live setting overrides as one atomic JSON — see F18 | n/a | n/a | local file perms (umask-derived — F18) |
+| state dump | `--dump-path`: the cached words (+ stamps) and the live setting overrides as one atomic JSON — see F18 | n/a | n/a | **created `0600` explicitly** (never the umask) + a sha256 integrity hash checked at restore (F18) |
 | token files | `--control-token-file` / `--metrics-token-file` | `--auth-token-file` | same as the cache | **owner-only (0600) enforced** — a group/world-accessible token file refuses to start (F12) |
 | upstream device connection | outbound to the inverter/SDongle | outbound poll to the inverter/SDongle (or the cache), every 10 s by default | n/a (it *is* the device) | none (protocol-inherent) |
 | audit trail | XDG state home or stdout, append-only, rotated, control-character-folded (the shared `common/audit.py`) | same | same | local file perms |
@@ -130,7 +130,8 @@ control-server access only.
   their original stamps so the ttl bounds any staleness; restored setting
   overrides go through the same validation as the live `set`
   (`cache/lib/control.py:711-726`) — the dump is config-equivalent trust
-  (F18).
+  (F18): created `0600`, integrity-hashed, restored only after the hash
+  and the mode checks pass.
 - **Supply chain (NIS2 21.2(d), DORA art. 28)** — stdlib-only, zero
   third-party dependencies, no transitive risk; Nix-pinned builds; the
   demo's Prometheus comes from the alpine package (pinned by the base
@@ -168,9 +169,9 @@ control-server access only.
 
 ## 3. Findings
 
-### 3.1 Closed (F2–F9, F11–F13; fixes verified, see §4)
+### 3.1 Closed (F2–F10, F11–F13, F18; fixes verified, see §4)
 
-Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12, F13, F10.
+Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12, F13, F10, F18.
 
 | # | Module | Was | Fix (where) |
 |---|---|---|---|
@@ -196,7 +197,6 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12, F1
 | F15 | scrape | INFO | The metrics expose production values (generation, consumption, battery SoC) — a home-occupancy privacy consideration. | The bearer token (F13) + the localhost bind are the controls; treat the endpoint as internal. |
 | F16 | scrape | INFO | No automated alerting yet (freshness gap, poll down, exception spikes — the rules pack is pending). | Ship the alert rules file with the NixOS module; NIS2 21.2(d) wants detection wired, not just logged. |
 | F17 | docker | INFO | The `/config` volume holds the live ini files — anything a user puts there (e.g. a `control_token =` line) sits in plaintext on a docker volume, and the entrypoint seeds copies **once** (existing files are never refreshed): a fixed bundled default does not reach an existing volume until it is wiped. The generated `metrics.token` (F7) lives in the same volume — 0600 and root-owned-seeded, but not secret-backed. | Prefer token files outside the volume / `LoadCredential` / secret-backed mounts for anything sensitive; document `docker compose down -v` as the way to re-sync the volume with the bundled defaults. |
-| F18 | cache | LOW | **The state dump is config-equivalent trust at rest, with an umask-derived mode**: `--dump-path`'s JSON carries the cached register values (production data) *and* the live setting overrides, and a restore re-applies any registered setting through the live validation — `allow-write` included (`persist.py:35-39` writes the tmp file with the umask-derived mode; `control.py:711-726` re-applies the overrides). Whoever can write the dump file effectively holds config trust; whoever can read it sees the values. The dump path is operator-chosen (no search-path surprises) and loading on start is gated. | Create the dump with an explicit `0600` (chmod the tmp before `os.replace`, the F8/F12 pattern); document the dump as config-trust (own it like the ini; a group-shared dump belongs under `--control-socket-group`-style decisions, not the umask). |
 
 ## 4. Verified evidence
 
@@ -283,6 +283,14 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12, F1
   the cache and the fake metrics 503 past `--metrics-max-clients`
   (asserted in both regtests), and the cache's Modbus per-IP gate refuses
   the second same-peer connection until `set max-conn-per-ip` raises it.
+- **F18 (the state dump → owned trust at rest)** — the cache regtest
+  asserts the whole story: the dump file is observed `0600` right after a
+  `request dump` and carries the 64-hex integrity hash; a tampered dump
+  (a flipped word) refuses with `fails its integrity hash — nothing
+  restored`; an unsigned (pre-hash) dump refuses with `predates the
+  integrity hash — dump again`; a group/world-writable dump (mode 646)
+  refuses outright with `chmod 0600`; and after all three refusals the
+  untouched dump still restores cleanly (91 words + the override).
 - **The write-default hardening** (posture, not a finding) — the cache
   regtest's `none`-modes block asserts the new defaults end-to-end: the
   start log reads `connect acl: any, write acl: none, write allow-list:
@@ -360,13 +368,15 @@ per-peer caps everywhere) and F10 (the audit trail is tamper-evident:
 a chained hash per entry, per writer prefix, with `scripts/audit_verify.py`
 — the honest boundary: a determined local admin holding the algorithm can
 rechain, so journald forwarding stays the strong answer where the
-retention requirement is strict), and hardened the write defaults on the
-way. The trust-boundary picture is otherwise stable — the state-dump
-surface stays the one newish weak spot (F18, small: an explicit `0600` on
-the dump closes it) beside one documented trust decision (a restored dump
-may re-apply setting overrides; the dump file deserves the ini's care).
-The inverter fake remains a test instrument with deliberately soft edges —
-now capped and documented as such (F11 closed); the scraper's remaining
+retention requirement is strict), F18 (the state dump created `0600`
+explicitly and integrity-hashed — a restore fails closed on a tampered,
+unsigned or group-writable file), and hardened the write defaults on the
+way. The remaining open set is the documented trust decisions and the
+deployment stories: the state-dump trust is owned now (F18 closed) — the
+dump file deserves the ini's care (the hash catches tampering, not a
+local admin who rechashes). The inverter fake remains a test instrument
+with deliberately soft edges — now capped and documented as such (F11
+closed); the scraper's remaining
 exposures stay operational, not architectural — terminate TLS at a proxy
 when exposed (F14) and ship the alert rules (F16). The accepted exposure
 remains F1 (Modbus TCP itself) — mitigate with segmentation and the write

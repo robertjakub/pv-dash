@@ -96,7 +96,7 @@ def parse_args():
     ap.add_argument('--requests-audit', dest='requests_audit', type=float,
                     help='audit one REQUESTS tally per client per this many seconds, 0 = off (default: config, $MODBUS_CACHE_REQUESTS_AUDIT or 300)')
     ap.add_argument('--dump-path', dest='dump_path',
-                    help='the state dump (write-behind): the cached words + the live setting overrides as one JSON; dumped on shutdown, on the request dump command and every --dump-interval seconds; loaded on start only with --restore-on-start, on demand with the request restore command (default: config, $MODBUS_CACHE_DUMP_PATH or none)')
+                    help='the state dump (write-behind): the cached words + the live setting overrides as one JSON, written 0600 with an integrity hash (a restore refuses a tampered, unsigned or group-writable dump); dumped on shutdown, on the request dump command and every --dump-interval seconds; loaded on start only with --restore-on-start, on demand with the request restore command (default: config, $MODBUS_CACHE_DUMP_PATH or none)')
     ap.add_argument('--dump-interval', dest='dump_interval', type=float,
                     help='seconds between the automatic state dumps, 0 = on request (the request dump command and the shutdown) (default: config, $MODBUS_CACHE_DUMP_INTERVAL or 0)')
     ap.add_argument('--restore-on-start', dest='restore_on_start', action='store_true',

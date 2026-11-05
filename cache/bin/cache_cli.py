@@ -40,6 +40,7 @@ except ImportError:
 
 from common.audit import AuditLog
 from common.config import load_token_file
+from common.human import secs
 from lib.config import resolve_control_target
 from lib.settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from lib.statics import CLI_KEEPALIVE_S, CLI_TIMEOUT_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S
@@ -53,7 +54,7 @@ COMMAND_HELP = {
     'set': 'configure a setting live: set <setting> <value>',
     'unset': 'restore a setting to its configured value: unset <setting>',
     'inspect': 'one pretty dump of everything (the status, the map, the counters, the write gate)',
-    'show': 'runtime state: show <setting|status|connections|cache|settings|version>',
+    'show': 'runtime state: show <setting|status|connections|cache|uplink|settings|version>',
     'clear': 'drop the cached registers, repoll now (clear cache)',
     'restart': 'restart the upstream session: connection + cache dropped, repoll',
     'shutdown': 'stop the proxy gracefully (asks to confirm)',
@@ -64,6 +65,7 @@ SHOW_VALUES = (
     ('status', 'multi-line effective state report: one key=value per field'),
     ('connections', 'connected clients: peer, age, requests served'),
     ('cache', 'cache contents: ranges, words, freshness, hits/misses'),
+    ('uplink', 'the inverter link: session counters, per-block latency and errors'),
     ('settings', 'every tunable setting with its live value, one per line'),
     ('version', 'the modbus-cache version'),
 )
@@ -124,7 +126,7 @@ def candidates(buf):
         pool, hint = tuple(s.values), s.value_shape
         desc = lambda w, s=s: s.value_help.get(w, s.value_help.get(w.lower(), '')) or None
     elif head == 'show' and len(done) == 1:
-        pool, hint, desc = SETTING_NAMES + ('status', 'connections', 'cache', 'settings', 'version'), None, describe_word
+        pool, hint, desc = SETTING_NAMES + ('status', 'connections', 'cache', 'uplink', 'settings', 'version'), None, describe_word
     elif head == 'clear' and len(done) == 1:
         pool, hint, desc = ('cache',), None, describe_word
     else:
@@ -343,8 +345,8 @@ def reconnect(addr, is_unix, args, audit=None):
     --reconnect-wait seconds between the attempts; every attempt is
     audited. Returns the new socket, or None when the tries run out."""
     for attempt in range(1, args.reconnect + 1):
-        print('%% connection lost, reconnecting in %gs (attempt %d of %d)'
-              % (args.reconnect_wait, attempt, args.reconnect))
+        print('%% connection lost, reconnecting in %s (attempt %d of %d)'
+              % (secs(args.reconnect_wait), attempt, args.reconnect))
         try:
             time.sleep(args.reconnect_wait)
             s = connect_once(addr, is_unix, args.timeout)
@@ -413,18 +415,6 @@ def wire(cmd):
     return json.dumps({'cmd': cmd}, ensure_ascii=False)
 
 
-def human_uptime(seconds):
-    """30s / 5m / 3h / 2d — one unit, no decimal digits."""
-    s = int(seconds)
-    if s >= 86400:
-        return '%dd' % (s // 86400)
-    if s >= 3600:
-        return '%dh' % (s // 3600)
-    if s >= 60:
-        return '%dm' % (s // 60)
-    return '%ds' % s
-
-
 def welcome(sock):
     """The first-connect greeting: probe the status and introduce the proxy —
     the upstream, the poll health, how long it has been running — and the
@@ -440,7 +430,7 @@ def welcome(sock):
     print('% Welcome to the modbus-cache console')
     print('%%   %s upstream | poll %s, last poll %s | running for %s | %s client(s)'
           % (st.get('upstream', '?'), st.get('poll', '?'), st.get('last_poll', '?'),
-             human_uptime(float(st.get('uptime', '0') or 0)), st.get('clients', '?')))
+             st.get('uptime', '?'), st.get('clients', '?')))
     print('%   TAB completes, ? lists the commands, quit leaves')
 
 

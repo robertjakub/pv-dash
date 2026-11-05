@@ -11,6 +11,7 @@ and the [fake inverter](../inverter/README.md):
 | `config.py` | `parse_listen`, `load_token_file` and the device-profile resolution against the shared [profiles/](../profiles/README.md) |
 | `protocol.py` | the Modbus TCP wire core: `ModbusError`, `recv_exact`, `exception_frame` |
 | `logutil.py` | `UtcFormatter` — UTC log timestamps |
+| `human.py` | `secs` — human time for the command reports: ms/s/m/h/d, one unit, always two decimals |
 
 How `common` is found:
 

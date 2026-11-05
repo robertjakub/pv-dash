@@ -179,7 +179,7 @@ The control server speaks JSON lines: one request
 (the settings registry drives the grammar):
 .BR set ", " unset ", " show ", " help ,
 the reports
-.BR inspect ", " "show status" ", " "show connections" ", " "show cache" " [all]" ", " "show version" ,
+.BR inspect ", " "show status" ", " "show connections" ", " "show cache" " [all]" ", " "show uplink" ", " "show version" ,
 the ops
 .BR clear\ cache ", " restart ", " shutdown ", " quit .
 .RS
@@ -191,7 +191,12 @@ log-level, profile, selection, connect-acl, write-acl, timeout); a
 SIGHUP re-applies the config (the file always wins).
 .IP \(bu 2
 .B show cache all
-prints every cached entry: name, words, age, expiry, poll status.
+prints every cached entry: name, words, values, age, expiry, poll status.
+.IP \(bu 2
+.B show uplink
+analyses the inverter link: session counters (connects, exchanges, bytes,
+errors) and one row per poll block with its status, latency (last/mean/max)
+and last error.
 .IP \(bu 2
 .B clear cache
 / SIGUSR1, \fBrestart\fR (drop the upstream + the cache, repoll),

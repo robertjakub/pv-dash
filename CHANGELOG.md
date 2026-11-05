@@ -6,6 +6,29 @@ tagged commits'. The early tags (before 0.1.0) carried per-tool versions —
 the dashboard, the scraper and the cache each numbered their own releases
 before the repo restructured into one suite.
 
+## Unreleased
+
+### Added
+
+- **cache** — `show uplink`: the inverter-link report for analysing the
+  upstream connection — the session counters (state, connects, exchanges,
+  bytes in/out, errors, last error) and one row per poll block with its
+  status (`ok`/`ex N`/`error`/`pending`), latency (last/mean/max), failure
+  count and last error. The metrics endpoint exports the same state as
+  `modbus_cache_uplink_*` gauges (session counters + per-block
+  up/latency/fails with `fc`/`start`/`count` labels).
+
+### Changed
+
+- **common** — `human.secs`: one human time formatter for every command
+  surface in the suite (ms/s/m/h/d, one unit, always two decimals) — the
+  control reports, the set/unset confirmations, the `show cache all` /
+  `show uplink` tables and the console banners all speak it now (the logs,
+  the audit trail and the Prometheus endpoints keep raw seconds).
+- **cache** — `show cache all` carries the cached words' values too: a
+  `values` column between `words` and `age` (`-` = the register is not
+  cached yet).
+
 ## 0.3.0 — 2026-11-05
 
 The control surface, the shared core and the docs redo.

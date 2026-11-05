@@ -549,12 +549,12 @@ try:
 
     # 5d. set/unset/show settings: the live settings registry (the inverter's pattern)
     r = ctl_cmd('set interval 2', 15514)
-    check('set: interval applied with the state summary', r.startswith('ok interval=2s upstream=127.0.0.1:15512')
+    check('set: interval applied with the state summary', r.startswith('ok interval=2.00s upstream=127.0.0.1:15512')
           and 'poll=' in r and 'hits=' in r, r[:120])
     r = ctl_cmd('show status', 15514)
-    check('set: show status reflects the new interval', 'interval=2s' in r, r[:120])
+    check('set: show status reflects the new interval', 'interval=2.00s' in r, r[:120])
     r = ctl_cmd('show settings', 15514)
-    check('set: the live override carries the * marker', 'interval=2s*' in r, r[:160])
+    check('set: the live override carries the * marker', 'interval=2.00s*' in r, r[:160])
     r = ctl_cmd('show status', 15514)
     check('set: the overridden row lists the setting', 'overridden=interval' in r, r[-160:])
     r = ctl_cmd('set interval bogus', 15514)
@@ -563,21 +563,29 @@ try:
     check('set: unknown setting', r.startswith('err unknown setting'), r[:100])
     r = ctl_cmd('show settings', 15514)
     check('show settings: every tunable, one per line', r.startswith('ok settings\n')
-          and 'interval=2s*' in r and '\nttl=' in r and '\nmerge-gap=' in r
+          and 'interval=2.00s*' in r and '\nttl=' in r and '\nmerge-gap=' in r
           and '\nlog-level=INFO' in r, r[:160])
     r = ctl_cmd('show interval', 15514)
-    check('show <setting>: the bare value', r == 'ok interval=2s', r)
+    check('show <setting>: the bare value', r == 'ok interval=2.00s', r)
     r = ctl_cmd('help ttl', 15514)
     check('help <setting>: the registry description', r.startswith('ok ttl - per-register cache TTL'), r[:110])
     r = ctl_cmd('unset interval', 15514)
-    check('unset: restores the configured value', r.startswith('ok interval=1s'), r[:110])
+    check('unset: restores the configured value', r.startswith('ok interval=1.00s'), r[:110])
     r = ctl_cmd('show status', 15514)
     check('unset: the override marker clears', 'overridden=none' in r, r[-160:])
     r = ctl_cmd('show cache all', 15514)
     check('show cache all: per-entry rows with age, expiry and status', r.startswith('ok cache all\n')
           and 'pv-power' in r and 'expires' in r and 'fc3' in r and '2/2' in r, r[:200])
+    rows = r.splitlines()
+    check('show cache all: the values column carries the cached words',
+          'values' in rows[1] and any(len(row.split()) > 3 and row.split()[3].isdigit()
+                                      for row in rows[2:]), r[:200])
     r = ctl_cmd('show cache', 15514)
     check('show cache: the summary still works beside the dump', r.startswith('ok cache '), r[:80])
+    r = ctl_cmd('show uplink', 15514)
+    check('show uplink: session counters and per-block latency rows', r.startswith('ok uplink\n')
+          and 'exchanges' in r and 'connects' in r and 'mean' in r and 'fails' in r
+          and 'fc3' in r and 'status' in r, r[:200])
 
     # selection none: the map empties, every read forwards, nothing is stored
     r = ctl_cmd('set selection none', 15514)
@@ -642,7 +650,7 @@ try:
     check('per-entry ttl: the fast entry re-forwards, the global one stays cached',
           int(f2) == int(f1) + 1, '%s -> %s' % (f1, f2))
     r = ctl_cmd('show cache all', 15534)
-    check('show cache all: the entry ttl is marked', 'pv-power' in r and '[ttl 2s]' in r, r[:200])
+    check('show cache all: the entry ttl is marked', 'pv-power' in r and '[ttl 2.00s]' in r, r[:200])
     p_ttl.send_signal(signal.SIGTERM)
     p_ttl.wait(timeout=10)
 
@@ -679,6 +687,11 @@ try:
                                       'modbus_cache_last_poll_age_seconds')), '%s %r' % (st, body[:120]))
     check('metrics: the poll is up and the words are cached', 'modbus_cache_poll_up 1' in body
           and 'modbus_cache_words 91' in body, repr(body[:200]))
+    check('metrics: the uplink session and the per-block gauges',
+          all(n in body for n in ('modbus_cache_uplink_up 1', 'modbus_cache_uplink_exchanges_total',
+                                  'modbus_cache_uplink_errors_total', 'modbus_cache_uplink_bytes_total',
+                                  'modbus_cache_uplink_block_up{fc="3"', 'modbus_cache_uplink_block_latency_seconds',
+                                  'modbus_cache_uplink_block_fails_total')), repr(body[:200]))
     r = ctl_cmd('show status', 15530)
     check('metrics: show status carries the endpoint', 'metrics=127.0.0.1:15529 (bearer token)' in r, r[:160])
     p_metrics.send_signal(signal.SIGTERM)

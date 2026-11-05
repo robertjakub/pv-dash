@@ -72,6 +72,7 @@ class Proxy:
         self.last_ok = None
         self.poll_ok = False
         self.blocks = build_blocks(cache.ranges, merge_gap)
+        self.block_stats = {}    # (fc, start, count) -> the uplink tally: attempts, latency, errors
         self.generation = 0
         self.poll_wake = threading.Event()
         self.listen_sock = None
@@ -191,6 +192,25 @@ class Proxy:
             self.cache.set_leaf_error(leaf, e.code)
         self.cache.range_ok[leaf] = False
 
+    def _block_stat(self, key, secs, err=None):
+        """The `show uplink` tally of one poll-block attempt: the round-trip
+        time, the outcome (DeviceError keeps its Modbus exception code)."""
+        s = self.block_stats.setdefault(key, {'n': 0, 'ok_n': 0, 'fails': 0,
+                                              'last': 0.0, 'sum': 0.0, 'max': 0.0,
+                                              'last_err': None, 'last_code': None})
+        s['n'] += 1
+        s['last'] = secs
+        s['max'] = max(s['max'], secs)
+        if err is None:
+            s['ok_n'] += 1
+            s['sum'] += secs
+            s['last_err'] = None
+            s['last_code'] = None
+        else:
+            s['fails'] += 1
+            s['last_err'] = str(err)
+            s['last_code'] = err.code if isinstance(err, DeviceError) else None
+
     def poll_once(self):
         generation = self.generation
         version = self.cache.map_version
@@ -206,8 +226,10 @@ class Proxy:
             elif self.read_delay and paced:
                 time.sleep(self.read_delay)
             try:
+                t0 = time.monotonic()
                 with self.upstream.lock:
                     words = self.upstream.read(fc, start, count)
+                self._block_stat((fc, start, count), time.monotonic() - t0)
                 paced = True
                 self.cache.store(fc, start, words, version)
                 self.last_ok = time.monotonic()
@@ -226,11 +248,14 @@ class Proxy:
                     pending.appendleft((fc, right[0][1], span(right), right))
                     pending.appendleft((fc, left[0][1], span(left), left))
                 else:
+                    self._block_stat((fc, start, count), time.monotonic() - t0, e)
                     self._leaf_fail(leaves[0], e)
                     ok[leaves[0]] = False
                     done.append((fc, start, count, leaves))
         if generation == self.generation:
             self.blocks = done
+            live = {(fc, s, c) for fc, s, c, _ in done}
+            self.block_stats = {k: v for k, v in self.block_stats.items() if k in live}
         self.poll_ok = any(ok.values())
 
     def audit_reads(self):

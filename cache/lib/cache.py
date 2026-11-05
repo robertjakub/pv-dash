@@ -8,6 +8,8 @@ never merge across function codes (a read can only serve one)."""
 import threading
 import time
 
+from common.human import secs
+
 from .statics import MAX_COUNT
 
 
@@ -101,7 +103,7 @@ class Cache:
     def describe_ttl(self):
         if not self.cache_ttl:
             return 'never expires'
-        return 'for %gs' % self.cache_ttl
+        return 'for %s' % secs(self.cache_ttl)
 
     def words(self, fc, addr, count):
         with self.lock:
@@ -156,17 +158,18 @@ class Cache:
 
     def entries(self):
         """Per-range dump for `show cache all`: (fc, start, count, cached word
-        count, oldest age in s or None, poll error code or None, the entry's
-        effective ttl)."""
+        count, values (int or None per register), oldest age in s or None,
+        poll error code or None, the entry's effective ttl)."""
         with self.lock:
             now = time.time()
             out = []
             for (fc, start, count) in self.ranges:
-                words = sum(1 for a in range(start, start + count) if (fc, a) in self.regs)
+                values = [self.regs.get((fc, a)) for a in range(start, start + count)]
+                words = sum(1 for v in values if v is not None)
                 ages = [now - self.ts[(fc, a)] for a in range(start, start + count)
                         if (fc, a) in self.ts]
                 oldest = max(ages) if ages else None
                 ttl = self.ttls.get((fc, start, count))
-                out.append((fc, start, count, words, oldest,
+                out.append((fc, start, count, words, values, oldest,
                             self.leaf_errors.get((fc, start, count)), ttl))
             return out

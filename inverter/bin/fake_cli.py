@@ -39,6 +39,7 @@ import time
 
 from common.audit import AuditLog
 from common.config import load_token_file
+from common.human import secs
 
 try:
     import readline
@@ -336,8 +337,8 @@ def reconnect(addr, is_unix, args, audit=None):
     --reconnect-wait seconds between the attempts; every attempt is
     audited. Returns the new socket, or exits 1 when the tries run out."""
     for attempt in range(1, args.reconnect + 1):
-        print('%% connection lost, reconnecting in %gs (attempt %d of %d)'
-              % (args.reconnect_wait, attempt, args.reconnect))
+        print('%% connection lost, reconnecting in %s (attempt %d of %d)'
+              % (secs(args.reconnect_wait), attempt, args.reconnect))
         try:
             time.sleep(args.reconnect_wait)
             s = connect_once(addr, is_unix, args.timeout)
@@ -401,18 +402,6 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
             pass
 
 
-def human_uptime(seconds):
-    """30s / 5m / 3h / 2d — one unit, no decimal digits."""
-    s = int(seconds)
-    if s >= 86400:
-        return '%dd' % (s // 86400)
-    if s >= 3600:
-        return '%dh' % (s // 3600)
-    if s >= 60:
-        return '%dm' % (s // 60)
-    return '%ds' % s
-
-
 def welcome(sock):
     """The first-connect greeting: probe the status and introduce the device —
     the profile, how long the fake has been running, the grid/clock/battery
@@ -423,8 +412,8 @@ def welcome(sock):
     st = dict(row.split('=', 1) for row in reply.split('\n')[1:] if '=' in row)
     print('% Welcome to the Fake Inverter console')
     print('%%   %s' % st.get('profile', 'unknown profile'))
-    print('%%   running for %s | %s clock | %s V grid | battery %s'
-          % (human_uptime(st.get('uptime', '0')), st.get('timezone', 'utc'), st.get('grid_voltage', '230'),
+    print('%   running for %s | %s clock | %s V grid | battery %s'
+          % (st.get('uptime', '?'), st.get('timezone', 'utc'), st.get('grid_voltage', '230'),
              ('on (%s W, %s %%SoC)' % (st.get('battery', '?'), st.get('soc', '?')))
              if 'soc' in st else 'off'))
     print('%   TAB completes, ? lists the commands, help <setting> explains one, quit leaves')

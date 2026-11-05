@@ -257,7 +257,8 @@ permissions instead.
 | `show status` | the **effective state report**: one stable `key=value` line per field (`upstream`, `unit`, `listen`, `control`, `uptime`, `poll`, `last_poll`, `interval`, `ttl`, `merge_gap`, `ranges`, `fc4_ranges`, `map_version`, `hits`, `misses`, `clients`, `writes`, `write_allow_list`, `reads_audit`, `profile`, `selection`) — scriptable |
 | `show connections` | connected clients: peer, connection age, requests served |
 | `show cache` | cache contents: ranges, cached words, oldest entry, TTL, map version, failed ranges, hit/miss counters |
-| `show cache all` | every cached entry, one row per profile range: name, words cached, age of the oldest, when it expires, poll status (`ok`/`partial`/`empty`/`failed (ex N)`) |
+| `show cache all` | every cached entry, one row per profile range: name, words cached, their values (`-` = not cached), age of the oldest, when it expires, poll status (`ok`/`partial`/`empty`/`failed (ex N)`) |
+| `show uplink` | the inverter link: session counters (state, connects, exchanges, bytes in/out, errors, last error) plus one row per poll block — status (`ok`/`ex N`/`error`/`pending`), latency (last/mean/max), failure count, last error |
 | `show version` | the modbus-cache version |
 | `clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
 | `restart` | drop the upstream connection **and** the cache, repoll now — for recovering from a wedged inverter session |
@@ -300,7 +301,7 @@ the first connect (a TTY) it probes the status and greets you —
 $ python3 cache/bin/cache_cli.py
 
 % Welcome to the modbus-cache console
-%   192.168.1.100:5502 upstream | poll ok, last poll 2s | running for 5m | 1 client(s)
+%   192.168.1.100:5502 upstream | poll ok, last poll 2.00s | running for 1.00h | 1 client(s)
 %   TAB completes, ? lists the commands, quit leaves
 
 cache:15502 > show status
@@ -309,11 +310,11 @@ upstream=192.168.1.100:5502
 unit=1
 listen=127.0.0.1:15502
 control=unix:/tmp/modbus-cache-15502.socket
-uptime=3600
+uptime=1.00h
 poll=ok
-last_poll=2s
-interval=10s
-ttl=30s
+last_poll=2.00s
+interval=10.00s
+ttl=30.00s
 merge_gap=8
 ranges=13
 fc4_ranges=0
@@ -323,7 +324,7 @@ misses=9
 clients=1
 writes=disabled
 write_allow_list=any
-reads_audit=300s
+reads_audit=5.00m
 
 cache:15502 > clear cache
 ok
@@ -389,7 +390,15 @@ scraper's `huawei_cache_*` export path: `modbus_cache_hits_total` /
 `modbus_cache_last_poll_age_seconds`, `modbus_cache_age_seconds` (the
 oldest cached word), `modbus_cache_words` / `modbus_cache_ranges` (the
 `fc` labels), `modbus_cache_clients`, the uptime and the poll-cycle
-durations (`modbus_cache_poll_duration_seconds{,_mean,_max}`). With
+durations (`modbus_cache_poll_duration_seconds{,_mean,_max}`). The
+uplink exports the session state — `modbus_cache_uplink_up`,
+`modbus_cache_uplink_{connects,exchanges,errors}_total`,
+`modbus_cache_uplink_bytes_total{dir=in|out}`,
+`modbus_cache_uplink_last_error_age_seconds` — and every poll block as
+`modbus_cache_uplink_block_up{fc,start,count}`,
+`modbus_cache_uplink_block_latency_seconds{,_mean,_max}` (absent while
+the block fails) and `modbus_cache_uplink_block_fails_total` (see
+`show uplink`). With
 `--metrics-token` / `--metrics-token-file` set, requests need
 `Authorization: Bearer <token>` — the same scheme the scraper's exporter
 speaks; anything but `/metrics` answers 404, an unauthenticated read 401.

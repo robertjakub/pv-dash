@@ -19,6 +19,7 @@ import threading
 import time
 
 from common.audit import AuditLog
+from common.human import secs
 from .profile import load_profile, profile_label, resolve_profile
 from common.version import version_string
 from .settings import SETTING_NAMES, SETTING_BY_NAME, describe_setting
@@ -501,10 +502,10 @@ class ControlServer:
             'profile   %s' % sim.profile.description,
             'registers %d served, overlay %d: %s' % (len(sim.profile.entries), len(overlay),
                 ', '.join('%d=%d' % kv for kv in sorted(overlay.items())[:8]) or 'empty'),
-            'now       %s %s%s, uptime %d s' % (format_clock(t),
+            'now       %s %s%s, uptime %s' % (format_clock(t),
                 'utc' if sim.utc else 'local',
                 ' x%g' % sim.time_scale if sim.time_scale != 1.0 else '',
-                int(time.monotonic() - self.started)),
+                secs(time.monotonic() - self.started)),
             'power     pv %g W, load %g W, grid %g W' % (pv_w, load_w,
                 0.0 if sim.outage_active() else pv_w - batt_w - load_w),
             'battery   %s' % ('%g W, SoC %s, state %s' % (batt_w,
@@ -541,7 +542,7 @@ class ControlServer:
                      'battery_state=%s' % (sim.batt_state or 'auto')]
         rows += ['cloud=%s' % sim.cloud_display(),
                  'clock=%s' % format_clock(t), 'time_scale=x%g' % sim.time_scale,
-                 'uptime=%d' % int(time.monotonic() - self.started),
+                 'uptime=%s' % secs(time.monotonic() - self.started),
                  'chaos=%.2f' % self.chaos.p, 'chaos_hits=%d' % self.chaos.hits,
                  'pinned=%s' % pinned, 'profile=%s' % sim.profile.description]
         return 'ok status\n' + '\n'.join(rows)

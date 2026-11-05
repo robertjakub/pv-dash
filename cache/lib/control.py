@@ -18,6 +18,7 @@ import time
 
 from common.version import version_string
 from common.config import default_profile_path, resolve_profile_file
+from common.human import secs
 from .statics import CONTROL_IDLE_TIMEOUT_S
 from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .cache import build_blocks
@@ -26,7 +27,7 @@ from .config import parse_write_registers, parse_acl, parse_selection
 logger = logging.getLogger('modbus-cache')
 
 COMMAND_HELP = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|cache|'
-                'settings|version>, clear cache, restart, shutdown, quit; help <setting> describes it')
+                'uplink|settings|version>, clear cache, restart, shutdown, quit; help <setting> describes it')
 
 
 class ControlServer:
@@ -240,6 +241,8 @@ class ControlServer:
             return 'ok connections ' + self.connections_line()
         if low == 'show cache all':
             return self.cache_all_report()
+        if low == 'show uplink':
+            return self.uplink_report()
         if low == 'show cache':
             return 'ok ' + self.cache_line()
         if low == 'show settings':
@@ -296,7 +299,7 @@ class ControlServer:
                 raise ValueError('interval must be 0 < N <= 86400 seconds')
             p.interval = v
             p.poll_wake.set()
-            return '%gs' % v
+            return secs(v)
         if key == 'ttl':
             if val in ('off', 'none', '0'):
                 p.cache.cache_ttl = 0
@@ -305,13 +308,13 @@ class ControlServer:
             if not 0 <= v <= 86400 * 7:
                 raise ValueError('ttl must be 0..604800 seconds')
             p.cache.cache_ttl = v
-            return '%gs' % v
+            return secs(v)
         if key == 'read-delay':
             v = num(val, 'read-delay', 'seconds')
             if not 0 <= v <= 60:
                 raise ValueError('read-delay must be 0..60 seconds')
             p.read_delay = v
-            return '%gs' % v
+            return secs(v)
         if key == 'merge-gap':
             v = numi(val, 'merge-gap', 'registers')
             if not 0 <= v <= 100:
@@ -339,7 +342,7 @@ class ControlServer:
             if not 0 <= v <= 86400:
                 raise ValueError('client-timeout must be 0..86400 seconds')
             p.client_timeout = v
-            return '%gs' % v
+            return secs(v)
         if key == 'reads-audit':
             if val in ('off', 'none', '0'):
                 p.reads_audit_s = 0
@@ -348,7 +351,7 @@ class ControlServer:
             if not 1 <= v <= 86400:
                 raise ValueError('reads-audit must be 1..86400 seconds')
             p.reads_audit_s = v
-            return '%gs' % v
+            return secs(v)
         if key == 'log-level':
             lvl = val.upper()
             if lvl not in ('DEBUG', 'INFO', 'WARNING', 'ERROR'):
@@ -361,7 +364,7 @@ class ControlServer:
                 raise ValueError('timeout must be 0 < N <= 60 seconds')
             p.upstream.timeout = v
             p.config['timeout'] = v
-            return '%gs' % v
+            return secs(v)
         if key == 'connect-acl':
             acl = self._acl(val, 'connect-acl')
             p.connect_acl = acl
@@ -415,11 +418,11 @@ class ControlServer:
     def _get(self, key):
         p = self.proxy
         if key == 'interval':
-            return '%gs' % p.interval
+            return secs(p.interval)
         if key == 'ttl':
-            return 'off' if not p.cache.cache_ttl else '%gs' % p.cache.cache_ttl
+            return 'off' if not p.cache.cache_ttl else secs(p.cache.cache_ttl)
         if key == 'read-delay':
-            return '%gs' % p.read_delay
+            return secs(p.read_delay)
         if key == 'merge-gap':
             return '%d' % p.merge_gap
         if key == 'allow-write':
@@ -429,13 +432,13 @@ class ControlServer:
         if key == 'max-clients':
             return '%d' % p.max_clients
         if key == 'client-timeout':
-            return '%gs' % p.client_timeout
+            return 'none' if not p.client_timeout else secs(p.client_timeout)
         if key == 'reads-audit':
-            return 'off' if not p.reads_audit_s else '%gs' % p.reads_audit_s
+            return 'off' if not p.reads_audit_s else secs(p.reads_audit_s)
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         if key == 'timeout':
-            return '%gs' % p.upstream.timeout
+            return secs(p.upstream.timeout)
         if key == 'connect-acl':
             return self._acl_text(p.connect_acl)
         if key == 'write-acl':
@@ -451,22 +454,22 @@ class ControlServer:
         per line (scriptable)."""
         p = self.proxy
         now = time.monotonic()
-        age = 'never' if p.last_ok is None else '%ds' % max(0, int(now - p.last_ok))
+        age = 'never' if p.last_ok is None else secs(max(0, now - p.last_ok))
         fc4 = sum(1 for r in p.cache.ranges if r[0] == 4)
         cfg = p.config or {}
         rows = [
             'upstream=%s:%d' % (p.upstream.host, p.upstream.port),
             'unit=%d' % p.upstream.unit,
-            'timeout=%gs' % p.upstream.timeout,
+            'timeout=%s' % secs(p.upstream.timeout),
             'listen=%s:%d' % (p.listen_addr[0], p.listen_addr[1]),
             'control=%s' % self.describe(),
-            'uptime=%d' % int(now - p.started),
+            'uptime=%s' % secs(now - p.started),
             'poll=%s' % ('ok' if p.poll_ok else 'down'),
             'last_poll=%s' % age,
-            'poll_duration=%gs' % p.poll_secs_last,
-            'poll_duration_mean=%gs' % (p.poll_secs_sum / p.poll_count if p.poll_count else 0),
-            'interval=%gs' % p.interval,
-            'ttl=%gs' % p.cache.cache_ttl,
+            'poll_duration=%s' % secs(p.poll_secs_last),
+            'poll_duration_mean=%s' % secs(p.poll_secs_sum / p.poll_count if p.poll_count else 0),
+            'interval=%s' % secs(p.interval),
+            'ttl=%s' % secs(p.cache.cache_ttl),
             'merge_gap=%d' % p.merge_gap,
             'ranges=%d' % len(p.cache.ranges),
             'fc4_ranges=%d' % fc4,
@@ -475,12 +478,12 @@ class ControlServer:
             'misses=%d' % p.cache_misses,
             'clients=%d' % p.client_count,
             'max_clients=%s' % (p.max_clients or 'none'),
-            'client_timeout=%s' % ('%gs' % p.client_timeout if p.client_timeout else 'none'),
+            'client_timeout=%s' % (secs(p.client_timeout) if p.client_timeout else 'none'),
             'connect_acl=%s' % ('any' if p.connect_acl is None else '%d network(s)' % len(p.connect_acl)),
             'writes=%s' % ('enabled' if p.allow_write else 'disabled'),
             'write_acl=%s' % ('any' if p.write_acl is None else '%d network(s)' % len(p.write_acl)),
             'write_allow_list=%s' % p.describe_write_ranges(),
-            'reads_audit=%s' % ('off' if not p.reads_audit_s else '%gs' % p.reads_audit_s),
+            'reads_audit=%s' % ('off' if not p.reads_audit_s else secs(p.reads_audit_s)),
             'profile=%s' % (cfg.get('profile') or p.profile),
             'selection=%s' % (cfg.get('selection') or 'all'),
             'metrics=%s' % getattr(p, 'metrics_desc', 'off'),
@@ -503,9 +506,9 @@ class ControlServer:
         """The compact state summary appended to the set/unset replies."""
         p = self.proxy
         now = time.monotonic()
-        age = 'never' if p.last_ok is None else '%ds' % max(0, int(now - p.last_ok))
-        return ('upstream=%s:%d interval=%gs ttl=%gs poll=%s last-poll=%s hits=%d misses=%d clients=%d'
-                % (p.upstream.host, p.upstream.port, p.interval, p.cache.cache_ttl,
+        age = 'never' if p.last_ok is None else secs(max(0, now - p.last_ok))
+        return ('upstream=%s:%d interval=%s ttl=%s poll=%s last-poll=%s hits=%d misses=%d clients=%d'
+                % (p.upstream.host, p.upstream.port, secs(p.interval), secs(p.cache.cache_ttl),
                    'ok' if p.poll_ok else 'down', age, p.cache_hits, p.cache_misses, p.client_count))
 
     def connections_line(self):
@@ -513,7 +516,7 @@ class ControlServer:
             if not self.proxy.clients:
                 return 'none'
             now = time.monotonic()
-            return '; '.join('%s connected %ds requests %d' % (k, int(now - v['since']), v['requests'])
+            return '; '.join('%s connected %s requests %d' % (k, secs(now - v['since']), v['requests'])
                              for k, v in sorted(self.proxy.clients.items()))
 
     def inspect(self):
@@ -521,14 +524,14 @@ class ControlServer:
         the write gate: the baton for a bug report. Multi-line reply."""
         p = self.proxy
         now = time.monotonic()
-        age = 'never' if p.last_ok is None else '%ds ago' % max(0, int(now - p.last_ok))
+        age = 'never' if p.last_ok is None else '%s ago' % secs(max(0, now - p.last_ok))
         fc3 = sum(1 for r in p.cache.ranges if r[0] == 3)
         fc4 = len(p.cache.ranges) - fc3
         cfg = p.config or {}
         rows = [
             'version   modbus-cache %s' % version_string(),
-            'upstream  %s:%d unit %d, timeout %gs, last poll %s%s' % (p.upstream.host, p.upstream.port,
-                                                                     p.upstream.unit, p.upstream.timeout, age,
+            'upstream  %s:%d unit %d, timeout %s, last poll %s%s' % (p.upstream.host, p.upstream.port,
+                                                                     p.upstream.unit, secs(p.upstream.timeout), age,
                                                                      '' if p.poll_ok else ' (FAILING)'),
             'listen    %s:%d, control %s, connect-acl %s'
             % (p.listen_addr[0], p.listen_addr[1], self.describe(),
@@ -538,33 +541,33 @@ class ControlServer:
             'selection %s' % (cfg.get('selection') or 'all'),
             'metrics   %s' % getattr(p, 'metrics_desc', 'off'),
             'selection %s' % (cfg.get('selection') or 'all'),
-            'cache     %d range(s) (fc3 %d, fc4 %d), %d word(s), oldest %s, ttl %gs, failed range(s) %d'
+            'cache     %d range(s) (fc3 %d, fc4 %d), %d word(s), oldest %s, ttl %s, failed range(s) %d'
             % (len(p.cache.ranges), fc3, fc4, len(p.cache.regs),
-               self._oldest() or 'n/a', p.cache.cache_ttl,
+               self._oldest() or 'n/a', secs(p.cache.cache_ttl),
                sum(1 for v in p.cache.range_ok.values() if v is False)),
             'poll plan %d block(s): %s' % (len(p.blocks),
                                            ' '.join('%s%d:%d' % ('' if fc == 3 else 'fc%d ' % fc, s, c)
                                                     for fc, s, c, _ in p.blocks)),
-            'poll cyc  last %gs, mean %gs, max %gs'
-            % (p.poll_secs_last,
-               p.poll_secs_sum / p.poll_count if p.poll_count else 0, p.poll_secs_max),
+            'poll cyc  last %s, mean %s, max %s'
+            % (secs(p.poll_secs_last),
+               secs(p.poll_secs_sum / p.poll_count if p.poll_count else 0), secs(p.poll_secs_max)),
             'counters  hits %d, misses %d, clients %d (limit %s, timeout %s)'
             % (p.cache_hits, p.cache_misses, p.client_count,
-               p.max_clients or 'none', '%gs' % p.client_timeout if p.client_timeout else 'none'),
+               p.max_clients or 'none', secs(p.client_timeout) if p.client_timeout else 'none'),
             'writes    %s, write-acl %s, write-registers %s'
             % ('ENABLED' if p.allow_write else 'disabled',
                'any' if p.write_acl is None else '%d network(s)' % len(p.write_acl),
                p.describe_write_ranges()),
             'audit     %s%s' % ('off' if p.audit is None else (p.audit.path if p.audit.path != '-' else 'stdout'),
-                                ', reads accounting every %gs' % p.reads_audit_s if p.audit and p.reads_audit_s else ''),
-            'uptime    %ds' % int(now - p.started),
+                                ', reads accounting every %s' % secs(p.reads_audit_s) if p.audit and p.reads_audit_s else ''),
+            'uptime    %s' % secs(now - p.started),
         ]
         return 'ok inspect\n' + '\n'.join(rows)
 
     def _oldest(self):
         with self.proxy.cache.lock:
             oldest = max((time.time() - t for t in self.proxy.cache.ts.values()), default=None)
-        return '%ds' % int(oldest) if oldest is not None else None
+        return secs(oldest) if oldest is not None else None
 
     def cache_line(self):
         c = self.proxy.cache
@@ -572,27 +575,29 @@ class ControlServer:
             words = len(c.regs)
             fc4 = sum(1 for r in c.ranges if r[0] == 4)
         failed = sum(1 for v in c.range_ok.values() if v is False)
-        return ('cache %d range(s)%s, %d word(s) cached%s, ttl %gs, map v%d, failed range(s) %d, hits %d, misses %d'
+        return ('cache %d range(s)%s, %d word(s) cached%s, ttl %s, map v%d, failed range(s) %d, hits %d, misses %d'
                 % (len(c.ranges), ' (fc4 %d)' % fc4 if fc4 else '', words,
                    ', oldest %s' % (self._oldest() or 'n/a'),
-                   c.cache_ttl, c.map_version, failed, self.proxy.cache_hits, self.proxy.cache_misses))
+                   secs(c.cache_ttl), c.map_version, failed, self.proxy.cache_hits, self.proxy.cache_misses))
 
     def cache_all_report(self):
         """Every cached entry, one row per profile range: the words cached,
-        the age of the oldest, when it expires and the poll status."""
+        their values, the age of the oldest, when it expires and the poll
+        status."""
         c = self.proxy.cache
         names = c.names
         cells = []
-        for fc, start, count, words, oldest, err, entry_ttl in c.entries():
+        for fc, start, count, words, values, oldest, err, entry_ttl in c.entries():
             ttl = entry_ttl if entry_ttl is not None else c.cache_ttl
-            age = 'n/a' if oldest is None else '%.2fs' % oldest
+            age = 'n/a' if oldest is None else secs(oldest)
+            shown = [('-' if v is None else '%d' % v) for v in values] or ['-']
             if not ttl:
                 exp = 'never'
             elif oldest is None:
                 exp = 'n/a'
             else:
                 left = ttl - oldest
-                exp = '%.2fs' % left if left > 0 else 'expired'
+                exp = secs(left) if left > 0 else 'expired'
             if err is not None:
                 status = 'failed (ex %d)' % err
             elif not words:
@@ -603,12 +608,67 @@ class ControlServer:
                 status = 'ok'
             name = names.get((fc, start, count), '')
             if entry_ttl is not None:
-                name = ('%s [ttl %gs]' % (name, entry_ttl)).strip()
+                name = ('%s [ttl %s]' % (name, secs(entry_ttl))).strip()
             cells.append(('fc%d' % fc, '%d:%d' % (start, count), '%d/%d' % (words, count),
-                          age, exp, status, name))
-        head = ('fc', 'range', 'words', 'age', 'expires', 'status', 'name')
+                          ' '.join(shown), age, exp, status, name))
+        head = ('fc', 'range', 'words', 'values', 'age', 'expires', 'status', 'name')
         widths = [max(len(h), max((len(r[i]) for r in cells), default=0)) for i, h in enumerate(head)]
         rows = ['  '.join(h.ljust(w) for h, w in zip(head, widths))]
         for r in cells:
             rows.append('  '.join(v.ljust(w) for v, w in zip(r, widths)))
         return 'ok cache all\n' + '\n'.join(rows)
+
+    @staticmethod
+    def _bytes(n):
+        return '%.1fkiB' % (n / 1024) if n >= 1024 else '%dB' % n
+
+    def uplink_report(self):
+        """The inverter link: the session counters (connects, exchanges,
+        bytes, errors) and one row per poll block with its status, latency
+        and last error — for analysing what the upstream connection does."""
+        p = self.proxy
+        u = p.upstream
+        now = time.monotonic()
+        if u.sock is not None:
+            sess = 'connected %s' % (secs(now - u.connected_since)
+                                     if u.connected_since is not None else '?')
+        else:
+            sess = 'down' if u.connects else 'never connected'
+        mean = p.poll_secs_sum / p.poll_count if p.poll_count else 0.0
+        last_ok = 'never' if p.last_ok is None else secs(now - p.last_ok)
+        if u.last_error is None:
+            last_err = 'none'
+        else:
+            when = '' if u.last_error_at is None else '%s ago: ' % secs(now - u.last_error_at)
+            last_err = '%s%s' % (when, u.last_error)
+        rows = [
+            'upstream  %s:%d unit %d, timeout %s' % (u.host, u.port, u.unit, secs(u.timeout)),
+            'session   %s, connects %d, exchanges %d, in %s out %s, errors %d'
+            % (sess, u.connects, u.exchanges, self._bytes(u.bytes_in), self._bytes(u.bytes_out), u.errors),
+            'last err  %s' % last_err,
+            'poll      interval %s, cycle last %s mean %s max %s, last ok %s ago, plan %d block(s)'
+            % (secs(p.interval), secs(p.poll_secs_last), secs(mean), secs(p.poll_secs_max),
+               last_ok, len(p.blocks)),
+        ]
+        cells = []
+        for fc, start, count, _leaves in p.blocks:
+            s = p.block_stats.get((fc, start, count))
+            if s is None:
+                cells.append(('fc%d' % fc, '%d:%d' % (start, count), 'pending', '-', '-', '-', '0', '-'))
+                continue
+            if s['last_err'] is None:
+                status, err = 'ok', '-'
+            elif s['last_code'] is not None:
+                status, err = 'ex %d' % s['last_code'], s['last_err']
+            else:
+                status, err = 'error', s['last_err']
+            cells.append(('fc%d' % fc, '%d:%d' % (start, count), status, secs(s['last']),
+                          secs(s['sum'] / s['ok_n']) if s['ok_n'] else '-',
+                          secs(s['max']), '%d' % s['fails'], err))
+        if cells:
+            head = ('fc', 'range', 'status', 'last', 'mean', 'max', 'fails', 'last error')
+            widths = [max(len(h), max((len(r[i]) for r in cells), default=0)) for i, h in enumerate(head)]
+            rows.append('  '.join(h.ljust(w) for h, w in zip(head, widths)))
+            for r in cells:
+                rows.append('  '.join(v.ljust(w) for v, w in zip(r, widths)))
+        return 'ok uplink\n' + '\n'.join(rows)

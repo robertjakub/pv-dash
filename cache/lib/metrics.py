@@ -2,7 +2,8 @@
 """The cache's own Prometheus endpoint: a small /metrics on its own port,
 gated (off by default). Serves the cache's self-observability in the
 Prometheus text format: the hit/miss counters, the poll health and age, the
-poll-cycle durations, the client count — without depending on the scraper's
+poll-cycle durations, the client count, the uplink session counters and the
+per-block poll latency/errors — without depending on the scraper's
 `huawei_cache_*` export path. With --metrics-token set, requests need
 `Authorization: Bearer <token>` (the same scheme the scraper speaks)."""
 import hmac
@@ -31,6 +32,13 @@ class MetricsServer:
         fc3 = sum(1 for r in c.ranges if r[0] == 3)
         fc4 = len(c.ranges) - fc3
         mean = p.poll_secs_sum / p.poll_count if p.poll_count else 0.0
+        u = p.upstream
+        blocks = []
+        for fc, start, count, _leaves in p.blocks:
+            s = p.block_stats.get((fc, start, count))
+            blocks.append((fc, start, count,
+                           None if s is None else (s['last'], s['sum'] / s['ok_n'] if s['ok_n'] else None,
+                                                   s['max'], s['fails'], s['last_err'])))
         return {
             'uptime': int(now - (p.started or now)),
             'hits': p.cache_hits, 'misses': p.cache_misses,
@@ -39,6 +47,11 @@ class MetricsServer:
             'words': words, 'ranges': len(c.ranges), 'fc4': fc4,
             'oldest': oldest, 'clients': p.client_count,
             'poll_last': p.poll_secs_last, 'poll_mean': mean, 'poll_max': p.poll_secs_max,
+            'uplink_up': 1 if u.sock is not None else 0,
+            'uplink_connects': u.connects, 'uplink_exchanges': u.exchanges,
+            'uplink_errors': u.errors, 'uplink_bytes_in': u.bytes_in, 'uplink_bytes_out': u.bytes_out,
+            'uplink_err_age': None if u.last_error_at is None else now - u.last_error_at,
+            'uplink_blocks': blocks,
         }
 
     def render(self):
@@ -88,6 +101,54 @@ class MetricsServer:
                 '# TYPE modbus_cache_age_seconds gauge',
                 'modbus_cache_age_seconds %g' % st['oldest'],
             ]
+        rows += [
+            '# HELP modbus_cache_uplink_up 1 = the upstream socket to the inverter is connected.',
+            '# TYPE modbus_cache_uplink_up gauge',
+            'modbus_cache_uplink_up %d' % st['uplink_up'],
+            '# HELP modbus_cache_uplink_connects_total Successful upstream connects (2 = one reconnect).',
+            '# TYPE modbus_cache_uplink_connects_total counter',
+            'modbus_cache_uplink_connects_total %d' % st['uplink_connects'],
+            '# HELP modbus_cache_uplink_exchanges_total Completed upstream request/reply exchanges.',
+            '# TYPE modbus_cache_uplink_exchanges_total counter',
+            'modbus_cache_uplink_exchanges_total %d' % st['uplink_exchanges'],
+            '# HELP modbus_cache_uplink_errors_total Failed upstream exchanges (timeout, reset, refused, bad frame).',
+            '# TYPE modbus_cache_uplink_errors_total counter',
+            'modbus_cache_uplink_errors_total %d' % st['uplink_errors'],
+            '# HELP modbus_cache_uplink_bytes_total Upstream bytes by direction.',
+            '# TYPE modbus_cache_uplink_bytes_total counter',
+            'modbus_cache_uplink_bytes_total{dir="in"} %d' % st['uplink_bytes_in'],
+            'modbus_cache_uplink_bytes_total{dir="out"} %d' % st['uplink_bytes_out'],
+        ]
+        if st['uplink_err_age'] is not None:
+            rows += [
+                '# HELP modbus_cache_uplink_last_error_age_seconds Seconds since the last upstream error.',
+                '# TYPE modbus_cache_uplink_last_error_age_seconds gauge',
+                'modbus_cache_uplink_last_error_age_seconds %g' % st['uplink_err_age'],
+            ]
+        rows += [
+            '# HELP modbus_cache_uplink_block_up 1 = the poll block\'s last attempt succeeded.',
+            '# TYPE modbus_cache_uplink_block_up gauge',
+            '# HELP modbus_cache_uplink_block_latency_seconds The block\'s last poll round-trip (absent while failing).',
+            '# TYPE modbus_cache_uplink_block_latency_seconds gauge',
+            '# HELP modbus_cache_uplink_block_latency_mean_seconds The block\'s mean poll round-trip (ok attempts).',
+            '# TYPE modbus_cache_uplink_block_latency_mean_seconds gauge',
+            '# HELP modbus_cache_uplink_block_latency_max_seconds The block\'s longest poll round-trip so far.',
+            '# TYPE modbus_cache_uplink_block_latency_max_seconds gauge',
+            '# HELP modbus_cache_uplink_block_fails_total Failed poll attempts of the block.',
+            '# TYPE modbus_cache_uplink_block_fails_total counter',
+        ]
+        for fc, start, count, s in st['uplink_blocks']:
+            label = '{fc="%d",start="%d",count="%d"}' % (fc, start, count)
+            if s is None:                      # the plan block has not been polled yet
+                rows.append('modbus_cache_uplink_block_up%s 0' % label)
+                continue
+            last, mean_b, max_b, fails, last_err = s
+            rows.append('modbus_cache_uplink_block_up%s %d' % (label, 1 if last_err is None else 0))
+            rows.append('modbus_cache_uplink_block_fails_total%s %d' % (label, fails))
+            if last_err is None:
+                rows.append('modbus_cache_uplink_block_latency_seconds%s %g' % (label, last))
+                rows.append('modbus_cache_uplink_block_latency_mean_seconds%s %g' % (label, mean_b))
+                rows.append('modbus_cache_uplink_block_latency_max_seconds%s %g' % (label, max_b))
         return '\n'.join(rows) + '\n'
 
     class _Handler(http.server.BaseHTTPRequestHandler):

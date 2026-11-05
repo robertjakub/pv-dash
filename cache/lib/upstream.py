@@ -3,6 +3,7 @@
 import socket
 import struct
 import threading
+import time
 
 from common.protocol import ModbusError, recv_exact
 from .protocol import DeviceError
@@ -18,6 +19,14 @@ class Upstream:
         self.lock = threading.Lock()
         self.sock = None
         self.txn = 0
+        self.exchanges = 0         # completed request/reply exchanges
+        self.connects = 0          # successful connects (2 = one reconnect)
+        self.errors = 0            # failed exchanges (timeout, reset, bad frame)
+        self.last_error = None     # the text of the last failure
+        self.last_error_at = None  # monotonic
+        self.connected_since = None
+        self.bytes_in = 0
+        self.bytes_out = 0
 
     def close(self):
         if self.sock:
@@ -31,6 +40,8 @@ class Upstream:
         self.close()
         self.sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
         self.sock.settimeout(self.timeout)
+        self.connects += 1
+        self.connected_since = time.monotonic()
 
     def _recv_exact(self, n):
         try:
@@ -39,17 +50,28 @@ class Upstream:
             raise ModbusError(str(e))
 
     def _exchange(self, frame, want_txn):
-        if not self.sock:
-            self._connect()
-        self.sock.sendall(frame)
-        txn, proto, length, unit = struct.unpack('>HHHB', self._recv_exact(7))
-        if not 2 <= length <= MAX_PDU + 2:
-            raise ModbusError('bad response length %d' % length)
-        body = self._recv_exact(length - 1)
-        if txn != want_txn:
-            raise ModbusError('transaction id mismatch')
-        if proto != 0:
-            raise ModbusError('unexpected protocol id %d' % proto)
+        try:
+            if not self.sock:
+                self._connect()
+            self.sock.sendall(frame)
+            self.bytes_out += len(frame)
+            head = self._recv_exact(7)
+            self.bytes_in += len(head)
+            txn, proto, length, unit = struct.unpack('>HHHB', head)
+            if not 2 <= length <= MAX_PDU + 2:
+                raise ModbusError('bad response length %d' % length)
+            body = self._recv_exact(length - 1)
+            self.bytes_in += len(body)
+            if txn != want_txn:
+                raise ModbusError('transaction id mismatch')
+            if proto != 0:
+                raise ModbusError('unexpected protocol id %d' % proto)
+        except (ModbusError, OSError) as e:
+            self.errors += 1
+            self.last_error = str(e)
+            self.last_error_at = time.monotonic()
+            raise
+        self.exchanges += 1
         return txn, proto, length, unit, body
 
     def read(self, fc, addr, count):

@@ -20,8 +20,10 @@ import threading
 import time
 
 from common.audit import AuditLog
+from common.config import acl_summary, acl_text, parse_acl
 from common.cred import peer_uid
 from common.human import secs
+from common.wiresec import verify_request_mac, sign_reply, proof_tag
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
 from common.version import version_string
@@ -71,17 +73,24 @@ class ControlServer:
 
     def serve(self):
         srv = socket.socket(socket.AF_UNIX if self.is_unix else socket.AF_INET, socket.SOCK_STREAM)
-        if self.is_unix:
-            if os.path.exists(self.sockpath):
-                logger.warning('control socket %s exists, replacing it', self.sockpath)
-                os.unlink(self.sockpath)
-            srv.bind(self.sockpath)
-            os.chmod(self.sockpath, 0o600)   # the mode is not left to the umask
-        else:
-            srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            srv.bind(('127.0.0.1', self.port))
-        srv.listen(16)
-        logger.info('control server listening on %s', self.describe())
+        try:
+            if self.is_unix:
+                if os.path.exists(self.sockpath):
+                    logger.warning('control socket %s exists, replacing it', self.sockpath)
+                    os.unlink(self.sockpath)
+                srv.bind(self.sockpath)
+                # the mode is not left to the umask: 0600 = owner only,
+                # 0660 with --control-socket-group (a local group shares it)
+                os.chmod(self.sockpath, 0o660 if self.socket_group else 0o600)
+            else:
+                srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                srv.bind(('127.0.0.1', self.port))
+            srv.listen(16)
+        except OSError as e:
+            logger.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
+            return
+        logger.info('control server listening on %s%s',
+                    self.describe(), ', token auth required on TCP' if self.token and not self.is_unix else '')
         while True:
             try:
                 client, addr = srv.accept()
@@ -109,13 +118,22 @@ class ControlServer:
         if cmd.lower() == 'auth':
             given = obj.get('token')
             if self.token and isinstance(given, str) and hmac.compare_digest(given, self.token):
-                return 'auth', {'status': 'ok', 'text': 'authenticated'}, 'ok authenticated'
+                reply = 'ok authenticated'
+                return 'auth', {'status': 'ok', 'text': 'authenticated', 'mac': sign_reply(self.token, reply)}, reply
             return 'auth', {'status': 'err', 'text': 'bad token'}, 'err bad token'
+        if self.token and obj.get('mac') is None and not self.is_unix:
+            return cmd, {'status': 'err',
+                         'text': 'unsigned command rejected: TCP commands carry the hmac-sha256 of the command, keyed by the token'}, \
+                'err unsigned command'
+        if self.token and obj.get('mac') is not None and not verify_request_mac(self.token, cmd, obj.get('mac')):
+            return cmd, {'status': 'err',
+                         'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac'
         reply = self.command(cmd)
-        if reply.endswith('\n.'):        # a legacy multi-line terminator; the JSON frames need none
-            reply = reply[:-2]
         status, _, text = reply.partition(' ')
-        return cmd, {'status': status, 'text': text}, reply
+        reply_obj = {'status': status, 'text': text}
+        if self.token:
+            reply_obj['mac'] = sign_reply(self.token, reply)
+        return cmd, reply_obj, reply
 
     @staticmethod
     def peer(addr):
@@ -174,7 +192,8 @@ class ControlServer:
                     elif self.audit:
                         self.audit.event('AUTH-FAIL', 'peer=%s' % who)
                 elif self.audit and cmd.lower() != 'ping':
-                    self.audit.event('COMMAND', "peer=%s '%s' -> %s" % (who, cmd, reply.split(' ', 1)[0]))
+                    self.audit.event('COMMAND', "peer=%s '%s'%s -> %s"
+                                     % (who, cmd, proof_tag(obj), reply.split(' ', 1)[0]))
                 if self.log_replies:
                     logger.debug('control from %s: %s -> %s', who, cmd, reply)
                 else:
@@ -202,11 +221,12 @@ class ControlServer:
     SCENARIOS = {'morning': 8.5, 'noon': 12.0, 'evening': 19.5, 'night': 23.0}
 
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
-                 trust_uids=None):
+                 trust_uids=None, socket_group=False):
         self.log_replies = log_replies   # DEBUG also logs the full command output
         self.audit = audit               # the INV audit trail (common.audit), None = off
         self.token = token               # the control auth token; None = no auth (the unix = the perms)
         self.trust_uids = trust_uids or frozenset()   # extra peer uids the unix socket trusts without the token
+        self.socket_group = bool(socket_group)   # chmod 0660 instead of 0600 on the unix socket
         self.simulator = simulator
         self.chaos = chaos
         self.fake = fake
@@ -349,12 +369,25 @@ class ControlServer:
                 fake.conn_gate.max_per_ip = v
                 return str(v)
             raise ValueError('no modbus device attached')
+        if key == 'connect-acl':
+            if not fake:
+                raise ValueError('no modbus device attached')
+            try:
+                fake.connect_acl = parse_acl(val, 'connect-acl')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            return acl_text(fake.connect_acl)
         if key == 'metrics-server':
             if not fake:
                 raise ValueError('no modbus device attached')
             if val in ('on', 'true', '1', 'yes'):
                 if fake.metrics_srv:
                     return 'on'
+                if not fake.metrics_token:
+                    from common.config import is_loopback_host
+                    if not is_loopback_host(fake.metrics_listen[0]):
+                        logger.warning('serving /metrics on %s:%d without a token: the values are production-shaped '
+                                       'even though this is a test tool — set --metrics-token', *fake.metrics_listen)
                 srv = MetricsServer(sim, chaos, fake, self, fake.metrics_listen, token=fake.metrics_token,
                                     max_clients=fake.metrics_caps[0], client_timeout=fake.metrics_caps[1],
                                     max_per_ip=fake.metrics_caps[2])
@@ -447,6 +480,8 @@ class ControlServer:
             return str(fake.max_clients) if fake else '?'
         if key == 'max-conn-per-ip':
             return str(fake.conn_gate.max_per_ip) if fake else '?'
+        if key == 'connect-acl':
+            return acl_text(fake.connect_acl) if fake else '?'
         if key == 'metrics-server':
             return ('on' if fake.metrics_srv else 'off') if fake else '?'
         if key == 'client-timeout':
@@ -534,7 +569,7 @@ class ControlServer:
                     else:
                         val = '%g' % vals.get(name)
                     rows.append((name, str(addr), typ, val))
-                # a multi-line reply: the clients read on until the '.' terminator
+                # the multi-line reply carries its newlines inside the JSON text
                 w1 = max(len(r[0]) for r in rows)
                 w2 = max(len(r[1]) for r in rows)
                 w3 = max(len(r[2]) for r in rows)
@@ -616,13 +651,16 @@ class ControlServer:
             'chaos     p=%.2f, %d hit(s)' % (self.chaos.p, self.chaos.hits),
             'pinned    %s' % ('; '.join('%s=%s' % (k, ov[k]) for k in
                               ('pv', 'load', 'batt', 'grid', 'soc', 'cloud') if ov[k] is not None) or 'nothing'),
+            'metrics   %s' % getattr(self.fake, 'metrics_desc', 'off'),
         ]
         if self.fake:
             la = self.fake.listen_addr or ('?', '?')
-            rows.append('modbus    %s:%d, clients %d (limit %s, timeout %s, per-ip %s)'
+            rows.append('modbus    %s:%d, clients %d (limit %s, timeout %s, per-ip %s, connect-acl %s)'
                         % (la[0], la[1], self.fake.client_count, self.fake.max_clients or 'none',
                            secs(self.fake.client_timeout) if self.fake.client_timeout else 'none',
-                           self.fake.conn_gate.max_per_ip or 'none'))
+                           self.fake.conn_gate.max_per_ip or 'none',
+                           'any' if self.fake.connect_acl is None
+                           else ('none' if not self.fake.connect_acl else '%d network(s)' % len(self.fake.connect_acl))))
         return 'ok inspect\n' + '\n'.join(rows)
 
     def status_report(self):
@@ -646,9 +684,11 @@ class ControlServer:
                  'clock=%s' % format_clock(t), 'time_scale=x%g' % sim.time_scale,
                  'uptime=%s' % secs(time.monotonic() - self.started),
                  'chaos=%.2f' % self.chaos.p, 'chaos_hits=%d' % self.chaos.hits,
-                 'pinned=%s' % pinned, 'profile=%s' % sim.profile.description]
+                 'pinned=%s' % pinned, 'profile=%s' % sim.profile.description,
+                 'metrics=%s' % getattr(self.fake, 'metrics_desc', 'off')]
         if self.fake:
             rows.append('clients=%d' % self.fake.client_count)
+            rows.append('connect_acl=%s' % acl_summary(self.fake.connect_acl))
         return 'ok status\n' + '\n'.join(rows)
 
     def status(self):

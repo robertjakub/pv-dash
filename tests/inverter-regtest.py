@@ -10,6 +10,7 @@ set max-clients/client-timeout round-trip, the status/inspect fields).
 
 Checks: ALL PASS (or a FAILURES list; exit 1).
 """
+import json
 import os
 import socket
 import struct
@@ -26,6 +27,12 @@ FAILURES = []
 A_MODBUS, A_CTL = 15970, 15971        # --max-clients 1
 B_MODBUS, B_CTL = 15972, 15973        # --client-timeout 1
 C_MODBUS, C_CTL = 15974, 15975        # --max-conn-per-ip 1 --max-clients 0
+D_MODBUS = 15976                      # the default unix control socket (mode 0600)
+E_MODBUS, E_SOCK = 15977, '/tmp/inv_regtest_eg.socket'   # --control-socket-group (0660)
+F_MODBUS, F_CTL = 15978, 15980        # the live token-less metrics warn (listen 0.0.0.0)
+F_METRICS = 15981
+G_MODBUS, G_SOCK = 15982, '/nonexistent_dir_regtest/x.socket'   # an unbindable control target (the bind guard)
+H_MODBUS, H_CTL = 15983, 15984        # the token'd TCP control (the signed wire)
 B_METRICS = 15979                     # instance B's /metrics (max-clients 1)
 UNIT = 1
 
@@ -36,8 +43,9 @@ def check(name, ok, detail=''):
         FAILURES.append(name)
 
 
-def ctl(port, *cmds):
-    out = subprocess.run([sys.executable, CTL, '--control-port', str(port)] + list(cmds),
+def ctl(port, *cmds, token=None):
+    out = subprocess.run([sys.executable, CTL, '--control-port', str(port)]
+                         + (['--control-token', token] if token else []) + list(cmds),
                          capture_output=True, text=True, timeout=15)
     return out.stdout.strip()
 
@@ -98,6 +106,22 @@ def main():
                                        '--control-port', str(C_CTL), '--max-clients', '0',
                                        '--max-conn-per-ip', '1'],
                                       stdout=open(LOG + '.c', 'w'), stderr=subprocess.STDOUT))
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(D_MODBUS)],
+                                      stdout=open(LOG + '.d', 'w'), stderr=subprocess.STDOUT))
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(E_MODBUS),
+                                       '--control-port', E_SOCK, '--control-socket-group'],
+                                      stdout=open(LOG + '.e', 'w'), stderr=subprocess.STDOUT))
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(F_MODBUS),
+                                       '--control-port', str(F_CTL),
+                                       '--metrics-listen', '0.0.0.0:%d' % F_METRICS],
+                                      stdout=open(LOG + '.f', 'w'), stderr=subprocess.STDOUT))
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(G_MODBUS),
+                                       '--control-port', G_SOCK],
+                                      stdout=open(LOG + '.g', 'w'), stderr=subprocess.STDOUT))
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(H_MODBUS),
+                                       '--control-port', str(H_CTL), '--control-token', 'tok',
+                                       '--audit-log', '/tmp/inv_regtest_audit.log'],
+                                      stdout=open(LOG + '.h', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.1)
 
         # ---- instance A: the read-count cap (F11) + the client limit
@@ -127,9 +151,12 @@ def main():
               and 'requests' in tx, tx)
         st = dict(line.split('=', 1) for line in ctl(A_CTL, 'show status').splitlines()[1:])
         check('show status carries clients=', st.get('clients') == '1', str(st.get('clients')))
+        check('show status carries metrics=off (no endpoint)', st.get('metrics') == 'off', str(st.get('metrics')))
         ins = ctl(A_CTL, 'inspect')
-        check('inspect carries the modbus row', 'modbus    127.0.0.1:%d, clients 1 (limit 1, timeout 5.00m, per-ip none)' % A_MODBUS in ins,
+        check('inspect carries the modbus row', 'modbus    127.0.0.1:%d, clients 1 (limit 1, timeout 5.00m, per-ip none, connect-acl any)' % A_MODBUS in ins,
               [l for l in ins.splitlines() if l.startswith('modbus')])
+        check('inspect carries the metrics row', 'metrics   off' in ins,
+              [l for l in ins.splitlines() if l.startswith('metrics')])
 
         # the second client is refused at accept (max-clients 1), the first keeps serving
         c2 = connect(A_MODBUS)
@@ -236,10 +263,127 @@ def main():
         except OSError:
             srv_down = True
         check('metrics-server: the port is closed after set off', srv_down)
+        stb = dict(line.split('=', 1) for line in ctl(B_CTL, 'show status').splitlines()[1:])
+        check('metrics-server: show status says off', stb.get('metrics') == 'off', str(stb.get('metrics')))
         tx = ctl(B_CTL, 'set metrics-server on')
         check('metrics-server: set on serves again', tx.startswith('ok metrics-server=on'), tx)
         st, _ = http_get(B_METRICS, token='tok')
         check('metrics-server: the gauges are back', st.split()[1] == '200', st)
+        stb = dict(line.split('=', 1) for line in ctl(B_CTL, 'show status').splitlines()[1:])
+        check('metrics-server: show status carries the endpoint line',
+              stb.get('metrics') == '127.0.0.1:%d (bearer token), clients 1, per-ip none' % B_METRICS,
+              str(stb.get('metrics')))
+
+        # ---- the control-server parity round (the cache's shape)
+        check('control: the default unix socket mode is 0600 (not the umask)',
+              os.stat('/tmp/fake-inverter-%d.socket' % D_MODBUS).st_mode & 0o777 == 0o600,
+              oct(os.stat('/tmp/fake-inverter-%d.socket' % D_MODBUS).st_mode & 0o777))
+        check('control: --control-socket-group chmods the socket 0660',
+              os.stat(E_SOCK).st_mode & 0o777 == 0o660, oct(os.stat(E_SOCK).st_mode & 0o777))
+        tx = ctl(F_CTL, 'set metrics-server on')
+        check('metrics-server: the token-less live start on 0.0.0.0 accepted', tx.startswith('ok metrics-server=on'), tx)
+        ctl(F_CTL, 'set metrics-server off')
+        logf = open(LOG + '.f').read()
+        check('metrics-server: the live token-less start beyond loopback warns',
+              'serving /metrics on 0.0.0.0:%d without a token' % F_METRICS in logf,
+              [l for l in logf.splitlines() if 'token' in l])
+        g = connect(G_MODBUS)
+        txn, unit, body = exchange(g, read_req(1, 3, 32064, 2), 1)
+        check('control: the fake serves Modbus despite the failed control bind', txn == 1 and body[0] == 3, body.hex())
+        g.close()
+        logg = open(LOG + '.g').read()
+        check('control: an unbindable target logs a one-liner, no crash',
+              'control server cannot bind unix:%s' % G_SOCK in logg and 'Traceback' not in logg,
+              [l for l in logg.splitlines() if 'control' in l or 'Trace' in l])
+
+        # ---- the connect ACL (the cache's connect-acl, mirrored; the
+        # default 'any' keeps the trusted-LAN posture)
+        c9 = connect(A_MODBUS)
+        exchange(c9, read_req(9, 3, 32064, 2), 9)     # a live client keeps serving
+        tx = ctl(A_CTL, 'set connect-acl 10.9.9.9')
+        check('connect-acl: set to a foreign network', 'ok connect-acl=' in tx and '10.9.9.9' in tx, tx)
+        c10 = connect(A_MODBUS)
+        check('connect-acl: the foreign-network-only ACL refuses the peer', eof_soon(c10))
+        txn, unit, body = exchange(c9, read_req(10, 3, 32064, 2), 10)
+        check('connect-acl: the admitted client keeps serving', txn == 10 and body[0] == 3, body.hex())
+        st = dict(line.split('=', 1) for line in ctl(A_CTL, 'show status').splitlines()[1:])
+        check('connect-acl: show status carries connect_acl=', st.get('connect_acl') == '1 network(s)',
+              str(st.get('connect_acl')))
+        tx = ctl(A_CTL, 'unset connect-acl')
+        check('connect-acl: unset restores any', 'ok connect-acl=any' in tx, tx)
+        c9.close()
+        time.sleep(0.4)   # the slot frees (max-clients 1 on this instance)
+        c11 = connect(A_MODBUS)
+        exchange(c11, read_req(11, 3, 32064, 2), 11)
+        c11.close()
+        log = open(LOG).read()
+        check('connect-acl: the rejection logged', 'not on the connect ACL' in log)
+
+        # ---- the signed wire (the full sha256 HMAC of every frame, keyed by
+        # the control token; instance H's TCP control speaks 'tok')
+        import hashlib
+        import hmac as _hmac
+
+        def wiremac(payload, token='tok'):
+            return _hmac.new(token.encode(), payload.encode(), hashlib.sha256).hexdigest()
+
+        tx = ctl(H_CTL, 'show version', token='tok')
+        check('signed wire: the token ctl authenticates and answers', tx.startswith('ok fake-inverter'), tx)
+        tx = ctl(H_CTL, 'show version', token='wrong')
+        check('signed wire: the wrong token fails the handshake', 'control auth failed' in tx
+              or tx == '', tx or '(empty)')
+        s = connect(H_CTL)
+        s.sendall(json.dumps({'cmd': 'auth', 'token': 'tok'}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            buf += s.recv(4096)
+        s.sendall(b'{"cmd": "show version"}\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            buf += s.recv(4096)
+        obj = json.loads(buf.decode())
+        s.close()
+        check('signed wire: an unsigned command over TCP is refused',
+              obj.get('status') == 'err' and 'unsigned command' in obj.get('text', ''), str(obj))
+        s = connect(H_CTL)
+        s.sendall(json.dumps({'cmd': 'auth', 'token': 'tok'}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            buf += s.recv(4096)
+        obj = json.loads(buf.decode())
+        check('signed wire: the auth-ok reply carries the mac',
+              obj.get('status') == 'ok' and obj.get('mac') == wiremac('ok authenticated'), str(obj))
+        s.sendall(json.dumps({'cmd': 'show version', 'mac': wiremac('show version')}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            buf += s.recv(4096)
+        obj = json.loads(buf.decode())
+        s.close()
+        check('signed wire: a signed command honored, the reply mac verifies',
+              obj.get('status') == 'ok' and 'fake-inverter' in obj.get('text', '')
+              and obj.get('mac') == wiremac('%s %s' % (obj.get('status'), obj.get('text', ''))), str(obj))
+        s = connect(H_CTL)
+        s.sendall(json.dumps({'cmd': 'auth', 'token': 'tok'}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            buf += s.recv(4096)
+        s.sendall(json.dumps({'cmd': 'show version', 'mac': 'ab' * 32}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            buf += s.recv(4096)
+        obj = json.loads(buf.decode())
+        s.close()
+        check('signed wire: a bad command mac is refused',
+              obj.get('status') == 'err' and 'mac does not verify' in obj.get('text', ''), str(obj))
+        aud = open('/tmp/inv_regtest_audit.log').read()
+        check('signed wire: the audit COMMAND line carries the wire mac', "'show version' wire=h" in aud, aud[-200:])
+
+        # ---- --man: every tool prints its generated roff page
+        for tool, title in ((F, 'MODBUS-FAKE-INVERTER'), (CTL, 'MODBUS-FAKE-CTL'),
+                            (os.path.join(REPO, 'inverter', 'bin', 'fake_cli.py'), 'MODBUS-FAKE-CLI')):
+            r = subprocess.run([sys.executable, tool, '--man'], capture_output=True, text=True, timeout=30)
+            check('--man: %s prints the page' % os.path.basename(tool),
+                  r.returncode == 0 and r.stdout.startswith('.TH %s 1' % title), r.stdout[:40] or r.stderr[-80:])
 
         # ---- the listening line documents the policy
         log = open(LOG).read()

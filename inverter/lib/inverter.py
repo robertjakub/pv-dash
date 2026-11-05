@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """The fake inverter's Modbus TCP server: FC3 reads from the simulator
 (strict mode, write overlay), FC06/16 writes, chaos injection."""
+import ipaddress
 import logging
 import socket
 import struct
@@ -17,7 +18,7 @@ logger = logging.getLogger('fake-inverter')
 
 class FakeInverter:
     def __init__(self, unit, simulator, strict=False, chaos=None, max_clients=64, client_timeout=300.0,
-                 max_conn_per_ip=0):
+                 max_conn_per_ip=0, connect_acl=None):
         self.unit = unit
         self.simulator = simulator
         self.strict = strict
@@ -31,9 +32,22 @@ class FakeInverter:
         self.max_clients = max(0, int(max_clients))       # 0 = no limit
         self.client_timeout = max(0.0, float(client_timeout))   # 0 = never
         self.conn_gate = ConnGate(0, max(0, int(max_conn_per_ip)))   # 0 = no per-IP limit
+        self.connect_acl = connect_acl    # None = any (the default); () = none; networks = the allow list
         self.client_lock = threading.Lock()
         self.client_count = 0
         self.clients = {}        # 'ip:port' -> {'since': monotonic, 'requests': n} (show connections)
+
+    def allowed(self, ip):
+        """The connect ACL: None = off (everybody allowed — the default, the
+        trusted-LAN posture); () = nobody; otherwise the ip must land in one
+        network (the cache's _allowed, mirrored)."""
+        if self.connect_acl is None:
+            return True
+        try:
+            a = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        return any(a.version == n.version and a in n for n in self.connect_acl)
 
     def serve(self, host, port):
         srv = socket.socket()
@@ -42,11 +56,12 @@ class FakeInverter:
         srv.listen(16)
         self.srv = srv
         self.listen_addr = (host, port)
-        logger.info('fake inverter %s listening on %s:%d (unit %d, peak PV %gW, client limit %s, client timeout %s, per-ip limit %s)%s',
+        logger.info('fake inverter %s listening on %s:%d (unit %d, peak PV %gW, client limit %s, client timeout %s, per-ip limit %s, connect-acl %s)%s',
                     version_string(), host, port, self.unit, self.simulator.peak_w,
                     self.max_clients or 'none',
                     '%gs' % self.client_timeout if self.client_timeout else 'none',
                     self.conn_gate.max_per_ip or 'none',
+                    'any' if self.connect_acl is None else ('none' if not self.connect_acl else '%d network(s)' % len(self.connect_acl)),
                     ', chaos p=%.2f' % self.chaos.p if self.chaos and self.chaos.p else '')
         while True:
             try:
@@ -59,6 +74,9 @@ class FakeInverter:
                     if not ok:
                         logger.info('connection refused: per-IP limit of %d reached (%s:%d)',
                                     self.conn_gate.max_per_ip, *addr[:2])
+                    elif not self.allowed(addr[0]):
+                        self.conn_gate.release(addr[0])
+                        logger.info('connection rejected: %s:%d not on the connect ACL', *addr[:2])
                     elif self.max_clients and self.client_count >= self.max_clients:
                         self.conn_gate.release(addr[0])
                         logger.info('connection refused: client limit of %d reached (%s:%d)',

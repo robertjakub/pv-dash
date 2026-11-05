@@ -201,7 +201,13 @@ token when `--control-token <secret>` is set**: the first request must be
 `{"cmd": "auth", "token": "..."}`. Over the unix socket the kernel vouches
 for the peer (`SO_PEERCRED`): root, the daemon's own user and the extra
 **`--control-trust-uids`** uids skip the handshake — a local systemd unit
-speaks without the secret; TCP peers always need the token. The clients
+speaks without the secret; TCP peers always need the token. **With a token
+configured the wire is signed**: every command and reply carries the full
+sha256 HMAC of its payload, keyed by the token (`"mac": …`,
+`common/wiresec.py`) — a token-holding client verifies nothing was injected
+or altered in flight, and over TCP the signed commands are mandatory (on
+the unix socket the mac is verify-if-present, so the trusted peers keep
+speaking without the secret). The clients
 take `--control-token`
 / **`FAKE_CONTROL_TOKEN`** — or the hardened way, **`--control-token-file`**
 (the first line of a key file or a systemd
@@ -221,9 +227,9 @@ take `--control-token`
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
 | `show settings` | every setting and its value — one stable `key=value` line per setting (scriptable) |
-| `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `clients`, `chaos`, `chaos_hits`, `pinned`, `profile`, `timezone`) — scriptable |
+| `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `clients`, `chaos`, `chaos_hits`, `pinned`, `profile`, `metrics`, `timezone`) — scriptable |
 | `show connections` | the fake's live **Modbus** clients: peer, connection age, requests served (`none` when idle) — the cache's `show connections`, pointed at the simulator |
-| `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins — the baton for a bug report |
+| `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins, the metrics endpoint state — the baton for a bug report |
 | `show registers` | the loaded profile's register map, one register per line: `name \| register \| type \| value`, columns aligned; the value = what the registers serve right now, `NaN` = not calculated (e.g. the battery block with the battery off) |
 | `show version` | the fake-inverter version (`0.3.0`, or `0.3.0-<short git>` from a checkout) |
 | `set scenario <name>` | apply a scenario preset (below) |
@@ -261,7 +267,8 @@ take `--control-token`
 | `max-clients` | `N` (`0` = no limit) | the simultaneous Modbus client limit — refuse further connections past it (`--max-clients`/`FAKE`-flag startup value, tunable live) |
 | `client-timeout` | seconds (`0` = never) | disconnect Modbus clients silent for this long — sheds connections from clients that died without closing (`--client-timeout` startup value, tunable live) |
 | `max-conn-per-ip` | `N` (`0` = no limit) | the per-peer-IP Modbus connection limit (`--max-conn-per-ip` startup value, tunable live) |
-| `metrics-server` | `on`/`off` | the fake's own `/metrics` endpoint (default off; the address is `--metrics-listen`, tunable live) |
+| `connect-acl` | `any` \| `none` \| IP/CIDR list | the Modbus connect ACL (`--connect-acl` startup value, tunable live): who may connect to the Modbus surface at all |
+| `metrics-server` | `on`/`off` | the fake's own `/metrics` endpoint (default off; the address is `--metrics-listen`, tunable live); a token-less listen beyond loopback logs a warning |
 | `register` | `addr value` | `set register <addr> <value>` — write a raw register into the **write overlay** (the same store the FC06/FC16 writes use, so the scrapers read it); `reset` clears it, `show registers` marks the rows with `*` |
 | `profile` | `<file>` | swap the register-map profile live |
 | `log-level` | `DEBUG\|INFO\|WARNING\|ERROR` | live log level |
@@ -366,7 +373,7 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--unit` | `1` | Modbus unit id served |
 | `--grid-voltage` | `230` | nominal grid phase voltage (V, 120 or 230); the per-phase machine wanders ±10 % around it |
 | `--grid-frequency` | `50` | nominal grid frequency (Hz); the machine wanders ±0.2 Hz around it |
-| `--metrics-server` | off | serve the fake's own Prometheus `/metrics` endpoint — **live-settable** (`set metrics-server on/off`) |
+| `--metrics-server` | off | serve the fake's own Prometheus `/metrics` endpoint — **live-settable** (`set metrics-server on/off`; the token-less-beyond-loopback warning holds on both paths) |
 | `--metrics-listen` | `127.0.0.1:9452` | the metrics bind address `HOST:PORT` (`0.0.0.0:PORT` serves every interface — mind the values) |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`) |
 | `--metrics-token-file` | off | the metrics bearer token from a file (the first line; owner-only `0600`, F12) — instead of `--metrics-token`, giving both is an error |
@@ -380,6 +387,7 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--max-clients` | `64` | refuse further Modbus connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect Modbus clients silent for this many seconds (`0` = never) — sheds connections from clients that died without closing |
 | `--max-conn-per-ip` | `0` | refuse further Modbus connections from one peer IP past this many simultaneous connections (`0` = no per-IP limit) |
+| `--connect-acl` | any | the Modbus clients allowed to connect (the cache's `connect-acl`, mirrored): `"any"` (the default — the trusted-LAN posture), `"none"`, or a comma-separated list of IPs and CIDR prefixes, e.g. `127.0.0.1,10.48.0.0/16` (env `FAKE_CONNECT_ACL`; live-settable, `show status` carries `connect_acl=`) |
 | `--timezone` | `utc` | clock the state machines integrate over (`utc` or `local`) |
 | `--time` | real clock | freeze simulated time `HH:MM` (zone-independent) |
 | `--time-scale` | `1` | the simulated clock speed: N× real time — a full simulated day takes 24/N real hours (`set time-scale` tunes it live) |
@@ -393,11 +401,13 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `FAKE_CONTROL_TOKEN`) |
 | `--control-token-file` | off | the control token from a file (the first line; a key file or a systemd `LoadCredential`, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12), instead of `--control-token`; giving both is an error |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `FAKE_CONTROL_TRUST_UIDS`) |
+| `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user |
 | `--control-log-replies` | off | DEBUG-log the full output of every control command, not just the command |
 | `--chaos` | `0` | probability 0..1 that a request is answered hostile and dropped |
 | `--seed` | random | chaos/cloud RNG seed for reproducible runs |
 | `--dry-run` | off | validate the configuration, print the effective settings and exit (`0` = valid, `1` = invalid, `2` = CLI misuse) |
 | `--log-level` | `INFO` | `DEBUG` adds per-client traffic and per-poll detail |
+| `--man` | off | print the generated man page (roff) to stdout and exit (`modbus-fake-inverter --man \| man -l -`); the shipped pages are the same generator's output |
 
 ## Docker
 

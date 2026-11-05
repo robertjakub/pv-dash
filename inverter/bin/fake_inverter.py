@@ -38,8 +38,8 @@ import math
 import os
 import threading
 
-from common.audit import AuditLog, default_path as default_audit_path
-from common.config import load_token_file, parse_listen
+from common.audit import AuditLog
+from common.config import acl_text, load_token_file, parse_acl, parse_listen
 from common.cred import parse_trust_uids
 from common.version import version_string
 from lib.chaos import Chaos
@@ -102,6 +102,7 @@ def validate(args):
 
 def configured_defaults(args, frozen, profile_text):
     """Every setting's configured startup value — what `unset <setting>` restores."""
+    connect_acl = parse_acl(args.connect_acl or os.environ.get('FAKE_CONNECT_ACL'), 'connect-acl')
     return {
         'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'grid': 'auto', 'soc': 'auto', 'cloud': 'clear',
         'time': '%02d:%02d' % (int(frozen), round((frozen % 1.0) * 60)) if frozen is not None else 'auto',
@@ -123,6 +124,7 @@ def configured_defaults(args, frozen, profile_text):
         'max-clients': str(args.max_clients),
         'client-timeout': '%g' % args.client_timeout,
         'max-conn-per-ip': str(args.max_conn_per_ip),
+        'connect-acl': acl_text(connect_acl),
         'metrics-server': 'on' if args.metrics_server else 'off',
         'profile': profile_text,
         'log-level': args.log_level,
@@ -143,7 +145,7 @@ def main():
     p.add_argument('--grid-frequency', type=float, default=GRID_FREQUENCY_HZ, help='nominal grid frequency in Hz (the machine wanders ±0.2 Hz around it, default %(default)s)')
     p.add_argument('--max-kwp', type=float, default=DEFAULT_MAX_KWP, help='PV array size in kWp, peak = 75%% of it (default %(default)s)')
     p.add_argument('--time', help='freeze simulated time HH:MM (default: real clock)')
-    p.add_argument('--time-scale', type=float, default=DEFAULT_TIME_SCALE, help='the simulated clock speed: N× real time — every machine (the battery, the clouds, the voltages, the day counters) integrates over it, so a full simulated day takes 24/N real hours (default: 1 = real time)')
+    p.add_argument('--time-scale', type=float, default=DEFAULT_TIME_SCALE, help='the simulated clock speed: N times real time - every machine (the battery, the clouds, the voltages, the day counters) integrates over it, so a full simulated day takes 24/N real hours (default: 1 = real time)')
     p.add_argument('--static', action='store_true', help='constant demo values instead of the day simulation')
     p.add_argument('--battery', action='store_true', default=True, help='simulate a battery (the default)')
     p.add_argument('--no-battery', dest='battery', action='store_false', help='no battery values')
@@ -152,6 +154,7 @@ def main():
     p.add_argument('--max-clients', type=int, default=DEFAULT_MAX_CLIENTS, help='refuse further Modbus connections past this many simultaneous clients, 0 = no limit (default %(default)s)')
     p.add_argument('--client-timeout', type=float, default=DEFAULT_CLIENT_TIMEOUT_S, help='disconnect Modbus clients silent for this many seconds, 0 = never (default %(default)s) — sheds connections from clients that died without closing')
     p.add_argument('--max-conn-per-ip', type=int, default=DEFAULT_MAX_CONN_PER_IP, help='refuse further Modbus connections from one peer IP past this many simultaneous connections, 0 = no per-IP limit (default %(default)s)')
+    p.add_argument('--connect-acl', default=None, help='the Modbus clients allowed to connect (the cache\'s connect-acl, mirrored): "any" (the default — the trusted-LAN posture), "none", or a comma-separated list of IPs and CIDR prefixes, e.g. 127.0.0.1,10.48.0.0/16 (env FAKE_CONNECT_ACL)')
     p.add_argument('--control-log-replies', action='store_true', help='DEBUG-log the full output of every control command (the default logs the command only)')
     p.add_argument('--metrics-server', action='store_true', help="serve the fake's own Prometheus /metrics endpoint (the live `set metrics-server` toggle exists too); off by default")
     p.add_argument('--metrics-listen', default=DEFAULT_METRICS_LISTEN, help='the metrics bind address HOST:PORT (default %(default)s)')
@@ -166,7 +169,7 @@ def main():
     p.add_argument('--seed', type=int, help='chaos RNG seed (default: random)')
     p.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
     p.add_argument('--log-level', default=DEFAULT_LOG_LEVEL, choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'])
-    p.add_argument('--audit-log', default=None, help='INV audit trail: a file path or - for stdout (the docker/journald way); default: %s — the XDG state home' % default_audit_path('fake-inverter'))
+    p.add_argument('--audit-log', default=None, help='INV audit trail: a file path or - for stdout (the docker/journald way); default: ~/.local/state/fake-inverter/audit.log — the XDG state home')
     p.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation (default %(default)s)')
     p.add_argument('--audit-daily', action='store_true', help='also rotate the audit log at UTC midnight')
     p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
@@ -174,7 +177,13 @@ def main():
     p.add_argument('--control-token', default=None, help='require a token on control connections: the client authenticates with {"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s own user or --control-trust-uids — SO_PEERCRED) skips the token')
     p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file; must be owner-only 0600) — takes the place of --control-token; giving both is an error (env FAKE_CONTROL_TOKEN_FILE)')
     p.add_argument('--control-trust-uids', default=None, help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (env FAKE_CONTROL_TRUST_UIDS)')
+    p.add_argument('--control-socket-group', action='store_true', help='leave the unix control socket group-accessible (chmod 0660 instead of the default 0600): a local group may speak to the control without being the service user')
+    p.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-fake-inverter --man | man -l -)')
     args = p.parse_args()
+    if args.man:
+        from lib.man import daemon_page
+        sys.stdout.write(daemon_page(p))
+        raise SystemExit(0)
     logging.basicConfig(level=getattr(logging, args.log_level),
                         format='%(levelname)-7s %(message)s' if os.environ.get('JOURNAL_STREAM')
                         else '%(asctime)s %(levelname)-7s %(message)s')
@@ -195,22 +204,25 @@ def main():
                           battery=args.battery, battery_kwh=args.battery_kwh,
                           profile=load_profile(profile_path), seed=args.seed)
     simulator.set_time_scale(args.time_scale)   # validated above; before any machine reads the clock
+    connect_acl = parse_acl(args.connect_acl or os.environ.get('FAKE_CONNECT_ACL'), 'connect-acl')
     chaos = Chaos(args.chaos, seed=args.seed)
     target = resolve_control_target(args.control_port, args.port)
-    if args.control_token and args.control_token_file:
+    control_token_file = args.control_token_file or os.environ.get('FAKE_CONTROL_TOKEN_FILE')
+    if args.control_token and control_token_file:
         logger.error('--control-token and --control-token-file are mutually exclusive')
         raise SystemExit(1)
     control_token = args.control_token
-    if args.control_token_file:
-        control_token = load_token_file(args.control_token_file)
+    if control_token_file:
+        control_token = load_token_file(control_token_file)
     trust_uids = parse_trust_uids(args.control_trust_uids or os.environ.get('FAKE_CONTROL_TRUST_UIDS'),
                                   'control-trust-uids')
-    if args.metrics_token and args.metrics_token_file:
+    metrics_token_file = args.metrics_token_file or os.environ.get('FAKE_METRICS_TOKEN_FILE')
+    if args.metrics_token and metrics_token_file:
         logger.error('--metrics-token and --metrics-token-file are mutually exclusive')
         raise SystemExit(1)
     metrics_token = args.metrics_token
-    if args.metrics_token_file:
-        metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
+    if metrics_token_file:
+        metrics_token = load_token_file(metrics_token_file, 'metrics-token-file')
     metrics_listen = parse_listen(args.metrics_listen)
     if args.metrics_server and metrics_token is None:
         from common.config import is_loopback_host
@@ -241,19 +253,21 @@ def main():
                                                     daily=args.audit_daily, files=args.audit_files)
     fake = FakeInverter(args.unit, simulator, strict=args.strict, chaos=chaos,
                         max_clients=args.max_clients, client_timeout=args.client_timeout,
-                        max_conn_per_ip=args.max_conn_per_ip)
+                        max_conn_per_ip=args.max_conn_per_ip, connect_acl=connect_acl)
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,
                                 defaults=configured_defaults(args, frozen, profile_text),
                                 log_replies=args.control_log_replies, audit=audit,
-                                token=control_token, trust_uids=trust_uids)
+                                token=control_token, trust_uids=trust_uids,
+                                socket_group=args.control_socket_group)
         threading.Thread(target=control.serve, daemon=True).start()
     fake.metrics_listen = metrics_listen
     fake.metrics_token = metrics_token
     fake.metrics_caps = (args.metrics_max_clients, args.metrics_client_timeout, args.metrics_max_conn_per_ip)
     fake.metrics_desc = describe_metrics(metrics_listen, metrics_token,
-                                         args.metrics_max_clients, args.metrics_max_conn_per_ip)
+                                         args.metrics_max_clients, args.metrics_max_conn_per_ip) \
+        if args.metrics_server else 'off'
     if args.metrics_server:
         fake.metrics_srv = MetricsServer(simulator, chaos, fake, control, metrics_listen,
                                          token=metrics_token, max_clients=args.metrics_max_clients,

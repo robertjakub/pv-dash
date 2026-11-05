@@ -9,11 +9,12 @@ modbus-fake-ctl \- one-shot control client for the fake inverter
 .B modbus-fake-ctl
 .RI [ options ]
 < commands
+
 .SH DESCRIPTION
 Sends one control command (or a batch piped on stdin, one per line) to the
-.B modbus-fake-inverter
-JSON-lines control server and prints the replies on stdout, one per line.
-Every invocation lands in the audit trail (prefix \fBCTL\fR).
+\fBmodbus-fake-inverter\fR JSON-lines control server and prints the
+replies on stdout, one per line. Every invocation lands in the audit trail
+(prefix \fBCTL\fR).
 .PP
 The command grammar is the fake's: \fBset\fR/\fBunset\fR/\fBshow\fR/
 \fBhelp\fR (the 26-setting registry), \fBshow status\fR,
@@ -22,29 +23,41 @@ The command grammar is the fake's: \fBset\fR/\fBunset\fR/\fBshow\fR/
 \fBinspect\fR, \fBreset\fR, \fBshutdown\fR, \fBquit\fR. See
 .BR modbus-fake-inverter (1)
 CONTROL.
+
 .SH OPTIONS
 .TP
-.BI \-\-control-port " TARGET"
-the control target: a unix socket path or a TCP port. Default
-\fB/tmp/fake-inverter-\fR\fI<modbus-port>\fB.socket\fR; the
-\fBFAKE_CTL\fR environment variable is the same knob.
+.B \-\-control\-port
+control server target: unix socket path or TCP port on 127.0.0.1,
+auto\-detected (default: /tmp/fake\-inverter\-5502.socket; env FAKE_CTL
+when unset) — same flag as the fake itself
 .TP
-.BI \-\-timeout " S"
-wire timeout, seconds. Default \fB5\fR.
+.B command
+control command, e.g. set pv 2500, set scenario noon, show settings,
+status, reset, shutdown
 .TP
-.BI \-\-control-token " TOKEN" ", " \-\-control-token-file " FILE"
-the token for TCP control (mutually exclusive; the file must be owner-only
-\fB0600\fR \(em a token flag is visible in \fBps\fR, prefer the file).
+.BI \-\-timeout " N"
+socket timeout in seconds (default 5.0)
 .TP
-.BI \-\-audit-log " FILE|\-"
-the client's own audit trail
-(\fB~/.local/state/fake-inverter/audit.log\fR by default).
+.B \-\-control\-token
+control auth token for TCP (env FAKE_CONTROL_TOKEN)
 .TP
-.BI \-\-audit-max-mb " N ", \-\-audit-files " N"
-the file sink's gated rotation (defaults \fB10\fR / \fB3\fR).
+.B \-\-control\-token\-file
+the token from a file (the first line; must be owner\-only 0600); not
+for use with \-\-control\-token (env FAKE_CONTROL_TOKEN_FILE)
 .TP
-.B \-\-no-audit-log
-disable the client's audit trail.
+.B \-\-audit\-log
+audit trail: a file path or \- for stdout; default: the XDG state home
+.TP
+.BI \-\-audit\-max\-mb " N"
+rotate the audit log at this size, 0 = off (default: 10.0)
+.TP
+.BI \-\-audit\-files " N"
+rotated audit backups to keep (default 3)
+.TP
+.B \-\-no\-audit\-log
+disable the audit trail (default: off)
+
+
 .SH EXAMPLES
 .RS
 .IP \(bu 2
@@ -54,6 +67,7 @@ disable the client's audit trail.
 .IP \(bu 2
 .B printf 'set pv 2500\\nset soc 30\\nshow status\\n' | modbus-fake-ctl
 .RE
+
 .SH EXIT STATUS
 .TP
 .B 0
@@ -64,6 +78,7 @@ connection or control error.
 .TP
 .B 2
 command-line misuse.
+
 .SH SEE ALSO
 .BR modbus-fake-inverter (1),
 .BR modbus-fake-cli (1)

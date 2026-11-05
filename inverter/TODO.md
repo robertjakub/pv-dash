@@ -5,6 +5,33 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The token-file env vars honored: `FAKE_CONTROL_TOKEN_FILE` and
+`FAKE_METRICS_TOKEN_FILE` do what the help always promised — the env form
+of `--control-token-file` / `--metrics-token-file` on the fake and both
+clients (flag over env, the file over the plain token, giving both is the
+familiar mutual-exclusion error; F12's 0600 gate applies either way).
+
+The **signed wire**: with a control token configured every command and
+reply on the control socket carries the full sha256 HMAC of its payload
+keyed by the token (`common/wiresec.py`) — over TCP the signed commands
+are mandatory, on the unix socket the mac is verify-if-present; the
+fake_ctl/fake_cli clients sign and verify both directions, and the audit
+trail's COMMAND entries carry the frame's mac. The opt-in **connect ACL**
+for the Modbus surface (`--connect-acl`, the cache's mirrored: any/none/
+IP-CIDR list, the default stays `any` — the trusted-LAN posture; a live
+setting, `show status` carries `connect_acl=`). The man pages are
+generated now (`common/manpage.py`, `--man` prints the page,
+scripts/gen_man.py regenerates the shipped files).
+
+
+The control server aligned with the cache's (the metrics-renames round):
+the metrics endpoint state reports on `show status` (`metrics=`) and
+`inspect` (the shared `describe_metrics` one-liner, `off` when off), the
+live `set metrics-server on` warns about a token-less listen beyond
+loopback like the startup does, an unbindable control target logs and
+keeps running, the legacy `.`-terminator strip is gone, and the unix
+control socket grew the cache's `--control-socket-group` (0660 opt-in).
+
 The audit finding F11 closed (rev. 3): the cache's client knobs mirrored
 (`--max-clients` / `--client-timeout`, live-settable, `show connections`
 to watch them), the per-IP connection cap (`--max-conn-per-ip`), the

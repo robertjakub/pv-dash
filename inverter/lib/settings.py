@@ -83,6 +83,10 @@ SETTINGS = (
             {'0': 'no limit'}),
     Setting('max-conn-per-ip', 'simultaneous Modbus connections from one peer IP', (), 'N',
             {'0': 'no per-IP limit (the default)'}),
+    Setting('connect-acl', 'the Modbus clients allowed to connect (the cache\'s connect-acl, mirrored: '
+            '"any", "none", or a comma-separated IP/CIDR list; off by default — the trusted-LAN posture)', (), '<acl>',
+            {'any': 'every peer allowed (the default)',
+             'none': 'every peer refused'}),
     Setting('metrics-server', "the fake's own Prometheus /metrics endpoint "
             '(the address is --metrics-listen)', ('on', 'off'), None,
             {'on': 'serve /metrics on the configured listen address',

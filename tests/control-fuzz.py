@@ -8,6 +8,8 @@ serving afterwards.
 
 Checks: ALL PASS (or a FAILURES list; exit 1).
 """
+import hashlib
+import hmac
 import json as _json
 import os
 import socket
@@ -16,6 +18,11 @@ import subprocess
 import sys
 import threading
 import time
+
+
+def wiremac(token, payload):
+    """The control wire's frame mac: the full sha256 HMAC, keyed by the token."""
+    return hmac.new(token.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
@@ -143,14 +150,24 @@ def main():
             while not buf.endswith(b'\n'):
                 buf += s.recv(4096)
             auth = _json.loads(buf.decode())
-            check('fuzz: the right token authenticates', auth.get('status') == 'ok', str(auth))
-            s.sendall(b'{"cmd": "show version"}\n')
+            check('fuzz: the right token authenticates', auth.get('status') == 'ok'
+                  and auth.get('mac') == wiremac('sekrit', 'ok authenticated'), str(auth))
+            s.sendall(_json.dumps({'cmd': 'show version', 'mac': wiremac('sekrit', 'show version')}).encode() + b'\n')
             buf = b''
             while not buf.endswith(b'\n'):
                 buf += s.recv(4096)
             reply = _json.loads(buf.decode())
             check('fuzz: authenticated command works on the same connection', reply.get('status') == 'ok'
-                  and 'fake-inverter' in reply.get('text', ''), str(reply))
+                  and 'fake-inverter' in reply.get('text', '')
+                  and reply.get('mac') == wiremac('sekrit', '%s %s' % (reply.get('status'), reply.get('text', ''))),
+                  str(reply))
+            s.sendall(b'{"cmd": "show version"}\n')
+            buf = b''
+            while not buf.endswith(b'\n'):
+                buf += s.recv(4096)
+            reply = _json.loads(buf.decode())
+            check('fuzz: an unsigned command over TCP is refused', reply.get('status') == 'err'
+                  and 'unsigned command' in reply.get('text', ''), str(reply))
             s.close()
         except (OSError, ValueError) as e:
             check('fuzz: the right token authenticates', False, str(e))
@@ -203,6 +220,44 @@ def main():
                            capture_output=True, text=True, timeout=15)
         check('fuzz: a group/world-readable token file refuses to start (F12)',
               r.returncode != 0 and '0600' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
+
+        # 6c. the token-file env vars the help promises: honored like the flags
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py'),
+                            '--control-port', '15964', 'show', 'version'],
+                           capture_output=True, text=True, timeout=15,
+                           env={**os.environ, 'FAKE_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+        check('fuzz: fake_ctl honors FAKE_CONTROL_TOKEN_FILE', r.returncode == 0
+              and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_ctl.py'),
+                            '--control-port', '15964', 'status'],
+                           capture_output=True, text=True, timeout=15,
+                           env={**os.environ, 'FAKE_CONTROL_TOKEN': 'x',
+                                'FAKE_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+        check('fuzz: the token env + the token-file env is a clean error', r.returncode != 0
+              and 'mutually exclusive' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py'),
+                            '--port', '15962', '--dry-run', '--control-token', 'a'],
+                           capture_output=True, text=True, timeout=15,
+                           env={**os.environ, 'FAKE_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+        check('fuzz: flag token + the control token-file env is a clean error', r.returncode != 0
+              and 'mutually exclusive' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py'),
+                            '--port', '15962', '--dry-run', '--metrics-server',
+                            '--metrics-listen', '127.0.0.1:15967'],
+                           capture_output=True, text=True, timeout=15,
+                           env={**os.environ, 'FAKE_METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+        check('fuzz: the fake honors FAKE_METRICS_TOKEN_FILE', r.returncode == 0
+              and 'bearer token' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py'),
+                            '--port', '15962', '--dry-run', '--metrics-token', 'a'],
+                           capture_output=True, text=True, timeout=15,
+                           env={**os.environ, 'FAKE_METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+        check('fuzz: flag metrics token + the metrics token-file env is a clean error', r.returncode != 0
+              and 'mutually exclusive' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
 
         # 7. twenty parallel clients: garbage and real commands interleaved

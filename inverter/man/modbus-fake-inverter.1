@@ -1,12 +1,14 @@
 .TH MODBUS-FAKE-INVERTER 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
 .SH NAME
-modbus-fake-inverter \- simulated PV inverter for testing the pv-suite stack
+modbus-fake-inverter \- simulated PV inverter for testing the pv-suite
+stack
 .SH SYNOPSIS
 .B modbus-fake-inverter
 .RI [ options ]
 .br
 .B modbus-fake-inverter \-\-static
 .RI [ options ]
+
 .SH DESCRIPTION
 A stdlib-only Modbus TCP server that plays an inverter \(em with a
 battery, a smart meter, the modbus-cache diagnostics block and the
@@ -25,124 +27,173 @@ clock \(em UTC by default, freezable (\fB--time\fR) and scalable
 (\fB--time-scale\fR for time-lapse). \fB--static\fR replaces the day with
 constant demo values. Writes (FC06/FC16) land in an overlay the scrapers
 read; \fB--chaos\fR answers a fraction of requests hostile.
+
 .SH OPTIONS
 .TP
-.BI \-\-host " HOST" ", " \-\-port " N"
-the Modbus TCP listener. Defaults \fB127.0.0.1:5502\fR.
+.B \-\-host
+bind address (default 127.0.0.1)
+.TP
+.BI \-\-port " N"
+Modbus TCP port (default 5502)
 .TP
 .BI \-\-unit " N"
-the unit id served. Default \fB1\fR.
+Modbus unit id served (default 1)
 .TP
-.BI \-\-profile " NAME|PATH"
-the register-map profile (a bare name or a JSON path). Default the
-bundled \fBsun2000\fR.
+.B \-\-timezone
+clock the state machines integrate over (the PV bell, the home load, the
+clouds, the battery, the grid voltage): UTC (the default) or the local
+wall clock (default: utc)
+.TP
+.BI \-\-grid\-voltage " N"
+nominal grid phase voltage in V (120 or 230; the per\-phase machine
+wanders ±10 %% around it, default 230.0)
+.TP
+.BI \-\-grid\-frequency " N"
+nominal grid frequency in Hz (the machine wanders ±0.2 Hz around it,
+default 50.0)
+.TP
+.BI \-\-max\-kwp " N"
+PV array size in kWp, peak = 75%% of it (default 6.0)
+.TP
+.B \-\-time
+freeze simulated time HH:MM (default: real clock)
+.TP
+.BI \-\-time\-scale " N"
+the simulated clock speed: N times real time \- every machine (the
+battery, the clouds, the voltages, the day counters) integrates over it,
+so a full simulated day takes 24/N real hours (default: 1 = real time)
+(default: 1.0)
 .TP
 .B \-\-static
-constant demo values (PV 4000 W, home 4300 W, grid \-1500 W, battery
-+1200 W at 65 % SoC) instead of the day simulation.
+constant demo values instead of the day simulation (default: off)
 .TP
-.BI \-\-max-kwp " KW"
-PV array size; the peak is 75 % of it. Default \fB6\fR.
+.B \-\-battery
+simulate a battery (the default) (default: on)
 .TP
-.BI \-\-battery-kwh " KWH"
-usable battery capacity. Default \fB6.9\fR.
-.TP
-.B \-\-battery " / " \-\-no-battery
-simulate the battery (the default) or not.
-.TP
-.BI \-\-timezone " utc|local"
-the clock the machines integrate over. Default \fButc\fR.
-.TP
-.BI \-\-time " HH:MM"
-freeze the simulated clock at this time (zone-independent).
-.TP
-.BI \-\-time-scale " N"
-the simulated clock runs N\(en real time (a full simulated day takes
-24/N real hours). Default \fB1\fR.
-.TP
-.BI \-\-grid-voltage " V"
-nominal phase voltage, \fB120\fR or \fB230\fR (the per-phase machine
-wanders +/-10 %). Default \fB230\fR.
-.TP
-.BI \-\-grid-frequency " HZ"
-nominal frequency (the machine wanders +/-0.2 Hz). Default \fB50\fR.
+.B \-\-no\-battery
+no battery values (default: on)
 .TP
 .B \-\-strict
-reject undefined registers with exception 02.
+reject reads of undefined registers with exception 02 (like the real
+device) (default: off)
 .TP
-.BI \-\-max-clients " N"
-refuse further Modbus connections past this many simultaneous clients
-(\fB0\fR = no limit). Default \fB64\fR. Tunable live on the control
-server (\fBset max-clients\fR, \fBshow connections\fR).
+.BI \-\-battery\-kwh " N"
+usable battery capacity in kWh (default 6.9)
 .TP
-.BI \-\-client-timeout " S"
-disconnect Modbus clients silent for this many seconds (\fB0\fR = never)
-\(em sheds connections from clients that died without closing. Default
-\fB300\fR. Tunable live (\fBset client-timeout\fR).
+.BI \-\-max\-clients " N"
+refuse further Modbus connections past this many simultaneous clients, 0
+= no limit (default 64)
 .TP
-.BI \-\-max-conn-per-ip " N"
+.BI \-\-client\-timeout " N"
+disconnect Modbus clients silent for this many seconds, 0 = never
+(default 300.0) — sheds connections from clients that died without
+closing
+.TP
+.BI \-\-max\-conn\-per\-ip " N"
 refuse further Modbus connections from one peer IP past this many
-simultaneous connections (default \fB0\fR = no per-IP limit). Tunable live
-(\fBset max-conn-per-ip\fR).
+simultaneous connections, 0 = no per\-IP limit (default 0)
 .TP
-.BI \-\-chaos " P"
-probability 0..1 that a request is answered hostile (garbage, short/lying
-lengths, wrong ids, stalls, dropouts, raw exceptions) and dropped.
+.B \-\-connect\-acl
+the Modbus clients allowed to connect (the cache's connect\-acl,
+mirrored): "any" (the default — the trusted\-LAN posture), "none", or a
+comma\-separated list of IPs and CIDR prefixes, e.g.
+127.0.0.1,10.48.0.0/16 (env FAKE_CONNECT_ACL)
+.TP
+.B \-\-control\-log\-replies
+DEBUG\-log the full output of every control command (the default logs
+the command only) (default: off)
+.TP
+.B \-\-metrics\-server
+serve the fake's own Prometheus /metrics endpoint (the live `set
+metrics\-server` toggle exists too); off by default (default: off)
+.TP
+.B \-\-metrics\-listen
+the metrics bind address HOST:PORT (default 127.0.0.1:9452)
+.TP
+.B \-\-metrics\-token
+require Authorization: Bearer <token> on the /metrics endpoint (the same
+scheme the scraper speaks)
+.TP
+.B \-\-metrics\-token\-file
+the metrics bearer token from a file (the first line; must be
+owner\-only 0600) — takes the place of \-\-metrics\-token; giving both
+is an error (env FAKE_METRICS_TOKEN_FILE)
+.TP
+.BI \-\-metrics\-max\-clients " N"
+maximum concurrent HTTP clients on the /metrics endpoint; extras get an
+immediate 503, 0 = unlimited (default 64)
+.TP
+.BI \-\-metrics\-client\-timeout " N"
+seconds an idle /metrics client is kept before the socket times out, 0 =
+the built\-in 5 s cap (default 5.0)
+.TP
+.BI \-\-metrics\-max\-conn\-per\-ip " N"
+maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
+limit (default 0)
+.TP
+.B \-\-control\-port
+control server target: unix socket path (default:
+/tmp/fake\-inverter\-<modbus\-port>.socket) or TCP port number on
+127.0.0.1 (e.g. 15599); 0 = off. Talk to it with fake_ctl.py
+.TP
+.B \-\-profile
+inverter profile JSON: name \-> register (+ optional type/scale), e.g.
+profiles/profiles/sun2000.json (the default); FAKE_PROFILE when unset
+.TP
+.BI \-\-chaos " N"
+probability 0..1 that a request is answered hostile and dropped
+(default: off); seed with \-\-seed for reproducibility (default: 0.0)
 .TP
 .BI \-\-seed " N"
-the chaos/cloud RNG seed for reproducible runs.
+chaos RNG seed (default: random)
 .TP
-.BI \-\-control-port " TARGET"
-the JSON-lines control server: a unix socket path or a TCP port. Default
-\fB/tmp/fake-inverter-\fR\fI<modbus-port>\fB.socket\fR; \fB0\fR = off.
+.B \-\-dry\-run
+validate the configuration, print the effective settings and exit
+(nothing is bound or connected) (default: off)
 .TP
-.BI \-\-control-token " TOKEN" ", " \-\-control-token-file " FILE"
-require the token auth handshake on control connections (mutually
-exclusive). Over the unix socket a trusted peer (root, the daemon's own
-user or \fB--control-trust-uids\fR \(em \fBSO_PEERCRED\fR) skips the
-handshake. The file must be owner-only (\fB0600\fR); a group/world-accessible
-token file refuses to start. A token passed as \fB--control-token\fR is
-visible in \fBps\fR / \fB/proc/*/cmdline\fR \(em prefer the file; the flag
-form is for quick tests.
+.B \-\-log\-level
+ (default: INFO)
 .TP
-.BI \-\-control-trust-uids " UIDS"
-extra peer uids the unix control socket trusts without the token: a
-comma-separated list (a local systemd unit speaks without the secret).
+.B \-\-audit\-log
+INV audit trail: a file path or \- for stdout (the docker/journald way);
+default: ~/.local/state/fake\-inverter/audit.log — the XDG state home
 .TP
-.B \-\-control-log-replies
-DEBUG-log the full reply of every control command.
+.BI \-\-audit\-max\-mb " N"
+rotate the audit log at this size in MB, keeping 3 backups; 0 = no size
+rotation (default 10.0)
 .TP
-.BI \-\-metrics-server ", " \-\-metrics-listen " HOST:PORT"
-serve the fake's own Prometheus \fB/metrics\fR endpoint (off by default;
-live-settable on the control server) on the bind address (default
-\fB127.0.0.1:9452\fR; \fB0.0.0.0:PORT\fR serves every interface — mind the
-values).
+.B \-\-audit\-daily
+also rotate the audit log at UTC midnight (default: off)
 .TP
-.BI \-\-metrics-token " TOKEN" ", " \-\-metrics-token-file " FILE"
-require \fBAuthorization: Bearer\fR on the metrics endpoint (mutually
-exclusive; the file must be owner-only \fB0600\fR).
+.BI \-\-audit\-files " N"
+rotated audit backups to keep (default 3)
 .TP
-.BI \-\-metrics-max-clients " N" ", " \-\-metrics-client-timeout " S" ", " \-\-metrics-max-conn-per-ip " N"
-cap concurrent HTTP clients on the metrics endpoint (default \fB64\fR;
-overflow answers 503), time out idle ones (default \fB5\fR s; \fB0\fR = the
-same built-in cap) and cap concurrent connections from one peer IP
-(default \fB0\fR = no per-IP limit).
+.B \-\-no\-audit\-log
+disable the INV audit trail (default: off)
 .TP
-.BI \-\-audit-log " FILE|\-"
-the audit trail (default
-\fB~/.local/state/fake-inverter/audit.log\fR; \fB\-\fR = stdout).
+.B \-\-control\-token
+require a token on control connections: the client authenticates with
+{"cmd": "auth", "token": ...}; over the unix socket a trusted peer
+(root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
+skips the token
 .TP
-.BI \-\-audit-max-mb " N ", \-\-audit-daily ", " \-\-audit-files " N", " \-\-no-audit-log"
-the file sink's gated rotation (defaults \fB10\fR / off / \fB3\fR).
+.B \-\-control\-token\-file
+the token from a file (the first line; e.g. a systemd LoadCredential or
+a key file; must be owner\-only 0600) — takes the place of
+\-\-control\-token; giving both is an error (env
+FAKE_CONTROL_TOKEN_FILE)
 .TP
-.B \-\-dry-run
-validate the configuration, print the effective settings and exit.
+.B \-\-control\-trust\-uids
+extra peer uids the unix control socket trusts without the token
+(SO_PEERCRED — a local systemd unit speaks without the secret); root and
+the daemon's own user are always trusted (env FAKE_CONTROL_TRUST_UIDS)
 .TP
-.BI \-\-log-level " LEVEL"
-default \fBINFO\fR.
-.TP
-.B \-\-version
-print the version.
+.B \-\-control\-socket\-group
+leave the unix control socket group\-accessible (chmod 0660 instead of
+the default 0600): a local group may speak to the control without being
+the service user (default: off)
+
+
 .SH SIGNALS
 .TP
 .B SIGHUP
@@ -154,14 +205,16 @@ are dropped.
 .TP
 .BR SIGTERM ", " SIGINT
 graceful shutdown with a session summary.
+
 .SH CONTROL
 The control server speaks JSON lines
 (\fB{"cmd": "..."}\fR -> \fB{"status": "ok|err|bye", "text": "..."}\fR;
 TCP requires the token when configured). Commands: \fBset\fR/\fBunset\fR/
-\fBshow\fR/\fBhelp\fR (26 settings: pv, load, batt, grid, grid-voltage,
+\fBshow\fR/\fBhelp\fR (the settings: pv, load, batt, grid, grid-voltage,
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
 scenario, chaos, seed, battery, battery-state, strict, static, max-kwp,
-battery-kwh, max-clients, client-timeout, register, profile, log-level),
+battery-kwh, max-clients, client-timeout, max-conn-per-ip, metrics-server,
+register, profile, log-level),
 \fBshow status\fR, \fBshow connections\fR (the live Modbus clients: peer,
 age, requests), \fBshow settings\fR, \fBshow registers\fR,
 \fBshow version\fR, \fBinspect\fR, \fBreset\fR, \fBshutdown\fR,
@@ -169,6 +222,7 @@ age, requests), \fBshow settings\fR, \fBshow registers\fR,
 .BR modbus-fake-ctl (1)
 and
 .BR modbus-fake-cli (1).
+
 .SH SECURITY
 The fake is a development/test instrument, not a security-first design
 (the audit's F11): the Modbus surface speaks to any peer that can reach
@@ -178,9 +232,11 @@ LAN-isolated network, next to the tools it is meant to serve.
 \fB--max-clients\fR/\fB--client-timeout\fR cap runaway connections and
 the read-count gate keeps a malformed frame from assembling an oversized
 reply.
+
 .SH ENVIRONMENT
 .TP
-.B FAKE_CHAOS ", " FAKE_MAX_KWP ", " FAKE_PROFILE ", " FAKE_BATTERY ", " FAKE_STRICT ", " FAKE_TIME ", " FAKE_TIME_SCALE ", " FAKE_LOG_LEVEL
+.B FAKE_CHAOS ", " FAKE_MAX_KWP ", " FAKE_PROFILE ", " FAKE_BATTERY ,
+.B FAKE_STRICT ", " FAKE_TIME ", " FAKE_TIME_SCALE ", " FAKE_LOG_LEVEL
 the SIGHUP-reloadable layer.
 .TP
 .B FAKE_CTL
@@ -188,6 +244,7 @@ the default control target for the clients.
 .TP
 .B FAKE_CONTROL_TOKEN ", " FAKE_CLI_KEEPALIVE
 the clients' TCP token and idle-ping interval.
+
 .SH FILES
 .TP
 .I /tmp/fake-inverter-<port>.socket
@@ -195,6 +252,7 @@ the default control socket.
 .TP
 .I ~/.local/state/fake-inverter/audit.log
 the default audit trail.
+
 .SH SEE ALSO
 .BR modbus-fake-ctl (1),
 .BR modbus-fake-cli (1),

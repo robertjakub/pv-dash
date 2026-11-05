@@ -118,6 +118,26 @@ before the repo restructured into one suite.
   the scraper's SIGHUP-reread loader re-checks on every reload (F12); the
   docker entrypoint seeds generated token files 0600. The regtests assert
   the refusal.
+- **inverter** — the audit finding F11 (docs/AUDIT.md) closed as
+  recommended — capped and documented, not redesigned: the fake's Modbus
+  listener grew **`--max-clients`** (refuse past the limit at accept,
+  default 64, `0` = no limit) and **`--client-timeout`** (shed silent
+  clients, default 300 s, `0` = never) mirroring the cache — both tunable
+  live (`set max-clients` / `set client-timeout`, `unset` restores the
+  configured value) and watched via the new **`show connections`** control
+  command (peer, connection age, requests served; `clients=` joined the
+  `show status` fields and `inspect` carries the modbus row). A declared
+  read count past the 125-register cap (`0`, `0xFFFF`, a span past the
+  16-bit space) now answers exception 03 — the cache's gate — instead of
+  assembling an oversized reply. The README's Security section and the man
+  page's SECURITY block document the posture: the fake is a development
+  tool, not security-first design — run it on a trusted, LAN-isolated
+  network. Verified by the new `tests/inverter-regtest.py`. The two suites
+  that predate the earlier fixes caught up in the same sweep: the
+  cache-control fuzzer authenticates now (its token-less TCP control port
+  predates the F5 startup refusal) and the cache stress proxy opens its
+  write path explicitly (`--write-acl any --write-registers any` — the
+  write defaults are none).
 
 ## 0.3.0 — 2026-11-05
 

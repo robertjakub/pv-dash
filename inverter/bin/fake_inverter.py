@@ -47,9 +47,10 @@ from lib.paths import resolve_control_target
 from lib.control import ControlServer
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
-from lib.statics import (AUDIT_FILES, AUDIT_MAX_MB, DEFAULT_BATTERY_KWH, DEFAULT_CHAOS, DEFAULT_HOST,
-                         DEFAULT_LOG_LEVEL, DEFAULT_MAX_KWP, DEFAULT_MODBUS_PORT, DEFAULT_TIME_SCALE,
-                         DEFAULT_UNIT, GRID_FREQUENCY_HZ, GRID_VOLTAGE_V, PEAK_RATIO, TIME_SCALE_MAX)
+from lib.statics import (AUDIT_FILES, AUDIT_MAX_MB, DEFAULT_BATTERY_KWH, DEFAULT_CHAOS, DEFAULT_CLIENT_TIMEOUT_S,
+                         DEFAULT_HOST, DEFAULT_LOG_LEVEL, DEFAULT_MAX_CLIENTS, DEFAULT_MAX_KWP, DEFAULT_MODBUS_PORT,
+                         DEFAULT_TIME_SCALE, DEFAULT_UNIT, GRID_FREQUENCY_HZ, GRID_VOLTAGE_V, PEAK_RATIO,
+                         TIME_SCALE_MAX)
 from lib.signals import SignalBox, parse_time
 from lib.metrics import MetricsServer
 from lib.simulator import Simulator
@@ -82,6 +83,10 @@ def validate(args):
         problems.append('--time-scale must be 0 < N <= %g (a day per minute), got %r' % (TIME_SCALE_MAX, args.time_scale))
     if not 0.0 <= args.chaos <= 1.0:
         problems.append('--chaos must be a probability 0..1, got %r' % args.chaos)
+    if args.max_clients < 0:
+        problems.append('--max-clients must be >= 0 (0 = no limit), got %d' % args.max_clients)
+    if not (math.isfinite(args.client_timeout) and args.client_timeout >= 0):
+        problems.append('--client-timeout must be >= 0 seconds (0 = never), got %r' % args.client_timeout)
     return problems
 
 
@@ -105,6 +110,8 @@ def configured_defaults(args, frozen, profile_text):
         'static': 'on' if args.static else 'off',
         'max-kwp': '%g' % args.max_kwp,
         'battery-kwh': '%g' % args.battery_kwh,
+        'max-clients': str(args.max_clients),
+        'client-timeout': '%g' % args.client_timeout,
         'profile': profile_text,
         'log-level': args.log_level,
     }
@@ -130,6 +137,8 @@ def main():
     p.add_argument('--no-battery', dest='battery', action='store_false', help='no battery values')
     p.add_argument('--strict', action='store_true', help='reject reads of undefined registers with exception 02 (like the real device)')
     p.add_argument('--battery-kwh', type=float, default=DEFAULT_BATTERY_KWH, help='usable battery capacity in kWh (default %(default)s)')
+    p.add_argument('--max-clients', type=int, default=DEFAULT_MAX_CLIENTS, help='refuse further Modbus connections past this many simultaneous clients, 0 = no limit (default %(default)s)')
+    p.add_argument('--client-timeout', type=float, default=DEFAULT_CLIENT_TIMEOUT_S, help='disconnect Modbus clients silent for this many seconds, 0 = never (default %(default)s) — sheds connections from clients that died without closing')
     p.add_argument('--control-log-replies', action='store_true', help='DEBUG-log the full output of every control command (the default logs the command only)')
     p.add_argument('--metrics-port', type=int, default=0, help='serve the fake\'s own Prometheus /metrics on 127.0.0.1:PORT; 0 = off (the default)')
     p.add_argument('--metrics-token', default=None, help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
@@ -188,13 +197,15 @@ def main():
     if args.dry_run:
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')
-        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, profile %s: %s, %d register(s), control server %s)',
+        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, profile %s: %s, %d register(s), control server %s)',
                     args.host, args.port, args.unit, PEAK_RATIO * args.max_kwp * 1000.0,
                     mode,
                     'on' if args.battery else 'off',
                     ' (%g kWh)' % args.battery_kwh if args.battery else '',
                     args.strict, args.chaos,
                     args.seed if args.seed is not None else 'random',
+                    args.max_clients or 'none',
+                    '%gs' % args.client_timeout if args.client_timeout else 'never',
                     simulator.profile.description, profile_label(profile_path), len(simulator.profile.entries),
                     ('127.0.0.1:' + target) if target.isdigit() else ('unix:' + target) if target != '0' else 'off')
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
@@ -202,7 +213,8 @@ def main():
     audit = None if args.no_audit_log else AuditLog(args.audit_log, 'INV', app='fake-inverter',
                                                     max_mb=args.audit_max_mb,
                                                     daily=args.audit_daily, files=args.audit_files)
-    fake = FakeInverter(args.unit, simulator, strict=args.strict, chaos=chaos)
+    fake = FakeInverter(args.unit, simulator, strict=args.strict, chaos=chaos,
+                        max_clients=args.max_clients, client_timeout=args.client_timeout)
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,

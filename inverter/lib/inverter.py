@@ -8,38 +8,66 @@ import threading
 import time
 
 from common.protocol import recv_exact
-from .statics import MAX_PDU
+from .statics import MAX_COUNT, MAX_PDU
 from common.version import version_string
 
 logger = logging.getLogger('fake-inverter')
 
 
 class FakeInverter:
-    def __init__(self, unit, simulator, strict=False, chaos=None):
+    def __init__(self, unit, simulator, strict=False, chaos=None, max_clients=64, client_timeout=300.0):
         self.unit = unit
         self.simulator = simulator
         self.strict = strict
         self.chaos = chaos
         self.overlay = {}
         self.srv = None
+        self.listen_addr = None
         self.stopping = False
         self.conns = 0
         self.requests = 0
+        self.max_clients = max(0, int(max_clients))       # 0 = no limit
+        self.client_timeout = max(0.0, float(client_timeout))   # 0 = never
+        self.client_lock = threading.Lock()
+        self.client_count = 0
+        self.clients = {}        # 'ip:port' -> {'since': monotonic, 'requests': n} (show connections)
 
     def serve(self, host, port):
         srv = socket.socket()
         srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         srv.bind((host, port))
-        srv.listen(4)
+        srv.listen(16)
         self.srv = srv
-        logger.info('fake inverter %s listening on %s:%d (unit %d, peak PV %gW)%s',
-                    version_string(),
-                    host, port, self.unit, self.simulator.peak_w,
+        self.listen_addr = (host, port)
+        logger.info('fake inverter %s listening on %s:%d (unit %d, peak PV %gW, client limit %s, client timeout %s)%s',
+                    version_string(), host, port, self.unit, self.simulator.peak_w,
+                    self.max_clients or 'none',
+                    '%gs' % self.client_timeout if self.client_timeout else 'none',
                     ', chaos p=%.2f' % self.chaos.p if self.chaos and self.chaos.p else '')
         while True:
             try:
                 client, addr = srv.accept()
-                threading.Thread(target=self.handle, args=(client, addr), daemon=True).start()
+                admitted = False
+                try:
+                    if self.client_timeout:
+                        client.settimeout(self.client_timeout)
+                    if self.max_clients and self.client_count >= self.max_clients:
+                        logger.info('connection refused: client limit of %d reached (%s:%d)',
+                                    self.max_clients, *addr[:2])
+                    else:
+                        with self.client_lock:
+                            self.client_count += 1
+                        admitted = True
+                        threading.Thread(target=self.handle, args=(client, addr), daemon=True).start()
+                except (OSError, RuntimeError) as e:
+                    logger.error('connection from %s:%d failed before serving (%s)', addr[0], addr[1], e)
+                    if admitted:
+                        with self.client_lock:
+                            self.client_count -= 1
+                        admitted = False
+                finally:
+                    if not admitted:
+                        client.close()
             except (OSError, RuntimeError) as e:
                 if self.stopping:
                     return   # the signal box closed the listener; it logs the shutdown
@@ -73,6 +101,9 @@ class FakeInverter:
     def handle(self, client, addr):
         logger.info('client connected: %s:%d', *addr[:2])
         self.conns += 1
+        key = '%s:%d' % addr[:2]
+        with self.client_lock:
+            self.clients[key] = {'since': time.monotonic(), 'requests': 0}
         try:
             while True:
                 self.requests += 1
@@ -81,12 +112,25 @@ class FakeInverter:
                     logger.info('malformed frame from %s:%d (MBAP length %d), closing', addr[0], addr[1], length)
                     break
                 pdu = recv_exact(client, length - 1)
+                with self.client_lock:
+                    entry = self.clients.get(key)
+                    if entry:
+                        entry['requests'] += 1
                 func, addr_, count = struct.unpack('>BHH', pdu[:5])
                 if unit != self.unit:
                     logger.debug('request for unit %d, serving %d', unit, self.unit)
                 if self.chaos and self.chaos.hit():
                     self._chaos_fault(client, txn, self.unit)
                 if func in (3, 4):   # the same map over holding (FC3) and input (FC4) registers
+                    if not 1 <= count <= MAX_COUNT or addr_ + count > 65536:
+                        # the read-count gate, the cache's shape: a declared
+                        # count beyond the PDU (0xFFFF with a truncated frame)
+                        # must not make the fake assemble an oversized reply
+                        body = struct.pack('>BB', func + 0x80, 3)
+                        client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
+                        logger.info('fc%d read %d regs @%d from %s:%d -> exception 03 (illegal data value)',
+                                    func, count, addr_, addr[0], addr[1])
+                        continue
                     regs = self.simulator.registers()
                     regs.update(self.overlay)
                     if self.strict and any(addr_ + i not in regs for i in range(count)):
@@ -122,4 +166,7 @@ class FakeInverter:
         except Exception as e:
             logger.error('error handling %s:%d: %s', *addr[:2], e)
         finally:
+            with self.client_lock:
+                self.clients.pop(key, None)
+                self.client_count -= 1
             client.close()

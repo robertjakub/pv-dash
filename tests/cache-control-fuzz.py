@@ -18,9 +18,11 @@ import threading
 import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
 P = os.path.join(REPO, 'cache', 'bin', 'modbus_cache.py')
+F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
 FAILURES = []
+TOKEN = 'sekrit'
+AUTH_PORT = 15965   # the fuzz cache runs token'd (F5): roundtrip authenticates first there
 
 
 def check(name, ok, detail=''):
@@ -35,9 +37,20 @@ def connect(port, timeout=5.0):
 
 
 def roundtrip(port, wire_bytes, timeout=5.0):
-    """Send raw bytes, read one line, parse the JSON; (status, text) or ('dead', ...)."""
+    """Send raw bytes, read one line, parse the JSON; (status, text) or ('dead', ...).
+    On AUTH_PORT the token handshake runs first (the F5 rule: a TCP control
+    port refuses to start without a token)."""
     try:
         s = connect(port, timeout)
+        if port == AUTH_PORT:
+            s.sendall(_json.dumps({'cmd': 'auth', 'token': TOKEN}).encode() + b'\n')
+            buf = b''
+            while not buf.endswith(b'\n'):
+                chunk = s.recv(65536)
+                if not chunk:
+                    s.close()
+                    return 'dead', 'connection closed during auth'
+                buf += chunk
         s.sendall(wire_bytes)
         buf = b''
         while not buf.endswith(b'\n'):
@@ -61,7 +74,7 @@ def main():
                                       stderr=subprocess.DEVNULL))
         procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15960',
                                        '--listen', '127.0.0.1:15964', '--interval', '1',
-                                       '--control-port', '15965'],
+                                       '--control-port', '15965', '--control-token', TOKEN],
                                       stdout=open('/tmp/cache_ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.5)
 
@@ -96,6 +109,10 @@ def main():
         # 3. split packets: one byte at a time, the server assembles the frame
         try:
             s = connect(15965)
+            s.sendall(_json.dumps({'cmd': 'auth', 'token': TOKEN}).encode() + b'\n')
+            buf = b''
+            while not buf.endswith(b'\n'):
+                buf += s.recv(4096)
             for b in b'{"cmd": "show version"}\n':
                 s.sendall(bytes([b]))
                 time.sleep(0.001)

@@ -221,7 +221,8 @@ take `--control-token`
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
 | `show settings` | every setting and its value — one stable `key=value` line per setting (scriptable) |
-| `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `chaos`, `chaos_hits`, `pinned`, `profile`, `timezone`) — scriptable |
+| `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `clients`, `chaos`, `chaos_hits`, `pinned`, `profile`, `timezone`) — scriptable |
+| `show connections` | the fake's live **Modbus** clients: peer, connection age, requests served (`none` when idle) — the cache's `show connections`, pointed at the simulator |
 | `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins — the baton for a bug report |
 | `show registers` | the loaded profile's register map, one register per line: `name \| register \| type \| value`, columns aligned; the value = what the registers serve right now, `NaN` = not calculated (e.g. the battery block with the battery off) |
 | `show version` | the fake-inverter version (`0.3.0`, or `0.3.0-<short git>` from a checkout) |
@@ -257,6 +258,8 @@ take `--control-token`
 | `static` | `on` \| `off` | switch static demo values / day simulation |
 | `max-kwp` | `kW` | PV array size (peak = 75 % of it) |
 | `battery-kwh` | `kWh` | usable battery capacity |
+| `max-clients` | `N` (`0` = no limit) | the simultaneous Modbus client limit — refuse further connections past it (`--max-clients`/`FAKE`-flag startup value, tunable live) |
+| `client-timeout` | seconds (`0` = never) | disconnect Modbus clients silent for this long — sheds connections from clients that died without closing (`--client-timeout` startup value, tunable live) |
 | `register` | `addr value` | `set register <addr> <value>` — write a raw register into the **write overlay** (the same store the FC06/FC16 writes use, so the scrapers read it); `reset` clears it, `show registers` marks the rows with `*` |
 | `profile` | `<file>` | swap the register-map profile live |
 | `log-level` | `DEBUG\|INFO\|WARNING\|ERROR` | live log level |
@@ -368,6 +371,8 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--audit-max-mb` | `10` | rotate the audit log at this size, keeping 3 backups; `0` = off |
 | `--audit-daily` | off | also rotate the audit log at UTC midnight |
 | `--max-kwp` | `6` | PV array size in kWp, peak = 75 % of it |
+| `--max-clients` | `64` | refuse further Modbus connections past this many simultaneous clients (`0` = no limit) |
+| `--client-timeout` | `300` | disconnect Modbus clients silent for this many seconds (`0` = never) — sheds connections from clients that died without closing |
 | `--timezone` | `utc` | clock the state machines integrate over (`utc` or `local`) |
 | `--time` | real clock | freeze simulated time `HH:MM` (zone-independent) |
 | `--time-scale` | `1` | the simulated clock speed: N× real time — a full simulated day takes 24/N real hours (`set time-scale` tunes it live) |
@@ -443,6 +448,19 @@ trail, not a duplicate of it.
 ## Security
 
 Honest scope of a demo device:
+
+> **The fake is a development tool — run it on a trusted, LAN-isolated
+> network.** It is deliberately *not* security-first design: the Modbus
+> surface speaks to any peer that can reach the port (no TLS, no auth, no
+> ACL — that is what the real device's network isolation is for), and its
+> Prometheus `/metrics` serves without a token unless `--metrics-token` is
+> set. The audit (F11) accepts exactly this for a test instrument and asks
+> for the blunt mitigations only: **`--max-clients` / `--client-timeout`**
+> cap runaway connections (both tunable live via the control server,
+> `show connections` watches them), the read-count gate keeps a malformed
+> frame from making the fake assemble an oversized reply, and the
+> documentation says the quiet part out loud — keep the fake on the demo
+> LAN, next to the tools it is meant to serve.
 
 - **Minimal supply chain.** Every tool is Python standard library only — the
   SBOM is two lines (python + alpine in the container). No pip, no vendored

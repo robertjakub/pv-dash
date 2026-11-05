@@ -1,7 +1,8 @@
 {
   "protocol": {
     "max_pdu": 260,
-    "max_registers": 65536
+    "max_registers": 65536,
+    "max_count": 125
   },
 
   "diagnostics": {
@@ -64,6 +65,8 @@
     "time_scale": 1.0,
     "time_scale_max": 1440.0,
     "chaos": 0.0,
+    "max_clients": 64,
+    "client_timeout_s": 300.0,
     "log_level": "INFO",
     "audit_max_mb": 10.0,
     "audit_files": 3,

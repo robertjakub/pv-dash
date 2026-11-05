@@ -16,7 +16,8 @@ JSON-lines control server and prints the replies on stdout, one per line.
 Every invocation lands in the audit trail (prefix \fBCTL\fR).
 .PP
 The command grammar is the fake's: \fBset\fR/\fBunset\fR/\fBshow\fR/
-\fBhelp\fR (the 24-setting registry), \fBshow status\fR,
+\fBhelp\fR (the 26-setting registry), \fBshow status\fR,
+\fBshow connections\fR (the live Modbus clients: peer, age, requests),
 \fBshow settings\fR, \fBshow registers\fR, \fBshow version\fR,
 \fBinspect\fR, \fBreset\fR, \fBshutdown\fR, \fBquit\fR. See
 .BR modbus-fake-inverter (1)

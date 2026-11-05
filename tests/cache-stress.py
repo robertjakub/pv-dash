@@ -54,7 +54,8 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
                                    '--listen', '127.0.0.1:%d' % CACHE_PORT, '--interval', '1',
                                    '--cache-ttl', '3', '--allow-write', '--max-clients', '0',
-                                   '--client-timeout', '0', '--profile', map_file],
+                                   '--client-timeout', '0', '--profile', map_file,
+                                   '--write-acl', 'any', '--write-registers', 'any'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, preexec_fn=raise_fds))
     for _ in range(50):                                        # wait until the listener is up
         try:

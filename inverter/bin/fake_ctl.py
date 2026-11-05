@@ -10,8 +10,9 @@ require the token first ({"cmd": "auth", "token": ...}) — pass it with
   printf 'set pv 2500\\nset soc 30\\nstatus\\n' | python3 fake_ctl.py --control-port 15599
 
 Commands (see the server's help): set <pv|load|batt|soc|cloud|time|scenario|
-chaos|seed|battery|strict|static|max-kwp|battery-kwh|log-level> <value>,
-show <setting|settings>, status, reset, shutdown, quit.
+chaos|seed|battery|strict|static|max-kwp|battery-kwh|max-clients|
+client-timeout|log-level> <value>, show <setting|status|connections|settings>,
+status, reset, shutdown, quit.
 
 Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.
 """

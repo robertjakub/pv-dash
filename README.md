@@ -62,6 +62,7 @@ run them from the repo root:
 
 ```bash
 python3 tests/cache-regtest.py        # the cache: the full functional battery
+python3 tests/inverter-regtest.py    # the fake: the F11 surface (client cap/timeout, the count gate)
 python3 tests/scrape-regtest.py      # the scraper + the fake's machines
 python3 tests/cache-stress.py        # the cache: 100 clients / 15 s load
 python3 tests/cache-fuzz.py [n]      # the cache: n hostile client frames

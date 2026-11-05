@@ -17,6 +17,7 @@ with open(os.path.join(_here, 'static.json'), encoding='utf-8') as _f:
 PROTOCOL = STATIC['protocol']
 MAX_PDU = PROTOCOL['max_pdu']                  # the largest accepted Modbus frame
 MAX_REGISTERS = PROTOCOL['max_registers']      # the 16-bit register space
+MAX_COUNT = PROTOCOL['max_count']              # max registers per FC3/FC4 read (the cache's cap)
 
 DIAGNOSTICS = STATIC['diagnostics']
 DIAG_BASE = DIAGNOSTICS['base']                # the synthesized diagnostics block
@@ -32,6 +33,8 @@ DEFAULT_BATTERY_KWH = DEFAULTS['battery_kwh']
 DEFAULT_TIME_SCALE = DEFAULTS['time_scale']
 TIME_SCALE_MAX = DEFAULTS['time_scale_max']    # a day per minute
 DEFAULT_CHAOS = DEFAULTS['chaos']
+DEFAULT_MAX_CLIENTS = DEFAULTS['max_clients']
+DEFAULT_CLIENT_TIMEOUT_S = DEFAULTS['client_timeout_s']
 DEFAULT_LOG_LEVEL = DEFAULTS['log_level']
 AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
 AUDIT_FILES = DEFAULTS['audit_files']

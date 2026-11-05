@@ -24,7 +24,12 @@ three waves on top of that:**
   opens the ACL and the register allow-list — and both ACLs and the
   allow-list grew a `none` (restrict all) mode; `connect-acl` grew `none`
   too (its default stays `any`). The default poll/scrape cadence across
-  the family is 10 s.
+  the family is 10 s;
+- the **fake's surface capped** (finding F11, closed as recommended): the
+  inverter's Modbus listener got the cache's `--max-clients` /
+  `--client-timeout` (both live-tunable, `show connections` to watch
+  them), the read-count gate (exception 03 past the 125-register cap) and
+  the trusted-LAN / not-security-first documentation.
 
 Method is unchanged: manual code review of every module (wire handling,
 control servers, CLIs, config/token/dump loading, audit trail, metrics
@@ -157,9 +162,9 @@ control-server access only.
 
 ## 3. Findings
 
-### 3.1 Closed (F2–F9, F12; fixes verified, see §4)
+### 3.1 Closed (F2–F9, F11, F12; fixes verified, see §4)
 
-Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12.
+Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F11, F12.
 
 | # | Module | Was | Fix (where) |
 |---|---|---|---|
@@ -172,6 +177,7 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12.
 | F8 | cache, inverter | LOW — the unix control socket's file mode was never set explicitly (rev. 2): `bind()` created it with the umask-derived mode, and a permissive umask (002/000) made it group/world-connectable, i.e. control access without a token. | Both control servers `chmod 0600` immediately after `bind()`; the cache takes `--control-socket-group` for `0660` — an opt-in, documented delegation to a local group (`cache/lib/control.py:78-86`, `inverter/lib/control.py:71-79`). Verified: the modes are observed `0600`/`0660` on the live sockets. |
 | F9 | cache, inverter, scrape | INFO — tokens passed as `--control-token` / `--metrics-token` / `--auth-token` flags are visible in `ps` / `/proc/*/cmdline` to other local users. The token-file / env-var paths existed; nothing said the flag was the weak way. Closed rev. 3. | Documented in all three READMEs and the token-flag man pages: the flag form is for quick tests, prefer `--control-token-file` / `--metrics-token-file` / `--auth-token-file` (LoadCredential) or the env vars — and every `-file` help says the file must be owner-only 0600. The file path got hard in the same wave (F12). Verified: the README/man wording, `mandoc -Tlint` clean (§4). |
 | F12 | cache, inverter, scrape | INFO — token files were not permission-checked: the shared `load_token_file` (`common/config.py`) accepted a group/world-readable token file silently. Closed rev. 3. (The `/tmp` control-socket half of the original finding stays covered by the Nix module's `PrivateTmp`; use `/run/<tool>/` under systemd.) | Fail closed: `check_token_file_mode` (`common/config.py`) stats the path before the read — any group/world bit (`0600` is the documented form) refuses to start with a one-liner (`chmod 0600`), on the daemons and the ctl/cli clients alike; the scraper's SIGHUP-reread loader runs the same check on every reload. The docker entrypoint seeds generated `*.token` files 0600. Verified: 0644/0640 refused, 0600 accepted, the regtests assert the refusal (§4). |
+| F11 | inverter | INFO — the fake's Modbus surface had no client limit, no client timeout and no ACL — any LAN peer could hold threads or flood requests when bound beyond localhost — and a declared read count far above the payload (e.g. `0xFFFF` with a truncated frame) made the fake assemble an oversized reply / scan the range. Closed rev. 3, as the audit recommended: the mitigations + the honest docs, not a security redesign — a test instrument stays a test instrument (the metrics endpoint still serves without a token by design; no connect ACL — that is the deployment's segmentation job). | The cache's knobs, mirrored: **`--max-clients`** (refuse past the limit at accept, `inverter/lib/inverter.py`) and **`--client-timeout`** (shed silent clients) — both tunable live (`set max-clients` / `set client-timeout`, `unset` restores the configured value), **`show connections`** on the control server (peer, age, requests — plus `clients=` in the status report and the modbus row in `inspect`), and the **read-count gate** (count `0` or past the 125-register cap, or a span past the 16-bit space → exception 03, the cache's shape). Documented: the README's Security section and the man page's SECURITY block say the fake is a development tool, not security-first — run it on a trusted, LAN-isolated network. Verified: the new `tests/inverter-regtest.py` (§4). |
 
 ### 3.2 Open findings
 
@@ -179,7 +185,6 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12.
 |---|---|---|---|---|
 | F1 | cache, scrape, inverter | HIGH (accepted, protocol-inherent) | Modbus TCP carries no authentication and no encryption — listener and upstream alike. For the scraper this is outbound-only: it cannot be reached through the device, but a compromised inverter LAN segment can feed it bogus register values (sanity-capped by `--max-kwp` / `--max-grid-kw`). | Keep the listener off the WAN (the default binds 127.0.0.1), set the connect ACL on a LAN (`none` if no client should connect at all), keep `--allow-write` off unless needed — the write path now defaults fully closed (`write-acl`/`write-registers` none); the cache owning the device's single client slot is the mitigation. |
 | F10 | cache, scrape, inverter | INFO | The audit trail is append-only but not integrity-protected (no hash chain / signature); a local administrator can rewrite it (applies to all three modules — one shared writer). The F2 fix removed the remote-forgery vector; the local-admin trust assumption remains. | Forward to journald (sealed) or a remote collector for the retention/immutability requirement. |
-| F11 | inverter | INFO | The fake's Modbus surface has no client limit, no client timeout and no ACL — any LAN peer can hold threads or flood requests when bound beyond localhost. Its metrics endpoint also serves without a token by design. Acceptable for a test tool; the Docker CMD deliberately binds 0.0.0.0 (the compose network is the demo's boundary). | Document that the fake is for trusted/LAN-isolated networks; optionally add `--max-clients`/`--client-timeout` mirroring the cache. Also: a declared read count far above the payload (e.g. 0xFFFF with a truncated frame) makes the fake assemble an oversized reply / scan the range — cap `count` by the remaining frame as the cache does. |
 | F13 | scrape | MEDIUM | `/metrics` is unauthenticated by default (`--auth-token` unset → every request is authorized). The listener binds 127.0.0.1 by default, but one flag (`0.0.0.0`-style listen or a published port) exposes every register value — production data, not metadata. The demo stack now ships the token (F7), so exposing it unauthenticated is an explicit operator act; the tool default is unchanged. The rate limiter is per-connection, not per-IP. | Always set the token in the deployment (the demo stack does); consider refusing to start when the listen host is not loopback and no token is configured (the cache's F5 pattern). |
 | F14 | scrape | LOW | No TLS on the HTTP endpoint (plain HTTP): the bearer token and the metrics travel in clear text. | Terminate TLS in a reverse proxy when anything beyond localhost needs the endpoint. |
 | F15 | scrape | INFO | The metrics expose production values (generation, consumption, battery SoC) — a home-occupancy privacy consideration. | The bearer token (F13) + the localhost bind are the controls; treat the endpoint as internal. |
@@ -242,6 +247,19 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12.
   traceback); the fuzz suite exercises the fake + ctl path with a 0600
   file. The SIGHUP-reread scraper loader re-runs the check on every
   reload.
+- **F11 (the fake's soft edges → capped + documented)** — a new
+  `tests/inverter-regtest.py` asserts the whole surface end-to-end: the
+  count gate (a `0xFFFF` read, count 126, count 0 and a span past the
+  16-bit space all answer exception `03` with the connection surviving; a
+  125-register read at the cap still answers normally), `--max-clients 1`
+  (the excess connection gets EOF at accept, the admitted client keeps
+  serving, the refused peer is not tracked), `--client-timeout 1` (the
+  silent client is shed in ~1 s; `set client-timeout 0` live keeps one
+  connected), `show connections` (the peer with its request tally, `none`
+  after the exits) and the listening line naming the policy (`client
+  limit 1, client timeout 300s`). The README's Security section and the
+  man page's SECURITY block document the trusted-LAN / not-security-first
+  posture.
 - **The write-default hardening** (posture, not a finding) — the cache
   regtest's `none`-modes block asserts the new defaults end-to-end: the
   start log reads `connect acl: any, write acl: none, write allow-list:
@@ -306,13 +324,17 @@ itself (F2, F3) and three cheap control-channel gaps (F4/F5/F8); rev. 2
 fixed and re-verified all five, together with F6. Rev. 3 closed F7 (the
 compose stack publishes nothing — one internal network, plus the demo
 Prometheus service with the scrape/token story), F9 (the token-flag
-exposure documented everywhere) and F12 (token files fail closed unless
-owner-only 0600), and hardened the write defaults on the way. The
+exposure documented everywhere), F12 (token files fail closed unless
+owner-only 0600) and F11 (the fake's Modbus surface got the cache's
+client cap/timeout, the `show connections` view and the read-count gate —
+with the trusted-LAN posture documented instead of a security redesign),
+and hardened the write defaults on the way. The
 trust-boundary picture is otherwise stable — the state-dump surface stays
 the one newish weak spot (F18, small: an explicit `0600` on the dump closes
 it) beside one documented trust decision (a restored dump may re-apply
 setting overrides; the dump file deserves the ini's care). The inverter
-fake remains a test instrument with deliberately soft edges (F11); the
+fake remains a test instrument with deliberately soft edges — now capped
+and documented as such (F11 closed); the
 scraper's material exposures stay operational, not architectural — set the
 token (F13), terminate TLS at a proxy when exposed (F14) and ship the
 alert rules (F16). The accepted exposure remains F1 (Modbus TCP itself) —

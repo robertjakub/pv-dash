@@ -115,7 +115,7 @@ def candidates(buf):
     elif head == 'set' and len(done) == 1:
         pool, hint, desc = SETTING_NAMES + ('register',), None, describe_word
     elif head == 'show' and len(done) == 1:
-        pool, hint, desc = SETTING_NAMES + ('settings', 'status', 'registers', 'version'), None, describe_word
+        pool, hint, desc = SETTING_NAMES + ('settings', 'status', 'connections', 'registers', 'version'), None, describe_word
     elif head in ('set', 'unset') and len(done) == 2:
         s = SETTING_BY_NAME.get(done[1].lower())
         pool, hint = (s.values if s else []), (s.hint if s else None)

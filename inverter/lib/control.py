@@ -332,6 +332,22 @@ class ControlServer:
                 raise ValueError('battery-kwh must be a positive kWh value')
             sim.battery_kwh = v
             return '%g' % v
+        if key == 'max-clients':
+            v = int(float(val))
+            if not 0 <= v <= 4096:
+                raise ValueError('max-clients must be 0..4096')
+            if fake:
+                fake.max_clients = v
+                return str(v)
+            raise ValueError('no modbus device attached')
+        if key == 'client-timeout':
+            v = float(val)
+            if not (math.isfinite(v) and 0 <= v <= 86400):
+                raise ValueError('client-timeout must be 0..86400 seconds')
+            if fake:
+                fake.client_timeout = v
+                return '%gs' % v if v else 'never'
+            raise ValueError('no modbus device attached')
         if key == 'log-level':
             level = val.upper()
             if level not in ('DEBUG', 'INFO', 'WARNING', 'ERROR'):
@@ -397,6 +413,10 @@ class ControlServer:
             return '%g' % (sim.peak_w / (1000.0 * PEAK_RATIO))
         if key == 'battery-kwh':
             return '%g' % sim.battery_kwh
+        if key == 'max-clients':
+            return str(fake.max_clients) if fake else '?'
+        if key == 'client-timeout':
+            return ('%gs' % fake.client_timeout if fake.client_timeout else 'never') if fake else '?'
         if key == 'profile':
             return '%s (%s)' % (sim.profile.description, profile_label(sim.profile.path))
         if key == 'log-level':
@@ -422,7 +442,7 @@ class ControlServer:
                 if what in SETTING_BY_NAME:
                     return 'ok %s' % describe_setting(what)
                 return 'err unknown setting %s (try help)' % what
-            return ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|settings>, '
+            return ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|connections|settings>, '
                     'reset, shutdown, quit; help <setting> describes it' % '|'.join(self.SETTING_KEYS))
         if cmd == 'unset':
             if not args:
@@ -456,6 +476,8 @@ class ControlServer:
             what = args[0].lower()
             if what == 'status':
                 return self.status_report()
+            if what == 'connections':
+                return 'ok connections ' + self.connections_line()
             if what == 'version':
                 return 'ok fake-inverter %s' % version_string()
             if what in ('settings', 'all'):
@@ -518,6 +540,18 @@ class ControlServer:
             return 'ok %s=%s %s' % (key, shown, self.status())
         return 'err unknown command %s (try help)' % cmd
 
+    def connections_line(self):
+        """The fake's live Modbus clients: peer, connection age, requests
+        served (the cache's show connections, pointed at the simulator)."""
+        if not self.fake:
+            return 'err no modbus device attached'
+        with self.fake.client_lock:
+            if not self.fake.clients:
+                return 'none'
+            now = time.monotonic()
+            return '; '.join('%s connected %s requests %d' % (k, secs(now - v['since']), v['requests'])
+                             for k, v in sorted(self.fake.clients.items()))
+
     def inspect(self):
         """One pretty dump of everything — the status, the machines' states,
         the write overlay, the version: the baton for a bug report."""
@@ -549,6 +583,11 @@ class ControlServer:
             'pinned    %s' % ('; '.join('%s=%s' % (k, ov[k]) for k in
                               ('pv', 'load', 'batt', 'grid', 'soc', 'cloud') if ov[k] is not None) or 'nothing'),
         ]
+        if self.fake:
+            la = self.fake.listen_addr or ('?', '?')
+            rows.append('modbus    %s:%d, clients %d (limit %s, timeout %s)'
+                        % (la[0], la[1], self.fake.client_count, self.fake.max_clients or 'none',
+                           secs(self.fake.client_timeout) if self.fake.client_timeout else 'none'))
         return 'ok inspect\n' + '\n'.join(rows)
 
     def status_report(self):
@@ -573,6 +612,8 @@ class ControlServer:
                  'uptime=%s' % secs(time.monotonic() - self.started),
                  'chaos=%.2f' % self.chaos.p, 'chaos_hits=%d' % self.chaos.hits,
                  'pinned=%s' % pinned, 'profile=%s' % sim.profile.description]
+        if self.fake:
+            rows.append('clients=%d' % self.fake.client_count)
         return 'ok status\n' + '\n'.join(rows)
 
     def status(self):

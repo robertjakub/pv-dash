@@ -20,11 +20,11 @@ stdenv.mkDerivation (finalAttrs: {
   installPhase = ''
     runHook preInstall
 
-    install -Dm755 bin/modbus_scraper.py $out/share/modbus-scraper/modbus_scraper.py
-    install -Dm755 bin/scraper_ctl.py $out/share/modbus-scraper/scraper_ctl.py
-    install -Dm755 bin/scraper_cli.py $out/share/modbus-scraper/scraper_cli.py
+    install -Dm755 bin/modbus-scraper.py $out/share/modbus-scraper/modbus-scraper.py
+    install -Dm755 bin/modbus-scraper-ctl.py $out/share/modbus-scraper/modbus-scraper-ctl.py
+    install -Dm755 bin/modbus-scraper-cli.py $out/share/modbus-scraper/modbus-scraper-cli.py
     install -dm755 $out/share/modbus-scraper/lib
-    install -m644 lib/*.py lib/static.json $out/share/modbus-scraper/lib/
+    install -m644 lib/*.py lib/static.json lib/metrics.json $out/share/modbus-scraper/lib/
     install -dm755 $out/share/modbus-scraper/common
     install -m644 ${../common}/*.py $out/share/modbus-scraper/common/
     install -Dm644 metrics.json $out/share/modbus-scraper/metrics.json
@@ -34,11 +34,11 @@ stdenv.mkDerivation (finalAttrs: {
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper \
-      --add-flags "$out/share/modbus-scraper/modbus_scraper.py"
+      --add-flags "$out/share/modbus-scraper/modbus-scraper.py"
     makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper-ctl \
-      --add-flags "$out/share/modbus-scraper/scraper_ctl.py"
+      --add-flags "$out/share/modbus-scraper/modbus-scraper-ctl.py"
     makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper-cli \
-      --add-flags "$out/share/modbus-scraper/scraper_cli.py"
+      --add-flags "$out/share/modbus-scraper/modbus-scraper-cli.py"
 
     runHook postInstall
   '';
@@ -54,7 +54,7 @@ stdenv.mkDerivation (finalAttrs: {
       Polls Modbus TCP inverters over FC3/FC4 registers and exposes the
       huawei_*_watts metrics the dashboard expects (the metric names follow
       the dashboard contract), plus health gauges, at /metrics in the
-      Prometheus text format. Includes scraper_ctl and scraper_cli, CLI
+      Prometheus text format. Includes modbus-scraper-ctl and modbus-scraper-cli, CLI
       clients for the JSON-lines control server (inspect, the live
       settings, poll now, the config reload, shutdown — the token-signed
       wire). Python standard library only, no third-party dependencies.

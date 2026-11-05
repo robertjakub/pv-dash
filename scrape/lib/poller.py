@@ -22,6 +22,11 @@ class Scraper:
         self.up = False
         self.last_poll = 0.0
         self.errors = 0
+        # the poll-cycle latency (the slow-dongle gauges: scraper_poll_duration_*)
+        self.poll_secs_last = 0.0
+        self.poll_secs_sum = 0.0
+        self.poll_secs_max = 0.0
+        self.poll_count = 0
         self.wake = threading.Event()   # `poll now` on the control server: the wait ends immediately
 
     def reload(self, cfg):
@@ -67,6 +72,7 @@ class Scraper:
 
     def poll_once(self):
         cfg = self.cfg
+        started = time.monotonic()
         try:
             pv_raw = self._read('pv-power')
             grid_raw = self._read('grid-power')
@@ -78,9 +84,10 @@ class Scraper:
             self.client.close()
             self._mark_up(False, e)
             logger.debug('poll failed: %s', e)
+            self._account_cycle(started)
             return
-        pv = pv_raw * cfg['scale']
-        grid = grid_raw * cfg['grid_scale']
+        self._account_cycle(started)
+        pv, grid = pv_raw, grid_raw
         if cfg['grid_positive_import']:
             grid = -grid
         batt = batt_raw
@@ -93,42 +100,45 @@ class Scraper:
                 pv_raw, grid_raw, batt_raw, pv, grid, batt)
         else:
             context = ' [poll: pv_raw=%d grid_raw=%d -> pv=%.0fW grid=%.0fW]' % (pv_raw, grid_raw, pv, grid)
+        pv_reg = cfg['sources']['pv-power']['register']
+        grid_reg = cfg['sources']['grid-power']['register']
         err = None
         if pv < 0:
             err = 'PV power is negative: %.0f W (register %d raw %d)%s' % (
-                pv, cfg['pv_register'], pv_raw, context)
+                pv, pv_reg, pv_raw, context)
         elif cfg['max_kwp'] > 0 and pv > cap:
             err = 'PV energy exceeds max_kwp: %.0f W > %.0f W (register %d raw %d)%s' % (
-                pv, cap, cfg['pv_register'], pv_raw, context)
+                pv, cap, pv_reg, pv_raw, context)
         elif cfg['max_kwp'] > 0 and grid > cap + discharge:
             err = 'Exported power exceeds max_kwp: %.0f W > %.0f W (register %d raw %d)%s' % (
-                grid, cap + discharge, cfg['grid_register'], grid_raw, context)
+                grid, cap + discharge, grid_reg, grid_raw, context)
         elif cfg['max_grid_kw'] > 0 and abs(grid) > grid_cap:
             err = 'Grid power exceeds max_grid_kw: %.0f W > %.0f W (register %d raw %d)%s' % (
-                abs(grid), grid_cap, cfg['grid_register'], grid_raw, context)
+                abs(grid), grid_cap, grid_reg, grid_raw, context)
         elif home < 0:
             err = 'Home power is negative: %.0f W (inconsistent readings)%s' % (home, context)
         with self.lock:
             self.error = err
             if err is None:
                 metric = {pn: src['metric'] for pn, src in cfg['sources'].items()}
+                prefix = cfg.get('metric_prefix') or 'huawei'
                 self.values = {
                     metric['pv-power']: pv,
                     metric['grid-power']: grid,
-                    'huawei_grid_export_watts': max(grid, 0.0),
-                    'huawei_grid_import_watts': max(-grid, 0.0),
-                    'huawei_home_consumption_watts': home,
-                    'huawei_battery': 1 if battery else 0,
+                    '%s_grid_export_watts' % prefix: max(grid, 0.0),
+                    '%s_grid_import_watts' % prefix: max(-grid, 0.0),
+                    '%s_home_consumption_watts' % prefix: home,
+                    'scraper_battery': 1 if battery else 0,
                 }
                 if battery and 'battery-power' in metric:
                     self.values[metric['battery-power']] = batt
-                    self.values['huawei_battery_charge_watts'] = max(batt, 0.0)
-                    self.values['huawei_battery_discharge_watts'] = max(-batt, 0.0)
+                    self.values['%s_battery_charge_watts' % prefix] = max(batt, 0.0)
+                    self.values['%s_battery_discharge_watts' % prefix] = max(-batt, 0.0)
                     self.values[metric['battery-soc']] = soc
                 if diag is not None:
-                    self.values['huawei_cache_device_up'] = diag[1]
-                    self.values['huawei_cache_age_seconds'] = min(diag[2], DIAG_MAX)
-                    self.values['huawei_cache_uptime_seconds'] = diag[3]
+                    self.values['scraper_cache_device_up'] = diag[1]
+                    self.values['scraper_cache_age_seconds'] = min(diag[2], DIAG_MAX)
+                    self.values['scraper_cache_uptime_seconds'] = diag[3]
                 self.last_poll = time.time()
             else:
                 self.errors += 1
@@ -137,6 +147,16 @@ class Scraper:
             return
         self._mark_up(True, None)
         logger.debug('poll ok: pv_raw=%d grid_raw=%d batt_raw=%d', pv_raw, grid_raw, batt_raw)
+
+    def _account_cycle(self, started):
+        """One poll cycle's latency: last/mean/max — the poll-latency gauges
+        (a slow dongle shows up here before the freshness gap does)."""
+        secs = time.monotonic() - started
+        with self.lock:
+            self.poll_secs_last = secs
+            self.poll_secs_sum += secs
+            self.poll_count += 1
+            self.poll_secs_max = max(self.poll_secs_max, secs)
 
     def _read_diag(self):
         """Auto-detect a modbus-cache in front of the device (4 diag registers, magic-checked).

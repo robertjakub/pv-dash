@@ -34,3 +34,4 @@ CLI_TIMEOUT_S = DEFAULTS['cli_timeout_s']
 CLI_RECONNECT = DEFAULTS['cli_reconnect']
 CLI_RECONNECT_WAIT_S = DEFAULTS['cli_reconnect_wait_s']
 CONTROL_IDLE_TIMEOUT_S = DEFAULTS['control_idle_timeout_s']
+CONTROL_LINE_CAP = int(STATIC['control']['line_cap_bytes'])

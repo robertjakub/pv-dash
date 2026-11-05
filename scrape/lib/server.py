@@ -59,8 +59,13 @@ class Handler(BaseHTTPRequestHandler):
     def exposition(self):
         spec = self.scraper.spec
         up, values, last_poll, errors = self.scraper.snapshot()
-        up_name, errors_name, last_name = ('huawei_up', 'huawei_modbus_errors_total',
-                                          'huawei_last_poll_timestamp_seconds')
+        # the poll gauges render from the spec (scraper_* in the bundled
+        # sectioned spec; the legacy flat specs keep their huawei_* names)
+        up_name = 'scraper_up' if 'scraper_up' in spec.help else 'huawei_up'
+        errors_name = 'scraper_modbus_errors_total' if 'scraper_modbus_errors_total' in spec.help \
+            else 'huawei_modbus_errors_total'
+        last_name = 'scraper_last_poll_timestamp_seconds' if 'scraper_last_poll_timestamp_seconds' in spec.help \
+            else 'huawei_last_poll_timestamp_seconds'
 
         def fmt(v):
             return '%d' % round(v) if float(v).is_integer() else '%.3f' % v
@@ -76,6 +81,18 @@ class Handler(BaseHTTPRequestHandler):
             '# TYPE %s %s' % (last_name, spec.type[last_name]),
             '%s %.3f' % (last_name, last_poll),
         ]
+        # the poll-latency gauges (last/mean/max) — present in the bundled spec
+        s = self.scraper
+        for name in ('scraper_poll_duration_seconds', 'scraper_poll_duration_mean_seconds',
+                     'scraper_poll_duration_max_seconds'):
+            if name not in spec.help:
+                continue
+            v = {'scraper_poll_duration_seconds': s.poll_secs_last,
+                 'scraper_poll_duration_mean_seconds': s.poll_secs_sum / s.poll_count if s.poll_count else 0.0,
+                 'scraper_poll_duration_max_seconds': s.poll_secs_max}[name]
+            lines.append('# HELP %s %s' % (name, spec.help[name]))
+            lines.append('# TYPE %s %s' % (name, spec.type[name]))
+            lines.append('%s %s' % (name, fmt(v)))
         for name in sorted(values):
             lines.append('# HELP %s %s' % (name, spec.help.get(name, name)))
             lines.append('# TYPE %s %s' % (name, spec.type.get(name, 'gauge')))

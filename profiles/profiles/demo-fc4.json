@@ -1,0 +1,15 @@
+{
+  "description": "FC4 demo map: the same registers a small single-phase hybrid serves, marked as input registers (fc 4) \u2014 the shipped profile that exercises the input-register path end to end (the fake serves both function codes, the cache caches fc3/fc4 separately, the scraper reads per-entry fc). Point the family at it to prove the fc: 4 wiring without hardware.",
+  "mappings": [
+    {"register": "device-status", "values": {"1": "self-checking", "2": "normal", "3": "fault"}}
+  ],
+  "registers": [
+    {"name": "pv-power", "register": 32064, "type": "i32", "desc": "PV (inverter input) power (W)", "fc": 4},
+    {"name": "grid-power", "register": 37113, "type": "i32", "desc": "grid power (W, + = export)", "fc": 4},
+    {"name": "battery-power", "register": 37001, "type": "i32", "desc": "battery power (W, + = charging)", "fc": 4},
+    {"name": "battery-soc", "register": 37004, "type": "u16", "desc": "battery state of charge (%)", "fc": 4},
+    {"name": "device-status", "register": 32000, "type": "u16", "desc": "running status code", "fc": 4},
+    {"name": "device-temperature", "register": 32087, "type": "i16", "scale": 10, "desc": "internal temperature (C x10)", "fc": 4},
+    {"name": "input-voltage", "register": 32069, "type": "u16", "scale": 10, "desc": "PV1 input voltage (V x10)", "fc": 4}
+  ]
+}

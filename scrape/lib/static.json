@@ -1,4 +1,7 @@
 {
+"control": {
+  "line_cap_bytes": 1048576
+},
   "protocol": {
     "max_pdu": 253,
     "max_count": 125,
@@ -27,8 +30,6 @@
     "timeout_s": 3.0,
     "listen": "127.0.0.1:9350",
     "interval_s": 10.0,
-    "scale": 1.0,
-    "grid_scale": 1.0,
     "max_kwp": 6.0,
     "max_grid_kw": 12.0,
     "max_clients": 64,

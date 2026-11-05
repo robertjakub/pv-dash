@@ -35,97 +35,83 @@ config reload, the Modbus session restart, the graceful shutdown. With a
 control token configured the wire is HMAC-signed: every command and reply
 carries the full sha256 of its payload, keyed by the token
 (common/wiresec.py) \(em a token-holding client verifies both directions,
-and over TCP the signed commands are mandatory.
+and over TCP the signed commands are mandatory. A second, read-only token
+(\fB--control-ops-token\fR) authenticates into the show/clear verbs only
+\(em the ops shift against the admin key, both roles audited.
 
 .SH OPTIONS
 .TP
 .B \-\-config
-config file (default: $SCRAPER_CONFIG, then scraper.ini next to this
-script, then the subproject root) (default:
-/Users/oom/GensparkCode/pv\-dash/scrape/scraper.ini)
+config file — the set grammar: every line a `set <name> <value>`,
+comments start with # (default: $SCR_CONFIG, then scraper.conf next to
+this script, then the subproject root) (default:
+/Users/oom/GensparkCode/pv\-dash/scrape/scraper.conf)
 .TP
 .B \-\-host
-inverter Modbus TCP address (default: config, $SCRAPER_HOST or
-127.0.0.1)
+inverter Modbus TCP address (default: config, $SCR_HOST or 127.0.0.1)
 .TP
 .BI \-\-modbus\-port " N"
-inverter Modbus TCP port (default: config, $SCRAPER_MODBUS_PORT or 5502)
+inverter Modbus TCP port (default: config, $SCR_MODBUS_PORT or 5502)
 .TP
 .BI \-\-unit " N"
-Modbus unit id (default: config, $SCRAPER_UNIT or 1)
+Modbus unit id (default: config, $SCR_UNIT or 1)
 .TP
 .BI \-\-modbus\-offset " N"
-added to register addresses (default: config, $SCRAPER_MODBUS_OFFSET or
-0)
+added to register addresses (default: config, $SCR_MODBUS_OFFSET or 0)
 .TP
 .BI \-\-timeout " N"
-Modbus timeout in seconds (default: config, $SCRAPER_TIMEOUT or 3)
+Modbus timeout in seconds (default: config, $SCR_TIMEOUT or 3)
 .TP
 .B \-\-profile
 device profile JSON (the shared profiles/ schema; scrape\-marked entries
-feed the metric registers) (default: config, $SCRAPER_PROFILE or the
-bundled sun2000 profile)
+feed the metric registers) (default: config, $SCR_PROFILE or the bundled
+sun2000 profile)
 .TP
 .B \-\-metrics\-spec
-metrics spec JSON: metric name \-> {help, type, profile?} (default:
-config, $SCRAPER_METRICS_SPEC or the bundled metrics.json)
+metrics spec JSON, sectioned: {profile: {key: {help, profile?}},
+compute: ..., scraper: ...} — merged in memory over the built\-in
+lib/metrics.json scraper_* block (default: config, $SCR_METRICS_SPEC or
+the bundled metrics.json)
 .TP
-.BI \-\-pv\-register " N"
-PV power register, signed I32 watts (default: config,
-$SCRAPER_PV_REGISTER, the profile or 32064)
-.TP
-.BI \-\-grid\-register " N"
-grid power register, signed I32 watts (default: config,
-$SCRAPER_GRID_REGISTER or 37113)
-.TP
-.BI \-\-scale " N"
-PV register multiplier (default: config, $SCRAPER_SCALE or 1)
-.TP
-.BI \-\-grid\-scale " N"
-grid register multiplier (default: config, $SCRAPER_GRID_SCALE or 1)
+.B \-\-metric\-prefix
+the prefix on the profile\- and compute\-fed metric names (default:
+config, $SCR_METRIC_PREFIX or 'huawei'); the bundled scraper_* names are
+fixed
 .TP
 .BI \-\-max\-kwp " N"
-maximum PV array kWp (default: config, $SCRAPER_MAX_KWP or 6; 0 = no
+maximum PV array kWp (default: config, $SCR_MAX_KWP or 6; 0 = no
 checking)
 .TP
 .BI \-\-max\-grid\-kw " N"
-maximum grid kW, either direction (default: config, $SCRAPER_MAX_GRID_KW
-or 12; 0 = no checking)
+maximum grid kW, either direction (default: config, $SCR_MAX_GRID_KW or
+12; 0 = no checking)
 .TP
 .B \-\-battery
-enable battery support (default: config, $SCRAPER_BATTERY or off)
-.TP
-.BI \-\-battery\-register " N"
-battery power register, signed I32 watts, +charging (default: config,
-$SCRAPER_BATTERY_REGISTER or 37001)
-.TP
-.BI \-\-battery\-soc\-register " N"
-battery SoC register, U16 percent*10 (default: config,
-$SCRAPER_BATTERY_SOC_REGISTER or 37004)
+enable battery support (default: config, $SCR_BATTERY or off)
 .TP
 .B \-\-grid\-positive\-import
 grid register positive when importing (default: config,
-$SCRAPER_GRID_POSITIVE_IMPORT or positive = export)
+$SCR_GRID_POSITIVE_IMPORT or positive = export)
 .TP
 .B \-\-listen
-listen address HOST:PORT (default: config, $SCRAPER_LISTEN or
+listen address HOST:PORT (default: config, $SCR_LISTEN or
 127.0.0.1:9350)
 .TP
 .BI \-\-interval " N"
-seconds between polls (default: config, $SCRAPER_INTERVAL or 10)
+seconds between polls (default: config, $SCR_INTERVAL or 10)
 .TP
 .BI \-\-max\-clients " N"
 maximum concurrent HTTP clients; extras get an immediate 503 (default:
-config, $SCRAPER_MAX_CLIENTS or 64; 0 = unlimited)
+config, $SCR_MAX_CLIENTS or 64; 0 = unlimited)
 .TP
 .BI \-\-client\-timeout " N"
 seconds an idle keep\-alive HTTP client is kept before being kicked
-(default: config, $SCRAPER_CLIENT_TIMEOUT or 300; 0 = off)
+(default: config, $SCR_CLIENT_TIMEOUT or 300; 0 = off)
 .TP
 .BI \-\-max\-conn\-per\-ip " N"
 maximum concurrent HTTP connections from one peer IP; extras get an
-immediate 503 (default: config, $SCRAPER_MAX_CONN_PER_IP or 0 = no
-per\-IP limit)
+immediate 503 (default: config, $SCR_MAX_CONN_PER_IP or 0 = no per\-IP
+limit)
 .TP
 .B \-\-local\-time
 log timestamps in the system time zone instead of UTC (default: off)
@@ -133,26 +119,42 @@ log timestamps in the system time zone instead of UTC (default: off)
 .B \-\-control\-port
 JSON\-lines control server target: unix socket path (default:
 /tmp/modbus\-scraper\-<listen\-port>.socket) or TCP port number on
-127.0.0.1 (e.g. 15599); 0 = off. Talk to it with scraper_ctl.py
-(default: config, $SCRAPER_CONTROL_PORT)
+127.0.0.1 (e.g. 15599); 0 = off. Talk to it with modbus\-scraper\-ctl.py
+(default: config, $SCR_CTL)
 .TP
 .B \-\-control\-token
 require a token on control connections: the client authenticates with
 {"cmd": "auth", "token": ...}; over the unix socket a trusted peer
 (root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
-skips the token (default: config, $SCRAPER_CONTROL_TOKEN or none)
+skips the token (default: config, $SCR_CONTROL_TOKEN or none)
 .TP
 .B \-\-control\-token\-file
 the control token from a file (the first line; e.g. a systemd
 LoadCredential or a key file; must be owner\-only 0600) — takes the
 place of \-\-control\-token; giving both is an error (env
-SCRAPER_CONTROL_TOKEN_FILE)
+SCR_CONTROL_TOKEN_FILE)
+.TP
+.B \-\-control\-ops\-token
+a second, read\-only control token: sessions authenticating with it may
+run the show/clear verbs only (no set/unset, no poll now, no request
+reload, no restart, no shutdown) — the ops shift against the admin key,
+both audited (default: config, $SCR_CONTROL_OPS_TOKEN or none)
+.TP
+.B \-\-control\-ops\-token\-file
+the read\-only ops token from a file (the first line; must be
+owner\-only 0600) — takes the place of \-\-control\-ops\-token; giving
+both is an error (env SCR_CONTROL_OPS_TOKEN_FILE)
+.TP
+.B \-\-control\-ops\-verbs
+the read\-only ops role's RBAC policy: the verbs its sessions may run,
+comma\-separated (default: show,clear; validated against the control
+grammar at start)
 .TP
 .B \-\-control\-trust\-uids
 extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
 the daemon's own user are always trusted (default: config,
-$SCRAPER_CONTROL_TRUST_UIDS or none)
+$SCR_CONTROL_TRUST_UIDS or none)
 .TP
 .B \-\-audit\-log
 SCR audit trail: a file path or \- for stdout (the docker/journald way);
@@ -169,12 +171,12 @@ rotated audit backups to keep (default 3)
 disable the SCR audit trail (default: off)
 .TP
 .B \-\-log\-access
-log every HTTP request at INFO (default: config, $SCRAPER_LOG_ACCESS or
+log every HTTP request at INFO (default: config, $SCR_LOG_ACCESS or
 quiet)
 .TP
 .B \-\-auth\-token
 require Authorization: Bearer <token> on all requests (default: config,
-$SCRAPER_AUTH_TOKEN or disabled)
+$SCR_AUTH_TOKEN or disabled)
 .TP
 .B \-\-auth\-token\-file
 read the bearer token from this file instead (single line, trimmed;
@@ -182,7 +184,7 @@ re\-read on every SIGHUP — rotate by rewriting the file and reloading;
 must be owner\-only 0600); mutually exclusive with \-\-auth\-token
 .TP
 .B \-\-log\-level
-log level (default: config, $SCRAPER_LOG_LEVEL or INFO)
+log level (default: config, $SCR_LOG_LEVEL or INFO)
 .TP
 .B \-\-dry\-run
 validate the configuration, print the effective settings and exit
@@ -206,7 +208,8 @@ configured and refuses to start without one). Commands:
 \fBset\fR/\fBunset\fR/\fBshow\fR/\fBhelp\fR (the settings: interval,
 timeout, max-clients, client-timeout, max-conn-per-ip, log-access,
 log-level), \fBshow status\fR, \fBshow connections\fR (the live HTTP
-clients), \fBshow settings\fR, \fBshow version\fR, \fBpoll now\fR,
+clients), \fBshow settings\fR, \fBshow version\fR, \fBshow knobs\fR
+(the dictionary of the registry), \fBpoll now\fR,
 \fBinspect\fR, \fBrequest reload\fR, \fBrestart\fR, \fBshutdown\fR,
 \fBquit\fR. See
 .BR modbus-scraper-ctl (1)
@@ -220,9 +223,11 @@ default, set the bearer token when it must serve beyond loopback (a
 non-loopback token-less start is refused, F13), and keep the connection
 caps on. The control surface is loopback-only (TCP) or a 0600 unix socket;
 a TCP control port without a token refuses to start (F5); with a token the
-wire is signed and the commands/replies verify end to end. The audit trail
-(default in the XDG state home, prefix SCR) records the control commands,
-the auth failures, the reloads and the shutdowns.
+wire is signed and the commands/replies verify end to end; a second,
+read-only ops token (\fB--control-ops-token\fR) scopes its sessions to
+the show/clear verbs. The audit trail (default in the XDG state home,
+prefix SCR) records the control commands with their roles, the auth
+failures, the reloads and the shutdowns.
 
 .SH FILES
 .TP

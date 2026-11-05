@@ -8,48 +8,67 @@
 let
   cfg = config.services.modbus-scraper;
 
-  configIni = pkgs.writeText "scraper.ini" (lib.generators.toINI { } {
-    scraper = {
-      host = cfg.inverterHost;
-      modbus_port = toString cfg.inverterPort;
-      unit = toString cfg.unitId;
-      modbus_offset = toString cfg.modbusOffset;
-      timeout = toString cfg.timeout;
-      pv_register = toString cfg.pvRegister;
-      grid_register = toString cfg.gridRegister;
-      scale = toString cfg.scale;
-      grid_scale = toString cfg.gridScale;
-      max_kwp = toString cfg.maxKwp;
-      max_grid_kw = toString cfg.maxGridKw;
-      battery = lib.boolToString cfg.battery;
-      battery_register = toString cfg.batteryRegister;
-      battery_soc_register = toString cfg.batterySocRegister;
-      grid_positive_import = lib.boolToString cfg.gridPositiveImport;
-      listen = "${cfg.listenHost}:${toString cfg.listenPort}";
-      interval = toString cfg.interval;
-      log_level = cfg.logLevel;
-      local_time = lib.boolToString cfg.localTime;
-      log_access = lib.boolToString cfg.logAccess;
-      auth_token = if cfg.authToken == null then "" else cfg.authToken;
-      auth_token_file = if cfg.authTokenFile == null then "" else cfg.authTokenFile;
-      max_clients = toString cfg.maxClients;
-      client_timeout = toString cfg.clientTimeout;
-      max_conn_per_ip = toString cfg.maxConnPerIp;
-    } // lib.optionalAttrs (cfg.auditLog != null) {
-      audit_log = cfg.auditLog;
-      audit_max_mb = toString cfg.auditMaxMb;
-      audit_files = toString cfg.auditFiles;
-    } // lib.optionalAttrs (cfg.controlPort != null) {
-      control_port = toString cfg.controlPort;
-    } // lib.optionalAttrs (cfg.controlToken != null) {
-      control_token = cfg.controlToken;
-    } // lib.optionalAttrs (cfg.controlTokenFile != null) {
+  # the set-grammar config script (the ini format is gone): every line a
+  # `set <name> <value>` — the file pipes through modbus-scraper-ctl unchanged
+  setLine = name: value: "set ${name} ${value}";
+  configScript = pkgs.writeText "scraper.conf" (lib.concatStringsSep "\n" (lib.flatten [
+    "# modbus-scraper configuration — the control grammar: every line a `set <name> <value>`"
+    "# rendered by services.modbus-scraper; the flags and the env still win over this file"
+    ""
+    "# --- the device (upstream inverter) and the register map ---"
+    (setLine "host" cfg.inverterHost)
+    (setLine "modbus-port" (toString cfg.inverterPort))
+    (setLine "unit" (toString cfg.unitId))
+    (setLine "modbus-offset" (toString cfg.modbusOffset))
+    (setLine "timeout" (toString cfg.timeout))
+    (setLine "max-kwp" (toString cfg.maxKwp))
+    (setLine "max-grid-kw" (toString cfg.maxGridKw))
+    (setLine "battery" (lib.boolToString cfg.battery))
+    (setLine "grid-positive-import" (lib.boolToString cfg.gridPositiveImport))
+    ""
+    "# --- what the tool serves and where ---"
+    (setLine "listen" "${cfg.listenHost}:${toString cfg.listenPort}")
+    (setLine "interval" (toString cfg.interval))
+    (setLine "local-time" (lib.boolToString cfg.localTime))
+    ""
+    "# --- the connection caps ---"
+    (setLine "max-clients" (toString cfg.maxClients))
+    (setLine "client-timeout" (toString cfg.clientTimeout))
+    (setLine "max-conn-per-ip" (toString cfg.maxConnPerIp))
+    ""
+    "# --- the /metrics bearer token ---"
+    (lib.optionals (cfg.authToken != null) [ (setLine "auth-token" cfg.authToken) ])
+    (lib.optionals (cfg.authTokenFile != null) [ (setLine "auth-token-file" cfg.authTokenFile) ])
+    ""
+    "# --- the control plane ---"
+    (lib.optionals (cfg.controlPort != null) [ (setLine "control-port" (toString cfg.controlPort)) ])
+    (lib.optionals (cfg.controlToken != null) [ (setLine "control-token" cfg.controlToken) ])
+    (lib.optionals (cfg.controlTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      control_token_file = "/run/credentials/modbus-scraper/control-token";
-    } // lib.optionalAttrs (cfg.controlTrustUids != null) {
-      control_trust_uids = cfg.controlTrustUids;
-    };
-  });
+      (setLine "control-token-file" "/run/credentials/modbus-scraper/control-token")
+    ])
+    (lib.optionals (cfg.controlOpsToken != null) [ (setLine "control-ops-token" cfg.controlOpsToken) ])
+    (lib.optionals (cfg.controlOpsTokenFile != null) [
+      # systemd LoadCredential mounts the file here (see serviceConfig below)
+      (setLine "control-ops-token-file" "/run/credentials/modbus-scraper/control-ops-token")
+    ])
+    (lib.optionals (cfg.controlOpsVerbs != null) [ (setLine "control-ops-verbs" cfg.controlOpsVerbs) ])
+    (lib.optionals (cfg.controlTrustUids != null) [ (setLine "control-trust-uids" cfg.controlTrustUids) ])
+    (lib.optionals (cfg.profile != null) [ (setLine "profile" (toString cfg.profile)) ])
+    (lib.optionals (cfg.metricsSpec != null) [ (setLine "metrics-spec" cfg.metricsSpec) ])
+    (lib.optionals (cfg.metricPrefix != null) [ (setLine "metric-prefix" cfg.metricPrefix) ])
+    ""
+    "# --- the audit trail ---"
+    (lib.optionals (cfg.auditLog != null) [
+      (setLine "audit-log" cfg.auditLog)
+      (setLine "audit-max-mb" (toString cfg.auditMaxMb))
+      (setLine "audit-files" (toString cfg.auditFiles))
+    ])
+    ""
+    "# --- the log surface ---"
+    (setLine "log-level" cfg.logLevel)
+    (setLine "log-access" (lib.boolToString cfg.logAccess))
+  ]));
 in
 {
   options.services.modbus-scraper = {
@@ -86,50 +105,10 @@ in
       description = "Offset added to register addresses (set -1 for gateways that need 0-based addressing).";
     };
 
-    pvRegister = lib.mkOption {
-      type = lib.types.int;
-      default = 32064;
-      description = "Holding register of the signed 32-bit PV input power.";
-    };
-
-    gridRegister = lib.mkOption {
-      type = lib.types.int;
-      default = 37113;
-      description = "Holding register of the signed 32-bit grid/active power (positive = feed-in).";
-    };
-
     battery = lib.mkOption {
       type = lib.types.bool;
       default = false;
       description = "Battery support (experimental, untested against real hardware).";
-    };
-
-    batteryRegister = lib.mkOption {
-      type = lib.types.int;
-      default = 37001;
-      description = "Holding register of the signed 32-bit battery power in watts, positive = charging (37001 on the default profile); used when battery is enabled.";
-    };
-
-    batterySocRegister = lib.mkOption {
-      type = lib.types.int;
-      default = 37004;
-      description = "Holding register of the battery state of charge (U16, percent*10); used when battery is enabled.";
-    };
-
-    scale = lib.mkOption {
-      type = lib.types.float;
-      default = 1.0;
-      description = "Multiplier for the PV register raw value (the default profile's power registers already report watts via the gain convention; set 1000.0 for devices reporting kW).";
-    };
-
-    gridScale = lib.mkOption {
-      type = lib.types.float;
-      default = 1.0;
-      description = ''
-        Multiplier for the grid register raw value. Defaults to 1.0 (the
-        [Power meter collection] register 37113 reports watts); set 1000.0
-        for devices reporting kW.
-      '';
     };
 
     maxKwp = lib.mkOption {
@@ -268,7 +247,8 @@ in
       default = null;
       description = ''
         Require a token on TCP control connections. WARNING: it is rendered
-        into the world-readable ini in the nix store — prefer controlTokenFile.
+        into the world-readable config script in the nix store — prefer
+        controlTokenFile.
       '';
     };
 
@@ -279,6 +259,48 @@ in
         The control token from a file (the first line is the token),
         mounted via systemd LoadCredential — the hardened way to pass the
         secret. Mutually exclusive with controlToken.
+      '';
+    };
+
+    controlOpsToken = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        A second, read-only control token: sessions authenticating with it
+        run the show/clear verbs only (no set/unset, no poll now, no
+        request reload, no restart, no shutdown) — the ops shift against
+        the admin key. Needs controlToken/controlTokenFile. WARNING: it is
+        rendered into the world-readable config script in the nix store —
+        prefer controlOpsTokenFile.
+      '';
+    };
+
+    controlOpsTokenFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        The read-only ops token from a file (the first line is the token),
+        mounted via systemd LoadCredential. Mutually exclusive with
+        controlOpsToken; needs controlToken/controlTokenFile.
+      '';
+    };
+
+    controlOpsVerbs = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The read-only ops role's RBAC policy: the verbs its sessions may
+        run, comma-separated (default: show,clear). Validated against the
+        control grammar at start; needs controlOpsToken/controlOpsTokenFile.
+      '';
+    };
+
+    profile = lib.mkOption {
+      type = lib.types.nullOr (lib.types.either lib.types.path lib.types.str);
+      default = null;
+      description = ''
+        The device profile: a path, or a bare name resolved in
+        profiles/profiles/ (default: the bundled sun2000 profile).
       '';
     };
 
@@ -315,13 +337,33 @@ in
       default = 3;
       description = "Rotated audit backups to keep.";
     };
+
+    noAuditLog = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Disable the SCR audit trail entirely.";
+    };
+
+    metricsSpec = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "The metrics spec JSON path, merged in memory over the built-in lib/metrics.json scraper_* block (default: the bundled sectioned metrics.json).";
+    };
+
+    metricPrefix = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "The prefix on the profile- and compute-fed metric names (default: huawei).";
+    };
   };
 
   config = lib.mkIf cfg.enable {
     warnings = lib.optional (cfg.authToken != null && cfg.authTokenFile != null)
       "services.modbus-scraper: both authToken and authTokenFile are set — the inline token wins and the file is ignored."
       ++ lib.optional (cfg.controlToken != null)
-      "services.modbus-scraper: controlToken is rendered into the world-readable ini in the nix store — prefer controlTokenFile."
+      "services.modbus-scraper: controlToken is rendered into the world-readable config script in the nix store — prefer controlTokenFile."
+      ++ lib.optional (cfg.controlOpsToken != null)
+      "services.modbus-scraper: controlOpsToken is rendered into the world-readable config script in the nix store — prefer controlOpsTokenFile."
       ++ lib.optionals (cfg.controlPort != null
           && lib.isString cfg.controlPort
           && lib.hasPrefix "/tmp/" cfg.controlPort)
@@ -352,7 +394,7 @@ in
       restartIfChanged = false;
 
       serviceConfig = {
-        ExecStart = "${lib.getExe cfg.package} --config ${configIni}";
+        ExecStart = "${lib.getExe cfg.package} --config ${configScript}";
         ExecReload = "${pkgs.util-linux}/bin/kill -HUP $MAINPID";
         DynamicUser = true;
         Restart = "on-failure";
@@ -387,8 +429,9 @@ in
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
         SystemCallArchitectures = "native";
         SystemCallFilter = [ "@system-service" ];
-      } // lib.optionalAttrs (cfg.controlTokenFile != null) {
-        LoadCredential = [ "control-token:${toString cfg.controlTokenFile}" ];
+      } // lib.optionalAttrs (cfg.controlTokenFile != null || cfg.controlOpsTokenFile != null) {
+        LoadCredential = lib.optionals (cfg.controlTokenFile != null) [ "control-token:${toString cfg.controlTokenFile}" ]
+          ++ lib.optionals (cfg.controlOpsTokenFile != null) [ "control-ops-token:${toString cfg.controlOpsTokenFile}" ];
       } // lib.optionalAttrs (cfg.controlPort != null
           && lib.isString cfg.controlPort
           && lib.hasPrefix "/run/modbus-scraper/" cfg.controlPort) {

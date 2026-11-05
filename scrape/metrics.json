@@ -1,18 +1,24 @@
 {
-  "huawei_pv_generation_watts":         {"profile": "pv-power",      "help": "Current PV (inverter input) power in watts."},
-  "huawei_grid_export_watts":           {"help": "Current power exported to the grid in watts (>= 0)."},
-  "huawei_grid_import_watts":           {"help": "Current power imported from the grid in watts (>= 0)."},
-  "huawei_home_consumption_watts":      {"help": "Home consumption in watts (PV input minus battery power minus net grid power)."},
-  "huawei_grid_net_watts":              {"profile": "grid-power",    "help": "Net grid power in watts (positive = export by default)."},
-  "huawei_battery_net_watts":           {"profile": "battery-power", "help": "Battery net power in watts (positive = charging, negative = discharging)."},
-  "huawei_battery_charge_watts":        {"help": "Battery charging power in watts (0 when not charging)."},
-  "huawei_battery_discharge_watts":     {"help": "Battery discharging power in watts (0 when not discharging)."},
-  "huawei_battery_soc_percent":         {"profile": "battery-soc",   "help": "Battery state of charge in percent."},
-  "huawei_cache_device_up":             {"help": "1 when the modbus-cache in front of the device finished its last poll cycle with at least one successful read, 0 when the device is unreachable behind the cache."},
-  "huawei_cache_age_seconds":           {"help": "Seconds since the modbus-cache's last successful device read (65535 = none yet). Grows while the device is down behind the cache."},
-  "huawei_cache_uptime_seconds":        {"help": "Uptime of the modbus-cache process in seconds."},
-  "huawei_battery":                     {"help": "1 if battery support is enabled (always exported)."},
-  "huawei_up":                          {"type": "gauge",   "help": "1 if the last Modbus poll of the inverter succeeded."},
-  "huawei_modbus_errors_total":         {"type": "counter", "help": "Total failed or rejected polls since start."},
-  "huawei_last_poll_timestamp_seconds": {"type": "gauge",   "help": "Unix time of the last successful poll."}
+  "profile": {
+    "pv_generation_watts":    {"profile": "pv-power",      "help": "Current PV (inverter input) power in watts."},
+    "grid_net_watts":         {"profile": "grid-power",    "help": "Net grid power in watts (positive = export by default)."},
+    "battery_net_watts":      {"profile": "battery-power", "help": "Battery net power in watts (positive = charging, negative = discharging)."},
+    "battery_soc_percent":    {"profile": "battery-soc",   "help": "Battery state of charge in percent."},
+    "phase_a_voltage_volts":  {"profile": "meter-voltage-a", "help": "Phase A to-neutral grid voltage in volts."},
+    "phase_b_voltage_volts":  {"profile": "meter-voltage-b", "help": "Phase B to-neutral grid voltage in volts."},
+    "phase_c_voltage_volts":  {"profile": "meter-voltage-c", "help": "Phase C to-neutral grid voltage in volts."},
+    "phase_a_current_amps":   {"profile": "meter-current-a", "help": "Phase A current in amperes."},
+    "phase_b_current_amps":   {"profile": "meter-current-b", "help": "Phase B current in amperes."},
+    "phase_c_current_amps":   {"profile": "meter-current-c", "help": "Phase C current in amperes."},
+    "phase_a_power_watts":    {"profile": "meter-power-a", "help": "Phase A active power in watts."},
+    "phase_b_power_watts":    {"profile": "meter-power-b", "help": "Phase B active power in watts."},
+    "phase_c_power_watts":    {"profile": "meter-power-c", "help": "Phase C active power in watts."}
+  },
+  "compute": {
+    "grid_export_watts":      {"help": "Current power exported to the grid in watts (>= 0)."},
+    "grid_import_watts":      {"help": "Current power imported from the grid in watts (>= 0)."},
+    "home_consumption_watts": {"help": "Home consumption in watts (PV input minus battery power minus net grid power)."},
+    "battery_charge_watts":   {"help": "Battery charging power in watts (0 when not charging)."},
+    "battery_discharge_watts": {"help": "Battery discharging power in watts (0 when not discharging)."}
+  }
 }

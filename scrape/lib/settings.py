@@ -5,6 +5,8 @@ setting with its short description and value hints. The control server
 here, so the wire grammar, the help texts, the completions and the docs can
 never drift."""
 
+from .statics import LOG_LEVELS
+
 
 class Setting:
     def __init__(self, name, help, values=(), hint=None, value_help=None):
@@ -25,6 +27,8 @@ class Setting:
 
 # name, description, completable values, value-shape hint, per-value descriptions
 SETTINGS = (
+    Setting('profile', 'device profile JSON: the registers the metrics read (a bare name resolves in profiles/profiles/)', ('default',), '<file>',
+            {'default': 'the bundled sun2000 profile'}),
     Setting('interval', 'seconds between polls of the inverter', (), 's', {}),
     Setting('timeout', 'Modbus connect/read timeout', (), 's', {}),
     Setting('max-clients', 'simultaneous HTTP clients on /metrics; extras get an immediate 503', (), 'N',
@@ -36,7 +40,7 @@ SETTINGS = (
     Setting('log-access', 'log every HTTP request at INFO', ('on', 'off'), None,
             {'on': 'audit trail for who polled /metrics and when',
              'off': 'quiet (the default)'}),
-    Setting('log-level', 'log verbosity', ('DEBUG', 'INFO', 'WARNING', 'ERROR'), None,
+    Setting('log-level', 'log verbosity', LOG_LEVELS, None,
             {'DEBUG': 'per-poll detail + the HTTP access log at DEBUG',
              'INFO': 'lifecycle, control commands, poll up/down',
              'WARNING': 'problems only',
@@ -52,7 +56,7 @@ COMMAND_HELP = {
     'set': 'configure a setting live: set <setting> <value>',
     'unset': 'restore a setting to its configured value: unset <setting>',
     'inspect': 'one pretty dump of everything (the state, the counters, the caps)',
-    'show': 'runtime state: show <setting|status|connections|settings|version>',
+    'show': 'runtime state: show <setting|status|connections|settings|version|knobs>',
     'request': 'request reload: re-read the config (the SIGHUP path, the token file included)',
     'restart': 'drop the Modbus session (reconnects on the next poll)',
     'shutdown': 'stop the scraper gracefully',
@@ -65,6 +69,7 @@ SHOW_VALUES = (
     ('connections', 'the live HTTP clients of /metrics: the gate counters, one row per peer IP'),
     ('settings', 'every tunable setting with its live value, one per line'),
     ('version', 'the modbus-scraper version'),
+    ('knobs', 'the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes'),
 )
 
 

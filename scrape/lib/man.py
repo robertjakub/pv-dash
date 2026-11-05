@@ -42,7 +42,9 @@ config reload, the Modbus session restart, the graceful shutdown. With a
 control token configured the wire is HMAC-signed: every command and reply
 carries the full sha256 of its payload, keyed by the token
 (common/wiresec.py) \\(em a token-holding client verifies both directions,
-and over TCP the signed commands are mandatory."""
+and over TCP the signed commands are mandatory. A second, read-only token
+(\\fB--control-ops-token\\fR) authenticates into the show/clear verbs only
+\\(em the ops shift against the admin key, both roles audited."""
     signals = """.SH SIGNALS
 .TP
 .B SIGHUP
@@ -59,7 +61,8 @@ configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: interval,
 timeout, max-clients, client-timeout, max-conn-per-ip, log-access,
 log-level), \\fBshow status\\fR, \\fBshow connections\\fR (the live HTTP
-clients), \\fBshow settings\\fR, \\fBshow version\\fR, \\fBpoll now\\fR,
+clients), \\fBshow settings\\fR, \\fBshow version\\fR, \\fBshow knobs\\fR
+(the dictionary of the registry), \\fBpoll now\\fR,
 \\fBinspect\\fR, \\fBrequest reload\\fR, \\fBrestart\\fR, \\fBshutdown\\fR,
 \\fBquit\\fR. See
 .BR modbus-scraper-ctl (1)
@@ -72,9 +75,11 @@ default, set the bearer token when it must serve beyond loopback (a
 non-loopback token-less start is refused, F13), and keep the connection
 caps on. The control surface is loopback-only (TCP) or a 0600 unix socket;
 a TCP control port without a token refuses to start (F5); with a token the
-wire is signed and the commands/replies verify end to end. The audit trail
-(default in the XDG state home, prefix SCR) records the control commands,
-the auth failures, the reloads and the shutdowns."""
+wire is signed and the commands/replies verify end to end; a second,
+read-only ops token (\\fB--control-ops-token\\fR) scopes its sessions to
+the show/clear verbs. The audit trail (default in the XDG state home,
+prefix SCR) records the control commands with their roles, the auth
+failures, the reloads and the shutdowns."""
     files = """.SH FILES
 .TP
 .I /tmp/modbus-scraper-<listen-port>.socket
@@ -125,10 +130,10 @@ apart). With a control token configured the wire is HMAC-signed: the
 console signs every command and verifies every reply."""
     env = """.SH ENVIRONMENT
 .TP
-.B SCRAPER_CTL
+.B SCR_CTL
 the default control target for the clients.
 .TP
-.B SCRAPER_CONTROL_TOKEN ", " SCRAPER_CLI_KEEPALIVE
+.B SCR_CONTROL_TOKEN ", " SCR_CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off)."""
     return page(
         "console-style session on the modbus-scraper control server",

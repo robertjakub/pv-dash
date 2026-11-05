@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Configuration for modbus-scraper: ini/env/CLI resolution (stdlib only)."""
-import configparser
+"""Configuration for modbus-scraper: the set-grammar config script, the env
+layer and the CLI flags (stdlib only). The config file speaks the control
+grammar (common/options.py): every line a `set <name> <value>`, every
+comment a `#` comment — the ini format is gone (the breaking wave in
+docs/TODO.md)."""
 import json
 import logging
 import math
 import os
 import re
 
+from common.options import parse_config_script
 from common.config import check_token_file_mode, default_profile_path, is_loopback_host, load_token_file, \
     parse_listen, resolve_profile_file
 from .metrics import Metrics
@@ -19,11 +23,11 @@ HOST_RE = re.compile(r'[A-Za-z0-9._:\[\]-]+')
 
 def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
     """The control server target for the daemon and the clients: the flag
-    wins, then SCRAPER_CTL, then the default unix socket named after the
+    wins, then SCR_CTL, then the default unix socket named after the
     listen port (/tmp/modbus-scraper-9350.socket)."""
     if explicit is not None and str(explicit).strip():
         return str(explicit).strip()
-    env = os.environ.get('SCRAPER_CTL')
+    env = os.environ.get('SCR_CTL')
     if env and env.strip():
         return env.strip()
     return '/tmp/modbus-scraper-%d.socket' % int(listen_port)
@@ -47,17 +51,28 @@ def str_to_bool(value):
 
 
 def load_config(path):
-    """Parse the ini (missing file is fine); a malformed file is fatal."""
-    cfg = configparser.ConfigParser()
-    if os.path.isfile(path):
-        try:
-            with open(path) as fh:
-                cfg.read_file(fh)
-        except (configparser.Error, OSError) as e:
-            raise SystemExit('cannot parse config file %s: %s' % (path, e))
-    if not cfg.has_section('scraper'):
-        cfg.add_section('scraper')
-    return cfg['scraper']
+    """Parse the set-grammar config script (missing file is fine); a
+    malformed file — or the legacy ini format — is fatal. Returns {key:
+    raw-string value} with the dash names underscore-normalized."""
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding='utf-8') as fh:
+            text = fh.read()
+    except OSError as e:
+        raise SystemExit('cannot read config file %s: %s' % (path, e))
+    try:
+        rows = parse_config_script(text, path)
+    except ValueError as e:
+        raise SystemExit(str(e))
+    out = {}
+    for name, value in rows:
+        key = name.replace('-', '_')
+        if key in out:
+            raise SystemExit('%s: %s is set twice (the file applies top to bottom — say it once)'
+                             % (path, name))
+        out[key] = value
+    return out
 
 
 def check_hostname(host, label):
@@ -83,14 +98,10 @@ def validate_config(cfg):
         fail('unit', 'must be %d..%d (Modbus unit id)' % UNIT_ID_RANGE)
     if not -100000 <= cfg['modbus_offset'] <= 100000:
         fail('modbus_offset', 'must be within +/-100000')
-    for key in ('pv_register', 'grid_register', 'battery_register', 'battery_soc_register'):
-        check_register(cfg[key], key)
     if cfg['timeout'] <= 0:
         fail('timeout', 'must be > 0')
     if cfg['interval'] <= 0:
         fail('interval', 'must be > 0')
-    if cfg['scale'] < 0 or cfg['grid_scale'] < 0:
-        fail('scale', 'must be >= 0')
     if cfg['max_kwp'] < 0 or cfg['max_grid_kw'] < 0:
         fail('max_kwp', 'must be 0 (checks off) or a positive kW value')
     if cfg['level'] not in LOG_LEVELS:
@@ -101,7 +112,7 @@ def validate_config(cfg):
         fail('client_timeout', 'must be >= 0 (0 = off)')
     if cfg['max_conn_per_ip'] < 0:
         fail('max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
-    for key in ('timeout', 'interval', 'scale', 'grid_scale', 'max_kwp', 'max_grid_kw', 'client_timeout'):
+    for key in ('timeout', 'interval', 'max_kwp', 'max_grid_kw', 'client_timeout'):
         if not math.isfinite(cfg[key]):
             fail(key, 'must be a finite number (nan/inf are nonsense here)')
     if cfg['timeout'] > cfg['interval']:
@@ -157,6 +168,9 @@ def load_device_profile(path):
             scale = float(scale)
         except (TypeError, ValueError):
             raise SystemExit('%s (%s): bad "scale" %r' % (label, entry['name'], scale))
+        if not math.isfinite(scale) or scale <= 0:
+            raise SystemExit('%s (%s): "scale" %r must be a finite number > 0 '
+                             '(the decode divides the wire value by it)' % (label, entry['name'], scale))
         check_register(register, '%s (%s) register' % (label, entry['name']))
         out[str(entry['name'])] = (register, typ, scale, fc)
     return out
@@ -182,9 +196,34 @@ def load_mapping(path):
     return out
 
 
+def build_sources(profile, spec, profile_path):
+    """Bind the metrics spec's "profile" fields to the device profile's
+    registers: {profile register name: {register, type, gain, fc, metric}}.
+    Each source carries register/type/gain and the metric it feeds; the
+    power math depends on pv-power and grid-power (ValueError when the
+    profile lacks them — the live `set profile` rolls back on it)."""
+    sources = {}
+    for profile_name, metric in spec.by_profile.items():
+        entry = profile.get(profile_name)
+        if entry is None:
+            logger.warning('metrics: %r binds profile register %r, which the device profile %s does not define; the metric stays absent',
+                           metric, profile_name, profile_path)
+            continue
+        sources[profile_name] = {'register': entry[0], 'type': entry[1], 'gain': entry[2],
+                                 'fc': entry[3], 'metric': metric}
+    if 'pv-power' not in sources or 'grid-power' not in sources:
+        raise ValueError('the metrics spec must bind %s to device-profile registers '
+                         '(the power math depends on them)' %
+                         ' and '.join(spec.by_profile.get(n, n) for n in ('pv-power', 'grid-power')
+                                      if n not in sources))
+    return sources
+
+
 def resolve_config(args, script_dir=None):
-    """Effective settings: CLI flags > SCRAPER_* env > [scraper] ini >
-    device profile (the shared profiles/ schema) > defaults."""
+    """Effective settings: CLI flags > SCR_* env > config script >
+    device profile (the shared profiles/ schema) > defaults. The register
+    map itself — addresses, types, gains, function codes — comes from the
+    device profile alone: there are no register override knobs."""
     cfg = load_config(args.config)
 
     def resolve(cli_value, env_name, cfg_key, default, conv):
@@ -201,81 +240,82 @@ def resolve_config(args, script_dir=None):
             logger.error('invalid %s = %r: %s (using %r)', cfg_key, raw, e, default)
             return default
 
-    profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'SCRAPER_PROFILE',
+    profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'SCR_PROFILE',
                                                 'profile', default_profile_path(), str))
     profile = load_device_profile(profile_path)
-    spec = Metrics(resolve(getattr(args, 'metrics_spec', None), 'SCRAPER_METRICS_SPEC',
-                           'metrics_spec', None, str))
+    metric_prefix = (resolve(getattr(args, 'metric_prefix', None), 'SCR_METRIC_PREFIX',
+                             'metric_prefix', 'huawei', str) or 'huawei').strip() or 'huawei'
+    spec = Metrics(resolve(getattr(args, 'metrics_spec', None), 'SCR_METRICS_SPEC',
+                           'metrics_spec', None, str), prefix=metric_prefix)
 
     # the metrics spec's "profile" fields pick the device registers feeding
     # the register-backed metrics; each source carries register/type/gain
     # and the metric it feeds
-    sources = {}
-    for profile_name, metric in spec.by_profile.items():
-        entry = profile.get(profile_name)
-        if entry is None:
-            logger.warning('metrics: %r binds profile register %r, which the device profile %s does not define; the metric stays absent',
-                           metric, profile_name, profile_path)
-            continue
-        sources[profile_name] = {'register': entry[0], 'type': entry[1], 'gain': entry[2],
-                                 'fc': entry[3], 'metric': metric}
-    if 'pv-power' not in sources or 'grid-power' not in sources:
-        raise SystemExit('the metrics spec must bind huawei_pv_generation_watts and huawei_grid_net_watts '
-                         'to device-profile registers (the power math depends on them)')
+    try:
+        sources = build_sources(profile, spec, profile_path)
+    except ValueError as e:
+        raise SystemExit(str(e))
 
-    battery = resolve(args.battery, 'SCRAPER_BATTERY', 'battery', False, str_to_bool)
+    battery = resolve(args.battery, 'SCR_BATTERY', 'battery', False, str_to_bool)
     cfg = {
         'profile': profile_path,
-        'host': resolve(args.host, 'SCRAPER_HOST', 'host', DEFAULTS['host'], str),
-        'modbus_port': resolve(args.modbus_port, 'SCRAPER_MODBUS_PORT', 'modbus_port',
+        'host': resolve(args.host, 'SCR_HOST', 'host', DEFAULTS['host'], str),
+        'modbus_port': resolve(args.modbus_port, 'SCR_MODBUS_PORT', 'modbus_port',
                                DEFAULTS['modbus_port'], int),
-        'unit': resolve(args.unit, 'SCRAPER_UNIT', 'unit', DEFAULTS['unit'], int),
-        'modbus_offset': resolve(args.modbus_offset, 'SCRAPER_MODBUS_OFFSET', 'modbus_offset', 0, int),
-        'timeout': resolve(args.timeout, 'SCRAPER_TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
-        'pv_register': resolve(args.pv_register, 'SCRAPER_PV_REGISTER', 'pv_register',
-                               sources['pv-power']['register'], int),
-        'grid_register': resolve(args.grid_register, 'SCRAPER_GRID_REGISTER', 'grid_register',
-                                 sources['grid-power']['register'], int),
-        'scale': resolve(args.scale, 'SCRAPER_SCALE', 'scale', DEFAULTS['scale'], float),
-        'grid_scale': resolve(args.grid_scale, 'SCRAPER_GRID_SCALE', 'grid_scale', DEFAULTS['grid_scale'], float),
-        'max_kwp': resolve(args.max_kwp, 'SCRAPER_MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float),
-        'max_grid_kw': resolve(args.max_grid_kw, 'SCRAPER_MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float),
+        'unit': resolve(args.unit, 'SCR_UNIT', 'unit', DEFAULTS['unit'], int),
+        'modbus_offset': resolve(args.modbus_offset, 'SCR_MODBUS_OFFSET', 'modbus_offset', 0, int),
+        'timeout': resolve(args.timeout, 'SCR_TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
+        'max_kwp': resolve(args.max_kwp, 'SCR_MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float),
+        'max_grid_kw': resolve(args.max_grid_kw, 'SCR_MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float),
         'battery': battery,
-        'battery_register': resolve(args.battery_register, 'SCRAPER_BATTERY_REGISTER', 'battery_register',
-                                    sources.get('battery-power', {}).get('register', 37001), int),
-        'battery_soc_register': resolve(args.battery_soc_register, 'SCRAPER_BATTERY_SOC_REGISTER',
-                                        'battery_soc_register',
-                                        sources.get('battery-soc', {}).get('register', 37004), int),
-        'grid_positive_import': resolve(args.grid_positive_import, 'SCRAPER_GRID_POSITIVE_IMPORT',
+        'grid_positive_import': resolve(args.grid_positive_import, 'SCR_GRID_POSITIVE_IMPORT',
                                         'grid_positive_import', False, str_to_bool),
-        'listen': resolve(args.listen, 'SCRAPER_LISTEN', 'listen', DEFAULTS['listen'], str),
-        'interval': resolve(args.interval, 'SCRAPER_INTERVAL', 'interval', DEFAULTS['interval_s'], float),
-        'max_clients': resolve(args.max_clients, 'SCRAPER_MAX_CLIENTS', 'max_clients',
+        'listen': resolve(args.listen, 'SCR_LISTEN', 'listen', DEFAULTS['listen'], str),
+        'interval': resolve(args.interval, 'SCR_INTERVAL', 'interval', DEFAULTS['interval_s'], float),
+        'max_clients': resolve(args.max_clients, 'SCR_MAX_CLIENTS', 'max_clients',
                                DEFAULTS['max_clients'], int),
-        'client_timeout': resolve(args.client_timeout, 'SCRAPER_CLIENT_TIMEOUT', 'client_timeout',
+        'client_timeout': resolve(args.client_timeout, 'SCR_CLIENT_TIMEOUT', 'client_timeout',
                                   DEFAULTS['client_timeout_s'], float),
-        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'SCRAPER_MAX_CONN_PER_IP',
+        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'SCR_MAX_CONN_PER_IP',
                                    'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
-        'local_time': resolve(args.local_time, 'SCRAPER_LOCAL_TIME', 'local_time', False, str_to_bool),
-        'log_access': resolve(args.log_access, 'SCRAPER_LOG_ACCESS', 'log_access', False, str_to_bool),
-        'auth_token': (resolve(args.auth_token, 'SCRAPER_AUTH_TOKEN', 'auth_token', None, str) or '').strip() or None,
-        'auth_token_file': resolve(args.auth_token_file, 'SCRAPER_AUTH_TOKEN_FILE', 'auth_token_file',
+        'local_time': resolve(args.local_time, 'SCR_LOCAL_TIME', 'local_time', False, str_to_bool),
+        'log_access': resolve(args.log_access, 'SCR_LOG_ACCESS', 'log_access', False, str_to_bool),
+        'metric_prefix': metric_prefix,
+        'auth_token': (resolve(args.auth_token, 'SCR_AUTH_TOKEN', 'auth_token', None, str) or '').strip() or None,
+        'auth_token_file': resolve(args.auth_token_file, 'SCR_AUTH_TOKEN_FILE', 'auth_token_file',
                                    None, str),
-        'level': resolve(args.log_level, 'SCRAPER_LOG_LEVEL', 'log_level',
+        'level': resolve(args.log_level, 'SCR_LOG_LEVEL', 'log_level',
                          DEFAULTS['log_level'], str).strip().upper(),
     }
-    cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'SCRAPER_CONTROL_PORT',
+    cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'SCR_CTL',
                                   'control_port', None, str)
-    cfg['control_token'] = (resolve(getattr(args, 'control_token', None), 'SCRAPER_CONTROL_TOKEN',
+    cfg['control_token'] = (resolve(getattr(args, 'control_token', None), 'SCR_CONTROL_TOKEN',
                                     'control_token', None, str) or '').strip() or None
-    control_token_file = resolve(getattr(args, 'control_token_file', None), 'SCRAPER_CONTROL_TOKEN_FILE',
+    control_token_file = resolve(getattr(args, 'control_token_file', None), 'SCR_CONTROL_TOKEN_FILE',
                                  'control_token_file', None, str)
-    cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'SCRAPER_CONTROL_TRUST_UIDS',
+    cfg['control_ops_token'] = (resolve(getattr(args, 'control_ops_token', None), 'SCR_CONTROL_OPS_TOKEN',
+                                        'control_ops_token', None, str) or '').strip() or None
+    control_ops_token_file = resolve(getattr(args, 'control_ops_token_file', None), 'SCR_CONTROL_OPS_TOKEN_FILE',
+                                     'control_ops_token_file', None, str)
+    cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'SCR_CONTROL_OPS_VERBS',
+                                        'control_ops_verbs', 'show,clear', str) or 'show,clear').strip() or 'show,clear'
+    cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'SCR_CONTROL_TRUST_UIDS',
                                         'control_trust_uids', None, str)
     if cfg['control_token'] and control_token_file:
         raise SystemExit('--control-token and --control-token-file are mutually exclusive')
     if control_token_file:
         cfg['control_token'] = load_token_file(control_token_file, 'control-token-file')
+    if cfg['control_ops_token'] and control_ops_token_file:
+        raise SystemExit('--control-ops-token and --control-ops-token-file are mutually exclusive')
+    if control_ops_token_file:
+        cfg['control_ops_token'] = load_token_file(control_ops_token_file, 'control-ops-token-file')
+    if cfg['control_ops_token']:
+        if not cfg['control_token']:
+            raise SystemExit('the read-only ops token supplements the admin token: '
+                             'set --control-token/--control-token-file too')
+        if cfg['control_ops_token'] == cfg['control_token']:
+            raise SystemExit('the ops token must differ from the admin token (the same secret would '
+                             'hand every holder the role the server picks first)')
     if cfg['control_token'] and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in cfg['control_token']):
         raise SystemExit('invalid control_token: must not contain whitespace or control characters')
     if cfg['auth_token'] and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in cfg['auth_token']):
@@ -284,6 +324,9 @@ def resolve_config(args, script_dir=None):
         raise SystemExit('invalid auth_token_file: must not contain control characters')
     if cfg['auth_token'] and cfg['auth_token_file']:
         raise SystemExit('--auth-token and --auth-token-file are mutually exclusive')
+    if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', cfg['metric_prefix']):
+        raise SystemExit('invalid metric_prefix = %r: must be a valid metric-name start '
+                         '(letters/digits/underscore, not starting with a digit)' % cfg['metric_prefix'])
     if cfg['auth_token_file']:
         check_token_file_mode(cfg['auth_token_file'], 'auth_token_file')
         try:
@@ -298,10 +341,6 @@ def resolve_config(args, script_dir=None):
         cfg['auth_token'] = token
     cfg['host'] = cfg['host'].strip()
     cfg['listen'] = cfg['listen'].strip()
-    for profile_name, reg_key in (('pv-power', 'pv_register'), ('grid-power', 'grid_register'),
-                                  ('battery-power', 'battery_register'), ('battery-soc', 'battery_soc_register')):
-        if profile_name in sources:
-            sources[profile_name]['register'] = cfg[reg_key]
     cfg['sources'] = sources
     validate_config(cfg)
     return cfg

@@ -23,9 +23,29 @@ let
       "--upstream ${cfg.prometheusUrl}"
       "--prom-prefix ${cfg.promPrefix}"
       "--config-js ${configFile}"
+      "--max-clients ${toString cfg.maxClients}"
+      "--client-timeout ${toString cfg.clientTimeout}"
+      "--max-conn-per-ip ${toString cfg.maxConnPerIp}"
     ]
     ++ lib.optional (cfg.staticDir != null) "--static-dir ${cfg.staticDir}"
     ++ lib.optional cfg.battery "--battery"
+    ++ lib.optional cfg.logAccess "--log-access"
+    ++ lib.optionals (cfg.auditLog != null) [
+      "--audit-log ${cfg.auditLog}"
+      "--audit-max-mb ${toString cfg.auditMaxMb}"
+      "--audit-files ${toString cfg.auditFiles}"
+    ]
+    ++ lib.optionals (cfg.controlPort != null) [
+      "--control-port ${
+        if lib.isInt cfg.controlPort then toString cfg.controlPort else "'${cfg.controlPort}'"
+      }"
+    ]
+    ++ lib.optionals (cfg.controlToken != null) [ "--control-token ${cfg.controlToken}" ]
+    ++ lib.optionals (cfg.controlTokenFile != null) [
+      # systemd LoadCredential mounts the file here (see serviceConfig below)
+      "--control-token-file /run/credentials/dashboard/control-token"
+    ]
+    ++ lib.optionals (cfg.controlTrustUids != null) [ "--control-trust-uids ${cfg.controlTrustUids}" ]
   );
 in
 {
@@ -108,28 +128,164 @@ in
       default = false;
       description = "Open the listen port in the firewall (only needed for direct LAN access).";
     };
+
+    maxClients = lib.mkOption {
+      type = lib.types.int;
+      default = 64;
+      description = "Maximum concurrent HTTP clients (pages + proxy); extras get an immediate 503 (0 = unlimited).";
+    };
+
+    clientTimeout = lib.mkOption {
+      type = lib.types.float;
+      default = 300.0;
+      description = "Seconds an idle keep-alive HTTP client is kept before being kicked (0 = off).";
+    };
+
+    maxConnPerIp = lib.mkOption {
+      type = lib.types.int;
+      default = 0;
+      description = "Maximum concurrent HTTP connections from one peer IP; extras get an immediate 503 (0 = no per-IP limit).";
+    };
+
+    logAccess = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Log every HTTP request (page loads, /prom queries) at INFO — audit trail for who polled and when.";
+    };
+
+    controlPort = lib.mkOption {
+      type = lib.types.nullOr (lib.types.either lib.types.int lib.types.str);
+      default = null;
+      description = ''
+        The JSON-lines control server target: a TCP port (bound to
+        127.0.0.1) or a unix socket path. The service has PrivateTmp — a
+        socket under /tmp is unreachable from outside; use a path under
+        /run/dashboard/ (created for the service). The control surface
+        speaks the signed wire (the full sha256 HMAC of every frame, keyed
+        by the token) and is talked to with dashboard-ctl / dashboard-cli.
+        null = the server default (a /tmp unix socket, private to the
+        service).
+      '';
+    };
+
+    controlToken = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Require a token on TCP control connections. WARNING: it is rendered
+        into the world-readable systemd unit in the nix store — prefer
+        controlTokenFile.
+      '';
+    };
+
+    controlTokenFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        The control token from a file (the first line is the token),
+        mounted via systemd LoadCredential — the hardened way to pass the
+        secret. Mutually exclusive with controlToken.
+      '';
+    };
+
+    controlTrustUids = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Extra peer uids the unix control socket trusts without the token
+        (SO_PEERCRED): a comma-separated uid list — a local systemd unit
+        speaks without the secret. Root and the daemon's own user are
+        always trusted. null = the defaults only.
+      '';
+    };
+
+    auditLog = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "-";
+      description = ''
+        The DSH audit trail (the control commands, the auth attempts,
+        reloads, shutdowns): a file path, or "-" for stdout (default —
+        journald captures it; the hardened service cannot write the XDG
+        state home). null = the tool's default (the XDG state home).
+      '';
+    };
+
+    auditMaxMb = lib.mkOption {
+      type = lib.types.float;
+      default = 10.0;
+      description = "Rotate the audit log at this size in MB, keeping auditFiles backups; 0 = off.";
+    };
+
+    auditFiles = lib.mkOption {
+      type = lib.types.int;
+      default = 3;
+      description = "Rotated audit backups to keep.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    warnings = lib.optional (cfg.controlToken != null)
+      "services.dashboard: controlToken is rendered into the world-readable systemd unit in the nix store — prefer controlTokenFile."
+      ++ lib.optionals (cfg.controlPort != null
+          && lib.isString cfg.controlPort
+          && lib.hasPrefix "/tmp/" cfg.controlPort)
+      [
+        "services.dashboard: the control socket is under /tmp, which the service's PrivateTmp makes private — the CLI outside cannot reach it; use a path under /run/dashboard/ instead."
+      ];
+
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.port ];
 
     systemd.services.dashboard = {
       description = "PV dashboard server (static + Prometheus proxy)";
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
+      reloadIfChanged = true;
+      restartIfChanged = false;
 
       serviceConfig = {
         ExecStart = "${lib.getExe cfg.package} ${execArgs}";
+        ExecReload = "${pkgs.util-linux}/bin/kill -HUP $MAINPID";
         DynamicUser = true;
         Restart = "on-failure";
         RestartSec = 3;
+        UMask = "0077";
+        # the sandbox pass (verified with systemd-analyze security in the
+        # flake's hardening check): the whole filesystem read-only, no
+        # /home, no /tmp sharing, no device nodes, no kernel interfaces, no
+        # namespace/clock/hostname mutation, no privileges, no
+        # writable+executable memory, only the AF_UNIX + INET* socket
+        # families and the @system-service calls.
         NoNewPrivileges = true;
         ProtectSystem = "strict";
         ProtectHome = true;
         PrivateTmp = true;
+        PrivateDevices = true;
         ProtectKernelTunables = true;
+        ProtectKernelModules = true;
+        ProtectKernelLogs = true;
         ProtectControlGroups = true;
-        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+        ProtectClock = true;
+        ProtectHostname = true;
+        ProtectProc = "invisible";
+        RestrictNamespaces = true;
+        RestrictRealtime = true;
+        RestrictSUIDSGID = true;
+        LockPersonality = true;
+        MemoryDenyWriteExecute = true;
+        CapabilityBoundingSet = "";
+        # AF_UNIX: the default control target is a unix socket — without it
+        # the socket() call fails and the control server silently never binds
+        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
+        SystemCallArchitectures = "native";
+        SystemCallFilter = [ "@system-service" ];
+      } // lib.optionalAttrs (cfg.controlTokenFile != null) {
+        LoadCredential = [ "control-token:${toString cfg.controlTokenFile}" ];
+      } // lib.optionalAttrs (cfg.controlPort != null
+          && lib.isString cfg.controlPort
+          && lib.hasPrefix "/run/dashboard/" cfg.controlPort) {
+        # the control socket's directory, owned by the dynamic user
+        RuntimeDirectory = "dashboard";
+        RuntimeDirectoryMode = "0755";
       };
     };
   };

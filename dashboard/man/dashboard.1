@@ -1,0 +1,185 @@
+.TH DASHBOARD 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
+.SH NAME
+dashboard \- Static single-page home PV monitoring dashboard with a
+Prometheus proxy
+.SH SYNOPSIS
+.B dashboard
+.RI [ options ]
+
+.SH DESCRIPTION
+Static single-page home PV monitoring dashboard (energy flow diagram,
+energy summary and chart) fed by Prometheus through the bundled
+stdlib-only proxy: the browser loads the static app from the server, the
+app's queries go to \fB/prom\fR and are proxied to the upstream
+Prometheus (\fB--upstream\fR). The front-end configuration is served as
+/config.js (the SOLAR_CONFIG object; \fB--battery\fR injects the battery
+panels).
+.PP
+The HTTP surface is the tool's serving surface: the connection caps
+(\fB--max-clients\fR total, \fB--max-conn-per-ip\fR per peer, extras
+get an immediate 503), the idle keep-alive kick (\fB--client-timeout\fR).
+The README documents the loopback/reverse-proxy paths \(em the server
+speaks plain HTTP with no authentication on page or proxy yet (the auth
+story in docs/TODO.md): bind the loopback or put a proxy in front.
+.PP
+The JSON-lines control server (\fB--control-port\fR, talked to with
+\fBdashboard-ctl\fR(1) and \fBdashboard-cli\fR(1)) inspects and steers
+the running server: the live settings (the caps, the log surface, the
+battery flag), the config reload, the graceful shutdown. With a control
+token configured the wire is HMAC-signed: every command and reply carries
+the full sha256 of its payload, keyed by the token (common/wiresec.py)
+\(em a token-holding client verifies both directions, and over TCP the
+signed commands are mandatory.
+
+.SH OPTIONS
+.TP
+.B \-\-config
+config file (default: $DASHBOARD_CONFIG, then server.ini next to this
+script, then the subproject root) (default:
+/Users/oom/GensparkCode/pv\-dash/dashboard/server.ini)
+.TP
+.BI \-\-port " N"
+listen port (default: config file, $PORT or 8080)
+.TP
+.B \-\-bind
+address to bind (default: config file, $BIND or 0.0.0.0)
+.TP
+.B \-\-static\-dir
+directory to serve (default: config file, $STATIC_DIR or static next to
+the script)
+.TP
+.B \-\-config\-js
+config.js to serve at /config.js (default: config file, $CONFIG_JS or
+config.js next to the script)
+.TP
+.B \-\-prom\-prefix
+path under which Prometheus is proxied (default: config file,
+$PROM_PREFIX or /prom); empty string proxies everything
+.TP
+.B \-\-upstream
+upstream Prometheus URL (default: config file, $PROM_URL or
+http://localhost:9090)
+.TP
+.BI \-\-max\-clients " N"
+maximum concurrent HTTP clients (pages + proxy); extras get an immediate
+503 (default: config file, $DASHBOARD_MAX_CLIENTS or 64; 0 = unlimited)
+.TP
+.BI \-\-client\-timeout " N"
+seconds an idle keep\-alive HTTP client is kept before being kicked
+(default: config file, $DASHBOARD_CLIENT_TIMEOUT or 300; 0 = off)
+.TP
+.BI \-\-max\-conn\-per\-ip " N"
+maximum concurrent HTTP connections from one peer IP; extras get an
+immediate 503 (default: config file, $DASHBOARD_MAX_CONN_PER_IP or 0 =
+no per\-IP limit)
+.TP
+.B \-\-log\-level
+log level (default: config file or INFO); DEBUG logs every request
+.TP
+.B \-\-log\-queries
+log proxied Prometheus queries at INFO level
+.TP
+.B \-\-log\-access
+log every HTTP request at INFO (default: config file,
+$DASHBOARD_LOG_ACCESS or quiet)
+.TP
+.B \-\-local\-time
+log timestamps in the system time zone instead of UTC (default: off)
+.TP
+.B \-\-battery
+enable battery support in the served config.js (default: config file,
+$BATTERY or off)
+.TP
+.B \-\-control\-port
+JSON\-lines control server target: unix socket path (default:
+/tmp/dashboard\-<port>.socket) or TCP port number on 127.0.0.1 (e.g.
+15598); 0 = off. Talk to it with dashboard\-ctl.py (default: config
+file, $DASHBOARD_CONTROL_PORT)
+.TP
+.B \-\-control\-token
+require a token on control connections: the client authenticates with
+{"cmd": "auth", "token": ...}; over the unix socket a trusted peer
+(root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
+skips the token (default: config file, $DASHBOARD_CONTROL_TOKEN or none)
+.TP
+.B \-\-control\-token\-file
+the control token from a file (the first line; e.g. a systemd
+LoadCredential or a key file; must be owner\-only 0600) — takes the
+place of \-\-control\-token; giving both is an error (env
+DASHBOARD_CONTROL_TOKEN_FILE)
+.TP
+.B \-\-control\-trust\-uids
+extra peer uids the unix control socket trusts without the token
+(SO_PEERCRED — a local systemd unit speaks without the secret); root and
+the daemon's own user are always trusted (default: config file,
+$DASHBOARD_CONTROL_TRUST_UIDS or none)
+.TP
+.B \-\-audit\-log
+DSH audit trail: a file path or \- for stdout (the docker/journald way);
+default: the XDG state home (~/.local/state/dashboard/audit.log)
+.TP
+.BI \-\-audit\-max\-mb " N"
+rotate the audit log at this size in MB, keeping 3 backups; 0 = no size
+rotation (default 10.0)
+.TP
+.BI \-\-audit\-files " N"
+rotated audit backups to keep (default 3)
+.TP
+.B \-\-no\-audit\-log
+disable the SCR audit trail (default: off)
+.TP
+.B \-\-dry\-run
+validate the configuration, print the effective settings and exit
+(nothing is bound) (default: off)
+
+
+.SH SIGNALS
+.TP
+.B SIGHUP
+re-read the config file and apply what is live (the same path as the
+control server's request reload); the listen address and port are bound
+and stay.
+.TP
+.BR SIGTERM ", " SIGINT
+graceful shutdown (the connected consoles get the daemon-exit frame).
+
+.SH CONTROL
+The control server speaks JSON lines ({"cmd": "..."} ->
+{"status": "ok|err|bye", "text": "..."}; TCP requires the token when
+configured and refuses to start without one). Commands:
+\fBset\fR/\fBunset\fR/\fBshow\fR/\fBhelp\fR (the settings: max-clients,
+client-timeout, max-conn-per-ip, log-access, log-queries, battery,
+log-level), \fBshow status\fR, \fBshow connections\fR (the live HTTP
+clients), \fBshow settings\fR, \fBshow version\fR, \fBinspect\fR,
+\fBrequest reload\fR, \fBshutdown\fR, \fBquit\fR. See
+.BR dashboard-ctl (1)
+and
+.BR dashboard-cli (1).
+
+.SH SECURITY
+The server speaks plain HTTP and has no authentication on the page or the
+proxy yet (the auth story in docs/TODO.md): bind the loopback (the NixOS
+module's default) or publish the port loopback-only and put an
+authenticating reverse proxy in front for anything beyond localhost. The
+control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
+control port without a token refuses to start (F5); with a token the wire
+is signed and the commands/replies verify end to end. The audit trail
+(default in the XDG state home, prefix DSH) records the control commands,
+the auth failures, the reloads and the shutdowns.
+
+.SH FILES
+.TP
+.I /tmp/dashboard-<port>.socket
+the default control socket.
+.TP
+.I ~/.local/state/dashboard/audit.log
+the default audit trail.
+
+.SH SEE ALSO
+.BR dashboard-ctl (1),
+.BR dashboard-cli (1),
+.BR modbus-scraper (1),
+.BR modbus-cache (1),
+.BR modbus-fake-inverter (1)
+.PP
+dashboard/README.md in the suite checkout \(em the full documentation.

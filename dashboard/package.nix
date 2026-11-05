@@ -9,7 +9,7 @@ stdenv.mkDerivation (finalAttrs: {
   pname = "dashboard";
   version = "0.3.0";
 
-  src = lib.cleanSource ./src;
+  src = lib.cleanSource ./.;
 
   nativeBuildInputs = [ makeWrapper ];
 
@@ -20,16 +20,25 @@ stdenv.mkDerivation (finalAttrs: {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/share/dashboard $out/bin
+    install -Dm755 bin/dashboard.py $out/share/dashboard/dashboard.py
+    install -Dm755 bin/dashboard_ctl.py $out/share/dashboard/dashboard_ctl.py
+    install -Dm755 bin/dashboard_cli.py $out/share/dashboard/dashboard_cli.py
+    install -dm755 $out/share/dashboard/lib
+    install -m644 lib/*.py lib/static.json $out/share/dashboard/lib/
+    install -dm755 $out/share/dashboard/common
+    install -m644 ${../common}/*.py $out/share/dashboard/common/
     cp -r static $out/share/dashboard/static
-    cp -r lib $out/share/dashboard/lib
-    install -Dm755 server.py $out/share/dashboard/server.py
     install -Dm644 config.js $out/share/dashboard/config.js
+    install -Dm644 server.ini $out/share/dashboard/server.ini
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/
 
     makeWrapper ${lib.getExe python3} $out/bin/dashboard \
-      --add-flags "$out/share/dashboard/server.py"
+      --add-flags "$out/share/dashboard/dashboard.py"
+    makeWrapper ${lib.getExe python3} $out/bin/dashboard-ctl \
+      --add-flags "$out/share/dashboard/dashboard_ctl.py"
+    makeWrapper ${lib.getExe python3} $out/bin/dashboard-cli \
+      --add-flags "$out/share/dashboard/dashboard_cli.py"
 
     runHook postInstall
   '';
@@ -41,11 +50,14 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   meta = {
-    description = "Single-page home PV monitoring dashboard with a Prometheus proxy";
+    description = "Single-page home PV monitoring dashboard with a Prometheus proxy + console-style control CLIs";
     longDescription = ''
       Static single-page dashboard (energy flow diagram, energy summary and
       chart) fed by Prometheus through the bundled stdlib-only proxy server
-      (dashboard launcher runs server.py; /prom is proxied to the upstream).
+      (/prom is proxied to the upstream). Includes dashboard_ctl and
+      dashboard_cli, CLI clients for the JSON-lines control server (inspect,
+      the live settings, the config reload, shutdown — the token-signed
+      wire). Python standard library only, no third-party dependencies.
     '';
     license = lib.licenses.bsd3;
     mainProgram = "dashboard";

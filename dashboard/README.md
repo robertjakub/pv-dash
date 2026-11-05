@@ -14,17 +14,21 @@ and packaging overview live in the [suite root](../README.md).
 
 | File | Purpose |
 |---|---|
-| `src/static/index.html` | markup only — links `style.css`, loads `boot.js`, `app.js`, `config.js`, `i18n.js` |
-| `src/lib/static.json` | the static constants: the shipped server defaults (port, bind, upstream, proxy prefix/timeout) |
-| `src/lib/statics.py` | its loader (the STATIC dict + the named aliases) |
-| `src/static/vendor/echarts.min.js` | vendored ECharts 5.5.1 (Apache-2.0) — no CDN needed |
-| `src/static/style.css` | all styling (dark/light themes, layout, flow diagram) |
-| `src/static/boot.js` | config/i18n loader — must stay in `<head>`; sets `window.__boot` |
-| `src/static/app.js` | the whole application (chart, flow animation, i18n, stats) |
-| `src/static/i18n.js` | translations (`window.SOLAR_I18N`) |
-| `src/server.py` / `src/server.ini` | static server + Prometheus proxy (serves `src/static/` by default) |
-| `src/config.js` | user settings (`SOLAR_CONFIG`) — lives next to `server.py`, served at `/config.js` |
-| `src/man/dashboard.1` | the man page (installed by the Nix package under `share/man/man1/`) |
+| `static/index.html` | markup only — links `style.css`, loads `boot.js`, `app.js`, `config.js`, `i18n.js` |
+| `lib/static.json` | the static constants: the shipped server defaults (port, bind, upstream, proxy prefix/timeout) |
+| `lib/statics.py` | its loader (the STATIC dict + the named aliases) |
+| `static/vendor/echarts.min.js` | vendored ECharts 5.5.1 (Apache-2.0) — no CDN needed |
+| `static/style.css` | all styling (dark/light themes, layout, flow diagram) |
+| `static/boot.js` | config/i18n loader — must stay in `<head>`; sets `window.__boot` |
+| `static/app.js` | the whole application (chart, flow animation, i18n, stats) |
+| `static/i18n.js` | translations (`window.SOLAR_I18N`) |
+| `bin/dashboard.py` / `server.ini` | static server + Prometheus proxy (serves `static/` by default) |
+| `bin/dashboard_ctl.py` / `bin/dashboard_cli.py` | control clients: the one-shot / batch and the console-style session (see [Control](#control)) |
+| `lib/config.py` | settings resolution (CLI > env > `server.ini` > defaults) and the control-target resolution |
+| `lib/settings.py` | the control grammar registry (the settings, their help — one source for the wire, the completions and the docs) |
+| `lib/control.py` | the JSON-lines control server (the signed wire, the peer-cred shortcut) |
+| `config.js` | user settings (`SOLAR_CONFIG`) — at the subproject root, served at `/config.js` |
+| `man/*.1` | the man pages — **generated** (`scripts/gen_man.py` / the tools' `--man`), installed by the Nix package under `share/man/man1/` |
 | `package.nix` / `module.nix` | Nix packaging and service module (the flake entry point lives at the [suite root](../README.md)) |
 
 ## Features
@@ -52,7 +56,7 @@ and packaging overview live in the [suite root](../README.md).
   (e.g. `de: { ... }`) — it appears in the switcher automatically and is merged
   over the built-in English fallback.
  - **Battery (optional, experimental)** — enable with `battery: true` in `config.js`
-  (or `server.py --battery` / `BATTERY=1` / `battery = true` in `server.ini`,
+  (or `dashboard.py --battery` / `BATTERY=1` / `battery = true` in `server.ini`,
   which injects it into the served config.js, or `?battery=1` for testing):
   a Battery node joins the flow diagram (teal particles up = discharging,
   down = charging, state line with SoC %), the energy splits become three-way
@@ -73,7 +77,7 @@ and packaging overview live in the [suite root](../README.md).
 
 ## Configuration
 
-All settings live in `src/config.js` next to `server.py` (served at `/config.js`; relocate with `--config-js`, `$CONFIG_JS` or `config_js` in `server.ini` — if the override file is missing, `/config.js` 404s and the page boots with built-in defaults):
+All settings live in `config.js` at the subproject root (served at `/config.js`; relocate with `--config-js`, `$CONFIG_JS` or `config_js` in `server.ini` — if the override file is missing, `/config.js` 404s and the page boots with built-in defaults):
 
 ```js
 const SOLAR_CONFIG = {
@@ -98,7 +102,7 @@ const SOLAR_CONFIG = {
 
 | Key              | Meaning                                              |
 |------------------|------------------------------------------------------|
-| `prometheusUrl`  | `/prom` (same-origin proxy from `server.py`) or a direct Prometheus URL |
+| `prometheusUrl`  | `/prom` (same-origin proxy from the dashboard server) or a direct Prometheus URL |
 | `metrics`        | full metric selectors — label matchers like `{job="sun2000"}` are allowed and passed through to PromQL; values are always expected in **watts**. `gridExport` = export power (≥ 0); with optional `gridImport` set, the net grid value is computed as `export − import` (negative = importing) |
 | `load`           | home consumption selector |
 | `battery`         | `true`/`false` — master switch for battery support: Battery node, three-way energy split, battery chart series; selectors come from `metrics.battery` (signed W) / `metrics.batterySoC` (%) / `metrics.batteryFlag` (0 or missing = no battery → dimmed node + warning banner) |
@@ -123,15 +127,15 @@ those are missing too (plain static page), the built-in defaults apply
 
 ## Run
 
-**Recommended (proxy mode, no CORS issues):** `server.py` serves the page and
-proxies `/prom/*` to your Prometheus — the browser never talks to Prometheus
-directly:
+**Recommended (proxy mode, no CORS issues):** `bin/dashboard.py` serves the
+page and proxies `/prom/*` to your Prometheus — the browser never talks to
+Prometheus directly:
 
 ```bash
-python3 src/server.py                          # upstream http://localhost:9090
-python3 src/server.py --port 8080 --upstream http://192.168.1.50:9090
-python3 src/server.py --bind 127.0.0.1         # localhost only
-PROM_URL=http://pi:9090 python3 src/server.py  # via env
+python3 bin/dashboard.py                          # upstream http://localhost:9090
+python3 bin/dashboard.py --port 8080 --upstream http://192.168.1.50:9090
+python3 bin/dashboard.py --bind 127.0.0.1         # localhost only
+PROM_URL=http://pi:9090 python3 bin/dashboard.py  # via env
 # open http://localhost:8080
 ```
 
@@ -146,8 +150,14 @@ DEBUG level only (or at INFO when `--log-queries` is passed / set in
 `server.ini`). Log level and query logging come from (CLI wins):
 
 1. CLI: `--port`, `--bind`, `--upstream`, `--static-dir`, `--prom-prefix`,
-   `--log-level DEBUG|INFO|WARNING|ERROR`, `--log-queries`
-2. Environment: `PORT`, `BIND`, `PROM_URL`, `PROM_PREFIX`
+   `--log-level DEBUG|INFO|WARNING|ERROR`, `--log-queries`, `--log-access`,
+   `--max-clients`, `--client-timeout`, `--max-conn-per-ip`, `--local-time`,
+   `--control-port`, `--control-token`, `--control-token-file`,
+   `--control-trust-uids`, `--audit-log`, `--dry-run`, `--man`
+2. Environment: `PORT`, `BIND`, `PROM_URL`, `PROM_PREFIX` (the generic, docker-documented
+   set) plus the family-shaped `DASHBOARD_MAX_CLIENTS`, `DASHBOARD_CLIENT_TIMEOUT`,
+   `DASHBOARD_MAX_CONN_PER_IP`, `DASHBOARD_LOG_ACCESS`, `DASHBOARD_CONTROL_PORT`,
+   `DASHBOARD_CONTROL_TOKEN`, `DASHBOARD_CONTROL_TOKEN_FILE`, `DASHBOARD_CONTROL_TRUST_UIDS`
 3. `server.ini` (same keys, snake_case):
 
 ```ini
@@ -160,12 +170,55 @@ prom_prefix = /prom
 log_level = INFO
 log_queries = false
 battery = false
+max_clients = 64
+client_timeout = 300
+max_conn_per_ip = 0
+# control_port = /tmp/dashboard-8080.socket
 ```
 
 `--prom-prefix ''` (empty) proxies *every* unmatched path to Prometheus.
 
+The HTTP surface carries the family's connection caps: `--max-clients` (a
+total cap, extras get an immediate 503), `--max-conn-per-ip` (per peer) and
+`--client-timeout` (the idle keep-alive kick) — all live-settable through
+the control server below.
+
+## Control
+
+The server speaks the family's JSON-lines control protocol (the same wire
+as `modbus-cache`, `modbus-fake-inverter` and `modbus-scraper`): it listens
+on a 0600 unix socket by default (`/tmp/dashboard-<port>.socket`) or a TCP
+port on 127.0.0.1 (a token is mandatory there — a token-less TCP control
+port refuses to start; with a token configured the wire is HMAC-signed:
+every command and reply carries the full sha256 of its frame, keyed by the
+token). Over the unix socket a trusted peer (root, the daemon's own user or
+`--control-trust-uids`) skips the token handshake (SO_PEERCRED).
+
+```bash
+python3 bin/dashboard.py --control-port /tmp/dashboard-8080.socket &
+python3 bin/dashboard_ctl.py show status          # one-shot
+python3 bin/dashboard_ctl.py request reload       # the SIGHUP path
+printf 'set battery on\nshow settings\n' | python3 bin/dashboard_ctl.py
+python3 bin/dashboard_cli.py                      # the console: TAB completion, ?, reconnect
+```
+
+Commands: `set <setting> <value>` / `unset <setting>` (the live settings:
+`max-clients`, `client-timeout`, `max-conn-per-ip`, `log-access`,
+`log-queries`, `battery`, `log-level`), `show <setting>` / `show status` /
+`show connections` (the live HTTP clients per peer IP) / `show settings` /
+`show version`, `inspect` (the one-page dump for a bug report), `request
+reload` (re-read `server.ini` — the SIGHUP path; the listen address and
+port are bound and stay), `shutdown`, `quit`; `help <setting>` describes a
+setting. A SIGHUP or `request reload` also clears the live-override marks
+(`show settings` marks an overridden value with `*`).
+
+Every control command, auth failure, reload and shutdown lands in the audit
+trail (prefix `DSH`, default `~/.local/state/dashboard/audit.log`;
+`--audit-log -` for stdout — the journald way; the ctl/cli keep their own
+`CTL`/`CLI` trails of the session frame).
+
 **Static-only mode:** any web server works (e.g.
-`python3 -m http.server 8080 -d src/static`), but then set `prometheusUrl`
+`python3 -m http.server 8080 -d static`), but then set `prometheusUrl`
 in `config.js` to the direct Prometheus URL — the browser will fetch it
 directly, which requires CORS to be allowed.
 
@@ -173,7 +226,7 @@ directly, which requires CORS to be allowed.
 
 The dashboard only makes same-origin GET requests — any proxy works.
 
-**A. Proxy → server.py** (keeps Prometheus hidden):
+**A. Proxy → dashboard.py** (keeps Prometheus hidden):
 
 ```nginx
 location / { proxy_pass http://127.0.0.1:8080; }   # nginx
@@ -182,7 +235,7 @@ location / { proxy_pass http://127.0.0.1:8080; }   # nginx
 solar.example.com { reverse_proxy 127.0.0.1:8080 }  # Caddy
 ```
 
-Run `src/server.py --bind 127.0.0.1` so only the proxy reaches it.
+Run `bin/dashboard.py --bind 127.0.0.1` so only the proxy reaches it.
 
 **B. Proxy serves static files and routes `/prom` to Prometheus itself:**
 
@@ -201,7 +254,7 @@ prefix); add auth at the proxy if exposed to the internet.
 - Energy (kWh) is integrated from `avg_over_time(<metric>[<step>s])` buckets, so
   every raw sample inside a bucket contributes — spikes are not lost. The step is
   always a multiple of `scrapeSec`.
-- If the browser blocks direct Prometheus access (CORS), run `server.py` —
+- If the browser blocks direct Prometheus access (CORS), run `bin/dashboard.py` —
   the dashboard then fetches same-origin `/prom` and the browser never sees
   the Prometheus host (also avoids mixed-content blocking on HTTPS pages).
 - **Fully offline** — the only external library (Apache-2.0 licensed ECharts
@@ -210,7 +263,7 @@ prefix); add auth at the proxy if exposed to the internet.
 
 ## NixOS
 
-`package.nix` builds the dashboard (`src/static/` + `src/server.py` wrapped
+`package.nix` builds the dashboard (`static/` + `bin/dashboard.py` wrapped
 with a `dashboard` launcher); `module.nix` adds a `services.dashboard`
 option. A flake at the repo root exposes `packages.default`, an overlay and
 `nixosModules.default` — `nix run .` runs the dashboard locally:
@@ -240,8 +293,16 @@ Options: `enable`, `package`, `host` (127.0.0.1), `port` (8080),
 `--battery` to the server; add the battery selectors to `settings.metrics`),
 `settings` (SOLAR_CONFIG
 attrset, rendered to the served `config.js`), `configFile` (use an explicit
-config.js instead of `settings`), `openFirewall`. The service runs with a
-dynamic user and systemd hardening; put a reverse proxy in front for LAN/HTTPS.
+config.js instead of `settings`), `openFirewall`, the connection caps
+(`maxClients`, `clientTimeout`, `maxConnPerIp`), `logAccess`, the audit
+trail (`auditLog` — default `-`, journald; `auditMaxMb`, `auditFiles`) and
+the control surface (`controlPort` — a TCP port or a unix socket path; the
+service's PrivateTmp makes /tmp private, so put the socket under
+`/run/dashboard/`, which the module creates for you; `controlTokenFile` —
+mounted via systemd LoadCredential, the hardened way; `controlToken` —
+inline, store-rendered, discouraged; `controlTrustUids`). The service runs
+with a dynamic user and systemd hardening (`systemctl reload` re-reads the
+config); put a reverse proxy in front for LAN/HTTPS.
 
 ## Metrics source
 
@@ -273,7 +334,7 @@ The dashboard code (server, page, Nix packaging) is licensed under the
 **BSD 3-Clause License** — see the `LICENSE` file. The `scrape/` and `cache/`
 subprojects are also licensed under the **BSD 3-Clause License**.
 
-The bundled chart library `src/static/vendor/echarts.min.js` is
+The bundled chart library `static/vendor/echarts.min.js` is
 [Apache ECharts](https://echarts.apache.org/) 5.5.1, licensed under the
 **Apache License 2.0** (© the Apache Software Foundation); the license notice
 is preserved in the vendored file.

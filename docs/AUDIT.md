@@ -1,4 +1,4 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scrape, /scripts (rev. 6)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scrape, /scripts (rev. 8)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
@@ -90,9 +90,9 @@ and the **dashboard's HTTP surface** (the static page + the Prometheus
 proxy: GET-only, the connection caps, the traversal-guarded static tree —
 served **without authentication**, raised as **F21**). The walk also found
 **F20**: the ctl/cli help and the READMEs promised the token-file env
-vars (`MODBUS_CACHE_CONTROL_TOKEN_FILE`, `SCRAPER_CONTROL_TOKEN_FILE`,
-`FAKE_CONTROL_TOKEN_FILE`/`FAKE_METRICS_TOKEN_FILE`,
-`DASHBOARD_CONTROL_TOKEN_FILE`) and the clients never read them — a
+vars (`MCH_CONTROL_TOKEN_FILE`, `SCR_CONTROL_TOKEN_FILE`,
+`INV_CONTROL_TOKEN_FILE`/`INV_METRICS_TOKEN_FILE`,
+`DSH_CONTROL_TOKEN_FILE`) and the clients never read them — a
 documented control that does not exist; closed in the same wave (one
 resolution shape family-wide). The release gate's suite list had drifted
 from the repo's suite set (the full gate ran eight of the ten suites —
@@ -115,12 +115,78 @@ weighted accordingly. Findings keep their numbers across revisions; the
 ones closed stay listed in §3.1 with their fix and verification, open
 ones in §3.2 (next number: F22).
 
+**Rev. 7 raises and closes F22: the control plane had no role
+separation.** One token meant one capability — a token holder could steer
+everything (`set`, the dumps, `restart`, `shutdown`) or only watch,
+nothing in between; the ops shift (NOC-style monitoring, the "is it
+polled?" checks) had to hold the full-power key. The wave that closes it
+gives every control server a second, **read-only ops token**
+(`--control-ops-token`/`--control-ops-token-file`, ini + env twins per
+tool): sessions authenticating with it may run the **show/clear verbs
+only** — no `set`/`unset`, no `request dump`/`restore`/`reload`, no
+`poll now`, no `restart`, no `shutdown` — the ops shift versus the admin
+key. The gate lives once, in `common/wiresec.py` (`ROLE_ADMIN`/`ROLE_OPS`,
+`role_allows` — the command's head verb against the ops verb set plus the
+session housekeeping verbs `help`/`?`/`ping`/`quit`); the four control
+servers call it after the wire-integrity checks. Both keys are audited:
+the COMMAND audit entries carry `role=ops`/`role=admin` (the denied ops
+attempts are in the trail as `-> err`), and each session's frames are
+mac'd with the key it authenticated with — an ops client verifies its own
+replies against the ops token. The peer-cred trusted peers hold the admin
+role. Misconfiguration fails fast: an ops token without the admin token,
+or equal to it, refuses to start. Scope of the re-read: the shared role
+core, the four control servers' `framed`/`handle` paths, the four config
+resolutions (the F12 0600 gate rides the ops token-file too), the eight
+clients (unchanged — the role is the server's decision; their help/env
+claims stay true), the NixOS modules (`controlOpsToken`/`controlOpsTokenFile`
++ the LoadCredential mounts) and the ops coverage in the control suites.
+No new findings besides F22; the open set is F1/F14/F15/F16/F17/F21.
+
 Scope: the whole tree, directory by directory — `/cache`, `/common`,
 `/dashboard`, `/docker`, `/inverter`, `/profiles`, `/scrape` and
 `/scripts` (the inventory in §1). `/tests` is the verification evidence,
 not a runtime asset. Findings keep their numbers
 across revisions; the ones closed stay listed in §3.1 with their fix and
-verification, open ones in §3.2 (next number: F22).
+verification, open ones in §3.2 (next number: F24).
+
+**Rev. 8 re-walks the config/RBAC/metrics wave — no new findings.** Three
+surfaces changed and were re-read:
+
+- **the configuration format (breaking)** — the ini is gone: the config
+  files are set-grammar scripts (`common/options.py`: every line a
+  `set <name> <value>`, `#` comments stay comments). Re-read: the loaders
+  fail fast (a legacy ini line names the new form, a duplicated key is
+  fatal — never partial state), the token resolution keeps the F12 0600
+  gate and the env layer (flag > env > config script > default), the
+  bundled samples and the NixOS renderers produce registry-named lines
+  (dash names — a legacy underscore key answers the ini error), and the
+  secrets never render into `show config` (the inline tokens are hidden;
+  the token-file paths are).
+- **the RBAC policy is a table** — `ROLE_POLICIES` in
+  `common/wiresec.py`: admin = every verb, ops = the configured verb set
+  (`--control-ops-verbs`, ini + env twins). Re-read: the verb list is
+  validated against the tool's grammar at startup (empty/unknown refuses
+  to start — the fail-fast posture), the gate runs after the mac checks
+  (a denied frame is still authenticated, integrity-verified and audited
+  with `role=`), the session verbs stay open to every role, and an
+  unknown role fails closed. `role=None` (no token configured — the
+  filesystem/peer-cred boundary) keeps the pre-existing full-access
+  posture, unchanged from rev. 2's analysis.
+- **the dashboard's own /metrics endpoint** (the mirror wave's last
+  leg) — `--metrics-server` off by default and **a bearer token is
+  mandatory when on** (the F6 posture the cache's endpoint set: the
+  start-up refuses without one, the live `set metrics-server on` raises
+  the same demand), the constant-time bearer compare, the family gate
+  capping the surface, the bind default loopback, and the gauges are the
+  self-observability (uptime, request counters, the gate) — not the PV
+  values the F21 auth story guards.
+
+The scraper's metrics rework (the sectioned spec, `--metric-prefix`, the
+`scraper_*` renames) and the shipped FC4 profile carry no security
+surface beyond what rev. 7 walked; the regtest/fuzz suites cover them.
+All ten suites pass on the revised tree; `scripts/check_options.py` (the
+one-knob-one-source gate) passes; the man pages regenerate
+(`mandoc -Tlint` clean).
 
 ## 1. Assets and trust boundaries
 
@@ -147,7 +213,7 @@ but hold no runtime trust of their own.
 | HTTP surface | the `/metrics` endpoint: `--metrics-server` (live-settable), off; binds `--metrics-listen` (default `127.0.0.1:9252`; `0.0.0.0` allowed, **the token is mandatory regardless**) | the exporter itself: `--listen`, default `127.0.0.1:9350` — two GET routes (`/`, `/metrics`), everything else a 404, `Cache-Control: no-store` | the `/metrics` endpoint: `--metrics-server`, off; binds `--metrics-listen` (default `127.0.0.1:9452`) | the page + the Prometheus proxy: `--bind`, default **`0.0.0.0`:8080** — GET-only, the static tree realpath-guarded (403 on escape), the proxy under `--prom-prefix` | bearer token (`hmac.compare_digest`): mandatory on the cache, mandatory beyond loopback on the scraper (F13's refusal), optional on the fake (test tool — a non-loopback bind without one logs a warning); **none on the dashboard (F21)** |
 | control server (JSON lines) | unix socket `/tmp/modbus-cache-<port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket `/tmp/modbus-scraper-<listen-port>.socket`, `chmod 0600` after bind; `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1 (exempt from the refusal — the F11 test-tool posture) | unix socket `/tmp/dashboard-<port>.socket`, `chmod 0600` after bind; `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | token on TCP (`hmac.compare_digest`), refused without; on unix a kernel-vouched peer (peer-cred: root, the daemon's own user, `--control-trust-uids`) skips the handshake; the signed wire (the full HMAC per frame) wherever a token is held |
 | state dump | `--dump-path`: the live setting overrides and — with `--dump-with-cache`/`request dump with-cache` — the cached words (+ stamps), as one atomic JSON — see F18 | n/a | n/a | n/a | **created `0600` explicitly** (never the umask) + a sha256 integrity hash checked at restore (F18) |
-| token files | `--control-token-file` / `--metrics-token-file` | `--auth-token-file` / `--control-token-file` | `--control-token-file` / `--metrics-token-file` | `--control-token-file` | **owner-only (0600) enforced** — a group/world-accessible token file refuses to start (F12); the env forms (`MODBUS_CACHE_CONTROL_TOKEN_FILE`, `SCRAPER_CONTROL_TOKEN_FILE`, `FAKE_CONTROL_TOKEN_FILE`/`FAKE_METRICS_TOKEN_FILE`, `DASHBOARD_CONTROL_TOKEN_FILE`) are honored by the daemons and the ctl/cli clients alike (F20 closed) |
+| token files | `--control-token-file` / `--metrics-token-file` | `--auth-token-file` / `--control-token-file` | `--control-token-file` / `--metrics-token-file` | `--control-token-file` | **owner-only (0600) enforced** — a group/world-accessible token file refuses to start (F12); the env forms (`MCH_CONTROL_TOKEN_FILE`, `SCR_CONTROL_TOKEN_FILE`, `INV_CONTROL_TOKEN_FILE`/`INV_METRICS_TOKEN_FILE`, `DSH_CONTROL_TOKEN_FILE`) are honored by the daemons and the ctl/cli clients alike (F20 closed) |
 | upstream connection | outbound to the inverter/SDongle | outbound poll to the inverter/SDongle (or the cache), every 10 s by default | n/a (it *is* the device) | outbound HTTP to the Prometheus (`--upstream`, default `http://localhost:9090`) | none (protocol-inherent); the Prometheus hop is plain HTTP too |
 | audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded (the shared `common/audit.py`) | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | local file perms + the per-writer hash chain, verified by `scripts/audit_verify.py` (F10) |
 | compose demo stack | the four services (`fake-inverter`, `modbus-cache`, `modbus-scraper`, `prometheus`) on one `internal: true` network (`pv-modbus`), **nothing published on the host**, no outbound route; one shared `config` volume (prometheus: read-only) with the generated 0600 `metrics.token` (F7) | | | | the internal network is the boundary; the exporter bearer-gated in the demo |
@@ -164,7 +230,8 @@ su-exec to the unprivileged `prometheus` user).
 The scraper is the read-only consumer in the family: it polls the device (or
 the cache) and exposes Prometheus metrics — no write path, no
 state-changing verbs; its attack surface is one HTTP GET route set, the
-JSON-lines control server (the family auth: rev. 6) and one outbound
+JSON-lines control server (the family auth: rev. 7, the read-only ops
+role included) and one outbound
 Modbus client (FC3/FC4 reads only). The control verbs change the scraper's
 own polling/log settings, not the device; the `set` vocabulary stops at
 the exporter. The cache's write
@@ -185,18 +252,24 @@ control-server access only.
   `any`/`none`/an explicit list, `proxy.py:287,366-395`); control
   TCP requires the token before any command and a token-less TCP control
   refuses to start (F5) on every tool that serves one — the cache
-  (`cache/bin/modbus_cache.py:243-247`, `cache/lib/control.py:141-148`,
+  (`cache/bin/modbus-cache.py:243-247`, `cache/lib/control.py:141-148`,
   constant-time `hmac.compare_digest` at `:146`), the scraper
   (`scrape/lib/config.py`, asserted by the regtest) and the dashboard
   (`dashboard/lib/config.py:150`) — the fake stays exempt on purpose
   (F11's test-tool posture); on the unix sockets the peer-cred path
-  authenticates the kernel-vouched peers without the secret
-  (`cache/lib/control.py:110-126` and the family mirrors,
-  `common/cred.py`) and everyone else still needs the token; wherever a
-  token is held the wire is signed both directions (`common/wiresec.py` —
-  the full payload HMAC per frame, mandatory over TCP, verify-if-present
-  on unix); the cache's metrics endpoint is token-mandatory when enabled
-  (`cache/bin/modbus_cache.py:252-256`, the gate at
+   authenticates the kernel-vouched peers without the secret
+   (`cache/lib/control.py:110-126` and the family mirrors,
+   `common/cred.py`) and everyone else still needs the token; wherever a
+   token is held the wire is signed both directions (`common/wiresec.py` —
+   the full payload HMAC per frame, mandatory over TCP, verify-if-present
+   on unix); **the control plane carries a least-privilege role**
+   (rev. 7, F22): a second, read-only ops token scopes its sessions to
+   the show/clear verbs (the gate lives in `common/wiresec.py`'s
+   `role_allows`, the audit COMMAND entries name `role=ops`/`role=admin`,
+   the denied attempts in the trail), each session's frames mac'd with
+   the key it authenticated with; the cache's metrics endpoint is
+   token-mandatory when enabled
+  (`cache/bin/modbus-cache.py:252-256`, the gate at
   `cache/lib/metrics.py:161-175`); all non-Modbus listeners bind 127.0.0.1
   hard-coded — the dashboard is the documented exception (F21).
 - **Input validation (DORA art. 9)** — MBAP length capped (`2 <= length <=
@@ -261,7 +334,7 @@ control-server access only.
   `/metrics`), everything else a 404; responses carry
   `Cache-Control: no-store`; `--auth-token-file` (LoadCredential-style,
   SIGHUP-rereadable, mode-enforced) is preferred over `--auth-token` and
-  giving both is an error (`scrape/bin/modbus_scraper.py:89`);
+  giving both is an error (`scrape/bin/modbus-scraper.py:89`);
   `--max-clients` (default 64) sheds excess HTTP clients with an immediate
   503 (`lib/server.py:119`) and `--client-timeout` kicks idle keep-alive
   connections — the fixed-rate poll loop (10 s by default) means request
@@ -287,18 +360,18 @@ control-server access only.
 
 ## 3. Findings
 
-### 3.1 Closed (F2–F10, F11–F13, F18–F20; fixes verified, see §4)
+### 3.1 Closed (F2–F10, F11–F13, F18–F20, F22; fixes verified, see §4)
 
-Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed in rev. 4: F11, F13, F10, F18. Closed in rev. 6: F20.
+Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed in rev. 4: F11, F13, F10, F18. Closed in rev. 6: F20. Closed in rev. 7: F22.
 
 | # | Module | Was | Fix (where) |
 |---|---|---|---|
 | F2 | cache, inverter | MEDIUM — **audit-trail injection** (rev. 2): a control command embedding newlines (JSON `\u000a`) wrote a second, fully attacker-crafted physical trail line (a forged `AUDIT CACHE WRITE …` with an attacker-chosen stamp), undermining the integrity of the very artifact DORA art. 11 detection relies on. | The writer folds control characters in every detail line — one shared site covers the COMMAND echoes and any future writer (`common/audit.py event()`). Verified: the forged text stays inside the one wrapped COMMAND line (§4). |
 | F3 | cache | LOW — **register allow-list failed open on unparseable writes** (rev. 2): a write frame too short to carry the address yielded `_write_target → None`, `_write_allowed(None) → True`, and after the first two gates the frame was forwarded upstream verbatim. | Fail closed: an unparseable write frame is refused with ILLEGAL_VALUE and audited as `WRITE-REFUSED` (`proxy.py:366-372`). Verified: FC6 with no address → `0x86/0x03`. |
 | F4 | cache, inverter | LOW — **uncapped pre-auth control line buffer** (rev. 2): a client streaming bytes without a newline grew `buf` until the 300 s idle timeout — an unauthenticated local memory amplification on the unix socket. | Both control servers drop the connection past the 1 MB `MAX_LINE` (`cache/lib/control.py:33,191-193`, `inverter/lib/control.py:33,162-164`). Verified: a 1.1 MB newline-less stream is dropped. |
-| F5 | cache, inverter | LOW — **token-less TCP control was fully unauthenticated** (rev. 2): `--control-port N` without a token left every control verb (including `set allow-write on` and `shutdown`) open to any local process able to reach 127.0.0.1; no rate limit on auth attempts either (AUTH-FAIL is audited, the compare is constant-time). | The cache refuses to start a TCP control port without a token — the unix socket needs none (`cache/bin/modbus_cache.py:243-247`); the inverter stays exempt (a test tool, F11). Verified: startup refusal, one line, rc 2. |
-| F6 | cache | LOW — the cache's metrics endpoint, when enabled without `--metrics-token`, exposed register values, addresses and poll state to anyone who could reach it; no connect timeout on the handler (slowloris could pin threads). Closed rev. 2. | The token is mandatory when the port is set — the proxy refuses to start otherwise (`cache/bin/modbus_cache.py:254-257`); the handler socket times out after 5 s (`cache/lib/metrics.py:156`). Verified: startup refusal; the 401/200 flows unchanged. |
-| F7 | docker (all services) | LOW — the compose stack published every listener on all host interfaces: the fake's Modbus (`5502`), the cache's Modbus (`15502`) **and the scraper's unauthenticated-by-default `/metrics` (`9350`)** — in the demo stack F13's exposure was materialized by default. Closed rev. 3, in two steps. | **Nothing is published.** Step one: every `ports:` entry dropped; the services wire onto one `internal: true` network (`pv-modbus`, explicitly named so collectors can attach — no host ports, no outbound route); every surface (Modbus, control, metrics, the Prometheus UI) is reachable only from inside the network — `docker compose exec`, or a collector container attached by name; the `docker run` examples bind to `127.0.0.1` only. Step two: the demo **Prometheus service with the scrape/token story** (`Dockerfile.prometheus`, `entrypoint-prometheus.sh`, `prometheus.yml`) — the exporter serves with a bearer token in the demo now (`SCRAPER_AUTH_TOKEN_FILE=/config/metrics.token`; the entrypoint materializes bundled `*.token` defaults as random 0600 values owned by pvsuite — the bundled placeholder is never copied) and Prometheus scrapes `modbus-scraper:9350` with `authorization.credentials_file`, reading its own 0600 copy of the same token. Verified: the resolved config carries zero published ports, the internal network and the token env (§4). |
+| F5 | cache, inverter | LOW — **token-less TCP control was fully unauthenticated** (rev. 2): `--control-port N` without a token left every control verb (including `set allow-write on` and `shutdown`) open to any local process able to reach 127.0.0.1; no rate limit on auth attempts either (AUTH-FAIL is audited, the compare is constant-time). | The cache refuses to start a TCP control port without a token — the unix socket needs none (`cache/bin/modbus-cache.py:243-247`); the inverter stays exempt (a test tool, F11). Verified: startup refusal, one line, rc 2. |
+| F6 | cache | LOW — the cache's metrics endpoint, when enabled without `--metrics-token`, exposed register values, addresses and poll state to anyone who could reach it; no connect timeout on the handler (slowloris could pin threads). Closed rev. 2. | The token is mandatory when the port is set — the proxy refuses to start otherwise (`cache/bin/modbus-cache.py:254-257`); the handler socket times out after 5 s (`cache/lib/metrics.py:156`). Verified: startup refusal; the 401/200 flows unchanged. |
+| F7 | docker (all services) | LOW — the compose stack published every listener on all host interfaces: the fake's Modbus (`5502`), the cache's Modbus (`15502`) **and the scraper's unauthenticated-by-default `/metrics` (`9350`)** — in the demo stack F13's exposure was materialized by default. Closed rev. 3, in two steps. | **Nothing is published.** Step one: every `ports:` entry dropped; the services wire onto one `internal: true` network (`pv-modbus`, explicitly named so collectors can attach — no host ports, no outbound route); every surface (Modbus, control, metrics, the Prometheus UI) is reachable only from inside the network — `docker compose exec`, or a collector container attached by name; the `docker run` examples bind to `127.0.0.1` only. Step two: the demo **Prometheus service with the scrape/token story** (`Dockerfile.prometheus`, `entrypoint-prometheus.sh`, `prometheus.yml`) — the exporter serves with a bearer token in the demo now (`SCR_AUTH_TOKEN_FILE=/config/metrics.token`; the entrypoint materializes bundled `*.token` defaults as random 0600 values owned by pvsuite — the bundled placeholder is never copied) and Prometheus scrapes `modbus-scraper:9350` with `authorization.credentials_file`, reading its own 0600 copy of the same token. Verified: the resolved config carries zero published ports, the internal network and the token env (§4). |
 | F8 | cache, inverter | LOW — the unix control socket's file mode was never set explicitly (rev. 2): `bind()` created it with the umask-derived mode, and a permissive umask (002/000) made it group/world-connectable, i.e. control access without a token. | Both control servers `chmod 0600` immediately after `bind()`; the cache takes `--control-socket-group` for `0660` — an opt-in, documented delegation to a local group (`cache/lib/control.py:78-86`, `inverter/lib/control.py:71-79`). Verified: the modes are observed `0600`/`0660` on the live sockets. |
 | F9 | cache, inverter, scrape | INFO — tokens passed as `--control-token` / `--metrics-token` / `--auth-token` flags are visible in `ps` / `/proc/*/cmdline` to other local users. The token-file / env-var paths existed; nothing said the flag was the weak way. Closed rev. 3. | Documented in all three READMEs and the token-flag man pages: the flag form is for quick tests, prefer `--control-token-file` / `--metrics-token-file` / `--auth-token-file` (LoadCredential) or the env vars — and every `-file` help says the file must be owner-only 0600. The file path got hard in the same wave (F12). Verified: the README/man wording, `mandoc -Tlint` clean (§4). |
 | F12 | cache, inverter, scrape | INFO — token files were not permission-checked: the shared `load_token_file` (`common/config.py`) accepted a group/world-readable token file silently. Closed rev. 3. (The `/tmp` control-socket half of the original finding stays covered by the Nix module's `PrivateTmp`; use `/run/<tool>/` under systemd.) | Fail closed: `check_token_file_mode` (`common/config.py`) stats the path before the read — any group/world bit (`0600` is the documented form) refuses to start with a one-liner (`chmod 0600`), on the daemons and the ctl/cli clients alike; the scraper's SIGHUP-reread loader runs the same check on every reload. The docker entrypoint seeds generated `*.token` files 0600. Verified: 0644/0640 refused, 0600 accepted, the regtests assert the refusal (§4). |
@@ -307,7 +380,8 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
 | F10 | cache, scrape, inverter | INFO — the audit trail was append-only but not integrity-protected (no hash chain): a local administrator could rewrite it unnoticed. Closed rev. 4 with the honest boundary: the trail is now tamper-EVIDENT (any edited, reordered or deleted middle entry breaks the chain at verification); a determined local admin holding the algorithm can rechain, and trailing deletion leaves nothing to verify — journald forwarding stays the strong answer for the retention/immutability requirement. | **A chained hash per entry**: every line carries a short hash right after the event name — `<stamp> AUDIT <PREFIX> <EVENT> <12 hex> [detail]`, `sha256(prev | stamp | prefix | event + detail)` truncated, chained **per writer prefix** (CACHE / INV / CLI / CTL each chain their own lines, so interleaved writers in one file verify independently and a restarted writer seeds from its own tail, `common/audit.py`). **The verifier**: `scripts/audit_verify.py [FILE|-]...` (default: the family's XDG trails) walks a file and its rotated backups oldest-first, recomputes every chain, anchors at each prefix's first surviving entry, reports unsigned (pre-chain) lines and names the line where a chain breaks; exit 1 on any break. Documented: the trail's README sections + `common/audit.py`'s docstring. Verified: the new `tests/audit-chain.py` (§4). |
 | F18 | cache | LOW — **the state dump was config-equivalent trust at rest, with an umask-derived mode**: `--dump-path`'s JSON carries the cached register values (production data) *and* the live setting overrides, and a restore re-applies any registered setting through the live validation — `allow-write` included. Whoever could write the dump file effectively held config trust; whoever could read it saw the values. Closed rev. 4. | **Fail closed, the F8/F12 pattern**: the dump is created **`0600` explicitly** (`os.open` + `fchmod` on the tmp before `os.replace` — never the umask, `cache/lib/persist.py`), and every dump carries a **sha256 integrity hash** of its canonical content — a restore recomputes it (`hmac.compare_digest`) and refuses an edited/truncated/foreign dump (`fails its integrity hash — nothing restored`) and an unsigned pre-hash dump (`dump again`); a **group/world-writable dump refuses outright** (`the dump holds config trust, chmod 0600`) — shrink the writer set to the owner. The exposure itself shrank too: by default the dump now carries **settings only** — the words ride along only on `request dump with-cache` or `--dump-with-cache` (the words are production data; keep them out unless the write-behind/restart story needs them). Documented as config-trust: own the dump like the ini; the hash catches corruption and casual tampering, not a local admin who rechashes (the F10 boundary). Verified: the mode/hash/tamper/unsigned/writable-refusal checks in `tests/cache-regtest.py` (§4). |
 | F19 | scripts | LOW — **the release landed before the CI gate reported** (found rev. 4): `scripts/release.py` cut the GitHub release locally right after the tag push — the tag-triggered workflow's test+build jobs start only after the tag exists, so an unverified release could be published and a failing CI could not un-cut it; the local verification defaulted to `--tests quick` (two of the nine suites) and the annotated tag was unsigned. Closed rev. 5 as recommended. | **The defaults flipped**: the GitHub release is the **workflow's** job — `.github/workflows/release.yml`'s `release` job gates on `needs: [test, build]` (the suites + the four-package nix build) and cuts the GH release from the changelog section only after both report; the local cut is the explicit opt-in (`--release`, help + flight print name the bypass). **The local gate defaults to `--tests full`** (all ten suites as of rev. 6; `--tests quick` stays for a re-cut). **The tag is signed** (`git tag -s`) whenever a signing key exists — the unsigned annotated tag is the fallback and the flight prints why. Verified: the dry-run plan and the flight matrix in a scratch repo (§4). |
-| F20 | cache, scrape, inverter, dashboard (the ctl/cli clients) | LOW — **the help promised a control the code did not have** (found rev. 6, re-checking the docs against the code): every ctl/cli `--control-token-file` help — and the man pages rendered from it — promised the env form (`MODBUS_CACHE_CONTROL_TOKEN_FILE`, `SCRAPER_CONTROL_TOKEN_FILE`, `FAKE_CONTROL_TOKEN_FILE`, `DASHBOARD_CONTROL_TOKEN_FILE`), and none of the eight clients read it; a script following the documented hardened path ran token-less and failed the handshake. The daemons were unaffected (their config resolution reads the env). Closed rev. 6, in the same wave. | One resolution shape family-wide, in every ctl/cli: `token_file = flag or env`, `token = flag or env`, both together the mutual-exclusion error, the file over the plain token, then the shared `load_token_file` (the F12 0600 gate applies to the env path too). The fake's daemon got the env form of `--control-token-file` / `--metrics-token-file` the same way (the other daemons resolved the env from the start). Documented: the READMEs' env lists and flag tables are true again; the closed TODO item (the token-file env honored) records the wave. Verified: the new env checks in all four affected suites + the live `fake_cli` / `dashboard_cli` smokes (§4, rev. 6). |
+| F20 | cache, scrape, inverter, dashboard (the ctl/cli clients) | LOW — **the help promised a control the code did not have** (found rev. 6, re-checking the docs against the code): every ctl/cli `--control-token-file` help — and the man pages rendered from it — promised the env form (`MCH_CONTROL_TOKEN_FILE`, `SCR_CONTROL_TOKEN_FILE`, `INV_CONTROL_TOKEN_FILE`, `DSH_CONTROL_TOKEN_FILE`), and none of the eight clients read it; a script following the documented hardened path ran token-less and failed the handshake. The daemons were unaffected (their config resolution reads the env). Closed rev. 6, in the same wave. | One resolution shape family-wide, in every ctl/cli: `token_file = flag or env`, `token = flag or env`, both together the mutual-exclusion error, the file over the plain token, then the shared `load_token_file` (the F12 0600 gate applies to the env path too). The fake's daemon got the env form of `--control-token-file` / `--metrics-token-file` the same way (the other daemons resolved the env from the start). Documented: the READMEs' env lists and flag tables are true again; the closed TODO item (the token-file env honored) records the wave. Verified: the new env checks in all four affected suites + the live `fake_cli` / `dashboard_cli` smokes (§4, rev. 6). |
+| F22 | cache, scrape, inverter, dashboard (the control servers) + common | LOW — **the control plane had no role separation** (found rev. 7, re-walking the auth story): one token meant one capability — a token holder could steer everything (`set`, the dumps, `restart`, `shutdown`) or only watch; there was nothing in between, so the ops shift (monitoring, freshness checks) had to hold the full-power key, and the audit trail could not tell a looker from a steerer. Closed rev. 7, in the same wave. | A second, read-only token per control server (`--control-ops-token`/`--control-ops-token-file`, ini + env twins): its sessions run the show/clear verbs only. The gate lives once — `common/wiresec.py`'s roles (`ROLE_ADMIN`/`ROLE_OPS`, `role_allows` on the command's head verb, the session verbs `help`/`?`/`ping`/`quit` open to every role) — and runs after the wire-integrity checks, so a denied frame is still an authenticated, mac-verified frame. Both audited: the COMMAND entries carry `role=ops`/`role=admin` with the denials included, and each session's frames are mac'd with the key it authenticated with (an ops client verifies its own replies against the ops token). Fail-fast configs: the ops token without the admin token, or equal to it, refuses to start; the F12 0600 gate covers the ops token-file. The clients are unchanged (the role is the server's decision — their env claims stay true). Verified: the ops matrices in `tests/control-fuzz.py`, `tests/cache-control-fuzz.py` (`clear cache` honored, steering denied), `tests/dashboard-control-fuzz.py` and `tests/scrape-regtest.py` §6c, plus the role-carrying trail lines (§4, rev. 7). |
 
 ### 3.2 Open findings
 
@@ -353,7 +427,7 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   (the file review + a YAML parse; no docker host in the audit sandbox):
   the compose file carries no `ports:` on any service; all services attach
   to one `internal: true` network (`pv-modbus`); the scraper service sets
-  `SCRAPER_AUTH_TOKEN_FILE=/config/metrics.token`; the entrypoint
+  `SCR_AUTH_TOKEN_FILE=/config/metrics.token`; the entrypoint
   materializes bundled `*.token` defaults as random 0600 pvsuite-owned
   values (the pipeline verified: 24 urandom bytes → 48 hex chars) and the
   Prometheus entrypoint copies the token 0600 for the unprivileged
@@ -480,15 +554,15 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
 
 - **F20 (the promised env → honored)** — new checks in all four affected
   suites: `tests/cache-regtest.py` (cache_ctl honors
-  `MODBUS_CACHE_CONTROL_TOKEN_FILE` against the token-file proxy; the
+  `MCH_CONTROL_TOKEN_FILE` against the token-file proxy; the
   token env + the token-file env is the clean mutual-exclusion error),
   `tests/scrape-regtest.py` (scraper_ctl and scraper_cli honor
-  `SCRAPER_CONTROL_TOKEN_FILE` against the token'd TCP control; the env
+  `SCR_CONTROL_TOKEN_FILE` against the token'd TCP control; the env
   conflict), `tests/control-fuzz.py` §6c (fake_ctl honors
-  `FAKE_CONTROL_TOKEN_FILE` against the token-file fake; the fake's
-  dry-run honors `FAKE_METRICS_TOKEN_FILE`; the env/env and flag/env
+  `INV_CONTROL_TOKEN_FILE` against the token-file fake; the fake's
+  dry-run honors `INV_METRICS_TOKEN_FILE`; the env/env and flag/env
   conflicts), `tests/dashboard-control-fuzz.py` §6b (dashboard_ctl honors
-  `DASHBOARD_CONTROL_TOKEN_FILE`; the env conflict). Plus the live
+  `DSH_CONTROL_TOKEN_FILE`; the env conflict). Plus the live
   smokes: a real `fake_cli` and a `dashboard_cli` session authenticating
   and signing the wire with only the env file set.
 - **The dashboard re-audit** — `dashboard/bin/dashboard.py`,
@@ -517,6 +591,34 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   (`mandoc -Tlint` clean) — on the way a help slip in the dashboard's
   `--audit-log` (it said SCR; the trail is DSH) is fixed.
 
+### Rev. 7 (this revision)
+
+- **F22 (the role separation) closed with the wave it was raised in** —
+  the read was: `common/wiresec.py` (the role core: `command_verb` splits
+  the head verb, `role_allows` gates ops to the show/clear verbs plus
+  `help`/`?`/`ping`/`quit`, `role_tag` renders the audit fragment), then
+  the four control servers' `framed`/`handle` paths (the auth handshake
+  resolves the token to a role, `session_key` picks the mac key per role,
+  the gate runs after the integrity checks, the COMMAND entries carry
+  `role=`), then the four config resolutions (the ops token twins of the
+  admin token's guards: the mutual exclusion, the F12 0600 mode gate, the
+  fail-fast ops-without-admin and ops==admin refusals).
+- **The gate sits after the mac checks** — a deliberate order: a denied
+  ops frame is still authenticated and integrity-verified first, so the
+  trail distinguishes "bad wire" from "forbidden role".
+- **The clients stay untouched** — the role is the server's decision; an
+  ops operator passes the ops token to the same ctl/cli flags/envs (the
+  F20 env claims stay true — no new client-side env was promised beyond
+  the daemons').
+- **Ops coverage in the suites**: `tests/control-fuzz.py` §6d (the fake:
+  show ok, `set`/`reset`/`shutdown` forbidden, the ops-keyed macs
+  verified, fake_ctl reading but not steering, the audit's role= lines),
+  `tests/cache-control-fuzz.py` §6d (`clear cache` honored — the
+  read-only shift may flush — steering denied, the config refusals),
+  `tests/dashboard-control-fuzz.py` §6c, `tests/scrape-regtest.py` §6c
+  (poll now/restart/shutdown forbidden). All four print ALL PASS on the
+  revised tree; the man pages regenerated (`mandoc -Tlint` clean).
+
 ## 5. NIS2 / DORA mapping (all modules; cache is the production-relevant one)
 
 | Requirement | Status | Where |
@@ -527,7 +629,7 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
 | NIS2 21.2(d) supply chain | yes | stdlib-only, no third-party code, pinned Nix builds; the demo Prometheus from the pinned alpine package; the shared `common/` core |
 | NIS2 21.2(f) effectiveness | partial | fuzz/stress/regression suites (self-contained); no CI enforcement yet |
 | NIS2 21.2(g) cyber hygiene / crypto | partial | constant-time token compares, LoadCredential, owner-only token files enforced, no secrets in logs; no TLS (F1 — protocol-inherent, F14 — proxy) |
-| NIS2 21.2(h) access control / MFA | yes (scoped) | the four write gates (two defaulting to none), ACLs with a restrict-all mode, token-mandatory control/metrics, the refusal of a non-loopback metrics listen without a token (F13), the token'd TCP control refusing to start without a token on all four control servers (the fake exempt — F11), per-IP + total connection caps on every serving surface, peer-cred on the unix sockets, the signed wire wherever a token is held; MFA not applicable to a machine protocol |
+| NIS2 21.2(h) access control / MFA | yes (scoped) | the four write gates (two defaulting to none), ACLs with a restrict-all mode, token-mandatory control/metrics, the refusal of a non-loopback metrics listen without a token (F13), the token'd TCP control refusing to start without a token on all four control servers (the fake exempt — F11), per-IP + total connection caps on every serving surface, peer-cred on the unix sockets, the signed wire wherever a token is held, the read-only ops role on the control plane (least privilege: the show/clear verbs versus the admin key, F22); MFA not applicable to a machine protocol |
 | DORA art. 8 ICT asset identification | yes | every option logged at start; `inspect` dumps the full state; the demo topology is documented (docker/README.md) |
 | DORA art. 9-10 protection/prevention | yes | write gates, ACLs, capped framing, capped buffers, fail-closed writes, token-mandatory surfaces, the non-loopback refusal (F13), the per-IP + total connection caps, explicit socket + token-file modes, fail-fast validation; the dashboard's GET-only route set with the traversal guard (the auth gap aside — F21) |
 | DORA art. 11 detection | yes (integrity restored, now evidenced); wiring pending | the audit trail's integrity is defensible again (F2 closed, fold at the writer) and evident per entry (the hash chain, F10 closed); auth-fail/refusal events; the alert rules pack is the remaining gap (F16) |
@@ -618,8 +720,12 @@ family-wide in the same wave) and **F21** MEDIUM (the dashboard's HTTP
 surface serves page and proxy without authentication on the `0.0.0.0`
 default bind — the caps and the closed route set shape traffic, the
 bearer gate mirroring the scraper's is the recommendation), and the
-release gate's suite list was corrected to all ten suites. The remaining
-open set is otherwise the documented trust decisions and the
+release gate's suite list was corrected to all ten suites. Rev. 7 gave the
+control plane its least-privilege shape: **F22** LOW (one token, one
+capability — no role separation) raised and closed in the same wave — a
+second, read-only ops token per control server, its sessions scoped to
+the show/clear verbs, both keys audited with the denials in the trail.
+The remaining open set is otherwise the documented trust decisions and the
 deployment stories: the state-dump trust is owned now (F18 closed) — the
 dump file deserves the ini's care (the hash catches tampering, not a
 local admin who rechashes). The inverter fake remains a test instrument

@@ -7,15 +7,6 @@ the **Done/history** records for their tool.
 
 ## The next breaking wave (the interface evolution)
 
-- **the config files will change format** `[common]` — the ini format
-  (`[cache]` + `key = value`) is the legacy surface now: it can and will be
-  replaced by the **`set <setting> <value>` grammar** the control servers
-  already speak — one vocabulary from the CLI to the file (a config file
-  becomes a runnable script: every line is a `set`, every comment stays a
-  comment). The tools will read both for a transition window (ini keeps
-  loading, the `set`-format file is the documented form, `show config`
-  writes it), then the ini goes away. Breaking: every rendered ini (the
-  NixOS modules, the docker `/config` volume seeds) follows.
 - **the CLI redone: hierarchical commands, one grammar for the family**
   `[common]` `[cache]` `[inverter]` `[scrape]` — the control vocabulary
   grew organically per tool and it shows: flatten it into namespaces and
@@ -23,22 +14,8 @@ the **Done/history** records for their tool.
   (the surface, then the knob) instead of the flat `set max-conn-per-ip`,
   `set metrics-server off` / `set metrics listen 0.0.0.0:9252` on all
   three control servers, the same verbs everywhere
-  (set/unset/show/request/...), the same reply shapes. Also:
-  **`show config`** — every setting printed in `set` format (one
-  re-enterable block: `show config` pipes straight back into `cache_ctl`
-  /`fake_ctl` after a restart), complementing the scriptable
-  `show settings` key=value listing. Breaking: every script and unit file
-  speaking the old flat grammar follows.
-- **one knob, one source** `[common]` — every option currently lives in
-  four places (`--help`, the ini keys, the NixOS module options, the
-  README tables) and they drift; the settings registry already knows
-  name/default/help — generate the `--help` text, the rendered config and
-  the NixOS option skeletons from it (or at least a CI check that all four
-  agree). The man pages already render from the parser/registry (the
-  `--man` wave); `--help` and the README tables are next.
-- **a read-only control role** `[cache]` — a second token granting only
-  the show/clear verbs (no `set`, no `shutdown`): the ops shift versus the
-  admin key, both audited.
+  (set/unset/show/request/...), the same reply shapes. Breaking: every
+  script and unit file speaking the old flat grammar follows.
 
 ## The security wave (the audit follow-ups)
 
@@ -47,7 +24,7 @@ the **Done/history** records for their tool.
   (F19 closed rev. 5 — the workflow cuts the release after the CI gate,
   see the release-discipline item): F16 (the alert-rules pack — the rules
   item below), F17 (the volume secrets), F14 (TLS — the item below), F15
-  (the privacy note — the item below), F1 (accepted) — see
+  (closed — the README privacy note), F1 (accepted) — see
   [AUDIT.md](AUDIT.md); F2–F10, F11–F13, F18 and F19 are closed and
   verified (§3.1/§4); re-run the audit after the scrape control surface,
   the TLS story or the dashboard service (the dashboard is the next audit
@@ -57,10 +34,6 @@ the **Done/history** records for their tool.
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a
   proxy-less LAN install defensible: the bearer token stops travelling in
   clear text. The Modbus side stays F1 (accepted, protocol-inherent).
-- **the "what /metrics leaks" privacy note** `[scrape]` — a short README
-  section (F15): the endpoint exposes production values (generation,
-  consumption, battery SoC) — a home-occupancy consideration; the token +
-  the localhost bind are the controls.
 - **a connect ACL for the fake's Modbus** `[inverter]` — F11 closed
   without one (a test tool, trusted LAN); an opt-in `--connect-acl`
   mirroring the cache's would let the paranoid demo the ACL story end to
@@ -120,25 +93,10 @@ the **Done/history** records for their tool.
   exception-code spikes, the write-refusal bursts (F16) — the cache
   contributes its side (poll down, age spikes, write refusals); the pages
   write themselves from the audit vocabulary.
-- **the scraper's FC4 awareness** `[scrape]` `[cache]` — the profile
-  schema carries the `fc` field and the cache polls/caches FC4
-  independently; the scraper still reads everything with FC3 — a profile
-  that marks an FC4 entry `scrape` needs the scraper to follow the field.
-  Related gap: no shipped profile exercises `fc: 4` yet (the linter and
-  the cache are ready, the data isn't).
 - **the multi-target scrape** `[scrape]` — one process polling several
   inverters (per-target metrics with a unit/host label) for the
   two-string-roof households; the metrics endpoint and the audit are
   already per-process.
-- **the poll-latency gauges** `[scrape]` — last/max poll cycle duration as
-  Prometheus gauges, so a slow dongle shows up in dashboards before the
-  freshness gap does.
-- **the per-phase chain** `[inverter]` → `[scrape]` → `[dashboard]` — the
-  fake serves per-phase voltages/currents and the unbalanced home already;
-  the scraper exports none of it and the dashboard shows none of it. A
-  `phase` label on the metrics (or three suffixed metrics), then the
-  dashboard's per-phase panels (three-phase health at a glance, the
-  unbalance visible) close the loop.
 - **the priced grid machine** `[inverter]` — a tariff-aware import/export
   model on top of the `grid` setpoint (a price curve → the battery
   greedy/eco strategies).
@@ -225,13 +183,49 @@ the **Done/history** records for their tool.
   SUN2000/SDongle week (poll pacing, the dongle's single-client
   behaviour, real exception codes, the FC4 input registers, reconnect
   storms; the Deye profiles through the cache) is the last mile.
-- **the docs site** `[common]` — the family READMEs are the docs today; a
-  static render (mkdocs or mdBook on GH Pages) with the audit, the TODOs
-  and the per-tool pages would make them navigable. Low priority, but the
-  cross-links are already written.
+- **the docs site** `[common]` — **the scaffold is in** (`docs/book/`, the
+  mdBook form: the READMEs/audit/TODO/changelog included via
+  `{{#include}}`); what remains is the publishing: build + deploy the book
+  on GH Pages in the CI item's workflow.
+
 
 ## Done (the highlights; the git history has the details)
 
+- **the rename + env-prefix wave** — the bins and clients carry their
+  man-page names (the dash names: `modbus-cache.py`,
+  `modbus-cache-ctl.py`, `modbus-scraper*.py`, `modbus-fake-*.py`,
+  `dashboard-*.py`); every env twin wears its tool's prefix — `MCH_*`
+  (cache), `SCR_*` (scraper), `INV_*` (fake), `DSH_*` (dashboard, the
+  generic docker envs retired) — with the one short `*_CTL` form for the
+  control port; the constants audit put `log_levels` in every tool's
+  `lib/static.json` (and the metrics-endpoint defaults on the dashboard),
+  and the scraper's register map now lives in the device profile alone —
+  the register/scale knobs are gone and `set profile` swaps the map live
+  (a bad profile rolls back).
+- **the config-format wave** — the ini is gone (the breaking wave): the
+  config files speak the control grammar (`set <name> <value>` lines, `#`
+  comments — a config file pipes through a ctl client), `show config`
+  regenerates the script from the running daemon (secrets hidden),
+  `help config` maps every knob to its control command, the bundled
+  samples and the NixOS modules render the set grammar, and the
+  **one-knob-one-source** registry (`lib/options.py` per tool on
+  `common/options.py`) + `scripts/check_options.py` gate the four
+  surfaces against drift. Also closed in the wave: the RBAC verb policy
+  (`--control-ops-verbs`), the dashboard's own /metrics endpoint, the
+  metrics.json sections + `--metric-prefix` + the `scraper_*` renames
+  (the `scraper` section since moved to `lib/metrics.json`, merged in
+  memory over the configured spec),
+  the poll-latency gauges, the shipped FC4 profile
+  (`profiles/profiles/demo-fc4.json`) and the per-phase chain (the
+  metrics + the dashboard's phase strip); the scrape README carries the
+  F15 privacy note.
+- **the read-only control role** — the former open item ("a second token
+  granting only the show/clear verbs") shipped family-wide: every control
+  server takes `--control-ops-token`/`--control-ops-token-file` and scopes
+  its ops sessions to the show/clear verbs — the ops shift versus the
+  admin key, both audited (`role=ops`/`role=admin` in the COMMAND
+  entries). The per-tool records name the flag/env forms; the audit wave
+  is docs/AUDIT.md rev. 7 (F22 raised and closed with it).
 - **the metrics endpoint wave** — the caps (max-clients/client-timeout/
   max-conn-per-ip) on every HTTP + Modbus surface, the fake's and the
   cache's endpoints live-togglable (`metrics-server` + `--metrics-listen`),
@@ -243,7 +237,7 @@ the **Done/history** records for their tool.
 - **the release tooling** — `scripts/release.py` + the tag-triggered
   release workflow (the pipeline item above is the operational follow-up).
 - **the token-file env honored** `[inverter]` — the help promised
-  `FAKE_CONTROL_TOKEN_FILE` / `FAKE_METRICS_TOKEN_FILE`, the code never
+  `INV_CONTROL_TOKEN_FILE` / `INV_METRICS_TOKEN_FILE`, the code never
   read them: both are honored now (the fake and the two clients — flag
   over env, the file over the plain token, both together the
   mutual-exclusion error).

@@ -6,9 +6,131 @@ tagged commits'. The early tags (before 0.1.0) carried per-tool versions —
 the dashboard, the scraper and the cache each numbered their own releases
 before the repo restructured into one suite.
 
+# Changelog
+
 ## Unreleased
 
 ### Added
+
+- **everywhere** — **`show knobs`, the dictionary of all knobs**: every
+  control server answers `show knobs` (the `help knobs` alias too) with
+  the whole option registry under its section — one row per knob with the
+  set-grammar/config name, the argparse flag, the env twin(s), the home
+  section, the command that changes it live (or the restart note for the
+  startup-only knobs) and a `, secret` marker on the tokens
+  (`common/options.py` `knob_dictionary()` — registry data only, no values
+  render, so the secrets are named, never shown; `show config` stays the
+  values view, `help config` the command mapper). The ctl/cli clients'
+  TAB completion and `show?` word-help offer the new `show` argument; the
+  RBAC read path covers it as is (`show` is an ops verb).
+- **everywhere (the family)** — **a read-only control role**: every
+  control server accepts a second token
+  (`--control-ops-token`/`--control-ops-token-file`, ini + env twins:
+  `MCH_CONTROL_OPS_TOKEN(_FILE)`, `SCR_CONTROL_OPS_TOKEN(_FILE)`,
+  `INV_CONTROL_OPS_TOKEN(_FILE)`, `DSH_CONTROL_OPS_TOKEN(_FILE)`)
+  beside the admin one, and sessions authenticating with it may run the
+  **`show`/`clear` verbs only** — no `set`/`unset`, no `request
+  dump`/`restore`/`reload`, no `poll now`, no `restart`, no `shutdown`:
+  the ops shift versus the admin key. The gate is the command's head verb
+  (`common/wiresec.py`: `ROLE_ADMIN`/`ROLE_OPS`, `role_allows`); the
+  session verbs (`help`/`?`/`ping`/`quit`) every role speaks; a denied
+  command answers `err forbidden: the ops token runs the show/clear verbs
+  only (<verb> needs the admin token)`. Both audited: the COMMAND audit
+  entries name the session's role (`role=ops`/`role=admin`, the denials
+  included), and each session's frames are mac'd with the key it
+  authenticated with — an ops client verifies its own replies against the
+  ops token. The peer-cred trusted peers hold the admin role. A role-less
+  config is unchanged. Misconfigurations fail fast: an ops token without
+  the admin token, or one equal to it, refuses to start. The ops coverage
+  landed in the control suites (the fake, the cache — `clear cache`
+  honored, steering denied —, the dashboard) and scrape-regtest §6c;
+  the NixOS modules grew `controlOpsToken`/`controlOpsTokenFile`
+  (the cache's and scraper's ini rendering + the dashboard's ExecStart
+  flags, the LoadCredential mounts included). Audit rev. 7 raised and
+  closed **F22** (the control plane had no role separation — one token,
+  one capability) with this wave.
+- **everywhere** — **one knob, one source**: every knob of every tool lives
+  once in an option registry (per-tool `lib/options.py`, the shared
+  `common/options.py` vocabulary) — the name, the flag, the env twin(s),
+  the **section** it files under (device / serving / control plane /
+  metrics / audit / limits / persistence / logging), whether it is
+  live-settable (the knob -> control-command mapper) and whether it is a
+  secret. Built on it: the **configuration file** below, the **`show
+  config`** control command (the effective configuration as a set-grammar
+  script — the output pipes straight back into a config file or through a
+  ctl client; the secrets never render), **`help config`** (the mapper:
+  every knob and the command that changes it live, or the restart note for
+  the startup-only ones), the sectioned README/config surfaces and
+  **`scripts/check_options.py`** — the gate that the four surfaces (the
+  flags, the env names, the NixOS module options, the README tables, plus
+  the bundled config scripts) agree with the registry.
+- **everywhere** — **the configuration format (breaking)**: the ini format
+  is gone. The config file is a **set-grammar script** now — every line a
+  `set <name> <value>`, every comment a `#` comment, one vocabulary from
+  the CLI to the file to the control wire; a config file runs through a
+  ctl client unchanged (the clients strip comments/blank lines locally)
+  and `show config` regenerates it. A legacy ini file fails with a clean
+  pointer to the new form (never silently ignored). The bundled configs
+  are the rewritten samples (`modbus_cache.conf`, `scraper.conf`,
+  `server.conf`) and the NixOS modules render the set grammar
+  (`pkgs.writeText` line lists, dash names).
+- **everywhere** — **RBAC on the control plane**: the roles are a policy
+  table now (`common/wiresec.py` `ROLE_POLICIES` — admin = the full verb
+  set, ops = the read-only shift), and the ops role's verb set is
+  configurable per daemon (`--control-ops-verbs show,clear`, ini + env
+  twins, validated against the tool's control grammar at start; an empty
+  or unknown verb list refuses to start). The session verbs
+  (`help`/`?`/`ping`/`quit`) stay open to every role; unknown roles fail
+  closed.
+- **dashboard** — **its own Prometheus /metrics endpoint** (the last
+  family tool without one): `--metrics-server` (off by default, **a
+  bearer token is mandatory when on** — the F6 posture), `--metrics-listen`
+  (default `127.0.0.1:9452`), the token flags + the client caps like the
+  cache's endpoint; serves the self-observability (the uptime, the request
+  counters by status class, the proxied-query total, the client gate, the
+  version) — not the PV values. Live-settable (`set metrics-server
+  on/off`). The cache's and the fake's existing endpoints are unchanged.
+- **dashboard** — **the per-phase chain closed**: the phase voltage/current
+  selectors land in `config.js` (`phaseVoltages`/`phaseCurrents` — the
+  `<prefix>_phase_{a,b,c}_*` metrics), and the page renders a per-phase
+  health strip (the volts/amps per phase plus the voltage-unbalance
+  percentage, highlighted when it leaves the 2 % band). Optional: omit the
+  selectors, lose the strip.
+- **scrape** — **the metrics.json sections**: the spec files its metrics
+  now — `[profile]` (register-fed), `[compute]` (derived by the poller),
+  `[scraper]` (the exporter's own gauges **and the bundled cache-diag
+  block**, `scraper_*` named) — and **`--metric-prefix`** (default
+  `huawei`, env `SCR_METRIC_PREFIX`) prefixes the profile- and
+  compute-fed names; the bundled `scraper_*` names are fixed. The
+  renames: `huawei_cache_*` -> `scraper_cache_*`, `huawei_battery` ->
+  `scraper_battery`, `huawei_up` -> `scraper_up`,
+  `huawei_modbus_errors_total` -> `scraper_modbus_errors_total`,
+  `huawei_last_poll_timestamp_seconds` -> `scraper_last_poll_timestamp_seconds`
+  (the dashboard's default selectors and the regtest follow; a custom
+  legacy flat spec keeps working for the profile/compute metrics). The
+  `scraper` section moves to **`lib/metrics.json`** (next to the loader,
+  installed with it) and is merged in memory over the configured spec —
+  a custom spec carries only the `profile`/`compute` entries it wants,
+  its `scraper` entries override the built-ins by name, neither file is
+  rewritten.
+- **scrape** — **the poll-latency gauges**: `scraper_poll_duration_seconds`
+  (+ mean/max) — a slow dongle shows up on /metrics before the freshness
+  gap does. The cache has carried its `modbus_cache_poll_duration_*`
+  gauges since the metrics wave.
+- **scrape** — **the shipped FC4 profile**: `profiles/profiles/demo-fc4.json`
+  (lint-clean, the family key order) marks every register as input
+  registers (`fc: 4`) — the shipped data the fc4 regtests lacked; the
+  fake serves both function codes, the cache caches fc3/fc4 separately,
+  the scraper reads per-entry fc.
+- **docs** — **the mdBook scaffold** (`docs/book/`): the suite's
+  documentation navigable — the SUMMARY includes the READMEs, the audit,
+  the TODO and the changelog (`{{#include}}`, rebuilt with `mdbook build
+  docs/book`; the only tooling the book adds — the suite stays
+  stdlib-only).
+- **docs** — the scraper README's **"what /metrics leaks" privacy note**
+  (F15): the endpoint exposes production values (generation, consumption,
+  battery SoC, the per-phase voltages) — a home-occupancy consideration;
+  the token + the localhost bind are the controls.
 
 - **dashboard** — **the control plane** (the family set is complete now):
   the JSON-lines control server on the scraper's pattern — the unix socket
@@ -19,7 +141,7 @@ before the repo restructured into one suite.
   set/unset/show), `show status`/`show connections` (the live HTTP clients
   per peer IP), `show settings`, `inspect`, `request reload` (the SIGHUP
   path — the listen address/port are bound and stay), `shutdown`. Plus
-  **`dashboard_ctl`** / **`dashboard_cli`** (the family's one-shot and
+  **`dashboard-ctl`** / **`dashboard-cli`** (the family's one-shot and
   console clients) and the **DSH audit trail**. The HTTP surface grew the
   family's **connection gate** (`--max-clients`, `--client-timeout`,
   `--max-conn-per-ip` — the refusals answer 503; `show connections` reads
@@ -41,8 +163,8 @@ before the repo restructured into one suite.
   HTTP clients via the connection gate's new snapshot), `poll now` (the
   poll loop wakes immediately), `request reload` (the SIGHUP path — the
   token file re-reads, so the bearer token rotates too), the Modbus
-  session `restart`, `inspect`, `shutdown`. Plus **`scraper_ctl`** /
-  **`scraper_cli`** (the family's one-shot and console clients, the token
+  session `restart`, `inspect`, `shutdown`. Plus **`modbus-scraper-ctl`** /
+  **`modbus-scraper-cli`** (the family's one-shot and console clients, the token
   handshake + the signed wire included) and the **SCR audit trail**
   (`--audit-log/-max-mb/-files/--no-audit-log`; `scripts/audit_verify.py`
   already walked the scraper's path). The NixOS module grew
@@ -75,7 +197,7 @@ before the repo restructured into one suite.
   regenerated with `python3 scripts/gen_man.py`.
 - **fake-inverter** — **`--connect-acl`**: the Modbus connect ACL the
   cache's audit story uses, mirrored (any/`none`/a comma-separated IP/CIDR
-  list, env `FAKE_CONNECT_ACL`, a live setting, `show status` carries
+  list, env `INV_CONNECT_ACL`, a live setting, `show status` carries
   `connect_acl=`, the rejections logged). **The default stays `any`** —
   the fake's trusted-LAN posture is unchanged; the flag exists so the ACL
   story can be demoed end to end without touching the real cache.
@@ -183,6 +305,40 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **breaking: every environment twin carries the tool's
+  prefix now** — `MCH_*` (the cache), `SCR_*` (the scraper), `INV_*` (the
+  fake inverter), `DSH_*` (the dashboard) — and each control-port answers
+  to the one short form (`MCH_CTL`/`SCR_CTL`/`INV_CTL`/`DSH_CTL`, the
+  daemons and the ctl/cli clients agree; no more long/short duplicates).
+  The dashboard retires the generic docker envs (`PORT`, `BIND`, `PROM_URL`,
+  `PROM_PREFIX`, `STATIC_DIR`, `CONFIG_JS`, `BATTERY`) for
+  `DSH_PORT`/`DSH_BIND`/`DSH_PROM_URL`/`DSH_PROM_PREFIX`/
+  `DSH_STATIC_DIR`/`DSH_CONFIG_JS`/`DSH_BATTERY` — the compose stack, the
+  docker docs and the compose's Prometheus wiring follow. Anything
+  scripting the old names must follow.
+- **everywhere** — the bins are renamed to match their man pages (the
+  family's dash names): `cache/bin/modbus_cache.py` → **`modbus-cache.py`**,
+  the `*_ctl.py`/`*_cli.py` clients likewise (`modbus-cache-ctl.py`,
+  `modbus-cache-cli.py`, `modbus-scraper*.py`, `modbus-fake-*.py`,
+  `dashboard-*.py`) — the man page, the bin and the installed entrypoint
+  share one name now; the nix packages, the docker images and the docs
+  follow.
+- **scrape** — **breaking: the register-map config is gone** —
+  `--pv-register`/`--grid-register`/`--battery-register`/
+  `--battery-soc-register`/`--scale`/`--grid-scale` (flags, envs, config
+  keys, NixOS options) existed because the spec predates the device
+  profile; the device profile is the register map's single source now
+  (addresses, types, gains, function codes — its per-entry `scale` is the
+  decode divisor, validated finite > 0 at load). The live control surface
+  gained **`set profile <file-or-name>`** (`default` = the bundled sun2000
+  profile, `unset` restores the configured one): the new register map
+  loads, the metric sources rebuild and a profile without the registers
+  the power math needs rolls back with a clean error.
+- **everywhere** — the log levels are a static constant: every tool's
+  `lib/static.json` carries **`log_levels`** (`DEBUG`/`INFO`/`WARNING`/
+  `ERROR`) and every consumer reads it from there (the argparse choices,
+  the config validation, the live `set log-level` completion and check)
+  — nothing hardcodes the ladder anymore.
 - **dashboard** — the bin+lib layout like the rest of the family: `src/`
   splits into `bin/` (`server.py` → **`bin/dashboard.py`**) and `lib/`
   (the statics loader), with `config.js`, `server.ini` and `man/` promoted
@@ -246,12 +402,12 @@ before the repo restructured into one suite.
 - **the family** — the help promised the token-file env vars, the client
   code never read them (the audit's F20, docs/AUDIT.md rev. 6): the ctl/cli
   clients honor their `--control-token-file` env form now —
-  **`MODBUS_CACHE_CONTROL_TOKEN_FILE`** (`cache_ctl`, `cache_cli`),
-  **`SCRAPER_CONTROL_TOKEN_FILE`** (`scraper_ctl`, `scraper_cli`),
-  **`DASHBOARD_CONTROL_TOKEN_FILE`** (`dashboard_ctl`, `dashboard_cli`) and
-  **`FAKE_CONTROL_TOKEN_FILE`** (`fake_ctl`, `fake_cli`) — and the fake
-  itself honors `FAKE_CONTROL_TOKEN_FILE` /
-  **`FAKE_METRICS_TOKEN_FILE`** (the env form of `--control-token-file` /
+  **`MCH_CONTROL_TOKEN_FILE`** (`modbus-cache-ctl`, `modbus-cache-cli`),
+  **`SCR_CONTROL_TOKEN_FILE`** (`modbus-scraper-ctl`, `modbus-scraper-cli`),
+  **`DSH_CONTROL_TOKEN_FILE`** (`dashboard-ctl`, `dashboard-cli`) and
+  **`INV_CONTROL_TOKEN_FILE`** (`modbus-fake-ctl`, `modbus-fake-cli`) — and the fake
+  itself honors `INV_CONTROL_TOKEN_FILE` /
+  **`INV_METRICS_TOKEN_FILE`** (the env form of `--control-token-file` /
   `--metrics-token-file`; the other daemons resolved the env from the
   start). One resolution shape everywhere: the flag wins over the env, the
   file over the plain token, both together the usual mutual-exclusion
@@ -266,7 +422,12 @@ before the repo restructured into one suite.
 
 ### Docs
 
-- **docs/AUDIT.md rev. 6** — the audit covers the whole pv-suite now (the
+- this wave's docs: the READMEs updated family-wide (the config grammar —
+  the ini is gone —, `show config`/`help config`, the RBAC verbs flag, the
+  dashboard's metrics/audit rows, the scrape privacy note), the man pages
+  regenerated (mandoc -Tlint clean), the TODOs follow, the mdBook scaffold
+  (`docs/book/`); **docs/AUDIT.md rev. 8** records the wave (no new
+  findings). **docs/AUDIT.md rev. 6** — the audit covers the whole pv-suite (the
   dashboard's deferral closed): the scraper's and the dashboard's control
   planes walked (no new findings beyond F20), the dashboard's HTTP surface
   audited for the first time — **F21** raised (no auth on page/proxy, the
@@ -404,7 +565,7 @@ The control surface, the shared core and the docs redo.
   profile resolution, the Modbus wire core (`ModbusError`, `recv_exact`,
   `exception_frame`), the UTC log formatter and the version string — one
   implementation for the whole family.
-- **scrape/** — restructured to the family layout: `bin/modbus_scraper.py`,
+- **scrape/** — restructured to the family layout: `bin/modbus-scraper.py`,
   the modules in `lib/`, `scraper.ini` and `metrics.json` at the subproject
   root.
 - **profiles/** — the device JSONs moved under `profiles/profiles/`, the

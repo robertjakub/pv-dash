@@ -60,7 +60,7 @@ logger = logging.getLogger('modbus-cache')
 
 def parse_args():
     ap = argparse.ArgumentParser(description='Modbus TCP caching proxy for Huawei SUN2000 inverters.')
-    ap.add_argument('--config', default=default_config_path(),
+    ap.add_argument('--config', default=None,
                     help='config file (default: $MODBUS_CACHE_CONFIG, then modbus_cache.ini next to this script, then the subproject root)')
     ap.add_argument('--host', help='inverter Modbus TCP address (default: config, $MODBUS_CACHE_HOST or 127.0.0.1)')
     ap.add_argument('--port', type=int, help='inverter Modbus TCP port (default: config, $MODBUS_CACHE_PORT or 5502)')
@@ -121,7 +121,7 @@ def parse_args():
     ap.add_argument('--metrics-max-conn-per-ip', dest='metrics_max_conn_per_ip', type=int,
                     help="maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit (default: config, $MODBUS_CACHE_METRICS_MAX_CONN_PER_IP or 0)")
     ap.add_argument('--audit-log', dest='audit_log',
-                    help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MODBUS_CACHE_AUDIT_LOG or %s — the XDG state home' % default_audit_path('modbus-cache'))
+                    help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MODBUS_CACHE_AUDIT_LOG or ~/.local/state/modbus-cache/audit.log — the XDG state home')
     ap.add_argument('--audit-max-mb', dest='audit_max_mb', type=float,
                     help='rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation (default: config, $MODBUS_CACHE_AUDIT_MAX_MB or 10)')
     ap.add_argument('--audit-daily', dest='audit_daily', action='store_true',
@@ -133,7 +133,15 @@ def parse_args():
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration and register map, print the effective settings and exit (nothing is bound or connected)')
     ap.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                     help='log level (default: config, $MODBUS_CACHE_LOG_LEVEL or INFO)')
-    return ap.parse_args()
+    ap.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-cache --man | man -l -)')
+    args = ap.parse_args()
+    if args.man:
+        from lib.man import daemon_page
+        sys.stdout.write(daemon_page(ap))
+        raise SystemExit(0)
+    if args.config is None:
+        args.config = default_config_path()
+    return args
 
 
 def setup_logging(cfg):

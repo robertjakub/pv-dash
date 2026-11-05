@@ -6,7 +6,7 @@ import json
 import logging
 import os
 
-from common.config import default_profile_path, parse_listen, resolve_profile_file
+from common.config import acl_summary, acl_text, default_profile_path, parse_acl, parse_listen, resolve_profile_file
 from common.cred import parse_trust_uids
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, MAX_COUNT, MAX_REGISTERS, \
     REGISTER_TYPES, UNIT_ID_RANGE
@@ -39,48 +39,6 @@ def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
     if env and env.strip():
         return env.strip()
     return '/tmp/modbus-cache-%d.socket' % listen_port
-
-
-def parse_acl(text, label):
-    """'any'/'*'/empty/None -> None (allow all); 'none' -> () (allow nobody);
-    'IP, CIDR, ...' -> tuple of networks. An empty tuple refuses every peer —
-    the ACL's restrict-all mode."""
-    if text is None:
-        return None
-    t = str(text).strip()
-    if t in ('', 'any', '*'):
-        return None
-    if t.lower() == 'none':
-        return ()
-    nets = []
-    for part in t.split(','):
-        part = part.strip()
-        if not part:
-            continue
-        try:
-            nets.append(ipaddress.ip_network(part, strict=False))
-        except ValueError as e:
-            raise SystemExit('%s: bad ACL entry %r (%s)' % (label, part, e))
-    return tuple(nets)
-
-
-def acl_text(acl):
-    """The ACL normalized for `unset` to re-parse: 'any' | 'none' | the network list."""
-    if acl is None:
-        return 'any'
-    if not acl:
-        return 'none'
-    return ','.join(str(n) for n in acl)
-
-
-def acl_summary(acl):
-    """The ACL for humans (the start log, show status, inspect): 'any' (no
-    restriction), 'none' (everybody refused) or the network count."""
-    if acl is None:
-        return 'any'
-    if not acl:
-        return 'none'
-    return '%d network(s)' % len(acl)
 
 
 def parse_write_registers(text, label='write-registers'):

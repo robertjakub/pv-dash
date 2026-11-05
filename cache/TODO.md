@@ -5,6 +5,27 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The token-file env honored: `MODBUS_CACHE_CONTROL_TOKEN_FILE` does what
+the clients' help always promised — the env form of
+`--control-token-file` on `cache_ctl`/`cache_cli` (the daemon's config
+resolved it from the start; flag over env, the file over the plain
+token, both together the mutual-exclusion error).
+
+The **signed wire**: with a control token configured every command and
+reply on the control socket carries the full sha256 HMAC of its payload
+keyed by the token (`common/wiresec.py`) — over TCP the signed commands
+are mandatory (an unsigned or bad-mac frame is refused), on the unix
+socket the mac is verify-if-present (the peer-cred trusted peers keep
+speaking without the secret); the cache_ctl/cache_cli clients sign and
+verify both directions, and the audit trail's COMMAND entries carry the
+frame's mac (`wire=h…`). The man pages are generated now
+(`common/manpage.py`: the OPTIONS section renders from the parser, the
+prose lives in lib/man.py, `--man` prints the page, scripts/gen_man.py
+regenerates the shipped files) and the NixOS module's sandbox got the full
+hardening pass (tests/hardening.nix scores it with systemd-analyze
+security).
+
+
 The state persistence (the write-behind): `--dump-path` turns on the state
 dump — the cached words (+ their original stamps) and the live setting
 overrides, one atomically-written JSON; the dumps land every

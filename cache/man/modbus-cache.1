@@ -7,15 +7,15 @@ modbus-cache \- Modbus TCP caching proxy for single-client devices
 .br
 .B modbus-cache \-\-dry-run
 .RI [ options ]
+
 .SH DESCRIPTION
-.B modbus-cache
-owns the single Modbus TCP client connection a device allows (Huawei
-SUN2000 inverters and their SDongle/EMMA radios accept exactly one) and
-multiplexes it: a background loop polls the configured register ranges
-into an in-memory cache, any number of clients are served FC3/FC4 reads
-from the cache, reads outside the map and other function codes are
-forwarded live, and writes (FC05/06/15/16/22/23) are forwarded when
-explicitly enabled and audited. A synthesized diagnostics block at
+\fBmodbus-cache\fR owns the single Modbus TCP client connection a device
+allows (Huawei SUN2000 inverters and their SDongle/EMMA radios accept
+exactly one) and multiplexes it: a background loop polls the configured
+register ranges into an in-memory cache, any number of clients are served
+FC3/FC4 reads from the cache, reads outside the map and other function
+codes are forwarded live, and writes (FC05/06/15/16/22/23) are forwarded
+when explicitly enabled and audited. A synthesized diagnostics block at
 registers 65000\(en65003 lets clients tell cached data from live data.
 .PP
 Resilience: when the device dies, cached reads keep serving last-known
@@ -24,199 +24,216 @@ range, the poll status is remembered instead of hammering it; garbage from
 either side is answered one line at a time and never fatal. Verified
 against the fake inverter, fuzzing and stress suites \-\- not against real
 hardware.
+
 .SH OPTIONS
 .TP
-.BI \-\-config " FILE"
-config file (ini, \fB[cache]\fR section, snake_case keys). Default:
-\fBmodbus_cache.ini\fR next to the script, then the packaged sample; a
-missing file is fine. A malformed file is fatal.
+.B \-\-config
+config file (default: $MODBUS_CACHE_CONFIG, then modbus_cache.ini next
+to this script, then the subproject root)
 .TP
-.BI \-\-host " HOST"
-upstream inverter/dongle address. Default \fB127.0.0.1\fR.
+.B \-\-host
+inverter Modbus TCP address (default: config, $MODBUS_CACHE_HOST or
+127.0.0.1)
 .TP
 .BI \-\-port " N"
-upstream Modbus TCP port. Default \fB5502\fR.
+inverter Modbus TCP port (default: config, $MODBUS_CACHE_PORT or 5502)
 .TP
 .BI \-\-unit " N"
-Modbus unit id (1\(en247). Default \fB1\fR.
+Modbus unit id (default: config, $MODBUS_CACHE_UNIT or 1)
 .TP
-.BI \-\-timeout " S"
-upstream connect/read timeout, seconds. Default \fB3\fR.
+.BI \-\-timeout " N"
+Modbus connect/read timeout in seconds (default: config,
+$MODBUS_CACHE_TIMEOUT or 3)
 .TP
-.BI \-\-listen " HOST:PORT"
-proxy listen address. Default \fB127.0.0.1:15502\fR (loopback only).
+.B \-\-listen
+listen address HOST:PORT (default: config, $MODBUS_CACHE_LISTEN or
+127.0.0.1:15502)
 .TP
-.BI \-\-profile " NAME|PATH"
-device profile: a bare name resolved against the shared
-\fBprofiles/profiles/\fR directory or a JSON path. Default the bundled
-\fBsun2000\fR. Re-read on SIGHUP.
+.BI \-\-interval " N"
+seconds between cache polls (default: config, $MODBUS_CACHE_INTERVAL or
+10)
 .TP
-.BI \-\-selection " all|none|PATH"
-which profile entries to fetch: every entry (\fBall\fR, the default), an
-empty map (\fBnone\fR \(em every read forwards, nothing is stored), or a
-JSON file \fB{"registers": ["pv-power", ...]}\fR.
+.BI \-\-read\-delay " N"
+seconds between consecutive inverter reads within a poll cycle, 0 = no
+delay (default: config, $MODBUS_CACHE_READ_DELAY or 0.05)
 .TP
-.BI \-\-interval " S"
-seconds between cache polls. Default \fB10\fR.
+.BI \-\-merge\-gap " N"
+max register gap when merging ranges into block reads, 0 = read ranges
+separately (default: config, $MODBUS_CACHE_MERGE_GAP or 8)
 .TP
-.BI \-\-cache-ttl " S"
-per-register cache TTL; entries older than this are refetched on the next
-read. Default \fB3\(en\fR\fBinterval\fR; \fB0\fR = never expire. Profile
-entries may override per entry (\fBttl\fR field).
+.B \-\-profile
+device profile JSON (the shared profiles/ schema) (default: config,
+$MODBUS_CACHE_PROFILE or the bundled sun2000 profile)
 .TP
-.BI \-\-read-delay " S"
-seconds between consecutive device reads within a poll cycle. Default
-\fB0.05\fR.
+.B \-\-selection
+selection JSON: {"registers": ["pv\-power", ...]} — the profile names to
+fetch (default: config, $MODBUS_CACHE_SELECTION or every profile entry)
 .TP
-.BI \-\-merge-gap " N"
-maximum register gap when merging ranges into block reads (\fB0\fR = read
-separately). Default \fB8\fR.
+.BI \-\-cache\-ttl " N"
+per\-register cache TTL: cached registers older than this are refetched
+from the inverter, 0 = never expire, serve last known values forever
+(default: config, $MODBUS_CACHE_TTL or 3x interval)
 .TP
-.B \-\-allow-write
-forward write requests to the device. Off by default (they are refused
-with a Modbus illegal-function exception).
+.B \-\-allow\-write
+forward write requests (FC05/06/15/16) to the inverter; default: refuse
+them with a Modbus illegal\-function exception (default: off)
 .TP
-.BI \-\-write-registers " RANGES"
-register ranges a forwarded write may touch: comma-separated
-\fBSTART:COUNT\fR (e.g. \fB47400:100,47600:100\fR), \fBany\fR (every
-register writable) or \fBnone\fR (no register writable). Default \fBnone\fR.
+.B \-\-write\-registers
+register ranges a (forwarded) write may touch: comma\-separated
+START:COUNT, e.g. 47400:100,47600:100; "any" = unrestricted; "none" = no
+register writable (default: config, $MODBUS_CACHE_WRITE_REGISTERS or
+none)
 .TP
-.BI \-\-connect-acl " LIST"
-clients allowed to connect: \fBany\fR (the default), \fBnone\fR (refuse
-every peer) or comma-separated IPs/CIDR prefixes, IPv4 or IPv6.
+.B \-\-local\-time
+log timestamps in the system time zone instead of UTC (default: off)
 .TP
-.BI \-\-write-acl " LIST"
-clients allowed to write; still requires \fB--allow-write\fR. \fBany\fR,
-\fBnone\fR (refuse every peer) or comma-separated IPs/CIDR prefixes.
-Default \fBnone\fR.
+.B \-\-log\-access
+log client connects/disconnects at INFO instead of DEBUG (default: off)
 .TP
-.BI \-\-control-port " TARGET"
-the JSON-lines control server: a unix socket path or a TCP port (bound to
-127.0.0.1). Default \fB/tmp/modbus-cache-\fR\fI<listen-port>\fB.socket\fR;
-\fB0\fR = off.
+.BI \-\-max\-clients " N"
+refuse further connections past this many simultaneous clients, 0 = no
+limit (default: config, $MODBUS_CACHE_MAX_CLIENTS or 64)
 .TP
-.BI \-\-control-token " TOKEN"
-require a token on control connections (the first command must be
-\fB{"cmd": "auth", "token": "..."}\fR). Over the unix socket a trusted
-peer (root, the daemon's own user or \fB--control-trust-uids\fR \(em
-\fBSO_PEERCRED\fR) skips the handshake. A TCP control port refuses to
-start without a token.
+.BI \-\-client\-timeout " N"
+disconnect clients silent for this many seconds, 0 = never (default:
+config, $MODBUS_CACHE_CLIENT_TIMEOUT or 300)
 .TP
-.BI \-\-control-token-file " FILE"
-the token from a file (the first line; a systemd \fBLoadCredential\fR) \(em
-instead of \fB--control-token\fR; giving both is an error. The file must be
-owner-only (\fB0600\fR): a group/world-accessible token file refuses to
-start. A token passed as \fB--control-token\fR is visible in \fBps\fR /
-\fB/proc/*/cmdline\fR to every local user \(em prefer the file (or the env
-var); the flag form is for quick tests.
-.TP
-.BI \-\-control-socket-group
-leave the unix control socket group-accessible (\fBchmod 0660\fR instead
-of the default \fB0600\fR): a local group may speak to the control
-without being the service user.
-.TP
-.BI \-\-control-trust-uids " UIDS"
-extra peer uids the unix control socket trusts without the token: a
-comma-separated list (a local systemd unit speaks without the secret);
-root and the daemon's own user are always trusted.
-.TP
-.BI \-\-dump-path " FILE"
-the state dump (write-behind): the live setting overrides and \(em with
-\fB--dump-with-cache\fR \(em the cached words + their stamps, as one JSON
-\(em written on shutdown, by the \fBrequest dump\fR command and every
-\fB--dump-interval\fR seconds; loaded on start only with
-\fB--restore-on-start\fR, on demand by the \fBrequest restore\fR command
-(the restore takes either shape). The file is created \fB0600\fR (never the
-umask) and carries a sha256 integrity hash \(em a restore refuses an
-edited, unsigned or group/world-writable dump (F18: the dump is
-config-equivalent trust; own it like the ini). Off by default.
-.TP
-.B \-\-dump-with-cache
-dump the cached words too: the \fBrequest dump\fR command and the
-\fB--dump-interval\fR loop write the words + the settings (the default off
-= settings only; \fBrequest dump with-cache\fR always includes them). Off
-by default.
-.TP
-.B \-\-restore-on-start
-load the state dump when the daemon starts (needs \fB--dump-path\fR) \(em
-a restart serves last-known values instead of cold misses. Off by
-default: start cold, load on demand.
-.TP
-.BI \-\-dump-interval " S"
-seconds between the automatic state dumps (default \fB0\fR = on request:
-the \fBrequest dump\fR command and the shutdown); needs \fB--dump-path\fR.
-.TP
-.BI \-\-requests-audit " S"
-audit one REQUESTS tally per client per this many seconds (default
-\fB300\fR); \fB0\fR = off.
-.TP
-.BI \-\-metrics-server ", " \-\-metrics-listen " HOST:PORT"
-serve the cache's own Prometheus \fB/metrics\fR endpoint (the
-\fBmodbus_cache_*\fR gauges; off by default, live-settable on the control
-server) on the bind address (default \fB127.0.0.1:9252\fR;
-\fB0.0.0.0:PORT\fR serves every interface); refuses to start without
-\fB--metrics-token\fR.
-.TP
-.BI \-\-metrics-token " TOKEN"
-require \fBAuthorization: Bearer\fR on the metrics endpoint.
-.TP
-.BI \-\-metrics-token-file " FILE"
-the metrics bearer token from a file (the first line; owner-only \fB0600\fR,
-like the control token file); mutually exclusive with \fB--metrics-token\fR.
-.TP
-.BI \-\-metrics-max-clients " N" ", " \-\-metrics-client-timeout " S" ", " \-\-metrics-max-conn-per-ip " N"
-cap concurrent HTTP clients on the metrics endpoint (default \fB64\fR;
-overflow answers 503), time out idle ones (default \fB5\fR s; \fB0\fR = the
-same built-in cap) and cap concurrent connections from one peer IP
-(default \fB0\fR = no per-IP limit).
-.TP
-.BI \-\-audit-log " FILE|\-"
-the append-only audit trail. Default the XDG state home
-(\fB~/.local/state/modbus-cache/audit.log\fR); \fB\-\fR = stdout (docker
-logs / journald); the trail falls back to stdout when the file is
-unwritable.
-.TP
-.BI \-\-audit-max-mb " N"
-rotate the audit trail at this size (default \fB10\fR); \fB0\fR =
-unbounded.
-.TP
-.B \-\-audit-daily
-also rotate the audit trail at UTC midnight.
-.TP
-.BI \-\-audit-files " N"
-rotated audit backups to keep. Default \fB3\fR.
-.TP
-.B \-\-no-audit-log
-disable the audit trail.
-.TP
-.BI \-\-max-clients " N"
-refuse further connections past this many simultaneous clients (default
-\fB64\fR; \fB0\fR = unlimited).
-.TP
-.BI \-\-client-timeout " S"
-disconnect clients silent for this many seconds (default \fB300\fR;
-\fB0\fR = never).
-.TP
-.BI \-\-max-conn-per-ip " N"
+.BI \-\-max\-conn\-per\-ip " N"
 refuse further connections from one peer IP past this many simultaneous
-connections (default \fB0\fR = no per-IP limit).
+connections, 0 = no per\-IP limit (default: config,
+$MODBUS_CACHE_MAX_CONN_PER_IP or 0)
 .TP
-.BI \-\-log-level " LEVEL"
-\fBDEBUG\fR adds per-client traffic and per-poll detail. Default
-\fBINFO\fR.
+.B \-\-connect\-acl
+clients allowed to connect: "any", "none" (refuse everyone) or
+comma\-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16 (default:
+config, $MODBUS_CACHE_CONNECT_ACL or any)
 .TP
-.B \-\-log-access
-log client connects/disconnects at INFO instead of DEBUG.
+.B \-\-write\-acl
+clients allowed to write (requires \-\-allow\-write): "any", "none"
+(refuse everyone) or comma\-separated IPs/prefixes (default: config,
+$MODBUS_CACHE_WRITE_ACL or none)
 .TP
-.B \-\-local-time
-log timestamps in the system time zone instead of UTC.
+.B \-\-control\-port
+control server target: unix socket path or TCP port on 127.0.0.1
+(default: config, $MODBUS_CACHE_CTL or
+/tmp/modbus\-cache\-<listen\-port>.socket); 0 = off
 .TP
-.B \-\-dry-run
-validate the configuration and the register map, print the effective
-settings and exit without binding or contacting anything.
+.B \-\-control\-token
+require a token on control connections: the client authenticates with
+{"cmd": "auth", "token": ...}; over the unix socket a trusted peer
+(root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
+skips the token (default: config, $MODBUS_CACHE_CONTROL_TOKEN or none)
 .TP
-.B \-\-version
-print the version.
+.B \-\-control\-token\-file
+the token from a file (the first line; e.g. a systemd LoadCredential or
+a key file; must be owner\-only 0600) — takes the place of
+\-\-control\-token; giving both is an error (default: config,
+$MODBUS_CACHE_CONTROL_TOKEN_FILE)
+.TP
+.B \-\-control\-socket\-group
+leave the unix control socket group\-accessible (chmod 0660 instead of
+the default 0600) (default: config, $MODBUS_CACHE_CONTROL_SOCKET_GROUP)
+(default: off)
+.TP
+.BI \-\-requests\-audit " N"
+audit one REQUESTS tally per client per this many seconds, 0 = off
+(default: config, $MODBUS_CACHE_REQUESTS_AUDIT or 300)
+.TP
+.B \-\-dump\-path
+the state dump (write\-behind): the live setting overrides and — with
+\-\-dump\-with\-cache — the cached words, as one JSON, written 0600 with
+an integrity hash (a restore refuses a tampered, unsigned or
+group\-writable dump); dumped on shutdown, on the request dump command
+and every \-\-dump\-interval seconds; loaded on start only with
+\-\-restore\-on\-start, on demand with the request restore command
+(default: config, $MODBUS_CACHE_DUMP_PATH or none)
+.TP
+.B \-\-dump\-with\-cache
+dump the cached words too: `request dump` and the \-\-dump\-interval
+loop write the words + the settings (the default off = settings only;
+`request dump with\-cache` always includes them; the restore takes
+either shape) (default: config, $MODBUS_CACHE_DUMP_WITH_CACHE or off)
+(default: off)
+.TP
+.BI \-\-dump\-interval " N"
+seconds between the automatic state dumps, 0 = on request (the request
+dump command and the shutdown) (default: config,
+$MODBUS_CACHE_DUMP_INTERVAL or 0)
+.TP
+.B \-\-restore\-on\-start
+load the state dump when the daemon starts (needs \-\-dump\-path) — a
+restart serves last\-known values instead of cold misses; default: start
+cold, load only on demand (env MODBUS_CACHE_RESTORE_ON_START, ini
+restore_on_start) (default: off)
+.TP
+.B \-\-control\-trust\-uids
+extra peer uids the unix control socket trusts without the token
+(SO_PEERCRED — a local systemd unit speaks without the secret); root and
+the daemon's own user are always trusted (default: config,
+$MODBUS_CACHE_CONTROL_TRUST_UIDS or none)
+.TP
+.B \-\-metrics\-server
+serve the cache's own Prometheus /metrics endpoint (the live `set
+metrics\-server` toggle exists too); off by default (the default:
+config, $MODBUS_CACHE_METRICS_SERVER or off) (default: off)
+.TP
+.B \-\-metrics\-listen
+the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every
+interface, a token is mandatory regardless (default: config,
+$MODBUS_CACHE_METRICS_LISTEN or 127.0.0.1:9252)
+.TP
+.B \-\-metrics\-token
+require Authorization: Bearer <token> on the /metrics endpoint (the same
+scheme the scraper speaks)
+.TP
+.B \-\-metrics\-token\-file
+the metrics bearer token from a file (the first line; must be
+owner\-only 0600) — takes the place of \-\-metrics\-token; giving both
+is an error (env MODBUS_CACHE_METRICS_TOKEN_FILE)
+.TP
+.BI \-\-metrics\-max\-clients " N"
+maximum concurrent HTTP clients on the /metrics endpoint; extras get an
+immediate 503, 0 = unlimited (default: config,
+$MODBUS_CACHE_METRICS_MAX_CLIENTS or 64)
+.TP
+.BI \-\-metrics\-client\-timeout " N"
+seconds an idle /metrics client is kept before the socket times out, 0 =
+the built\-in 5 s cap (default: config,
+$MODBUS_CACHE_METRICS_CLIENT_TIMEOUT or 5)
+.TP
+.BI \-\-metrics\-max\-conn\-per\-ip " N"
+maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
+limit (default: config, $MODBUS_CACHE_METRICS_MAX_CONN_PER_IP or 0)
+.TP
+.B \-\-audit\-log
+CACHE audit trail: a file path or \- for stdout (the docker/journald
+way); default: config, $MODBUS_CACHE_AUDIT_LOG or
+~/.local/state/modbus\-cache/audit.log — the XDG state home
+.TP
+.BI \-\-audit\-max\-mb " N"
+rotate the audit log at this size in MB, keeping N backups; 0 = no size
+rotation (default: config, $MODBUS_CACHE_AUDIT_MAX_MB or 10)
+.TP
+.B \-\-audit\-daily
+also rotate the audit log at UTC midnight (default: config,
+$MODBUS_CACHE_AUDIT_DAILY) (default: off)
+.TP
+.BI \-\-audit\-files " N"
+rotated audit backups to keep (default: config,
+$MODBUS_CACHE_AUDIT_FILES or 3)
+.TP
+.B \-\-no\-audit\-log
+disable the CACHE audit trail (default: config,
+$MODBUS_CACHE_NO_AUDIT_LOG) (default: off)
+.TP
+.B \-\-dry\-run
+validate the configuration and register map, print the effective
+settings and exit (nothing is bound or connected) (default: off)
+.TP
+.B \-\-log\-level
+log level (default: config, $MODBUS_CACHE_LOG_LEVEL or INFO)
+
+
 .SH SIGNALS
 .TP
 .B SIGHUP
@@ -230,6 +247,7 @@ errors are dropped; the poller repopulates immediately.
 .TP
 .BR SIGTERM ", " SIGINT
 graceful shutdown.
+
 .SH CONTROL
 The control server speaks JSON lines: one request
 \fB{"cmd": "..."}\fR per line, one reply
@@ -237,9 +255,11 @@ The control server speaks JSON lines: one request
 (the settings registry drives the grammar):
 .BR set ", " unset ", " show ", " help ,
 the reports
-.BR inspect ", " "show status" ", " "show connections" ", " "show cache" " [all]" ", " "show uplink" ", " "show version" ,
+.BR inspect ", " "show status" ", " "show connections" ,
+.BR "show cache" " [all]" ", " "show uplink" ", " "show version" ,
 the ops
-.BR "request dump" ", " "request restore" ", " clear\ cache ", " restart ", " shutdown ", " quit .
+.BR "request dump" ", " "request restore" ", " clear\ cache ,
+.BR restart ", " shutdown ", " quit .
 .RS
 .IP \(bu 2
 .B set <setting> <value>
@@ -273,6 +293,7 @@ See
 and
 .BR modbus-cache-cli (1)
 for the clients.
+
 .SH ENVIRONMENT
 .TP
 .B MODBUS_CACHE_CTL
@@ -283,6 +304,7 @@ wins).
 every flag has an environment twin (\fBMODBUS_CACHE_HOST\fR,
 \fBMODBUS_CACHE_LISTEN\fR, \fBMODBUS_CACHE_ALLOW_WRITE\fR, ...); the flag
 wins over the env, the env over the ini.
+
 .SH FILES
 .TP
 .I /tmp/modbus-cache-<port>.socket
@@ -293,6 +315,7 @@ the default audit trail.
 .TP
 .I cache/modbus_cache.ini ", " cache/selection.json
 the packaged sample config and the example selection.
+
 .SH EXIT STATUS
 .TP
 .B 0
@@ -303,6 +326,7 @@ invalid configuration (reason on stderr; \fB--dry-run\fR only).
 .TP
 .B 2
 command-line misuse.
+
 .SH SEE ALSO
 .BR modbus-cache-ctl (1),
 .BR modbus-cache-cli (1),

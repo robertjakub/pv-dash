@@ -9,11 +9,12 @@ modbus-cache-ctl \- one-shot control client for the modbus-cache daemon
 .B modbus-cache-ctl
 .RI [ options ]
 < commands
+
 .SH DESCRIPTION
 Sends one control command (or a batch piped on stdin, one per line) to the
-.B modbus-cache
-JSON-lines control server and prints the replies on stdout, one per line.
-Every invocation lands in the audit trail (prefix \fBCTL\fR).
+\fBmodbus-cache\fR JSON-lines control server and prints the replies on
+stdout, one per line. Every invocation lands in the audit trail (prefix
+\fBCTL\fR).
 .PP
 The command grammar is the daemon's: \fBset\fR/\fBunset\fR/\fBshow\fR/
 \fBhelp\fR (the settings registry), \fBinspect\fR, \fBshow status\fR,
@@ -22,34 +23,42 @@ The command grammar is the daemon's: \fBset\fR/\fBunset\fR/\fBshow\fR/
 \fBquit\fR. See
 .BR modbus-cache (1)
 CONTROL.
+
 .SH OPTIONS
 .TP
-.BI \-\-control-port " TARGET"
-the control target: a unix socket path or a TCP port. Default
-\fB/tmp/modbus-cache-\fR\fI<listen-port>\fB.socket\fR; the
-\fBMODBUS_CACHE_CTL\fR environment variable is the same knob.
+.B \-\-control\-port
+control server target: unix socket path or TCP port on 127.0.0.1,
+auto\-detected (default: /tmp/modbus\-cache\-15502.socket; env
+MODBUS_CACHE_CTL or CACHE_CTL when unset) — same flag as the proxy
+itself
 .TP
-.BI \-\-timeout " S"
-wire timeout, seconds. Default \fB5\fR.
+.B command
+control command, e.g. inspect, show status, show cache, clear cache,
+restart, shutdown
 .TP
-.BI \-\-control-token " TOKEN"
-the token for TCP control (the daemon must have been started with the
-same one).
+.BI \-\-timeout " N"
+socket timeout in seconds (default 5.0)
 .TP
-.BI \-\-control-token-file " FILE"
-the token from a file (the first line); mutually exclusive with
-\fB--control-token\fR. The file must be owner-only (\fB0600\fR) \(em a
-token flag is visible in \fBps\fR, prefer the file.
+.B \-\-control\-token
+control auth token for TCP (env MODBUS_CACHE_CONTROL_TOKEN)
 .TP
-.BI \-\-audit-log " FILE|\-"
-the client's own audit trail
-(\fB~/.local/state/modbus-cache/audit.log\fR by default).
+.B \-\-control\-token\-file
+the token from a file (the first line; must be owner\-only 0600); not
+for use with \-\-control\-token (env MODBUS_CACHE_CONTROL_TOKEN_FILE)
 .TP
-.BI \-\-audit-max-mb " N ", \-\-audit-files " N"
-the file sink's gated rotation (defaults \fB10\fR / \fB3\fR).
+.B \-\-audit\-log
+audit trail: a file path or \- for stdout; default: the XDG state home
 .TP
-.B \-\-no-audit-log
-disable the client's audit trail.
+.BI \-\-audit\-max\-mb " N"
+rotate the audit log at this size, 0 = off (default: 10.0)
+.TP
+.BI \-\-audit\-files " N"
+rotated audit backups to keep (default 3)
+.TP
+.B \-\-no\-audit\-log
+disable the audit trail (default: off)
+
+
 .SH EXAMPLES
 .RS
 .IP \(bu 2
@@ -59,6 +68,7 @@ disable the client's audit trail.
 .IP \(bu 2
 .B printf 'show cache\\nclear cache\\n' | modbus-cache-ctl
 .RE
+
 .SH EXIT STATUS
 .TP
 .B 0
@@ -69,6 +79,7 @@ connection or control error.
 .TP
 .B 2
 command-line misuse.
+
 .SH SEE ALSO
 .BR modbus-cache (1),
 .BR modbus-cache-cli (1)

@@ -25,6 +25,18 @@ TOKEN = 'sekrit'
 AUTH_PORT = 15965   # the fuzz cache runs token'd (F5): roundtrip authenticates first there
 
 
+def wiremac(payload):
+    """The control wire's frame mac: the full sha256 HMAC, keyed by the token."""
+    import hashlib
+    import hmac
+    return hmac.new(TOKEN.encode(), payload.encode(), hashlib.sha256).hexdigest()
+
+
+def signed(cmd):
+    """The signed wire form of one command (the token'd server refuses the unsigned)."""
+    return _json.dumps({'cmd': cmd, 'mac': wiremac(cmd)}).encode() + b'\n'
+
+
 def check(name, ok, detail=''):
     print(('PASS ' if ok else 'FAIL ') + name + (' — ' + str(detail) if detail and not ok else ''))
     if not ok:
@@ -90,7 +102,7 @@ def main():
             (b'{"cmd": null}\n', 'null cmd'),
             (b'\xff\xfe\x00binary\n', 'binary bytes'),
             (b'{"cmd": "show stat\xc3\xbc\u007f"}\n', 'unicode cmd'),
-            (b'{"cmd": "show status", "extra": ' + b'[' * 40 + b']' * 40 + b'}\n', 'deeply nested'),   # the extra field is ignored
+            (signed('show status')[:-2] + b', "extra": ' + b'[' * 40 + b']' * 40 + b'}\n', 'deeply nested'),   # the extra field is ignored
             (b'\n', 'empty line'),
             (b'   \n', 'whitespace line'),
         ]
@@ -113,7 +125,7 @@ def main():
             buf = b''
             while not buf.endswith(b'\n'):
                 buf += s.recv(4096)
-            for b in b'{"cmd": "show version"}\n':
+            for b in signed('show version'):
                 s.sendall(bytes([b]))
                 time.sleep(0.001)
             buf = b''
@@ -133,16 +145,16 @@ def main():
         s = connect(15965)
         s.sendall(b'{"cmd": "show status"}')
         s.close()
-        st, tx = roundtrip(15965, b'{"cmd": "show version"}\n')
+        st, tx = roundtrip(15965, signed('show version'))
         check('fuzz: frameless close does not wedge the server', st == 'ok', '%s %s' % (st, tx))
 
         # 5. ping flood: 100 keepalives, then a real command still works
         ok = True
         for _ in range(100):
-            st, tx = roundtrip(15965, b'{"cmd": "ping"}\n', timeout=10)
+            st, tx = roundtrip(15965, signed('ping'), timeout=10)
             ok = ok and st == 'ok'
         check('fuzz: ping flood survives (100x)', ok)
-        st, tx = roundtrip(15965, b'{"cmd": "show status"}\n')
+        st, tx = roundtrip(15965, signed('show status'))
         check('fuzz: real command after the flood', st == 'ok', '%s %s' % (st, tx))
 
         # 6. the token server: the auth abuse is rejected, the real token works
@@ -167,7 +179,7 @@ def main():
                 buf += s.recv(4096)
             auth = _json.loads(buf.decode())
             check('fuzz: the right token authenticates', auth.get('status') == 'ok', str(auth))
-            s.sendall(b'{"cmd": "show version"}\n')
+            s.sendall(signed('show version'))
             buf = b''
             while not buf.endswith(b'\n'):
                 buf += s.recv(4096)
@@ -184,7 +196,7 @@ def main():
         def hammer(i):
             try:
                 if i % 2:
-                    wire = b'{"cmd": "show cache"}\n'
+                    wire = signed('show cache')
                 else:
                     wire = ('garbage %d\n' % i).encode()
                 st, tx = roundtrip(15965, wire, timeout=15)
@@ -208,7 +220,7 @@ def main():
         check('fuzz: modbus side still answers after the fuzzing', len(r) >= 10, r.hex())
 
         # 9. clean shutdown
-        st, tx = roundtrip(15965, b'{"cmd": "shutdown"}\n')
+        st, tx = roundtrip(15965, signed('shutdown'))
         check('fuzz: shutdown still works', st == 'bye', '%s %s' % (st, tx))
         time.sleep(1)
         check('fuzz: proxy exited cleanly', procs[1].poll() == 0, str(procs[1].poll()))

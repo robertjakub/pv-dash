@@ -4,6 +4,8 @@
 Run from anywhere: python3 cache/test/regtest.py
 Starts its own fake inverter + proxy on scratch ports and cleans up.
 """
+import hashlib
+import hmac
 import json as _json
 import os
 import signal
@@ -372,7 +374,12 @@ try:
 
     def ctl_cmd(cmd, port):
         """One JSON-lines control exchange (the token handshake first — every
-        regtest TCP control speaks 'sekrit'): send {"cmd": ...}, return 'status text'."""
+        regtest TCP control speaks 'sekrit'): sign the command, verify the
+        reply's mac, return 'status text'."""
+
+        def wiremac(payload):
+            return hmac.new(b'sekrit', payload.encode(), hashlib.sha256).hexdigest()
+
         s = socket.create_connection(('127.0.0.1', port), timeout=5)
         s.sendall(_json.dumps({'cmd': 'auth', 'token': 'sekrit'}).encode() + b'\n')
         buf = b''
@@ -380,7 +387,7 @@ try:
             buf += s.recv(4096)
         auth = _json.loads(buf.decode())
         assert auth.get('status') == 'ok', auth
-        s.sendall(_json.dumps({'cmd': cmd}).encode() + b'\n')
+        s.sendall(_json.dumps({'cmd': cmd, 'mac': wiremac(cmd)}).encode() + b'\n')
         buf = b''
         while not buf.endswith(b'\n'):
             b2 = s.recv(4096)
@@ -389,6 +396,8 @@ try:
             buf += b2
         s.close()
         obj = _json.loads(buf.decode())
+        assert obj.get('mac') == wiremac('%s %s' % (obj.get('status'), obj.get('text', ''))), \
+            'the reply mac does not verify: %r' % obj
         return '%s %s' % (obj.get('status'), obj.get('text', ''))
 
     start([sys.executable, F, '--static', '--port', '15512', '--control-port', '0'])
@@ -487,19 +496,28 @@ try:
     while not buf.endswith(b'\n'):
         buf += s.recv(4096)
     auth = _json.loads(buf.decode())
-    s.sendall(b'{"cmd": "show status"}\n')
+    signed_cmd = _json.dumps({'cmd': 'show status',
+                              'mac': hmac.new(b'sekrit', b'show status', hashlib.sha256).hexdigest()})
+    s.sendall(signed_cmd.encode() + b'\n')
     buf = b''
     while not buf.endswith(b'\n'):
         buf += s.recv(4096)
     st = _json.loads(buf.decode())
     s.close()
-    check('control: the right token authenticates, commands work after it',
+    check('control: the right token authenticates, signed commands work after it',
           auth.get('status') == 'ok' and st.get('status') == 'ok'
           and 'upstream=127.0.0.1:15512' in st.get('text', ''), '%s %s' % (auth, st))
+    r = ctl_raw(b'{"cmd": "show status"}\n', 15520, token='sekrit')
+    check('control: an unsigned command over TCP is refused (the signed wire)',
+          r.get('status') == 'err' and 'unsigned command' in r.get('text', ''), str(r))
+    r = ctl_raw(_json.dumps({'cmd': 'show status', 'mac': 'ab' * 32}).encode() + b'\n', 15520, token='sekrit')
+    check('control: a bad command mac is refused',
+          r.get('status') == 'err' and 'mac does not verify' in r.get('text', ''), str(r))
     tok_audit = open('/tmp/reg_audit_ctl.log').read()
-    check('audit: AUTH-FAIL + COMMAND events with the peer',
+    check('audit: AUTH-FAIL + COMMAND events with the peer and the wire mac',
           'AUTH-FAIL' in tok_audit and 'AUDIT CACHE COMMAND ' in tok_audit
-          and 'peer=127.0.0.1:' in tok_audit and "'show status' -> ok" in tok_audit, tok_audit[-200:])
+          and 'peer=127.0.0.1:' in tok_audit and "'show status' wire=h" in tok_audit
+          and ' -> ok' in tok_audit, tok_audit[-240:])
 
     # the pre-auth line buffer is capped: a newline-less stream is dropped, not buffered
     s = socket.create_connection(('127.0.0.1', 15520), timeout=10)
@@ -1173,6 +1191,18 @@ try:
                        capture_output=True, text=True, timeout=15)
     check('token file: cache_ctl authenticates with the file token', r.returncode == 0
           and r.stdout.startswith('ok modbus-cache'), repr(r.stdout[:80]))
+    r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'show', 'version'],
+                       capture_output=True, text=True, timeout=15,
+                       env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN_FILE': tokfile})
+    check('token file: cache_ctl honors MODBUS_CACHE_CONTROL_TOKEN_FILE', r.returncode == 0
+          and r.stdout.startswith('ok modbus-cache'), repr(r.stdout[:80]))
+    r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'status'],
+                       capture_output=True, text=True, timeout=15,
+                       env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'x',
+                            'MODBUS_CACHE_CONTROL_TOKEN_FILE': tokfile})
+    check('token file: the token env + the token-file env is a clean error', r.returncode != 0
+          and 'mutually exclusive' in (r.stderr + r.stdout)
+          and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'show', 'version'],
                        capture_output=True, text=True, timeout=15)
     check('token file: token-less ctl refused', r.returncode == 0

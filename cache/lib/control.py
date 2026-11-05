@@ -22,6 +22,7 @@ from common.config import default_profile_path, resolve_profile_file
 from common.cred import peer_uid, parse_trust_uids
 from common.human import secs
 from common.protocol import ModbusError
+from common.wiresec import frame_mac, sign_reply, verify_request_mac, proof_tag
 from .statics import CONTROL_IDLE_TIMEOUT_S
 from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .cache import build_blocks
@@ -145,13 +146,24 @@ class ControlServer:
         if cmd.lower() == 'auth':
             given = obj.get('token')
             if self.token and isinstance(given, str) and hmac.compare_digest(given, self.token):
-                return 'auth', {'status': 'ok', 'text': 'authenticated'}, 'ok authenticated'
+                reply = 'ok authenticated'
+                return 'auth', {'status': 'ok', 'text': 'authenticated', 'mac': sign_reply(self.token, reply)}, reply
             return 'auth', {'status': 'err', 'text': 'bad token'}, 'err bad token'
+        if self.token and obj.get('mac') is None and not self.is_unix:
+            return cmd, {'status': 'err',
+                         'text': 'unsigned command rejected: TCP commands carry the hmac-sha256 of the command, keyed by the token'}, \
+                'err unsigned command'
+        if self.token and obj.get('mac') is not None and not verify_request_mac(self.token, cmd, obj.get('mac')):
+            return cmd, {'status': 'err',
+                         'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac'
         reply = self.command(cmd)
         if reply is None:              # quit: no reply, just close
             return cmd, None, 'bye'
         status, _, text = reply.partition(' ')
-        return cmd, {'status': status, 'text': text}, reply
+        reply_obj = {'status': status, 'text': text}
+        if self.token:
+            reply_obj['mac'] = sign_reply(self.token, reply)
+        return cmd, reply_obj, reply
 
     def announce_exit(self, reason):
         """The daemon is going down: send every connected control client a
@@ -203,7 +215,8 @@ class ControlServer:
                     elif self.audit:
                         self.audit.event('AUTH-FAIL', 'peer=%s' % who)
                 elif self.audit and cmd.lower() != 'ping':
-                    self.audit.event('COMMAND', "peer=%s '%s' -> %s" % (who, cmd, reply.split(' ', 1)[0]))
+                    self.audit.event('COMMAND', "peer=%s '%s'%s -> %s"
+                                     % (who, cmd, proof_tag(obj), reply.split(' ', 1)[0]))
                 logger.debug('control from %s: %s -> %s', who, cmd, reply)
                 if obj is not None:
                     client.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())

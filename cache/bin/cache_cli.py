@@ -41,6 +41,7 @@ except ImportError:
 from common.audit import AuditLog
 from common.config import load_token_file
 from common.human import secs
+from common.wiresec import sign_request, verify_reply
 from lib.config import resolve_control_target
 from lib.settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from lib.statics import CLI_KEEPALIVE_S, CLI_TIMEOUT_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S
@@ -221,21 +222,25 @@ def aligned_rows(matches, desc, hint):
 _last_listed = None   # the completer is called several times per attempt;
                       # list each distinct buffer only once
 _prompt = 'cache > '   # the session's prompt; the completer re-echoes it after the list
+_token = None             # the control token: every frame is signed with it when set
+_require_reply_mac = False   # True once the token handshake happened (TCP): unsigned replies are fatal
 
 _send_lock = threading.Lock()   # the keepalive thread and exchange() share the wire
 _stop_ping = threading.Event()
 
 
 def keepalive(sock, interval, audit=None):
-    """Send pings while the user thinks, so the control server's idle timeout
-    never drops a live session; any traffic resets that timer. A dead wire
-    while the console sits at the prompt: if the daemon announced its exit,
-    the bye frame is still pending — print the notice and leave (no reconnect
-    against a dead proxy); an unannounced death is the main loop's business."""
+    """Send signed pings while the user thinks, so the control server's idle
+    timeout never drops a live session; any traffic resets that timer. A
+    dead wire while the console sits at the prompt: if the daemon announced
+    its exit, the bye frame is still pending — print the notice and leave
+    (no reconnect against a dead proxy); an unannounced death is the main
+    loop's business."""
     while not _stop_ping.wait(interval):
         try:
             with _send_lock:
-                sock.sendall(b'{"cmd": "ping"}\n')
+                sock.sendall((json.dumps(sign_request(_token, 'ping') if _token else {'cmd': 'ping'},
+                                         ensure_ascii=False) + '\n').encode())
         except OSError:
             try:
                 sock.setblocking(False)
@@ -312,16 +317,21 @@ def main():
     p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = off (default %(default)s)')
     p.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
     p.add_argument('--no-audit-log', action='store_true', help='disable the audit trail')
+    p.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-cache-cli --man | man -l -)')
     args = p.parse_args()
+    if args.man:
+        from lib.man import cli_page
+        sys.stdout.write(cli_page(p))
+        raise SystemExit(0)
 
     audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CLI', app='modbus-cache',
                                                     max_mb=args.audit_max_mb, files=args.audit_files)
-    if args.control_token and args.control_token_file:
+    token_file = args.control_token_file or os.environ.get('MODBUS_CACHE_CONTROL_TOKEN_FILE')
+    token = args.control_token or os.environ.get('MODBUS_CACHE_CONTROL_TOKEN')
+    if token and token_file:
         p.error('--control-token and --control-token-file are mutually exclusive')
-    if args.control_token_file:
-        token = load_token_file(args.control_token_file, 'control-token-file')
-    else:
-        token = args.control_token or os.environ.get('MODBUS_CACHE_CONTROL_TOKEN')
+    if token_file:
+        token = load_token_file(token_file, 'control-token-file')
     target = resolve_control_target(args.control_port)
     if target.isdigit():
         if not 1 <= int(target) <= 65535:
@@ -391,8 +401,9 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
     """Read-execute loop: local commands first, everything else goes to the
     proxy. A dead connection raises ConnectionLost out of the loop and is
     met with the reconnect cycle (--reconnect); --reconnect 0 exits."""
-    global _prompt
+    global _prompt, _token, _require_reply_mac
     _prompt = prompt
+    _token = token
     try:
         while True:
             try:
@@ -401,6 +412,7 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
                     if not reply or not reply.startswith('ok'):
                         print('control auth failed: %s' % (reply or 'no reply'), file=sys.stderr)
                         return 1
+                    _require_reply_mac = True   # the handshake holds: unsigned replies are fatal
                 if sys.stdin.isatty():
                     welcome(sock)
                 interval = float(os.environ.get(KEEPALIVE_ENV, '') or DEFAULT_KEEPALIVE)
@@ -433,8 +445,10 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
 
 
 def wire(cmd):
-    """The JSON wire form of a typed command."""
-    return json.dumps({'cmd': cmd}, ensure_ascii=False)
+    """The JSON wire form of a typed command — token-signed when we hold
+    the token (the server verifies every frame; the reply macs verify in
+    exchange())."""
+    return json.dumps(sign_request(_token, cmd) if _token else {'cmd': cmd}, ensure_ascii=False)
 
 
 def welcome(sock):
@@ -568,6 +582,12 @@ def exchange(sock, wire_text):
             except ValueError:
                 continue
             text = '%s %s' % (obj.get('status', 'err'), str(obj.get('text', '')))
+            mac = obj.get('mac')
+            if _token and mac is not None and not verify_reply(_token, obj.get('status', 'err'),
+                                                               str(obj.get('text', '')), mac):
+                raise ConnectionLost('the reply mac does not verify — the wire was tampered with')
+            if _token and mac is None and _require_reply_mac:
+                raise ConnectionLost('the server did not sign the reply')
             if obj.get('status') == 'bye' and str(obj.get('text', '')).startswith('daemon-exit'):
                 raise DaemonExit(text)
             if text.strip() == 'ok pong':

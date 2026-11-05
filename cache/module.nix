@@ -506,13 +506,36 @@ in
         DynamicUser = true;
         Restart = "on-failure";
         RestartSec = 3;
+        UMask = "0077";
+        # the sandbox pass (verified with systemd-analyze security in the
+        # flake's hardening check): the whole filesystem read-only but the
+        # explicit RW paths, no /home, no /tmp sharing, no device nodes, no
+        # kernel interfaces, no namespace/clock/hostname mutation, no
+        # privileges, no writable+executable memory, only the AF_UNIX +
+        # INET* socket families and the @system-service calls.
         NoNewPrivileges = true;
         ProtectSystem = "strict";
         ProtectHome = true;
         PrivateTmp = true;
+        PrivateDevices = true;
         ProtectKernelTunables = true;
+        ProtectKernelModules = true;
+        ProtectKernelLogs = true;
         ProtectControlGroups = true;
-        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+        ProtectClock = true;
+        ProtectHostname = true;
+        ProtectProc = "invisible";
+        RestrictNamespaces = true;
+        RestrictRealtime = true;
+        RestrictSUIDSGID = true;
+        LockPersonality = true;
+        MemoryDenyWriteExecute = true;
+        CapabilityBoundingSet = "";
+        # AF_UNIX: the default control target is a unix socket — without it
+        # the socket() call fails and the control server silently never binds
+        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
+        SystemCallArchitectures = "native";
+        SystemCallFilter = [ "@system-service" ];
       } // lib.optionalAttrs (rwPaths != [ ]) {
         ReadWritePaths = rwPaths;
       } // lib.optionalAttrs (cfg.controlTokenFile != null) {

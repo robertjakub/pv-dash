@@ -204,6 +204,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--max-conn-per-ip` | `0` | refuse further connections from one peer IP past this many simultaneous connections (`0` = no per-IP limit) |
 | **Logging** | | |
 | `--log-level` | `INFO` | `DEBUG` adds per-client traffic and per-poll detail |
+| `--man` | off | print the generated man page (roff) to stdout and exit (`modbus-cache --man \| man -l -`); the shipped pages are the same generator's output |
 | `--log-access` | `DEBUG` | log client connects/disconnects at `INFO` instead of `DEBUG` |
 | `--local-time` | UTC | log timestamps in the system time zone instead of UTC |
 
@@ -258,6 +259,17 @@ on both transports. Over the unix socket the kernel vouches for the peer
 `--control-trust-uids` uids skip the handshake, so a local systemd unit
 speaks without sharing the secret; TCP peers always need the token. Without
 a token the unix socket relies on filesystem permissions.
+
+**With a token configured the wire is signed**: every command and reply
+carries the **full sha256 HMAC of its payload, keyed by the token**
+(`"mac": …` next to the payload — `common/wiresec.py`). The token auth
+proves who is speaking once; the mac proves it for every frame — a client
+holding the token verifies nothing was injected or altered in flight, and
+over TCP the signed commands are mandatory (an unsigned or bad-mac frame is
+refused; on the unix socket the mac is verify-if-present so the trusted
+peers keep speaking without the secret). The audit trail's COMMAND entries
+carry the frame's mac (`wire=h…`) — the command the server logs
+cryptographically matches the command the client sent.
 
 > **A token flag lands in `ps`.** Tokens passed as `--control-token` /
 > `--metrics-token <secret>` are visible on the process command line — every

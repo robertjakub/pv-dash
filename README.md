@@ -25,7 +25,7 @@ a reconnecting console session).
 ## The flake
 
 ```bash
-nix run .#dashboard          # the dashboard (server.py + static page)
+nix run .#dashboard          # the dashboard (bin/dashboard.py + static page)
 nix run .#modbus-scraper -- --host <inverter-lan-ip> --listen 0.0.0.0:9350
 nix run .#modbus-cache       # multiplex the inverter's single Modbus client
 nix run .#modbus-fake-inverter   # fake inverter for development and testing
@@ -71,6 +71,7 @@ python3 tests/cache-fuzz.py [n]      # the cache: n hostile client frames
 python3 tests/scrape-fuzz.py [n]     # the scraper: n hostile HTTP frames
 python3 tests/cache-control-fuzz.py  # the cache: hostile JSON on the control server
 python3 tests/control-fuzz.py        # the fake inverter: hostile JSON on the control server
+python3 tests/dashboard-control-fuzz.py  # the dashboard: hostile JSON on the control server
 ```
 
 Every scenario must end with the process under test alive and **zero
@@ -92,7 +93,7 @@ carry a per-writer hash chain verified by `scripts/audit_verify.py` (F10).
 
 The whole suite is licensed under the **BSD 3-Clause License** — see the
 `LICENSE` file. The bundled chart library in
-`dashboard/src/static/vendor/echarts.min.js` is
+`dashboard/static/vendor/echarts.min.js` is
 [Apache ECharts](https://echarts.apache.org/) 5.5.1, licensed under the
 **Apache License 2.0** (© the Apache Software Foundation); the license notice
 is preserved in the vendored file.

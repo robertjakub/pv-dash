@@ -5,10 +5,10 @@
 > at any time.
 
 The suite is stdlib-only, so the containers are trivial: `alpine` + `apk add
-python3`, no pip, no venv, ~50 MB images. One Dockerfile per Modbus tool —
-`Dockerfile.inverter`, `Dockerfile.cache`, `Dockerfile.scraper` — plus
-`Dockerfile.prometheus` for the demo stack's scraper, and a `compose.yaml`
-wiring the demo stack. The pattern:
+python3`, no pip, no venv, ~50 MB images. One Dockerfile per tool —
+`Dockerfile.inverter`, `Dockerfile.cache`, `Dockerfile.scraper`,
+`Dockerfile.dashboard` — plus `Dockerfile.prometheus` for the demo stack's
+collector, and a `compose.yaml` wiring the demo stack. The pattern:
 
 - an unprivileged **`pvsuite`** user (`adduser -D`, `COPY --chown`); the
   entrypoint runs as root only to seed the config volume and drops to
@@ -46,16 +46,21 @@ docker compose up -d fake-inverter              # build + serve on the internal 
 docker compose up -d modbus-cache               # + the cache proxy (upstream: fake-inverter)
 docker compose up -d modbus-scraper             # + the exporter (upstream: modbus-cache)
 docker compose up -d prometheus                 # + the scraper's Prometheus, scraping modbus-scraper:9350
+docker compose up -d dashboard                  # + the dashboard, proxying the internal Prometheus
 docker compose exec --user pvsuite fake-inverter fake-cli   # a console session on the control server
 docker compose down
 ```
 
-**Nothing is published on the host** (the audit's F7): the four services
-talk over one `internal: true` network (`pv-modbus` — no host ports, no
-outbound route), so the Modbus listeners, the exporter's `/metrics` and the
-Prometheus UI are reachable only from inside that network. `docker compose
-down` removes the network with the stack. (To browse the Prometheus UI from
-the host, add `ports: ["127.0.0.1:9090:9090"]` to the service in a
+**Exactly one port is published on the host** — the dashboard's HTTP
+interface, loopback-only (`127.0.0.1:8080:8080`): the front for the stack's
+internal Prometheus, its `/prom` proxy aimed at `http://prometheus:9090` by
+the compose's `PROM_URL`. Everything else stays closed (the audit's F7): the
+services talk over one `internal: true` network (`pv-modbus` — no other host
+ports, no outbound route), so the Modbus listeners, the exporter's
+`/metrics` and the Prometheus UI are reachable only from inside that network.
+`docker compose down` removes the network with the stack. (To browse the
+Prometheus UI directly from the host as well, add
+`ports: ["127.0.0.1:9090:9090"]` to the service in a
 `docker-compose.override.yaml` — loopback-only, an explicit operator act.)
 
 **The scrape/token story ships in the stack** (the audit's F13 closed for
@@ -100,39 +105,41 @@ generated into that volume gating the exporter. The arrows are the traffic;
 every listener binds inside the network only:
 
 ```text
-        HOST — nothing published (no ports, no outbound route from the network)
+        HOST — 127.0.0.1:8080 published (the dashboard's UI), nothing else
    ┌─────────────────────────────────────────────────────────────────────┐
    │                                                                     │
    │   internal network "pv-modbus"                                      │
    │   ┌──────────────────────────────────────────────────────────┐      │
    │   │                                                          │      │
-   │   │  ┌──────────────┐  FC3/4 reads   ┌──────────────┐        │      │
-   │   │  │fake-inverter │◄────10s poll──┤ modbus-cache │        │      │
-   │   │  │  (the device)│────values────►│    15502     │        │      │
-   │   │  └──────▲───────┘               └──────┬───────┘        │      │
-   │   │         │ FC06/16 writes (gated; the   │ 10s poll       │      │
-   │   │         │ write gates default closed:  │ /metrics       │      │
-   │   │         │ allow-write off, write-acl/  │                │      │
-   │   │         │ write-registers none)        │                │      │
-   │   │         └──────────────────────────────┘                │      │
-   │   │                                        │                │      │
-   │   │                                        ▼                │      │
-   │   │   Bearer token (0600) ──────► ┌──────────────┐          │      │
-   │   │                               │modbus-scraper│          │      │
-   │   │                               │    9350      │          │      │
-   │   │                               └──────┬───────┘          │      │
-   │   │                                      │ scrape 10s       │      │
-   │   │                                      ▼                  │      │
-   │   │                               ┌──────────────┐          │      │
-   │   │                               │  prometheus  │ 9090 UI  │      │
-   │   │                               │ (TSDB volume,│ internal │      │
-   │   │                               │  dashboard = │          │      │
-   │   │                               │  pending)    │          │      │
-   │   │                               └──────────────┘          │      │
+   │   │  ┌──────────────┐  FC3/4 reads  ┌──────────────┐         │      │
+   │   │  │fake-inverter │◄────10s poll──┤ modbus-cache │         │      │
+   │   │  │  (the device)│────values────►│    15502     │         │      │
+   │   │  └──────▲───────┘               └──────┬───────┘         │      │
+   │   │         │ FC06/16 writes (gated; the   │ 10s poll        │      │
+   │   │         │ write gates default closed:  │ /metrics        │      │
+   │   │         │ allow-write off, write-acl/  │                 │      │
+   │   │         │ write-registers none)        │                 │      │
+   │   │         └──────────────────────────────┘                 │      │
+   │   │                                        │                 │      │
+   │   │                                        ▼                 │      │
+   │   │   Bearer token (0600) ──────► ┌──────────────┐           │      │
+   │   │                               │modbus-scraper│           │      │
+   │   │                               │    9350      │           │      │
+   │   │                               └──────┬───────┘           │      │
+   │   │                                      │ scrape 10s        │      │
+   │   │                                      ▼                   │      │
+   │   │                               ┌──────────────┐           │      │
+   │   │                        9090   │  prometheus  │           │      │
+   │   │              ┌───── /prom ────│ (TSDB volume)│           │      │
+   │   │              │                └──────────────┘           │      │
+   │   │              ▼                                           │      │
+   │   │      ┌──────────────┐                                    │      │
+   │   │      │  dashboard   │ 8080 ── the one published port     │      │
+   │   │      └──────────────┘        (127.0.0.1 only)            │      │
    │   └──────────────────────────────────────────────────────────┘      │
    │                                                                     │
    │   shared "config" volume (/config): the ini files + metrics.token,  │
-   │   mounted by all three Modbus services; prometheus mounts it ro     │
+   │   mounted by the Modbus services + the dashboard; prometheus ro     │
    │                                                                     │
    │   docker compose exec <service> …  — the way in                     │
    └─────────────────────────────────────────────────────────────────────┘
@@ -146,11 +153,16 @@ every listener binds inside the network only:
 - **modbus-scraper** — the exporter: polls the cache every 10 s, serves
   `/metrics` with the bearer token.
 - **prometheus** — scrapes the exporter every 10 s with the same token;
-  its TSDB is the `prometheus-data` volume, its UI stays internal (the
-  dashboard service will be the front when it lands).
-- **the `config` volume** — mounted by all three Modbus services (prometheus
-  reads it read-only): the ini files are editable there; `/config/metrics.token`
-  is the generated shared secret.
+  its TSDB is the `prometheus-data` volume; its UI stays internal — the
+  dashboard is the front.
+- **dashboard** — the single-page app + its stdlib proxy server: the only
+  published surface, loopback `127.0.0.1:8080:8080`; `/prom` proxies the
+  internal Prometheus (`PROM_URL=http://prometheus:9090`), the static files
+  and the served `config.js` come from the image (the `/config` copies for
+  the live edits).
+- **the `config` volume** — mounted by the three Modbus services and the
+  dashboard (prometheus reads it read-only): the ini files are editable
+  there; `/config/metrics.token` is the generated shared secret.
 - **the audit trails** — the tools audit to stdout in the demo, so `docker
   compose logs <service>` is the trail.
 
@@ -234,7 +246,29 @@ Compose-only by design: it mounts the shared `config` volume (read-only)
 for the token, needs `modbus-scraper` on the internal network, and its
 entrypoint (`entrypoint-prometheus.sh`) drops root before the exec — see
 [The demo stack](#the-demo-stack-compose). The UI serves on the internal
-network only; nothing is published on the host.
+network only — the dashboard's proxy is the way in from the host.
+
+### dashboard (`Dockerfile.dashboard`)
+
+The static single-page app with its stdlib Prometheus proxy — see the
+[dashboard](../dashboard/README.md). The live configs are
+`/config/server.ini` and `/config/config.js` (`--config /config/server.ini`,
+`CONFIG_JS`):
+
+```bash
+cd docker
+docker build -t pv-dashboard --build-context scripts=../docker ../dashboard
+docker run --rm -p 127.0.0.1:8080:8080 pv-dashboard    # loopback-published, serves 0.0.0.0:8080 in the container
+docker run --rm -it pv-dashboard bash                  # poke around as pvsuite
+docker run --rm -p 127.0.0.1:8080:8080 -e PROM_URL=http://prometheus:9090 \
+    pv-dashboard                                       # the upstream via env (env beats server.ini)
+```
+
+The upstream defaults to the bundled `server.ini`'s
+`upstream = http://localhost:9090`; `PROM_URL` (env) or a `--upstream` flag
+override it. In the compose stack the compose sets `PROM_URL` to the
+internal `prometheus` service — the dashboard is the stack's one published
+surface (`127.0.0.1:8080:8080`).
 
 ## The version inside the image
 

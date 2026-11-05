@@ -19,7 +19,7 @@ Every `import` in the suite resolves to the Python standard library or to
 first-party code (`common.*`, the subproject's own `lib.*`):
 
 ```bash
-grep -rhE '^import |^from ' --include='*.py' common cache inverter scrape dashboard/src profiles/bin \
+grep -rhE '^import |^from ' --include='*.py' common cache inverter scrape dashboard/bin dashboard/lib profiles/bin \
     | sed -E 's/^(import|from) ([a-zA-Z_0-9.]+).*/\2/' | sort -u
 ```
 
@@ -38,7 +38,7 @@ Every name in that list is stdlib (`argparse`, `configparser`, `hmac`,
 | [`cache/`](cache/README.md) | `modbus_cache.py` + `lib/` (10 modules) + 2 control clients | none — stdlib only (+ `common`) | proxy daemon |
 | [`inverter/`](inverter/README.md) | `fake_inverter.py` + `lib/` (14 modules) + 2 control clients | none — stdlib only (+ `common`) | simulator |
 | [`scrape/`](scrape/README.md) | `modbus_scraper.py` + `lib/` (7 modules) | none — stdlib only (+ `common`) | exporter |
-| [`dashboard/`](dashboard/README.md) | `server.py` + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `src/static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
+| [`dashboard/`](dashboard/README.md) | `bin/dashboard.py` + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
 
 ## Runtime and deployment layers
 
@@ -57,7 +57,7 @@ Every name in that list is stdlib (`argparse`, `configparser`, `hmac`,
 ## What is deliberately not in the SBOM
 
 - Python third-party packages — there are none (the claim, checked, above).
-- A JavaScript package tree — the page is served from `dashboard/src/static/`
+- A JavaScript package tree — the page is served from `dashboard/static/`
   as-is; the only `.js` dependency is the vendored ECharts file.
 - Compiler/toolchain artifacts — the Nix builds are stdenv wrappers, the
   docker images install the interpreter from the distro.
@@ -66,7 +66,7 @@ Every name in that list is stdlib (`argparse`, `configparser`, `hmac`,
 
 ```bash
 # the import claim (above) — stdlib + common/lib only
-grep -rhE '^import |^from ' --include='*.py' common cache inverter scrape dashboard/src profiles/bin | sort -u
+grep -rhE '^import |^from ' --include='*.py' common cache inverter scrape dashboard/bin dashboard/lib profiles/bin | sort -u
 
 # the container layer
 docker build -t pv-sbom-check --build-context profiles=../profiles \
@@ -77,7 +77,7 @@ docker run --rm pv-sbom-check sh -c 'apk info -v | sort'                        
 cat flake.lock
 
 # the vendored exception
-head -c 400 dashboard/src/static/vendor/echarts.min.js                            # the Apache-2.0 notice
+head -c 400 dashboard/static/vendor/echarts.min.js                            # the Apache-2.0 notice
 ```
 
 For the NIS2/DORA supply-chain rows: the suite's "known-vulnerabilities"

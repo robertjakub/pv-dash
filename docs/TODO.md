@@ -29,47 +29,29 @@ the **Done/history** records for their tool.
   /`fake_ctl` after a restart), complementing the scriptable
   `show settings` key=value listing. Breaking: every script and unit file
   speaking the old flat grammar follows.
-- **the verifiable control commands** `[common]` `[cache]` `[inverter]` —
-  the control wire gets the audit trail's integrity idea: commands (and
-  the replies?) carry a short hash (the trail's chained `h=` shape or an
-  HMAC keyed by the control token) so a client can verify nothing was
-  injected/altered between the CLI and the server — over plain TCP the
-  token auth is the boundary today; this closes the last unauthenticated
-  corner (the audit-trail line: the command the server logs should
-  cryptographically match the command the client sent).
 - **one knob, one source** `[common]` — every option currently lives in
   four places (`--help`, the ini keys, the NixOS module options, the
   README tables) and they drift; the settings registry already knows
   name/default/help — generate the `--help` text, the rendered config and
   the NixOS option skeletons from it (or at least a CI check that all four
-  agree). The man pages join when the `--man` item below lands.
-- **the man pages: `--man` + generated** `[common]` — every tool has
-  `--help` and a README; the shipped roff pages (11, in each subproject's
-  `man/`, installed to `share/man/man1/`) are the packaged-installs story —
-  what is missing is a **`--man` flag** (print the roff to stdout,
-  `modbus-cache --man | man -l -` works in a container with no man pages
-  installed) and keeping the pages generated from the registry rather than
-  hand-edited.
+  agree). The man pages already render from the parser/registry (the
+  `--man` wave); `--help` and the README tables are next.
 - **a read-only control role** `[cache]` — a second token granting only
   the show/clear verbs (no `set`, no `shutdown`): the ops shift versus the
   admin key, both audited.
-- **the token-file env honored** `[inverter]` — the clients' help promises
-  `FAKE_CONTROL_TOKEN_FILE`, the code never reads it: honor it (like
-  `FAKE_CONTROL_TOKEN`) or drop the claim from the help. Same check for
-  `FAKE_METRICS_TOKEN_FILE`.
 
 ## The security wave (the audit follow-ups)
 
 - **the remaining audit findings** `[cache]` `[scrape]` `[inverter]`
-  `[docker]` `[scripts]` — **F19 is the new one** (the release lands
-  before the CI gate reports — flip the orchestrator's defaults, see the
-  release-discipline item); the rest are documented trust decisions /
-  deployment stories: F16 (the alert-rules pack — the rules item below),
-  F17 (the volume secrets), F14 (TLS — the item below), F15 (the privacy
-  note — the item below), F1 (accepted) — see
-  [AUDIT.md](AUDIT.md); F2–F10, F11–F13 and F18 are closed and verified
-  (§3.1/§4); re-run the audit after the scrape control surface, the TLS
-  story or the dashboard service (the dashboard is the next audit wave).
+  `[docker]` — all documented trust decisions / deployment stories now
+  (F19 closed rev. 5 — the workflow cuts the release after the CI gate,
+  see the release-discipline item): F16 (the alert-rules pack — the rules
+  item below), F17 (the volume secrets), F14 (TLS — the item below), F15
+  (the privacy note — the item below), F1 (accepted) — see
+  [AUDIT.md](AUDIT.md); F2–F10, F11–F13, F18 and F19 are closed and
+  verified (§3.1/§4); re-run the audit after the scrape control surface,
+  the TLS story or the dashboard service (the dashboard is the next audit
+  wave).
 - **native TLS on the HTTP surfaces** `[scrape]` `[cache]` `[inverter]` —
   F14 says "terminate at a proxy"; an opt-in native path
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a
@@ -95,7 +77,7 @@ the **Done/history** records for their tool.
 
 ## The pipeline (CI, releases, supply chain)
 
-- **the CI** `[all]` — GitHub Actions: the nine suites + `nix flake check`
+- **the CI** `[all]` — GitHub Actions: the ten suites + `nix flake check`
   (all four packages, all systems) on the push; the release workflow on
   the tag; the man pages linted (`mandoc -Tlint`) as a job; `promtool
   check metrics` on a sample exposition.
@@ -113,12 +95,13 @@ the **Done/history** records for their tool.
   matches its recorded version.
 - **the release discipline** `[common]` — **done**: `scripts/release.py`
   (the orchestrator: the version sweep, the changelog rename, the
-  flake.lock refresh, the verification, the commit, the annotated tag, the
-  push and the `gh release` from the changelog section) plus the
-  tag-triggered workflow. What remains is **F19** (the audit finding):
-  the release is cut locally before the workflow's gate reports — make
-  the workflow the release's cutter and the local gate `--tests full`; watch
-  the first few flights, then retire the training wheels.
+  flake.lock refresh, the verification, the commit, the annotated tag —
+  signed when a key exists — and the push) plus the tag-triggered
+  workflow, which is the release's cutter now (**F19 closed**,
+  docs/AUDIT.md rev. 5): the local gate defaults to `--tests full`, the GH
+  release is the workflow's `needs: [test, build]`-gated job and the local
+  cut is the opt-in `--release`. Watch the first few flights, then retire
+  the training wheels.
 
 ## The product (what the tools do next)
 
@@ -137,11 +120,6 @@ the **Done/history** records for their tool.
   exception-code spikes, the write-refusal bursts (F16) — the cache
   contributes its side (poll down, age spikes, write refusals); the pages
   write themselves from the audit vocabulary.
-- **the scraper's control surface** `[scrape]` — the only family tool
-  without one: the JSON-lines control server + `scraper_ctl`/`scraper_cli`
-  on the cache's pattern (`set interval` live, `show status`, the poll
-  state) — the SIGHUP story is the blunt instrument today. It inherits
-  the family grammar (the CLI-redone item) from day one.
 - **the scraper's FC4 awareness** `[scrape]` `[cache]` — the profile
   schema carries the `fc` field and the cache polls/caches FC4
   independently; the scraper still reads everything with FC3 — a profile
@@ -205,7 +183,8 @@ the **Done/history** records for their tool.
   `0.0.0.0` by default with no authentication on page or proxy; the README
   documents the loopback/reverse-proxy paths, but a bearer check mirroring
   the scraper's (or at least a loud startup note) belongs in the server
-  itself before anything leaves localhost.
+  itself before anything leaves localhost — the audit raised the same gap
+  as **F21** (docs/AUDIT.md, rev. 6); close them together.
 - **the cache gauges panels** `[dashboard]` — the cache's metrics endpoint
   exists (the `modbus_cache_*` gauges); chart the hit/miss ratio, the
   cache age and the poll health next to the generation panels.
@@ -263,8 +242,13 @@ the **Done/history** records for their tool.
   splits by content (settings by default, with-cache on request).
 - **the release tooling** — `scripts/release.py` + the tag-triggered
   release workflow (the pipeline item above is the operational follow-up).
+- **the token-file env honored** `[inverter]` — the help promised
+  `FAKE_CONTROL_TOKEN_FILE` / `FAKE_METRICS_TOKEN_FILE`, the code never
+  read them: both are honored now (the fake and the two clients — flag
+  over env, the file over the plain token, both together the
+  mutual-exclusion error).
 - **the man pages** — one roff page per tool in each subproject's `man/`
-  (`src/man/` for the dashboard; 11 pages total: the three cache binaries,
+  (`man/` per subproject; 11 pages total: the three cache binaries,
   the three inverter binaries, the scraper, the dashboard server, the two
   profile tools), installed by the Nix packages (`share/man/man1/`) and
   linted with `mandoc -Tlint`.

@@ -10,6 +10,90 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **dashboard** — **the control plane** (the family set is complete now):
+  the JSON-lines control server on the scraper's pattern — the unix socket
+  `/tmp/dashboard-<port>.socket` by default (`--control-port`, `0` = off),
+  the token'd TCP with the F5 refusal, the peer-cred trusted-peer shortcut,
+  the signed wire. The live settings (`max-clients`, `client-timeout`,
+  `max-conn-per-ip`, `log-access`, `log-queries`, `battery`, `log-level` —
+  set/unset/show), `show status`/`show connections` (the live HTTP clients
+  per peer IP), `show settings`, `inspect`, `request reload` (the SIGHUP
+  path — the listen address/port are bound and stay), `shutdown`. Plus
+  **`dashboard_ctl`** / **`dashboard_cli`** (the family's one-shot and
+  console clients) and the **DSH audit trail**. The HTTP surface grew the
+  family's **connection gate** (`--max-clients`, `--client-timeout`,
+  `--max-conn-per-ip` — the refusals answer 503; `show connections` reads
+  the gate). The NixOS module grew the matching options (`ExecReload`, the
+  /run socket directory, the credentials mount included) and joins the
+  hardening VM check; the docker image ships the ctl/cli. Also fixed:
+  `--control-port 0` (the documented disable value) hit the token refusal —
+  on the scraper too.
+- **scrape** — **the control plane** (the last family tool without one):
+  the JSON-lines control server on the cache's pattern — the unix socket
+  `/tmp/modbus-scraper-<listen-port>.socket` by default (`--control-port`,
+  `0` = off), the token'd TCP with the **F5 refusal** (a TCP control port
+  without a token does not start), the peer-cred trusted-peer shortcut
+  (`SO_PEERCRED`, `--control-trust-uids`), the line/cap discipline of the
+  family's servers. The live settings (`interval`, `timeout`,
+  `max-clients`, `client-timeout`, `max-conn-per-ip`, `log-access`,
+  `log-level` — set/unset/show, `show settings` one key=value per line
+  with the override markers), `show status`/`show connections` (the live
+  HTTP clients via the connection gate's new snapshot), `poll now` (the
+  poll loop wakes immediately), `request reload` (the SIGHUP path — the
+  token file re-reads, so the bearer token rotates too), the Modbus
+  session `restart`, `inspect`, `shutdown`. Plus **`scraper_ctl`** /
+  **`scraper_cli`** (the family's one-shot and console clients, the token
+  handshake + the signed wire included) and the **SCR audit trail**
+  (`--audit-log/-max-mb/-files/--no-audit-log`; `scripts/audit_verify.py`
+  already walked the scraper's path). The NixOS module grew
+  `controlPort`/`controlToken`/`controlTokenFile`/`controlTrustUids` +
+  `auditLog`/`auditMaxMb`/`auditFiles` (the credentials mount and the
+  /run socket directory included).
+- **common** — **the signed control wire** (`common/wiresec.py`): with a
+  control token configured, every command and reply on the JSON-lines
+  control sockets of the family's four tools carries the **full sha256 HMAC of
+  its payload, keyed by the token** — the token auth proves who is
+  speaking once, the mac proves it for every frame: a token-holding client
+  verifies nothing was injected or altered in flight (the verifiable
+  commands item in docs/TODO.md). Over TCP the signed commands are
+  mandatory (unsigned/bad-mac frames refused); on the unix sockets the mac
+  is verify-if-present, so the peer-cred trusted peers keep speaking
+  without the secret; without a token nothing changes. The ctl/cli
+  clients (cache, fake, scraper, dashboard — eight of them) sign and
+  verify both directions and treat a bad reply mac as a dropped wire; the
+  servers' audit COMMAND entries carry the frame's mac (`wire=h…`) — the
+  command the server logs cryptographically matches the command the
+  client sent.
+- **common** — **the man pages are generated** (`common/manpage.py` +
+  `scripts/gen_man.py`): every tool and client gained **`--man`** (print
+  the roff page to stdout — `modbus-cache --man | man -l -` works in a
+  container with no man pages installed), the OPTIONS sections render from
+  the tools' argparse parsers (the flags and their help live once —
+  `--help` and the man page cannot drift), the prose lives in per-tool
+  `lib/man.py`, and the shipped `man/*.1` files (now 12: the scraper's and
+  the dashboard's ctl/cli pages are new) are the generator's output,
+  regenerated with `python3 scripts/gen_man.py`.
+- **fake-inverter** — **`--connect-acl`**: the Modbus connect ACL the
+  cache's audit story uses, mirrored (any/`none`/a comma-separated IP/CIDR
+  list, env `FAKE_CONNECT_ACL`, a live setting, `show status` carries
+  `connect_acl=`, the rejections logged). **The default stays `any`** —
+  the fake's trusted-LAN posture is unchanged; the flag exists so the ACL
+  story can be demoed end to end without touching the real cache.
+- **nix** — **the systemd unit hardening pass** on all three NixOS
+  modules: `PrivateDevices`, `CapabilityBoundingSet = ""` (empty),
+  `ProtectKernelModules`/`ProtectKernelLogs`/`ProtectClock`/
+  `ProtectHostname`/`ProtectProc=invisible`, `RestrictNamespaces`,
+  `RestrictRealtime`, `RestrictSUIDSGID`, `LockPersonality`,
+  `MemoryDenyWriteExecute`, `SystemCallArchitectures=native`,
+  `SystemCallFilter=@system-service`, `UMask=0077` on top of the existing
+  ProtectSystem=strict/PrivateTmp/ProtectHome. The scraper and the cache
+  keep `AF_UNIX` in `RestrictAddressFamilies` — the default control target
+  is a unix socket, and the filter without it silently broke that surface
+  (found in the pass). Verified by the new **`hardening` flake check**
+  (tests/hardening.nix): a NixOS VM boots both units, asserts every knob
+  from the live unit config and scores each with `systemd-analyze
+  security` (the check fails above 2.0 exposure).
+
 - **cache** — the state persistence (the write-behind): `--dump-path` +
   `dump-interval` (a live setting, `0` = on request) dump the cached words
   (+ their stamps) and the live setting overrides as one atomic JSON — on
@@ -68,6 +152,17 @@ before the repo restructured into one suite.
   cap; `--metrics-max-conn-per-ip`, default 0 = no per-IP limit) and both
   Modbus listeners grew **`--max-conn-per-ip`** (default 0 = no per-IP
   limit; a live setting next to `max-clients`/`client-timeout`).
+- **fake-inverter** — the control server catches up with the cache's:
+  `show status` carries a `metrics=` field and `inspect` an endpoint line
+  (the shared `describe_metrics` one-liner, `off` when the endpoint is
+  off — the fake maintained the string and reported it nowhere), the live
+  `set metrics-server on` holds the documented posture (a token-less
+  listen beyond loopback logs the same warning the startup prints), an
+  unbindable control target logs a one-liner and keeps the fake running
+  instead of dying in the serve thread, the legacy `.`-terminator strip
+  is gone (the JSON frames never carried one) and the unix control socket
+  grew **`--control-socket-group`** (the cache's F8 opt-in: `chmod 0660`
+  instead of the default `0600`, a local group may speak to the control).
 - **scrape** — **`--max-conn-per-ip`** (default 0 = no per-IP limit):
   concurrent connections from one peer IP get the same immediate 503 as
   the total `--max-clients` cap; applied live on SIGHUP like the rest.
@@ -88,6 +183,12 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **dashboard** — the bin+lib layout like the rest of the family: `src/`
+  splits into `bin/` (`server.py` → **`bin/dashboard.py`**) and `lib/`
+  (the statics loader), with `config.js`, `server.ini` and `man/` promoted
+  to the subproject root (the dev checkout resolves them from the script's
+  parent; the installed package stays flattened); `package.nix` builds from
+  the subproject root now. No behavior change beyond the paths.
 - **cache** — **breaking**: the state dump splits by content — by default
   it dumps **settings only**; **`request dump with-cache`** includes the
   cached words, and the new **`--dump-with-cache`** flag flips the plain
@@ -140,8 +241,52 @@ before the repo restructured into one suite.
   default 3 unchanged) — the schema field now flows profile → source →
   wire (packed, and validated in the reply).
 
+### Fixed
+
+- **the family** — the help promised the token-file env vars, the client
+  code never read them (the audit's F20, docs/AUDIT.md rev. 6): the ctl/cli
+  clients honor their `--control-token-file` env form now —
+  **`MODBUS_CACHE_CONTROL_TOKEN_FILE`** (`cache_ctl`, `cache_cli`),
+  **`SCRAPER_CONTROL_TOKEN_FILE`** (`scraper_ctl`, `scraper_cli`),
+  **`DASHBOARD_CONTROL_TOKEN_FILE`** (`dashboard_ctl`, `dashboard_cli`) and
+  **`FAKE_CONTROL_TOKEN_FILE`** (`fake_ctl`, `fake_cli`) — and the fake
+  itself honors `FAKE_CONTROL_TOKEN_FILE` /
+  **`FAKE_METRICS_TOKEN_FILE`** (the env form of `--control-token-file` /
+  `--metrics-token-file`; the other daemons resolved the env from the
+  start). One resolution shape everywhere: the flag wins over the env, the
+  file over the plain token, both together the usual mutual-exclusion
+  error, the F12 0600 gate on every path.
+- **inverter** — the fake's daemon took no env for its token files (its
+  config had no resolution layer): covered by the family fix above.
+- **scripts** — the release gate's full suite list had drifted:
+  `--tests full` ran eight of the ten suites (the inverter regtest and the
+  audit-chain suite were missing) — the gate lists all ten now.
+- **dashboard** — the `--audit-log` help said SCR (the scraper's trail
+  prefix); the trail is DSH.
+
+### Docs
+
+- **docs/AUDIT.md rev. 6** — the audit covers the whole pv-suite now (the
+  dashboard's deferral closed): the scraper's and the dashboard's control
+  planes walked (no new findings beyond F20), the dashboard's HTTP surface
+  audited for the first time — **F21** raised (no auth on page/proxy, the
+  `0.0.0.0` default bind; the family TODO's auth-story item is the same
+  work) — the assets/surfaces inventory and the NIS2/DORA mapping extended
+  to the dashboard, and the release-gate drift recorded (fixed above).
+
 ### Security
 
+- **scripts** — the audit finding F19 (docs/AUDIT.md, rev. 5) closed: the
+  release no longer lands before the CI gate reports. The GitHub release
+  is the tag-triggered workflow's job (`needs: [test, build]` — the suites
+  + the nix build — then the cut from the changelog section); the
+  orchestrator's local cut becomes the explicit opt-in (**`--release`**,
+  printed with the bypass reminder; `--no-release` is gone). The local
+  gate defaults to **`--tests full`** (was `quick`), and the tag is
+  **signed** (`git tag -s`) whenever a signing key exists — the unsigned
+  annotated tag is the fallback, with the reason printed. Flight-tested on
+  the way: a fresh bump no longer dies on `git grep`'s no-matches exit
+  code, and a dry-run prints the plan without pretending the suites ran.
 - **cache** — the audit finding F18 (docs/AUDIT.md) closed: the state
   dump is owned trust at rest — created **`0600` explicitly** (never the
   umask) and carrying a **sha256 integrity hash** of its canonical

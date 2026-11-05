@@ -34,7 +34,7 @@
       "purl": "pkg:npm/echarts@5.5.1",
       "licenses": [{ "expression": "Apache-2.0" }],
       "properties": [
-        { "name": "pv-suite:vendored-at", "value": "dashboard/src/static/vendor/echarts.min.js" },
+        { "name": "pv-suite:vendored-at", "value": "dashboard/static/vendor/echarts.min.js" },
         { "name": "pv-suite:note", "value": "the only third-party code in the suite" }
       ] },
     { "bom-ref": "nixpkgs", "type": "framework", "name": "nixpkgs", "version": "nixos-unstable @ 1c89083e451e891152365b799595cf7790a43325",

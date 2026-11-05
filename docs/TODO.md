@@ -23,10 +23,13 @@
   pacing, the dongle's single-client behaviour, real exception codes, the
   FC4 input registers, reconnect storms) is the last mile. (Split per
   subproject: cache / scrape.)
-- **the release discipline** — the version lives in `common/version.py`
-  (`0.3.0`, `-<short git>` in a checkout) but nothing pins the process: a
-  CHANGELOG.md, the tag → release workflow, and the flake.lock/`version`
-  bump in the same commit.
+- **the release discipline** — **done**: `scripts/release.py` (the
+  orchestrator: the version sweep, the changelog rename, the flake.lock
+  refresh, the verification, the commit, the annotated tag, the push and
+  the `gh release` from the changelog section) plus the tag-triggered
+  workflow (`.github/workflows/release.yml`: the seven suites, the nix
+  build, the GitHub release). What remains is operational: watch the
+  first few flights, then retire the training wheels.
 - **the per-phase export** — the fake serves per-phase voltages/currents
   and the unbalanced home already; the scraper exports none of it and the
   dashboard shows none of it. A `phase` label on the metrics (or three
@@ -41,6 +44,8 @@
 
 ## Done (the highlights; the git history has the details)
 
+- **the release tooling** — `scripts/release.py` + the tag-triggered
+  release workflow: the Open item above is the operational follow-up.
 - **the man pages** — one roff page per tool in each subproject's `man/`
   (`src/man/` for the dashboard; 11 pages total: the three cache binaries,
   the three inverter binaries, the scraper, the dashboard server, the two

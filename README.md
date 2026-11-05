@@ -46,6 +46,7 @@ pv-suite/
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))
 ├── common/       # the shared Python package (version, audit, config, wire core; [docs](common/README.md))
 ├── tests/        # the test suites, one or more per Modbus tool
+├── scripts/      # release.py — the release orchestrator (bump, verify, tag, push, release)
 ├── docker/       # one alpine image per Modbus tool + the compose demo stack ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
 ├── docs/         # the family-level docs: the [security audit](docs/AUDIT.md), the

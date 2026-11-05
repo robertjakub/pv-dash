@@ -1,0 +1,55 @@
+name: release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: the seven suites
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          for s in cache-regtest scrape-regtest cache-stress cache-control-fuzz control-fuzz; do
+            python3 tests/$s.py
+          done
+          python3 tests/cache-fuzz.py 300
+          python3 tests/scrape-fuzz.py 300
+
+  build:
+    name: nix build (all four packages)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v30
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+          nix flake check --no-build || true
+          nix build .#modbus-cache .#modbus-scraper .#modbus-fake-inverter .#dashboard --no-link
+
+  release:
+    name: the GitHub release
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: extract the changelog section
+        run: |
+          python3 - "$GITHUB_REF_NAME" > body.md <<'EOF'
+          import re, sys
+          v, text = sys.argv[1], open('CHANGELOG.md').read()
+          m = re.search(r'^## %s\b.*\n(.*?)(?=^## |\Z)' % re.escape(v), text, re.M | re.S)
+          print(m.group(1).strip() if m else 'pv-suite %s' % v)
+          EOF
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: pv-suite ${{ github.ref_name }}
+          body_path: body.md
+          fail_on_unmatched_files: false

@@ -46,6 +46,16 @@ class ConnGate:
             else:
                 self._per_ip[ip] = n
 
+    def total(self):
+        """The concurrent-connection count right now (show status)."""
+        with self._lock:
+            return self._total
+
+    def snapshot(self):
+        """(total, {peer ip: count}) right now (show connections)."""
+        with self._lock:
+            return self._total, dict(self._per_ip)
+
 
 class GatedHTTPServer(http.server.ThreadingHTTPServer):
     """ThreadingHTTPServer + a ConnGate: admit at process_request (the

@@ -5,6 +5,7 @@ resolution (the shared profiles/ schema from the profiles/ subproject).
 The per-tool ini loaders stay in the subprojects on purpose: they agree on
 the shape (configparser, missing file fine, one [section]) but not on the
 failure policy (the cache logs and continues, the scraper dies)."""
+import ipaddress
 import os
 
 
@@ -52,10 +53,53 @@ def is_loopback_host(host):
     if t == 'localhost':
         return True
     try:
-        import ipaddress
         return ipaddress.ip_address(t).is_loopback
     except ValueError:
         return False
+
+
+def parse_acl(text, label):
+    """The connect ACL, one implementation for the family (the cache's
+    Modbus/write surfaces, the fake's Modbus listener): 'any'/'*'/empty/None
+    -> None (allow all); 'none' -> () (allow nobody); 'IP, CIDR, ...' ->
+    tuple of networks. An empty tuple refuses every peer — the ACL's
+    restrict-all mode."""
+    if text is None:
+        return None
+    t = str(text).strip()
+    if t in ('', 'any', '*'):
+        return None
+    if t.lower() == 'none':
+        return ()
+    nets = []
+    for part in t.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            nets.append(ipaddress.ip_network(part, strict=False))
+        except ValueError as e:
+            raise SystemExit('%s: bad ACL entry %r (%s)' % (label, part, e))
+    return tuple(nets)
+
+
+def acl_text(acl):
+    """The ACL normalized for `unset` to re-parse: 'any' | 'none' | the network list."""
+    if acl is None:
+        return 'any'
+    if not acl:
+        return 'none'
+    return ','.join(str(n) for n in acl)
+
+
+def acl_summary(acl):
+    """The ACL for humans (the start log, show status, inspect): 'any' (no
+    restriction), 'none' (everybody refused) or the network count."""
+    if acl is None:
+        return 'any'
+    if not acl:
+        return 'none'
+    return '%d network(s)' % len(acl)
 
 
 def load_token_file(path, label='control-token-file'):

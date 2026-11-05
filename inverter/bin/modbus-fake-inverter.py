@@ -21,9 +21,9 @@ Optional extras for demos and testing: a JSON-lines control server
 (--control-port, default unix socket /tmp/fake-inverter-<port>.socket; 0 = off) to pin
 values / freeze time / tune chaos at runtime, and
 seeded chaos injection (--chaos) that answers requests hostile. Signals
-mirror the family: SIGHUP re-applies the FAKE_* environment layer
-(FAKE_CHAOS/FAKE_MAX_KWP/FAKE_BATTERY/FAKE_STRICT/FAKE_TIME/FAKE_TIME_SCALE/
-FAKE_LOG_LEVEL, keep-last-good), SIGUSR1 resets the scenario (releases pins
+mirror the family: SIGHUP re-applies the INV_* environment layer
+(INV_CHAOS/INV_MAX_KWP/INV_BATTERY/INV_STRICT/INV_TIME/INV_TIME_SCALE/
+INV_LOG_LEVEL, keep-last-good), SIGUSR1 resets the scenario (releases pins
 + write overlay), SIGTERM/SIGINT shut down with a session summary.
 """
 import os
@@ -45,9 +45,11 @@ from common.version import version_string
 from lib.chaos import Chaos
 from lib.paths import resolve_control_target
 from lib.control import ControlServer
+from lib.options import KNOWN_VERBS
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
-from lib.statics import (AUDIT_FILES, AUDIT_MAX_MB, DEFAULT_BATTERY_KWH, DEFAULT_CHAOS, DEFAULT_CLIENT_TIMEOUT_S,
+from lib.statics import (LOG_LEVELS,
+                                                 AUDIT_FILES, AUDIT_MAX_MB, DEFAULT_BATTERY_KWH, DEFAULT_CHAOS, DEFAULT_CLIENT_TIMEOUT_S,
                          DEFAULT_HOST, DEFAULT_LOG_LEVEL, DEFAULT_MAX_CLIENTS, DEFAULT_MAX_CONN_PER_IP,
                          DEFAULT_MAX_KWP, DEFAULT_METRICS_CLIENT_TIMEOUT_S, DEFAULT_METRICS_LISTEN,
                          DEFAULT_METRICS_MAX_CLIENTS, DEFAULT_METRICS_MAX_CONN_PER_IP, DEFAULT_MODBUS_PORT,
@@ -102,7 +104,7 @@ def validate(args):
 
 def configured_defaults(args, frozen, profile_text):
     """Every setting's configured startup value — what `unset <setting>` restores."""
-    connect_acl = parse_acl(args.connect_acl or os.environ.get('FAKE_CONNECT_ACL'), 'connect-acl')
+    connect_acl = parse_acl(args.connect_acl or os.environ.get('INV_CONNECT_ACL'), 'connect-acl')
     return {
         'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'grid': 'auto', 'soc': 'auto', 'cloud': 'clear',
         'time': '%02d:%02d' % (int(frozen), round((frozen % 1.0) * 60)) if frozen is not None else 'auto',
@@ -131,6 +133,25 @@ def configured_defaults(args, frozen, profile_text):
     }
 
 
+def startup_values(args):
+    """The startup options as display strings by registry name — what
+    `show config` renders (the argv that would restart this fake; the
+    secrets and the unset flags drop)."""
+    from lib.options import OPTION_BY_NAME
+    out = {}
+    for name, opt in OPTION_BY_NAME.items():
+        v = getattr(args, name.replace('-', '_'), None)
+        if opt.secret or v is None or v == '' or v is False:
+            continue
+        if v is True:
+            out[name] = 'true'
+        elif name == 'connect-acl':
+            continue          # the parsed ACL renders in show status
+        else:
+            out[name] = str(v)
+    return out
+
+
 def main():
     import sys
     if '--version' in sys.argv:
@@ -154,29 +175,32 @@ def main():
     p.add_argument('--max-clients', type=int, default=DEFAULT_MAX_CLIENTS, help='refuse further Modbus connections past this many simultaneous clients, 0 = no limit (default %(default)s)')
     p.add_argument('--client-timeout', type=float, default=DEFAULT_CLIENT_TIMEOUT_S, help='disconnect Modbus clients silent for this many seconds, 0 = never (default %(default)s) — sheds connections from clients that died without closing')
     p.add_argument('--max-conn-per-ip', type=int, default=DEFAULT_MAX_CONN_PER_IP, help='refuse further Modbus connections from one peer IP past this many simultaneous connections, 0 = no per-IP limit (default %(default)s)')
-    p.add_argument('--connect-acl', default=None, help='the Modbus clients allowed to connect (the cache\'s connect-acl, mirrored): "any" (the default — the trusted-LAN posture), "none", or a comma-separated list of IPs and CIDR prefixes, e.g. 127.0.0.1,10.48.0.0/16 (env FAKE_CONNECT_ACL)')
+    p.add_argument('--connect-acl', default=None, help='the Modbus clients allowed to connect (the cache\'s connect-acl, mirrored): "any" (the default — the trusted-LAN posture), "none", or a comma-separated list of IPs and CIDR prefixes, e.g. 127.0.0.1,10.48.0.0/16 (env INV_CONNECT_ACL)')
     p.add_argument('--control-log-replies', action='store_true', help='DEBUG-log the full output of every control command (the default logs the command only)')
     p.add_argument('--metrics-server', action='store_true', help="serve the fake's own Prometheus /metrics endpoint (the live `set metrics-server` toggle exists too); off by default")
     p.add_argument('--metrics-listen', default=DEFAULT_METRICS_LISTEN, help='the metrics bind address HOST:PORT (default %(default)s)')
     p.add_argument('--metrics-token', default=None, help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
-    p.add_argument('--metrics-token-file', default=None, help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes the place of --metrics-token; giving both is an error (env FAKE_METRICS_TOKEN_FILE)')
+    p.add_argument('--metrics-token-file', default=None, help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes the place of --metrics-token; giving both is an error (env INV_METRICS_TOKEN_FILE)')
     p.add_argument('--metrics-max-clients', type=int, default=DEFAULT_METRICS_MAX_CLIENTS, help='maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited (default %(default)s)')
     p.add_argument('--metrics-client-timeout', type=float, default=DEFAULT_METRICS_CLIENT_TIMEOUT_S, help='seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap (default %(default)s)')
     p.add_argument('--metrics-max-conn-per-ip', type=int, default=DEFAULT_METRICS_MAX_CONN_PER_IP, help='maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit (default %(default)s)')
-    p.add_argument('--control-port', default=None, help='control server target: unix socket path (default: /tmp/fake-inverter-<modbus-port>.socket) or TCP port number on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with fake_ctl.py')
-    p.add_argument('--profile', default=None, help='inverter profile JSON: name -> register (+ optional type/scale), e.g. profiles/profiles/sun2000.json (the default); FAKE_PROFILE when unset')
+    p.add_argument('--control-port', default=None, help='control server target: unix socket path (default: /tmp/fake-inverter-<modbus-port>.socket) or TCP port number on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with modbus-fake-ctl.py')
+    p.add_argument('--profile', default=None, help='inverter profile JSON: name -> register (+ optional type/scale), e.g. profiles/profiles/sun2000.json (the default); INV_PROFILE when unset')
     p.add_argument('--chaos', type=float, default=DEFAULT_CHAOS, help='probability 0..1 that a request is answered hostile and dropped (default: off); seed with --seed for reproducibility')
     p.add_argument('--seed', type=int, help='chaos RNG seed (default: random)')
     p.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
-    p.add_argument('--log-level', default=DEFAULT_LOG_LEVEL, choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'])
+    p.add_argument('--log-level', default=DEFAULT_LOG_LEVEL, choices=list(LOG_LEVELS))
     p.add_argument('--audit-log', default=None, help='INV audit trail: a file path or - for stdout (the docker/journald way); default: ~/.local/state/fake-inverter/audit.log — the XDG state home')
     p.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation (default %(default)s)')
     p.add_argument('--audit-daily', action='store_true', help='also rotate the audit log at UTC midnight')
     p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
     p.add_argument('--no-audit-log', action='store_true', help='disable the INV audit trail')
     p.add_argument('--control-token', default=None, help='require a token on control connections: the client authenticates with {"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s own user or --control-trust-uids — SO_PEERCRED) skips the token')
-    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file; must be owner-only 0600) — takes the place of --control-token; giving both is an error (env FAKE_CONTROL_TOKEN_FILE)')
-    p.add_argument('--control-trust-uids', default=None, help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (env FAKE_CONTROL_TRUST_UIDS)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file; must be owner-only 0600) — takes the place of --control-token; giving both is an error (env INV_CONTROL_TOKEN_FILE)')
+    p.add_argument('--control-ops-token', default=None, help='a second, read-only control token: sessions authenticating with it may run the show/clear verbs only (no set/unset, no reset, no shutdown) — the ops shift against the admin key, both audited (env INV_CONTROL_OPS_TOKEN)')
+    p.add_argument('--control-ops-token-file', default=None, help='the read-only ops token from a file (the first line; must be owner-only 0600) — takes the place of --control-ops-token; giving both is an error (env INV_CONTROL_OPS_TOKEN_FILE)')
+    p.add_argument('--control-ops-verbs', default=None, help="the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated (default: show,clear; validated against the control grammar at start; env INV_CONTROL_OPS_VERBS)")
+    p.add_argument('--control-trust-uids', default=None, help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (env INV_CONTROL_TRUST_UIDS)')
     p.add_argument('--control-socket-group', action='store_true', help='leave the unix control socket group-accessible (chmod 0660 instead of the default 0600): a local group may speak to the control without being the service user')
     p.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-fake-inverter --man | man -l -)')
     args = p.parse_args()
@@ -198,25 +222,47 @@ def main():
         for problem in problems:
             logger.error(problem)
         raise SystemExit(1)
-    profile_text = args.profile or os.environ.get('FAKE_PROFILE') or 'sun2000'
+    profile_text = args.profile or os.environ.get('INV_PROFILE') or 'sun2000'
     profile_path = resolve_profile(profile_text)
     simulator = Simulator(PEAK_RATIO * args.max_kwp * 1000.0, args.static, frozen,
                           battery=args.battery, battery_kwh=args.battery_kwh,
                           profile=load_profile(profile_path), seed=args.seed)
     simulator.set_time_scale(args.time_scale)   # validated above; before any machine reads the clock
-    connect_acl = parse_acl(args.connect_acl or os.environ.get('FAKE_CONNECT_ACL'), 'connect-acl')
+    connect_acl = parse_acl(args.connect_acl or os.environ.get('INV_CONNECT_ACL'), 'connect-acl')
     chaos = Chaos(args.chaos, seed=args.seed)
     target = resolve_control_target(args.control_port, args.port)
-    control_token_file = args.control_token_file or os.environ.get('FAKE_CONTROL_TOKEN_FILE')
+    control_token_file = args.control_token_file or os.environ.get('INV_CONTROL_TOKEN_FILE')
     if args.control_token and control_token_file:
         logger.error('--control-token and --control-token-file are mutually exclusive')
         raise SystemExit(1)
     control_token = args.control_token
     if control_token_file:
         control_token = load_token_file(control_token_file)
-    trust_uids = parse_trust_uids(args.control_trust_uids or os.environ.get('FAKE_CONTROL_TRUST_UIDS'),
+    control_ops_token_file = args.control_ops_token_file or os.environ.get('INV_CONTROL_OPS_TOKEN_FILE')
+    if args.control_ops_token and control_ops_token_file:
+        logger.error('--control-ops-token and --control-ops-token-file are mutually exclusive')
+        raise SystemExit(1)
+    control_ops_token = args.control_ops_token or os.environ.get('INV_CONTROL_OPS_TOKEN')
+    if control_ops_token_file:
+        control_ops_token = load_token_file(control_ops_token_file, 'control-ops-token-file')
+    if control_ops_token and not control_token:
+        logger.error('the read-only ops token supplements the admin token: set --control-token or '
+                     '--control-token-file too (an ops token alone would leave the control plane unusable)')
+        raise SystemExit(1)
+    if control_ops_token and control_ops_token == control_token:
+        logger.error('the ops token must differ from the admin token (the same secret would hand '
+                     'every holder the role the server picks first)')
+        raise SystemExit(1)
+    ops_verbs = frozenset(v.strip().lower() for v in (args.control_ops_verbs
+                          or os.environ.get('INV_CONTROL_OPS_VERBS') or 'show,clear').split(',') if v.strip())
+    unknown = sorted(v for v in ops_verbs if v not in KNOWN_VERBS)
+    if not ops_verbs or unknown:
+        logger.error('--control-ops-verbs: %s (the ops policy needs at least one verb the grammar speaks: %s)',
+                     ', '.join(unknown) if unknown else 'empty', ', '.join(sorted(KNOWN_VERBS)))
+        raise SystemExit(1)
+    trust_uids = parse_trust_uids(args.control_trust_uids or os.environ.get('INV_CONTROL_TRUST_UIDS'),
                                   'control-trust-uids')
-    metrics_token_file = args.metrics_token_file or os.environ.get('FAKE_METRICS_TOKEN_FILE')
+    metrics_token_file = args.metrics_token_file or os.environ.get('INV_METRICS_TOKEN_FILE')
     if args.metrics_token and metrics_token_file:
         logger.error('--metrics-token and --metrics-token-file are mutually exclusive')
         raise SystemExit(1)
@@ -260,7 +306,9 @@ def main():
                                 defaults=configured_defaults(args, frozen, profile_text),
                                 log_replies=args.control_log_replies, audit=audit,
                                 token=control_token, trust_uids=trust_uids,
-                                socket_group=args.control_socket_group)
+                                socket_group=args.control_socket_group,
+                                ops_token=control_ops_token, ops_verbs=ops_verbs,
+                                startup_values=startup_values(args))
         threading.Thread(target=control.serve, daemon=True).start()
     fake.metrics_listen = metrics_listen
     fake.metrics_token = metrics_token

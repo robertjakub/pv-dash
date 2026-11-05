@@ -20,6 +20,7 @@ The command grammar is the fake's: \fBset\fR/\fBunset\fR/\fBshow\fR/
 \fBhelp\fR (the 26-setting registry), \fBshow status\fR,
 \fBshow connections\fR (the live Modbus clients: peer, age, requests),
 \fBshow settings\fR, \fBshow registers\fR, \fBshow version\fR,
+\fBshow knobs\fR (the dictionary of the registry),
 \fBinspect\fR, \fBreset\fR, \fBshutdown\fR, \fBquit\fR. See
 .BR modbus-fake-inverter (1)
 CONTROL.
@@ -28,7 +29,7 @@ CONTROL.
 .TP
 .B \-\-control\-port
 control server target: unix socket path or TCP port on 127.0.0.1,
-auto\-detected (default: /tmp/fake\-inverter\-5502.socket; env FAKE_CTL
+auto\-detected (default: /tmp/fake\-inverter\-5502.socket; env INV_CTL
 when unset) — same flag as the fake itself
 .TP
 .B command
@@ -39,11 +40,11 @@ status, reset, shutdown
 socket timeout in seconds (default 5.0)
 .TP
 .B \-\-control\-token
-control auth token for TCP (env FAKE_CONTROL_TOKEN)
+control auth token for TCP (env INV_CONTROL_TOKEN)
 .TP
 .B \-\-control\-token\-file
 the token from a file (the first line; must be owner\-only 0600); not
-for use with \-\-control\-token (env FAKE_CONTROL_TOKEN_FILE)
+for use with \-\-control\-token (env INV_CONTROL_TOKEN_FILE)
 .TP
 .B \-\-audit\-log
 audit trail: a file path or \- for stdout; default: the XDG state home

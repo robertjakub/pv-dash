@@ -36,7 +36,7 @@ read; \\fB--chaos\\fR answers a fraction of requests hostile."""
     signals = """.SH SIGNALS
 .TP
 .B SIGHUP
-re-apply the \\fBFAKE_*\\fR environment layer (all-or-nothing).
+re-apply the \\fBINV_*\\fR environment layer (all-or-nothing).
 .TP
 .B SIGUSR1
 reset the scenario: runtime pins, the cloud machine and the write overlay
@@ -55,8 +55,11 @@ battery-kwh, max-clients, client-timeout, max-conn-per-ip, metrics-server,
 register, profile, log-level),
 \\fBshow status\\fR, \\fBshow connections\\fR (the live Modbus clients: peer,
 age, requests), \\fBshow settings\\fR, \\fBshow registers\\fR,
-\\fBshow version\\fR, \\fBinspect\\fR, \\fBreset\\fR, \\fBshutdown\\fR,
-\\fBquit\\fR. See
+\\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
+\\fBinspect\\fR, \\fBreset\\fR, \\fBshutdown\\fR,
+\\fBquit\\fR. A second, read-only token (\\fB--control-ops-token\\fR)
+authenticates into the show verbs only \\(em the ops shift against the
+admin key, both roles audited. See
 .BR modbus-fake-ctl (1)
 and
 .BR modbus-fake-cli (1)."""
@@ -68,18 +71,22 @@ serves without a token unless one is configured. Run it on a trusted,
 LAN-isolated network, next to the tools it is meant to serve.
 \\fB--max-clients\\fR/\\fB--client-timeout\\fR cap runaway connections and
 the read-count gate keeps a malformed frame from assembling an oversized
-reply."""
+reply. The control surface can still carry the family's read-only ops
+token (\\fB--control-ops-token\\fR) when the ops shift only ever watches."""
     environment = """.SH ENVIRONMENT
 .TP
-.B FAKE_CHAOS ", " FAKE_MAX_KWP ", " FAKE_PROFILE ", " FAKE_BATTERY ,
-.B FAKE_STRICT ", " FAKE_TIME ", " FAKE_TIME_SCALE ", " FAKE_LOG_LEVEL
+.B INV_CHAOS ", " INV_MAX_KWP ", " INV_PROFILE ", " INV_BATTERY ,
+.B INV_STRICT ", " INV_TIME ", " INV_TIME_SCALE ", " INV_LOG_LEVEL
 the SIGHUP-reloadable layer.
 .TP
-.B FAKE_CTL
+.B INV_CTL
 the default control target for the clients.
 .TP
-.B FAKE_CONTROL_TOKEN ", " FAKE_CLI_KEEPALIVE
-the clients' TCP token and idle-ping interval."""
+.B INV_CONTROL_TOKEN ", " INV_CLI_KEEPALIVE
+the clients' TCP token and idle-ping interval.
+.TP
+.B INV_CONTROL_OPS_TOKEN ", " INV_CONTROL_OPS_TOKEN_FILE
+the daemon's read-only ops token (the flagless start; the OPTIONS above)."""
     files = """.SH FILES
 .TP
 .I /tmp/fake-inverter-<port>.socket
@@ -108,6 +115,7 @@ The command grammar is the fake's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
 \\fBhelp\\fR (the 26-setting registry), \\fBshow status\\fR,
 \\fBshow connections\\fR (the live Modbus clients: peer, age, requests),
 \\fBshow settings\\fR, \\fBshow registers\\fR, \\fBshow version\\fR,
+\\fBshow knobs\\fR (the dictionary of the registry),
 \\fBinspect\\fR, \\fBreset\\fR, \\fBshutdown\\fR, \\fBquit\\fR. See
 .BR modbus-fake-inverter (1)
 CONTROL."""
@@ -157,10 +165,10 @@ first success. The session is audited with the \\fBCLI\\fR prefix; the wire
 commands are audited once, by the server."""
     environment = """.SH ENVIRONMENT
 .TP
-.B FAKE_CLI_KEEPALIVE
+.B INV_CLI_KEEPALIVE
 idle ping interval, seconds (default \\fB55\\fR); \\fB0\\fR = off.
 .TP
-.B FAKE_CTL ", " FAKE_CONTROL_TOKEN
+.B INV_CTL ", " INV_CONTROL_TOKEN
 the default control target and TCP token."""
     exit_status = """.SH EXIT STATUS
 .TP

@@ -97,7 +97,7 @@ simultaneous connections, 0 = no per\-IP limit (default 0)
 the Modbus clients allowed to connect (the cache's connect\-acl,
 mirrored): "any" (the default — the trusted\-LAN posture), "none", or a
 comma\-separated list of IPs and CIDR prefixes, e.g.
-127.0.0.1,10.48.0.0/16 (env FAKE_CONNECT_ACL)
+127.0.0.1,10.48.0.0/16 (env INV_CONNECT_ACL)
 .TP
 .B \-\-control\-log\-replies
 DEBUG\-log the full output of every control command (the default logs
@@ -117,7 +117,7 @@ scheme the scraper speaks)
 .B \-\-metrics\-token\-file
 the metrics bearer token from a file (the first line; must be
 owner\-only 0600) — takes the place of \-\-metrics\-token; giving both
-is an error (env FAKE_METRICS_TOKEN_FILE)
+is an error (env INV_METRICS_TOKEN_FILE)
 .TP
 .BI \-\-metrics\-max\-clients " N"
 maximum concurrent HTTP clients on the /metrics endpoint; extras get an
@@ -134,11 +134,11 @@ limit (default 0)
 .B \-\-control\-port
 control server target: unix socket path (default:
 /tmp/fake\-inverter\-<modbus\-port>.socket) or TCP port number on
-127.0.0.1 (e.g. 15599); 0 = off. Talk to it with fake_ctl.py
+127.0.0.1 (e.g. 15599); 0 = off. Talk to it with modbus\-fake\-ctl.py
 .TP
 .B \-\-profile
 inverter profile JSON: name \-> register (+ optional type/scale), e.g.
-profiles/profiles/sun2000.json (the default); FAKE_PROFILE when unset
+profiles/profiles/sun2000.json (the default); INV_PROFILE when unset
 .TP
 .BI \-\-chaos " N"
 probability 0..1 that a request is answered hostile and dropped
@@ -180,13 +180,28 @@ skips the token
 .B \-\-control\-token\-file
 the token from a file (the first line; e.g. a systemd LoadCredential or
 a key file; must be owner\-only 0600) — takes the place of
-\-\-control\-token; giving both is an error (env
-FAKE_CONTROL_TOKEN_FILE)
+\-\-control\-token; giving both is an error (env INV_CONTROL_TOKEN_FILE)
+.TP
+.B \-\-control\-ops\-token
+a second, read\-only control token: sessions authenticating with it may
+run the show/clear verbs only (no set/unset, no reset, no shutdown) —
+the ops shift against the admin key, both audited (env
+INV_CONTROL_OPS_TOKEN)
+.TP
+.B \-\-control\-ops\-token\-file
+the read\-only ops token from a file (the first line; must be
+owner\-only 0600) — takes the place of \-\-control\-ops\-token; giving
+both is an error (env INV_CONTROL_OPS_TOKEN_FILE)
+.TP
+.B \-\-control\-ops\-verbs
+the read\-only ops role's RBAC policy: the verbs its sessions may run,
+comma\-separated (default: show,clear; validated against the control
+grammar at start; env INV_CONTROL_OPS_VERBS)
 .TP
 .B \-\-control\-trust\-uids
 extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
-the daemon's own user are always trusted (env FAKE_CONTROL_TRUST_UIDS)
+the daemon's own user are always trusted (env INV_CONTROL_TRUST_UIDS)
 .TP
 .B \-\-control\-socket\-group
 leave the unix control socket group\-accessible (chmod 0660 instead of
@@ -197,7 +212,7 @@ the service user (default: off)
 .SH SIGNALS
 .TP
 .B SIGHUP
-re-apply the \fBFAKE_*\fR environment layer (all-or-nothing).
+re-apply the \fBINV_*\fR environment layer (all-or-nothing).
 .TP
 .B SIGUSR1
 reset the scenario: runtime pins, the cloud machine and the write overlay
@@ -217,8 +232,11 @@ battery-kwh, max-clients, client-timeout, max-conn-per-ip, metrics-server,
 register, profile, log-level),
 \fBshow status\fR, \fBshow connections\fR (the live Modbus clients: peer,
 age, requests), \fBshow settings\fR, \fBshow registers\fR,
-\fBshow version\fR, \fBinspect\fR, \fBreset\fR, \fBshutdown\fR,
-\fBquit\fR. See
+\fBshow version\fR, \fBshow knobs\fR (the dictionary of the registry),
+\fBinspect\fR, \fBreset\fR, \fBshutdown\fR,
+\fBquit\fR. A second, read-only token (\fB--control-ops-token\fR)
+authenticates into the show verbs only \(em the ops shift against the
+admin key, both roles audited. See
 .BR modbus-fake-ctl (1)
 and
 .BR modbus-fake-cli (1).
@@ -231,19 +249,23 @@ serves without a token unless one is configured. Run it on a trusted,
 LAN-isolated network, next to the tools it is meant to serve.
 \fB--max-clients\fR/\fB--client-timeout\fR cap runaway connections and
 the read-count gate keeps a malformed frame from assembling an oversized
-reply.
+reply. The control surface can still carry the family's read-only ops
+token (\fB--control-ops-token\fR) when the ops shift only ever watches.
 
 .SH ENVIRONMENT
 .TP
-.B FAKE_CHAOS ", " FAKE_MAX_KWP ", " FAKE_PROFILE ", " FAKE_BATTERY ,
-.B FAKE_STRICT ", " FAKE_TIME ", " FAKE_TIME_SCALE ", " FAKE_LOG_LEVEL
+.B INV_CHAOS ", " INV_MAX_KWP ", " INV_PROFILE ", " INV_BATTERY ,
+.B INV_STRICT ", " INV_TIME ", " INV_TIME_SCALE ", " INV_LOG_LEVEL
 the SIGHUP-reloadable layer.
 .TP
-.B FAKE_CTL
+.B INV_CTL
 the default control target for the clients.
 .TP
-.B FAKE_CONTROL_TOKEN ", " FAKE_CLI_KEEPALIVE
+.B INV_CONTROL_TOKEN ", " INV_CLI_KEEPALIVE
 the clients' TCP token and idle-ping interval.
+.TP
+.B INV_CONTROL_OPS_TOKEN ", " INV_CONTROL_OPS_TOKEN_FILE
+the daemon's read-only ops token (the flagless start; the OPTIONS above).
 
 .SH FILES
 .TP

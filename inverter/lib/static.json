@@ -1,4 +1,7 @@
 {
+"control": {
+  "line_cap_bytes": 1048576
+},
   "protocol": {
     "max_pdu": 260,
     "max_registers": 65536,
@@ -81,5 +84,18 @@
     "cli_reconnect": 3,
     "cli_reconnect_wait_s": 10.0,
     "control_idle_timeout_s": 300
+  },
+  "log_levels": [
+    "DEBUG",
+    "INFO",
+    "WARNING",
+    "ERROR"
+  ]
+,
+  "scenarios": {
+    "morning": 8.5,
+    "noon": 12.0,
+    "evening": 19.5,
+    "night": 23.0
   }
 }

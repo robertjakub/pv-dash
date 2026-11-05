@@ -18,17 +18,17 @@ It ships three tools:
 
 | Tool | Purpose |
 |---|---|
-| `fake_inverter.py` | the server (also packaged as `modbus-fake-inverter`) |
-| `fake_ctl.py` | one-shot / batch client for the runtime control server (`modbus-fake-ctl`) |
-| `fake_cli.py` | console-style interactive session on the same control server (`modbus-fake-cli`) |
+| `modbus-fake-inverter.py` | the server (also packaged as `modbus-fake-inverter`) |
+| `modbus-fake-ctl.py` | one-shot / batch client for the runtime control server (`modbus-fake-ctl`) |
+| `modbus-fake-cli.py` | console-style interactive session on the same control server (`modbus-fake-cli`) |
 
 ## Quick start
 
 ```bash
-python3 inverter/bin/fake_inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
-python3 inverter/bin/fake_inverter.py --time 12:00          # frozen noon: ~4.5 kW PV, exporting
-python3 inverter/bin/fake_inverter.py --static              # constant PV 4000 W, grid -1500 W, battery charging 1200 W at 65 %
-python3 inverter/bin/fake_inverter.py --port 15502 --log-level DEBUG
+python3 inverter/bin/modbus-fake-inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
+python3 inverter/bin/modbus-fake-inverter.py --time 12:00          # frozen noon: ~4.5 kW PV, exporting
+python3 inverter/bin/modbus-fake-inverter.py --static              # constant PV 4000 W, grid -1500 W, battery charging 1200 W at 65 %
+python3 inverter/bin/modbus-fake-inverter.py --port 15502 --log-level DEBUG
 ```
 
 ## Simulation
@@ -151,7 +151,7 @@ hybrids) are documented once in
 
 `show registers` prints the loaded profile as a table (name, register,
 description), `set profile <name|path>` swaps it live, `--profile` /
-`FAKE_PROFILE` pick it at start; `unset profile` returns to the configured
+`INV_PROFILE` pick it at start; `unset profile` returns to the configured
 map.
 
 ## Served registers (the default profile)
@@ -188,7 +188,7 @@ A JSON-lines control server runs **by default on the unix socket
 instance per Modbus port, stale files replaced, unlinked on shutdown, nothing
 ever lands in the working directory. Pass a TCP port number to bind
 `127.0.0.1:PORT` instead, or `0` to switch the control server off. Both tools
-resolve the target the same way: flag > **`FAKE_CTL`** environment variable >
+resolve the target the same way: flag > **`INV_CTL`** environment variable >
 default socket.
 
 The wire is **JSON lines** (stdlib `json` only): one request object per
@@ -207,18 +207,27 @@ sha256 HMAC of its payload, keyed by the token (`"mac": …`,
 `common/wiresec.py`) — a token-holding client verifies nothing was injected
 or altered in flight, and over TCP the signed commands are mandatory (on
 the unix socket the mac is verify-if-present, so the trusted peers keep
-speaking without the secret). The clients
+speaking without the secret). A **second, read-only token**
+(`--control-ops-token`/`--control-ops-token-file`) authenticates into the
+**`show` verbs only** — no `set`/`unset`, no `reset`, no `shutdown`: the
+ops shift against the admin key (the fake has no `clear` verb — watching is
+what the ops shift does here). Denied commands answer `err forbidden: the
+ops token runs the show/clear verbs only (<verb> needs the admin token)`;
+the INV trail's COMMAND entries name the session's role
+(`role=ops`/`role=admin`, the denials included), and each session's frames
+are mac'd with the key it authenticated with. The clients
 take `--control-token`
-/ **`FAKE_CONTROL_TOKEN`** — or the hardened way, **`--control-token-file`**
+/ **`INV_CONTROL_TOKEN`** — or the hardened way, **`--control-token-file`**
 (the first line of a key file or a systemd
-`LoadCredential`) — and authenticate automatically:
+`LoadCredential`) — and authenticate automatically (the ops staff pass the
+read-only ops token the same way):
 
 > **A token flag lands in `ps`.** Tokens passed as `--control-token` /
 > `--metrics-token <secret>` are visible on the process command line — every
 > local user can read them in `ps` output or `/proc/*/cmdline` (the audit's
 > F9; the clients included). Prefer the **`-file`**
 > variants — the file must be **owner-only (`0600`)**: group/world-accessible
-> token files refuse to start (F12) — or the `FAKE_CONTROL_TOKEN` env var.
+> token files refuse to start (F12) — or the `INV_CONTROL_TOKEN` env var.
 > The flag form is for quick tests (the fake is a test tool — F11).
 
 | Command | Effect |
@@ -227,6 +236,7 @@ take `--control-token`
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
 | `show settings` | every setting and its value — one stable `key=value` line per setting (scriptable) |
+| `show knobs` | the dictionary of all knobs: every registry knob under its section — its flag, its env twin(s) when it has one, its home section, the command that changes it live (or the restart note) |
 | `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `clients`, `chaos`, `chaos_hits`, `pinned`, `profile`, `metrics`, `timezone`) — scriptable |
 | `show connections` | the fake's live **Modbus** clients: peer, connection age, requests served (`none` when idle) — the cache's `show connections`, pointed at the simulator |
 | `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins, the metrics endpoint state — the baton for a bug report |
@@ -277,20 +287,20 @@ The commands and settings — including their descriptions — live in one share
 registry (`lib/settings.py`) that both the control server and the CLIs
 read, so the wire grammar, the help texts and the completions can never drift.
 
-### `fake_ctl` — one-shot / batch client
+### `modbus-fake-ctl` — one-shot / batch client
 
 ```bash
-python3 inverter/bin/fake_ctl.py set pv 2500
-python3 inverter/bin/fake_ctl.py show settings
-printf 'set pv 2500\nset soc 30\nshow status\n' | python3 inverter/bin/fake_ctl.py --control-port 15599
+python3 inverter/bin/modbus-fake-ctl.py set pv 2500
+python3 inverter/bin/modbus-fake-ctl.py show settings
+printf 'set pv 2500\nset soc 30\nshow status\n' | python3 inverter/bin/modbus-fake-ctl.py --control-port 15599
 ```
 
-Same `--control-port` flag / `FAKE_CTL` env as the fake itself; several
+Same `--control-port` flag / `INV_CTL` env as the fake itself; several
 commands can be passed as arguments or piped on stdin (one reply per line).
 Exit codes: `0` = ok, `1` = connection/control error, `2` = CLI misuse.
 Every invocation lands in the audit log (below).
 
-### `fake_cli` — console-style session
+### `modbus-fake-cli` — console-style session
 
 An interactive front-end on the same socket (same flag/env resolution): on
 the first connect it probes the status and greets you —
@@ -306,7 +316,7 @@ The prompt shows the connected port, `set`/`unset` print only the `ok`
 confirmation, `show <setting>` prints the bare value, `show settings` prints
 one setting per line, and `shutdown` asks `Proceed with shutdown? [confirm]`
 first — RETURN or `y` proceeds, anything else aborts with `% Aborted.`.
-While it idles the CLI sends wire pings (every 55 s, `FAKE_CLI_KEEPALIVE` to
+While it idles the CLI sends wire pings (every 55 s, `INV_CLI_KEEPALIVE` to
 tune, `0` = off) so the control server's idle timeout never drops a live
 session. When the connection dies anyway (the fake was killed, the port went
 dark), the CLI doesn't fold: it retries **`--reconnect` times (default 3)**
@@ -322,7 +332,7 @@ from the shared registry. `?` in any position prints the same list without
 completing; `help <setting>` shows the description on the wire, too.
 
 ```
-$ python3 inverter/bin/fake_cli.py
+$ python3 inverter/bin/modbus-fake-cli.py
 
 fake-inverter:5502 > set pv 2500
 ok
@@ -354,14 +364,14 @@ The fake mirrors the family (`modbus-scraper` / `modbus-cache`):
 
 | Signal | Effect |
 |---|---|
-| `SIGHUP` | **Re-apply the `FAKE_*` environment layer** — all-or-nothing (invalid value keeps the previous settings). Flags are startup-only; the env is the reloadable layer. |
+| `SIGHUP` | **Re-apply the `INV_*` environment layer** — all-or-nothing (invalid value keeps the previous settings). Flags are startup-only; the env is the reloadable layer. |
 | `SIGUSR1` | **Reset the scenario**: all runtime pins, the cloud machine and the Modbus write overlay are dropped, the simulation continues. |
 | `SIGTERM` / `SIGINT` | **Graceful shutdown** with a session summary (duration, connections, requests, chaos hits). |
 
-Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
-`FAKE_PROFILE` (register-map profile path), `FAKE_BATTERY`, `FAKE_STRICT`,
-`FAKE_TIME` (`HH:MM` or `auto`), `FAKE_TIME_SCALE` (N× real time),
-`FAKE_LOG_LEVEL` — boolean values accept
+Reloadable environment variables: `INV_CHAOS` (0..1), `INV_MAX_KWP`,
+`INV_PROFILE` (register-map profile path), `INV_BATTERY`, `INV_STRICT`,
+`INV_TIME` (`HH:MM` or `auto`), `INV_TIME_SCALE` (N× real time),
+`INV_LOG_LEVEL` — boolean values accept
 `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 
 ## Flags
@@ -387,7 +397,7 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--max-clients` | `64` | refuse further Modbus connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect Modbus clients silent for this many seconds (`0` = never) — sheds connections from clients that died without closing |
 | `--max-conn-per-ip` | `0` | refuse further Modbus connections from one peer IP past this many simultaneous connections (`0` = no per-IP limit) |
-| `--connect-acl` | any | the Modbus clients allowed to connect (the cache's `connect-acl`, mirrored): `"any"` (the default — the trusted-LAN posture), `"none"`, or a comma-separated list of IPs and CIDR prefixes, e.g. `127.0.0.1,10.48.0.0/16` (env `FAKE_CONNECT_ACL`; live-settable, `show status` carries `connect_acl=`) |
+| `--connect-acl` | any | the Modbus clients allowed to connect (the cache's `connect-acl`, mirrored): `"any"` (the default — the trusted-LAN posture), `"none"`, or a comma-separated list of IPs and CIDR prefixes, e.g. `127.0.0.1,10.48.0.0/16` (env `INV_CONNECT_ACL`; live-settable, `show status` carries `connect_acl=`) |
 | `--timezone` | `utc` | clock the state machines integrate over (`utc` or `local`) |
 | `--time` | real clock | freeze simulated time `HH:MM` (zone-independent) |
 | `--time-scale` | `1` | the simulated clock speed: N× real time — a full simulated day takes 24/N real hours (`set time-scale` tunes it live) |
@@ -395,12 +405,15 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--battery` | on | simulate a battery (the battery state machine runs; on by default) |
 | `--no-battery` | | no battery values |
 | `--battery-kwh` | `6.9` | usable battery capacity in kWh |
-| `--profile` | `sun2000` | register-map profile: the built-in name or a JSON path (name → register + optional type/scale); `FAKE_PROFILE` when unset |
+| `--profile` | `sun2000` | register-map profile: the built-in name or a JSON path (name → register + optional type/scale); `INV_PROFILE` when unset |
 | `--strict` | off | reject undefined registers with exception 02 |
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
-| `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `FAKE_CONTROL_TOKEN`) |
+| `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `INV_CONTROL_TOKEN`) |
 | `--control-token-file` | off | the control token from a file (the first line; a key file or a systemd `LoadCredential`, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12), instead of `--control-token`; giving both is an error |
-| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `FAKE_CONTROL_TRUST_UIDS`) |
+| `--control-ops-token` | off | a second, **read-only** control token: its sessions run the `show` verbs only (no `set`/`unset`, no `reset`, no `shutdown`) — needs `--control-token`/`--control-token-file`, must differ from it; both roles audited (`INV_CONTROL_OPS_TOKEN`) |
+| `--control-ops-token-file` | off | the read-only ops token from a file (the first line; **owner-only `0600`**, F12), instead of `--control-ops-token`; giving both is an error |
+| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (`INV_CONTROL_OPS_VERBS`) |
+| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `INV_CONTROL_TRUST_UIDS`) |
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user |
 | `--control-log-replies` | off | DEBUG-log the full output of every control command, not just the command |
 | `--chaos` | `0` | probability 0..1 that a request is answered hostile and dropped |
@@ -436,11 +449,12 @@ cannot be opened, the trail falls back to stdout rather than vanishing. **Rotati
 (the default) rotates at 10 MB keeping 3 backups (`audit.log.1..3`),
 `--audit-daily` additionally rotates at UTC midnight, `--audit-max-mb 0`
 = unbounded. One line per event; the prefix names the writer — `INV`
-(the fake), `CLI` (fake_cli), `CTL` (fake_ctl):
+(the fake), `CLI` (modbus-fake-cli), `CTL` (modbus-fake-ctl):
 
 ```
 2026-11-03T20:10:06Z INV START 3f9a21c04de7 version=0.3.0 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
 2026-11-03T20:10:07Z AUDIT INV COMMAND 9c41e2b7a058 peer=127.0.0.1:54425 'set soc 40' -> ok
+2026-11-03T20:10:07Z AUDIT INV COMMAND 3d82f6c05e19 peer=127.0.0.1:54426 role=ops 'show status' wire=h4b91de207a86 -> ok
 2026-11-03T20:10:08Z INV RESET 77b0c4e19d23 SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
 2026-11-03T20:10:08Z INV SHUTDOWN 5e2af8c30b61 SIGTERM: uptime=2s conns=0 requests=0 chaos_hits=0
 2026-11-03T18:44:10Z CLI CONNECT a01f65c3924b target=127.0.0.1:15731 user=oom
@@ -457,7 +471,9 @@ family's XDG trails, or a journald dump on stdin).
 UTC stamps, the command as entered and its outcome (`ok` / `err`) — the
 structured who-when-what evidence trail. **Every wire command is
 audited once, by the server** (`AUDIT INV COMMAND`, with the client peer — it
-knows the who); the clients audit their session (the CONNECT/the
+knows the who, and the role — the ops shift against the admin key — plus
+the frame's mac when the wire is signed; the denied ops attempts are in the
+trail too); the clients audit their session (the CONNECT/the
 DISCONNECT) and the local-only events (`quit`, an aborted `shutdown`).
 The fake logs its lifecycle too: `START`, `RELOAD` (SIGHUP), `RESET`
 (SIGUSR1) and `SHUTDOWN` (a restart = the SHUTDOWN + the next START).
@@ -491,7 +507,7 @@ Honest scope of a demo device:
 - **The control surface is plain-text by design** — a demo harness: the TCP
   control server binds `127.0.0.1` only, and `--control-token` adds a
   token-auth handshake (the clients authenticate with
-  `FAKE_CONTROL_TOKEN`, or `--control-token-file` / `FAKE_CONTROL_TOKEN_FILE`
+  `INV_CONTROL_TOKEN`, or `--control-token-file` / `INV_CONTROL_TOKEN_FILE`
   — the first line of a key file or a `LoadCredential`); over the unix
   socket a kernel-vouched peer (root, the daemon's own user or
   `--control-trust-uids` — `SO_PEERCRED`) skips the token. The container
@@ -519,9 +535,9 @@ fake is a test/demo tool, not a daemon you deploy.
 
 ```
 inverter/bin/
-├── fake_inverter.py    # CLI entry, logging, wiring
-├── fake_ctl.py         # control-server CLI client (one-shot / batch)
-├── fake_cli.py         # console-style interactive control session
+├── modbus-fake-inverter.py    # CLI entry, logging, wiring
+├── modbus-fake-ctl.py         # control-server CLI client (one-shot / batch)
+├── modbus-fake-cli.py         # console-style interactive control session
 └── lib/
     ├── settings.py     # shared command/setting registry (grammar + descriptions)
     ├── profile.py      # register-map profiles: name registry, encoding, loading

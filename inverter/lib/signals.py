@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Signal handling mirroring the scraper/cache family: SIGHUP reloads the
-FAKE_* environment layer (keep-last-good), SIGUSR1 resets the scenario,
+INV_* environment layer (keep-last-good), SIGUSR1 resets the scenario,
 SIGTERM/SIGINT shut down gracefully with a session summary."""
 import logging
 import os
@@ -61,47 +61,47 @@ class SignalBox:
                     logger.error('%s handling crashed (%s)', name, e)
             time.sleep(0.2)
 
-    # ---- SIGHUP: re-read the FAKE_* environment layer, all-or-nothing
+    # ---- SIGHUP: re-read the INV_* environment layer, all-or-nothing
 
     def reload(self):
         plan = []
         env = os.environ
         try:
-            v = env.get('FAKE_CHAOS')
+            v = env.get('INV_CHAOS')
             if v:
                 plan.append(('chaos=%g' % float(v), lambda v=float(v): self.chaos.set_probability(v)))
-            v = env.get('FAKE_MAX_KWP')
+            v = env.get('INV_MAX_KWP')
             if v:
                 plan.append(('peak=%gW' % (0.75 * float(v) * 1000.0),
                              lambda v=float(v): setattr(self.simulator, 'peak_w', 0.75 * v * 1000.0)))
-            v = env.get('FAKE_BATTERY')
+            v = env.get('INV_BATTERY')
             if v:
                 flag = v.strip().lower() in ('1', 'true', 'yes', 'on')
                 plan.append(('battery=%s' % flag, lambda: setattr(self.simulator, 'battery', flag)))
-            v = env.get('FAKE_STRICT')
+            v = env.get('INV_STRICT')
             if v:
                 flag = v.strip().lower() in ('1', 'true', 'yes', 'on')
                 plan.append(('strict=%s' % flag, lambda: setattr(self.fake, 'strict', flag)))
-            v = env.get('FAKE_TIME')
+            v = env.get('INV_TIME')
             if v:
                 if v.strip().lower() in ('auto', 'live'):
                     plan.append(('time=live', lambda: self.simulator.freeze(None)))
                 else:
                     plan.append(('time=%s' % v.strip(), lambda v=v: self.simulator.freeze(parse_time(v))))
-            v = env.get('FAKE_TIME_SCALE')
+            v = env.get('INV_TIME_SCALE')
             if v:
                 x = float(v)
                 if not 0 < x <= 1440:
-                    raise ValueError('FAKE_TIME_SCALE must be 0 < N <= 1440, got %r' % v)
+                    raise ValueError('INV_TIME_SCALE must be 0 < N <= 1440, got %r' % v)
                 plan.append(('time-scale=x%g' % x, lambda x=x: self.simulator.set_time_scale(x)))
-            v = env.get('FAKE_PROFILE')
+            v = env.get('INV_PROFILE')
             if v:
                 path = v.strip()
                 new_map = load_profile(path)   # eager: a bad profile keeps everything
                 plan.append(('profile=%s: %s' % (profile_label(new_map.path), new_map.description),
                              lambda m=new_map: self.simulator.set_profile(m)))
-            v = env.get('FAKE_LOG_LEVEL')
-            v = env.get('FAKE_LOG_LEVEL')
+            v = env.get('INV_LOG_LEVEL')
+            v = env.get('INV_LOG_LEVEL')
             if v:
                 level = getattr(logging, v.strip().upper())
                 plan.append(('log_level=%s' % v.strip().upper(),
@@ -113,9 +113,9 @@ class SignalBox:
                 self.audit.event('RELOAD', 'failed: %s' % e)
             return
         if not plan:
-            logger.info('SIGHUP: reloaded, no FAKE_* environment settings to apply')
+            logger.info('SIGHUP: reloaded, no INV_* environment settings to apply')
             if self.audit:
-                self.audit.event('RELOAD', 'no FAKE_* environment settings to apply')
+                self.audit.event('RELOAD', 'no INV_* environment settings to apply')
             return
         for _, fn in plan:
             fn()

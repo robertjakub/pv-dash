@@ -4,6 +4,9 @@ command and setting with its short description and value hints. Both the
 control server (lib.control) and the console CLI (fake_cli) read from here,
 so the wire grammar, the help texts and the completions can never drift."""
 
+from .statics import LOG_LEVELS
+
+
 
 class Setting:
     def __init__(self, name, help, values=(), hint=None, value_help=None):
@@ -93,7 +96,7 @@ SETTINGS = (
              'off': 'no metrics endpoint (the default)'}),
     Setting('client-timeout', 'disconnect Modbus clients silent for this long', (), 's',
             {'0': 'never'}),
-    Setting('log-level', 'log verbosity', ('DEBUG', 'INFO', 'WARNING', 'ERROR'), None,
+    Setting('log-level', 'log verbosity', LOG_LEVELS, None,
             {'DEBUG': 'client traffic + per-poll detail',
              'INFO': 'lifecycle, control commands, writes',
              'WARNING': 'problems only',
@@ -107,7 +110,7 @@ SETTING_NAMES = tuple(s.name for s in SETTINGS)
 COMMANDS = (
     ('set', 'configure a setting: set <setting> <value>'),
     ('unset', 'restore a setting to its configured value: unset <setting>'),
-    ('show', 'display a setting, the status report, or all: show <setting|status|connections|settings>'),
+    ('show', 'display a setting, the status report, or all: show <setting|status|connections|settings|config|knobs>'),
     ('reset', 'clear all pins + the write overlay'),
     ('shutdown', 'stop the fake inverter (asks to confirm)'),
     ('quit', 'close the session'),

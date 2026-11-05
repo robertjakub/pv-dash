@@ -40,7 +40,9 @@ DEFAULT_METRICS_LISTEN = DEFAULTS['metrics_listen']
 DEFAULT_METRICS_MAX_CLIENTS = DEFAULTS['metrics_max_clients']
 DEFAULT_METRICS_CLIENT_TIMEOUT_S = DEFAULTS['metrics_client_timeout_s']
 DEFAULT_METRICS_MAX_CONN_PER_IP = DEFAULTS['metrics_max_conn_per_ip']
+LOG_LEVELS = tuple(STATIC['log_levels'])
 DEFAULT_LOG_LEVEL = DEFAULTS['log_level']
+SCENARIOS = {k: float(v) for k, v in STATIC['scenarios'].items()}
 AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
 AUDIT_FILES = DEFAULTS['audit_files']
 CLI_KEEPALIVE_S = DEFAULTS['cli_keepalive_s']
@@ -48,6 +50,7 @@ CLI_TIMEOUT_S = DEFAULTS['cli_timeout_s']
 CLI_RECONNECT = DEFAULTS['cli_reconnect']
 CLI_RECONNECT_WAIT_S = DEFAULTS['cli_reconnect_wait_s']
 CONTROL_IDLE_TIMEOUT_S = DEFAULTS['control_idle_timeout_s']
+CONTROL_LINE_CAP = int(STATIC['control']['line_cap_bytes'])
 
 SUNRISE = STATIC['sun']['sunrise']             # the simulated day's window
 SUNSET = STATIC['sun']['sunset']               # (the battery day plan)

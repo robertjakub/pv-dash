@@ -24,7 +24,7 @@ commands are audited once, by the server.
 .TP
 .B \-\-control\-port
 control server target: unix socket path or TCP port on 127.0.0.1,
-auto\-detected (default: /tmp/fake\-inverter\-5502.socket; env FAKE_CTL
+auto\-detected (default: /tmp/fake\-inverter\-5502.socket; env INV_CTL
 when unset) — same flag as the fake itself
 .TP
 .BI \-\-timeout " N"
@@ -38,11 +38,11 @@ this many times before giving up; 0 = off (default 3)
 seconds between the reconnect attempts (default 10.0)
 .TP
 .B \-\-control\-token
-control auth token for TCP (env FAKE_CONTROL_TOKEN)
+control auth token for TCP (env INV_CONTROL_TOKEN)
 .TP
 .B \-\-control\-token\-file
 the token from a file (the first line; must be owner\-only 0600); not
-for use with \-\-control\-token (env FAKE_CONTROL_TOKEN_FILE)
+for use with \-\-control\-token (env INV_CONTROL_TOKEN_FILE)
 .TP
 .B \-\-audit\-log
 audit trail: a file path or \- for stdout; default: the XDG state home
@@ -60,10 +60,10 @@ disable the audit trail (default: off)
 
 .SH ENVIRONMENT
 .TP
-.B FAKE_CLI_KEEPALIVE
+.B INV_CLI_KEEPALIVE
 idle ping interval, seconds (default \fB55\fR); \fB0\fR = off.
 .TP
-.B FAKE_CTL ", " FAKE_CONTROL_TOKEN
+.B INV_CTL ", " INV_CONTROL_TOKEN
 the default control target and TCP token.
 
 .SH EXIT STATUS

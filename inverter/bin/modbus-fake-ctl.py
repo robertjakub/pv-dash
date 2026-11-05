@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Small client for the fake inverter's JSON-lines control server: sends one
 command (or a batch from stdin) over TCP or a unix socket (--control-port,
-env FAKE_CTL) and prints the replies. TCP servers with --control-token
+env INV_CTL) and prints the replies. TCP servers with --control-token
 require the token first ({"cmd": "auth", "token": ...}) — pass it with
---control-token or the FAKE_CONTROL_TOKEN environment variable.
+--control-token or the INV_CONTROL_TOKEN environment variable.
 
-  python3 fake_ctl.py --control-port 15599 set pv 2500
-  python3 fake_ctl.py --control-port 15599 status
-  printf 'set pv 2500\\nset soc 30\\nstatus\\n' | python3 fake_ctl.py --control-port 15599
+  python3 modbus-fake-ctl.py --control-port 15599 set pv 2500
+  python3 modbus-fake-ctl.py --control-port 15599 status
+  printf 'set pv 2500\\nset soc 30\\nstatus\\n' | python3 modbus-fake-ctl.py --control-port 15599
 
 Commands (see the server's help): set <pv|load|batt|soc|cloud|time|scenario|
 chaos|seed|battery|strict|static|max-kwp|battery-kwh|max-clients|
@@ -42,11 +42,11 @@ from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S
 
 def main():
     p = argparse.ArgumentParser(description='Send commands to the fake inverter control server (TCP or unix socket).')
-    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/fake-inverter-5502.socket; env FAKE_CTL when unset) — same flag as the fake itself')
+    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/fake-inverter-5502.socket; env INV_CTL when unset) — same flag as the fake itself')
     p.add_argument('command', nargs='*', help='control command, e.g. set pv 2500, set scenario noon, show settings, status, reset, shutdown')
     p.add_argument('--timeout', type=float, default=CLI_TIMEOUT_S, help='socket timeout in seconds (default %(default)s)')
-    p.add_argument('--control-token', default=None, help='control auth token for TCP (env FAKE_CONTROL_TOKEN)')
-    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env FAKE_CONTROL_TOKEN_FILE)')
+    p.add_argument('--control-token', default=None, help='control auth token for TCP (env INV_CONTROL_TOKEN)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env INV_CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
     p.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB, help='rotate the audit log at this size, 0 = off')
     p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
@@ -65,12 +65,14 @@ def main():
     if not commands:
         if sys.stdin.isatty():
             p.error('no command given (pass it as arguments or pipe commands on stdin)')
-        commands = [line.strip() for line in sys.stdin if line.strip()]
+        # the config scripts pipe through: comments (#) and blank lines stay comments
+        commands = [line.strip() for line in sys.stdin
+                    if line.strip() and not line.strip().startswith('#')]
         if not commands:
             p.error('no commands on stdin')
 
-    token_file = args.control_token_file or os.environ.get('FAKE_CONTROL_TOKEN_FILE')
-    token = args.control_token or os.environ.get('FAKE_CONTROL_TOKEN')
+    token_file = args.control_token_file or os.environ.get('INV_CONTROL_TOKEN_FILE')
+    token = args.control_token or os.environ.get('INV_CONTROL_TOKEN')
     if token and token_file:
         p.error('--control-token and --control-token-file are mutually exclusive')
     if token_file:

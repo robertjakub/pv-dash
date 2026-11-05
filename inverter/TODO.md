@@ -4,9 +4,39 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[inverter]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The rename + env-prefix wave: the bins carry the man-page names now
+(`modbus-fake-inverter.py`, `modbus-fake-ctl.py`, `modbus-fake-cli.py`),
+and every env twin wears the tool's prefix (`INV_*` — the `FAKE_*` era
+envs are gone). The constants audit: `log_levels` joined
+`lib/static.json` and every consumer reads the ladder from there.
 
-The token-file env vars honored: `FAKE_CONTROL_TOKEN_FILE` and
-`FAKE_METRICS_TOKEN_FILE` do what the help always promised — the env form
+The knob-dictionary wave: `show knobs` (the `help knobs` alias too) prints
+the dictionary of all knobs — every registry knob under its section with
+its flag, its env twin(s) when it has one (the fake's INV_* layer), its
+home section, the command that changes it live (or the restart note for
+the startup-only ones) and the secret marker on the tokens
+(`common/options.py` `knob_dictionary()`; the values stay in `show config`,
+the command mapping in `help config`). The fake_ctl's TAB completion and
+`show?` word-help offer the new `show` argument.
+
+The RBAC verb set: `--control-ops-verbs` (default show,clear, validated
+against the fake's grammar at start) configures the read-only role's
+policy; `show config` renders the argv that would restart the fake (the
+option registry landed in lib/options.py; the fake carries no config file
+— its startup surface stays the flags and the INV_* env layer).
+
+The read-only control role: a second token
+(`--control-ops-token`/`--control-ops-token-file`, env
+`INV_CONTROL_OPS_TOKEN(_FILE)`) beside the admin one, and its sessions
+run the show verbs only — the reports yes, `set`/`unset`/`reset`/
+`shutdown` no (`err forbidden: … needs the admin token`; the fake has no
+`clear` verb — watching is what the ops shift does here): the ops shift
+versus the admin key, both audited (`role=ops`/`role=admin` in the INV
+COMMAND entries, the denials included), each session's frames mac'd with
+the key it authenticated with.
+
+The token-file env vars honored: `INV_CONTROL_TOKEN_FILE` and
+`INV_METRICS_TOKEN_FILE` do what the help always promised — the env form
 of `--control-token-file` / `--metrics-token-file` on the fake and both
 clients (flag over env, the file over the plain token, giving both is the
 familiar mutual-exclusion error; F12's 0600 gate applies either way).

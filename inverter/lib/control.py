@@ -9,7 +9,9 @@ json module): the request = {"cmd": "<command>"}, the reply =
 (bound to 127.0.0.1) or a unix socket path. Connections need a token auth
 handshake when --control-token is set ({"cmd": "auth", "token": ...}); over
 the unix socket a kernel-vouched peer (root, the daemon's own user or
---control-trust-uids — SO_PEERCRED) skips the handshake."""
+--control-trust-uids — SO_PEERCRED) skips the handshake. A second,
+read-only token (--control-ops-token) authenticates into the show/clear
+verbs only — the ops shift against the admin key, both audited."""
 import hmac
 import json
 import logging
@@ -23,17 +25,18 @@ from common.audit import AuditLog
 from common.config import acl_summary, acl_text, parse_acl
 from common.cred import peer_uid
 from common.human import secs
-from common.wiresec import verify_request_mac, sign_reply, proof_tag
+from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.options import control_command
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
 from common.version import version_string
 from .settings import SETTING_NAMES, SETTING_BY_NAME, describe_setting
 from .simulator import CLOUD_MACHINES, format_clock
-from .statics import CONTROL_IDLE_TIMEOUT_S, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
+from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
 
 logger = logging.getLogger('fake-inverter')
 
-MAX_LINE = 1024 * 1024   # the pre-auth line-buffer cap (drop past it)
+MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
 
 
 class ControlServer:
@@ -42,7 +45,10 @@ class ControlServer:
     127.0.0.1) or a unix socket path (stale files are replaced, unlinked on
     shutdown). A connection must authenticate with the token first when one
     is configured — over the unix socket a kernel-vouched peer (root, the
-    daemon's own user or trust_uids — SO_PEERCRED) skips the handshake."""
+    daemon's own user or trust_uids — SO_PEERCRED) skips the handshake. A
+    second, read-only token (ops_token) may be configured beside the admin
+    token: it authenticates into the show/clear verbs only — no set/unset,
+    no reset, no shutdown (common/wiresec.py's roles)."""
 
     def describe(self):
         return 'unix:%s' % self.sockpath if self.is_unix else '127.0.0.1:%d' % self.port
@@ -58,18 +64,34 @@ class ControlServer:
         """The peer-cred auth on the unix control socket: with a token
         configured, a peer the kernel vouches for — root, the daemon's own
         user or one of trust_uids — is authenticated without the token (a
-        local systemd unit speaks without sharing the secret). TCP peers
-        always need the token."""
+        local systemd unit speaks without sharing the secret) and holds the
+        admin role. TCP peers always need a token (admin or ops)."""
         if not (self.token and self.is_unix):
-            return False
+            return None
         uid = peer_uid(client)
         if uid is None:
-            return False
+            return None
         if uid == 0 or uid == os.getuid() or uid in self.trust_uids:
             logger.debug('control client from %s: trusted peer uid %d, no token required', who, uid)
-            return True
+            return ROLE_ADMIN
         logger.info('control client from %s: peer uid %d is not trusted, the token is required', who, uid)
-        return False
+        return None
+
+    def session_key(self, role):
+        """The hmac key of one session's role: the ops sessions sign and
+        verify with the ops token, everything else (admin, trusted peer,
+        pre-auth) with the admin token."""
+        return self.ops_token if role == ROLE_OPS else self.token
+
+    def auth_role(self, given):
+        """Which role a presented token authenticates into (hmac.compare_digest
+        against both keys): the admin token, the ops token, or None."""
+        if isinstance(given, str):
+            if self.token and hmac.compare_digest(given, self.token):
+                return ROLE_ADMIN
+            if self.ops_token and hmac.compare_digest(given, self.ops_token):
+                return ROLE_OPS
+        return None
 
     def serve(self):
         srv = socket.socket(socket.AF_UNIX if self.is_unix else socket.AF_INET, socket.SOCK_STREAM)
@@ -90,7 +112,8 @@ class ControlServer:
             logger.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
             return
         logger.info('control server listening on %s%s',
-                    self.describe(), ', token auth required on TCP' if self.token and not self.is_unix else '')
+                    self.describe(), (', token auth required on TCP' if self.token and not self.is_unix else '')
+                    + (', read-only ops token accepted' if self.ops_token else ''))
         while True:
             try:
                 client, addr = srv.accept()
@@ -99,41 +122,56 @@ class ControlServer:
                 logger.error('control accept failed (%s), retrying', e)
                 time.sleep(0.1)
 
-    def framed(self, line, who, authed):
+    def framed(self, line, who, role):
         """One wire frame in, one out: parse {"cmd": ...}, gate the TCP auth,
-        run the command, return (cmd, reply-obj, internal-reply). The text of
-        a multi-line reply keeps its embedded newlines; the '.' terminator of
-        the internal form is stripped (the JSON frame needs no framing)."""
+        gate the ops role (show/clear only), verify the frame mac keyed by
+        the session's token, run the command. Returns (cmd, reply-obj,
+        internal-reply, role) — the role so the auth reply can promote the
+        session. The text of a multi-line reply keeps its embedded newlines;
+        the '.' terminator of the internal form is stripped (the JSON frame
+        needs no framing)."""
         try:
             obj = json.loads(line) if line else {}
         except ValueError:
             obj = None
         if not isinstance(obj, dict) or not isinstance(obj.get('cmd'), str):
             return '', {'status': 'err',
-                        'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request'
+                        'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request', role
         cmd = obj['cmd']
-        if self.token and cmd.lower() != 'auth' and not authed:
+        if self.token and cmd.lower() != 'auth' and role is None:
             return cmd, {'status': 'err', 'text': 'authenticate first: {"cmd": "auth", "token": "..."}'}, \
-                'err authenticate first'
+                'err authenticate first', role
         if cmd.lower() == 'auth':
-            given = obj.get('token')
-            if self.token and isinstance(given, str) and hmac.compare_digest(given, self.token):
+            granted = self.auth_role(obj.get('token'))
+            if granted:
+                key = self.session_key(granted)
                 reply = 'ok authenticated'
-                return 'auth', {'status': 'ok', 'text': 'authenticated', 'mac': sign_reply(self.token, reply)}, reply
-            return 'auth', {'status': 'err', 'text': 'bad token'}, 'err bad token'
-        if self.token and obj.get('mac') is None and not self.is_unix:
+                return 'auth', {'status': 'ok', 'text': 'authenticated', 'mac': sign_reply(key, reply)}, reply, granted
+            return 'auth', {'status': 'err', 'text': 'bad token'}, 'err bad token', role
+        key = self.session_key(role)
+        if key and obj.get('mac') is None and not self.is_unix:
             return cmd, {'status': 'err',
                          'text': 'unsigned command rejected: TCP commands carry the hmac-sha256 of the command, keyed by the token'}, \
-                'err unsigned command'
-        if self.token and obj.get('mac') is not None and not verify_request_mac(self.token, cmd, obj.get('mac')):
+                'err unsigned command', role
+        if key and obj.get('mac') is not None and not verify_request_mac(key, cmd, obj.get('mac')):
             return cmd, {'status': 'err',
-                         'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac'
+                         'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac', role
+        if not role_allows(role, cmd, self.ops_verbs):
+            verb = command_verb(cmd) or cmd
+            text = ('forbidden: the ops token runs the %s verbs only (%s needs the admin token)'
+                    % ('/'.join(sorted(self.ops_verbs)), verb))
+            reply = 'err ' + text
+            reply_obj = {'status': 'err', 'text': text}
+            if key:
+                reply_obj['mac'] = sign_reply(key, reply)
+            logger.warning('control: ops session from %s denied %r (read-only role)', who, cmd)
+            return cmd, reply_obj, reply, role
         reply = self.command(cmd)
         status, _, text = reply.partition(' ')
         reply_obj = {'status': status, 'text': text}
-        if self.token:
-            reply_obj['mac'] = sign_reply(self.token, reply)
-        return cmd, reply_obj, reply
+        if key:
+            reply_obj['mac'] = sign_reply(key, reply)
+        return cmd, reply_obj, reply, role
 
     @staticmethod
     def peer(addr):
@@ -164,7 +202,7 @@ class ControlServer:
     def handle(self, client, addr):
         who = self.peer(addr)
         logger.debug('control client connected from %s', who)
-        authed = self.trusted_peer(client, who)
+        role = self.trusted_peer(client, who)   # the peer-cred shortcut = the admin role; TCP starts unauthenticated
         with self.clients_lock:
             self.clients.add(client)
         try:
@@ -184,16 +222,14 @@ class ControlServer:
                 if b'\n' not in buf:
                     continue
                 line, buf = buf.split(b'\n', 1)
-                cmd, obj, reply = self.framed(line.decode('utf-8', 'replace').strip(), who, authed)
+                cmd, obj, reply, role = self.framed(line.decode('utf-8', 'replace').strip(), who, role)
                 if cmd == 'auth':
                     ok = reply.startswith('ok')
-                    if ok:
-                        authed = True
-                    elif self.audit:
+                    if not ok and self.audit:
                         self.audit.event('AUTH-FAIL', 'peer=%s' % who)
                 elif self.audit and cmd.lower() != 'ping':
-                    self.audit.event('COMMAND', "peer=%s '%s'%s -> %s"
-                                     % (who, cmd, proof_tag(obj), reply.split(' ', 1)[0]))
+                    self.audit.event('COMMAND', "peer=%s%s '%s'%s -> %s"
+                                     % (who, role_tag(role), cmd, proof_tag(obj), reply.split(' ', 1)[0]))
                 if self.log_replies:
                     logger.debug('control from %s: %s -> %s', who, cmd, reply)
                 else:
@@ -216,15 +252,18 @@ class ControlServer:
     # every configurable of the fake: the shared registry (lib.settings)
     SETTING_KEYS = SETTING_NAMES
 
-    # scenario presets: freeze the clock at a typical moment and release the
-    # value pins, so the day simulation (and the battery machine) take over
-    SCENARIOS = {'morning': 8.5, 'noon': 12.0, 'evening': 19.5, 'night': 23.0}
+    # the scenario presets live in static.json (lib.statics.SCENARIOS):
+    # freeze the clock at a typical moment and release the value pins, so
+    # the day simulation (and the battery machine) take over
 
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
-                 trust_uids=None, socket_group=False):
+                 trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None, startup_values=None):
         self.log_replies = log_replies   # DEBUG also logs the full command output
         self.audit = audit               # the INV audit trail (common.audit), None = off
-        self.token = token               # the control auth token; None = no auth (the unix = the perms)
+        self.token = token               # the control auth token (the admin role); None = no auth (the unix = the perms)
+        self.ops_token = ops_token       # the read-only ops token (the ops role); None = off
+        self.ops_verbs = frozenset(v.lower() for v in (ops_verbs or OPS_VERBS))   # the ops role's RBAC policy
+        self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
         self.trust_uids = trust_uids or frozenset()   # extra peer uids the unix socket trusts without the token
         self.socket_group = bool(socket_group)   # chmod 0660 instead of 0600 on the unix socket
         self.simulator = simulator
@@ -241,6 +280,41 @@ class ControlServer:
         self.is_unix = not self.target.isdigit()
         self.port = int(self.target) if not self.is_unix else None
         self.sockpath = self.target if self.is_unix else None
+
+    def config_mapping(self):
+        """The knob -> control-command mapper (help config): every option of
+        the registry under its section, with the command that changes it on
+        a running fake — or the restart note when the knob is startup-only."""
+        from .options import OPTIONS
+        from common.options import SECTIONS, section_title
+        lines = ['ok config mapping']
+        for section, _title in SECTIONS:
+            rows = [o for o in OPTIONS if o.section == section]
+            if not rows:
+                continue
+            lines.append('# --- %s ---' % section_title(section))
+            for o in rows:
+                lines.append('%-24s %s' % (o.name, control_command(o)))
+        return '\n'.join(lines)
+
+    def knobs_dictionary(self):
+        """The dictionary of all knobs (show knobs): every option of the
+        registry under its section, with its flag, its env twin(s) when it
+        has one, its home section, the control command that changes it and
+        the secret marker."""
+        from .options import OPTIONS
+        from common.options import knob_dictionary
+        return knob_dictionary(OPTIONS, who='the fake inverter')
+
+    def show_config(self):
+        """The startup options as a set-grammar script — the argv that would
+        restart this fake (the secrets never render; the live `set` values
+        are the `show settings` view, not here)."""
+        from .options import OPTIONS
+        from common.options import render_config_script
+        script = render_config_script(OPTIONS, dict(self.startup_values),
+                                      comment='generated by show config — the argv that would restart this fake (secrets hidden)')
+        return 'ok config\n' + script
 
     def _apply(self, key, value):
         sim, chaos, fake = self.simulator, self.chaos, self.fake
@@ -413,8 +487,8 @@ class ControlServer:
             raise ValueError('no modbus device attached')
         if key == 'log-level':
             level = val.upper()
-            if level not in ('DEBUG', 'INFO', 'WARNING', 'ERROR'):
-                raise ValueError('log level must be DEBUG|INFO|WARNING|ERROR')
+            if level not in LOG_LEVELS:
+                raise ValueError('log level must be one of %s' % ', '.join(LOG_LEVELS))
             logging.getLogger('fake-inverter').setLevel(level)
             return level
         if key == 'scenario':
@@ -424,9 +498,9 @@ class ControlServer:
                     sim.override(k, None)
                 self.scenario = 'custom'
                 return val
-            if val not in self.SCENARIOS:
-                raise ValueError('unknown scenario %s (try %s)' % (val, '|'.join(sorted(self.SCENARIOS))))
-            sim.freeze(self.SCENARIOS[val])
+            if val not in SCENARIOS:
+                raise ValueError('unknown scenario %s (try %s)' % (val, '|'.join(sorted(SCENARIOS))))
+            sim.freeze(SCENARIOS[val])
             for k in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud'):
                 sim.override(k, None)
             self.scenario = val
@@ -508,11 +582,21 @@ class ControlServer:
         if cmd in ('help', '?'):
             if args:
                 what = args[0].lower()
+                if what == 'config':
+                    return self.config_mapping()
+                if what == 'knobs':
+                    return self.knobs_dictionary()
                 if what in SETTING_BY_NAME:
                     return 'ok %s' % describe_setting(what)
                 return 'err unknown setting %s (try help)' % what
-            return ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|connections|settings>, '
-                    'reset, shutdown, quit; help <setting> describes it' % '|'.join(self.SETTING_KEYS))
+            return ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|connections|settings|config|knobs>, '
+                    'reset, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
+                    'show knobs prints the full dictionary'
+                    % '|'.join(self.SETTING_KEYS))
+        if cmd == 'show' and args and args[0].lower() == 'config':
+            return self.show_config()
+        if cmd == 'show' and args and args[0].lower() == 'knobs':
+            return self.knobs_dictionary()
         if cmd == 'unset':
             if not args:
                 return 'err unset needs a setting (try help)'

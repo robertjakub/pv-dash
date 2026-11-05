@@ -4,13 +4,16 @@
 One command per release: bump the version everywhere it lives, rename the
 CHANGELOG's Unreleased section, (optionally) refresh flake.lock, verify
 (the suites + the nix build), commit with the expanded note, tag
-(annotated, the bare X.Y.Z the suite has always used), push, and cut the
-GitHub release from the changelog section.
+(annotated, signed when a key exists — the bare X.Y.Z the suite has
+always used) and push. The GitHub release is the tag-triggered workflow's
+job (it gates on the suites + the nix build first — docs/AUDIT.md F19);
+pass --release to cut it locally and skip that gate.
 
-    python3 scripts/release.py 0.4.0              # the full flight
-    python3 scripts/release.py 0.4.0 --dry-run    # everything but the landing
-    python3 scripts/release.py 0.4.0 --tests full # all seven suites
-    python3 scripts/release.py 0.4.0 --keep-lock  # keep the nixpkgs pin
+    python3 scripts/release.py 0.4.0               # the full flight
+    python3 scripts/release.py 0.4.0 --dry-run     # everything but the landing
+    python3 scripts/release.py 0.4.0 --tests quick # the two regtests only
+    python3 scripts/release.py 0.4.0 --keep-lock   # keep the nixpkgs pin
+    python3 scripts/release.py 0.4.0 --release     # cut the GH release locally
 
 Re-releasing an already-bumped tree works (idempotent): the bump is a
 no-op, the commit only happens if something changed, the tag/release
@@ -30,10 +33,10 @@ CHANGELOG = ROOT / 'CHANGELOG.md'
 PKG_NIX = ['cache/package.nix', 'inverter/package.nix',
            'scrape/package.nix', 'dashboard/package.nix']
 SUITES_QUICK = ['tests/cache-regtest.py', 'tests/scrape-regtest.py']
-SUITES_FULL = SUITES_QUICK + ['tests/cache-stress.py', 'tests/cache-fuzz.py',
+SUITES_FULL = SUITES_QUICK + ['tests/inverter-regtest.py', 'tests/audit-chain.py',
+                              'tests/cache-stress.py', 'tests/cache-fuzz.py',
                               'tests/scrape-fuzz.py', 'tests/cache-control-fuzz.py',
-                              'tests/control-fuzz.py']
-
+                              'tests/control-fuzz.py', 'tests/dashboard-control-fuzz.py']
 
 def run(cmd, **kw):
     print('  $ ' + ' '.join(str(c) for c in cmd))
@@ -86,7 +89,11 @@ def bump(old, new, dry):
         print('release: bumped %s' % f)
     if dry:
         return
-    left = run(['git', 'grep', '-l', '-F', old, '--', '.', ':!CHANGELOG.md']).stdout.strip()
+    left = subprocess.run(['git', 'grep', '-l', '-F', old, '--', '.', ':!CHANGELOG.md'],
+                          cwd=ROOT, capture_output=True, text=True)
+    if left.returncode not in (0, 1):  # 1 = no matches, the success case
+        sys.exit('release: %r failed:\n%s%s' % ('git grep', left.stdout, left.stderr))
+    left = left.stdout.strip()
     if left:
         sys.exit('release: the old version still appears in:\n' + left)
 
@@ -123,7 +130,7 @@ def tests(which, dry):
     for suite in (SUITES_QUICK if which == 'quick' else SUITES_FULL):
         print('release: %s' % suite)
         r = run(['python3', suite], dry=dry)
-        if 'ALL PASS' not in r.stdout:
+        if not dry and 'ALL PASS' not in r.stdout:
             sys.exit('release: %s did not report ALL PASS' % suite)
 
 
@@ -149,12 +156,14 @@ def main():
     ap = argparse.ArgumentParser(description='pv-suite release orchestrator')
     ap.add_argument('version', help='the version to release (X.Y.Z)')
     ap.add_argument('--dry-run', action='store_true', help='print the plan, touch nothing')
-    ap.add_argument('--tests', choices=['quick', 'full', 'none'], default='quick',
-                    help='quick = the two regtests (default), full = all seven')
+    ap.add_argument('--tests', choices=['quick', 'full', 'none'], default='full',
+                    help='full = all ten suites (default), quick = the two regtests')
     ap.add_argument('--skip-nix', action='store_true', help='skip the nix build')
     ap.add_argument('--keep-lock', action='store_true', help='do not refresh flake.lock')
     ap.add_argument('--no-push', action='store_true', help='commit + tag locally, no push')
-    ap.add_argument('--no-release', action='store_true', help='no GitHub release')
+    ap.add_argument('--release', action='store_true',
+                    help='cut the GitHub release locally (default: the tag-triggered '
+                         'workflow cuts it after its CI gate — docs/AUDIT.md F19)')
     a = ap.parse_args()
     new = parse_version(a.version)
     old = old_version()
@@ -177,27 +186,36 @@ def main():
         git('add', '-A', dry=dry)
         git('commit', '-m',
             'release: pv-suite %s\n\n%s\n\n(the orchestrator: scripts/release.py — the version sites,\n'
-            'the changelog rename, the verification, the tag and the GitHub release)'
+            'the changelog rename, the verification, the tag and the push; the workflow cuts the release)'
             % (new, body), dry=dry)
     else:
         print('release: nothing to commit (the tree is already released)')
 
     if new in git('tag', '-l', dry=dry).split():
         print('release: the tag %s exists' % new)
+    elif dry:
+        print('release: tagged %s (annotated, signed when a key exists)' % new)
     else:
-        git('tag', '-a', new, '-m', 'pv-suite %s' % new, dry=dry)
-        print('release: tagged %s (annotated)' % new)
+        signed = subprocess.run(['git', 'tag', '-s', new, '-m', 'pv-suite %s' % new],
+                                cwd=ROOT, capture_output=True, text=True)
+        if signed.returncode == 0:
+            print('release: tagged %s (signed)' % new)
+        else:
+            git('tag', '-a', new, '-m', 'pv-suite %s' % new)
+            why = next((l for l in signed.stderr.splitlines() if l.strip()), 'no reason printed')
+            print('release: tagged %s (annotated — no signing key: %s)' % (new, why))
 
     if a.no_push:
         print('release: --no-push, done locally')
         return
     git('push', 'origin', 'main', dry=dry)
     git('push', 'origin', new, dry=dry)
-    print('release: pushed main + the %s tag (the workflow takes it from here)' % new)
+    print('release: pushed main + the %s tag (the workflow gates the suites + the build, then cuts the release)' % new)
 
-    if a.no_release:
-        print('release: --no-release, no GitHub release')
+    if not a.release:
+        print("release: no local cut — the GitHub release is the workflow's job; pass --release to cut it here")
         return
+    print('release: --release cuts the GitHub release locally, before the CI gate reports')
     if not sh(['bash', '-c', 'command -v gh'], dry=dry):
         print('release: no gh on PATH, skipping the GitHub release (the workflow will cut it)')
         return

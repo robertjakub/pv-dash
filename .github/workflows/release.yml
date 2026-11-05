@@ -10,12 +10,12 @@ permissions:
 
 jobs:
   test:
-    name: the seven suites
+    name: the eight suites
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: |
-          for s in cache-regtest scrape-regtest cache-stress cache-control-fuzz control-fuzz; do
+          for s in cache-regtest scrape-regtest cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz; do
             python3 tests/$s.py
           done
           python3 tests/cache-fuzz.py 300

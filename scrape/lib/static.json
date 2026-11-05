@@ -18,7 +18,7 @@
     "unit": 1,
     "timeout_s": 3.0,
     "listen": "127.0.0.1:9350",
-    "interval_s": 5.0,
+    "interval_s": 10.0,
     "scale": 1.0,
     "grid_scale": 1.0,
     "max_kwp": 6.0,

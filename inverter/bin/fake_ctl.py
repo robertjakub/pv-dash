@@ -44,7 +44,7 @@ def main():
     p.add_argument('command', nargs='*', help='control command, e.g. set pv 2500, set scenario noon, show settings, status, reset, shutdown')
     p.add_argument('--timeout', type=float, default=CLI_TIMEOUT_S, help='socket timeout in seconds (default %(default)s)')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env FAKE_CONTROL_TOKEN)')
-    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line); not for use with --control-token (env FAKE_CONTROL_TOKEN_FILE)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env FAKE_CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
     p.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB, help='rotate the audit log at this size, 0 = off')
     p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')

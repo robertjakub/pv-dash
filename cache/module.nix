@@ -238,9 +238,10 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = ''
-        Clients allowed to connect: "any" or a comma-separated list of IPs
-        and CIDR prefixes (e.g. "10.0.0.7,10.48.0.0/16", IPv4 or IPv6).
-        null = any.
+        Clients allowed to connect: "any", "none" (refuse every peer) or a
+        comma-separated list of IPs and CIDR prefixes (e.g.
+        "10.0.0.7,10.48.0.0/16", IPv4 or IPv6). null = the tool's default
+        ("any").
       '';
     };
 
@@ -248,8 +249,9 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = ''
-        Clients allowed to write (also needs allowWrite): "any" or a
-        comma-separated list of IPs and CIDR prefixes. null = any.
+        Clients allowed to write (also needs allowWrite): "any", "none"
+        (refuse every peer) or a comma-separated list of IPs and CIDR
+        prefixes. null = the tool's default ("none" — no client writes).
       '';
     };
 
@@ -258,9 +260,10 @@ in
       default = null;
       description = ''
         Register ranges a forwarded write may touch: a comma-separated
-        START:COUNT list (e.g. "47400:100,47600:100"). Writes outside the
-        ranges are refused with a Modbus illegal-function exception.
-        null = any register writable (the default).
+        START:COUNT list (e.g. "47400:100,47600:100"), "any", or "none".
+        Writes outside the ranges are refused with a Modbus illegal-function
+        exception. null = the tool's default ("none" — no register
+        writable).
       '';
     };
 

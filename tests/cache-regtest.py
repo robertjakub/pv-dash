@@ -166,6 +166,7 @@ try:
     time.sleep(0.7)
     start([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT), '--listen', '127.0.0.1:%d' % CACHE_PORT,
            '--interval', '1', '--cache-ttl', '3', '--allow-write', '--profile', R,
+           '--write-acl', 'any', '--write-registers', 'any',
            '--audit-log', '/tmp/reg_audit.log'], log='/tmp/reg_cache.log')
     time.sleep(2.5)
 
@@ -410,6 +411,7 @@ try:
 
     start([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
            '--listen', '127.0.0.1:15513', '--interval', '1', '--profile', R,
+           '--write-acl', 'any', '--write-registers', 'any',
            '--control-port', '15514'], log='/tmp/reg_ctl.log',
           env_extra={'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
     time.sleep(2)
@@ -905,7 +907,8 @@ try:
     # the allow-list rides the ini (the reloadable source: the env is frozen at start)
     ini4 = '/tmp/reg_fc4.ini'
     open(ini4, 'w').write(open(os.path.join(CACHE_DIR, 'modbus_cache.ini')).read()
-                          .replace('write_registers = any', 'write_registers = 47400:100'))
+                          .replace('write_registers = none', 'write_registers = 47400:100')
+                          .replace('write_acl = none', 'write_acl = any'))
 
     def rd4(addr, n, port=CACHE_PORT):
         return txn(struct.pack('>BHH', 4, addr, n), port)
@@ -968,6 +971,54 @@ try:
     b = wr6(47615, 9, port=15521)
     check('SIGHUP: the reloaded allow-list accepts the new range', b == bytes.fromhex('06b9ff0009'), b.hex())
 
+    # the 'none' modes: the write path defaults fully closed (write-acl none +
+    # write-registers none — --allow-write alone refuses every write); the
+    # connect ACL's none refuses every connection at accept
+    start([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
+           '--listen', '127.0.0.1:15531', '--interval', '1', '--profile', R,
+           '--allow-write', '--control-port', '15532', '--control-token', 'sekrit'],
+          log='/tmp/reg_none.log')
+    time.sleep(2)
+    none_log = open('/tmp/reg_none.log').read()
+    check('defaults logged: write acl none, allow-list none',
+          'connect acl: any' in none_log and 'write acl: none' in none_log
+          and 'write allow-list: none' in none_log, none_log[:240])
+    b = wr6(47415, 5, port=15531)
+    check('write-acl none (the default): the write is refused', b[0] == 0x86 and b[1] == 1, b.hex())
+    none_log = open('/tmp/reg_none.log').read()
+    check('write-acl none: the refusal names the ACL',
+          'not on the write ACL' in none_log)
+    r = ctl_cmd('set write-acl any', 15532)
+    check('write-acl any: the write is still refused (write-registers none)',
+          r.startswith('ok write-acl=any'), r[:80])
+    b = wr6(47415, 5, port=15531)
+    check('write-registers none: refused via the allow-list', b[0] == 0x86 and b[1] == 1, b.hex())
+    r = ctl_cmd('set write-registers any', 15532)
+    b = wr6(47415, 5, port=15531)
+    check('write-acl any + write-registers any: the write passes',
+          b == bytes.fromhex('06b9370005'), b.hex())
+    r = ctl_cmd('unset write-acl', 15532)
+    check('unset write-acl restores the default none', r.startswith('ok write-acl=none'), r[:80])
+    b = wr6(47415, 5, port=15531)
+    check('write-acl none again: refused', b[0] == 0x86 and b[1] == 1, b.hex())
+
+    start([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
+           '--listen', '127.0.0.1:15539', '--interval', '1', '--profile', R,
+           '--connect-acl', 'none', '--control-port', '15540', '--control-token', 'sekrit'],
+          log='/tmp/reg_noconn.log')
+    time.sleep(2)
+    try:
+        b = rd(32064, 2, port=15539)
+        ok = False
+    except (ConnectionError, OSError):
+        ok = True
+    check('connect-acl none: the connection is rejected at accept', ok)
+    r = ctl_cmd('set connect-acl any', 15540)
+    check('set connect-acl any', r.startswith('ok connect-acl=any'), r[:80])
+    b = rd(32064, 2, port=15539)
+    check('connect-acl any: the client connects again',
+          b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
+
     # a write frame too short to carry an address fails CLOSED (the
     # allow-list cannot vet what it cannot parse)
     b = txn(b'\x06', port=15521)          # FC6 with no address: forwarded before the fix
@@ -1001,9 +1052,11 @@ try:
           'REQUESTS peer=127.0.0.1:' in fc4_audit and '(last 1s:' in fc4_audit
           and 'connected=' in fc4_audit, fc4_audit[-160:])
 
-    # the control token from a file (the LoadCredential pattern)
+    # the control token from a file (the LoadCredential pattern);
+    # the file must be owner-only 0600 (F12 in docs/AUDIT.md)
     tokfile = '/tmp/reg_token_file'
     open(tokfile, 'w').write('tokensecret\n')
+    os.chmod(tokfile, 0o600)
     r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
                         '--listen', '127.0.0.1:15523', '--interval', '1', '--profile', fc4map,
                         '--control-port', '15524', '--control-token', 'a', '--control-token-file', tokfile],
@@ -1030,6 +1083,14 @@ try:
                        capture_output=True, text=True, timeout=15)
     check('token file: a missing file fails fast, one line', r.returncode != 0
           and 'cannot read control-token-file' in (r.stderr + r.stdout)
+          and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
+    lax = '/tmp/reg_token_file_lax'
+    open(lax, 'w').write('laxsecret\n')                                 # the umask default (0644)
+    r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512', '--listen', '127.0.0.1:15525',
+                        '--control-token-file', lax, '--dry-run'],
+                       capture_output=True, text=True, timeout=15)
+    check('token file: a group/world-readable file refuses to start (F12)',
+          r.returncode != 0 and '0600' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
 
     # the audit-finding refusals (F5/F6 in docs/AUDIT.md): the token-less

@@ -8,6 +8,23 @@ failure policy (the cache logs and continues, the scraper dies)."""
 import os
 
 
+def check_token_file_mode(path, label='token-file'):
+    """The token-file discipline (F12 in docs/AUDIT.md): a token file must
+    be owner-only (0600) — a group- or world-accessible token file is
+    refused before the read (a leaked file mode is a leaked token).
+    os.stat follows symlinks, so a LoadCredential symlink is judged by its
+    target."""
+    try:
+        st = os.stat(path)
+    except OSError as e:
+        raise SystemExit('cannot read %s %s: %s' % (label, path, e))
+    mode = st.st_mode & 0o777
+    if mode & 0o077:
+        raise SystemExit('%s %s: mode %03o is group/world accessible — '
+                         'a token file must be 0600, chmod 0600 %s'
+                         % (label, path, mode, path))
+
+
 def parse_listen(text):
     """HOST:PORT -> (host, port); a malformed value exits with a clean
     one-liner (the repo's config style — never a traceback)."""
@@ -26,8 +43,11 @@ def parse_listen(text):
 def load_token_file(path, label='control-token-file'):
     """The token from a file: the first line, whitespace-stripped (a systemd
     LoadCredential or a plain key file — anything but the rendered ini,
-    which lands world-readable in the store). Fails fast with a clean
-    one-liner (so is a token that silently vanishes)."""
+    which lands world-readable in the store). The file must be owner-only
+    (0600) — group/world-accessible token files are refused (F12 in
+    docs/AUDIT.md). Fails fast with a clean one-liner (so is a token that
+    silently vanishes)."""
+    check_token_file_mode(path, label)
     try:
         with open(path, encoding='utf-8') as fh:
             token = fh.readline().strip()

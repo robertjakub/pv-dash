@@ -41,13 +41,26 @@ scrape_configs:
       - targets: ['localhost:9350']
 ```
 
+(The docker demo stack ships this wired end-to-end: the `prometheus`
+compose service scrapes `modbus-scraper:9350` over the internal network
+with the generated token file — see [docker/README.md](../docker/README.md).)
+
 **Authentication is disabled by default.** Set **`--auth-token <secret>`**
 (ini `auth_token`, env `SCRAPER_AUTH_TOKEN`) to require
 `Authorization: Bearer <token>` on every request — anything else gets `401`
 with a `WWW-Authenticate: Bearer` challenge. Keep the token out of the
 world-readable Nix store with **`--auth-token-file`** (NixOS: `authTokenFile`) —
 the file is re-read on every SIGHUP, so rotation is `rewrite file` +
-`systemctl reload`. Pass the token to Prometheus with:
+`systemctl reload`.
+
+> **The flag lands in `ps`.** A token passed as `--auth-token <secret>` is
+> visible on the process command line — every local user can read it in
+> `ps` output or `/proc/*/cmdline` (the audit's F9). Prefer
+> **`--auth-token-file`** — the file must be **owner-only (`0600`)**;
+> group/world-accessible token files refuse to start (F12) — or the
+> `SCRAPER_AUTH_TOKEN` env var. The flag form is for quick tests.
+
+Pass the token to Prometheus with:
 
 ```yaml
     authorization:
@@ -151,7 +164,9 @@ Settings are resolved in this order (first hit wins), mirroring
 Every setting is **sanitized and validated** before use: whitespace is
 stripped, hostnames/listen addresses are charset- and length-checked, all
 numeric settings must be finite (`nan`/`inf` rejected), tokens must be free
-of whitespace/control characters (file tokens capped at 8192 bytes), and a
+of whitespace/control characters (file tokens capped at 8192 bytes, and a
+token file must be owner-only — mode `0600` — a group/world-accessible one
+refuses to start, F12), and a
 **malformed config file is fatal** (it never silently falls back to
 defaults). Nonsense values (negative intervals, out-of-range
 registers/ports, bad unit ids, unknown log levels) abort with a clean
@@ -179,7 +194,7 @@ battery_register = 37001
 battery_soc_register = 37004
 grid_positive_import = false
 listen = 127.0.0.1:9350
-interval = 5
+interval = 10
 log_level = INFO
 ```
 
@@ -233,11 +248,11 @@ journald adds one.
 | `--grid-positive-import` | off | grid register positive means import |
 | `--timeout` | `3` | Modbus connect/read timeout, seconds |
 | `--listen` | `127.0.0.1:9350` | exporter bind address `HOST:PORT` (loopback by default) |
-| `--interval` | `5` | seconds between Modbus polls |
+| `--interval` | `10` | seconds between Modbus polls |
 | `--log-level` | `INFO` | `DEBUG` logs every poll |
 | `--log-access` | off | audit log: every HTTP request at INFO (client, path, status, size) |
 | `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; token compared timing-safe) |
-| `--auth-token-file` | disabled | read the bearer token from a file instead (single line, trimmed; **re-read on every SIGHUP** — rotate by rewriting the file and reloading); mutually exclusive with `--auth-token` |
+| `--auth-token-file` | disabled | read the bearer token from a file instead (single line, trimmed; **re-read on every SIGHUP** — rotate by rewriting the file and reloading; **owner-only `0600`** — a group/world-accessible token file refuses to start, F12); mutually exclusive with `--auth-token` |
 | `--max-clients` | `64` | cap concurrent HTTP clients; overflow gets an immediate `503 # rate limited` (0 = unlimited) |
 | `--client-timeout` | `300` | kick idle keep-alive clients after this many seconds (0 = off) |
 | `--local-time` | UTC | log timestamps in the system time zone |

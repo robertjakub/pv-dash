@@ -27,6 +27,13 @@ before the repo restructured into one suite.
   daemon's own user, `--control-trust-uids`) skip the token handshake
   (`SO_PEERCRED`, shared `common/cred.py`; the NixOS module carries
   `controlTrustUids`); TCP peers always authenticate.
+- **docker** — the demo Prometheus service (`Dockerfile.prometheus`:
+  alpine + the prometheus package, unprivileged via su-exec;
+  `entrypoint-prometheus.sh`: the token handoff, root only for the copy;
+  `prometheus.yml`): scrapes `modbus-scraper:9350` over the internal
+  network with `authorization.credentials_file` — the scrape/token story
+  ships with the stack now (still not the full demo: the dashboard service
+  is pending).
 - **cache** — the NixOS module grew the `selection` option: "all"/"none",
   a list of profile names (rendered into the selection JSON the
   `--selection` flag reads) or a path to one; the `profile` option
@@ -41,6 +48,18 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **cache** — **breaking**: the write path defaults fully closed —
+  `write-acl` and `write-registers` now default to **`none`** (was `any`):
+  enabling `--allow-write` alone refuses every write until the operator
+  opens the write ACL and the register allow-list (in the config or live
+  with `set`). Both settings (and `connect-acl`, whose default stays
+  `any`) grew the **`none`** mode — restrict all: `write-acl none` refuses
+  every client's writes, `write-registers none` refuses every write
+  regardless of the client, `connect-acl none` rejects every connection at
+  accept.
+- **scrape** — the default poll interval is **10 s** (was 5) — matching
+  the cache's poll default, the demo Prometheus's scrape interval and the
+  dashboard's `scrapeSec`; the cache already polled at 10 s.
 - **common** — `human.secs`: one human time formatter for every command
   surface in the suite (ms/s/m/h/d, one unit, always two decimals) — the
   control reports, the set/unset confirmations, the `show cache all` /
@@ -76,6 +95,29 @@ before the repo restructured into one suite.
   (F6, cache); the unix control socket is `chmod 0600` after bind (not the
   umask), with `--control-socket-group` opting into `0660` (F8, the cache's
   option; the inverter takes the default).
+- **docker** — the audit finding F7 (docs/AUDIT.md) closed: the compose
+  stack publishes nothing on the host — the services talk over one
+  `internal: true` network (`pv-modbus`, no outbound route), so the Modbus
+  listeners, the exporter's `/metrics` and the Prometheus UI are reachable
+  only from inside the network (`docker compose exec`, or a collector
+  container attached to the network by name); the plain `docker run`
+  examples bind their published ports to `127.0.0.1` now. The demo
+  exporter serves with a bearer token — the entrypoint generates
+  `/config/metrics.token` into the volume on the first seed (0600; bundled
+  `*.token` defaults are placeholders, never copied) and Prometheus scrapes
+  with the same value.
+- **cache, inverter, scrape** — the audit findings F9 and F12
+  (docs/AUDIT.md) closed: a token passed as `--control-token` /
+  `--metrics-token` / `--auth-token` lands in `ps` / `/proc/*/cmdline` —
+  the READMEs and the token-flag man pages now say prefer the `-file`
+  variants (LoadCredential) or the env vars, the flag form is for quick
+  tests (F9). Token files must be owner-only (`0600`): a group- or
+  world-accessible token file refuses to start with a one-line
+  `chmod 0600` error — the shared loader (`check_token_file_mode` in
+  `common/config.py`) covers the cache, the fake and the ctl/cli clients,
+  the scraper's SIGHUP-reread loader re-checks on every reload (F12); the
+  docker entrypoint seeds generated token files 0600. The regtests assert
+  the refusal.
 
 ## 0.3.0 — 2026-11-05
 

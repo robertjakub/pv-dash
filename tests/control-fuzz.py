@@ -156,7 +156,9 @@ def main():
             check('fuzz: the right token authenticates', False, str(e))
 
         # 6b. the token from a file: the fake reads it, the ctl authenticates with it
+        #     (the file must be owner-only 0600 — F12 in docs/AUDIT.md)
         open('/tmp/ctl_fuzz_token', 'w').write('filesecret\n')
+        os.chmod('/tmp/ctl_fuzz_token', 0o600)
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15965',
                                        '--control-port', '15964', '--control-token-file',
                                        '/tmp/ctl_fuzz_token'],
@@ -193,6 +195,14 @@ def main():
                             'status'], capture_output=True, text=True, timeout=15)
         check('fuzz: a missing token file fails fast, one line', r.returncode != 0
               and 'cannot read control-token-file' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
+        open('/tmp/ctl_fuzz_token_lax', 'w').write('laxsecret\n')          # the umask default (0644)
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py'),
+                            '--port', '15962', '--dry-run',
+                            '--control-token-file', '/tmp/ctl_fuzz_token_lax'],
+                           capture_output=True, text=True, timeout=15)
+        check('fuzz: a group/world-readable token file refuses to start (F12)',
+              r.returncode != 0 and '0600' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
 
         # 7. twenty parallel clients: garbage and real commands interleaved

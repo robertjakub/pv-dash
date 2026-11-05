@@ -76,7 +76,7 @@ def parse_args():
     ap.add_argument('--grid-positive-import', action='store_true', default=None,
                     help='grid register positive when importing (default: config, $SCRAPER_GRID_POSITIVE_IMPORT or positive = export)')
     ap.add_argument('--listen', help='listen address HOST:PORT (default: config, $SCRAPER_LISTEN or 127.0.0.1:9350)')
-    ap.add_argument('--interval', type=float, help='seconds between polls (default: config, $SCRAPER_INTERVAL or 5)')
+    ap.add_argument('--interval', type=float, help='seconds between polls (default: config, $SCRAPER_INTERVAL or 10)')
     ap.add_argument('--max-clients', type=int, help='maximum concurrent HTTP clients; extras get an immediate 503 '
                     '(default: config, $SCRAPER_MAX_CLIENTS or 64; 0 = unlimited)')
     ap.add_argument('--client-timeout', type=float, help='seconds an idle keep-alive HTTP client is kept before '
@@ -87,7 +87,8 @@ def parse_args():
     ap.add_argument('--auth-token', help='require Authorization: Bearer <token> on all requests '
                      '(default: config, $SCRAPER_AUTH_TOKEN or disabled)')
     ap.add_argument('--auth-token-file', help='read the bearer token from this file instead (single line, '
-                    'trimmed; re-read on every SIGHUP — rotate by rewriting the file and reloading); '
+                    'trimmed; re-read on every SIGHUP — rotate by rewriting the file and reloading; '
+                    'must be owner-only 0600); '
                     'mutually exclusive with --auth-token')
     ap.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                     help='log level (default: config, $SCRAPER_LOG_LEVEL or INFO)')

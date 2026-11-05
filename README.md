@@ -75,9 +75,10 @@ tracebacks** in the logs.
 
 ## Docker
 
-The containers — one alpine image per Modbus tool plus the compose demo
-stack (fake inverter → cache → scraper) — are documented in
-[`docker/README.md`](docker/README.md).
+The containers — one alpine image per Modbus tool, the Prometheus image,
+plus the compose demo stack (fake inverter → cache → scraper → Prometheus,
+internal-network only, nothing published on the host) — are documented in
+[`docker/README.md`](docker/README.md), topology diagram included.
 
 ## License
 

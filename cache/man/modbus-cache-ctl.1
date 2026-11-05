@@ -38,7 +38,8 @@ same one).
 .TP
 .BI \-\-control-token-file " FILE"
 the token from a file (the first line); mutually exclusive with
-\fB--control-token\fR.
+\fB--control-token\fR. The file must be owner-only (\fB0600\fR) \(em a
+token flag is visible in \fBps\fR, prefer the file.
 .TP
 .BI \-\-audit-log " FILE|\-"
 the client's own audit trail

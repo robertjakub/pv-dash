@@ -175,11 +175,11 @@ with a clean one-line error instead of failing later at runtime.
 | `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Behaviour toggles** | | |
 | `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (ini `allow_write`, env `MODBUS_CACHE_ALLOW_WRITE` accept `true`/`false`) |
-| `--write-registers` | `any` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception (ini `write_registers`, env `MODBUS_CACHE_WRITE_REGISTERS`) |
-| `--connect-acl` | `any` | clients allowed to connect: `any` or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
-| `--write-acl` | `any` | clients allowed to write — still requires `--allow-write` — see [Access control](#access-control) |
+| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default) (ini `write_registers`, env `MODBUS_CACHE_WRITE_REGISTERS`) |
+| `--connect-acl` | `any` | clients allowed to connect: `any`, `none` (refuse everyone) or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
+| `--write-acl` | `none` | clients allowed to write — still requires `--allow-write`; `none` = no client writes (the default) — see [Access control](#access-control) |
 | `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (ini `control_token`, env `MODBUS_CACHE_CONTROL_TOKEN`) |
-| `--control-token-file` | none | the token from a file (the first line; a systemd `LoadCredential` or a key file) — instead of `--control-token`, giving both is an error (ini `control_token_file`, env `MODBUS_CACHE_CONTROL_TOKEN_FILE`) |
+| `--control-token-file` | none | the token from a file (the first line; a systemd `LoadCredential` or a key file, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12) — instead of `--control-token`, giving both is an error (ini `control_token_file`, env `MODBUS_CACHE_CONTROL_TOKEN_FILE`) |
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user (ini `control_socket_group`, env `MODBUS_CACHE_CONTROL_SOCKET_GROUP`) |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (ini `control_trust_uids`, env `MODBUS_CACHE_CONTROL_TRUST_UIDS`) |
 | **Persistence** | | |
@@ -195,7 +195,7 @@ with a clean one-line error instead of failing later at runtime.
 | **Metrics** | | |
 | `--metrics-port` | off | serve the cache's own Prometheus `/metrics` on `127.0.0.1:PORT` (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `huawei_cache_*` path); **refuses to start without `--metrics-token`/`--metrics-token-file`** |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-port` is set |
-| `--metrics-token-file` | off | the metrics bearer token from a file (the first line); instead of `--metrics-token`, giving both is an error |
+| `--metrics-token-file` | off | the metrics bearer token from a file (the first line; owner-only `0600`, F12) — instead of `--metrics-token`, giving both is an error |
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect clients silent for this many seconds — sheds connections from clients that died without closing (`0` = never) |
@@ -255,6 +255,14 @@ on both transports. Over the unix socket the kernel vouches for the peer
 `--control-trust-uids` uids skip the handshake, so a local systemd unit
 speaks without sharing the secret; TCP peers always need the token. Without
 a token the unix socket relies on filesystem permissions.
+
+> **A token flag lands in `ps`.** Tokens passed as `--control-token` /
+> `--metrics-token <secret>` are visible on the process command line — every
+> local user can read them in `ps` output or `/proc/*/cmdline` (the audit's
+> F9; the same applies to the ctl/cli clients). Prefer the **`-file`**
+> variants — the file must be **owner-only (`0600`)**: group/world-accessible
+> token files refuse to start (F12) — or the `MODBUS_CACHE_CONTROL_TOKEN` /
+> `MODBUS_CACHE_METRICS_TOKEN` env vars. The flag form is for quick tests.
 
 | Command | Effect |
 |---|---|
@@ -368,19 +376,33 @@ token the proxy was started with.
 
 ## Access control
 
-Both ACLs default to **`any`**. When set, they take a comma-separated list
-of IPs and CIDR prefixes (IPv4 or IPv6, e.g.
-`--connect-acl 127.0.0.1,10.48.3.0/24`); the config-file/env/NixOS forms
-are `connect_acl`/`write_acl` (NixOS `connectAcl`/`writeAcl`).
+**`connect-acl` defaults to `any`** (who may connect is the listen bind's
+job — the default bind is loopback); **`write-acl` and `write-registers`
+default to `none`** — the write path is closed even before `--allow-write`
+enters the picture. Both ACLs take a comma-separated list of IPs and CIDR
+prefixes (IPv4 or IPv6, e.g. `--connect-acl 127.0.0.1,10.48.3.0/24`), or
+the two words `any` (no restriction) and `none` (refuse every peer —
+restrict all); the config-file/env/NixOS forms are
+`connect_acl`/`write_acl`/`write_registers` (NixOS
+`connectAcl`/`writeAcl`/`writeRegisters`).
 
-- **Connect ACL** — who may connect at all; a rejected connection is closed
-  at accept and logged (`connection rejected: … not on the connect ACL`).
-  From the client's view the connection opens and immediately dies.
+- **Connect ACL** — who may connect at all; `none` rejects every connection
+  at accept (logged: `connection rejected: … not on the connect ACL`). From
+  the client's view the connection opens and immediately dies.
 - **Write ACL** — whose write requests are forwarded; everything else is
   refused with a Modbus illegal-function exception, logged with the client
   IP and the attempted payload. The connection stays up and reads keep
-  working. Writing still requires `--allow-write`: effective write
-  permission = `--allow-write` **and** client on the write ACL.
+  working. `none` (the default) refuses every client's writes.
+- **Write registers** (`write-registers`) — the ranges a forwarded write
+  may touch; `none` (the default) refuses every write regardless of the
+  client, `any` lifts the register check entirely.
+
+Writing is therefore gated four times: `--allow-write` **and** the client
+on the write ACL **and** every touched register inside the allow-list
+(and the frame parse gate first) — with `write-acl` and `write-registers`
+defaulting to `none`, enabling `--allow-write` alone still refuses every
+write until the operator opens those two deliberately (in the config or
+live with `set`).
 
 ACLs re-resolve on `SIGHUP` like every other setting; a malformed list keeps
 the previous one.
@@ -579,8 +601,10 @@ Options: `inverterHost`, `inverterPort`, `unitId`, `timeout`, `interval`,
 `readDelay`, `mergeGap`, `profile` (device-profile JSON path; null = the
 bundled `sun2000` profile), `cacheTtl` (unset = 3× `interval`),
 `listenHost`, `listenPort`, `allowWrite`, `writeRegisters` (the
-comma-separated START:COUNT allow-list; null = any), `connectAcl`,
-`writeAcl`, `maxClients`, `clientTimeout`, `logLevel`, `localTime`,
+START:COUNT allow-list, `any` or `none`; null = the proxy default
+`none`), `connectAcl` (`any`/`none`/prefixes; null = `any`),
+`writeAcl` (`any`/`none`/prefixes; null = the proxy default `none`),
+`maxClients`, `clientTimeout`, `logLevel`, `localTime`,
 `logAccess`, `openFirewall`, `auditLog` (null = the trail goes to
 **stdout**, which journald captures — the hardened service cannot write
 the XDG state home), `auditMaxMb`, `auditDaily`, `auditFiles`, `requestsAudit`
@@ -602,8 +626,9 @@ manual `systemctl restart modbus-cache`.
 
 Modbus TCP (as spoken by the SUN2000 inverter and this proxy) has no auth,
 no encryption and no access control — the proxy forwards writes, so **anyone
-who can reach the listen port can read and write inverter registers** (write
-forwarding is off until `--allow-write` is set). The proxy therefore **binds
+who can reach the listen port can read** inverter registers (writes are
+gated four times and default closed: `--allow-write` is off, `write-acl`
+and `write-registers` are `none`). The proxy therefore **binds
 to 127.0.0.1 by default**; widen `listenHost` deliberately, keep it on a
 trusted LAN, and don't expose it to the internet. The connect/write ACLs add
 per-source control within the LAN; for stricter isolation use the firewall

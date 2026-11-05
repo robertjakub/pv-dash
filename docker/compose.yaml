@@ -1,13 +1,25 @@
 # The pv-suite Modbus tools as compose services. The build contexts are
 # ../inverter, ../cache and ../scrape; the shared profiles/ directory, the
 # entrypoint and the common/ package ride in as named contexts. Run one service: docker compose up -d fake-inverter
-# Run the stack:         docker compose up -d (inverter + cache + scraper)
+# Run the stack:         docker compose up -d (inverter + cache + scraper + prometheus)
 #
 # All three share the external `config` volume mounted at /config: on start
 # the entrypoint seeds it with the bundled defaults (every file the volume
 # lacks is copied in, existing ones stay) — edits to /config survive
 # container recreation. `docker compose exec` sessions bypass the entrypoint
 # and run as root; add --user pvsuite to land as pvsuite.
+#
+# Nothing is published on the host (the audit's F7): the four services talk
+# over one `internal: true` network — no host ports, no outbound route. The
+# Modbus listeners and the exporter's /metrics are reachable only from inside
+# that network: `docker compose exec`, or a collector container attached to
+# the same network by name (see README.md).
+#
+# The scrape/token story ships in the stack: the exporter serves with a
+# bearer token (SCRAPER_AUTH_TOKEN_FILE -> /config/metrics.token — a random
+# value the entrypoint generates on the first seed, 0600, owner pvsuite) and
+# the Prometheus service reads its copy of the same file from the config
+# volume. Read the token: docker compose exec modbus-scraper cat /config/metrics.token
 services:
   fake-inverter:
     build:
@@ -17,10 +29,10 @@ services:
         scripts: ../docker
         common: ../common
     image: fake-inverter
-    ports:
-      - "5502:5502"
     volumes:
       - config:/config
+    networks:
+      - modbus
     restart: unless-stopped
 
   modbus-cache:
@@ -31,10 +43,10 @@ services:
         scripts: ../docker
         common: ../common
     image: modbus-cache
-    ports:
-      - "15502:15502"
     volumes:
       - config:/config
+    networks:
+      - modbus
     depends_on:
       - fake-inverter
     restart: unless-stopped
@@ -47,11 +59,35 @@ services:
         scripts: ../docker
         common: ../common
     image: modbus-scraper
-    ports:
-      - "9350:9350"
+    environment:
+      # the token the entrypoint generated into the volume (0600, pvsuite):
+      # the demo exporter never serves unauthenticated (the audit's F13)
+      SCRAPER_AUTH_TOKEN_FILE: /config/metrics.token
+    networks:
+      - modbus
     depends_on:
       - modbus-cache
     restart: unless-stopped
 
+  prometheus:
+    build:
+      context: .
+      dockerfile: Dockerfile.prometheus
+    image: pv-prometheus
+    volumes:
+      - config:/config:ro
+      - prometheus-data:/prometheus
+    networks:
+      - modbus
+    depends_on:
+      - modbus-scraper
+    restart: unless-stopped
+
+networks:
+  modbus:
+    name: pv-modbus
+    internal: true
+
 volumes:
   config:
+  prometheus-data:

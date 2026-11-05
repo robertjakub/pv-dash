@@ -1,0 +1,31 @@
+# The demo Prometheus in the compose stack — alpine + the prometheus
+# package, stdlib-style (no pip, no python). The pattern of the Modbus
+# images: an unprivileged user, an entrypoint that runs as root only for
+# the token handoff, then su-exec drops before the exec.
+#
+# Build (the context = the docker/ directory itself):
+#   cd docker
+#   docker build -t pv-prometheus -f Dockerfile.prometheus .
+#   # or: docker compose up -d prometheus
+#
+# The entrypoint waits for /config/metrics.token (the modbus-scraper's
+# entrypoint seeds it into the shared config volume — a random value,
+# 0600, owner pvsuite), copies it for the prometheus user, and execs.
+# The UI serves on the internal network only — the compose stack
+# publishes nothing on the host (docs/AUDIT.md F7).
+FROM alpine:3.20
+
+RUN apk add --no-cache prometheus su-exec
+
+# the alpine package ships its own system user; this is a no-op then
+RUN adduser -D prometheus 2>/dev/null || true
+
+COPY prometheus.yml /etc/prometheus/prometheus.yml
+COPY entrypoint-prometheus.sh /usr/local/bin/pv-prometheus-entrypoint
+RUN chmod +x /usr/local/bin/pv-prometheus-entrypoint \
+    && mkdir -p /prometheus \
+    && chown -R prometheus:prometheus /etc/prometheus /prometheus
+
+VOLUME /prometheus
+EXPOSE 9090
+ENTRYPOINT ["/usr/local/bin/pv-prometheus-entrypoint"]

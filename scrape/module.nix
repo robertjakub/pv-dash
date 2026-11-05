@@ -154,7 +154,7 @@ in
 
     interval = lib.mkOption {
       type = lib.types.float;
-      default = 5.0;
+      default = 10.0;
       description = "Seconds between Modbus polls.";
     };
 

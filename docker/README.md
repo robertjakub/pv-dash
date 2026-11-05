@@ -6,8 +6,9 @@
 
 The suite is stdlib-only, so the containers are trivial: `alpine` + `apk add
 python3`, no pip, no venv, ~50 MB images. One Dockerfile per Modbus tool —
-`Dockerfile.inverter`, `Dockerfile.cache`, `Dockerfile.scraper` — plus a
-`compose.yaml` wiring the demo stack. The pattern:
+`Dockerfile.inverter`, `Dockerfile.cache`, `Dockerfile.scraper` — plus
+`Dockerfile.prometheus` for the demo stack's scraper, and a `compose.yaml`
+wiring the demo stack. The pattern:
 
 - an unprivileged **`pvsuite`** user (`adduser -D`, `COPY --chown`); the
   entrypoint runs as root only to seed the config volume and drops to
@@ -34,25 +35,124 @@ python3`, no pip, no venv, ~50 MB images. One Dockerfile per Modbus tool —
 
 ## The demo stack (compose)
 
-All three services share the named `config` volume mounted at `/config`;
-each container seeds it with its own bundled defaults on start. `docker
-compose exec` sessions bypass the entrypoint and run as root — add
+All three Modbus services share the named `config` volume mounted at
+`/config`; each container seeds it with its own bundled defaults on start.
+`docker compose exec` sessions bypass the entrypoint and run as root — add
 `--user pvsuite` to land as `pvsuite`.
 
 ```bash
 cd docker
-docker compose up -d fake-inverter              # build + serve on 0.0.0.0:5502
-docker compose up -d modbus-cache               # + the cache proxy on 0.0.0.0:15502 (upstream: fake-inverter)
-docker compose up -d modbus-scraper             # + the exporter on 0.0.0.0:9350 (upstream: modbus-cache)
+docker compose up -d fake-inverter              # build + serve on the internal network
+docker compose up -d modbus-cache               # + the cache proxy (upstream: fake-inverter)
+docker compose up -d modbus-scraper             # + the exporter (upstream: modbus-cache)
+docker compose up -d prometheus                 # + the scraper's Prometheus, scraping modbus-scraper:9350
 docker compose exec --user pvsuite fake-inverter fake-cli   # a console session on the control server
 docker compose down
 ```
 
-The poll chain is **fake-inverter → modbus-cache → scraper**: the cache owns
-the inverter's single Modbus client and the exporter polls the cache — which
-it auto-detects and reports with the `huawei_cache_*` diagnostics metrics
-(`device_up 0` / a growing `age_seconds` mean the device is down behind the
-cache while the cache keeps serving last-known values).
+**Nothing is published on the host** (the audit's F7): the four services
+talk over one `internal: true` network (`pv-modbus` — no host ports, no
+outbound route), so the Modbus listeners, the exporter's `/metrics` and the
+Prometheus UI are reachable only from inside that network. `docker compose
+down` removes the network with the stack. (To browse the Prometheus UI from
+the host, add `ports: ["127.0.0.1:9090:9090"]` to the service in a
+`docker-compose.override.yaml` — loopback-only, an explicit operator act.)
+
+**The scrape/token story ships in the stack** (the audit's F13 closed for
+the demo): the exporter never serves unauthenticated — the compose sets
+`SCRAPER_AUTH_TOKEN_FILE=/config/metrics.token`, and the entrypoint
+generates that file into the volume on the first seed: a random value,
+**0600, owner pvsuite** (bundled `*.token` defaults are placeholders that
+are never copied — the generation is in `entrypoint.sh`; the token survives
+container recreation with the volume). The Prometheus service reads its own
+copy of the same file (`Dockerfile.prometheus` +
+`entrypoint-prometheus.sh`: root copies `/config/metrics.token` to
+`/etc/prometheus/metrics.token`, 0600, then drops to the unprivileged
+`prometheus` user via su-exec) and scrapes with
+`authorization: credentials_file` (`prometheus.yml`).
+
+Read the token and the metrics from the inside:
+
+```bash
+docker compose exec modbus-scraper cat /config/metrics.token
+TOKEN=$(docker compose exec modbus-scraper cat /config/metrics.token)
+docker compose exec modbus-scraper wget -qO- --header "Authorization: Bearer $TOKEN" \
+    http://127.0.0.1:9350/metrics
+```
+
+A token-less request gets a 401 with a `WWW-Authenticate: Bearer` challenge.
+Give Prometheus for another stack the same value as
+`authorization.credentials_file` (an owner-only file, F12) — or attach the
+collector container to the `pv-modbus` network and scrape
+`modbus-scraper:9350` like the demo service does.
+
+The poll chain is **fake-inverter → modbus-cache → scraper → Prometheus**:
+the cache owns the inverter's single Modbus client and the exporter polls
+the cache — which it auto-detects and reports with the `huawei_cache_*`
+diagnostics metrics (`device_up 0` / a growing `age_seconds` mean the device
+is down behind the cache while the cache keeps serving last-known values).
+
+## The demo stack's topology
+
+One `internal: true` network (`pv-modbus`), nothing published on the host,
+one shared `config` volume seeded by the entrypoints, one bearer token
+generated into that volume gating the exporter. The arrows are the traffic;
+every listener binds inside the network only:
+
+```text
+        HOST — nothing published (no ports, no outbound route from the network)
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │                                                                     │
+   │   internal network "pv-modbus"                                      │
+   │   ┌──────────────────────────────────────────────────────────┐      │
+   │   │                                                          │      │
+   │   │  ┌──────────────┐  FC3/4 reads   ┌──────────────┐        │      │
+   │   │  │fake-inverter │◄────10s poll──┤ modbus-cache │        │      │
+   │   │  │  (the device)│────values────►│    15502     │        │      │
+   │   │  └──────▲───────┘               └──────┬───────┘        │      │
+   │   │         │ FC06/16 writes (gated; the   │ 10s poll       │      │
+   │   │         │ write gates default closed:  │ /metrics       │      │
+   │   │         │ allow-write off, write-acl/  │                │      │
+   │   │         │ write-registers none)        │                │      │
+   │   │         └──────────────────────────────┘                │      │
+   │   │                                        │                │      │
+   │   │                                        ▼                │      │
+   │   │   Bearer token (0600) ──────► ┌──────────────┐          │      │
+   │   │                               │modbus-scraper│          │      │
+   │   │                               │    9350      │          │      │
+   │   │                               └──────┬───────┘          │      │
+   │   │                                      │ scrape 10s       │      │
+   │   │                                      ▼                  │      │
+   │   │                               ┌──────────────┐          │      │
+   │   │                               │  prometheus  │ 9090 UI  │      │
+   │   │                               │ (TSDB volume,│ internal │      │
+   │   │                               │  dashboard = │          │      │
+   │   │                               │  pending)    │          │      │
+   │   │                               └──────────────┘          │      │
+   │   └──────────────────────────────────────────────────────────┘      │
+   │                                                                     │
+   │   shared "config" volume (/config): the ini files + metrics.token,  │
+   │   mounted by all three Modbus services; prometheus mounts it ro     │
+   │                                                                     │
+   │   docker compose exec <service> …  — the way in                     │
+   └─────────────────────────────────────────────────────────────────────┘
+```
+
+- **fake-inverter** — the device; its Modbus is the only "hardware" in the
+  demo (no auth — the internal network is the boundary).
+- **modbus-cache** — the proxy: polls the fake every 10 s, owns the single
+  client slot, serves reads from memory; writes stay closed by default
+  (`allow-write` off, `write-acl`/`write-registers` none).
+- **modbus-scraper** — the exporter: polls the cache every 10 s, serves
+  `/metrics` with the bearer token.
+- **prometheus** — scrapes the exporter every 10 s with the same token;
+  its TSDB is the `prometheus-data` volume, its UI stays internal (the
+  dashboard service will be the front when it lands).
+- **the `config` volume** — mounted by all three Modbus services (prometheus
+  reads it read-only): the ini files are editable there; `/config/metrics.token`
+  is the generated shared secret.
+- **the audit trails** — the tools audit to stdout in the demo, so `docker
+  compose logs <service>` is the trail.
 
 The volume is a compose-managed named volume: `docker compose down` keeps
 it, `down -v` wipes it (reseeded with the bundled defaults on the next
@@ -70,9 +170,9 @@ The demo device for development and testing — see the
 cd docker
 docker build -t fake-inverter --build-context profiles=../profiles \
     --build-context scripts=../docker --build-context common=../common ../inverter
-docker run --rm -p 5502:5502 fake-inverter               # serves on 0.0.0.0:5502
-docker run --rm -it fake-inverter bash                   # poke around as pvsuite
-docker run --rm -p 5502:5502 fake-inverter \
+docker run --rm -p 127.0.0.1:5502:5502 fake-inverter      # loopback-published, serves on 0.0.0.0:5502 in the container
+docker run --rm -it fake-inverter bash                    # poke around as pvsuite
+docker run --rm -p 127.0.0.1:5502:5502 fake-inverter \
     fake-inverter --profile deye-sg04lp3 --no-battery    # any flags via the CMD override
 ```
 
@@ -90,9 +190,9 @@ and `/config/selection.json` (`MODBUS_CACHE_CONFIG` /
 cd docker
 docker build -t modbus-cache --build-context profiles=../profiles \
     --build-context scripts=../docker --build-context common=../common ../cache
-docker run --rm -p 15502:15502 modbus-cache    # upstream defaults to the fake-inverter service name
+docker run --rm -p 127.0.0.1:15502:15502 modbus-cache    # upstream defaults to the fake-inverter service name
 docker run --rm -it modbus-cache bash          # poke around as pvsuite
-docker run --rm -p 15502:15502 modbus-cache \
+docker run --rm -p 127.0.0.1:15502:15502 modbus-cache \
     modbus-cache --host 192.168.1.100          # any flags via the CMD override
 ```
 
@@ -110,11 +210,31 @@ configs are `/config/scraper.ini` and `/config/metrics.json`
 cd docker
 docker build -t modbus-scraper --build-context profiles=../profiles \
     --build-context scripts=../docker --build-context common=../common ../scrape
-docker run --rm -p 9350:9350 modbus-scraper    # upstream defaults to the modbus-cache service name (port 15502)
+docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper    # upstream defaults to the modbus-cache service name (port 15502)
 docker run --rm -it modbus-scraper bash        # poke around as pvsuite
-docker run --rm -p 9350:9350 modbus-scraper \
+docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper \
     modbus-scraper --host 192.168.1.100        # any flags via the CMD override
 ```
+
+Standalone runs stay token-less by default — the compose stack is what
+wires the token (`SCRAPER_AUTH_TOKEN_FILE`); pass
+`-e SCRAPER_AUTH_TOKEN_FILE=/config/metrics.token` by hand to mirror it.
+
+### prometheus (`Dockerfile.prometheus`)
+
+The demo stack's scraper — alpine + the prometheus package, no python.
+The context is the `docker/` directory itself:
+
+```bash
+cd docker
+docker build -t pv-prometheus -f Dockerfile.prometheus .
+```
+
+Compose-only by design: it mounts the shared `config` volume (read-only)
+for the token, needs `modbus-scraper` on the internal network, and its
+entrypoint (`entrypoint-prometheus.sh`) drops root before the exec — see
+[The demo stack](#the-demo-stack-compose). The UI serves on the internal
+network only; nothing is published on the host.
 
 ## The version inside the image
 

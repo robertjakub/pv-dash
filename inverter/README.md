@@ -207,6 +207,14 @@ take `--control-token`
 (the first line of a key file or a systemd
 `LoadCredential`) — and authenticate automatically:
 
+> **A token flag lands in `ps`.** Tokens passed as `--control-token` /
+> `--metrics-token <secret>` are visible on the process command line — every
+> local user can read them in `ps` output or `/proc/*/cmdline` (the audit's
+> F9; the clients included). Prefer the **`-file`**
+> variants — the file must be **owner-only (`0600`)**: group/world-accessible
+> token files refuse to start (F12) — or the `FAKE_CONTROL_TOKEN` env var.
+> The flag form is for quick tests (the fake is a test tool — F11).
+
 | Command | Effect |
 |---|---|
 | `set <setting> <value>` | configure a setting (below) |
@@ -355,7 +363,7 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--grid-frequency` | `50` | nominal grid frequency (Hz); the machine wanders ±0.2 Hz around it |
 | `--metrics-port` | off | serve the fake's own Prometheus `/metrics` on `127.0.0.1:PORT` |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`) |
-| `--metrics-token-file` | off | the metrics bearer token from a file (the first line); instead of `--metrics-token`, giving both is an error |
+| `--metrics-token-file` | off | the metrics bearer token from a file (the first line; owner-only `0600`, F12) — instead of `--metrics-token`, giving both is an error |
 | `--audit-log` | XDG state | the audit trail: a file path or `-` for stdout (docker logs / journald) |
 | `--audit-max-mb` | `10` | rotate the audit log at this size, keeping 3 backups; `0` = off |
 | `--audit-daily` | off | also rotate the audit log at UTC midnight |
@@ -371,7 +379,7 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 | `--strict` | off | reject undefined registers with exception 02 |
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
 | `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `FAKE_CONTROL_TOKEN`) |
-| `--control-token-file` | off | the control token from a file (the first line; a key file or a systemd `LoadCredential`), instead of `--control-token`; giving both is an error |
+| `--control-token-file` | off | the control token from a file (the first line; a key file or a systemd `LoadCredential`, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12), instead of `--control-token`; giving both is an error |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `FAKE_CONTROL_TRUST_UIDS`) |
 | `--control-log-replies` | off | DEBUG-log the full output of every control command, not just the command |
 | `--chaos` | `0` | probability 0..1 that a request is answered hostile and dropped |

@@ -8,7 +8,7 @@ and the [fake inverter](../inverter/README.md):
 |---|---|
 | `version.py` | the suite version string: `0.3.0`, or `0.3.0-<short git>` in a checkout |
 | `audit.py` | the append-only audit trail (`AuditLog`): `<stamp> AUDIT <PREFIX> <EVENT>`, size/daily rotation, `-` = stdout |
-| `config.py` | `parse_listen`, `load_token_file` and the device-profile resolution against the shared [profiles/](../profiles/README.md) |
+| `config.py` | `parse_listen`, the token loading (`load_token_file` — the first line of an **owner-only (0600)** file; `check_token_file_mode` refuses group/world-accessible token files, F12 in docs/AUDIT.md) and the device-profile resolution against the shared [profiles/](../profiles/README.md) |
 | `protocol.py` | the Modbus TCP wire core: `ModbusError`, `recv_exact`, `exception_frame` |
 | `logutil.py` | `UtcFormatter` — UTC log timestamps |
 | `human.py` | `secs` — human time for the command reports: ms/s/m/h/d, one unit, always two decimals |

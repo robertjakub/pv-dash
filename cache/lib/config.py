@@ -42,11 +42,18 @@ def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
 
 
 def parse_acl(text, label):
-    """'any'/empty/None -> None (allow all); 'IP, CIDR, ...' -> tuple of networks."""
-    if text is None or str(text).strip() in ('', 'any', '*'):
+    """'any'/'*'/empty/None -> None (allow all); 'none' -> () (allow nobody);
+    'IP, CIDR, ...' -> tuple of networks. An empty tuple refuses every peer —
+    the ACL's restrict-all mode."""
+    if text is None:
         return None
+    t = str(text).strip()
+    if t in ('', 'any', '*'):
+        return None
+    if t.lower() == 'none':
+        return ()
     nets = []
-    for part in str(text).split(','):
+    for part in t.split(','):
         part = part.strip()
         if not part:
             continue
@@ -57,14 +64,39 @@ def parse_acl(text, label):
     return tuple(nets)
 
 
+def acl_text(acl):
+    """The ACL normalized for `unset` to re-parse: 'any' | 'none' | the network list."""
+    if acl is None:
+        return 'any'
+    if not acl:
+        return 'none'
+    return ','.join(str(n) for n in acl)
+
+
+def acl_summary(acl):
+    """The ACL for humans (the start log, show status, inspect): 'any' (no
+    restriction), 'none' (everybody refused) or the network count."""
+    if acl is None:
+        return 'any'
+    if not acl:
+        return 'none'
+    return '%d network(s)' % len(acl)
+
+
 def parse_write_registers(text, label='write-registers'):
-    """'any'/empty/None -> None (any register writable); 'START:COUNT,...'
-    (comma-separated) -> tuple of (start, count) ranges. A write is allowed
-    only when every register it touches lands inside one of the ranges."""
-    if text is None or str(text).strip() in ('', 'any', '*'):
+    """'any'/'*'/empty/None -> None (any register writable); 'none' -> ()
+    (no register writable); 'START:COUNT,...' (comma-separated) -> tuple of
+    (start, count) ranges. A write is allowed only when every register it
+    touches lands inside one of the ranges."""
+    if text is None:
         return None
+    t = str(text).strip()
+    if t in ('', 'any', '*'):
+        return None
+    if t.lower() == 'none':
+        return ()
     ranges = []
-    for part in str(text).split(','):
+    for part in t.split(','):
         part = part.strip()
         if not part:
             continue
@@ -274,7 +306,7 @@ def resolve_config(args, script_dir=None):
         'allow_write': resolve_bool(args.allow_write or None, 'MODBUS_CACHE_ALLOW_WRITE', 'allow_write', False),
         'write_registers': parse_write_registers(
             resolve(getattr(args, 'write_registers', None), 'MODBUS_CACHE_WRITE_REGISTERS',
-                    'write_registers', 'any', str)),
+                    'write_registers', 'none', str)),
         'profile': resolve_profile_file(resolve(getattr(args, 'profile', None), 'MODBUS_CACHE_PROFILE',
                                                 'profile', default_profile_path(), str)),
         'selection': parse_selection(resolve(getattr(args, 'selection', None), 'MODBUS_CACHE_SELECTION',
@@ -288,7 +320,7 @@ def resolve_config(args, script_dir=None):
                                   DEFAULTS['client_timeout_s'], float),
         'connect_acl': parse_acl(resolve(args.connect_acl, 'MODBUS_CACHE_CONNECT_ACL', 'connect_acl', 'any', str),
                                  'connect-acl'),
-        'write_acl': parse_acl(resolve(args.write_acl, 'MODBUS_CACHE_WRITE_ACL', 'write_acl', 'any', str),
+        'write_acl': parse_acl(resolve(args.write_acl, 'MODBUS_CACHE_WRITE_ACL', 'write_acl', 'none', str),
                                'write-acl'),
         'level': resolve(args.log_level, 'MODBUS_CACHE_LOG_LEVEL', 'log_level', DEFAULTS['log_level'], str).upper(),
         'control_port': resolve(getattr(args, 'control_port', None), 'MODBUS_CACHE_CTL', 'control_port', '', str)

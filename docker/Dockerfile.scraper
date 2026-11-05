@@ -10,16 +10,20 @@
 #   # or: docker compose up -d modbus-scraper
 #
 # Run:
-#   docker run --rm -p 9350:9350 modbus-scraper    # upstream defaults to the
-#                                                  # modbus-cache service name
-#   docker run --rm -it modbus-scraper bash        # poke around as pvsuite
-#   docker run --rm -p 9350:9350 modbus-scraper \
+#   docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper    # loopback-published; the
+#                                                            # compose stack publishes nothing
+#   docker run --rm -it modbus-scraper bash                  # poke around as pvsuite
+#   docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper \
 #       modbus-scraper --host 192.168.1.100        # any flags via the CMD override
 #
 # The config volume: the entrypoint seeds /config with the bundled defaults
 # on start (files the volume lacks are copied in, existing ones stay) — edit
 # /config/scraper.ini and /config/metrics.json there, they survive
-# recreation. The ENV vars below point the tool at the volume copies.
+# recreation. The ENV vars below point the tool at the volume copies. The
+# compose stack adds SCRAPER_AUTH_TOKEN_FILE=/config/metrics.token: a
+# random token the entrypoint generates on the first seed (0600, pvsuite —
+# bundled metrics.token is a placeholder that is never copied), shared with
+# the demo Prometheus (see README.md).
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \
@@ -32,7 +36,7 @@ COPY --from=common *.py common/
 COPY --chown=pvsuite bin/ scrape/bin/
 COPY --chown=pvsuite lib/ scrape/lib/
 COPY --chown=pvsuite scraper.ini metrics.json scrape/
-COPY --chown=pvsuite scraper.ini metrics.json config-defaults/
+COPY --chown=pvsuite scraper.ini metrics.json metrics.token config-defaults/
 RUN chmod +x scrape/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/scrape/bin/modbus_scraper.py /usr/local/bin/modbus-scraper
 

@@ -75,12 +75,16 @@ the grid register is positive on import (the default is export).
 exporter bind address. Default \fB127.0.0.1:9350\fR (loopback only).
 .TP
 .BI \-\-interval " S"
-seconds between Modbus polls. Default \fB5\fR.
+seconds between Modbus polls. Default \fB10\fR.
 .TP
 .BI \-\-auth-token " TOKEN" ", " \-\-auth-token-file " FILE"
 require \fBAuthorization: Bearer\fR on every request (401 +
 \fBWWW-Authenticate\fR otherwise); the file is re-read on every SIGHUP
-(rotation = rewrite + reload). Mutually exclusive.
+(rotation = rewrite + reload). Mutually exclusive. The file must be
+owner-only (\fB0600\fR) \(em a group/world-accessible token file refuses to
+start; a token passed as \fB--auth-token\fR is visible in \fBps\fR /
+\fB/proc/*/cmdline\fR to every local user \(em prefer the file (or the
+env var); the flag form is for quick tests.
 .TP
 .BI \-\-max-clients " N" ", " \-\-client-timeout " S"
 cap concurrent HTTP clients (default \fB64\fR; overflow answers 503) and

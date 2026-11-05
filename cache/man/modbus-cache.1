@@ -78,15 +78,17 @@ with a Modbus illegal-function exception).
 .TP
 .BI \-\-write-registers " RANGES"
 register ranges a forwarded write may touch: comma-separated
-\fBSTART:COUNT\fR (e.g. \fB47400:100,47600:100\fR). Default \fBany\fR.
+\fBSTART:COUNT\fR (e.g. \fB47400:100,47600:100\fR), \fBany\fR (every
+register writable) or \fBnone\fR (no register writable). Default \fBnone\fR.
 .TP
 .BI \-\-connect-acl " LIST"
-clients allowed to connect: \fBany\fR (the default) or comma-separated
-IPs/CIDR prefixes, IPv4 or IPv6.
+clients allowed to connect: \fBany\fR (the default), \fBnone\fR (refuse
+every peer) or comma-separated IPs/CIDR prefixes, IPv4 or IPv6.
 .TP
 .BI \-\-write-acl " LIST"
-clients allowed to write; still requires \fB--allow-write\fR. Default
-\fBany\fR.
+clients allowed to write; still requires \fB--allow-write\fR. \fBany\fR,
+\fBnone\fR (refuse every peer) or comma-separated IPs/CIDR prefixes.
+Default \fBnone\fR.
 .TP
 .BI \-\-control-port " TARGET"
 the JSON-lines control server: a unix socket path or a TCP port (bound to
@@ -102,7 +104,11 @@ start without a token.
 .TP
 .BI \-\-control-token-file " FILE"
 the token from a file (the first line; a systemd \fBLoadCredential\fR) \(em
-instead of \fB--control-token\fR; giving both is an error.
+instead of \fB--control-token\fR; giving both is an error. The file must be
+owner-only (\fB0600\fR): a group/world-accessible token file refuses to
+start. A token passed as \fB--control-token\fR is visible in \fBps\fR /
+\fB/proc/*/cmdline\fR to every local user \(em prefer the file (or the env
+var); the flag form is for quick tests.
 .TP
 .BI \-\-control-socket-group
 leave the unix control socket group-accessible (\fBchmod 0660\fR instead
@@ -143,7 +149,8 @@ serve the cache's own Prometheus \fB/metrics\fR on 127.0.0.1:\fIN\fR (the
 require \fBAuthorization: Bearer\fR on the metrics endpoint.
 .TP
 .BI \-\-metrics-token-file " FILE"
-the metrics bearer token from a file (the first line); mutually exclusive
+the metrics bearer token from a file (the first line; owner-only \fB0600\fR,
+like the control token file); mutually exclusive
 with \fB--metrics-token\fR.
 .TP
 .BI \-\-audit-log " FILE|\-"

@@ -3,18 +3,24 @@
 ## Open
 
 - **the rest of the demo stack** — the compose chain runs the three Modbus
-  tools (fake inverter → cache → scraper) with the seeded `/config` volume;
-  what is missing is the front and the storage: a **Prometheus** service
-  scraping the exporter and a **dashboard** service rendering it — plus the
-  demo config seeded into the volume (the cache's `allow-write` demo pokes,
-  the dashboard's `battery: true`), so `docker compose up` and the whole
-  story runs — the write-through pokes land in the charts live, the outages
-  banner themselves, the audit trail narrates.
-- **the audit-finding fixes** — the audit's prompt pair (F2 audit-trail
-  injection, F3 the fail-open write allow-list) plus the cheap hardening
-  gaps (F4 the uncapped pre-auth buffer, F5 the token-less TCP control, F8
-  the socket mode, F12 the token-file perms) — see [AUDIT.md](AUDIT.md);
-  each closes in a few lines, then re-run the audit.
+  tools (fake inverter → cache → scraper) with the seeded `/config` volume,
+  and a **Prometheus** service scrapes the exporter over the internal
+  network (the scrape/token story: a random bearer token generated into the
+  volume, 0600); what is missing is the front: a **dashboard** service
+  rendering the Prometheus — plus the demo config seeded into the volume
+  (the cache's `allow-write` demo pokes, the dashboard's `battery: true`),
+  so `docker compose up` and the whole story runs — the write-through pokes
+  land in the charts live, the outages banner themselves, the audit trail
+  narrates.
+- **the remaining audit findings** — the actionable open ones are small:
+  F18 (an explicit `0600` on the state-dump tmp — the F8/F12 pattern),
+  F13 (the scraper refusing a non-loopback listen without a token — the
+  cache's F5 pattern), F11 (capping the fake's reply count by the
+  remaining frame), F16 (the alert-rules pack), F17/F10/F15/F14
+  (documented trust decisions / deployment stories) — see
+  [AUDIT.md](AUDIT.md); F2–F9 and F12 are closed and verified (§3.1/§4);
+  re-run the audit after the scrape control surface, the TLS story or the
+  dashboard service.
 - **the CI** — GitHub Actions: the seven suites + `nix flake check` (all
   four packages, all systems) on the push; the release workflow on the tag.
   (Tracked per subproject too; it lands here once for all.)
@@ -34,11 +40,11 @@
   and the unbalanced home already; the scraper exports none of it and the
   dashboard shows none of it. A `phase` label on the metrics (or three
   suffixed registers) would close the loop fake → scrape → dashboard.
-- **the SBOM / supply-chain note** — [sbom/SBOM.md](sbom/SBOM.md) + `sbom/sbom.cdx.json`
-  state the stdlib-only claim per subproject (the machine-readable
-  CycloneDX copy rides along); what remains is the automation: generate
-  and check both in the release workflow, so the claim stays audited, not
-  asserted.
+- **the SBOM / supply-chain note** — [sbom/SBOM.md](sbom/SBOM.md) +
+  `sbom/sbom.cdx.json` state the stdlib-only claim per subproject (the
+  machine-readable CycloneDX copy rides along); what remains is the
+  automation: generate and check both in the release workflow, so the
+  claim stays audited, not asserted.
 - **the man pages** — every tool has `--help` and a README; a `--man` (or
   plain roff in each subproject) would make the packaged installs complete.
 

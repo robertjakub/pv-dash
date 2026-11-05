@@ -30,7 +30,7 @@ from common.config import default_profile_path, load_token_file, parse_listen
 from common.logutil import UtcFormatter
 from common.protocol import exception_frame
 from common.version import version_string
-from lib.config import load_registers_file, load_selection, resolve_config, parse_control_target
+from lib.config import load_registers_file, load_selection, resolve_config, parse_control_target, acl_text, acl_summary
 from lib import persist
 from lib.upstream import Upstream
 from lib.cache import Cache
@@ -76,19 +76,19 @@ def parse_args():
     ap.add_argument('--cache-ttl', type=float, help='per-register cache TTL: cached registers older than this are refetched from the inverter, 0 = never expire, serve last known values forever (default: config, $MODBUS_CACHE_TTL or 3x interval)')
     ap.add_argument('--allow-write', action='store_true', help='forward write requests (FC05/06/15/16) to the inverter; default: refuse them with a Modbus illegal-function exception')
     ap.add_argument('--write-registers', dest='write_registers',
-                    help='register ranges a (forwarded) write may touch: comma-separated START:COUNT, e.g. 47400:100,47600:100; "any" = unrestricted (default: config, $MODBUS_CACHE_WRITE_REGISTERS or any)')
+                    help='register ranges a (forwarded) write may touch: comma-separated START:COUNT, e.g. 47400:100,47600:100; "any" = unrestricted; "none" = no register writable (default: config, $MODBUS_CACHE_WRITE_REGISTERS or none)')
     ap.add_argument('--local-time', action='store_true', help='log timestamps in the system time zone instead of UTC')
     ap.add_argument('--log-access', action='store_true', help='log client connects/disconnects at INFO instead of DEBUG')
     ap.add_argument('--max-clients', type=int, help='refuse further connections past this many simultaneous clients, 0 = no limit (default: config, $MODBUS_CACHE_MAX_CLIENTS or 64)')
     ap.add_argument('--client-timeout', type=float, help='disconnect clients silent for this many seconds, 0 = never (default: config, $MODBUS_CACHE_CLIENT_TIMEOUT or 300)')
-    ap.add_argument('--connect-acl', help='clients allowed to connect: "any" or comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16 (default: config, $MODBUS_CACHE_CONNECT_ACL or any)')
-    ap.add_argument('--write-acl', help='clients allowed to write (requires --allow-write): "any" or comma-separated IPs/prefixes (default: config, $MODBUS_CACHE_WRITE_ACL or any)')
+    ap.add_argument('--connect-acl', help='clients allowed to connect: "any", "none" (refuse everyone) or comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16 (default: config, $MODBUS_CACHE_CONNECT_ACL or any)')
+    ap.add_argument('--write-acl', help='clients allowed to write (requires --allow-write): "any", "none" (refuse everyone) or comma-separated IPs/prefixes (default: config, $MODBUS_CACHE_WRITE_ACL or none)')
     ap.add_argument('--control-port', dest='control_port',
                     help='control server target: unix socket path or TCP port on 127.0.0.1 (default: config, $MODBUS_CACHE_CTL or /tmp/modbus-cache-<listen-port>.socket); 0 = off')
     ap.add_argument('--control-token', dest='control_token',
                     help='require a token on control connections: the client authenticates with {"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s own user or --control-trust-uids — SO_PEERCRED) skips the token (default: config, $MODBUS_CACHE_CONTROL_TOKEN or none)')
     ap.add_argument('--control-token-file', dest='control_token_file',
-                    help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file) — takes the place of --control-token; giving both is an error (default: config, $MODBUS_CACHE_CONTROL_TOKEN_FILE)')
+                    help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file; must be owner-only 0600) — takes the place of --control-token; giving both is an error (default: config, $MODBUS_CACHE_CONTROL_TOKEN_FILE)')
     ap.add_argument('--control-socket-group', dest='control_socket_group', action='store_true',
                     help='leave the unix control socket group-accessible (chmod 0660 instead of the default 0600) (default: config, $MODBUS_CACHE_CONTROL_SOCKET_GROUP)')
     ap.add_argument('--requests-audit', dest='requests_audit', type=float,
@@ -106,7 +106,7 @@ def parse_args():
     ap.add_argument('--metrics-token', dest='metrics_token',
                     help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
     ap.add_argument('--metrics-token-file', dest='metrics_token_file',
-                    help='the metrics bearer token from a file (the first line) — takes the place of --metrics-token; giving both is an error (env MODBUS_CACHE_METRICS_TOKEN_FILE)')
+                    help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes the place of --metrics-token; giving both is an error (env MODBUS_CACHE_METRICS_TOKEN_FILE)')
     ap.add_argument('--audit-log', dest='audit_log',
                     help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MODBUS_CACHE_AUDIT_LOG or %s — the XDG state home' % default_audit_path('modbus-cache'))
     ap.add_argument('--audit-max-mb', dest='audit_max_mb', type=float,
@@ -283,8 +283,8 @@ def main():
                 listen_host, listen_port, args.config, cfg['level'],
                 'local' if cfg['local_time'] else 'UTC',
                 cfg['max_clients'] or 'none', '%gs' % cfg['client_timeout'] if cfg['client_timeout'] else 'none',
-                'any' if cfg['connect_acl'] is None else '%d network(s)' % len(cfg['connect_acl']),
-                'any' if cfg['write_acl'] is None else '%d network(s)' % len(cfg['write_acl']),
+                acl_summary(cfg['connect_acl']),
+                acl_summary(cfg['write_acl']),
                 proxy.describe_write_ranges(),
                 'required on TCP' if control_token else 'none',
                 audit_display,
@@ -325,10 +325,8 @@ def main():
                     'log-level': cfg['level'],
                     'profile': cfg['profile'],
                     'selection': cfg['selection'] or 'all',
-                    'connect-acl': 'any' if cfg['connect_acl'] is None
-                                   else ','.join(str(n) for n in cfg['connect_acl']),
-                    'write-acl': 'any' if cfg['write_acl'] is None
-                                 else ','.join(str(n) for n in cfg['write_acl']),
+                    'connect-acl': acl_text(cfg['connect_acl']),
+                    'write-acl': acl_text(cfg['write_acl']),
                     'timeout': '%g' % cfg['timeout']}
         proxy.control = ControlServer(proxy, control_target, stop, audit=audit,
                                       token=control_token, defaults=defaults,

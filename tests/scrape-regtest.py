@@ -1204,8 +1204,10 @@ try:
           and '"GET /metrics" 200' not in auth_log)
 
     # 3d. token from file: enforced, rotates on SIGHUP, error paths fail dry-run
+    #     (the file must be owner-only 0600 — F12 in docs/AUDIT.md)
     with open('/tmp/scr_token.txt', 'w') as fh:
         fh.write('first-token\n')
+    os.chmod('/tmp/scr_token.txt', 0o600)
     write_ini('/tmp/scr_tokfile.ini', 'auth_token_file = /tmp/scr_token.txt')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_tokfile.ini',
                                    '--host', '127.0.0.1', '--modbus-port', str(FAKE_PORT),
@@ -1230,6 +1232,13 @@ try:
     r = subprocess.run([sys.executable, P, '--dry-run', '--auth-token-file', '/nonexistent/file'],
                        capture_output=True)
     check('token file: missing file -> clean rc=1', r.returncode == 1 and b'cannot read' in r.stderr)
+    lax = '/tmp/scr_token_lax.txt'
+    open(lax, 'w').write('laxsecret\n')                                 # the umask default (0644)
+    r = subprocess.run([sys.executable, P, '--dry-run', '--auth-token-file', lax],
+                       capture_output=True)
+    check('token file: group/world-readable file refused (F12)',
+          r.returncode == 1 and b'0600' in r.stderr and b'Traceback' not in r.stderr,
+          repr(r.stderr[-140:]))
 
     # 3e. resource limits: --max-clients 503s the overflow, --client-timeout kicks idle keep-alives
     write_ini('/tmp/scr_lim.ini', 'max_clients = 1\nclient_timeout = 1')

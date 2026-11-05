@@ -51,7 +51,7 @@ class Proxy:
         self.config = config or {}
         self.audit = audit   # the CACHE audit trail (common.audit), None = off
         self.allow_write = bool(self.config.get('allow_write', False))
-        self.write_ranges = self.config.get('write_registers')   # None = any register
+        self.write_ranges = self.config.get('write_registers')   # None = any register, () = none
         self.log_access = bool(self.config.get('log_access', False))
         self.max_clients = max(0, int(self.config.get('max_clients') or 0))
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
@@ -276,6 +276,8 @@ class Proxy:
                                  % (key, entry['requests'], int(self.requests_audit_s), delta))
 
     def _allowed(self, acl, ip):
+        """None = the ACL is off (everybody allowed); () = nobody allowed
+        (the 'none' mode); otherwise the ip must land in one network."""
         if acl is None:
             return True
         try:
@@ -286,7 +288,8 @@ class Proxy:
 
     def _write_allowed(self, target):
         """The register-range allow-list: every touched register must land
-        inside one of the configured ranges (None = any register)."""
+        inside one of the configured ranges (None = any register; () = none
+        writable — the 'none' mode)."""
         if self.write_ranges is None or target is None:
             return True
         addr, count = target
@@ -417,9 +420,11 @@ class Proxy:
         return self.forward(txn, proto, unit, pdu)
 
     def describe_write_ranges(self):
-        """The allow-list for humans: 'any' or the configured ranges."""
+        """The allow-list for humans: 'any', 'none' or the configured ranges."""
         if self.write_ranges is None:
             return 'any'
+        if not self.write_ranges:
+            return 'none'
         return ','.join('%d:%d' % r for r in self.write_ranges)
 
     def _diag(self, txn, proto, unit, addr, count):

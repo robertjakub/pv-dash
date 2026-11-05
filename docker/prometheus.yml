@@ -1,0 +1,17 @@
+# The demo Prometheus: scrapes the modbus-scraper exporter over the
+# internal compose network with the bearer token from the shared config
+# volume (the entrypoint copies it to /etc/prometheus/metrics.token,
+# 0600 — see entrypoint-prometheus.sh). The stack publishes nothing on
+# the host (docs/AUDIT.md F7): the UI is reachable from inside the
+# network only.
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: modbus-scraper
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics.token
+    static_configs:
+      - targets: ['modbus-scraper:9350']

@@ -25,7 +25,7 @@ from common.protocol import ModbusError
 from .statics import CONTROL_IDLE_TIMEOUT_S
 from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .cache import build_blocks
-from .config import parse_write_registers, parse_acl, parse_selection
+from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection
 from . import persist
 
 logger = logging.getLogger('modbus-cache')
@@ -468,8 +468,8 @@ class ControlServer:
 
     @staticmethod
     def _acl_text(acl):
-        """'any' or the normalized network list (what `unset` re-parses)."""
-        return 'any' if acl is None else ','.join(str(n) for n in acl)
+        """'any' | 'none' | the normalized network list (what `unset` re-parses)."""
+        return acl_text(acl)
 
     def _acl(self, val, label):
         try:
@@ -543,9 +543,9 @@ class ControlServer:
             'clients=%d' % p.client_count,
             'max_clients=%s' % (p.max_clients or 'none'),
             'client_timeout=%s' % (secs(p.client_timeout) if p.client_timeout else 'none'),
-            'connect_acl=%s' % ('any' if p.connect_acl is None else '%d network(s)' % len(p.connect_acl)),
+            'connect_acl=%s' % acl_summary(p.connect_acl),
             'writes=%s' % ('enabled' if p.allow_write else 'disabled'),
-            'write_acl=%s' % ('any' if p.write_acl is None else '%d network(s)' % len(p.write_acl)),
+            'write_acl=%s' % acl_summary(p.write_acl),
             'write_allow_list=%s' % p.describe_write_ranges(),
             'requests_audit=%s' % ('off' if not p.requests_audit_s else secs(p.requests_audit_s)),
             'dump=%s' % ('off' if not p.dump_path else '%s every %s' % (
@@ -603,7 +603,7 @@ class ControlServer:
                                                                      '' if p.poll_ok else ' (FAILING)'),
             'listen    %s:%d, control %s, connect-acl %s'
             % (p.listen_addr[0], p.listen_addr[1], self.describe(),
-               'any' if p.connect_acl is None else '%d network(s)' % len(p.connect_acl)),
+               acl_summary(p.connect_acl)),
             'profile   %s, map v%d' % (cfg.get('profile') or p.profile,
                                        p.cache.map_version),
             'selection %s' % (cfg.get('selection') or 'all'),
@@ -624,7 +624,7 @@ class ControlServer:
                p.max_clients or 'none', secs(p.client_timeout) if p.client_timeout else 'none'),
             'writes    %s, write-acl %s, write-registers %s'
             % ('ENABLED' if p.allow_write else 'disabled',
-               'any' if p.write_acl is None else '%d network(s)' % len(p.write_acl),
+               acl_summary(p.write_acl),
                p.describe_write_ranges()),
             'audit     %s%s' % ('off' if p.audit is None else (p.audit.path if p.audit.path != '-' else 'stdout'),
                                 ', requests accounting every %s' % secs(p.requests_audit_s) if p.audit and p.requests_audit_s else ''),

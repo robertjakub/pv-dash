@@ -10,10 +10,10 @@
 #   # or: docker compose up -d modbus-cache
 #
 # Run:
-#   docker run --rm -p 15502:15502 modbus-cache    # upstream defaults to the
-#                                                  # fake-inverter service name
-#   docker run --rm -it modbus-cache bash          # poke around as pvsuite
-#   docker run --rm -p 15502:15502 modbus-cache \
+#   docker run --rm -p 127.0.0.1:15502:15502 modbus-cache    # loopback-published; the
+#                                                            # compose stack publishes nothing
+#   docker run --rm -it modbus-cache bash                    # poke around as pvsuite
+#   docker run --rm -p 127.0.0.1:15502:15502 modbus-cache \
 #       modbus-cache --host 192.168.1.100          # any flags via the CMD override
 #
 # The config volume: the entrypoint seeds /config with the bundled defaults

@@ -7,7 +7,7 @@ import math
 import os
 import re
 
-from common.config import default_profile_path, parse_listen, resolve_profile_file
+from common.config import check_token_file_mode, default_profile_path, parse_listen, resolve_profile_file
 from .metrics import Metrics
 from .statics import DEFAULTS, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
@@ -246,6 +246,7 @@ def resolve_config(args, script_dir=None):
     if cfg['auth_token'] and cfg['auth_token_file']:
         raise SystemExit('--auth-token and --auth-token-file are mutually exclusive')
     if cfg['auth_token_file']:
+        check_token_file_mode(cfg['auth_token_file'], 'auth_token_file')
         try:
             with open(cfg['auth_token_file']) as fh:
                 token = fh.read(8192).strip()

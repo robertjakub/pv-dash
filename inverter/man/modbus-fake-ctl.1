@@ -32,7 +32,8 @@ the control target: a unix socket path or a TCP port. Default
 wire timeout, seconds. Default \fB5\fR.
 .TP
 .BI \-\-control-token " TOKEN" ", " \-\-control-token-file " FILE"
-the token for TCP control (mutually exclusive).
+the token for TCP control (mutually exclusive; the file must be owner-only
+\fB0600\fR \(em a token flag is visible in \fBps\fR, prefer the file).
 .TP
 .BI \-\-audit-log " FILE|\-"
 the client's own audit trail

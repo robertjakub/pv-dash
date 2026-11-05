@@ -85,7 +85,10 @@ the JSON-lines control server: a unix socket path or a TCP port. Default
 require the token auth handshake on control connections (mutually
 exclusive). Over the unix socket a trusted peer (root, the daemon's own
 user or \fB--control-trust-uids\fR \(em \fBSO_PEERCRED\fR) skips the
-handshake.
+handshake. The file must be owner-only (\fB0600\fR); a group/world-accessible
+token file refuses to start. A token passed as \fB--control-token\fR is
+visible in \fBps\fR / \fB/proc/*/cmdline\fR \(em prefer the file; the flag
+form is for quick tests.
 .TP
 .BI \-\-control-trust-uids " UIDS"
 extra peer uids the unix control socket trusts without the token: a
@@ -100,7 +103,7 @@ by default.
 .TP
 .BI \-\-metrics-token " TOKEN" ", " \-\-metrics-token-file " FILE"
 require \fBAuthorization: Bearer\fR on the metrics endpoint (mutually
-exclusive).
+exclusive; the file must be owner-only \fB0600\fR).
 .TP
 .BI \-\-audit-log " FILE|\-"
 the audit trail (default

@@ -133,7 +133,7 @@ def main():
     p.add_argument('--control-log-replies', action='store_true', help='DEBUG-log the full output of every control command (the default logs the command only)')
     p.add_argument('--metrics-port', type=int, default=0, help='serve the fake\'s own Prometheus /metrics on 127.0.0.1:PORT; 0 = off (the default)')
     p.add_argument('--metrics-token', default=None, help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
-    p.add_argument('--metrics-token-file', default=None, help='the metrics bearer token from a file (the first line) — takes the place of --metrics-token; giving both is an error (env FAKE_METRICS_TOKEN_FILE)')
+    p.add_argument('--metrics-token-file', default=None, help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes the place of --metrics-token; giving both is an error (env FAKE_METRICS_TOKEN_FILE)')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path (default: /tmp/fake-inverter-<modbus-port>.socket) or TCP port number on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with fake_ctl.py')
     p.add_argument('--profile', default=None, help='inverter profile JSON: name -> register (+ optional type/scale), e.g. profiles/profiles/sun2000.json (the default); FAKE_PROFILE when unset')
     p.add_argument('--chaos', type=float, default=DEFAULT_CHAOS, help='probability 0..1 that a request is answered hostile and dropped (default: off); seed with --seed for reproducibility')
@@ -146,7 +146,7 @@ def main():
     p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
     p.add_argument('--no-audit-log', action='store_true', help='disable the INV audit trail')
     p.add_argument('--control-token', default=None, help='require a token on control connections: the client authenticates with {"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s own user or --control-trust-uids — SO_PEERCRED) skips the token')
-    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file) — takes the place of --control-token; giving both is an error (env FAKE_CONTROL_TOKEN_FILE)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; e.g. a systemd LoadCredential or a key file; must be owner-only 0600) — takes the place of --control-token; giving both is an error (env FAKE_CONTROL_TOKEN_FILE)')
     p.add_argument('--control-trust-uids', default=None, help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (env FAKE_CONTROL_TRUST_UIDS)')
     args = p.parse_args()
     logging.basicConfig(level=getattr(logging, args.log_level),

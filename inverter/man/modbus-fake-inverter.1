@@ -112,9 +112,11 @@ comma-separated list (a local systemd unit speaks without the secret).
 .B \-\-control-log-replies
 DEBUG-log the full reply of every control command.
 .TP
-.BI \-\-metrics-port " N"
-serve the fake's own Prometheus \fB/metrics\fR on 127.0.0.1:\fIN\fR. Off
-by default.
+.BI \-\-metrics-server ", " \-\-metrics-listen " HOST:PORT"
+serve the fake's own Prometheus \fB/metrics\fR endpoint (off by default;
+live-settable on the control server) on the bind address (default
+\fB127.0.0.1:9452\fR; \fB0.0.0.0:PORT\fR serves every interface — mind the
+values).
 .TP
 .BI \-\-metrics-token " TOKEN" ", " \-\-metrics-token-file " FILE"
 require \fBAuthorization: Bearer\fR on the metrics endpoint (mutually

@@ -31,6 +31,7 @@ from common.logutil import UtcFormatter
 from common.protocol import exception_frame
 from common.version import version_string
 from lib.config import load_registers_file, load_selection, resolve_config, parse_control_target, acl_text, acl_summary
+from lib.metrics import MetricsServer, describe_metrics
 from lib import persist
 from lib.upstream import Upstream
 from lib.cache import Cache
@@ -96,15 +97,19 @@ def parse_args():
     ap.add_argument('--requests-audit', dest='requests_audit', type=float,
                     help='audit one REQUESTS tally per client per this many seconds, 0 = off (default: config, $MODBUS_CACHE_REQUESTS_AUDIT or 300)')
     ap.add_argument('--dump-path', dest='dump_path',
-                    help='the state dump (write-behind): the cached words + the live setting overrides as one JSON, written 0600 with an integrity hash (a restore refuses a tampered, unsigned or group-writable dump); dumped on shutdown, on the request dump command and every --dump-interval seconds; loaded on start only with --restore-on-start, on demand with the request restore command (default: config, $MODBUS_CACHE_DUMP_PATH or none)')
+                    help='the state dump (write-behind): the live setting overrides and — with --dump-with-cache — the cached words, as one JSON, written 0600 with an integrity hash (a restore refuses a tampered, unsigned or group-writable dump); dumped on shutdown, on the request dump command and every --dump-interval seconds; loaded on start only with --restore-on-start, on demand with the request restore command (default: config, $MODBUS_CACHE_DUMP_PATH or none)')
+    ap.add_argument('--dump-with-cache', dest='dump_with_cache', action='store_true',
+                    help='dump the cached words too: `request dump` and the --dump-interval loop write the words + the settings (the default off = settings only; `request dump with-cache` always includes them; the restore takes either shape) (default: config, $MODBUS_CACHE_DUMP_WITH_CACHE or off)')
     ap.add_argument('--dump-interval', dest='dump_interval', type=float,
                     help='seconds between the automatic state dumps, 0 = on request (the request dump command and the shutdown) (default: config, $MODBUS_CACHE_DUMP_INTERVAL or 0)')
     ap.add_argument('--restore-on-start', dest='restore_on_start', action='store_true',
                     help='load the state dump when the daemon starts (needs --dump-path) — a restart serves last-known values instead of cold misses; default: start cold, load only on demand (env MODBUS_CACHE_RESTORE_ON_START, ini restore_on_start)')
     ap.add_argument('--control-trust-uids', dest='control_trust_uids',
                     help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (default: config, $MODBUS_CACHE_CONTROL_TRUST_UIDS or none)')
-    ap.add_argument('--metrics-port', dest='metrics_port', type=int, default=0,
-                    help="serve the cache's own Prometheus /metrics on 127.0.0.1:PORT; 0 = off (the default)")
+    ap.add_argument('--metrics-server', dest='metrics_server', action='store_true',
+                    help="serve the cache's own Prometheus /metrics endpoint (the live `set metrics-server` toggle exists too); off by default (the default: config, $MODBUS_CACHE_METRICS_SERVER or off)")
+    ap.add_argument('--metrics-listen', dest='metrics_listen',
+                    help="the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every interface, a token is mandatory regardless (default: config, $MODBUS_CACHE_METRICS_LISTEN or 127.0.0.1:9252)")
     ap.add_argument('--metrics-token', dest='metrics_token',
                     help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
     ap.add_argument('--metrics-token-file', dest='metrics_token_file',
@@ -147,8 +152,10 @@ def install_signal_handlers(proxy, cache, args):
         if proxy.dump_path:
             try:
                 n = persist.write_dump(proxy.dump_path, proxy.cache,
-                                       proxy.control.dump_settings() if getattr(proxy, 'control', None) else None)
-                logger.info('state dumped to %s (%d word(s))', proxy.dump_path, n)
+                                       proxy.control.dump_settings() if getattr(proxy, 'control', None) else None,
+                                       with_cache=proxy.dump_with_cache)
+                logger.info('state dumped to %s (%d word(s), %s)', proxy.dump_path, n,
+                            'with cache' if proxy.dump_with_cache else 'settings only')
             except OSError as e:
                 logger.error('the shutdown dump to %s failed: %s', proxy.dump_path, e)
         if proxy.audit:
@@ -259,18 +266,15 @@ def main():
     metrics_token = args.metrics_token or os.environ.get('MODBUS_CACHE_METRICS_TOKEN')
     if args.metrics_token_file:
         metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
-    if args.metrics_port and not metrics_token:
+    metrics_listen = parse_listen(cfg['metrics_listen'])
+    if cfg['metrics_server'] and not metrics_token:
         logger.error('the metrics endpoint serves register values: set --metrics-token or '
-                     '--metrics-token-file when --metrics-port is on (or drop --metrics-port)')
+                     '--metrics-token-file when --metrics-server is on (or drop --metrics-server)')
         raise SystemExit(2)
     metrics_desc = 'off'
-    if args.metrics_port:
-        if not 0 < args.metrics_port <= 65535:
-            logger.error('--metrics-port out of range: %d', args.metrics_port)
-            raise SystemExit(2)
-        metrics_desc = '127.0.0.1:%d%s, clients %s, per-ip %s' % (
-            args.metrics_port, ' (bearer token)' if metrics_token else '',
-            cfg['metrics_max_clients'] or 'none', cfg['metrics_max_conn_per_ip'] or 'none')
+    if cfg['metrics_server']:
+        metrics_desc = describe_metrics(metrics_listen, metrics_token,
+                                        cfg['metrics_max_clients'], cfg['metrics_max_conn_per_ip'])
     if cfg['no_audit_log']:
         audit_display = 'off'
     elif cfg['audit_log'] == '-':
@@ -282,8 +286,18 @@ def main():
     proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
                   cfg['profile'], cfg)
     proxy.metrics_desc = metrics_desc
+    proxy.metrics_srv = MetricsServer(proxy, metrics_listen, token=metrics_token,
+                                      max_clients=cfg['metrics_max_clients'],
+                                      client_timeout=cfg['metrics_client_timeout'],
+                                      max_per_ip=cfg['metrics_max_conn_per_ip'],
+                                      started=time.monotonic()) if cfg['metrics_server'] else None
+    proxy.metrics_listen = metrics_listen
+    proxy.metrics_token = metrics_token
+    proxy.metrics_caps = (cfg['metrics_max_clients'], cfg['metrics_client_timeout'],
+                          cfg['metrics_max_conn_per_ip'])
     proxy.dump_path = cfg['dump_path'] or None
     proxy.dump_interval = cfg['dump_interval']
+    proxy.dump_with_cache = cfg['dump_with_cache']
     logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, audit trail: %s, requests audit: %s, metrics: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
@@ -331,6 +345,8 @@ def main():
                     'write-registers': proxy.describe_write_ranges(),
                     'max-clients': '%d' % cfg['max_clients'],
                     'client-timeout': '%g' % cfg['client_timeout'],
+                    'max-conn-per-ip': '%d' % cfg['max_conn_per_ip'],
+                    'metrics-server': 'on' if cfg['metrics_server'] else 'off',
                     'requests-audit': 'off' if not cfg['requests_audit_s'] else '%g' % cfg['requests_audit_s'],
                     'dump-interval': 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval'],
                     'log-level': cfg['level'],
@@ -378,17 +394,15 @@ def main():
                     break
                 try:
                     n = persist.write_dump(proxy.dump_path, proxy.cache,
-                                           proxy.control.dump_settings() if getattr(proxy, 'control', None) else None)
-                    logger.debug('state dumped to %s (%d word(s))', proxy.dump_path, n)
+                                           proxy.control.dump_settings() if getattr(proxy, 'control', None) else None,
+                                           with_cache=proxy.dump_with_cache)
+                    logger.debug('state dumped to %s (%d word(s), %s)', proxy.dump_path, n,
+                                 'with cache' if proxy.dump_with_cache else 'settings only')
                 except (OSError, ValueError) as e:
                     logger.error('the periodic dump to %s failed: %s', proxy.dump_path, e)
         threading.Thread(target=watch_dump, daemon=True, name='dump').start()
-    if args.metrics_port:
-        MetricsServer(proxy, args.metrics_port, token=metrics_token,
-                      max_clients=cfg['metrics_max_clients'],
-                      client_timeout=cfg['metrics_client_timeout'],
-                      max_per_ip=cfg['metrics_max_conn_per_ip'],
-                      started=time.monotonic()).start()
+    if proxy.metrics_srv:
+        proxy.metrics_srv.start()
     try:
         threading.Thread(target=proxy.poll_loop, daemon=True).start()
         proxy.serve(listen_host, listen_port)

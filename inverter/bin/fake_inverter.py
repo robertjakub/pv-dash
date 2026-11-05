@@ -39,7 +39,7 @@ import os
 import threading
 
 from common.audit import AuditLog, default_path as default_audit_path
-from common.config import load_token_file
+from common.config import load_token_file, parse_listen
 from common.cred import parse_trust_uids
 from common.version import version_string
 from lib.chaos import Chaos
@@ -49,11 +49,12 @@ from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
 from lib.statics import (AUDIT_FILES, AUDIT_MAX_MB, DEFAULT_BATTERY_KWH, DEFAULT_CHAOS, DEFAULT_CLIENT_TIMEOUT_S,
                          DEFAULT_HOST, DEFAULT_LOG_LEVEL, DEFAULT_MAX_CLIENTS, DEFAULT_MAX_CONN_PER_IP,
-                         DEFAULT_MAX_KWP, DEFAULT_METRICS_CLIENT_TIMEOUT_S, DEFAULT_METRICS_MAX_CLIENTS,
-                         DEFAULT_METRICS_MAX_CONN_PER_IP, DEFAULT_MODBUS_PORT, DEFAULT_TIME_SCALE, DEFAULT_UNIT,
-                         GRID_FREQUENCY_HZ, GRID_VOLTAGE_V, PEAK_RATIO, TIME_SCALE_MAX)
+                         DEFAULT_MAX_KWP, DEFAULT_METRICS_CLIENT_TIMEOUT_S, DEFAULT_METRICS_LISTEN,
+                         DEFAULT_METRICS_MAX_CLIENTS, DEFAULT_METRICS_MAX_CONN_PER_IP, DEFAULT_MODBUS_PORT,
+                         DEFAULT_TIME_SCALE, DEFAULT_UNIT, GRID_FREQUENCY_HZ, GRID_VOLTAGE_V, PEAK_RATIO,
+                         TIME_SCALE_MAX)
 from lib.signals import SignalBox, parse_time
-from lib.metrics import MetricsServer
+from lib.metrics import MetricsServer, describe_metrics
 from lib.simulator import Simulator
 
 logger = logging.getLogger('fake-inverter')
@@ -151,7 +152,8 @@ def main():
     p.add_argument('--client-timeout', type=float, default=DEFAULT_CLIENT_TIMEOUT_S, help='disconnect Modbus clients silent for this many seconds, 0 = never (default %(default)s) — sheds connections from clients that died without closing')
     p.add_argument('--max-conn-per-ip', type=int, default=DEFAULT_MAX_CONN_PER_IP, help='refuse further Modbus connections from one peer IP past this many simultaneous connections, 0 = no per-IP limit (default %(default)s)')
     p.add_argument('--control-log-replies', action='store_true', help='DEBUG-log the full output of every control command (the default logs the command only)')
-    p.add_argument('--metrics-port', type=int, default=0, help='serve the fake\'s own Prometheus /metrics on 127.0.0.1:PORT; 0 = off (the default)')
+    p.add_argument('--metrics-server', action='store_true', help="serve the fake's own Prometheus /metrics endpoint (the live `set metrics-server` toggle exists too); off by default")
+    p.add_argument('--metrics-listen', default=DEFAULT_METRICS_LISTEN, help='the metrics bind address HOST:PORT (default %(default)s)')
     p.add_argument('--metrics-token', default=None, help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
     p.add_argument('--metrics-token-file', default=None, help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes the place of --metrics-token; giving both is an error (env FAKE_METRICS_TOKEN_FILE)')
     p.add_argument('--metrics-max-clients', type=int, default=DEFAULT_METRICS_MAX_CLIENTS, help='maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited (default %(default)s)')
@@ -208,10 +210,16 @@ def main():
     metrics_token = args.metrics_token
     if args.metrics_token_file:
         metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
+    metrics_listen = parse_listen(args.metrics_listen)
+    if args.metrics_server and metrics_token is None:
+        from common.config import is_loopback_host
+        if not is_loopback_host(metrics_listen[0]):
+            logger.warning('serving /metrics on %s without a token: the values are production-shaped '
+                           'even though this is a test tool — set --metrics-token', args.metrics_listen)
     if args.dry_run:
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')
-        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, per-ip limit %s, profile %s: %s, %d register(s), control server %s)',
+        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, per-ip limit %s, profile %s: %s, %d register(s), metrics server %s, control server %s)',
                     args.host, args.port, args.unit, PEAK_RATIO * args.max_kwp * 1000.0,
                     mode,
                     'on' if args.battery else 'off',
@@ -222,6 +230,8 @@ def main():
                     '%gs' % args.client_timeout if args.client_timeout else 'never',
                     args.max_conn_per_ip or 'none',
                     simulator.profile.description, profile_label(profile_path), len(simulator.profile.entries),
+                    '%s:%d%s' % (metrics_listen[0], metrics_listen[1],
+                                 ' (bearer token)' if metrics_token else '') if args.metrics_server else 'off',
                     ('127.0.0.1:' + target) if target.isdigit() else ('unix:' + target) if target != '0' else 'off')
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
@@ -238,11 +248,19 @@ def main():
                                 log_replies=args.control_log_replies, audit=audit,
                                 token=control_token, trust_uids=trust_uids)
         threading.Thread(target=control.serve, daemon=True).start()
-    if args.metrics_port:
-        MetricsServer(simulator, chaos, fake, control, args.metrics_port,
-                      token=metrics_token, max_clients=args.metrics_max_clients,
-                      client_timeout=args.metrics_client_timeout,
-                      max_per_ip=args.metrics_max_conn_per_ip).start()
+    fake.metrics_listen = metrics_listen
+    fake.metrics_token = metrics_token
+    fake.metrics_caps = (args.metrics_max_clients, args.metrics_client_timeout, args.metrics_max_conn_per_ip)
+    fake.metrics_desc = describe_metrics(metrics_listen, metrics_token,
+                                         args.metrics_max_clients, args.metrics_max_conn_per_ip)
+    if args.metrics_server:
+        fake.metrics_srv = MetricsServer(simulator, chaos, fake, control, metrics_listen,
+                                         token=metrics_token, max_clients=args.metrics_max_clients,
+                                         client_timeout=args.metrics_client_timeout,
+                                         max_per_ip=args.metrics_max_conn_per_ip)
+        fake.metrics_srv.start()
+    else:
+        fake.metrics_srv = None
     box = SignalBox(simulator, chaos, fake, control=control, audit=audit)
     if control:
         control.signalbox = box

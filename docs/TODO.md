@@ -19,6 +19,26 @@
   (§3.1/§4);
   re-run the audit after the scrape control surface, the TLS story or the
   dashboard service.
+- **the CLI redone: hierarchical commands, one grammar for the family** —
+  the control vocabulary grew organically per tool and it shows: flatten
+  it into namespaces and make every tool speak the same shape —
+  `set modbus-client max-per-ip 8` (the surface, then the knob) instead of
+  the flat `set max-conn-per-ip`, `set metrics-server off` /
+  `set metrics listen 0.0.0.0:9252` on all three control servers, the same
+  verbs everywhere (set/unset/show/request/...), the same reply shapes.
+  Also: **`show config`** — every setting printed in `set` format (one
+  re-enterable block: `show config` pipes straight back into `cache_ctl`
+  /`fake_ctl` after a restart), complementing the scriptable
+  `show settings` key=value listing. Breaking: every script and unit file
+  speaking the old flat grammar follows.
+- **the verifiable control commands** — the control wire gets the audit
+  trail's integrity idea: commands (and the replies?) carry a short hash
+  (the trail's chained `h=` shape or an HMAC keyed by the control token)
+  so a client can verify nothing was injected/altered between the CLI and
+  the server — over plain TCP the token auth is the boundary today; this
+  closes the last unauthenticated corner (the audit-trail line: the
+  command the server logs should cryptographically match the command the
+  client sent).
 - **the CI** — GitHub Actions: the seven suites + `nix flake check` (all
   four packages, all systems) on the push; the release workflow on the tag.
   (Tracked per subproject too; it lands here once for all.)

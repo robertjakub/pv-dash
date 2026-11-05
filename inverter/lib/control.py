@@ -22,6 +22,7 @@ import time
 from common.audit import AuditLog
 from common.cred import peer_uid
 from common.human import secs
+from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
 from common.version import version_string
 from .settings import SETTING_NAMES, SETTING_BY_NAME, describe_setting
@@ -348,6 +349,27 @@ class ControlServer:
                 fake.conn_gate.max_per_ip = v
                 return str(v)
             raise ValueError('no modbus device attached')
+        if key == 'metrics-server':
+            if not fake:
+                raise ValueError('no modbus device attached')
+            if val in ('on', 'true', '1', 'yes'):
+                if fake.metrics_srv:
+                    return 'on'
+                srv = MetricsServer(sim, chaos, fake, self, fake.metrics_listen, token=fake.metrics_token,
+                                    max_clients=fake.metrics_caps[0], client_timeout=fake.metrics_caps[1],
+                                    max_per_ip=fake.metrics_caps[2])
+                srv.start()
+                fake.metrics_srv = srv
+                fake.metrics_desc = describe_metrics(fake.metrics_listen, fake.metrics_token,
+                                                     fake.metrics_caps[0], fake.metrics_caps[2])
+                return 'on'
+            if val in ('off', 'false', '0', 'no'):
+                if fake.metrics_srv:
+                    fake.metrics_srv.stop()
+                    fake.metrics_srv = None
+                    fake.metrics_desc = 'off'
+                return 'off'
+            raise ValueError('metrics-server must be on or off')
         if key == 'client-timeout':
             v = float(val)
             if not (math.isfinite(v) and 0 <= v <= 86400):
@@ -425,6 +447,8 @@ class ControlServer:
             return str(fake.max_clients) if fake else '?'
         if key == 'max-conn-per-ip':
             return str(fake.conn_gate.max_per_ip) if fake else '?'
+        if key == 'metrics-server':
+            return ('on' if fake.metrics_srv else 'off') if fake else '?'
         if key == 'client-timeout':
             return ('%gs' % fake.client_timeout if fake.client_timeout else 'never') if fake else '?'
         if key == 'profile':

@@ -183,7 +183,8 @@ with a clean one-line error instead of failing later at runtime.
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user (ini `control_socket_group`, env `MODBUS_CACHE_CONTROL_SOCKET_GROUP`) |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (ini `control_trust_uids`, env `MODBUS_CACHE_CONTROL_TRUST_UIDS`) |
 | **Persistence** | | |
-| `--dump-path` | off | the state dump (write-behind): the cached words + their stamps and the live setting overrides as one JSON — written on shutdown, by the `request dump` command and every `--dump-interval` seconds; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (ini `dump_path`, env `MODBUS_CACHE_DUMP_PATH`) |
+| `--dump-path` | off | the state dump (write-behind): the live setting overrides and — with `--dump-with-cache` — the cached words + their stamps, as one JSON, created `0600` with an integrity hash — written on shutdown, by the `request dump` command and every `--dump-interval` seconds; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (ini `dump_path`, env `MODBUS_CACHE_DUMP_PATH`) |
+| `--dump-with-cache` | off | dump the cached words too: the `request dump` command and the `--dump-interval` loop write the words + the settings (the default off = settings only; `request dump with-cache` always includes them; the restore takes either shape) (ini `dump_with_cache`, env `MODBUS_CACHE_DUMP_WITH_CACHE`) |
 | `--dump-interval` | `0` | seconds between the automatic state dumps, `0` = on request (the `request dump` command and the shutdown); needs `--dump-path`; live-settable (`set dump-interval`, ini `dump_interval`, env `MODBUS_CACHE_DUMP_INTERVAL`) |
 | **Audit trail** | | |
 | `--audit-log` | XDG state | the CACHE audit trail: a file path or `-` for stdout (docker logs / journald); default `~/.local/state/modbus-cache/audit.log` — see [Audit logging](#audit-logging) |
@@ -193,7 +194,8 @@ with a clean one-line error instead of failing later at runtime.
 | `--no-audit-log` | off | disable the audit trail |
 | `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds (who is hammering the cache), `0` = off (ini `requests_audit_s`, env `MODBUS_CACHE_REQUESTS_AUDIT`) |
 | **Metrics** | | |
-| `--metrics-port` | off | serve the cache's own Prometheus `/metrics` on `127.0.0.1:PORT` (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `huawei_cache_*` path); **refuses to start without `--metrics-token`/`--metrics-token-file`** |
+| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `huawei_cache_*` path); **live-settable** (`set metrics-server on/off`) and **refuses to start without `--metrics-token`/`--metrics-token-file`** (ini `metrics_server`, env `MODBUS_CACHE_METRICS_SERVER`) |
+| `--metrics-listen` | `127.0.0.1:9252` | the metrics bind address `HOST:PORT` — `0.0.0.0:PORT` serves every interface, **a token is mandatory regardless** (ini `metrics_listen`, env `MODBUS_CACHE_METRICS_LISTEN`) |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-port` is set |
 | `--metrics-token-file` | off | the metrics bearer token from a file (the first line; owner-only `0600`, F12) — instead of `--metrics-token`, giving both is an error |
 | **Limits** | | |
@@ -267,7 +269,7 @@ a token the unix socket relies on filesystem permissions.
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `interval`, `ttl`, `read-delay`, `merge-gap` (the poll plan rebuilds), `allow-write`, `write-registers`, `max-clients`, `client-timeout`, `max-conn-per-ip`, `requests-audit`, `dump-interval`, `log-level`, `profile`/`selection` (the register map swaps atomically), `connect-acl`, `write-acl`, `timeout` — the reply carries the compact state summary |
+| `set <setting> <value>` | configure a setting **live**: `interval`, `ttl`, `read-delay`, `merge-gap` (the poll plan rebuilds), `allow-write`, `write-registers`, `max-clients`, `client-timeout`, `max-conn-per-ip`, `metrics-server`, `requests-audit`, `dump-interval`, `log-level`, `profile`/`selection` (the register map swaps atomically), `connect-acl`, `write-acl`, `timeout` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
 | `show <setting>` | the bare live value of one tunable |
 | `show settings` | every tunable with its live value — one stable `key=value` line per setting (scriptable); a value set live carries a `*`, and a SIGHUP re-applies the config (the file always wins) and clears the markers — see [Live settings](#live-settings) |
@@ -278,7 +280,7 @@ a token the unix socket relies on filesystem permissions.
 | `show cache` | cache contents: ranges, cached words, oldest entry, TTL, map version, failed ranges, hit/miss counters |
 | `show cache all` | every cached entry, one row per profile range: name, words cached, their values (`-` = not cached), age of the oldest, when it expires, poll status (`ok`/`partial`/`empty`/`failed (ex N)`) |
 | `show uplink` | the inverter link: session counters (state, connects, exchanges, bytes in/out, errors, last error) plus one row per poll block — status (`ok`/`ex N`/`error`/`pending`), latency (last/mean/max), failure count, last error |
-| `request dump` | write the cached words (+ their stamps) and the live setting overrides to the `--dump-path` file — the write-behind state, see [Persistence](#persistence); the dump commands (and the `dump-interval` setting) show up in the listings only when a dump path is configured |
+| `request dump` | write the live setting overrides — and, with `--dump-with-cache` (or the `with-cache` suffix: `request dump with-cache`), the cached words (+ their stamps) — to the `--dump-path` file; the write-behind state, see [Persistence](#persistence); the dump commands (and the `dump-interval` setting) show up in the listings only when a dump path is configured |
 | `request restore` | load the dump back: the words return with their original stamps (their TTL bounds any staleness) and the overrides re-apply — what the startup restore does automatically |
 | `show version` | the modbus-cache version |
 | `clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
@@ -418,16 +420,23 @@ are not cached and need no invalidation.
 
 ## Persistence
 
-`--dump-path` turns on the **write-behind state dump**: the cached words
-(+ their original stamps, so freshness carries over — the poll ranges, the
-bridged gaps and the on-demand entries alike) and the live setting
-overrides, as one human-readable JSON — written atomically (tmp + rename).
-The dumps land in three ways: every `--dump-interval` seconds (live-settable
+`--dump-path` turns on the **write-behind state dump**: the live setting
+overrides and — when asked — the cached words (+ their original stamps, so
+freshness carries over — the poll ranges, the bridged gaps and the
+on-demand entries alike), as one human-readable JSON — written atomically
+(tmp + rename). **What lands in the file is split** (F18: the words are
+production data, the settings are config): by default **settings only**;
+**`request dump with-cache`** includes the words, and **`--dump-with-cache`**
+flips the plain `request dump` and the `--dump-interval` loop to the full
+shape (the shutdown dump follows the flag too). The restore takes either
+shape — it loads whatever the file carries. The dumps land in three ways:
+every `--dump-interval` seconds (live-settable
 `set dump-interval`, `0` = off — the default: on request), on the
 **`request dump`** command, and on every
 graceful shutdown. Loading is gated: **`--restore-on-start`** opts in to
 loading the dump when the daemon starts (a restart serves last-known
-values instead of cold misses); the default is starting cold — the
+values instead of cold misses — pair it with `--dump-with-cache` so the
+words ride along); the default is starting cold — the
 **`request restore`** command loads it on demand. Either way the words
 return as they were —
 their TTL bounds any staleness, and the next map swap prunes what the
@@ -452,8 +461,10 @@ admin who rechashes.
 
 ## Metrics
 
-`--metrics-port` (off by default) serves the cache's own Prometheus
-`/metrics` on `127.0.0.1:PORT` — the self-observability without the
+`--metrics-server` (off by default, live-settable `set metrics-server
+on/off`) serves the cache's own Prometheus `/metrics` on the
+`--metrics-listen HOST:PORT` address (default `127.0.0.1:9252`; `0.0.0.0`
+serves every interface) — the self-observability without the
 scraper's `huawei_cache_*` export path: `modbus_cache_hits_total` /
 `modbus_cache_misses_total`, `modbus_cache_poll_up` +
 `modbus_cache_last_poll_age_seconds`, `modbus_cache_age_seconds` (the

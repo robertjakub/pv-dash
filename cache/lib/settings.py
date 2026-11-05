@@ -43,6 +43,10 @@ SETTINGS = (
             {'0': 'never disconnect idle clients'}),
     Setting('max-conn-per-ip', 'simultaneous connections from one peer IP', (), 'N',
             {'0': 'no per-IP limit (the default)'}),
+    Setting('metrics-server', "the cache's own Prometheus /metrics endpoint (needs a token; "
+            'the address is --metrics-listen)', ('on', 'off'), None,
+            {'on': 'serve /metrics on the configured listen address',
+             'off': 'no metrics endpoint (the default)'}),
     Setting('requests-audit', 'audit one REQUESTS tally per client per this many seconds', ('off',), 's|off',
             {'off': 'no per-client request tallies'}),
     Setting('dump-interval', 'seconds between the automatic state dumps (the cached words + the setting overrides)', ('off',), 's|off',

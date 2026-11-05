@@ -49,8 +49,7 @@ before the repo restructured into one suite.
   audit finding F10, docs/AUDIT.md): every entry carries a short chained
   hash right after the event name — `<stamp> AUDIT <PREFIX> <EVENT> <12
   hex> [detail]`, `sha256(prev | stamp | prefix | event + detail)`, chained
-  **per
-  writer prefix** so the interleaved writers (CACHE/INV/CLI/CTL in one
+  **per writer prefix** so the interleaved writers (CACHE/INV/CLI/CTL in one
   file) verify independently and a restarted writer seeds from its own
   trail. The new `scripts/audit_verify.py` walks a trail (default: the
   family's XDG audit logs; `-` reads stdin) and its rotated backups
@@ -78,6 +77,26 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **cache** — **breaking**: the state dump splits by content — by default
+  it dumps **settings only**; **`request dump with-cache`** includes the
+  cached words, and the new **`--dump-with-cache`** flag flips the plain
+  `request dump`, the `--dump-interval` loop **and the shutdown dump** to
+  the full shape (the default off = settings only — the words are
+  production data, keep them out of the file unless the
+  write-behind/restart story needs them). The restore takes either shape
+  and loads whatever the file carries. Pair `--restore-on-start` with
+  `--dump-with-cache` for the words to survive the restart.
+- **cache, inverter** — **breaking**: the metrics endpoint renames — the
+  master switch is **`--metrics-server`** (off by default, **live-settable**
+  `set metrics-server on/off`), and **`--metrics-port`** becomes
+  **`--metrics-listen HOST:PORT`** (default `127.0.0.1:9252` on the cache,
+  `127.0.0.1:9452` on the fake) — `0.0.0.0:PORT` serves every interface
+  (the cache's token is mandatory regardless; the fake warns when bound
+  beyond loopback without one). Anything scripting `--metrics-port N`
+  follows.
+- **scrape** — the metrics surface is the tool by design (always on); the
+  connection limits are `--max-clients` (64), `--client-timeout` (300 s)
+  and `--max-conn-per-ip` (0 = no per-IP limit) — no master switch.
 - **cache** — **breaking**: the write path defaults fully closed —
   `write-acl` and `write-registers` now default to **`none`** (was `any`):
   enabling `--allow-write` alone refuses every write until the operator

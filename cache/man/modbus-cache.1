@@ -121,14 +121,21 @@ comma-separated list (a local systemd unit speaks without the secret);
 root and the daemon's own user are always trusted.
 .TP
 .BI \-\-dump-path " FILE"
-the state dump (write-behind): the cached words + their stamps and the
-live setting overrides, as one JSON \(em written on shutdown, by the
-\fBrequest dump\fR command and every \fB--dump-interval\fR seconds;
-loaded on start only with \fB--restore-on-start\fR, on demand by the
-\fBrequest restore\fR command. The file is created \fB0600\fR (never the
+the state dump (write-behind): the live setting overrides and \(em with
+\fB--dump-with-cache\fR \(em the cached words + their stamps, as one JSON
+\(em written on shutdown, by the \fBrequest dump\fR command and every
+\fB--dump-interval\fR seconds; loaded on start only with
+\fB--restore-on-start\fR, on demand by the \fBrequest restore\fR command
+(the restore takes either shape). The file is created \fB0600\fR (never the
 umask) and carries a sha256 integrity hash \(em a restore refuses an
 edited, unsigned or group/world-writable dump (F18: the dump is
 config-equivalent trust; own it like the ini). Off by default.
+.TP
+.B \-\-dump-with-cache
+dump the cached words too: the \fBrequest dump\fR command and the
+\fB--dump-interval\fR loop write the words + the settings (the default off
+= settings only; \fBrequest dump with-cache\fR always includes them). Off
+by default.
 .TP
 .B \-\-restore-on-start
 load the state dump when the daemon starts (needs \fB--dump-path\fR) \(em
@@ -143,10 +150,12 @@ the \fBrequest dump\fR command and the shutdown); needs \fB--dump-path\fR.
 audit one REQUESTS tally per client per this many seconds (default
 \fB300\fR); \fB0\fR = off.
 .TP
-.BI \-\-metrics-port " N"
-serve the cache's own Prometheus \fB/metrics\fR on 127.0.0.1:\fIN\fR (the
-\fBmodbus_cache_*\fR gauges); refuses to start without
-\fB--metrics-token\fR. Off by default.
+.BI \-\-metrics-server ", " \-\-metrics-listen " HOST:PORT"
+serve the cache's own Prometheus \fB/metrics\fR endpoint (the
+\fBmodbus_cache_*\fR gauges; off by default, live-settable on the control
+server) on the bind address (default \fB127.0.0.1:9252\fR;
+\fB0.0.0.0:PORT\fR serves every interface); refuses to start without
+\fB--metrics-token\fR.
 .TP
 .BI \-\-metrics-token " TOKEN"
 require \fBAuthorization: Bearer\fR on the metrics endpoint.

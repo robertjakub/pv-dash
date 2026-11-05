@@ -83,6 +83,10 @@ SETTINGS = (
             {'0': 'no limit'}),
     Setting('max-conn-per-ip', 'simultaneous Modbus connections from one peer IP', (), 'N',
             {'0': 'no per-IP limit (the default)'}),
+    Setting('metrics-server', "the fake's own Prometheus /metrics endpoint "
+            '(the address is --metrics-listen)', ('on', 'off'), None,
+            {'on': 'serve /metrics on the configured listen address',
+             'off': 'no metrics endpoint (the default)'}),
     Setting('client-timeout', 'disconnect Modbus clients silent for this long', (), 's',
             {'0': 'never'}),
     Setting('log-level', 'log verbosity', ('DEBUG', 'INFO', 'WARNING', 'ERROR'), None,

@@ -745,12 +745,12 @@ try:
     procs.append(p_dump)
     time.sleep(1.5)
     r = ctl_cmd('request dump', 15537)
-    check('request dump: the state lands in the json', r.startswith('ok dumped ') and '91 word(s)' in r
-          and '0 setting(s)' in r, r[:120])
+    check('request dump: settings-only by default (F18 round)', r.startswith('ok dumped 0 word(s)')
+          and 'setting(s)' in r, r[:120])
     d = _json.load(open(dumpfile))
-    check('request dump: the format is the versioned modbus-cache-dump', d.get('format') == 'modbus-cache-dump'
-          and d.get('version') == 1 and len(d.get('registers', [])) == 91 and d.get('settings') == {},
-          str(d.get('saved')))
+    check('request dump: the format is the versioned modbus-cache-dump, empty registers',
+          d.get('format') == 'modbus-cache-dump' and d.get('version') == 1
+          and d.get('registers') == [] and d.get('settings') == {}, str(d.get('saved')))
     check('request dump: the file is 0600 (F18) and carries the integrity hash',
           os.stat(dumpfile).st_mode & 0o777 == 0o600 and isinstance(d.get('hash'), str)
           and len(d['hash']) == 64, '%03o %r' % (os.stat(dumpfile).st_mode & 0o777, d.get('hash'))[:80])
@@ -759,18 +759,31 @@ try:
     r = ctl_cmd('help', 15537)
     check('request dump: the help lists the dump commands with a path', 'request dump' in r
           and 'request restore' in r, r[:160])
-    r = ctl_cmd('request dump', 15537)
-    check('request dump: no path arg — the configured file is the target', r.startswith('ok dumped '), r[:80])
+    r = ctl_cmd('request dump with-cache', 15537)
+    check('request dump with-cache: the words ride along', r.startswith('ok dumped 91 word(s)'), r[:120])
+    d = _json.load(open(dumpfile))
+    check('request dump with-cache: the registers are in the json', len(d.get('registers', [])) == 91,
+          str(len(d.get('registers', []))))
     r = ctl_cmd('request restore', 15537)
     check('request restore: the words are back without the device', r.startswith('ok restored 91 word(s)')
           and '0 setting(s)' in r, r[:120])
     ctl_cmd('set interval 2', 15537)
     ctl_cmd('request dump', 15537)
+    d = _json.load(open(dumpfile))
+    check('request dump: the settings-only dump keeps the words out', d.get('registers') == []
+          and d.get('settings', {}).get('interval') == 2.0, str(d.get('settings')))
     ctl_cmd('clear cache', 15537)
     r = ctl_cmd('show cache', 15537)
     check('request restore: the clear emptied the cache first', '0 word(s) cached' in r, r[:80])
     r = ctl_cmd('request restore', 15537)
-    check('request restore: the words and the override return', r.startswith('ok restored 91 word(s), 1 setting(s)'), r[:120])
+    check('request restore: the settings-only dump restores the override (the cache stays empty)',
+          r.startswith('ok restored 0 word(s), 1 setting(s)'), r[:120])
+    time.sleep(1.4)   # the poller refills (interval 1 s) before the with-cache dump
+    ctl_cmd('request dump with-cache', 15537)
+    ctl_cmd('clear cache', 15537)
+    r = ctl_cmd('request restore', 15537)
+    check('request restore: the with-cache dump brings the words back',
+          r.startswith('ok restored 91 word(s), 1 setting(s)'), r[:120])
     r = ctl_cmd('show interval', 15537)
     check('request restore: the setting override re-applied', r == 'ok interval=2.00s', r)
     r = ctl_cmd('show settings', 15537)
@@ -815,11 +828,11 @@ try:
     check('shutdown dump: the stopper wrote the file', r.startswith('bye'), r[:40])
     p_dump.wait(timeout=10)
     d = _json.load(open(dumpfile))
-    check('shutdown dump: the words + the override are in it', len(d.get('registers', [])) == 91
-          and d.get('settings', {}).get('interval') == 3.0, repr(d.get('settings')))
+    check('shutdown dump: settings-only by default (the override is in it, the words stay out)',
+          d.get('registers') == [] and d.get('settings', {}).get('interval') == 3.0, repr(d.get('settings')))
     p_dump = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
                                '--listen', '127.0.0.1:15536', '--interval', '1', '--cache-ttl', '30',
-                               '--profile', R, '--control-port', '15537',
+                               '--profile', R, '--control-port', '15537', '--dump-with-cache',
                                '--dump-path', dumpfile],
                               stdout=open('/tmp/reg_cache_dump2.log', 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
@@ -830,6 +843,10 @@ try:
           and 'restored the state dump' not in log.split('state dumps:')[1], log[-200:])
     r = ctl_cmd('show interval', 15537)
     check('restore-on-start: the override in the file did not leak in', r == 'ok interval=1.00s', r)
+    r = ctl_cmd('request dump', 15537)
+    check('dump-with-cache: the flag turns the plain request dump full', r.startswith('ok dumped 91 word(s)'),
+          r[:120])
+    ctl_cmd('clear cache', 15537)
     r = ctl_cmd('request restore', 15537)
     check('restore-on-start: the manual request restore still works', r.startswith('ok restored 91 word(s), ')
           and 'setting(s) from' in r, r[:120])
@@ -840,7 +857,7 @@ try:
     p_dump.wait(timeout=10)
     p_dump = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
                                '--listen', '127.0.0.1:15536', '--interval', '1', '--cache-ttl', '30',
-                               '--profile', R, '--control-port', '15537',
+                               '--profile', R, '--control-port', '15537', '--dump-with-cache',
                                '--dump-path', dumpfile, '--restore-on-start'],
                               stdout=open('/tmp/reg_cache_dump2.log', 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
@@ -860,7 +877,7 @@ try:
     p_metrics = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
                                   '--listen', '127.0.0.1:15528', '--interval', '1', '--profile', R,
                                   '--control-port', '15530',
-                                  '--metrics-port', '15529', '--metrics-token', 'sekrit',
+                                  '--metrics-listen', '127.0.0.1:15529', '--metrics-server', '--metrics-token', 'sekrit',
                                   '--metrics-max-clients', '1'],
                                  stdout=open('/tmp/reg_cache_metrics.log', 'w'), stderr=subprocess.STDOUT,
                                  env={**os.environ, 'MODBUS_CACHE_CONTROL_TOKEN': 'sekrit'})
@@ -908,6 +925,19 @@ try:
           reply.split(b'\r\n')[0].decode() if reply else 'empty reply')
     over.close()
     parked.close()
+    # the live metrics-server switch: off stops the endpoint, on restarts it
+    r = ctl_cmd('set metrics-server off', 15530)
+    check('metrics-server: set off stops the endpoint', r.startswith('ok metrics-server=off'), r[:80])
+    srv_down = False
+    try:
+        socket.create_connection(('127.0.0.1', 15529), timeout=1).close()
+    except OSError:
+        srv_down = True
+    check('metrics-server: the port is closed after set off', srv_down)
+    r = ctl_cmd('set metrics-server on', 15530)
+    check('metrics-server: set on serves again', r.startswith('ok metrics-server=on'), r[:80])
+    st, _ = get_metrics('sekrit')
+    check('metrics-server: the gauges are back', st == 200, str(st))
     p_metrics.send_signal(signal.SIGTERM)
     p_metrics.wait(timeout=10)
 
@@ -1171,7 +1201,7 @@ try:
           r.returncode != 0 and 'TCP control port' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
     r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512', '--dry-run',
-                        '--listen', '127.0.0.1:15599', '--metrics-port', '15598', '--profile', R],
+                        '--listen', '127.0.0.1:15599', '--metrics-listen', '127.0.0.1:15598', '--metrics-server', '--profile', R],
                        capture_output=True, text=True, timeout=15)
     check('metrics: the metrics endpoint without a token refuses to start',
           r.returncode != 0 and 'serves register values' in (r.stderr + r.stdout)

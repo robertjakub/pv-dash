@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""The cache's state dumps: the cached registers (+ their stamps) and the
-live setting overrides, as one JSON file — the write-behind that lets a
-daemon restart serve last-known values instead of cold misses (stdlib only).
+"""The cache's state dumps: the live setting overrides and (on request) the
+cached registers (+ their stamps), as one JSON file — the write-behind that
+lets a daemon restart serve last-known values instead of cold misses
+(stdlib only). A dump is settings-only or full (with-cache); a restore
+loads whatever the file carries (the words restore only if it has them).
 
 The file is written atomically (tmp + rename) and **explicitly 0600** (the
 F8/F12 pattern — the dump is config-equivalent trust at rest: the words are
@@ -36,19 +38,24 @@ def _payload_hash(state):
     return hashlib.sha256(payload.encode('utf-8')).hexdigest()
 
 
-def write_dump(path, cache, settings=None):
-    """Dump the cache (words + stamps) and the setting overrides to path,
-    atomically, 0600, with the integrity hash. Returns the dumped word count."""
-    words, stamps = cache.snapshot()
+def write_dump(path, cache, settings=None, with_cache=True):
+    """Dump the setting overrides and — when with_cache — the cached words
+    (+ stamps) to path, atomically, 0600, with the integrity hash.
+    Returns the dumped word count (0 for a settings-only dump)."""
     state = {
         'format': FORMAT,
         'version': VERSION,
         'saved': time.time(),
         'map_version': cache.map_version,
-        'registers': [[fc, addr, word, stamps[(fc, addr)]]
-                      for (fc, addr), word in sorted(words.items())],
+        'registers': [],
         'settings': settings or {},
     }
+    if with_cache:
+        words, stamps = cache.snapshot()
+        state['registers'] = [[fc, addr, word, stamps[(fc, addr)]]
+                              for (fc, addr), word in sorted(words.items())]
+    else:
+        words = {}
     state['hash'] = _payload_hash(state)
     tmp = '%s.tmp' % path
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

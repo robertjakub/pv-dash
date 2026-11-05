@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""The fake's own Prometheus endpoint: a small /metrics on its own port,
-gated (off by default). Serves the simulator's state and the server's
-counters in the Prometheus text format. With --metrics-token set, requests
-need `Authorization: Bearer <token>` (the same scheme the scraper speaks
-when it pulls token-protected exporters). Caps (F13 round):
---metrics-max-clients (immediate 503 past it), --metrics-client-timeout
-(0 = the built-in 5 s cap), --metrics-max-conn-per-ip (0 = no limit)."""
+"""The fake's own Prometheus endpoint: a small /metrics, gated (the
+`metrics-server` setting, default off). Serves the simulator's state and
+the server's counters in the Prometheus text format. With --metrics-token
+set, requests need `Authorization: Bearer <token>` (the same scheme the
+scraper speaks when it pulls token-protected exporters). The bind address
+is --metrics-listen HOST:PORT (0.0.0.0 serves every interface — mind the
+values, the fake is a demo). Caps: --metrics-max-clients (immediate 503
+past it), --metrics-client-timeout (0 = the built-in 5 s cap),
+--metrics-max-conn-per-ip (0 = no limit)."""
 import hmac
 import http.server
 import logging
@@ -22,18 +24,26 @@ METRICS_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
                b'# rate limited: too many concurrent clients\n')
 
 
+def describe_metrics(listen, token, max_clients=0, max_per_ip=0):
+    """The status/inspect one-liner for the endpoint state."""
+    host, port = listen
+    return '%s:%d%s, clients %s, per-ip %s' % (
+        host, port, ' (bearer token)' if token else '',
+        max_clients or 'none', max_per_ip or 'none')
+
+
 class MetricsServer:
     """A tiny Prometheus text-endpoint for the fake itself. None of the
     real-device semantics — the self-observability: the pv/load/grid/battery
     watts, the SoC, the machines' readings, the poll/connection counters."""
 
-    def __init__(self, simulator, chaos, fake, control, port, token=None, started=0.0,
+    def __init__(self, simulator, chaos, fake, control, listen, token=None, started=0.0,
                  max_clients=64, client_timeout=5.0, max_per_ip=0):
         self.simulator = simulator
         self.chaos = chaos
         self.fake = fake
         self.control = control
-        self.port = port
+        self.listen = listen            # (host, port)
         self.token = token
         self.started = started
         self.max_clients = max(0, int(max_clients or 0))
@@ -149,11 +159,20 @@ class MetricsServer:
                     pass
                 httpd.shutdown_request(request)
 
-        httpd = Server(('127.0.0.1', self.port), self._Handler)
+        httpd = Server(self.listen, self._Handler)
         httpd.setup_gate(self.max_clients, self.max_per_ip)
         httpd.metrics_server = self
         self._http = httpd
         httpd.serve_forever()
+
+    def stop(self):
+        """Stop the serving loop and close the socket (the live
+        `set metrics-server off`); a second stop is a no-op."""
+        httpd, self._http = self._http, None
+        if not httpd:
+            return
+        httpd.shutdown()
+        httpd.server_close()
 
     def start(self):
         threading.Thread(target=self.serve, daemon=True).start()

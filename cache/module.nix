@@ -75,9 +75,13 @@ let
       control_socket_group = lib.boolToString cfg.controlSocketGroup;
     } // lib.optionalAttrs (cfg.dumpPath != null) {
       dump_path = cfg.dumpPath;
+      dump_with_cache = lib.boolToString cfg.dumpWithCache;
       restore_on_start = lib.boolToString cfg.restoreOnStart;
     } // lib.optionalAttrs (cfg.dumpPath != null && cfg.dumpInterval != null) {
       dump_interval = toString cfg.dumpInterval;
+    } // lib.optionalAttrs (cfg.metricsServer != null) {
+      metrics_server = lib.boolToString cfg.metricsServer;
+      metrics_listen = cfg.metricsListen;
     };
   });
 in
@@ -262,6 +266,26 @@ in
       '';
     };
 
+    metricsServer = lib.mkOption {
+      type = lib.types.nullOr lib.types.bool;
+      default = null;
+      description = ''
+        Serve the cache's own Prometheus /metrics endpoint (default:
+        false). A token is mandatory when it is on — metricsServerToken /
+        metricsServerTokenFile. Live-settable on the control server.
+      '';
+    };
+
+    metricsListen = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The metrics bind address HOST:PORT (default: 127.0.0.1:9252).
+        0.0.0.0:PORT serves every interface — a token is mandatory
+        regardless.
+      '';
+    };
+
     metricsClientTimeout = lib.mkOption {
       type = lib.types.nullOr lib.types.float;
       default = null;
@@ -359,12 +383,23 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = ''
-        The state dump (write-behind): the cached words + their stamps and
-        the live setting overrides, as one JSON — written on shutdown, by
-        the request dump command and every dumpInterval seconds, restored
-        on start and by the request restore command; a daemon restart
-        serves last-known values instead of cold misses. null =
-        persistence off.
+        The state dump (write-behind): the live setting overrides and —
+        when dumpWithCache — the cached words + their stamps, as one JSON —
+        written on shutdown, by the request dump command and every
+        dumpInterval seconds, restored on start and by the request restore
+        command; created 0600, integrity-hashed, restored only after the
+        checks pass. null = persistence off.
+      '';
+    };
+
+    dumpWithCache = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Dump the cached words too: the request dump command and the
+        dumpInterval loop write the words + the settings (the default off =
+        settings only; request dump with-cache always includes them; the
+        restore takes either shape).
       '';
     };
 

@@ -242,6 +242,7 @@ def validate_config(cfg):
         fail('metrics_client_timeout', 'must be >= 0 (0 = the built-in 5 s cap)')
     if cfg['metrics_max_conn_per_ip'] < 0:
         fail('metrics_max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
+    parse_listen(cfg['metrics_listen'])
     if cfg['level'] not in ('DEBUG', 'INFO', 'WARNING', 'ERROR'):
         fail('log-level', 'must be DEBUG, INFO, WARNING or ERROR')
     if cfg['audit_max_mb'] < 0:
@@ -336,6 +337,10 @@ def resolve_config(args, script_dir=None):
         'metrics_max_conn_per_ip': resolve(getattr(args, 'metrics_max_conn_per_ip', None),
                                            'MODBUS_CACHE_METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
                                            DEFAULTS['metrics_max_conn_per_ip'], int),
+        'metrics_server': resolve_bool(getattr(args, 'metrics_server', False) or None,
+                                       'MODBUS_CACHE_METRICS_SERVER', 'metrics_server', False),
+        'metrics_listen': resolve(getattr(args, 'metrics_listen', None), 'MODBUS_CACHE_METRICS_LISTEN',
+                                  'metrics_listen', DEFAULTS['metrics_listen'], str),
         'connect_acl': parse_acl(resolve(args.connect_acl, 'MODBUS_CACHE_CONNECT_ACL', 'connect_acl', 'any', str),
                                  'connect-acl'),
         'write_acl': parse_acl(resolve(args.write_acl, 'MODBUS_CACHE_WRITE_ACL', 'write_acl', 'none', str),
@@ -362,6 +367,8 @@ def resolve_config(args, script_dir=None):
                              'dump_path', '', str),
         'dump_interval': resolve(getattr(args, 'dump_interval', None), 'MODBUS_CACHE_DUMP_INTERVAL',
                                  'dump_interval', 0.0, float),
+        'dump_with_cache': resolve_bool(getattr(args, 'dump_with_cache', False) or None,
+                                        'MODBUS_CACHE_DUMP_WITH_CACHE', 'dump_with_cache', False),
         'restore_on_start': resolve_bool(getattr(args, 'restore_on_start', False) or None,
                                          'MODBUS_CACHE_RESTORE_ON_START', 'restore_on_start', False),
         'control_trust_uids': parse_trust_uids(resolve(getattr(args, 'control_trust_uids', None),

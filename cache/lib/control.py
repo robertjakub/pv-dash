@@ -26,6 +26,7 @@ from .statics import CONTROL_IDLE_TIMEOUT_S
 from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .cache import build_blocks
 from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection
+from .metrics import MetricsServer, describe_metrics
 from . import persist
 
 logger = logging.getLogger('modbus-cache')
@@ -227,7 +228,7 @@ class ControlServer:
         cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|cache|'
                 'uplink|settings|version>')
         if self.proxy.dump_path:
-            cmds += ', request dump, request restore'
+            cmds += ', request dump [with-cache], request restore'
         cmds += ', clear cache, restart, shutdown, quit; help <setting> describes it'
         return cmds
 
@@ -307,7 +308,9 @@ class ControlServer:
             logger.info('control: cache cleared (%d register word(s) dropped), repolling now', dropped)
             return 'ok cache cleared (%d register word(s) dropped), repolling now' % dropped
         if low == 'request dump':
-            return self.dump_state()
+            return self.dump_state(self.proxy.dump_with_cache)
+        if low == 'request dump with-cache':
+            return self.dump_state(True)
         if low == 'request restore':
             return self.restore_state()
         if low == 'restart':
@@ -398,6 +401,28 @@ class ControlServer:
                 raise ValueError('max-conn-per-ip must be 0..4096')
             p.conn_gate.max_per_ip = v
             return '%d' % v
+        if key == 'metrics-server':
+            if val in ('on', 'true', '1', 'yes'):
+                if p.metrics_srv:
+                    return 'on'
+                if not p.metrics_token:
+                    raise ValueError('the metrics endpoint serves register values: '
+                                     'set --metrics-token/--metrics-token-file first (F6 in docs/AUDIT.md)')
+                srv = MetricsServer(p, p.metrics_listen, token=p.metrics_token,
+                                    max_clients=p.metrics_caps[0], client_timeout=p.metrics_caps[1],
+                                    max_per_ip=p.metrics_caps[2])
+                srv.start()
+                p.metrics_srv = srv
+                p.metrics_desc = describe_metrics(p.metrics_listen, p.metrics_token,
+                                                  p.metrics_caps[0], p.metrics_caps[2])
+                return 'on'
+            if val in ('off', 'false', '0', 'no'):
+                if p.metrics_srv:
+                    p.metrics_srv.stop()
+                    p.metrics_srv = None
+                    p.metrics_desc = 'off'
+                return 'off'
+            raise ValueError('metrics-server must be on or off')
         if key == 'requests-audit':
             if val in ('off', 'none', '0'):
                 p.requests_audit_s = 0
@@ -503,6 +528,8 @@ class ControlServer:
             return 'none' if not p.client_timeout else secs(p.client_timeout)
         if key == 'max-conn-per-ip':
             return '%d' % p.conn_gate.max_per_ip
+        if key == 'metrics-server':
+            return 'on' if p.metrics_srv else 'off'
         if key == 'requests-audit':
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
         if key == 'dump-interval':
@@ -711,6 +738,7 @@ class ControlServer:
             'merge-gap': p.merge_gap, 'allow-write': 'on' if p.allow_write else 'off',
             'write-registers': p.describe_write_ranges(), 'max-clients': p.max_clients,
             'client-timeout': p.client_timeout, 'max-conn-per-ip': p.conn_gate.max_per_ip,
+            'metrics-server': 'on' if p.metrics_srv else 'off',
             'requests-audit': p.requests_audit_s,
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'profile': p.config.get('profile'), 'selection': p.config.get('selection') or 'all',
@@ -736,20 +764,22 @@ class ControlServer:
                 failed.append('%s (%s)' % (name, e))
         return applied, failed
 
-    def dump_state(self):
-        """The write-behind: the cached words (+ stamps) and the live
-        setting overrides to the configured dump path — the same file the
-        dump-interval loop and the shutdown dump write."""
+    def dump_state(self, with_cache):
+        """The write-behind: the live setting overrides and — when
+        with_cache (the `request dump with-cache` command, the
+        `--dump-with-cache` default or the dump-interval loop) — the cached
+        words (+ stamps), to the configured dump path."""
         path = self.proxy.dump_path
         if not path:
             return 'err no dump path configured (set --dump-path)'
         settings = self.dump_settings()
         try:
-            n = persist.write_dump(path, self.proxy.cache, settings)
+            n = persist.write_dump(path, self.proxy.cache, settings, with_cache=with_cache)
         except (OSError, ValueError) as e:
             logger.error('control: the dump to %s failed: %s', path, e)
             return 'err dump failed: %s' % e
-        logger.info('control: state dumped to %s (%d word(s), %d setting(s))', path, n, len(settings))
+        logger.info('control: state dumped to %s (%d word(s), %d setting(s), %s)', path, n,
+                    len(settings), 'with cache' if with_cache else 'settings only')
         return 'ok dumped %d word(s), %d setting(s) to %s' % (n, len(settings), path)
 
     def restore_state(self):

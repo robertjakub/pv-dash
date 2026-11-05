@@ -660,7 +660,7 @@ try:
     # 2g2g. the fake's own metrics: the gated Prometheus endpoint + the bearer auth
     r = subprocess.run([sys.executable, F, '--dry-run'], capture_output=True, text=True)
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15901',
-                                   '--control-port', '15902', '--metrics-port', '15903'],
+                                   '--control-port', '15902', '--metrics-listen', '127.0.0.1:15903', '--metrics-server'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(1.2)
     status, body = None, None
@@ -675,8 +675,8 @@ try:
     subprocess.run([sys.executable, C, '--control-port', '15902', 'shutdown'], capture_output=True)
     time.sleep(0.8)
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15904',
-                                   '--control-port', '15905', '--metrics-port', '15906',
-                                   '--metrics-token', 'sekrit'],
+                                   '--control-port', '15905', '--metrics-listen', '127.0.0.1:15906',
+                                   '--metrics-server', '--metrics-token', 'sekrit'],
                                   stdout=open('/tmp/scr_metrics.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(1.2)
     status, body = None, None

@@ -91,7 +91,7 @@ def main():
                                       stdout=open(LOG, 'w'), stderr=subprocess.STDOUT))
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(B_MODBUS),
                                        '--control-port', str(B_CTL), '--client-timeout', '1',
-                                       '--metrics-port', str(B_METRICS), '--metrics-token', 'tok',
+                                       '--metrics-listen', '127.0.0.1:%d' % B_METRICS, '--metrics-token', 'tok', '--metrics-server',
                                        '--metrics-max-clients', '1'],
                                       stdout=open(LOG + '.b', 'w'), stderr=subprocess.STDOUT))
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(C_MODBUS),
@@ -227,6 +227,19 @@ def main():
         time.sleep(0.3)
         st, _ = http_get(B_METRICS, token='tok')
         check('metrics recovers after the slot frees', st.split()[1] == '200', st)
+        # the live metrics-server switch: off stops the endpoint, on restarts it
+        tx = ctl(B_CTL, 'set metrics-server off')
+        check('metrics-server: set off', tx.startswith('ok metrics-server=off'), tx)
+        srv_down = False
+        try:
+            connect(B_METRICS, 1.0).close()
+        except OSError:
+            srv_down = True
+        check('metrics-server: the port is closed after set off', srv_down)
+        tx = ctl(B_CTL, 'set metrics-server on')
+        check('metrics-server: set on serves again', tx.startswith('ok metrics-server=on'), tx)
+        st, _ = http_get(B_METRICS, token='tok')
+        check('metrics-server: the gauges are back', st.split()[1] == '200', st)
 
         # ---- the listening line documents the policy
         log = open(LOG).read()

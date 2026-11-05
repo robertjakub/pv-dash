@@ -1,7 +1,8 @@
 # The pv-suite Modbus tools as compose services. The build contexts are
-# ../inverter, ../cache and ../scrape; the shared profiles/ directory, the
-# entrypoint and the common/ package ride in as named contexts. Run one service: docker compose up -d fake-inverter
-# Run the stack:         docker compose up -d (inverter + cache + scraper + prometheus)
+# ../inverter, ../cache, ../scrape and ../dashboard; the shared profiles/
+# directory, the entrypoint and the common/ package ride in as named
+# contexts. Run one service: docker compose up -d fake-inverter
+# Run the stack:         docker compose up -d (inverter + cache + scraper + prometheus + dashboard)
 #
 # All three share the external `config` volume mounted at /config: on start
 # the entrypoint seeds it with the bundled defaults (every file the volume
@@ -9,11 +10,13 @@
 # container recreation. `docker compose exec` sessions bypass the entrypoint
 # and run as root; add --user pvsuite to land as pvsuite.
 #
-# Nothing is published on the host (the audit's F7): the four services talk
+# Nothing else is published on the host (the audit's F7): the services talk
 # over one `internal: true` network — no host ports, no outbound route. The
-# Modbus listeners and the exporter's /metrics are reachable only from inside
-# that network: `docker compose exec`, or a collector container attached to
-# the same network by name (see README.md).
+# one exception is the dashboard's HTTP port, loopback-only: the front for
+# the stack's internal Prometheus (its /prom proxy -> http://prometheus:9090).
+# The Modbus listeners and the exporter's /metrics stay reachable only from
+# inside that network: `docker compose exec`, or a collector container
+# attached to the same network by name (see README.md).
 #
 # The scrape/token story ships in the stack: the exporter serves with a
 # bearer token (SCRAPER_AUTH_TOKEN_FILE -> /config/metrics.token — a random
@@ -81,6 +84,29 @@ services:
       - modbus
     depends_on:
       - modbus-scraper
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ../dashboard
+      additional_contexts:
+        scripts: ../docker
+        common: ../common
+    image: pv-dashboard
+    environment:
+      # the proxy target: the stack's internal Prometheus service (the
+      # dashboard never needs the token — the scrape stays prometheus-side)
+      PROM_URL: http://prometheus:9090
+    volumes:
+      - config:/config
+    networks:
+      - modbus
+    ports:
+      # the stack's one published port, loopback-only (the audit's F7
+      # discipline: an explicit operator act, not reachable from the LAN)
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      - prometheus
     restart: unless-stopped
 
 networks:

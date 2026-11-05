@@ -3,7 +3,10 @@
     "max_pdu": 253,
     "max_count": 125,
     "max_registers": 65535,
-    "unit_id_range": [1, 247]
+    "unit_id_range": [
+      1,
+      247
+    ]
   },
   "diagnostics": {
     "base": 65000,
@@ -11,7 +14,12 @@
     "magic": 51966,
     "max_age": 65535
   },
-  "log_levels": ["DEBUG", "INFO", "WARNING", "ERROR"],
+  "log_levels": [
+    "DEBUG",
+    "INFO",
+    "WARNING",
+    "ERROR"
+  ],
   "defaults": {
     "host": "127.0.0.1",
     "modbus_port": 5502,
@@ -26,6 +34,13 @@
     "max_clients": 64,
     "client_timeout_s": 300.0,
     "max_conn_per_ip": 0,
-    "log_level": "INFO"
+    "log_level": "INFO",
+    "audit_max_mb": 10.0,
+    "audit_files": 3,
+    "cli_keepalive_s": 55.0,
+    "cli_timeout_s": 5.0,
+    "cli_reconnect": 3,
+    "cli_reconnect_wait_s": 10.0,
+    "control_idle_timeout_s": 300
   }
 }

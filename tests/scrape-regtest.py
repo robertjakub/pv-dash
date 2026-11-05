@@ -354,7 +354,9 @@ try:
                 break
             buf += chunk
         s.close()
-        obj = _json.loads(buf.decode('utf-8', 'replace'))
+        # the first frame only: the daemon-exit bye can ride the same
+        # segment on a shutdown (announce_exit)
+        obj = _json.loads(buf.split(b'\n', 1)[0].decode('utf-8', 'replace'))
         return '%s %s' % (obj.get('status', 'err'), str(obj.get('text', '')))
 
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15570',
@@ -1500,6 +1502,145 @@ try:
     check('dry-run valid config: rc=0, nothing bound', r.returncode == 0 and b'dry-run' in r.stderr)
     r = subprocess.run([sys.executable, P, '--dry-run', '--interval', '-1'], capture_output=True)
     check('dry-run invalid config: rc=1, clean message', r.returncode == 1 and b'invalid interval' in r.stderr)
+
+    # 6. the scraper's control plane (the cache's shape, mirrored): the
+    # signed wire (the full sha256 HMAC keyed by the token), the live
+    # settings, poll now, the reload, the Modbus restart, the shutdown
+    import hashlib
+    import hmac as _hmac
+
+    STOK = 'stok'
+
+    def wiremac(payload, token=STOK):
+        return _hmac.new(token.encode(), payload.encode(), hashlib.sha256).hexdigest()
+
+    def sctl(cmd, port, token=STOK, auth=True, unsigned=False, badmac=False):
+        """One signed control exchange; asserts the reply mac every time."""
+        s = socket.create_connection(('127.0.0.1', port), timeout=5)
+        if auth and token:
+            s.sendall((_json.dumps({'cmd': 'auth', 'token': token}) + '\n').encode())
+            buf = b''
+            while not buf.endswith(b'\n'):
+                buf += s.recv(4096)
+        if token and not unsigned:
+            mac = 'ab' * 32 if badmac else wiremac(cmd, token)
+            s.sendall((_json.dumps({'cmd': cmd, 'mac': mac}) + '\n').encode())
+        else:
+            s.sendall((_json.dumps({'cmd': cmd}) + '\n').encode())
+        buf = b''
+        while not buf.endswith(b'\n'):
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            buf += chunk
+        s.close()
+        # the first frame only: the daemon-exit bye can ride the same
+        # segment on a shutdown (announce_exit)
+        obj = _json.loads(buf.split(b'\n', 1)[0].decode('utf-8', 'replace'))
+        if token and not unsigned and not badmac and obj.get('mac') is not None:
+            want = wiremac('%s %s' % (obj.get('status'), obj.get('text', '')), token)
+            assert obj.get('mac') == want, 'the reply mac does not verify: %r' % obj
+        return '%s %s' % (obj.get('status', 'err'), str(obj.get('text', '')))
+
+    procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--modbus-port', str(FAKE_PORT),
+                                   '--listen', '127.0.0.1:19457', '--interval', '1',
+                                   '--control-port', '15597', '--control-token', STOK,
+                                   '--audit-log', '/tmp/scr_regtest_audit.log'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(1.5)
+    r = sctl('show version', 15597)
+    check('scraper control: show version', r.startswith('ok modbus-scraper'), r[:80])
+    r = sctl('show status', 15597)
+    check('scraper control: the status report', r.startswith('ok status\n')
+          and 'upstream=127.0.0.1:%d' % FAKE_PORT in r and 'metrics' not in r and 'listen=127.0.0.1:19457' in r,
+          r[:120])
+    r = sctl('show status', 15597, auth=False, unsigned=True)
+    check('scraper control: the token server rejects the unauthenticated',
+          r.startswith('err authenticate first'), r[:80])
+    r = sctl('show status', 15597, auth=True, unsigned=True)
+    check('scraper control: an unsigned command over TCP is refused',
+          r.startswith('err unsigned command'), r[:80])
+    r = sctl('show status', 15597, badmac=True)
+    check('scraper control: a bad command mac is refused',
+          r.startswith('err the command mac does not verify'), r[:80])
+    r = sctl('set interval 5', 15597)
+    check('scraper control: set interval', r.startswith('ok interval=5.00s'), r[:80])
+    r = sctl('show interval', 15597)
+    check('scraper control: show interval', r.startswith('ok interval=5.00s'), r[:80])
+    r = sctl('set interval 0', 15597)
+    check('scraper control: a bad value refused', r.startswith('err interval must be'), r[:80])
+    r = sctl('unset interval', 15597)
+    check('scraper control: unset restores the configured value', r.startswith('ok interval='), r[:80])
+    r = sctl('set log-access on', 15597)
+    check('scraper control: set log-access', r.startswith('ok log-access=on'), r[:80])
+    r = sctl('set max-conn-per-ip 2', 15597)
+    check('scraper control: the per-IP cap live', r.startswith('ok max-conn-per-ip=2'), r[:80])
+    r = sctl('show settings', 15597)
+    check('scraper control: the settings report', r.startswith('ok settings\n') and 'log-access=on' in r, r[:120])
+    r = sctl('poll now', 15597)
+    check('scraper control: poll now', r.startswith('ok poll now'), r[:80])
+    r = sctl('request reload', 15597)
+    check('scraper control: request reload', r.startswith('ok reloaded'), r[:80])
+    r = sctl('restart', 15597)
+    check('scraper control: the modbus session restart', r.startswith('ok modbus session dropped'), r[:80])
+    r = sctl('inspect', 15597)
+    check('scraper control: inspect', r.startswith('ok inspect\n') and 'version   modbus-scraper' in r, r[:120])
+    aud = open('/tmp/scr_regtest_audit.log').read()
+    check('scraper control: the SCR audit trail with the wire mac',
+          'AUDIT SCR COMMAND ' in aud and "'set interval 5' wire=h" in aud, aud[-200:])
+    r = sctl('shutdown', 15597)
+    check('scraper control: shutdown', r.startswith('bye shutdown'), r[:80])
+    time.sleep(0.6)
+
+    # 7. scraper_ctl + scraper_cli (the family clients) + the F5 refusal
+    CTLB = os.path.join(SCRAPE_DIR, 'bin', 'scraper_ctl.py')
+    CLIB = os.path.join(SCRAPE_DIR, 'bin', 'scraper_cli.py')
+    procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--modbus-port', str(FAKE_PORT),
+                                   '--listen', '127.0.0.1:19457', '--interval', '1',
+                                   '--control-port', '15597', '--control-token', STOK],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(1.5)
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
+                        'show', 'version'], capture_output=True, text=True, timeout=15)
+    check('scraper_ctl: one-shot show version', r.returncode == 0 and 'ok modbus-scraper' in r.stdout,
+          repr(r.stdout[:80]) + repr(r.stderr[-80:]))
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK],
+                       input='set interval 5\nshow status\n', capture_output=True, text=True, timeout=15)
+    check('scraper_ctl: a piped batch', r.returncode == 0 and 'ok interval=5.00s' in r.stdout
+          and 'ok status' in r.stdout, repr(r.stdout[:120]))
+    r = subprocess.run([sys.executable, CLIB, '--control-port', '15597', '--control-token', STOK],
+                       input='set log-access off\nshow interval\nquit\n', capture_output=True, text=True, timeout=15)
+    check('scraper_cli: the console session', r.returncode == 0 and '5' in r.stdout
+          and 'Welcome to the modbus-scraper console' not in r.stdout, repr(r.stdout[:120]))
+    stok_file = '/tmp/scr_ctl_fuzz_token'
+    open(stok_file, 'w').write(STOK + '\n')
+    os.chmod(stok_file, 0o600)
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', 'show', 'version'],
+                       capture_output=True, text=True, timeout=15,
+                       env={**os.environ, 'SCRAPER_CONTROL_TOKEN_FILE': stok_file})
+    check('scraper_ctl: honors SCRAPER_CONTROL_TOKEN_FILE', r.returncode == 0
+          and 'ok modbus-scraper' in r.stdout, repr(r.stdout[:80]) + repr(r.stderr[-80:]))
+    r = subprocess.run([sys.executable, CLIB, '--control-port', '15597'],
+                       input='show interval\nquit\n', capture_output=True, text=True, timeout=15,
+                       env={**os.environ, 'SCRAPER_CONTROL_TOKEN_FILE': stok_file})
+    check('scraper_cli: honors SCRAPER_CONTROL_TOKEN_FILE', r.returncode == 0 and '5' in r.stdout,
+          repr(r.stdout[:120]))
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', 'status'],
+                       capture_output=True, text=True, timeout=15,
+                       env={**os.environ, 'SCRAPER_CONTROL_TOKEN': 'x',
+                            'SCRAPER_CONTROL_TOKEN_FILE': stok_file})
+    check('scraper_ctl: the token env + the token-file env is a clean error', r.returncode != 0
+          and 'mutually exclusive' in (r.stderr + r.stdout)
+          and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
+    r = subprocess.run([sys.executable, P, '--dry-run', '--control-port', '15596'], capture_output=True,
+                       text=True, timeout=15)
+    check('scraper control: a TCP control port without a token refuses to start (F5)',
+          r.returncode == 1 and 'TCP control port' in r.stderr and 'Traceback' not in r.stderr,
+          r.stderr[-160:])
+    for tool, title in ((P, 'MODBUS-SCRAPER'), (CTLB, 'MODBUS-SCRAPER-CTL'), (CLIB, 'MODBUS-SCRAPER-CLI')):
+        r = subprocess.run([sys.executable, tool, '--man'], capture_output=True, text=True, timeout=30)
+        check('--man: %s prints the page' % os.path.basename(tool),
+              r.returncode == 0 and r.stdout.startswith('.TH %s 1' % title), r.stdout[:40] or r.stderr[-80:])
 finally:
     for p in procs:
         p.kill()

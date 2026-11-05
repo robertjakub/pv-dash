@@ -1,155 +1,241 @@
 .TH MODBUS-SCRAPER 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
 .SH NAME
-modbus-scraper \- Huawei SUN2000 Modbus TCP to Prometheus exporter
+modbus-scraper \- Prometheus exporter for Huawei SUN2000 inverters
+(Modbus TCP, stdlib only)
 .SH SYNOPSIS
 .B modbus-scraper
 .RI [ options ]
-.br
-.B modbus-scraper \-\-dry-run
-.RI [ options ]
+
 .SH DESCRIPTION
-A stdlib-only Prometheus exporter that polls a Huawei SUN2000 inverter
-over Modbus TCP and exposes the \fBhuawei_*\fR metrics the dashboard
-expects, plus health gauges. It can poll the inverter directly or through
-.BR modbus-cache (1)
-(which it auto-detects and reports as the \fBhuawei_cache_*\fR
-diagnostics). The exporter is the read-only consumer of the family: no
-write path, no control surface; its HTTP surface is exactly two GET
-routes (\fB/\fR and \fB/metrics\fR).
+Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP, stdlib
+only). Polls the inverter over Modbus TCP and serves the huawei_* metrics
+the dashboard expects at /metrics in the Prometheus text format: the PV
+generation, the grid exchange (import/export split), the home consumption
+implied by the balance, the battery (optional) and the health gauges
+(huawei_up, the error counter, the last poll age).
 .PP
-The exported metrics (names, HELP texts and profile bindings live in
-\fBmetrics.json\fR): the PV generation, the grid export/import split, the
-derived home consumption, the optional battery metrics (\fB--battery\fR),
-\fBhuawei_up\fR, the error counter and the last-poll timestamp. Sanity
-caps (\fB--max-kwp\fR, \fB--max-grid-kw\fR) turn impossible readings into
-HTTP 503 until a good poll. Modbus TCP must be enabled on the
-inverter/SDongle/EMMA (default port 502, unit id 1).
+Every poll is sanity-checked: a negative PV reading, an array larger than
+\fB--max-kwp\fR, a grid line beyond \fB--max-grid-kw\fR or a negative
+home balance marks the exposition \fB503\fR (the sensors are suspect, not
+the poller) and names the register in the log. A modbus-cache in front of
+the device is detected automatically (its synthesized diagnostics block)
+and adds the device-up / cache-age / cache-uptime gauges.
+.PP
+The exposition endpoint is the tool's serving surface: the connection caps
+(\fB--max-clients\fR total, \fB--max-conn-per-ip\fR per peer, extras
+get an immediate 503), the idle keep-alive kick (\fB--client-timeout\fR)
+and the bearer token (\fB--auth-token\fR/\fB--auth-token-file\fR). A
+non-loopback listen without a token refuses to start (F13 in
+docs/AUDIT.md).
+.PP
+The JSON-lines control server (\fB--control-port\fR, talked to with
+\fBmodbus-scraper-ctl\fR(1) and \fBmodbus-scraper-cli\fR(1)) inspects
+and steers the running exporter: the live settings, an immediate poll, the
+config reload, the Modbus session restart, the graceful shutdown. With a
+control token configured the wire is HMAC-signed: every command and reply
+carries the full sha256 of its payload, keyed by the token
+(common/wiresec.py) \(em a token-holding client verifies both directions,
+and over TCP the signed commands are mandatory.
+
 .SH OPTIONS
 .TP
-.BI \-\-config " FILE"
-config file (ini, \fB[scraper]\fR section, snake_case keys). Default:
-\fB$SCRAPER_CONFIG\fR, then \fBscraper.ini\fR next to the script, then the
-packaged sample; a missing file is fine, a malformed one is fatal.
+.B \-\-config
+config file (default: $SCRAPER_CONFIG, then scraper.ini next to this
+script, then the subproject root) (default:
+/Users/oom/GensparkCode/pv\-dash/scrape/scraper.ini)
 .TP
-.BI \-\-metrics-spec " FILE"
-the metrics spec JSON (name \(-> {help, type, profile?}). Default the
-bundled \fBmetrics.json\fR.
+.B \-\-host
+inverter Modbus TCP address (default: config, $SCRAPER_HOST or
+127.0.0.1)
 .TP
-.BI \-\-host " HOST" ", " \-\-modbus-port " N" ", " \-\-unit " N"
-the upstream device. Defaults \fB127.0.0.1\fR, \fB5502\fR, \fB1\fR.
+.BI \-\-modbus\-port " N"
+inverter Modbus TCP port (default: config, $SCRAPER_MODBUS_PORT or 5502)
 .TP
-.BI \-\-modbus-offset " N"
-added to register addresses (\fB\-1\fR for gateways that need 0-based
-addressing). Default \fB0\fR.
+.BI \-\-unit " N"
+Modbus unit id (default: config, $SCRAPER_UNIT or 1)
 .TP
-.BI \-\-profile " NAME|PATH"
-the device profile (the register map); defaults to the bundled
-\fBsun2000\fR. The explicit register flags below override the profile
-when set.
+.BI \-\-modbus\-offset " N"
+added to register addresses (default: config, $SCRAPER_MODBUS_OFFSET or
+0)
 .TP
-.BI \-\-pv-register " ADDR" ", " \-\-grid-register " ADDR"
-the PV input power (I32 W) and the grid/active power (I32 W) registers.
-Defaults \fB32064\fR / \fB37113\fR (Huawei Issue 04; the 20200520 protocol
-wants \fB32089\fR / \fB37258\fR).
+.BI \-\-timeout " N"
+Modbus timeout in seconds (default: config, $SCRAPER_TIMEOUT or 3)
 .TP
-.BI \-\-scale " X" ", " \-\-grid-scale " X"
-raw-value multipliers (defaults \fB1\fR \(em the registers already report
-watts; \fB1000\fR for kW devices).
+.B \-\-profile
+device profile JSON (the shared profiles/ schema; scrape\-marked entries
+feed the metric registers) (default: config, $SCRAPER_PROFILE or the
+bundled sun2000 profile)
 .TP
-.BI \-\-max-kwp " KW" ", " \-\-max-grid-kw " KW"
-sanity caps (\fB6\fR / \fB12\fR); a reading past them (and any negative
-PV) answers HTTP 503 until the data is sane again. \fB0\fR = off.
+.B \-\-metrics\-spec
+metrics spec JSON: metric name \-> {help, type, profile?} (default:
+config, $SCRAPER_METRICS_SPEC or the bundled metrics.json)
+.TP
+.BI \-\-pv\-register " N"
+PV power register, signed I32 watts (default: config,
+$SCRAPER_PV_REGISTER, the profile or 32064)
+.TP
+.BI \-\-grid\-register " N"
+grid power register, signed I32 watts (default: config,
+$SCRAPER_GRID_REGISTER or 37113)
+.TP
+.BI \-\-scale " N"
+PV register multiplier (default: config, $SCRAPER_SCALE or 1)
+.TP
+.BI \-\-grid\-scale " N"
+grid register multiplier (default: config, $SCRAPER_GRID_SCALE or 1)
+.TP
+.BI \-\-max\-kwp " N"
+maximum PV array kWp (default: config, $SCRAPER_MAX_KWP or 6; 0 = no
+checking)
+.TP
+.BI \-\-max\-grid\-kw " N"
+maximum grid kW, either direction (default: config, $SCRAPER_MAX_GRID_KW
+or 12; 0 = no checking)
 .TP
 .B \-\-battery
-enable battery support: the battery term in the home derivation and the
-battery metrics.
+enable battery support (default: config, $SCRAPER_BATTERY or off)
 .TP
-.BI \-\-battery-register " ADDR" ", " \-\-battery-soc-register " ADDR"
-battery power (I32 W, +charge) and SoC (U16, %\(en10). Defaults
-\fB37001\fR / \fB37004\fR.
+.BI \-\-battery\-register " N"
+battery power register, signed I32 watts, +charging (default: config,
+$SCRAPER_BATTERY_REGISTER or 37001)
 .TP
-.B \-\-grid-positive-import
-the grid register is positive on import (the default is export).
+.BI \-\-battery\-soc\-register " N"
+battery SoC register, U16 percent*10 (default: config,
+$SCRAPER_BATTERY_SOC_REGISTER or 37004)
 .TP
-.BI \-\-listen " HOST:PORT"
-exporter bind address. Default \fB127.0.0.1:9350\fR (loopback only).
-Beyond loopback a token is mandatory: a non-loopback listen without
-\fB--auth-token\fR/\fB--auth-token-file\fR refuses to start (F13).
+.B \-\-grid\-positive\-import
+grid register positive when importing (default: config,
+$SCRAPER_GRID_POSITIVE_IMPORT or positive = export)
 .TP
-.BI \-\-interval " S"
-seconds between Modbus polls. Default \fB10\fR.
+.B \-\-listen
+listen address HOST:PORT (default: config, $SCRAPER_LISTEN or
+127.0.0.1:9350)
 .TP
-.BI \-\-auth-token " TOKEN" ", " \-\-auth-token-file " FILE"
-require \fBAuthorization: Bearer\fR on every request (401 +
-\fBWWW-Authenticate\fR otherwise); the file is re-read on every SIGHUP
-(rotation = rewrite + reload). Mutually exclusive. The file must be
-owner-only (\fB0600\fR) \(em a group/world-accessible token file refuses to
-start; a token passed as \fB--auth-token\fR is visible in \fBps\fR /
-\fB/proc/*/cmdline\fR to every local user \(em prefer the file (or the
-env var); the flag form is for quick tests.
+.BI \-\-interval " N"
+seconds between polls (default: config, $SCRAPER_INTERVAL or 10)
 .TP
-.BI \-\-max-clients " N" ", " \-\-client-timeout " S" ", " \-\-max-conn-per-ip " N"
-cap concurrent HTTP clients (default \fB64\fR; overflow answers 503), kick
-idle keep-alive connections (default \fB300\fR) and cap concurrent
-connections from one peer IP (default \fB0\fR = no per-IP limit; overflow
-answers 503).
+.BI \-\-max\-clients " N"
+maximum concurrent HTTP clients; extras get an immediate 503 (default:
+config, $SCRAPER_MAX_CLIENTS or 64; 0 = unlimited)
 .TP
-.BI \-\-log-level " LEVEL" ", " \-\-local-time ", " \-\-log-access
-logging: default \fBINFO\fR, UTC stamps, quiet HTTP (\fB--log-access\fR
-logs every request at INFO). The scraper has no separate audit-trail
-file \(em its log is the trail.
+.BI \-\-client\-timeout " N"
+seconds an idle keep\-alive HTTP client is kept before being kicked
+(default: config, $SCRAPER_CLIENT_TIMEOUT or 300; 0 = off)
 .TP
-.B \-\-dry-run
-validate the configuration and print the effective settings without
-binding or contacting anything.
+.BI \-\-max\-conn\-per\-ip " N"
+maximum concurrent HTTP connections from one peer IP; extras get an
+immediate 503 (default: config, $SCRAPER_MAX_CONN_PER_IP or 0 = no
+per\-IP limit)
 .TP
-.B \-\-version
-print the version.
+.B \-\-local\-time
+log timestamps in the system time zone instead of UTC (default: off)
+.TP
+.B \-\-control\-port
+JSON\-lines control server target: unix socket path (default:
+/tmp/modbus\-scraper\-<listen\-port>.socket) or TCP port number on
+127.0.0.1 (e.g. 15599); 0 = off. Talk to it with scraper_ctl.py
+(default: config, $SCRAPER_CONTROL_PORT)
+.TP
+.B \-\-control\-token
+require a token on control connections: the client authenticates with
+{"cmd": "auth", "token": ...}; over the unix socket a trusted peer
+(root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
+skips the token (default: config, $SCRAPER_CONTROL_TOKEN or none)
+.TP
+.B \-\-control\-token\-file
+the control token from a file (the first line; e.g. a systemd
+LoadCredential or a key file; must be owner\-only 0600) — takes the
+place of \-\-control\-token; giving both is an error (env
+SCRAPER_CONTROL_TOKEN_FILE)
+.TP
+.B \-\-control\-trust\-uids
+extra peer uids the unix control socket trusts without the token
+(SO_PEERCRED — a local systemd unit speaks without the secret); root and
+the daemon's own user are always trusted (default: config,
+$SCRAPER_CONTROL_TRUST_UIDS or none)
+.TP
+.B \-\-audit\-log
+SCR audit trail: a file path or \- for stdout (the docker/journald way);
+default: the XDG state home (~/.local/state/modbus\-scraper/audit.log)
+.TP
+.BI \-\-audit\-max\-mb " N"
+rotate the audit log at this size in MB, keeping 3 backups; 0 = no size
+rotation (default 10.0)
+.TP
+.BI \-\-audit\-files " N"
+rotated audit backups to keep (default 3)
+.TP
+.B \-\-no\-audit\-log
+disable the SCR audit trail (default: off)
+.TP
+.B \-\-log\-access
+log every HTTP request at INFO (default: config, $SCRAPER_LOG_ACCESS or
+quiet)
+.TP
+.B \-\-auth\-token
+require Authorization: Bearer <token> on all requests (default: config,
+$SCRAPER_AUTH_TOKEN or disabled)
+.TP
+.B \-\-auth\-token\-file
+read the bearer token from this file instead (single line, trimmed;
+re\-read on every SIGHUP — rotate by rewriting the file and reloading;
+must be owner\-only 0600); mutually exclusive with \-\-auth\-token
+.TP
+.B \-\-log\-level
+log level (default: config, $SCRAPER_LOG_LEVEL or INFO)
+.TP
+.B \-\-dry\-run
+validate the configuration, print the effective settings and exit
+(nothing is bound or connected) (default: off)
+
+
 .SH SIGNALS
 .TP
 .B SIGHUP
-reload the configuration: interval, scales, caps, registers, the battery
-flag, the auth token (the token file is re-read = rotation), the client
-limits and the upstream address. The listen address, the log level and
-\fBmetrics.json\fR need a restart.
+re-read the config file (and the auth token file) and apply what is live
+(the same path as the control server's request reload); a broken config
+keeps the previous settings.
 .TP
 .BR SIGTERM ", " SIGINT
-graceful shutdown with a session summary.
-.SH LOGGING
-UTC-stamped lines on stdout/stderr (journald omits its own stamp when the
-service manager captures it). Reachability changes and reloads log at
-INFO; rejected requests (unauthorized, rate-limited) always log with the
-peer; the suite's rule is zero tracebacks.
-.SH ENVIRONMENT
-.TP
-.B SCRAPER_*
-every flag has an environment twin (\fBSCRAPER_HOST\fR,
-\fBSCRAPER_LISTEN\fR, \fBSCRAPER_AUTH_TOKEN\fR, ...); the flag wins over
-the env, the env over the ini.
+graceful shutdown.
+
+.SH CONTROL
+The control server speaks JSON lines ({"cmd": "..."} ->
+{"status": "ok|err|bye", "text": "..."}; TCP requires the token when
+configured and refuses to start without one). Commands:
+\fBset\fR/\fBunset\fR/\fBshow\fR/\fBhelp\fR (the settings: interval,
+timeout, max-clients, client-timeout, max-conn-per-ip, log-access,
+log-level), \fBshow status\fR, \fBshow connections\fR (the live HTTP
+clients), \fBshow settings\fR, \fBshow version\fR, \fBpoll now\fR,
+\fBinspect\fR, \fBrequest reload\fR, \fBrestart\fR, \fBshutdown\fR,
+\fBquit\fR. See
+.BR modbus-scraper-ctl (1)
+and
+.BR modbus-scraper-cli (1).
+
+.SH SECURITY
+The scraper reads an open Modbus device (no auth, no TLS — the inverter's
+network isolation is the boundary) and serves /metrics: bind loopback by
+default, set the bearer token when it must serve beyond loopback (a
+non-loopback token-less start is refused, F13), and keep the connection
+caps on. The control surface is loopback-only (TCP) or a 0600 unix socket;
+a TCP control port without a token refuses to start (F5); with a token the
+wire is signed and the commands/replies verify end to end. The audit trail
+(default in the XDG state home, prefix SCR) records the control commands,
+the auth failures, the reloads and the shutdowns.
+
 .SH FILES
 .TP
-.I scrape/scraper.ini ", " scrape/metrics.json
-the packaged sample config and the metrics spec.
-.SH EXIT STATUS
+.I /tmp/modbus-scraper-<listen-port>.socket
+the default control socket.
 .TP
-.B 0
-success (\fB--dry-run\fR: valid configuration).
-.TP
-.B 1
-invalid configuration (reason on stderr).
-.TP
-.B 2
-command-line misuse.
-.SH EXAMPLES
-Poll a cache proxy and scrape with a Prometheus job named \fBsun2000\fR:
-.RS
-.IP \(bu 2
-.B modbus-scraper --host 127.0.0.1 --modbus-port 15502
-.RE
+.I ~/.local/state/modbus-scraper/audit.log
+the default audit trail.
+
 .SH SEE ALSO
+.BR modbus-scraper-ctl (1),
+.BR modbus-scraper-cli (1),
 .BR modbus-cache (1),
-.BR modbus-fake-inverter (1),
-.BR dashboard (1)
+.BR modbus-fake-inverter (1)
 .PP
-\fBscrape/README.md\fR in the suite checkout \(em the metrics table, the
-caps and the Prometheus setup.
+scrape/README.md in the suite checkout \(em the full documentation.

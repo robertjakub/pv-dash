@@ -22,6 +22,7 @@ class Scraper:
         self.up = False
         self.last_poll = 0.0
         self.errors = 0
+        self.wake = threading.Event()   # `poll now` on the control server: the wait ends immediately
 
     def reload(self, cfg):
         """Apply a freshly resolved config (SIGHUP); the socket reconnects on the next poll."""
@@ -168,7 +169,8 @@ class Scraper:
         with self.lock:
             interval = self.cfg['interval']
         # clamp: a huge interval would overflow time.sleep and kill the poll thread
-        time.sleep(min(max(0.05, interval), 86400.0))
+        self.wake.wait(timeout=min(max(0.05, interval), 86400.0))
+        self.wake.clear()
 
     def snapshot(self):
         with self.lock:

@@ -21,6 +21,8 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
 
     install -Dm755 bin/modbus_scraper.py $out/share/modbus-scraper/modbus_scraper.py
+    install -Dm755 bin/scraper_ctl.py $out/share/modbus-scraper/scraper_ctl.py
+    install -Dm755 bin/scraper_cli.py $out/share/modbus-scraper/scraper_cli.py
     install -dm755 $out/share/modbus-scraper/lib
     install -m644 lib/*.py lib/static.json $out/share/modbus-scraper/lib/
     install -dm755 $out/share/modbus-scraper/common
@@ -33,6 +35,10 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper \
       --add-flags "$out/share/modbus-scraper/modbus_scraper.py"
+    makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper-ctl \
+      --add-flags "$out/share/modbus-scraper/scraper_ctl.py"
+    makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper-cli \
+      --add-flags "$out/share/modbus-scraper/scraper_cli.py"
 
     runHook postInstall
   '';
@@ -43,13 +49,15 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   meta = {
-    description = "Prometheus exporter for Modbus TCP inverters (stdlib-only Modbus TCP poller)";
+    description = "Prometheus exporter for Modbus TCP inverters (stdlib-only Modbus TCP poller) + console-style control CLIs";
     longDescription = ''
       Polls Modbus TCP inverters over FC3/FC4 registers and exposes the
       huawei_*_watts metrics the dashboard expects (the metric names follow
       the dashboard contract), plus health gauges, at /metrics in the
-      Prometheus text format. Python standard library only, no third-party
-      dependencies.
+      Prometheus text format. Includes scraper_ctl and scraper_cli, CLI
+      clients for the JSON-lines control server (inspect, the live
+      settings, poll now, the config reload, shutdown — the token-signed
+      wire). Python standard library only, no third-party dependencies.
     '';
     license = lib.licenses.bsd3;
     mainProgram = "modbus-scraper";

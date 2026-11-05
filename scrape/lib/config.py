@@ -7,13 +7,26 @@ import math
 import os
 import re
 
-from common.config import check_token_file_mode, default_profile_path, is_loopback_host, parse_listen, resolve_profile_file
+from common.config import check_token_file_mode, default_profile_path, is_loopback_host, load_token_file, \
+    parse_listen, resolve_profile_file
 from .metrics import Metrics
-from .statics import DEFAULTS, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
+from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
 logger = logging.getLogger('scraper')
 
 HOST_RE = re.compile(r'[A-Za-z0-9._:\[\]-]+')
+
+
+def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
+    """The control server target for the daemon and the clients: the flag
+    wins, then SCRAPER_CTL, then the default unix socket named after the
+    listen port (/tmp/modbus-scraper-9350.socket)."""
+    if explicit is not None and str(explicit).strip():
+        return str(explicit).strip()
+    env = os.environ.get('SCRAPER_CTL')
+    if env and env.strip():
+        return env.strip()
+    return '/tmp/modbus-scraper-%d.socket' % int(listen_port)
 
 
 def check_register(value, label):
@@ -102,6 +115,11 @@ def validate_config(cfg):
     if not is_loopback_host(listen_host) and not cfg['auth_token']:
         raise SystemExit('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
                          'listen = %r — set --auth-token/--auth-token-file or bind 127.0.0.1:PORT' % cfg['listen'])
+    control_port = str(cfg.get('control_port') or '').strip()
+    if control_port.isdigit() and control_port != '0' and not cfg.get('control_token'):
+        raise SystemExit('the TCP control port %s without a token is open to every local process; '
+                         'set --control-token or --control-token-file (the default unix socket needs none), '
+                         'or disable it with --control-port 0' % control_port)
 
 
 def load_device_profile(path):
@@ -246,6 +264,20 @@ def resolve_config(args, script_dir=None):
         'level': resolve(args.log_level, 'SCRAPER_LOG_LEVEL', 'log_level',
                          DEFAULTS['log_level'], str).strip().upper(),
     }
+    cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'SCRAPER_CONTROL_PORT',
+                                  'control_port', None, str)
+    cfg['control_token'] = (resolve(getattr(args, 'control_token', None), 'SCRAPER_CONTROL_TOKEN',
+                                    'control_token', None, str) or '').strip() or None
+    control_token_file = resolve(getattr(args, 'control_token_file', None), 'SCRAPER_CONTROL_TOKEN_FILE',
+                                 'control_token_file', None, str)
+    cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'SCRAPER_CONTROL_TRUST_UIDS',
+                                        'control_trust_uids', None, str)
+    if cfg['control_token'] and control_token_file:
+        raise SystemExit('--control-token and --control-token-file are mutually exclusive')
+    if control_token_file:
+        cfg['control_token'] = load_token_file(control_token_file, 'control-token-file')
+    if cfg['control_token'] and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in cfg['control_token']):
+        raise SystemExit('invalid control_token: must not contain whitespace or control characters')
     if cfg['auth_token'] and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in cfg['auth_token']):
         raise SystemExit('invalid auth_token: must not contain whitespace or control characters')
     if cfg['auth_token_file'] and any(ord(c) < 32 or ord(c) == 127 for c in cfg['auth_token_file']):

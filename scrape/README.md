@@ -216,6 +216,44 @@ log_level = INFO
 kill -HUP  $(pgrep -f scraper.py)   # reload the config
 ```
 
+### The control server
+
+The scraper runs the family's JSON-lines control server — **by default on
+the unix socket `/tmp/modbus-scraper-<listen-port>.socket`** (`0` switches
+it off, a TCP port number binds `127.0.0.1:PORT` instead, the socket path
+is just a path). Talk to it with **`scraper_ctl`** (one-shot / batch) or
+**`scraper_cli`** (the console session):
+
+```bash
+python3 scrape/bin/scraper_ctl.py show status
+printf 'set interval 5\npoll now\n' | python3 scrape/bin/scraper_ctl.py
+python3 scrape/bin/scraper_cli.py            # TAB completes, ? lists
+```
+
+Commands: `set`/`unset` over the live settings (**`interval`**,
+**`timeout`**, **`max-clients`**, **`client-timeout`**,
+**`max-conn-per-ip`**, **`log-access`**, **`log-level`** — `show settings`
+lists them one `key=value` per line, `*` = live-overridden),
+`show status` (the key=value report), `show connections` (the live HTTP
+clients of /metrics), `poll now` (the loop wakes immediately), `request
+reload` (the SIGHUP path — the token file re-reads, so the bearer token
+rotates too), `restart` (the Modbus session drops; the next poll
+reconnects), `inspect`, `show version`, `shutdown`.
+
+A **TCP control port refuses to start without a token** (the audit's F5 —
+the same rule as the cache): `--control-token`/`--control-token-file`
+require the token handshake (`{"cmd": "auth", "token": ...}`) on the first
+frame; over the unix socket a kernel-vouched peer (root, the daemon's own
+user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake.
+**With a token configured the wire is signed**: every command and reply
+carries the **full sha256 HMAC of its payload, keyed by the token** —
+a token-holding client verifies nothing was injected or altered in flight,
+and over TCP the signed commands are mandatory (the same wire the cache
+and the fake speak). The control commands (with their wire macs), the auth
+failures, the reloads and the shutdowns land in the **SCR audit trail**
+(`--audit-log`, the XDG state home by default — `scripts/audit_verify.py`
+walks it like the others).
+
 ## Logging and audit trail
 
 Logging is `logging`-based with **UTC timestamps by default** (`--local-time`
@@ -260,6 +298,13 @@ journald adds one.
 | `--log-access` | off | audit log: every HTTP request at INFO (client, path, status, size) |
 | `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; token compared timing-safe) |
 | `--auth-token-file` | disabled | read the bearer token from a file instead (single line, trimmed; **re-read on every SIGHUP** — rotate by rewriting the file and reloading; **owner-only `0600`** — a group/world-accessible token file refuses to start, F12); mutually exclusive with `--auth-token` |
+| `--control-port` | `/tmp/modbus-scraper-<listen-port>.socket` | the JSON-lines control server target (unix socket path or TCP port on 127.0.0.1), `0` = off |
+| `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `SCRAPER_CONTROL_TOKEN`); a TCP control port refuses to start without one (F5) |
+| `--control-token-file` | off | the control token from a file (the first line; a key file or a systemd `LoadCredential`, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12), instead of `--control-token`; giving both is an error |
+| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `SCRAPER_CONTROL_TRUST_UIDS`) |
+| `--audit-log` | the XDG state home | the SCR audit trail: a file path or `-` for stdout (the docker/journald way) |
+| `--audit-max-mb` / `--audit-files` / `--no-audit-log` | `10` / `3` / off | the audit trail's rotation and the off switch |
+| `--man` | off | print the generated man page (roff) to stdout and exit (`modbus-scraper --man \| man -l -`) |
 | `--max-clients` | `64` | cap concurrent HTTP clients; overflow gets an immediate `503 # rate limited` (0 = unlimited) |
 | `--client-timeout` | `300` | kick idle keep-alive clients after this many seconds (0 = off) |
 | `--max-conn-per-ip` | `0` | cap concurrent HTTP connections from one peer IP; overflow gets an immediate `503 # rate limited` (0 = no per-IP limit) |
@@ -381,7 +426,9 @@ Every scenario must end with the exporter serving correct metrics and
 ```
 scrape/
 ├── bin/
-│   └── modbus_scraper.py  # CLI, logging setup, signal handling
+│   ├── modbus_scraper.py  # CLI, logging setup, signal handling, the control wiring
+│   ├── scraper_ctl.py     # one-shot / batch control client
+│   └── scraper_cli.py     # console-style control session
 ├── scraper.ini            # sample config (the default --config target)
 ├── metrics.json           # metric names / HELP / TYPE specs
 └── lib/
@@ -392,6 +439,9 @@ scrape/
     ├── metrics.py         # metrics.json loader
     ├── poller.py          # poll loop + sanity checks + cache diagnostics
     ├── server.py          # Prometheus exposition endpoint (auth, limits)
+    ├── control.py         # JSON-lines control server (the cache's shape, mirrored)
+    ├── settings.py        # the live-settings registry (the control grammar's single source)
+    ├── man.py             # the generated man pages' prose (common/manpage.py renders)
     └── version.py         # the suite version
 ```
 

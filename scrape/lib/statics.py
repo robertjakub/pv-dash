@@ -27,3 +27,10 @@ LOG_LEVELS = tuple(STATIC['log_levels'])
 
 DEFAULTS = STATIC['defaults']
 DEFAULT_LISTEN_PORT = int(DEFAULTS['listen'].rsplit(':', 1)[1])
+AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
+AUDIT_FILES = DEFAULTS['audit_files']
+CLI_KEEPALIVE_S = DEFAULTS['cli_keepalive_s']
+CLI_TIMEOUT_S = DEFAULTS['cli_timeout_s']
+CLI_RECONNECT = DEFAULTS['cli_reconnect']
+CLI_RECONNECT_WAIT_S = DEFAULTS['cli_reconnect_wait_s']
+CONTROL_IDLE_TIMEOUT_S = DEFAULTS['control_idle_timeout_s']

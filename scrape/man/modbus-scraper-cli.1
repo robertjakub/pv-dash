@@ -1,0 +1,69 @@
+.TH MODBUS-SCRAPER-CLI 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
+.SH NAME
+modbus-scraper-cli \- console-style session on the modbus-scraper
+control server
+.SH SYNOPSIS
+.B modbus-scraper-cli
+.RI [ options ]
+
+.SH DESCRIPTION
+A session front-end on top of modbus-scraper's JSON-lines control socket:
+prompt with the connected port, TAB completion and \fB?\fR in every
+position (with the short descriptions from the shared command registry),
+\fBset\fR commands print only the confirmation, \fBshow <setting>\fR
+prints the bare value, \fBshow settings\fR one setting per line,
+\fBshow status\fR the key=value report, and \fBshutdown\fR asks before
+it stops the scraper. When the connection dies mid-session the console
+retries (\fB--reconnect\fR attempts, \fB--reconnect-wait\fR seconds
+apart). With a control token configured the wire is HMAC-signed: the
+console signs every command and verifies every reply.
+
+.SH OPTIONS
+.TP
+.B \-\-control\-port
+control server target: unix socket path or TCP port on 127.0.0.1,
+auto\-detected (default: /tmp/modbus\-scraper\-9350.socket; env
+SCRAPER_CTL when unset) — same flag as the scraper itself
+.TP
+.BI \-\-timeout " N"
+socket timeout in seconds (default 5.0)
+.TP
+.BI \-\-reconnect " N"
+when the connection dies (an unanswered ping, a reset, a timeout), retry
+this many times before giving up; 0 = off (default 3)
+.TP
+.BI \-\-reconnect\-wait " N"
+seconds between the reconnect attempts (default 10.0)
+.TP
+.B \-\-control\-token
+control auth token for TCP (env SCRAPER_CONTROL_TOKEN)
+.TP
+.B \-\-control\-token\-file
+the token from a file (the first line; must be owner\-only 0600); not
+for use with \-\-control\-token (env SCRAPER_CONTROL_TOKEN_FILE)
+.TP
+.B \-\-audit\-log
+audit trail: a file path or \- for stdout; default: the XDG state home
+.TP
+.BI \-\-audit\-max\-mb " N"
+rotate the audit log at this size in MB, keeping 3 backups; 0 = off
+(default 10.0)
+.TP
+.BI \-\-audit\-files " N"
+rotated audit backups to keep (default 3)
+.TP
+.B \-\-no\-audit\-log
+disable the audit trail (default: off)
+
+
+.SH ENVIRONMENT
+.TP
+.B SCRAPER_CTL
+the default control target for the clients.
+.TP
+.B SCRAPER_CONTROL_TOKEN ", " SCRAPER_CLI_KEEPALIVE
+the TCP token and the idle-ping interval in seconds (0 = off).
+
+.SH SEE ALSO
+.BR modbus-scraper-ctl (1),
+.BR modbus-scraper (1)

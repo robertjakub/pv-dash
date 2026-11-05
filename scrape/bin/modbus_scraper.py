@@ -21,10 +21,13 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
+from common.audit import AuditLog
 from common.config import parse_listen
+from common.cred import parse_trust_uids
 from common.logutil import UtcFormatter
 from common.version import version_string
-from lib.config import resolve_config
+from lib.config import resolve_config, resolve_control_target
+from lib.control import ControlServer
 from lib.metrics import Metrics
 from lib.poller import Scraper
 from lib.protocol import ModbusTCP
@@ -85,6 +88,20 @@ def parse_args():
                     'from one peer IP; extras get an immediate 503 '
                     '(default: config, $SCRAPER_MAX_CONN_PER_IP or 0 = no per-IP limit)')
     ap.add_argument('--local-time', action='store_true', help='log timestamps in the system time zone instead of UTC')
+    ap.add_argument('--control-port', dest='control_port',
+                    help='JSON-lines control server target: unix socket path (default: /tmp/modbus-scraper-<listen-port>.socket) or TCP port number on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with scraper_ctl.py (default: config, $SCRAPER_CONTROL_PORT)')
+    ap.add_argument('--control-token', dest='control_token',
+                    help='require a token on control connections: the client authenticates with {"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s own user or --control-trust-uids — SO_PEERCRED) skips the token (default: config, $SCRAPER_CONTROL_TOKEN or none)')
+    ap.add_argument('--control-token-file', dest='control_token_file',
+                    help='the control token from a file (the first line; e.g. a systemd LoadCredential or a key file; must be owner-only 0600) — takes the place of --control-token; giving both is an error (env SCRAPER_CONTROL_TOKEN_FILE)')
+    ap.add_argument('--control-trust-uids', dest='control_trust_uids',
+                    help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (default: config, $SCRAPER_CONTROL_TRUST_UIDS or none)')
+    ap.add_argument('--audit-log', default=None,
+                    help='SCR audit trail: a file path or - for stdout (the docker/journald way); '
+                         'default: the XDG state home (~/.local/state/modbus-scraper/audit.log)')
+    ap.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation (default %(default)s)')
+    ap.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
+    ap.add_argument('--no-audit-log', action='store_true', help='disable the SCR audit trail')
     ap.add_argument('--log-access', action='store_true', default=None,
                     help='log every HTTP request at INFO (default: config, $SCRAPER_LOG_ACCESS or quiet)')
     ap.add_argument('--auth-token', help='require Authorization: Bearer <token> on all requests '
@@ -96,7 +113,13 @@ def parse_args():
     ap.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                     help='log level (default: config, $SCRAPER_LOG_LEVEL or INFO)')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
-    return ap.parse_args()
+    ap.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-scraper --man | man -l -)')
+    args = ap.parse_args()
+    if args.man:
+        from lib.man import daemon_page
+        sys.stdout.write(daemon_page(ap))
+        raise SystemExit(0)
+    return args
 
 
 def setup_logging(cfg):
@@ -109,7 +132,7 @@ def setup_logging(cfg):
     root.addHandler(handler)
 
 
-def describe(cfg, args):
+def describe(cfg, args, control_desc):
     caps = (['pv cap %gW' % (cfg['max_kwp'] * 1000.0)] if cfg['max_kwp'] > 0 else []) + \
            (['grid cap %gW' % (cfg['max_grid_kw'] * 1000.0)] if cfg['max_grid_kw'] > 0 else [])
     limits = (['max-clients %d' % cfg['max_clients']] if cfg['max_clients'] else []) + \
@@ -118,7 +141,7 @@ def describe(cfg, args):
     listen_host, listen_port = parse_listen(cfg['listen'])
     return ('polling %s:%d unit %d (registers pv=%d grid=%d, scale pv=%g grid=%g, positive=%s%s) every %gs; '
             '%s /metrics on %s:%d (config: %s, log level: %s, log time: %s, log access: %s, auth: %s, '
-            'limits: %s, caps: %s, version: %s)' % (
+            'limits: %s, caps: %s, control server: %s, version: %s)' % (
                 cfg['host'], cfg['modbus_port'], cfg['unit'], cfg['pv_register'], cfg['grid_register'],
                 cfg['scale'], cfg['grid_scale'],
                 'import' if cfg['grid_positive_import'] else 'export',
@@ -132,10 +155,11 @@ def describe(cfg, args):
                 'bearer' if cfg['auth_token'] else 'none',
                 ', '.join(limits) if limits else 'off',
                 ', '.join(caps) if caps else 'none',
+                control_desc,
                 version_string()))
 
 
-def install_signal_handlers(scraper, httpd, args, started):
+def install_signal_handlers(scraper, httpd, args, started, apply_reload=None, graceful_stop=None):
     if hasattr(signal, 'SIGHUP'):
         reload_requested = threading.Event()
 
@@ -148,20 +172,8 @@ def install_signal_handlers(scraper, httpd, args, started):
                 reload_requested.clear()
                 logger.info('SIGHUP: reload requested')
                 try:
-                    cfg = resolve_config(args, SCRIPT_DIR)
-                    scraper.reload(cfg)
-                    Handler.log_access = cfg['log_access']
-                    Handler.auth_token = cfg['auth_token']
-                    Handler.timeout = cfg['client_timeout'] or None
-                    httpd.gate.max_total = cfg['max_clients']
-                    httpd.gate.max_per_ip = cfg['max_conn_per_ip']
-                    logger.info('SIGHUP: applied (upstream %s:%d unit %d, interval %gs, battery %s, '
-                                'caps pv=%g grid=%g, limits clients=%d idle=%gs per-ip=%d, auth %s, log access %s)',
-                                cfg['host'], cfg['modbus_port'], cfg['unit'], cfg['interval'],
-                                'on' if cfg['battery'] else 'off', cfg['max_kwp'], cfg['max_grid_kw'],
-                                cfg['max_clients'], cfg['client_timeout'], cfg['max_conn_per_ip'],
-                                'bearer' if cfg['auth_token'] else 'none',
-                                'on' if cfg['log_access'] else 'off')
+                    summary = apply_reload()
+                    logger.info('SIGHUP: applied (%s)', summary)
                 except (Exception, SystemExit) as e:
                     logger.error('SIGHUP: reload failed (%s), keeping the previous settings', e)
 
@@ -176,9 +188,7 @@ def install_signal_handlers(scraper, httpd, args, started):
         def watch_stop():
             while not stop_signal:
                 time.sleep(0.2)
-            logger.info('shutdown: %s received after %ds (%d poll errors), stopping the web server',
-                        signal.Signals(stop_signal[0]).name, time.monotonic() - started, scraper.errors)
-            httpd.shutdown()
+            graceful_stop(signal.Signals(stop_signal[0]).name)
 
         signal.signal(signal.SIGTERM, on_stop)
         signal.signal(signal.SIGINT, on_stop)
@@ -200,20 +210,83 @@ def main():
                        'smaller than the inverter capacity, check the caps', cfg['max_kwp'], cfg['max_grid_kw'])
 
     listen_host, listen_port = parse_listen(cfg['listen'])
+    control_target = resolve_control_target(cfg['control_port'], listen_port)
+    control_token = cfg['control_token'] or None
+    trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
+    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'SCR', app='modbus-scraper',
+                                                    max_mb=args.audit_max_mb, files=args.audit_files)
+    control_desc = 'off' if control_target == '0' \
+        else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target)
     client = ModbusTCP(cfg['host'], cfg['modbus_port'], cfg['unit'], cfg['timeout'], cfg['modbus_offset'])
     scraper = Scraper(cfg, client, spec)
     Handler.scraper = scraper
     Handler.log_access = cfg['log_access']
     Handler.auth_token = cfg['auth_token']
     Handler.timeout = cfg['client_timeout'] or None
-    logger.info('%s', describe(cfg, args))
+    logger.info('%s', describe(cfg, args, control_desc))
     if args.dry_run:
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
+    httpd = Server((listen_host, listen_port), Handler)
+    httpd.setup_gate(cfg['max_clients'], cfg['max_conn_per_ip'])
+    started = time.monotonic()
+
+    control = None
+    if control_target != '0':
+        defaults = {
+            'interval': '%g' % cfg['interval'],
+            'timeout': '%g' % cfg['timeout'],
+            'max-clients': str(cfg['max_clients']),
+            'client-timeout': '%g' % cfg['client_timeout'],
+            'max-conn-per-ip': str(cfg['max_conn_per_ip']),
+            'log-access': 'on' if cfg['log_access'] else 'off',
+            'log-level': cfg['level'],
+        }
+        control = ControlServer(scraper, httpd, int(control_target) if control_target.isdigit() else control_target,
+                                audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids)
+        control.start()
+
+    def apply_reload():
+        """The SIGHUP and the `request reload` command share this: re-resolve
+        the config, apply what is live (the gate, the handler, the poller),
+        clear the override markers, audit."""
+        new_cfg = resolve_config(args, SCRIPT_DIR)
+        scraper.reload(new_cfg)
+        Handler.log_access = new_cfg['log_access']
+        Handler.auth_token = new_cfg['auth_token']
+        Handler.timeout = new_cfg['client_timeout'] or None
+        httpd.gate.max_total = new_cfg['max_clients']
+        httpd.gate.max_per_ip = new_cfg['max_conn_per_ip']
+        if control:
+            control.clear_overrides()   # the config won: nothing is live-overridden
+        if audit:
+            audit.event('RELOAD', 'upstream %s:%d unit %d, interval %gs, auth %s'
+                        % (new_cfg['host'], new_cfg['modbus_port'], new_cfg['unit'], new_cfg['interval'],
+                           'bearer' if new_cfg['auth_token'] else 'none'))
+        return 'upstream %s:%d unit %d, interval %gs' % (new_cfg['host'], new_cfg['modbus_port'],
+                                                         new_cfg['unit'], new_cfg['interval'])
+
+    control.reloader = apply_reload   # the control server's `request reload` runs the same path
+
+    def graceful_stop(reason):
+        logger.info('shutdown: %s received after %ds (%d poll errors), stopping the web server',
+                    reason, time.monotonic() - started, scraper.errors)
+        if audit:
+            audit.event('SHUTDOWN', '%s: uptime=%ds errors=%d'
+                        % (reason, int(time.monotonic() - started), scraper.errors))
+        if control:
+            control.announce_exit(reason)   # the consoles print the notice and exit
+            control.cleanup()
+        httpd.shutdown()
+
+    if control:
+        control.stopper = graceful_stop
+    install_signal_handlers(scraper, httpd, args, started, apply_reload=apply_reload, graceful_stop=graceful_stop)
+    if audit:
+        audit.event('START', 'version=%s upstream=%s:%d unit %d listen=%s control=%s'
+                    % (version_string(), cfg['host'], cfg['modbus_port'], cfg['unit'], cfg['listen'],
+                       control_desc))
     try:
-        httpd = Server((listen_host, listen_port), Handler)
-        httpd.setup_gate(cfg['max_clients'], cfg['max_conn_per_ip'])
-        install_signal_handlers(scraper, httpd, args, time.monotonic())
         threading.Thread(target=scraper.poll_loop, daemon=True).start()
         httpd.serve_forever()
         logger.info('stopped')

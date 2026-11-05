@@ -61,13 +61,15 @@ the **Done/history** records for their tool.
 ## The security wave (the audit follow-ups)
 
 - **the remaining audit findings** `[cache]` `[scrape]` `[inverter]`
-  `[docker]` — the open ones are documented trust decisions / deployment
-  stories now: F16 (the alert-rules pack — the rules item below), F17
-  (the volume secrets), F14 (TLS — the item below), F15 (the privacy
+  `[docker]` `[scripts]` — **F19 is the new one** (the release lands
+  before the CI gate reports — flip the orchestrator's defaults, see the
+  release-discipline item); the rest are documented trust decisions /
+  deployment stories: F16 (the alert-rules pack — the rules item below),
+  F17 (the volume secrets), F14 (TLS — the item below), F15 (the privacy
   note — the item below), F1 (accepted) — see
   [AUDIT.md](AUDIT.md); F2–F10, F11–F13 and F18 are closed and verified
   (§3.1/§4); re-run the audit after the scrape control surface, the TLS
-  story or the dashboard service.
+  story or the dashboard service (the dashboard is the next audit wave).
 - **native TLS on the HTTP surfaces** `[scrape]` `[cache]` `[inverter]` —
   F14 says "terminate at a proxy"; an opt-in native path
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a
@@ -113,10 +115,10 @@ the **Done/history** records for their tool.
   (the orchestrator: the version sweep, the changelog rename, the
   flake.lock refresh, the verification, the commit, the annotated tag, the
   push and the `gh release` from the changelog section) plus the
-  tag-triggered workflow (`.github/workflows/release.yml`: the nine
-  suites, the nix build, the GitHub release). What remains is
-  operational: watch the first few flights, then retire the training
-  wheels.
+  tag-triggered workflow. What remains is **F19** (the audit finding):
+  the release is cut locally before the workflow's gate reports — make
+  the workflow the release's cutter and the local gate `--tests full`; watch
+  the first few flights, then retire the training wheels.
 
 ## The product (what the tools do next)
 

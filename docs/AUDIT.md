@@ -1,4 +1,4 @@
-# Security audit — modbus-cache, modbus-scraper & modbus-fake-inverter (rev. 4)
+# Security audit — the pv-suite tree: /cache, /common, /docker, /inverter, /profiles, /scrape, /scripts (rev. 4)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
@@ -62,9 +62,35 @@ is a test device simulator: its risk class is "developer/demo
 infrastructure", not production OT — findings there are weighted
 accordingly. Findings keep their numbers across revisions; the ones closed
 stay listed in §3.1 with their fix and verification, open ones in §3.2
-(next number: F19).
+(next number: F20).
+
+Scope: the whole tree, directory by directory — `/cache`, `/common`,
+`/docker`, `/inverter`, `/profiles`, `/scrape` and `/scripts` (the
+inventory in §1). `/dashboard` is **explicitly deferred to the next audit
+wave** (the young web surface — its auth story is tracked in the family
+TODO, not as a finding here), and `/tests` is the verification evidence,
+not a runtime asset. Findings keep their numbers
+across revisions; the ones closed stay listed in §3.1 with their fix and
+verification, open ones in §3.2 (next number: F20).
 
 ## 1. Assets and trust boundaries
+
+### The audited tree, directory by directory
+
+| Directory | What | Trust boundary / controls | Findings |
+|---|---|---|---|
+| `/cache` | the Modbus caching proxy: bin/ (the daemon + the ctl/cli clients), lib/ (proxy, cache, upstream, control, metrics, persist, config, settings), man/, the ini sample, the NixOS module | the production-relevant surface: two listeners (Modbus TCP + control), the metrics endpoint, the state dump, the audit trail; the write path quadruple-gated (the parse gate, `allow-write`, `write-acl` none, `write-registers` none); the dump is config-equivalent trust at rest | F2–F5, F8, F18 closed here; F1 accepted |
+| `/common` | the shared package every tool imports: `audit.py` (the append-only trail + the chained per-writer hashes), `config.py` (parse_listen, is_loopback_host, the profile resolution, the token loading + the 0600 enforcement), `connlimit.py` (the connection gates), `cred.py` (peer-cred), `protocol.py` (recv_exact, exception frames), `human.py`, `logutil.py`, `version.py` | trust amplifier: every tool inherits its guarantees (the fail-closed token modes, the wire discipline, the fold at the audit writer, the admit/release symmetry); a regression here is family-wide — the regtests + the audit-chain suite watch it | F10, F12 closed here |
+| `/docker` | one alpine image per Modbus tool, the Prometheus image, the two entrypoints (the `/config` seeding + the token handoff), the compose demo | the network is the boundary: one `internal: true` network, nothing published on the host; the images run unprivileged (`pvsuite`, the `prometheus` user); root exists only for the volume seeding and drops before exec; the bundled `*.token` defaults materialize as random 0600 values | F7 closed; F17 open (the volume trust) |
+| `/inverter` | the fake: bin/ (the daemon + the ctl/cli clients), lib/ (the simulator, the machines, control, metrics, inverter, profile), man/ | a test instrument on a trusted LAN: the Modbus surface capped (`max-clients`/`client-timeout`/`max-conn-per-ip`, live-settable), the read-count gate, the metrics endpoint optional (warns beyond loopback without a token); deliberately not security-first — documented as such | F11 closed; F1 accepted |
+| `/profiles` | the device profiles (JSON data: sun2000 + three Deye variants) + the linter and the formatter bins | data, not code: the profiles decide what the tools read (and what the cache's write allow-list may touch); the loader validates every entry (the type/width/scale, the address bounds, clean `SystemExit` one-liners), the search path is closed (three fixed candidates, no CWD or `PATH` dependence), the linter checks the schema shape, the overlaps and the bounds — treat a profile file like config: the operator picks it | none (rev. 4 review: the loader, the linter, the formatter) |
+| `/scrape` | the exporter: bin/ (the daemon), lib/ (server, scraper, config, statics), man/, the ini + the sample rules | the read-only consumer: one HTTP GET route set (bearer-gated, capped, the non-loopback refusal) + one outbound Modbus client; the SIGHUP reload re-validates everything (the token-file modes too) | F13 closed; F14/F15/F16 open |
+| `/scripts` | `release.py` (the release orchestrator: the version sweep, the changelog rename, the verify, the tag, the push, the GH release) + `audit_verify.py` (the F10 chain verifier) | maintainer-local trust: the orchestrator guards the dirty tree and the main-only rule, verifies (the suites + the nix build), then commits/tags/pushes; the verifier is offline and read-only; no runtime surface; the tag is the release's trust root — see F19 | **F19 open** (the release gate ordering) |
+
+`flake.nix` (the packaging: the packages, the overlay, the NixOS modules)
+and `tests/` (the verification suites cited in §4) are part of the story
+but hold no runtime trust of their own; `/dashboard` waits for the next
+audit wave (see the scope).
 
 | Surface | cache/ | scrape/ | inverter/ | Auth |
 |---|---|---|---|---|
@@ -216,6 +242,7 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
 | F15 | scrape | INFO | The metrics expose production values (generation, consumption, battery SoC) — a home-occupancy privacy consideration. | The bearer token (F13) + the localhost bind are the controls; treat the endpoint as internal. |
 | F16 | scrape | INFO | No automated alerting yet (freshness gap, poll down, exception spikes — the rules pack is pending). | Ship the alert rules file with the NixOS module; NIS2 21.2(d) wants detection wired, not just logged. |
 | F17 | docker | INFO | The `/config` volume holds the live ini files — anything a user puts there (e.g. a `control_token =` line) sits in plaintext on a docker volume, and the entrypoint seeds copies **once** (existing files are never refreshed): a fixed bundled default does not reach an existing volume until it is wiped. The generated `metrics.token` (F7) lives in the same volume — 0600 and root-owned-seeded, but not secret-backed. | Prefer token files outside the volume / `LoadCredential` / secret-backed mounts for anything sensitive; document `docker compose down -v` as the way to re-sync the volume with the bundled defaults. |
+| F19 | scripts | LOW | **The release lands before the CI gate reports**: `scripts/release.py` cuts the GitHub release locally, right after the tag push (`git push origin <tag>` → `gh release create` in the same run) — the tag-triggered workflow's test+build jobs (the gate: the nine suites + the nix build, `needs: [test, build]`) start only after the tag exists, so an unverified release can be published and a failing CI cannot un-cut it. The local verification defaults to `--tests quick` (two of the nine suites), and the annotated tag is unsigned — the tag is the release's trust root. | Flip the defaults: the GH release is the **workflow's** job (the local `--no-release` becomes the default; the workflow already gates on `needs: [test, build]`), the local gate defaults to `--tests full`, and sign the tag (`git tag -s`) when a key is available. Until then: treat a red CI on a release tag as a "revoke and re-cut" event. |
 
 ## 4. Verified evidence
 
@@ -327,11 +354,26 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   integrity hash — dump again`; a group/world-writable dump (mode 646)
   refuses outright with `chmod 0600`; and after all three refusals the
   untouched dump still restores cleanly (91 words + the override).
-- **The rev. 4 re-audit** — a focused review of the new shared surfaces
-  (`common/connlimit.py`, the audit chain, the hardened `persist.py`, the
-  gated HTTP servers) found no new findings; the removed
-  `--metrics-port` flags fail loudly (argparse, rc 2) rather than being
-  silently ignored; all nine suites pass on the re-audited tree.
+- **The rev. 4 re-audit — the new shared surfaces** — a focused review of
+  `common/connlimit.py` (the admit/release symmetry holds, including the
+  live-set path), the audit chain in `common/audit.py` (the chain state
+  under the lock, rotation-safe, the control-character fold intact) and
+  the hardened `cache/lib/persist.py` (the hash over the canonical
+  payload; the mode and the hash gates fire before anything restores) —
+  no new findings; the removed `--metrics-port` flags fail loudly
+  (argparse, rc 2) rather than being silently ignored.
+- **The rev. 4 re-audit — the rest of the tree, directory by directory** —
+  `/common`: every module re-read (config/token/cred/protocol/human/
+  logutil/version — the fail-closed one-liners, the closed search paths,
+  no dynamic imports or eval); `/profiles`: the loader, the linter and
+  the formatter re-read (stdlib `json` only, per-entry validation with
+  bounds, the three-candidate closed search path — no findings); 
+  `/scripts`: `release.py` reviewed line by line — the dirty-tree and
+  main-only guards, the idempotent bump/changelog/tag/release steps, no
+  secret handling — **one finding: F19** (the release is cut locally
+  before the CI gate reports); `/docker` and the three Modbus
+  subprojects: covered by the rev. 2–4 findings above. All nine suites
+  pass on the re-audited tree.
 
 - The remaining open findings are established by code reading (file:line in
   the table), unchanged from rev. 2 where the cited files did not change.
@@ -405,7 +447,12 @@ strict) and F18 (the state dump created `0600` explicitly and
 integrity-hashed — a restore fails closed on a tampered, unsigned or
 group-writable file; the dump itself now carries settings only by
 default, the words on `request dump with-cache` / `--dump-with-cache`).
-The remaining open set is the documented trust decisions and the
+This rev. 4 pass also walked the rest of the tree directory by directory
+(the inventory in §1) and found one new LOW: **F19** — the release
+orchestrator cuts the GitHub release before the tag-triggered CI gate
+reports; flip the defaults (the workflow cuts the release, the local gate
+runs the full suite, sign the tags when a key exists). The remaining
+open set is otherwise the documented trust decisions and the
 deployment stories: the state-dump trust is owned now (F18 closed) — the
 dump file deserves the ini's care (the hash catches tampering, not a
 local admin who rechashes). The inverter fake remains a test instrument

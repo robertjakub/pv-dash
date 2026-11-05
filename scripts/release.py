@@ -141,7 +141,7 @@ def nix_build(dry, skip):
 
 def notes_for(version):
     text = CHANGELOG.read_text()
-    m = re.search(r'^## %s\b.*\n(.*?)(?=^## |\Z)' % re.escape(version), text, re.M | re.S)
+    m = re.search(r'^## %s[^\n]*\n(.*?)(?=^## |\Z)' % re.escape(version), text, re.M | re.S)
     return m.group(1).strip() if m else None
 
 

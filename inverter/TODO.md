@@ -1,48 +1,19 @@
-# TODO
+# TODO (inverter — the Done/history records)
 
-## Open
-
-- **the priced grid machine** — a tariff-aware import/export model on top
-  of the `grid` setpoint (a price curve → the battery greedy/eco
-  strategies).
-- **the user-defined scenarios** — scene files (the time + the pins + the
-  machines) loadable with `set scenario <file>`; the audit trail of a
-  manual session could *record* one.
-- **the dongle latency profile** — a persistent slow-reply mode (the
-  laggy-modem character: every response delayed, not dropped) to exercise
-  read-delay and poll pacing against a realistic SDongle — the chaos
-  `stall` is a one-shot, a real dongle is a lifestyle.
-- **the machine gauges on /metrics** — the state machines' internals as
-  Prometheus gauges (cloud factor, outage state, per-string power, the
-  battery's decision): dashboards and the scrape fuzzing could watch the
-  machines, not just the registers they feed.
-- **the fake's client limits** — mirror the cache's `--max-clients` /
-  `--client-timeout` on the Modbus surface, and cap a declared read count
-  by the remaining frame (a truncated 0xFFFF-count frame makes the fake
-  assemble an oversized reply today — docs/AUDIT.md F11).
-- **the token-file env honored** — the clients' help promises
-  `FAKE_CONTROL_TOKEN_FILE`, the code never reads it: honor it (like
-  `FAKE_CONTROL_TOKEN`) or drop the claim from the help. Same check for
-  `FAKE_METRICS_TOKEN_FILE`.
-- **the frequency-based derate** — the machine already wanders ±0.2 Hz
-  around `--grid-frequency`; beyond a deviation bound the output power
-  should derate (exposed on /metrics too).
-- **the battery ageing** — the SoH drift over the simulated days (the
-  capacity shrinks a %/week of the simulated time) + the `battery_soh`
-  gauge on /metrics.
-- **the multi-unit serve** — one process serving two Modbus units (the
-  inverter + the meter as separate unit ids) for the gateway-style setups.
-- **the fault/alarm registers** — device health words driven by the
-  machines (an outage raises a fault, the derate a warning, the battery
-  cap a SoC notice): the cache/scrape export them and the dashboard can
-  banner a fault, not just a blackout.
-- **the forecast curve** — the PV/cloud machines follow a day-ahead
-  forecast file, so a demo runs repeatable weather instead of the RNG.
-- **the CI** — GitHub Actions: the six suites + `nix flake check` on the
-  push; the release workflow on the tag. (Family-wide, see the root
-  [TODO](../docs/TODO.md).)
+The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
+`[inverter]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+
+The audit finding F11 closed (rev. 3): the cache's client knobs mirrored
+(`--max-clients` / `--client-timeout`, live-settable, `show connections`
+to watch them), the per-IP connection cap (`--max-conn-per-ip`), the
+read-count gate (exception 03 past the 125-register cap — a truncated
+0xFFFF-count frame no longer makes the fake assemble an oversized reply)
+and the trusted-LAN / not-security-first posture documented (the README's
+Security section, the man page's SECURITY block). The metrics endpoint
+grew the caps too (`--metrics-max-clients` / `--metrics-client-timeout` /
+`--metrics-max-conn-per-ip`, the 503 past the cap) — F13's family round.
 
 The FC06/FC16 write path: the fake accepts real write requests (the echo
 + the overlay the scrapers see, audited with the writer), which the

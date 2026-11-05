@@ -1,39 +1,16 @@
-# TODO
+# TODO (scrape — the Done/history records)
 
-## Open
-
-- **the remaining audit findings** — the scraper's own open ones: F14 the
-  TLS recipe (a shipped reverse-proxy example for anything beyond
-  localhost; the native-TLS family item may cover it), F15 a short "what
-  /metrics leaks" privacy note in the README, F16 the alert rules pack
-  below. F13 is closed (the non-loopback refusal + the per-IP cap shipped
-  — see the resource-limits block). See [AUDIT.md](../docs/AUDIT.md).
-- **the multi-target scrape** — one process polling several inverters
-  (per-target metrics with a unit/host label) for the two-string-roof
-  households; the metrics endpoint and the audit are already per-process.
-- **the poll-latency gauges** — last/max poll cycle duration as Prometheus
-  gauges, so a slow dongle shows up in dashboards before the freshness
-  gap does.
-- **the alert rules pack** — a shipped Prometheus rules file next to the
-  exporter: the freshness gap, the poll down, the exception-code spikes,
-  the write-refusal bursts — the pages write themselves from the audit
-  vocabulary. (The family pack: the cache and the dashboard contribute
-  their sides.)
-- **the control surface** — the only family tool without one: the JSON-lines
-  control server + `scraper_ctl`/`scraper_cli` on the cache's pattern
-  (`set interval` live, `show status`, the poll state) — the SIGHUP story
-  is the blunt instrument today.
-- **the per-phase export** — the fake serves per-phase voltages/currents
-  and the unbalanced home; the scraper exports none of it. A `phase` label
-  (or three suffixed metrics) closes the loop fake → scrape → dashboard.
-- **the hardware soak** — everything is verified against the fake inverter
-  and the fuzzers; a real SDongle week (reconnect storms, the dongle's
-  single-client behaviour, real exception codes) is the last mile.
-- **the CI** — GitHub Actions: the regtest + fuzz suites + `nix flake
-  check` on the push; the release workflow on the tag. (Family-wide, see
-  the root [TODO](../docs/TODO.md).)
+The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
+`[scrape]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+
+The audit finding F13 closed (rev. 3): the non-loopback `/metrics` listen
+refuses to start without a token, and the connection limits ship —
+`--max-clients` (64, an immediate 503 past it), `--client-timeout`
+(300 s idle keep-alives) and `--max-conn-per-ip` (per-peer IP, 0 = no
+limit), all applied live on SIGHUP (the resource-limits block of the
+regtest asserts the matrix).
 
 The profile `fc` awareness: the scraper reads each spec-bound source with
 the profile entry's function code (`fc: 4` = input registers, the default

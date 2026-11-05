@@ -1,27 +1,7 @@
-# TODO
+# TODO (cache — the Done/history records)
 
-## Open
-
-- **the CI** — GitHub Actions: the four suites + `nix flake check` on the
-  push; the release workflow on the tag. (Family-wide, see the root
-  [TODO](../docs/TODO.md).)
-- **the hardware verification** — everything so far is verified against the
-  fake inverter, fuzzing and stress only; a real SUN2000/SDongle session
-  (poll pacing, the dongle's single-client behaviour, real exception codes,
-  the FC4 input registers on a real device) is the last mile. Also worth
-  testing: the Deye profiles against the cache.
-- **the scraper's FC4 awareness** — the profile schema now carries the `fc`
-  field (the cache polls/caches FC4 independently); the scraper still reads
-  everything with FC3 — a profile that marks an FC4 entry `scrape` needs
-  the scraper to follow the field. Related gap: no shipped profile
-  exercises `fc: 4` yet (the linter and the cache are ready, the data
-  isn't).
-- **the read-only control role** — a second token granting only the
-  show/clear verbs (no `set`, no `shutdown`): the ops shift versus the
-  admin key, both audited.
-- **the alert rules** — the cache's own gauges (poll down, age spikes,
-  write-refusal bursts) belong in the family's shipped Prometheus rules
-  pack (the scraper's TODO grows the file; the cache contributes rules).
+The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
+`[cache]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
 

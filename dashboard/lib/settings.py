@@ -5,6 +5,8 @@ setting with its short description and value hints. The control server
 here, so the wire grammar, the help texts, the completions and the docs can
 never drift."""
 
+from .statics import LOG_LEVELS
+
 
 class Setting:
     def __init__(self, name, help, values=(), hint=None, value_help=None):
@@ -40,7 +42,11 @@ SETTINGS = (
     Setting('battery', 'serve config.js with the battery panels enabled', ('on', 'off'), None,
             {'on': 'the battery KPIs and charts appear (the reload of the page picks it up)',
              'off': 'the generation-only view (the default)'}),
-    Setting('log-level', 'log verbosity', ('DEBUG', 'INFO', 'WARNING', 'ERROR'), None,
+    Setting('metrics-server', "the dashboard's own Prometheus /metrics endpoint (needs a token; "
+            'the address is --metrics-listen)', ('on', 'off'), None,
+            {'on': 'serve /metrics on the configured listen address',
+             'off': 'no metrics endpoint (the default)'}),
+    Setting('log-level', 'log verbosity', LOG_LEVELS, None,
             {'DEBUG': 'every request, the proxy detail, the gate decisions',
              'INFO': 'lifecycle, control commands, the upstream up/down flips',
              'WARNING': 'problems only',
@@ -56,7 +62,7 @@ COMMAND_HELP = {
     'set': 'configure a setting live: set <setting> <value>',
     'unset': 'restore a setting to its configured value: unset <setting>',
     'inspect': 'one pretty dump of everything (the state, the counters, the caps)',
-    'show': 'runtime state: show <setting|status|connections|settings|version>',
+    'show': 'runtime state: show <setting|status|connections|settings|version|knobs>',
     'request': 'request reload: re-read the config (the SIGHUP path)',
     'shutdown': 'stop the dashboard server gracefully',
     'quit': 'close the session',
@@ -68,6 +74,7 @@ SHOW_VALUES = (
     ('connections', 'the live HTTP clients: the gate counters, one row per peer IP'),
     ('settings', 'every tunable setting with its live value, one per line'),
     ('version', 'the dashboard version'),
+    ('knobs', 'the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes'),
 )
 
 

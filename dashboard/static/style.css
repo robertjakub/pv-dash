@@ -144,3 +144,11 @@
     #chart,#fallback{height:300px}
     .consent{bottom:calc(16px + env(safe-area-inset-bottom))}
   }
+
+/* the per-phase health strip (three-phase grids): one cell per phase, the
+   unbalance colored when it leaves the comfortable band */
+.phase-strip{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 0}
+.phase-cell{flex:1 1 120px;border:1px solid var(--border,#2a2a2a);border-radius:8px;padding:6px 10px;font-variant-numeric:tabular-nums}
+.phase-cell .ph{font-size:.75em;opacity:.7}
+.phase-cell .phv{font-size:1.05em}
+.phase-cell.unbalanced{border-color:#c0392b}

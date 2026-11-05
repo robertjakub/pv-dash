@@ -30,11 +30,15 @@ let
     ++ lib.optional (cfg.staticDir != null) "--static-dir ${cfg.staticDir}"
     ++ lib.optional cfg.battery "--battery"
     ++ lib.optional cfg.logAccess "--log-access"
+    ++ lib.optionals cfg.noAuditLog [ "--no-audit-log" ]
     ++ lib.optionals (cfg.auditLog != null) [
       "--audit-log ${cfg.auditLog}"
       "--audit-max-mb ${toString cfg.auditMaxMb}"
       "--audit-files ${toString cfg.auditFiles}"
     ]
+    ++ lib.optionals (cfg.logLevel != null) [ "--log-level ${cfg.logLevel}" ]
+    ++ lib.optional cfg.logQueries "--log-queries"
+    ++ lib.optional cfg.localTime "--local-time"
     ++ lib.optionals (cfg.controlPort != null) [
       "--control-port ${
         if lib.isInt cfg.controlPort then toString cfg.controlPort else "'${cfg.controlPort}'"
@@ -45,7 +49,22 @@ let
       # systemd LoadCredential mounts the file here (see serviceConfig below)
       "--control-token-file /run/credentials/dashboard/control-token"
     ]
+    ++ lib.optionals (cfg.controlOpsToken != null) [ "--control-ops-token ${cfg.controlOpsToken}" ]
+    ++ lib.optionals (cfg.controlOpsTokenFile != null) [
+      # systemd LoadCredential mounts the file here (see serviceConfig below)
+      "--control-ops-token-file /run/credentials/dashboard/control-ops-token"
+    ]
+    ++ lib.optionals (cfg.controlOpsVerbs != null) [ "--control-ops-verbs ${cfg.controlOpsVerbs}" ]
     ++ lib.optionals (cfg.controlTrustUids != null) [ "--control-trust-uids ${cfg.controlTrustUids}" ]
+    ++ lib.optionals (cfg.metricsServer != null) [ "--metrics-server" ]
+    ++ lib.optionals (cfg.metricsServer != null) [
+      "--metrics-listen ${cfg.metricsListen}"
+      "--metrics-token-file /run/credentials/dashboard/metrics-token"
+      "--metrics-max-clients ${toString cfg.metricsMaxClients}"
+      "--metrics-client-timeout ${toString cfg.metricsClientTimeout}"
+      "--metrics-max-conn-per-ip ${toString cfg.metricsMaxConnPerIp}"
+    ]
+    ++ lib.optionals (cfg.metricsToken != null) [ "--metrics-token ${cfg.metricsToken}" ]
   );
 in
 {
@@ -188,6 +207,94 @@ in
       '';
     };
 
+    controlOpsToken = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        A second, read-only control token: sessions authenticating with it
+        run the show/clear verbs only (no set/unset, no request reload, no
+        shutdown) — the ops shift against the admin key. Needs
+        controlToken/controlTokenFile. WARNING: it is rendered into the
+        world-readable systemd unit in the nix store — prefer
+        controlOpsTokenFile.
+      '';
+    };
+
+    controlOpsTokenFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        The read-only ops token from a file (the first line is the token),
+        mounted via systemd LoadCredential. Mutually exclusive with
+        controlOpsToken; needs controlToken/controlTokenFile.
+      '';
+    };
+
+    controlOpsVerbs = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The read-only ops role's RBAC policy: the verbs its sessions may
+        run, comma-separated (default: show,clear). Validated against the
+        control grammar at start; needs controlOpsToken/controlOpsTokenFile.
+      '';
+    };
+
+    metricsServer = lib.mkOption {
+      type = lib.types.nullOr lib.types.bool;
+      default = null;
+      description = ''
+        Serve the dashboard's own Prometheus /metrics endpoint (the uptime,
+        the request counters, the proxied query total, the client gate).
+        Off by default; when on, a bearer token is mandatory — mount it
+        with metricsTokenFile.
+      '';
+    };
+
+    metricsToken = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The /metrics bearer token (a token is mandatory when
+        metricsServer is on). WARNING: rendered into the world-readable
+        systemd unit in the nix store — prefer metricsTokenFile.
+      '';
+    };
+
+    metricsMaxClients = lib.mkOption {
+      type = lib.types.int;
+      default = 16;
+      description = "Maximum concurrent /metrics clients; extras get an immediate 503; 0 = unlimited.";
+    };
+
+    metricsClientTimeout = lib.mkOption {
+      type = lib.types.float;
+      default = 5.0;
+      description = "Seconds an idle /metrics client is kept before the socket times out; 0 = the built-in 5 s cap.";
+    };
+
+    metricsMaxConnPerIp = lib.mkOption {
+      type = lib.types.int;
+      default = 0;
+      description = "Maximum concurrent /metrics connections from one peer IP; 0 = no per-IP limit.";
+    };
+
+    metricsListen = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1:9452";
+      description = "The /metrics bind address HOST:PORT (metricsServer on).";
+    };
+
+    metricsTokenFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        The /metrics bearer token from a file (the first line is the
+        token), mounted via systemd LoadCredential. Mandatory when
+        metricsServer is on.
+      '';
+    };
+
     controlTrustUids = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -221,11 +328,37 @@ in
       default = 3;
       description = "Rotated audit backups to keep.";
     };
+
+    noAuditLog = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Disable the DSH audit trail entirely.";
+    };
+
+    logLevel = lib.mkOption {
+      type = lib.types.enum [ "DEBUG" "INFO" "WARNING" "ERROR" ];
+      default = "INFO";
+      description = "Log level.";
+    };
+
+    logQueries = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Log the proxied Prometheus queries at INFO.";
+    };
+
+    localTime = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Log timestamps in the system time zone instead of UTC.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
     warnings = lib.optional (cfg.controlToken != null)
       "services.dashboard: controlToken is rendered into the world-readable systemd unit in the nix store — prefer controlTokenFile."
+      ++ lib.optional (cfg.controlOpsToken != null)
+      "services.dashboard: controlOpsToken is rendered into the world-readable systemd unit in the nix store — prefer controlOpsTokenFile."
       ++ lib.optionals (cfg.controlPort != null
           && lib.isString cfg.controlPort
           && lib.hasPrefix "/tmp/" cfg.controlPort)
@@ -278,8 +411,11 @@ in
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
         SystemCallArchitectures = "native";
         SystemCallFilter = [ "@system-service" ];
-      } // lib.optionalAttrs (cfg.controlTokenFile != null) {
-        LoadCredential = [ "control-token:${toString cfg.controlTokenFile}" ];
+      } // lib.optionalAttrs (cfg.controlTokenFile != null || cfg.controlOpsTokenFile != null
+          || cfg.metricsTokenFile != null) {
+        LoadCredential = lib.optionals (cfg.controlTokenFile != null) [ "control-token:${toString cfg.controlTokenFile}" ]
+          ++ lib.optionals (cfg.controlOpsTokenFile != null) [ "control-ops-token:${toString cfg.controlOpsTokenFile}" ]
+          ++ lib.optionals (cfg.metricsTokenFile != null) [ "metrics-token:${toString cfg.metricsTokenFile}" ];
       } // lib.optionalAttrs (cfg.controlPort != null
           && lib.isString cfg.controlPort
           && lib.hasPrefix "/run/dashboard/" cfg.controlPort) {

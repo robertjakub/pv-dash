@@ -29,49 +29,51 @@ battery flag), the config reload, the graceful shutdown. With a control
 token configured the wire is HMAC-signed: every command and reply carries
 the full sha256 of its payload, keyed by the token (common/wiresec.py)
 \(em a token-holding client verifies both directions, and over TCP the
-signed commands are mandatory.
+signed commands are mandatory. A second, read-only token
+(\fB--control-ops-token\fR) authenticates into the show/clear verbs only
+\(em the ops shift against the admin key, both roles audited.
 
 .SH OPTIONS
 .TP
 .B \-\-config
-config file (default: $DASHBOARD_CONFIG, then server.ini next to this
-script, then the subproject root) (default:
-/Users/oom/GensparkCode/pv\-dash/dashboard/server.ini)
+config file (default: $DSH_CONFIG, then server.ini next to this script,
+then the subproject root) (default:
+/Users/oom/GensparkCode/pv\-dash/dashboard/server.conf)
 .TP
 .BI \-\-port " N"
-listen port (default: config file, $PORT or 8080)
+listen port (default: config file, $DSH_PORT or 8080)
 .TP
 .B \-\-bind
 address to bind (default: config file, $BIND or 0.0.0.0)
 .TP
 .B \-\-static\-dir
-directory to serve (default: config file, $STATIC_DIR or static next to
-the script)
+directory to serve (default: config file, $DSH_STATIC_DIR or static next
+to the script)
 .TP
 .B \-\-config\-js
-config.js to serve at /config.js (default: config file, $CONFIG_JS or
-config.js next to the script)
+config.js to serve at /config.js (default: config file, $DSH_CONFIG_JS
+or config.js next to the script)
 .TP
 .B \-\-prom\-prefix
 path under which Prometheus is proxied (default: config file,
-$PROM_PREFIX or /prom); empty string proxies everything
+$DSH_PROM_PREFIX or /prom); empty string proxies everything
 .TP
 .B \-\-upstream
-upstream Prometheus URL (default: config file, $PROM_URL or
+upstream Prometheus URL (default: config file, $DSH_PROM_URL or
 http://localhost:9090)
 .TP
 .BI \-\-max\-clients " N"
 maximum concurrent HTTP clients (pages + proxy); extras get an immediate
-503 (default: config file, $DASHBOARD_MAX_CLIENTS or 64; 0 = unlimited)
+503 (default: config file, $DSH_MAX_CLIENTS or 64; 0 = unlimited)
 .TP
 .BI \-\-client\-timeout " N"
 seconds an idle keep\-alive HTTP client is kept before being kicked
-(default: config file, $DASHBOARD_CLIENT_TIMEOUT or 300; 0 = off)
+(default: config file, $DSH_CLIENT_TIMEOUT or 300; 0 = off)
 .TP
 .BI \-\-max\-conn\-per\-ip " N"
 maximum concurrent HTTP connections from one peer IP; extras get an
-immediate 503 (default: config file, $DASHBOARD_MAX_CONN_PER_IP or 0 =
-no per\-IP limit)
+immediate 503 (default: config file, $DSH_MAX_CONN_PER_IP or 0 = no
+per\-IP limit)
 .TP
 .B \-\-log\-level
 log level (default: config file or INFO); DEBUG logs every request
@@ -80,39 +82,88 @@ log level (default: config file or INFO); DEBUG logs every request
 log proxied Prometheus queries at INFO level
 .TP
 .B \-\-log\-access
-log every HTTP request at INFO (default: config file,
-$DASHBOARD_LOG_ACCESS or quiet)
+log every HTTP request at INFO (default: config file, $DSH_LOG_ACCESS or
+quiet)
 .TP
 .B \-\-local\-time
 log timestamps in the system time zone instead of UTC (default: off)
 .TP
 .B \-\-battery
 enable battery support in the served config.js (default: config file,
-$BATTERY or off)
+$DSH_BATTERY or off)
 .TP
 .B \-\-control\-port
 JSON\-lines control server target: unix socket path (default:
 /tmp/dashboard\-<port>.socket) or TCP port number on 127.0.0.1 (e.g.
 15598); 0 = off. Talk to it with dashboard\-ctl.py (default: config
-file, $DASHBOARD_CONTROL_PORT)
+file, $DSH_CTL)
 .TP
 .B \-\-control\-token
 require a token on control connections: the client authenticates with
 {"cmd": "auth", "token": ...}; over the unix socket a trusted peer
 (root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
-skips the token (default: config file, $DASHBOARD_CONTROL_TOKEN or none)
+skips the token (default: config file, $DSH_CONTROL_TOKEN or none)
 .TP
 .B \-\-control\-token\-file
 the control token from a file (the first line; e.g. a systemd
 LoadCredential or a key file; must be owner\-only 0600) — takes the
 place of \-\-control\-token; giving both is an error (env
-DASHBOARD_CONTROL_TOKEN_FILE)
+DSH_CONTROL_TOKEN_FILE)
+.TP
+.B \-\-control\-ops\-token
+a second, read\-only control token: sessions authenticating with it may
+run the show/clear verbs only (no set/unset, no request reload, no
+shutdown) — the ops shift against the admin key, both audited (default:
+config file, $DSH_CONTROL_OPS_TOKEN or none)
+.TP
+.B \-\-control\-ops\-token\-file
+the read\-only ops token from a file (the first line; must be
+owner\-only 0600) — takes the place of \-\-control\-ops\-token; giving
+both is an error (env DSH_CONTROL_OPS_TOKEN_FILE)
 .TP
 .B \-\-control\-trust\-uids
 extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
 the daemon's own user are always trusted (default: config file,
-$DASHBOARD_CONTROL_TRUST_UIDS or none)
+$DSH_CONTROL_TRUST_UIDS or none)
+.TP
+.B \-\-control\-ops\-verbs
+the read\-only ops role's RBAC policy: the verbs its sessions may run,
+comma\-separated (default: show,clear; validated against the control
+grammar at start)
+.TP
+.B \-\-metrics\-server
+serve the dashboard's own Prometheus /metrics endpoint (the uptime, the
+request counters, the proxied query total, the client gate) — off by
+default and a token is mandatory when on (default: config file,
+$DSH_METRICS_SERVER or off)
+.TP
+.B \-\-metrics\-listen
+the metrics bind address HOST:PORT (default: config file,
+$DSH_METRICS_LISTEN or 127.0.0.1:9452)
+.TP
+.B \-\-metrics\-token
+require Authorization: Bearer <token> on the /metrics endpoint —
+mandatory when \-\-metrics\-server is on (default: config file,
+$DSH_METRICS_TOKEN)
+.TP
+.B \-\-metrics\-token\-file
+the metrics bearer token from a file (the first line; must be
+owner\-only 0600) — takes the place of \-\-metrics\-token; giving both
+is an error (env DSH_METRICS_TOKEN_FILE)
+.TP
+.BI \-\-metrics\-max\-clients " N"
+maximum concurrent /metrics clients; extras get an immediate 503, 0 =
+unlimited (default: config file, $DSH_METRICS_MAX_CLIENTS or 16)
+.TP
+.BI \-\-metrics\-client\-timeout " N"
+seconds an idle /metrics client is kept before the socket times out, 0 =
+the built\-in 5 s cap (default: config file, $DSH_METRICS_CLIENT_TIMEOUT
+or 5)
+.TP
+.BI \-\-metrics\-max\-conn\-per\-ip " N"
+maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
+limit (default: config file, $DSH_METRICS_MAX_CONN_PER_IP or 0)
 .TP
 .B \-\-audit\-log
 DSH audit trail: a file path or \- for stdout (the docker/journald way);
@@ -150,7 +201,8 @@ configured and refuses to start without one). Commands:
 \fBset\fR/\fBunset\fR/\fBshow\fR/\fBhelp\fR (the settings: max-clients,
 client-timeout, max-conn-per-ip, log-access, log-queries, battery,
 log-level), \fBshow status\fR, \fBshow connections\fR (the live HTTP
-clients), \fBshow settings\fR, \fBshow version\fR, \fBinspect\fR,
+clients), \fBshow settings\fR, \fBshow version\fR, \fBshow knobs\fR
+(the dictionary of the registry), \fBinspect\fR,
 \fBrequest reload\fR, \fBshutdown\fR, \fBquit\fR. See
 .BR dashboard-ctl (1)
 and
@@ -163,9 +215,11 @@ module's default) or publish the port loopback-only and put an
 authenticating reverse proxy in front for anything beyond localhost. The
 control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
 control port without a token refuses to start (F5); with a token the wire
-is signed and the commands/replies verify end to end. The audit trail
-(default in the XDG state home, prefix DSH) records the control commands,
-the auth failures, the reloads and the shutdowns.
+is signed and the commands/replies verify end to end; a second, read-only
+ops token (\fB--control-ops-token\fR) scopes its sessions to the
+show/clear verbs. The audit trail (default in the XDG state home, prefix
+DSH) records the control commands with their roles, the auth failures, the
+reloads and the shutdowns.
 
 .SH FILES
 .TP

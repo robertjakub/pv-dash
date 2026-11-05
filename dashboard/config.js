@@ -10,6 +10,14 @@ const SOLAR_CONFIG = {
     batterySoC: 'huawei_battery_soc_percent{job="sun2000"}',
     batteryFlag: 'huawei_battery{job="sun2000"}'
   },
+  // three-phase health (the per-phase chain): the per-phase voltage/current
+  // selectors — omit or empty to hide the strip
+  phaseVoltages: ['huawei_phase_a_voltage_volts{job="sun2000"}',
+                  'huawei_phase_b_voltage_volts{job="sun2000"}',
+                  'huawei_phase_c_voltage_volts{job="sun2000"}'],
+  phaseCurrents: ['huawei_phase_a_current_amps{job="sun2000"}',
+                  'huawei_phase_b_current_amps{job="sun2000"}',
+                  'huawei_phase_c_current_amps{job="sun2000"}'],
   scrapeSec: 10,
   smoothMin: 30,
   refreshSec: 30,

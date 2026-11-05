@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Configuration for the dashboard: ini/env/CLI resolution (stdlib only).
+"""Configuration for the dashboard: the set-grammar config script, the env
+layer and the CLI flags (stdlib only).
 
-The precedence is the family's: CLI flags > the DASHBOARD_* env > the
-[server] ini > the shipped defaults (lib/static.json). The generic envs the
-docker image documents (PORT, BIND, PROM_URL, CONFIG_JS, BATTERY) keep
-working alongside.
+The precedence is the family's: CLI flags > the DSH_* env > the config
+script > the shipped defaults (lib/static.json). The generic envs the docker
+image documents (PORT, BIND, PROM_URL, CONFIG_JS, BATTERY) keep working
+alongside. The config file speaks the control grammar (common/options.py):
+every line a `set <name> <value>`, every comment a `#` comment — the ini
+format is gone (the breaking wave in docs/TODO.md).
 """
-import configparser
 import logging
 import os
 
+from common.options import parse_config_script
 from common.config import load_token_file
 from .statics import DEFAULTS, DEFAULT_PORT, LOG_LEVELS
 
@@ -18,11 +21,11 @@ logger = logging.getLogger('dashboard')
 
 def resolve_control_target(explicit, listen_port=DEFAULT_PORT):
     """The control server target for the daemon and the clients: the flag
-    wins, then DASHBOARD_CTL, then the default unix socket named after the
+    wins, then DSH_CTL, then the default unix socket named after the
     listen port (/tmp/dashboard-8080.socket)."""
     if explicit is not None and str(explicit).strip():
         return str(explicit).strip()
-    env = os.environ.get('DASHBOARD_CTL')
+    env = os.environ.get('DSH_CTL')
     if env and env.strip():
         return env.strip()
     return '/tmp/dashboard-%d.socket' % int(listen_port)
@@ -40,17 +43,28 @@ def str_to_bool(value):
 
 
 def load_config(path):
-    """Parse the ini (missing file is fine); a malformed file is fatal."""
-    cfg = configparser.ConfigParser()
-    if os.path.isfile(path):
-        try:
-            with open(path) as fh:
-                cfg.read_file(fh)
-        except (configparser.Error, OSError) as e:
-            raise SystemExit('cannot parse config file %s: %s' % (path, e))
-    if not cfg.has_section('server'):
-        cfg.add_section('server')
-    return cfg['server']
+    """Parse the set-grammar config script (missing file is fine); a
+    malformed file — or the legacy ini format — is fatal. Returns {key:
+    raw-string value} with the dash names underscore-normalized."""
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding='utf-8') as fh:
+            text = fh.read()
+    except OSError as e:
+        raise SystemExit('cannot read config file %s: %s' % (path, e))
+    try:
+        rows = parse_config_script(text, path)
+    except ValueError as e:
+        raise SystemExit(str(e))
+    out = {}
+    for name, value in rows:
+        key = name.replace('-', '_')
+        if key in out:
+            raise SystemExit('%s: %s is set twice (the file applies top to bottom — say it once)'
+                             % (path, name))
+        out[key] = value
+    return out
 
 
 def next_to_script(name, script_dir=None):
@@ -64,12 +78,12 @@ def next_to_script(name, script_dir=None):
 
 
 def resolve_config(args, script_dir=None):
-    """Effective settings: CLI flags > env > [server] ini > defaults.
+    """Effective settings: CLI flags > DSH_* env > config script > defaults.
 
-    The legacy generic envs (PORT, BIND, STATIC_DIR, CONFIG_JS, PROM_PREFIX,
-    PROM_URL, BATTERY) keep their place between the flags and the ini — the
-    docker image points the proxy at the stack's Prometheus with PROM_URL
-    and the served config.js at the config volume with CONFIG_JS.
+    Every environment twin carries the tool's DSH_ prefix (the family
+    convention: the dashboard speaks DSH_PORT, DSH_PROM_URL, ...) — the
+    docker image points the proxy at the stack's Prometheus with DSH_PROM_URL
+    and the served config.js at the config volume with DSH_CONFIG_JS.
     """
     ini = load_config(args.config)
 
@@ -87,52 +101,67 @@ def resolve_config(args, script_dir=None):
             logger.error('invalid %s = %r: %s (using %r)', cfg_key, raw, e, default)
             return default
 
-    static_dir = resolve(args.static_dir, 'STATIC_DIR', 'static_dir',
+    static_dir = resolve(args.static_dir, 'DSH_STATIC_DIR', 'static_dir',
                          next_to_script('static', script_dir), str)
     if not os.path.isabs(static_dir):
         static_dir = os.path.join(script_dir or '.', static_dir)
     static_dir = os.path.realpath(static_dir)
-    config_js = resolve(args.config_js, 'CONFIG_JS', 'config_js',
+    config_js = resolve(args.config_js, 'DSH_CONFIG_JS', 'config_js',
                         next_to_script('config.js', script_dir), str)
     config_js = os.path.realpath(config_js if os.path.isabs(config_js)
                                  else os.path.join(script_dir or '.', config_js))
-    prom_prefix = resolve(args.prom_prefix, 'PROM_PREFIX', 'prom_prefix',
+    prom_prefix = resolve(args.prom_prefix, 'DSH_PROM_PREFIX', 'prom_prefix',
                           DEFAULTS['prom_prefix'], str).rstrip('/')
-    battery = resolve(args.battery, 'BATTERY', 'battery', DEFAULTS['battery'], str_to_bool)
+    battery = resolve(args.battery, 'DSH_BATTERY', 'battery', DEFAULTS['battery'], str_to_bool)
 
     cfg = {
-        'port': resolve(args.port, 'PORT', 'port', DEFAULT_PORT, int),
-        'bind': resolve(args.bind, 'BIND', 'bind', DEFAULTS['bind'], str),
-        'upstream': resolve(args.upstream, 'PROM_URL', 'upstream', DEFAULTS['upstream'], str),
+        'port': resolve(args.port, 'DSH_PORT', 'port', DEFAULT_PORT, int),
+        'bind': resolve(args.bind, 'DSH_BIND', 'bind', DEFAULTS['bind'], str),
+        'upstream': resolve(args.upstream, 'DSH_PROM_URL', 'upstream', DEFAULTS['upstream'], str),
         'prom_prefix': prom_prefix,
         'static_dir': static_dir,
         'config_js': config_js,
         'battery': battery,
         'log_queries': resolve(args.log_queries, None, 'log_queries', DEFAULTS['log_queries'], str_to_bool),
-        'log_access': resolve(args.log_access, 'DASHBOARD_LOG_ACCESS', 'log_access',
+        'log_access': resolve(args.log_access, 'DSH_LOG_ACCESS', 'log_access',
                               DEFAULTS['log_access'], str_to_bool),
-        'local_time': resolve(getattr(args, 'local_time', None), 'DASHBOARD_LOCAL_TIME',
+        'local_time': resolve(getattr(args, 'local_time', None), 'DSH_LOCAL_TIME',
                               'local_time', False, str_to_bool),
-        'max_clients': resolve(getattr(args, 'max_clients', None), 'DASHBOARD_MAX_CLIENTS',
+        'max_clients': resolve(getattr(args, 'max_clients', None), 'DSH_MAX_CLIENTS',
                                'max_clients', DEFAULTS['max_clients'], int),
-        'client_timeout': resolve(getattr(args, 'client_timeout', None), 'DASHBOARD_CLIENT_TIMEOUT',
+        'client_timeout': resolve(getattr(args, 'client_timeout', None), 'DSH_CLIENT_TIMEOUT',
                                   'client_timeout', DEFAULTS['client_timeout_s'], float),
-        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'DASHBOARD_MAX_CONN_PER_IP',
+        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'DSH_MAX_CONN_PER_IP',
                                    'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
         'level': resolve(args.log_level, None, 'log_level', DEFAULTS['log_level'], str).strip().upper(),
     }
-    cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'DASHBOARD_CONTROL_PORT',
+    cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'DSH_CTL',
                                   'control_port', None, str)
-    cfg['control_token'] = (resolve(getattr(args, 'control_token', None), 'DASHBOARD_CONTROL_TOKEN',
+    cfg['control_token'] = (resolve(getattr(args, 'control_token', None), 'DSH_CONTROL_TOKEN',
                                     'control_token', None, str) or '').strip() or None
-    control_token_file = resolve(getattr(args, 'control_token_file', None), 'DASHBOARD_CONTROL_TOKEN_FILE',
+    control_token_file = resolve(getattr(args, 'control_token_file', None), 'DSH_CONTROL_TOKEN_FILE',
                                  'control_token_file', None, str)
+    cfg['control_ops_token'] = (resolve(getattr(args, 'control_ops_token', None), 'DSH_CONTROL_OPS_TOKEN',
+                                        'control_ops_token', None, str) or '').strip() or None
+    control_ops_token_file = resolve(getattr(args, 'control_ops_token_file', None), 'DSH_CONTROL_OPS_TOKEN_FILE',
+                                     'control_ops_token_file', None, str)
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None),
-                                        'DASHBOARD_CONTROL_TRUST_UIDS', 'control_trust_uids', None, str)
+                                        'DSH_CONTROL_TRUST_UIDS', 'control_trust_uids', None, str)
     if cfg['control_token'] and control_token_file:
         raise SystemExit('--control-token and --control-token-file are mutually exclusive')
     if control_token_file:
         cfg['control_token'] = load_token_file(control_token_file, 'control-token-file')
+    if cfg['control_ops_token'] and control_ops_token_file:
+        raise SystemExit('--control-ops-token and --control-ops-token-file are mutually exclusive')
+    if control_ops_token_file:
+        cfg['control_ops_token'] = load_token_file(control_ops_token_file, 'control-ops-token-file')
+    if cfg['control_ops_token']:
+        if not cfg['control_token']:
+            raise SystemExit('the read-only ops token supplements the admin token: '
+                             'set --control-token/--control-token-file too')
+        if cfg['control_ops_token'] == cfg['control_token']:
+            raise SystemExit('the ops token must differ from the admin token (the same secret would '
+                             'hand every holder the role the server picks first)')
     if cfg['control_token'] and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in cfg['control_token']):
         raise SystemExit('invalid control_token: must not contain whitespace or control characters')
     if cfg['port'] < 1 or cfg['port'] > 65535:
@@ -145,6 +174,24 @@ def resolve_config(args, script_dir=None):
         raise SystemExit('invalid max_conn_per_ip = %d: must be >= 0 (0 = no per-IP limit)' % cfg['max_conn_per_ip'])
     if cfg['level'] not in LOG_LEVELS:
         raise SystemExit('invalid log_level = %r: must be one of %s' % (cfg['level'], ', '.join(LOG_LEVELS)))
+    cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'DSH_CONTROL_OPS_VERBS',
+                                        'control_ops_verbs', 'show,clear', str) or 'show,clear').strip() or 'show,clear'
+    cfg['metrics_server'] = resolve(getattr(args, 'metrics_server', False) or None, 'DSH_METRICS_SERVER',
+                                    'metrics_server', False, str_to_bool)
+    cfg['metrics_listen'] = resolve(getattr(args, 'metrics_listen', None), 'DSH_METRICS_LISTEN',
+                                    'metrics_listen', DEFAULTS['metrics_listen'], str)
+    cfg['metrics_token'] = (resolve(getattr(args, 'metrics_token', None), 'DSH_METRICS_TOKEN',
+                                    'metrics_token', None, str) or '').strip() or None
+    cfg['metrics_token_file'] = resolve(getattr(args, 'metrics_token_file', None), 'DSH_METRICS_TOKEN_FILE',
+                                        'metrics_token_file', None, str)
+    cfg['metrics_max_clients'] = resolve(getattr(args, 'metrics_max_clients', None), 'DSH_METRICS_MAX_CLIENTS',
+                                         'metrics_max_clients', DEFAULTS['metrics_max_clients'], int)
+    cfg['metrics_client_timeout'] = resolve(getattr(args, 'metrics_client_timeout', None),
+                                            'DSH_METRICS_CLIENT_TIMEOUT', 'metrics_client_timeout',
+                                            DEFAULTS['metrics_client_timeout_s'], float)
+    cfg['metrics_max_conn_per_ip'] = resolve(getattr(args, 'metrics_max_conn_per_ip', None),
+                                             'DSH_METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
+                                             DEFAULTS['metrics_max_conn_per_ip'], int)
     control_port = str(cfg['control_port'] or '').strip()
     if control_port.isdigit() and control_port != '0' and not cfg['control_token']:
         raise SystemExit('the TCP control port %s without a token is open to every local process; '

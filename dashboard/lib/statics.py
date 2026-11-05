@@ -12,7 +12,7 @@ _here = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(_here, 'static.json'), encoding='utf-8') as _f:
     STATIC = json.load(_f)
 
-LOG_LEVELS = ('DEBUG', 'INFO', 'WARNING', 'ERROR')
+LOG_LEVELS = tuple(STATIC['log_levels'])
 
 DEFAULTS = STATIC['defaults']
 DEFAULT_PORT = DEFAULTS['port']
@@ -28,3 +28,9 @@ CLI_TIMEOUT_S = DEFAULTS['cli_timeout_s']
 CLI_RECONNECT = DEFAULTS['cli_reconnect']
 CLI_RECONNECT_WAIT_S = DEFAULTS['cli_reconnect_wait_s']
 CONTROL_IDLE_TIMEOUT_S = DEFAULTS['control_idle_timeout_s']
+CONTROL_LINE_CAP = int(STATIC['control']['line_cap_bytes'])
+
+# the live `set metrics-server on` defaults (the flags configure the start-up one)
+DEFAULT_METRICS_CAPS = (int(DEFAULTS.get('metrics_max_clients', 16)),
+                        float(DEFAULTS.get('metrics_client_timeout_s', 5.0)),
+                        int(DEFAULTS.get('metrics_max_conn_per_ip', 0)))

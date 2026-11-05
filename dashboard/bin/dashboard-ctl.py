@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Small client for the dashboard's JSON-lines control server: sends one
 command (or a batch from stdin) over TCP or a unix socket (--control-port,
-env DASHBOARD_CTL) and prints the replies. TCP servers with --control-token
+env DSH_CTL) and prints the replies. TCP servers with --control-token
 require the token first ({"cmd": "auth", "token": ...}) — pass it with
---control-token or the DASHBOARD_CONTROL_TOKEN environment variable. With a
+--control-token or the DSH_CONTROL_TOKEN environment variable. With a
 token configured the wire is HMAC-signed (the full sha256 of each frame,
 common/wiresec.py): the client signs every command and verifies every
 reply.
 
-  python3 dashboard_ctl.py --control-port 15598 show status
-  python3 dashboard_ctl.py --control-port 15598 request reload
-  printf 'set battery on\\nshow settings\\n' | python3 dashboard_ctl.py --control-port 15598
+  python3 dashboard-ctl.py --control-port 15598 show status
+  python3 dashboard-ctl.py --control-port 15598 request reload
+  printf 'set battery on\\nshow settings\\n' | python3 dashboard-ctl.py --control-port 15598
 
 Commands (see the server's help): show <status|connections|settings|version>,
 set/unset, inspect, request reload, shutdown, quit.
@@ -39,11 +39,11 @@ from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S
 
 def main():
     p = argparse.ArgumentParser(description='Send commands to the dashboard control server (TCP or unix socket).')
-    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/dashboard-8080.socket; env DASHBOARD_CTL when unset) — same flag as the server itself')
+    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/dashboard-8080.socket; env DSH_CTL when unset) — same flag as the server itself')
     p.add_argument('command', nargs='*', help='control command, e.g. inspect, show status, set battery on, request reload, shutdown')
     p.add_argument('--timeout', type=float, default=CLI_TIMEOUT_S, help='socket timeout in seconds (default %(default)s)')
-    p.add_argument('--control-token', default=None, help='control auth token for TCP (env DASHBOARD_CONTROL_TOKEN)')
-    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env DASHBOARD_CONTROL_TOKEN_FILE)')
+    p.add_argument('--control-token', default=None, help='control auth token for TCP (env DSH_CONTROL_TOKEN)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env DSH_CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
     p.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB, help='rotate the audit log at this size, 0 = off')
     p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
@@ -62,12 +62,14 @@ def main():
     if not commands:
         if sys.stdin.isatty():
             p.error('no command given (pass it as arguments or pipe commands on stdin)')
-        commands = [line.strip() for line in sys.stdin if line.strip()]
+        # the config scripts pipe through: comments (#) and blank lines stay comments
+        commands = [line.strip() for line in sys.stdin
+                    if line.strip() and not line.strip().startswith('#')]
         if not commands:
             p.error('no commands on stdin')
 
-    token_file = args.control_token_file or os.environ.get('DASHBOARD_CONTROL_TOKEN_FILE')
-    token = args.control_token or os.environ.get('DASHBOARD_CONTROL_TOKEN')
+    token_file = args.control_token_file or os.environ.get('DSH_CONTROL_TOKEN_FILE')
+    token = args.control_token or os.environ.get('DSH_CONTROL_TOKEN')
     if token and token_file:
         p.error('--control-token and --control-token-file are mutually exclusive')
     if token_file:

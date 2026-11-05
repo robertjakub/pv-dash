@@ -18,6 +18,8 @@ const CONFIG = {
   battery: qs.get('batteryMetric') || CFG_METRICS.battery || '',
   batterySoC: qs.get('batterySoC') || CFG_METRICS.batterySoC || '',
   batteryFlag: qs.get('batteryFlag') || CFG_METRICS.batteryFlag || '',
+  phaseVoltages: CFG_METRICS.phaseVoltages || CFG.phaseVoltages || [],
+  phaseCurrents: CFG_METRICS.phaseCurrents || CFG.phaseCurrents || [],
   demoHour: qs.has('demoHour') ? parseFloat(qs.get('demoHour')) : null,
   batteryEnabled: CFG.battery === true || qs.get('battery') === '1',
   scrapeSec: parseFloat(qs.get('scrape') || CFG.scrapeSec) || 10,
@@ -50,6 +52,7 @@ const I18N_BUILTIN = {
     bLive: 'LIVE', bDemo: 'DEMO DATA', bOff: 'OFFLINE',
     today: 'Today', yesterday: 'Yesterday',
     bucketsTpl: '{s}s buckets · avg of {n} samples',
+    unbalance: 'unbalance',
     monthsShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   }
 };
@@ -947,6 +950,38 @@ function exportCsv(hourly = false) {
   URL.revokeObjectURL(a.href);
 }
 
+async function refreshPhases() {
+  // the per-phase chain: three voltage/current pairs, the voltage unbalance
+  // percentage highlighted when it leaves the comfortable band (2 %)
+  const vs = CONFIG.phaseVoltages, cs = CONFIG.phaseCurrents;
+  const strip = $('phaseStrip');
+  if (!strip) return;
+  if (!Array.isArray(vs) || vs.length !== 3) { strip.style.display = 'none'; return; }
+  const NEL = ['A', 'B', 'C'];
+  try {
+    const [va, vb, vc, ca, cb, cc] = await Promise.all([
+      instantVal(`sum(${vs[0]})`), instantVal(`sum(${vs[1]})`), instantVal(`sum(${vs[2]})`),
+      Array.isArray(cs) && cs.length === 3 ? instantVal(`sum(${cs[0]})`) : null,
+      Array.isArray(cs) && cs.length === 3 ? instantVal(`sum(${cs[1]})`) : null,
+      Array.isArray(cs) && cs.length === 3 ? instantVal(`sum(${cs[2]})`) : null
+    ]);
+    const volts = [va, vb, vc];
+    const amps = [ca, cb, cc];
+    const mean = volts.reduce((a, b) => a + b, 0) / 3;
+    const dev = Math.max(...volts.map(v => Math.abs(v - mean))) / (mean || 1) * 100;
+    strip.innerHTML = volts.map((v, i) =>
+      `<div class="phase-cell${dev > 2 ? ' unbalanced' : ''}">`
+      + `<div class="ph">${NEL[i]}</div>`
+      + `<div class="phv">${v.toFixed(1)} V${amps[i] != null ? ' · ' + amps[i].toFixed(1) + ' A' : ''}</div>`
+      + `</div>`).join('')
+      + `<div class="phase-cell${dev > 2 ? ' unbalanced' : ''}"><div class="ph">${t('unbalance')}</div>`
+      + `<div class="phv">${dev.toFixed(1)} %</div></div>`;
+    strip.style.display = 'flex';
+  } catch (e) {
+    strip.style.display = 'none';   // the per-phase metrics are optional
+  }
+}
+
 async function refreshLive() {
   const k = 1 / 1000;
   try {
@@ -961,6 +996,7 @@ async function refreshLive() {
     ]);
     state.battActive = CONFIG.batteryEnabled && !!CONFIG.battery;
     updateFlow(pv * k, load * k, (gExp - gImp) * k, batt * k, soc, flag);
+    refreshPhases();
     state.demo = false;
     state.flowUpdated = new Date().toLocaleTimeString();
     updateFlowSub();

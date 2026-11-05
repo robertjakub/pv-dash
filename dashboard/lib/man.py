@@ -36,7 +36,9 @@ battery flag), the config reload, the graceful shutdown. With a control
 token configured the wire is HMAC-signed: every command and reply carries
 the full sha256 of its payload, keyed by the token (common/wiresec.py)
 \\(em a token-holding client verifies both directions, and over TCP the
-signed commands are mandatory."""
+signed commands are mandatory. A second, read-only token
+(\\fB--control-ops-token\\fR) authenticates into the show/clear verbs only
+\\(em the ops shift against the admin key, both roles audited."""
     signals = """.SH SIGNALS
 .TP
 .B SIGHUP
@@ -53,7 +55,8 @@ configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: max-clients,
 client-timeout, max-conn-per-ip, log-access, log-queries, battery,
 log-level), \\fBshow status\\fR, \\fBshow connections\\fR (the live HTTP
-clients), \\fBshow settings\\fR, \\fBshow version\\fR, \\fBinspect\\fR,
+clients), \\fBshow settings\\fR, \\fBshow version\\fR, \\fBshow knobs\\fR
+(the dictionary of the registry), \\fBinspect\\fR,
 \\fBrequest reload\\fR, \\fBshutdown\\fR, \\fBquit\\fR. See
 .BR dashboard-ctl (1)
 and
@@ -65,9 +68,11 @@ module's default) or publish the port loopback-only and put an
 authenticating reverse proxy in front for anything beyond localhost. The
 control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
 control port without a token refuses to start (F5); with a token the wire
-is signed and the commands/replies verify end to end. The audit trail
-(default in the XDG state home, prefix DSH) records the control commands,
-the auth failures, the reloads and the shutdowns."""
+is signed and the commands/replies verify end to end; a second, read-only
+ops token (\\fB--control-ops-token\\fR) scopes its sessions to the
+show/clear verbs. The audit trail (default in the XDG state home, prefix
+DSH) records the control commands with their roles, the auth failures, the
+reloads and the shutdowns."""
     files = """.SH FILES
 .TP
 .I /tmp/dashboard-<port>.socket
@@ -118,10 +123,10 @@ apart). With a control token configured the wire is HMAC-signed: the
 console signs every command and verifies every reply."""
     env = """.SH ENVIRONMENT
 .TP
-.B DASHBOARD_CTL
+.B DSH_CTL
 the default control target for the clients.
 .TP
-.B DASHBOARD_CONTROL_TOKEN ", " DASHBOARD_CLI_KEEPALIVE
+.B DSH_CONTROL_TOKEN ", " DSH_CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off)."""
     return page(
         "console-style session on the dashboard control server",

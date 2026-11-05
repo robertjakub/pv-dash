@@ -46,6 +46,7 @@ window.SOLAR_I18N = {
     selfCons: 'Autokonsumpcja', selfConsHint: 'produkcji PV zużyta lub zmagazynowana',
     selfSus: 'Samowystarczalność', selfSusHint: 'zapotrzebowania pokryte z PV i baterii',
     flowTitle: 'Przepływ energii', currentPower: 'aktualna moc',
+    unbalance: 'asymetria',
     genByPv: 'Wytworzone z PV', consumedAppl: 'Zużyte przez urządzenia',
     selfConsumed: 'Zużyte bezpośrednio', fedToGrid: 'Do sieci', fromPvKwh: 'Z PV', fromGridKwh: 'Z sieci',
     thFlow: 'Przepływ energii', thEnergy: 'Energia', thShare: 'Udział',

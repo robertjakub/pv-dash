@@ -21,8 +21,8 @@ console signs every command and verifies every reply.
 .TP
 .B \-\-control\-port
 control server target: unix socket path or TCP port on 127.0.0.1,
-auto\-detected (default: /tmp/dashboard\-8080.socket; env DASHBOARD_CTL
-when unset) — same flag as the server itself
+auto\-detected (default: /tmp/dashboard\-8080.socket; env DSH_CTL when
+unset) — same flag as the server itself
 .TP
 .BI \-\-timeout " N"
 socket timeout in seconds (default 5.0)
@@ -35,11 +35,11 @@ this many times before giving up; 0 = off (default 3)
 seconds between the reconnect attempts (default 10.0)
 .TP
 .B \-\-control\-token
-control auth token for TCP (env DASHBOARD_CONTROL_TOKEN)
+control auth token for TCP (env DSH_CONTROL_TOKEN)
 .TP
 .B \-\-control\-token\-file
 the token from a file (the first line; must be owner\-only 0600); not
-for use with \-\-control\-token (env DASHBOARD_CONTROL_TOKEN_FILE)
+for use with \-\-control\-token (env DSH_CONTROL_TOKEN_FILE)
 .TP
 .B \-\-audit\-log
 audit trail: a file path or \- for stdout; default: the XDG state home
@@ -57,10 +57,10 @@ disable the audit trail (default: off)
 
 .SH ENVIRONMENT
 .TP
-.B DASHBOARD_CTL
+.B DSH_CTL
 the default control target for the clients.
 .TP
-.B DASHBOARD_CONTROL_TOKEN ", " DASHBOARD_CLI_KEEPALIVE
+.B DSH_CONTROL_TOKEN ", " DSH_CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off).
 
 .SH SEE ALSO

@@ -22,9 +22,9 @@ and packaging overview live in the [suite root](../README.md).
 | `static/boot.js` | config/i18n loader — must stay in `<head>`; sets `window.__boot` |
 | `static/app.js` | the whole application (chart, flow animation, i18n, stats) |
 | `static/i18n.js` | translations (`window.SOLAR_I18N`) |
-| `bin/dashboard.py` / `server.ini` | static server + Prometheus proxy (serves `static/` by default) |
-| `bin/dashboard_ctl.py` / `bin/dashboard_cli.py` | control clients: the one-shot / batch and the console-style session (see [Control](#control)) |
-| `lib/config.py` | settings resolution (CLI > env > `server.ini` > defaults) and the control-target resolution |
+| `bin/dashboard.py` / `server.conf` | static server + Prometheus proxy (serves `static/` by default) |
+| `bin/dashboard-ctl.py` / `bin/dashboard-cli.py` | control clients: the one-shot / batch and the console-style session (see [Control](#control)) |
+| `lib/config.py` | settings resolution (CLI > env > the `server.conf` set grammar > defaults) and the control-target resolution |
 | `lib/settings.py` | the control grammar registry (the settings, their help — one source for the wire, the completions and the docs) |
 | `lib/control.py` | the JSON-lines control server (the signed wire, the peer-cred shortcut) |
 | `config.js` | user settings (`SOLAR_CONFIG`) — at the subproject root, served at `/config.js` |
@@ -56,7 +56,7 @@ and packaging overview live in the [suite root](../README.md).
   (e.g. `de: { ... }`) — it appears in the switcher automatically and is merged
   over the built-in English fallback.
  - **Battery (optional, experimental)** — enable with `battery: true` in `config.js`
-  (or `dashboard.py --battery` / `BATTERY=1` / `battery = true` in `server.ini`,
+  (or `dashboard.py --battery` / `DSH_BATTERY=1` / `set battery true` in `server.conf`,
   which injects it into the served config.js, or `?battery=1` for testing):
   a Battery node joins the flow diagram (teal particles up = discharging,
   down = charging, state line with SoC %), the energy splits become three-way
@@ -77,7 +77,7 @@ and packaging overview live in the [suite root](../README.md).
 
 ## Configuration
 
-All settings live in `config.js` at the subproject root (served at `/config.js`; relocate with `--config-js`, `$CONFIG_JS` or `config_js` in `server.ini` — if the override file is missing, `/config.js` 404s and the page boots with built-in defaults):
+All settings live in `config.js` at the subproject root (served at `/config.js`; relocate with `--config-js`, `$DSH_CONFIG_JS` or `set config-js <file>` in `server.conf` — if the override file is missing, `/config.js` 404s and the page boots with built-in defaults):
 
 ```js
 const SOLAR_CONFIG = {
@@ -135,7 +135,7 @@ Prometheus directly:
 python3 bin/dashboard.py                          # upstream http://localhost:9090
 python3 bin/dashboard.py --port 8080 --upstream http://192.168.1.50:9090
 python3 bin/dashboard.py --bind 127.0.0.1         # localhost only
-PROM_URL=http://pi:9090 python3 bin/dashboard.py  # via env
+DSH_PROM_URL=http://pi:9090 python3 bin/dashboard.py  # via env
 # open http://localhost:8080
 ```
 
@@ -147,33 +147,45 @@ proxy](#behind-a-reverse-proxy) and the dashboard TODO's auth story).
 
 Logging uses the `logging` module. Proxied Prometheus queries are logged at
 DEBUG level only (or at INFO when `--log-queries` is passed / set in
-`server.ini`). Log level and query logging come from (CLI wins):
+`server.conf`). Log level and query logging come from (CLI wins):
 
 1. CLI: `--port`, `--bind`, `--upstream`, `--static-dir`, `--prom-prefix`,
    `--log-level DEBUG|INFO|WARNING|ERROR`, `--log-queries`, `--log-access`,
    `--max-clients`, `--client-timeout`, `--max-conn-per-ip`, `--local-time`,
    `--control-port`, `--control-token`, `--control-token-file`,
-   `--control-trust-uids`, `--audit-log`, `--dry-run`, `--man`
-2. Environment: `PORT`, `BIND`, `PROM_URL`, `PROM_PREFIX` (the generic, docker-documented
-   set) plus the family-shaped `DASHBOARD_MAX_CLIENTS`, `DASHBOARD_CLIENT_TIMEOUT`,
-   `DASHBOARD_MAX_CONN_PER_IP`, `DASHBOARD_LOG_ACCESS`, `DASHBOARD_CONTROL_PORT`,
-   `DASHBOARD_CONTROL_TOKEN`, `DASHBOARD_CONTROL_TOKEN_FILE`, `DASHBOARD_CONTROL_TRUST_UIDS`
-3. `server.ini` (same keys, snake_case):
+   `--control-ops-token`, `--control-ops-token-file`, `--control-ops-verbs`,
+   `--control-trust-uids`, `--audit-log`, `--audit-max-mb`, `--audit-files`,
+   `--no-audit-log`, `--metrics-server`, `--metrics-listen`, `--metrics-token`,
+   `--metrics-token-file`, `--metrics-max-clients`, `--metrics-client-timeout`,
+   `--metrics-max-conn-per-ip`, `--dry-run`, `--man`
+2. Environment: every env twin carries the tool's `DSH_` prefix —
+   `DSH_PORT`, `DSH_BIND`, `DSH_PROM_URL`, `DSH_PROM_PREFIX` (the
+   docker-documented set), `DSH_STATIC_DIR`, `DSH_CONFIG_JS`, `DSH_BATTERY`,
+   `DSH_MAX_CLIENTS`, `DSH_CLIENT_TIMEOUT`,
+   `DSH_MAX_CONN_PER_IP`, `DSH_LOG_ACCESS`, `DSH_CTL`,
+   `DSH_CONTROL_TOKEN`, `DSH_CONTROL_TOKEN_FILE`,
+   `DSH_CONTROL_OPS_TOKEN`, `DSH_CONTROL_OPS_TOKEN_FILE`,
+   `DSH_CONTROL_OPS_VERBS`, `DSH_METRICS_SERVER`,
+   `DSH_METRICS_LISTEN`, `DSH_METRICS_TOKEN`,
+   `DSH_METRICS_TOKEN_FILE`, `DSH_METRICS_MAX_CLIENTS`,
+   `DSH_METRICS_CLIENT_TIMEOUT`, `DSH_METRICS_MAX_CONN_PER_IP`,
+   `DSH_CONTROL_TRUST_UIDS`
+3. `server.conf` — the set grammar, every line a `set <name> <value>`:
 
-```ini
-[server]
-port = 8080
-bind = 0.0.0.0
-upstream = http://localhost:9090
-static_dir = /var/www/dashboard
-prom_prefix = /prom
-log_level = INFO
-log_queries = false
-battery = false
-max_clients = 64
-client_timeout = 300
-max_conn_per_ip = 0
-# control_port = /tmp/dashboard-8080.socket
+```conf
+# the dashboard's server.conf — every line is a set command
+set port 8080
+set bind 0.0.0.0
+set upstream http://localhost:9090
+set static-dir /var/www/dashboard
+set prom-prefix /prom
+set log-level INFO
+set log-queries false
+set battery false
+set max-clients 64
+set client-timeout 300
+set max-conn-per-ip 0
+# set control-port /tmp/dashboard-8080.socket
 ```
 
 `--prom-prefix ''` (empty) proxies *every* unmatched path to Prometheus.
@@ -192,22 +204,30 @@ port on 127.0.0.1 (a token is mandatory there — a token-less TCP control
 port refuses to start; with a token configured the wire is HMAC-signed:
 every command and reply carries the full sha256 of its frame, keyed by the
 token). Over the unix socket a trusted peer (root, the daemon's own user or
-`--control-trust-uids`) skips the token handshake (SO_PEERCRED).
+`--control-trust-uids`) skips the token handshake (SO_PEERCRED). A second,
+**read-only ops token** (`--control-ops-token`/`--control-ops-token-file`)
+authenticates into the `show` verbs only — no `set`/`unset`, no `request
+reload`, no `shutdown`: the ops shift against the admin key, both audited
+(the DSH trail's COMMAND entries carry `role=ops`/`role=admin`, the
+denials included; each session's frames are mac'd with the key it
+authenticated with).
 
 ```bash
 python3 bin/dashboard.py --control-port /tmp/dashboard-8080.socket &
-python3 bin/dashboard_ctl.py show status          # one-shot
-python3 bin/dashboard_ctl.py request reload       # the SIGHUP path
-printf 'set battery on\nshow settings\n' | python3 bin/dashboard_ctl.py
-python3 bin/dashboard_cli.py                      # the console: TAB completion, ?, reconnect
+python3 bin/dashboard-ctl.py show status          # one-shot
+python3 bin/dashboard-ctl.py request reload       # the SIGHUP path
+printf 'set battery on\nshow settings\n' | python3 bin/dashboard-ctl.py
+python3 bin/dashboard-cli.py                      # the console: TAB completion, ?, reconnect
 ```
 
 Commands: `set <setting> <value>` / `unset <setting>` (the live settings:
 `max-clients`, `client-timeout`, `max-conn-per-ip`, `log-access`,
 `log-queries`, `battery`, `log-level`), `show <setting>` / `show status` /
 `show connections` (the live HTTP clients per peer IP) / `show settings` /
-`show version`, `inspect` (the one-page dump for a bug report), `request
-reload` (re-read `server.ini` — the SIGHUP path; the listen address and
+`show version` / `show knobs` (the dictionary of every registry knob: its
+flag, its env twin, its section, how it changes), `inspect` (the one-page
+dump for a bug report), `request
+reload` (re-read `server.conf` — the SIGHUP path; the listen address and
 port are bound and stay), `shutdown`, `quit`; `help <setting>` describes a
 setting. A SIGHUP or `request reload` also clears the live-override marks
 (`show settings` marks an overridden value with `*`).
@@ -312,7 +332,7 @@ exporter that polls the inverter over Modbus TCP and serves exactly those
 metrics — see [`../scrape/README.md`](../scrape/README.md):
 
 ```bash
-python3 scrape/bin/modbus_scraper.py --host <inverter-lan-ip> --listen 0.0.0.0:9350
+python3 scrape/bin/modbus-scraper.py --host <inverter-lan-ip> --listen 0.0.0.0:9350
 ```
 
 ```yaml

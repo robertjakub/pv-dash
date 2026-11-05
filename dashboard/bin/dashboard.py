@@ -32,10 +32,13 @@ from common.cred import parse_trust_uids
 from common.connlimit import GatedHTTPServer
 from common.logutil import UtcFormatter
 from common.version import version_string
+from common.config import load_token_file, parse_listen
 from lib.config import resolve_config, resolve_control_target
 from lib.control import ControlServer
 from lib.man import daemon_page
-from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, PROXY_TIMEOUT_S
+from lib.metrics import MetricsServer, describe_metrics
+from lib.options import KNOWN_VERBS
+from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, DEFAULTS, LOG_LEVELS, PROXY_TIMEOUT_S
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -53,17 +56,17 @@ def next_to_script(name):
 
 
 def default_config_path():
-    """$DASHBOARD_CONFIG wins (the docker config volume); then a user's ini
+    """$DSH_CONFIG wins (the docker config volume); then a user's ini
     next to the script (the flattened package layout); then the dev
     checkout's sample at the subproject root."""
-    env = os.environ.get('DASHBOARD_CONFIG')
+    env = os.environ.get('DSH_CONFIG')
     if env and env.strip():
         return env.strip()
-    for candidate in (os.path.join(SCRIPT_DIR, 'server.ini'),
-                      os.path.join(os.path.dirname(SCRIPT_DIR), 'server.ini')):
+    for candidate in (os.path.join(SCRIPT_DIR, 'server.conf'),
+                      os.path.join(os.path.dirname(SCRIPT_DIR), 'server.conf')):
         if os.path.exists(candidate):
             return candidate
-    return os.path.join(SCRIPT_DIR, 'server.ini')
+    return os.path.join(SCRIPT_DIR, 'server.conf')
 
 
 RATE_LIMIT_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
@@ -84,11 +87,25 @@ class Handler(BaseHTTPRequestHandler):
     battery = False
     upstream_ok = True
     _upstream_lock = threading.Lock()
+    status_counts = {'2xx': 0, '4xx': 0, '5xx': 0, 'prom': 0}   # the /metrics counters
+
+    @classmethod
+    def count(cls, key):
+        try:
+            cls.status_counts[key] += 1
+        except (KeyError, TypeError):
+            pass
+
+    def send_response(self, code, message=None):
+        Handler.count('2xx' if code < 400 else '4xx' if code < 500 else '5xx')
+        super().send_response(code, message)
 
     def do_GET(self):
+        parts = urlsplit(self.path)
+        prefix = self.prom_prefix.rstrip('/')
+        if prefix and (parts.path == prefix or parts.path.startswith(prefix + '/')):
+            Handler.count('prom')
         try:
-            parts = urlsplit(self.path)
-            prefix = self.prom_prefix.rstrip('/')
             if not prefix or parts.path == prefix or parts.path.startswith(prefix + '/'):
                 self.proxy(parts)
             else:
@@ -232,7 +249,7 @@ def describe(cfg, args, control_desc):
              (['client-timeout %gs' % cfg['client_timeout']] if cfg['client_timeout'] else []) + \
              (['max-conn-per-ip %d' % cfg['max_conn_per_ip']] if cfg['max_conn_per_ip'] else [])
     return ('serving %s on http://%s:%d (proxy: %s/* -> %s, config.js: %s, log level: %s, log time: %s, '
-            'log access: %s, log queries: %s%s, limits: %s, control server: %s, version: %s)' % (
+            'log access: %s, log queries: %s%s, limits: %s, control server: %s, %s, version: %s)' % (
                 cfg['static_dir'], cfg['bind'], cfg['port'], cfg['prom_prefix'] or '/', cfg['upstream'],
                 cfg['config_js'], cfg['level'],
                 'local' if cfg['local_time'] else 'UTC',
@@ -241,6 +258,7 @@ def describe(cfg, args, control_desc):
                 ', battery enabled' if cfg['battery'] else '',
                 ', '.join(limits) if limits else 'off',
                 control_desc,
+                ('metrics: %s' % args.metrics_desc) if getattr(args, 'metrics_desc', 'off') != 'off' else 'metrics: off',
                 version_string()))
 
 
@@ -283,46 +301,80 @@ def install_signal_handlers(httpd, apply_reload=None, graceful_stop=None):
 def parse_args():
     ap = argparse.ArgumentParser(description='Static file server with a Prometheus proxy at /prom')
     ap.add_argument('--config', default=default_config_path(),
-                    help='config file (default: $DASHBOARD_CONFIG, then server.ini next to this script, then the subproject root)')
-    ap.add_argument('--port', type=int, help='listen port (default: config file, $PORT or 8080)')
+                    help='config file (default: $DSH_CONFIG, then server.ini next to this script, then the subproject root)')
+    ap.add_argument('--port', type=int, help='listen port (default: config file, $DSH_PORT or 8080)')
     ap.add_argument('--bind', help='address to bind (default: config file, $BIND or 0.0.0.0)')
-    ap.add_argument('--static-dir', help='directory to serve (default: config file, $STATIC_DIR or static next to the script)')
-    ap.add_argument('--config-js', help='config.js to serve at /config.js (default: config file, $CONFIG_JS or config.js next to the script)')
-    ap.add_argument('--prom-prefix', help='path under which Prometheus is proxied (default: config file, $PROM_PREFIX or /prom); empty string proxies everything')
-    ap.add_argument('--upstream', help='upstream Prometheus URL (default: config file, $PROM_URL or http://localhost:9090)')
+    ap.add_argument('--static-dir', help='directory to serve (default: config file, $DSH_STATIC_DIR or static next to the script)')
+    ap.add_argument('--config-js', help='config.js to serve at /config.js (default: config file, $DSH_CONFIG_JS or config.js next to the script)')
+    ap.add_argument('--prom-prefix', help='path under which Prometheus is proxied (default: config file, $DSH_PROM_PREFIX or /prom); empty string proxies everything')
+    ap.add_argument('--upstream', help='upstream Prometheus URL (default: config file, $DSH_PROM_URL or http://localhost:9090)')
     ap.add_argument('--max-clients', type=int, help='maximum concurrent HTTP clients (pages + proxy); extras get an immediate 503 '
-                    '(default: config file, $DASHBOARD_MAX_CLIENTS or 64; 0 = unlimited)')
+                    '(default: config file, $DSH_MAX_CLIENTS or 64; 0 = unlimited)')
     ap.add_argument('--client-timeout', type=float, help='seconds an idle keep-alive HTTP client is kept before '
-                    'being kicked (default: config file, $DASHBOARD_CLIENT_TIMEOUT or 300; 0 = off)')
+                    'being kicked (default: config file, $DSH_CLIENT_TIMEOUT or 300; 0 = off)')
     ap.add_argument('--max-conn-per-ip', dest='max_conn_per_ip', type=int, help='maximum concurrent HTTP connections '
                     'from one peer IP; extras get an immediate 503 '
-                    '(default: config file, $DASHBOARD_MAX_CONN_PER_IP or 0 = no per-IP limit)')
-    ap.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+                    '(default: config file, $DSH_MAX_CONN_PER_IP or 0 = no per-IP limit)')
+    ap.add_argument('--log-level', choices=list(LOG_LEVELS),
                     help='log level (default: config file or INFO); DEBUG logs every request')
     ap.add_argument('--log-queries', action='store_true', default=None,
                     help='log proxied Prometheus queries at INFO level')
     ap.add_argument('--log-access', action='store_true', default=None,
-                    help='log every HTTP request at INFO (default: config file, $DASHBOARD_LOG_ACCESS or quiet)')
+                    help='log every HTTP request at INFO (default: config file, $DSH_LOG_ACCESS or quiet)')
     ap.add_argument('--local-time', action='store_true', help='log timestamps in the system time zone instead of UTC')
     ap.add_argument('--battery', action='store_true', default=None,
-                    help='enable battery support in the served config.js (default: config file, $BATTERY or off)')
+                    help='enable battery support in the served config.js (default: config file, $DSH_BATTERY or off)')
     ap.add_argument('--control-port', dest='control_port',
                     help='JSON-lines control server target: unix socket path (default: /tmp/dashboard-<port>.socket) '
                          'or TCP port number on 127.0.0.1 (e.g. 15598); 0 = off. Talk to it with dashboard-ctl.py '
-                         '(default: config file, $DASHBOARD_CONTROL_PORT)')
+                         '(default: config file, $DSH_CTL)')
     ap.add_argument('--control-token', dest='control_token',
                     help='require a token on control connections: the client authenticates with '
                          '{"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s '
                          'own user or --control-trust-uids — SO_PEERCRED) skips the token '
-                         '(default: config file, $DASHBOARD_CONTROL_TOKEN or none)')
+                         '(default: config file, $DSH_CONTROL_TOKEN or none)')
     ap.add_argument('--control-token-file', dest='control_token_file',
                     help='the control token from a file (the first line; e.g. a systemd LoadCredential or a key '
                          'file; must be owner-only 0600) — takes the place of --control-token; giving both is an '
-                         'error (env DASHBOARD_CONTROL_TOKEN_FILE)')
+                         'error (env DSH_CONTROL_TOKEN_FILE)')
+    ap.add_argument('--control-ops-token', dest='control_ops_token',
+                    help='a second, read-only control token: sessions authenticating with it may run the '
+                         'show/clear verbs only (no set/unset, no request reload, no shutdown) — the ops shift '
+                         'against the admin key, both audited (default: config file, $DSH_CONTROL_OPS_TOKEN '
+                         'or none)')
+    ap.add_argument('--control-ops-token-file', dest='control_ops_token_file',
+                    help='the read-only ops token from a file (the first line; must be owner-only 0600) — takes '
+                         'the place of --control-ops-token; giving both is an error '
+                         '(env DSH_CONTROL_OPS_TOKEN_FILE)')
     ap.add_argument('--control-trust-uids', dest='control_trust_uids',
                     help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local '
                          'systemd unit speaks without the secret); root and the daemon\'s own user are always '
-                         'trusted (default: config file, $DASHBOARD_CONTROL_TRUST_UIDS or none)')
+                         'trusted (default: config file, $DSH_CONTROL_TRUST_UIDS or none)')
+    ap.add_argument('--control-ops-verbs', dest='control_ops_verbs',
+                    help="the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated "
+                         '(default: show,clear; validated against the control grammar at start)')
+    ap.add_argument('--metrics-server', dest='metrics_server', action='store_true', default=None,
+                    help="serve the dashboard's own Prometheus /metrics endpoint (the uptime, the request "
+                         'counters, the proxied query total, the client gate) — off by default and a token is '
+                         'mandatory when on (default: config file, $DSH_METRICS_SERVER or off)')
+    ap.add_argument('--metrics-listen', dest='metrics_listen',
+                    help='the metrics bind address HOST:PORT (default: config file, $DSH_METRICS_LISTEN or '
+                         '127.0.0.1:9452)')
+    ap.add_argument('--metrics-token', dest='metrics_token',
+                    help='require Authorization: Bearer <token> on the /metrics endpoint — mandatory when '
+                         '--metrics-server is on (default: config file, $DSH_METRICS_TOKEN)')
+    ap.add_argument('--metrics-token-file', dest='metrics_token_file',
+                    help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes '
+                         'the place of --metrics-token; giving both is an error (env DSH_METRICS_TOKEN_FILE)')
+    ap.add_argument('--metrics-max-clients', dest='metrics_max_clients', type=int,
+                    help='maximum concurrent /metrics clients; extras get an immediate 503, 0 = unlimited '
+                         '(default: config file, $DSH_METRICS_MAX_CLIENTS or 16)')
+    ap.add_argument('--metrics-client-timeout', dest='metrics_client_timeout', type=float,
+                    help='seconds an idle /metrics client is kept before the socket times out, 0 = the built-in '
+                         '5 s cap (default: config file, $DSH_METRICS_CLIENT_TIMEOUT or 5)')
+    ap.add_argument('--metrics-max-conn-per-ip', dest='metrics_max_conn_per_ip', type=int,
+                    help='maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit '
+                         '(default: config file, $DSH_METRICS_MAX_CONN_PER_IP or 0)')
     ap.add_argument('--audit-log', default=None,
                     help='DSH audit trail: a file path or - for stdout (the docker/journald way); '
                          'default: the XDG state home (~/.local/state/dashboard/audit.log)')
@@ -348,7 +400,28 @@ def main():
     setup_logging(cfg)
     control_target = resolve_control_target(cfg['control_port'], cfg['port'])
     control_token = cfg['control_token'] or None
+    control_ops_token = cfg['control_ops_token'] or None
+    ops_verbs = frozenset(v.strip().lower() for v in (cfg['control_ops_verbs'] or 'show,clear').split(',') if v.strip())
+    unknown = sorted(v for v in ops_verbs if v not in KNOWN_VERBS)
+    if not ops_verbs or unknown:
+        logger.error('--control-ops-verbs: %s (the ops policy needs at least one verb the grammar speaks: %s)',
+                     ', '.join(unknown) if unknown else 'empty', ', '.join(sorted(KNOWN_VERBS)))
+        raise SystemExit(2)
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
+    metrics_token = args.metrics_token or cfg.get('metrics_token')
+    if args.metrics_token_file:
+        metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
+    elif cfg.get('metrics_token_file'):
+        metrics_token = load_token_file(cfg['metrics_token_file'], 'metrics-token-file')
+    metrics_listen = parse_listen(cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9452'))
+    if cfg['metrics_server'] and not metrics_token:
+        logger.error('the metrics endpoint serves the request counters: set --metrics-token or '
+                     '--metrics-token-file when --metrics-server is on (or drop --metrics-server)')
+        raise SystemExit(2)
+    metrics_desc = 'off'
+    if cfg['metrics_server']:
+        metrics_desc = describe_metrics(metrics_listen, metrics_token, cfg.get('metrics_max_clients', 16),
+                                        cfg.get('metrics_max_conn_per_ip', 0))
     audit = None if args.no_audit_log else AuditLog(args.audit_log, 'DSH', app='dashboard',
                                                     max_mb=args.audit_max_mb, files=args.audit_files)
     control_desc = 'off' if control_target == '0' \
@@ -361,6 +434,7 @@ def main():
     Handler.prom_prefix = cfg['prom_prefix']
     Handler.battery = cfg['battery']
     Handler.timeout = cfg['client_timeout'] or None
+    args.metrics_desc = metrics_desc
     logger.info('%s', describe(cfg, args, control_desc))
     if args.dry_run:
         logger.info('dry-run: configuration is valid, nothing was bound')
@@ -385,8 +459,22 @@ def main():
             'log-level': cfg['level'],
         }
         control = ControlServer(httpd, int(control_target) if control_target.isdigit() else control_target,
-                                audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids)
+                                audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
+                                ops_token=control_ops_token, ops_verbs=ops_verbs)
         control.start()
+    metrics_srv = None
+    if cfg['metrics_server']:
+        metrics_srv = MetricsServer(httpd, metrics_listen, token=metrics_token, started=started,
+                                    max_clients=cfg.get('metrics_max_clients', 16),
+                                    client_timeout=cfg.get('metrics_client_timeout', 5),
+                                    max_per_ip=cfg.get('metrics_max_conn_per_ip', 0))
+        metrics_srv.start()
+        httpd.metrics_srv = metrics_srv
+        if control:
+            control.metrics_srv = metrics_srv
+            control.metrics_token = metrics_token
+            control.metrics_listen = metrics_listen
+            control.metrics_desc = metrics_desc
 
     def apply_reload():
         """The SIGHUP and the `request reload` command share this: re-resolve

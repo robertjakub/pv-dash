@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Regression test for the audit trail's hash chain (docs/AUDIT.md F10):
-every entry carries a short `h=` chaining to the writer's previous entry,
-per writer prefix, and scripts/audit_verify.py detects tampering (an edited
+every entry carries a short hash right after the event name, chaining to the
+writer's previous entry,
+and scripts/audit_verify.py detects tampering (an edited
 line, a deleted line, reordered lines), passes legit trails (restarts chain
 seamlessly, rotation spans the backups), and reports legacy unsigned lines
 without failing them.
@@ -57,6 +58,11 @@ def main():
         a.event('REQUESTS', 'clients=1 reads=3 writes=0')
         ok, out = verify(log, contain=['OK'])
         check('interleaved writers verify', ok, out)
+        # the layout: the hash sits right after the event name, no decoration
+        first = open(log).read().splitlines()[0].split(' ')
+        check('layout: hash inline after the event (no h=)', len(first) >= 5 and first[1] == 'AUDIT'
+              and len(first[4]) == 12 and all(ch in '0123456789abcdef' for ch in first[4])
+              and first[5] == 'version=test', ' '.join(first[:6]))
 
         # 2. an edited line breaks the chain at that line
         lines = open(log).read().splitlines()

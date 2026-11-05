@@ -801,7 +801,8 @@ try:
     r = cli('show version\nping\nquit\n', audit=AUD2)
     cli_rows = open(AUD2).read()
     check('audit: cli logs the session + the local commands; the wire commands = the server trail',
-          'CLI CONNECT target=' in cli_rows and "CLI COMMAND 'quit' -> local" in cli_rows
+          'CLI CONNECT ' in cli_rows and 'target=' in cli_rows
+          and 'CLI COMMAND ' in cli_rows and "'quit' -> local" in cli_rows
           and 'CLI DISCONNECT' in cli_rows and "CLI COMMAND 'show" not in cli_rows
           and 'ping' not in cli_rows and 'pong' not in cli_rows, cli_rows)
     r = cli('show settings\nquit\n')
@@ -890,9 +891,11 @@ try:
     time.sleep(1)
     inv_rows = open(AUDD).read()
     check('audit: INV logs START, COMMAND (peer), RELOAD, RESET, SHUTDOWN; ping skipped',
-          'INV START version=' in inv_rows and "INV COMMAND peer=127.0.0.1" in inv_rows
+          'INV START ' in inv_rows and 'version=' in inv_rows and "INV COMMAND " in inv_rows
+          and 'peer=127.0.0.1' in inv_rows
           and "'set soc 55' -> ok" in inv_rows and 'INV RELOAD' in inv_rows
-          and 'INV RESET SIGUSR1' in inv_rows and 'INV SHUTDOWN SIGTERM' in inv_rows
+          and 'INV RESET ' in inv_rows and 'SIGUSR1' in inv_rows and 'INV SHUTDOWN ' in inv_rows
+          and 'SIGTERM' in inv_rows
           and 'ping' not in inv_rows, inv_rows)
 
     # 2g1b. unset command + scenario custom (server side, shared registry)

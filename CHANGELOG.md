@@ -46,8 +46,10 @@ before the repo restructured into one suite.
   `modbus_cache_uplink_*` gauges (session counters + per-block
   up/latency/fails with `fc`/`start`/`count` labels).
 - **common, scripts** — the audit trails are **tamper-evident** now (the
-  audit finding F10, docs/AUDIT.md): every entry ends with a short chained
-  hash — `h=<12 hex>`, `sha256(prev | stamp | prefix | text)`, chained **per
+  audit finding F10, docs/AUDIT.md): every entry carries a short chained
+  hash right after the event name — `<stamp> AUDIT <PREFIX> <EVENT> <12
+  hex> [detail]`, `sha256(prev | stamp | prefix | event + detail)`, chained
+  **per
   writer prefix** so the interleaved writers (CACHE/INV/CLI/CTL in one
   file) verify independently and a restarted writer seeds from its own
   trail. The new `scripts/audit_verify.py` walks a trail (default: the

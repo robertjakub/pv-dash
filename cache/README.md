@@ -525,16 +525,22 @@ The prefix names the writer — `CACHE` (the proxy), `CLI` (cache_cli) and
 `CTL` (cache_ctl):
 
 ```
-2026-11-04T07:16:40Z AUDIT CACHE START version=0.3.0 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
-2026-11-04T07:16:43Z AUDIT CACHE WRITE register 47415 = 5 (single register, unit 1)
-2026-11-04T07:17:02Z AUDIT CACHE AUTH-FAIL peer=127.0.0.1:54425
-2026-11-04T07:17:12Z AUDIT CACHE COMMAND peer=127.0.0.1:54426 'clear cache' -> ok
-2026-11-04T07:17:30Z AUDIT CACHE REQUESTS peer=127.0.0.1:54425 requests=412 (last 300s: 380)
-2026-11-04T07:17:30Z AUDIT CLI CONNECT target=127.0.0.1:15502 user=oom
-2026-11-04T07:17:45Z AUDIT CACHE REQUESTS peer=127.0.0.1:54425 requests=412 connected=342s
-2026-11-04T07:17:45Z AUDIT CACHE SHUTDOWN SIGTERM received: uptime=65s clients=1 hits=412 misses=9
-2026-11-04T07:18:02Z AUDIT CTL CONNECT target=unix:/tmp/modbus-cache-15502.socket user=oom
+2026-11-04T07:16:40Z AUDIT CACHE START 4e1b92f0c7a3 version=0.3.0 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
+2026-11-04T07:16:43Z AUDIT CACHE WRITE b2c4e17f90d8 register 47415 = 5 (single register, unit 1)
+2026-11-04T07:17:02Z AUDIT CACHE AUTH-FAIL 6f3d84a1e2c9 peer=127.0.0.1:54425
+2026-11-04T07:17:12Z AUDIT CACHE COMMAND 09ab57d3f4e1 peer=127.0.0.1:54426 'clear cache' -> ok
+2026-11-04T07:17:30Z AUDIT CACHE REQUESTS 71d0c93be8f5 peer=127.0.0.1:54425 requests=412 (last 300s: 380)
+2026-11-04T07:17:30Z AUDIT CLI CONNECT 3a8e5f1c2d94 target=127.0.0.1:15502 user=oom
+2026-11-04T07:17:45Z AUDIT CACHE REQUESTS cc17e5b2a4f8 peer=127.0.0.1:54425 requests=412 connected=342s
+2026-11-04T07:17:45Z AUDIT CACHE SHUTDOWN d94a1f07c3e2 SIGTERM received: uptime=65s clients=1 hits=412 misses=9
+2026-11-04T07:18:02Z AUDIT CTL CONNECT 58c3f9e21b70 target=unix:/tmp/modbus-cache-15502.socket user=oom
 ```
+
+The 12-hex token after the event name is the entry's **chained hash** (the
+audit's F10): each entry hashes the writer's previous entry into its own —
+any edit, deletion or reordering in the middle of a prefix's trail shows up
+as a chain break in `scripts/audit_verify.py` (run it on this file, the
+family's XDG trails, or a journald dump on stdin).
 
 UTC stamps, the command as entered and its outcome — the structured
 who-when-what evidence trail. **Every wire command is audited once, by the

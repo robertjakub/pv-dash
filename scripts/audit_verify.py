@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Verify the audit trails' hash chains (docs/AUDIT.md F10): every entry
-ends with a short `h=` chaining to the writer's previous entry —
-h = sha256(prev | stamp | prefix | text), 12 hex chars, chained per writer
-prefix (CACHE / INV / CLI / CTL) so interleaved writers verify independently.
+carries a short hash right after the event name —
+`<stamp> AUDIT <PREFIX> <EVENT> <hash> [detail]` — chained to the writer's
+previous entry: h = sha256(prev | stamp | prefix | event + detail), 12 hex
+chars, chained per writer prefix (CACHE / INV / CLI / CTL) so interleaved
+writers verify independently.
 
   python3 scripts/audit_verify.py [FILE|- ...]      # default: the family's XDG trails
   python3 scripts/audit_verify.py -q ~/.local/state/modbus-cache/audit.log
@@ -11,7 +13,7 @@ prefix (CACHE / INV / CLI / CTL) so interleaved writers verify independently.
 For a real file the rotated backups (FILE.1 .. FILE.16) are verified first
 (oldest last-written first), so a chain that crossed a rotation still
 validates end to end. Per entry: chained (recomputed and matched), unsigned
-(no h= — a pre-chain line or one whose hash was stripped; reported, chain
+(no hash — a pre-chain line or one whose hash was stripped; reported, chain
 state unchanged) or BROKEN (the recomputed hash does not match — the line,
 its neighbours or its order were tampered with). Exit 0 = every chain holds,
 1 = at least one broken/malformed entry.
@@ -22,19 +24,18 @@ import sys
 here = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.dirname(here))   # the repo root — the common/ package
 
-from common.audit import HASH_LEN, entry_hash, parse_entry_hash, default_path
+from common.audit import HASH_LEN, entry_body, entry_hash, parse_entry_hash, default_path
 
 DEFAULT_TRAILS = ('modbus-cache', 'modbus-scraper', 'fake-inverter')
 
 
 def split_line(line):
-    """'<stamp> AUDIT <PREFIX> <body>' -> (stamp, prefix, body) or None."""
-    parts = line.split(' ', 3)
+    """'<stamp> AUDIT <PREFIX> ...' -> (stamp, prefix) or None (the rest is
+    read positionally by the shared parsers)."""
+    parts = line.split(' ')
     if len(parts) < 3 or parts[1] != 'AUDIT':
         return None
-    stamp, prefix = parts[0], parts[2]
-    body = parts[3] if len(parts) == 4 else ''
-    return stamp, prefix, body
+    return parts[0], parts[2]
 
 
 def verify_stream(name, lines, quiet):
@@ -54,13 +55,13 @@ def verify_stream(name, lines, quiet):
         if parsed is None:
             broken.append((no, '-', 'not an audit line (malformed)'))
             continue
-        stamp, prefix, body = parsed
+        stamp, prefix = parsed
         if h is None:
             unsigned += 1
             continue
         prev = chains.get(prefix)
         if prev is not None:
-            want = entry_hash(prev, stamp, prefix, body[:-(HASH_LEN + 3)])
+            want = entry_hash(prev, stamp, prefix, entry_body(line))
             if want != h:
                 broken.append((no, prefix, 'hash mismatch (the entry, its neighbours or the order were tampered with)'))
         chains[prefix] = h

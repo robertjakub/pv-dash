@@ -427,14 +427,20 @@ cannot be opened, the trail falls back to stdout rather than vanishing. **Rotati
 (the fake), `CLI` (fake_cli), `CTL` (fake_ctl):
 
 ```
-2026-11-03T20:10:06Z INV START version=0.3.0 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
-2026-11-03T20:10:07Z AUDIT INV COMMAND peer=127.0.0.1:54425 'set soc 40' -> ok
-2026-11-03T20:10:08Z INV RESET SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
-2026-11-03T20:10:08Z INV SHUTDOWN SIGTERM: uptime=2s conns=0 requests=0 chaos_hits=0
-2026-11-03T18:44:10Z CLI CONNECT target=127.0.0.1:15731 user=oom
-2026-11-03T18:44:10Z AUDIT CLI COMMAND 'quit' -> local
-2026-11-03T18:44:10Z CLI DISCONNECT target=127.0.0.1:15731
+2026-11-03T20:10:06Z INV START 3f9a21c04de7 version=0.3.0 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
+2026-11-03T20:10:07Z AUDIT INV COMMAND 9c41e2b7a058 peer=127.0.0.1:54425 'set soc 40' -> ok
+2026-11-03T20:10:08Z INV RESET 77b0c4e19d23 SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
+2026-11-03T20:10:08Z INV SHUTDOWN 5e2af8c30b61 SIGTERM: uptime=2s conns=0 requests=0 chaos_hits=0
+2026-11-03T18:44:10Z CLI CONNECT a01f65c3924b target=127.0.0.1:15731 user=oom
+2026-11-03T18:44:10Z AUDIT CLI COMMAND c8812a4f0d37 'quit' -> local
+2026-11-03T18:44:10Z CLI DISCONNECT 22b7d90e5f14 target=127.0.0.1:15731
 ```
+
+The 12-hex token after the event name is the entry's **chained hash** (the
+audit's F10): each entry hashes the writer's previous entry into its own —
+any edit, deletion or reordering in the middle of a prefix's trail shows up
+as a chain break in `scripts/audit_verify.py` (run it on this file, the
+family's XDG trails, or a journald dump on stdin).
 
 UTC stamps, the command as entered and its outcome (`ok` / `err`) — the
 structured who-when-what evidence trail. **Every wire command is

@@ -498,8 +498,8 @@ try:
           and 'upstream=127.0.0.1:15512' in st.get('text', ''), '%s %s' % (auth, st))
     tok_audit = open('/tmp/reg_audit_ctl.log').read()
     check('audit: AUTH-FAIL + COMMAND events with the peer',
-          'AUTH-FAIL' in tok_audit and 'AUDIT CACHE COMMAND peer=127.0.0.1:' in tok_audit
-          and "'show status' -> ok" in tok_audit, tok_audit[-200:])
+          'AUTH-FAIL' in tok_audit and 'AUDIT CACHE COMMAND ' in tok_audit
+          and 'peer=127.0.0.1:' in tok_audit and "'show status' -> ok" in tok_audit, tok_audit[-200:])
 
     # the pre-auth line buffer is capped: a newline-less stream is dropped, not buffered
     s = socket.create_connection(('127.0.0.1', 15520), timeout=10)

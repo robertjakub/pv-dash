@@ -5,10 +5,11 @@ so the trail filters cleanly out of a mixed log. ping/pong keepalives are
 never logged. The file is opened append-only and flushed per event, so a
 crash keeps everything up to the last command.
 
-Every entry ends with a short `h=` hash (12 hex chars) chaining to the
-writer's previous entry: h = sha256(prev | stamp | prefix | text) truncated.
-The chain is per writer prefix (CACHE, INV, CLI, CTL each chain their own
-lines), so several writers can interleave in one file and every chain stays
+Every entry carries a short chained hash right after the event name (12 hex
+chars, no decoration): `<stamp> AUDIT <PREFIX> <EVENT> <hash> [detail]` —
+h = sha256(prev | stamp | prefix | event + detail) truncated. The chain is
+per writer prefix (CACHE, INV, CLI, CTL each chain their own lines), so
+several writers can interleave in one file and every chain stays
 verifiable on its own — scripts/audit_verify.py walks a file (and its
 rotated backups, oldest first), recomputes each prefix's chain and names the
 line where it breaks. The chain is tamper-EVIDENT: any edited, reordered or
@@ -44,14 +45,23 @@ def entry_hash(prev, stamp, prefix, body):
 
 
 def parse_entry_hash(line):
-    """The trailing `h=<hex>` of one audit line (None when absent/malformed).
-    The hash is always the line's last token, exactly HASH_LEN chars."""
-    tail = line.rstrip()
-    idx = tail.rfind(' h=')
-    if idx < 0 or idx + 3 + HASH_LEN != len(tail):
+    """The chained hash of one audit line (None when absent/malformed): the
+    5th space-separated token, right after the event name, exactly
+    HASH_LEN hex chars — `<stamp> AUDIT <PREFIX> <EVENT> <hash> [detail...]`."""
+    parts = line.rstrip().split(' ')
+    if len(parts) < 5 or parts[1] != 'AUDIT':
         return None
-    h = tail[idx + 3:]
-    return h if all(c in '0123456789abcdef' for c in h) else None
+    h = parts[4]
+    if len(h) != HASH_LEN or not all(c in '0123456789abcdef' for c in h):
+        return None
+    return h
+
+
+def entry_body(line):
+    """The hashed text of one audit line: `<EVENT> [detail...]` — the hash
+    token skipped, everything after it verbatim."""
+    parts = line.rstrip().split(' ')
+    return ' '.join(parts[3:4] + parts[5:])
 
 
 def tail_hash(path, prefix):
@@ -154,7 +164,8 @@ class AuditLog:
             body = '%s%s' % (event, (' ' + detail) if detail else '')
             h = entry_hash(self._last, stamp, self.prefix, body)
             self._last = h
-            self._f.write('%s AUDIT %s %s h=%s\n' % (stamp, self.prefix, body, h))
+            self._f.write('%s AUDIT %s %s %s%s\n' % (stamp, self.prefix, event, h,
+                                                     (' ' + detail) if detail else ''))
             self._f.flush()
 
     def command(self, cmd, result):

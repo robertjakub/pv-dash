@@ -1,0 +1,147 @@
+.TH MODBUS-SCRAPER 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
+.SH NAME
+modbus-scraper \- Huawei SUN2000 Modbus TCP to Prometheus exporter
+.SH SYNOPSIS
+.B modbus-scraper
+.RI [ options ]
+.br
+.B modbus-scraper \-\-dry-run
+.RI [ options ]
+.SH DESCRIPTION
+A stdlib-only Prometheus exporter that polls a Huawei SUN2000 inverter
+over Modbus TCP and exposes the \fBhuawei_*\fR metrics the dashboard
+expects, plus health gauges. It can poll the inverter directly or through
+.BR modbus-cache (1)
+(which it auto-detects and reports as the \fBhuawei_cache_*\fR
+diagnostics). The exporter is the read-only consumer of the family: no
+write path, no control surface; its HTTP surface is exactly two GET
+routes (\fB/\fR and \fB/metrics\fR).
+.PP
+The exported metrics (names, HELP texts and profile bindings live in
+\fBmetrics.json\fR): the PV generation, the grid export/import split, the
+derived home consumption, the optional battery metrics (\fB--battery\fR),
+\fBhuawei_up\fR, the error counter and the last-poll timestamp. Sanity
+caps (\fB--max-kwp\fR, \fB--max-grid-kw\fR) turn impossible readings into
+HTTP 503 until a good poll. Modbus TCP must be enabled on the
+inverter/SDongle/EMMA (default port 502, unit id 1).
+.SH OPTIONS
+.TP
+.BI \-\-config " FILE"
+config file (ini, \fB[scraper]\fR section, snake_case keys). Default:
+\fB$SCRAPER_CONFIG\fR, then \fBscraper.ini\fR next to the script, then the
+packaged sample; a missing file is fine, a malformed one is fatal.
+.TP
+.BI \-\-metrics-spec " FILE"
+the metrics spec JSON (name \(-> {help, type, profile?}). Default the
+bundled \fBmetrics.json\fR.
+.TP
+.BI \-\-host " HOST" ", " \-\-modbus-port " N" ", " \-\-unit " N"
+the upstream device. Defaults \fB127.0.0.1\fR, \fB5502\fR, \fB1\fR.
+.TP
+.BI \-\-modbus-offset " N"
+added to register addresses (\fB\-1\fR for gateways that need 0-based
+addressing). Default \fB0\fR.
+.TP
+.BI \-\-profile " NAME|PATH"
+the device profile (the register map); defaults to the bundled
+\fBsun2000\fR. The explicit register flags below override the profile
+when set.
+.TP
+.BI \-\-pv-register " ADDR" ", " \-\-grid-register " ADDR"
+the PV input power (I32 W) and the grid/active power (I32 W) registers.
+Defaults \fB32064\fR / \fB37113\fR (Huawei Issue 04; the 20200520 protocol
+wants \fB32089\fR / \fB37258\fR).
+.TP
+.BI \-\-scale " X" ", " \-\-grid-scale " X"
+raw-value multipliers (defaults \fB1\fR \(em the registers already report
+watts; \fB1000\fR for kW devices).
+.TP
+.BI \-\-max-kwp " KW" ", " \-\-max-grid-kw " KW"
+sanity caps (\fB6\fR / \fB12\fR); a reading past them (and any negative
+PV) answers HTTP 503 until the data is sane again. \fB0\fR = off.
+.TP
+.B \-\-battery
+enable battery support: the battery term in the home derivation and the
+battery metrics.
+.TP
+.BI \-\-battery-register " ADDR" ", " \-\-battery-soc-register " ADDR"
+battery power (I32 W, +charge) and SoC (U16, %\(en10). Defaults
+\fB37001\fR / \fB37004\fR.
+.TP
+.B \-\-grid-positive-import
+the grid register is positive on import (the default is export).
+.TP
+.BI \-\-listen " HOST:PORT"
+exporter bind address. Default \fB127.0.0.1:9350\fR (loopback only).
+.TP
+.BI \-\-interval " S"
+seconds between Modbus polls. Default \fB5\fR.
+.TP
+.BI \-\-auth-token " TOKEN" ", " \-\-auth-token-file " FILE"
+require \fBAuthorization: Bearer\fR on every request (401 +
+\fBWWW-Authenticate\fR otherwise); the file is re-read on every SIGHUP
+(rotation = rewrite + reload). Mutually exclusive.
+.TP
+.BI \-\-max-clients " N" ", " \-\-client-timeout " S"
+cap concurrent HTTP clients (default \fB64\fR; overflow answers 503) and
+kick idle keep-alive connections (default \fB300\fR).
+.TP
+.BI \-\-log-level " LEVEL" ", " \-\-local-time ", " \-\-log-access
+logging: default \fBINFO\fR, UTC stamps, quiet HTTP (\fB--log-access\fR
+logs every request at INFO). The scraper has no separate audit-trail
+file \(em its log is the trail.
+.TP
+.B \-\-dry-run
+validate the configuration and print the effective settings without
+binding or contacting anything.
+.TP
+.B \-\-version
+print the version.
+.SH SIGNALS
+.TP
+.B SIGHUP
+reload the configuration: interval, scales, caps, registers, the battery
+flag, the auth token (the token file is re-read = rotation), the client
+limits and the upstream address. The listen address, the log level and
+\fBmetrics.json\fR need a restart.
+.TP
+.BR SIGTERM ", " SIGINT
+graceful shutdown with a session summary.
+.SH LOGGING
+UTC-stamped lines on stdout/stderr (journald omits its own stamp when the
+service manager captures it). Reachability changes and reloads log at
+INFO; rejected requests (unauthorized, rate-limited) always log with the
+peer; the suite's rule is zero tracebacks.
+.SH ENVIRONMENT
+.TP
+.B SCRAPER_*
+every flag has an environment twin (\fBSCRAPER_HOST\fR,
+\fBSCRAPER_LISTEN\fR, \fBSCRAPER_AUTH_TOKEN\fR, ...); the flag wins over
+the env, the env over the ini.
+.SH FILES
+.TP
+.I scrape/scraper.ini ", " scrape/metrics.json
+the packaged sample config and the metrics spec.
+.SH EXIT STATUS
+.TP
+.B 0
+success (\fB--dry-run\fR: valid configuration).
+.TP
+.B 1
+invalid configuration (reason on stderr).
+.TP
+.B 2
+command-line misuse.
+.SH EXAMPLES
+Poll a cache proxy and scrape with a Prometheus job named \fBsun2000\fR:
+.RS
+.IP \(bu 2
+.B modbus-scraper --host 127.0.0.1 --modbus-port 15502
+.RE
+.SH SEE ALSO
+.BR modbus-cache (1),
+.BR modbus-fake-inverter (1),
+.BR dashboard (1)
+.PP
+\fBscrape/README.md\fR in the suite checkout \(em the metrics table, the
+caps and the Prometheus setup.

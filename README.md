@@ -13,15 +13,22 @@ Huawei SUN2000 inverter, packaged together as one Nix flake:
 | [`scrape/`](scrape/README.md) | `modbus-scraper` | Huawei SUN2000 Prometheus exporter (Modbus TCP, stdlib only) with a NixOS module |
 | [`cache/`](cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
 | [`inverter/`](inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
-| [`profiles/`](profiles/) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; the tools select what to fetch/scrape via their own files |
+| [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; the tools select what to fetch/scrape via their own files; a linter and a formatter keep them in shape |
+| [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`): version string, audit trail, config plumbing, Modbus wire core |
+
+The tools speak one vocabulary: the fake inverter serves from a profile, the
+cache fetches its selection from it, the scraper binds its metrics to it —
+and the console tools (`*-ctl`, `*-cli`) share the family pattern (a
+JSON-lines control server, a settings registry, an append-only audit trail,
+a reconnecting console session).
 
 ## The flake
 
 ```bash
 nix run .#dashboard          # the dashboard (server.py + static page)
 nix run .#modbus-scraper -- --host <inverter-lan-ip> --listen 0.0.0.0:9350
-nix run .#modbus-cache          # multiplex the inverter's single Modbus client
-nix run .#modbus-fake-inverter  # fake inverter for development and testing
+nix run .#modbus-cache       # multiplex the inverter's single Modbus client
+nix run .#modbus-fake-inverter   # fake inverter for development and testing
 ```
 
 The flake also exposes the packages (`nix build .#<name>`), an overlay and
@@ -33,56 +40,43 @@ NixOS service modules (`services.dashboard`, `services.modbus-scraper`,
 ```
 pv-suite/
 ├── dashboard/    # the dashboard web UI + proxy server (package + NixOS module)
-├── scrape/       # modbus-scraper exporter (package + NixOS module + tests)
-├── cache/        # modbus-cache proxy (package + NixOS module + tests)
-├── inverter/     # fake inverter, control clients (package, tests, [TODO](inverter/TODO.md))
-├── profiles/     # shared inverter profiles ([the format](profiles/README.md))
-├── tests/        # the test suites, one per Modbus tool
+├── scrape/       # modbus-scraper exporter (package + NixOS module)
+├── cache/        # modbus-cache proxy (package + NixOS module)
+├── inverter/     # fake inverter + control clients (package, no service module)
+├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))
+├── common/       # the shared Python package (version, audit, config, wire core; [docs](common/README.md))
+├── tests/        # the test suites, one or more per Modbus tool
+├── docker/       # one alpine image per Modbus tool + the compose demo stack ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
-├── docker/       # Dockerfile.inverter + compose.yaml (the fake-inverter image)
+├── docs/         # the family-level docs: the [security audit](docs/AUDIT.md), the
+│                 #   [family-wide TODO](docs/TODO.md), the [SBOM](docs/sbom/SBOM.md)
+├── CHANGELOG.md  # the release history (the suite versions as one, from common/version.py)
 └── LICENSE       # BSD 3-Clause (whole suite)
 ```
 
+## Testing
+
+Every suite is standalone (stdlib only, scratch ports, self-cleaning) —
+run them from the repo root:
+
+```bash
+python3 tests/cache-regtest.py        # the cache: the full functional battery
+python3 tests/scrape-regtest.py      # the scraper + the fake's machines
+python3 tests/cache-stress.py        # the cache: 100 clients / 15 s load
+python3 tests/cache-fuzz.py [n]      # the cache: n hostile client frames
+python3 tests/scrape-fuzz.py [n]     # the scraper: n hostile HTTP frames
+python3 tests/cache-control-fuzz.py  # the cache: hostile JSON on the control server
+python3 tests/control-fuzz.py        # the fake inverter: hostile JSON on the control server
+```
+
+Every scenario must end with the process under test alive and **zero
+tracebacks** in the logs.
+
 ## Docker
 
-The suite is stdlib-only, so the containers are trivial: `alpine` + `apk add
-python3`, no pip, no venv, ~50 MB images. `docker/` holds the files
-(`Dockerfile.inverter`, `Dockerfile.cache`, `compose.yaml`) — the pattern:
-
-- an unprivileged **`pvsuite`** user (`adduser -D`, `COPY --chown`, `USER`)
-- the tools symlinked onto `PATH` (the inverter image:
-  `fake-inverter`, `fake-ctl`, `fake-cli`; the cache image:
-  `modbus-cache`, `modbus-cache-ctl`, `modbus-cache-cli`),
-  `bash` for interactive runs
-- the shared [`profiles/`](profiles/README.md) directory copied alongside —
-  the profile resolution finds it relative to the checkout layout
-- the build context = the subproject, the profiles ride in as a named
-  build context (`additional_contexts` in the compose, `--build-context`
-  for plain docker builds)
-
-```bash
-cd docker
-docker compose up -d fake-inverter              # build + serve on 0.0.0.0:5502
-docker compose up -d modbus-cache               # + the cache proxy on 0.0.0.0:15502 (upstream: fake-inverter)
-docker compose exec fake-inverter fake-cli      # a console session on the control server
-docker compose down
-```
-
-Or without compose:
-
-```bash
-cd docker
-docker build -t fake-inverter --build-context profiles=../profiles ../inverter
-docker run --rm -p 5502:5502 fake-inverter
-docker run --rm -it fake-inverter bash          # poke around as pvsuite
-
-docker build -t modbus-cache --build-context profiles=../profiles ../cache
-docker run --rm -p 15502:15502 modbus-cache     # upstream defaults to the fake-inverter service name
-```
-
-The same pattern extends to the scraper: swap the `COPY`/`CMD`
-lines for its `src/` tree. The version reports as `0.2.1` inside the
-image (no git metadata; a checkout shows `0.2.1-<short git>`).
+The containers — one alpine image per Modbus tool plus the compose demo
+stack (fake inverter → cache → scraper) — are documented in
+[`docker/README.md`](docker/README.md).
 
 ## License
 

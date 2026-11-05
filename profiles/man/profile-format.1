@@ -1,0 +1,32 @@
+.TH PROFILE-FORMAT 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
+.SH NAME
+profile-format \- rewrite pv-suite device profiles into the canonical layout
+.SH SYNOPSIS
+.B profile-format.py
+.RI [ FILE ...]
+.SH DESCRIPTION
+Rewrites the given pv-suite device-profile JSON files in place into the
+canonical layout (the \fBsun2000.json\fR shape): the description first,
+then the mappings, then the registers \(em one mappings entry per line,
+one register per line, the keys in the family order. Content-preserving
+and idempotent: a profile already in shape comes back byte-for-byte
+unchanged.
+.PP
+Validate before/after with
+.BR profile-lint (1).
+.SH EXIT STATUS
+.TP
+.B 0
+every file reformatted (or reported already in shape).
+.TP
+.B 1
+an invalid JSON file (it is left untouched).
+.SH EXAMPLES
+.RS
+.IP \(bu 2
+.B profile-format.py profiles/profiles/deye-sg03lp1.json
+.RE
+.SH SEE ALSO
+.BR profile-lint (1)
+.PP
+\fBprofiles/README.md\fR in the suite checkout \(em the profile format.

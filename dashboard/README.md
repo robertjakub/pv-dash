@@ -24,6 +24,7 @@ and packaging overview live in the [suite root](../README.md).
 | `src/static/i18n.js` | translations (`window.SOLAR_I18N`) |
 | `src/server.py` / `src/server.ini` | static server + Prometheus proxy (serves `src/static/` by default) |
 | `src/config.js` | user settings (`SOLAR_CONFIG`) — lives next to `server.py`, served at `/config.js` |
+| `src/man/dashboard.1` | the man page (installed by the Nix package under `share/man/man1/`) |
 | `package.nix` / `module.nix` | Nix packaging and service module (the flake entry point lives at the [suite root](../README.md)) |
 
 ## Features
@@ -62,9 +63,9 @@ and packaging overview live in the [suite root](../README.md).
   consumption / Consumed from PV** (charge counts into consumption and
   PV-side series, discharge into the output), and the KPIs count the battery
   too: self-consumption includes charging, self-sustainment includes
-  discharge. When `huawei_battery` is `0` or missing, the Battery node is
-  dimmed and a warning banner appears (the current scraper release does not
-  export the flag yet, so the node stays dimmed until you upgrade it).
+  discharge. When `huawei_battery` is `0` or missing (the scraper exports
+  the flag only when battery support is enabled there), the Battery node is
+  dimmed and a warning banner appears.
   **Experimental: untested against real hardware** — verified only against
   simulated data so far.
 - If Prometheus is unreachable, the page switches to **DEMO DATA** so you can
@@ -133,6 +134,12 @@ python3 src/server.py --bind 127.0.0.1         # localhost only
 PROM_URL=http://pi:9090 python3 src/server.py  # via env
 # open http://localhost:8080
 ```
+
+By default the server **binds to `0.0.0.0:8080`** (all interfaces) — pass
+`--bind 127.0.0.1` for loopback-only (e.g. behind a reverse proxy, below).
+The page and the proxy carry no authentication; keep the bind loopback or
+put an authenticating proxy in front (see [Behind a reverse
+proxy](#behind-a-reverse-proxy) and the dashboard TODO's auth story).
 
 Logging uses the `logging` module. Proxied Prometheus queries are logged at
 DEBUG level only (or at INFO when `--log-queries` is passed / set in
@@ -244,7 +251,7 @@ exporter that polls the inverter over Modbus TCP and serves exactly those
 metrics — see [`../scrape/README.md`](../scrape/README.md):
 
 ```bash
-python3 scrape/src/scraper.py --host <inverter-lan-ip> --listen 0.0.0.0:9350
+python3 scrape/bin/modbus_scraper.py --host <inverter-lan-ip> --listen 0.0.0.0:9350
 ```
 
 ```yaml

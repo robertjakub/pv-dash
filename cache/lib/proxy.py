@@ -8,12 +8,13 @@ import threading
 import time
 from collections import deque
 
-from .protocol import (MAX_COUNT, MAX_PDU, WRITE_FUNCS, GATEWAY_FAILED, ILLEGAL_FUNCTION,
-                       ILLEGAL_VALUE, ILLEGAL_ADDRESS, ModbusError, DeviceError, recv_exact,
-                       exception_frame, describe_write)
+from common.protocol import ModbusError, exception_frame, recv_exact
+from .protocol import DeviceError, describe_write
 from .config import load_registers_file, load_selection
 from .cache import build_blocks, span
-from .statics import DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX, READS_AUDIT_S
+from .statics import (MAX_COUNT, MAX_PDU, WRITE_FUNCS, GATEWAY_FAILED, ILLEGAL_FUNCTION,
+                      ILLEGAL_VALUE, ILLEGAL_ADDRESS, DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX,
+                      READS_AUDIT_S)
 
 logger = logging.getLogger('modbus-cache')
 
@@ -48,7 +49,7 @@ class Proxy:
         self.interval = interval
         self.profile = profile
         self.config = config or {}
-        self.audit = audit   # the CACHE audit trail (lib.audit), None = off
+        self.audit = audit   # the CACHE audit trail (common.audit), None = off
         self.allow_write = bool(self.config.get('allow_write', False))
         self.write_ranges = self.config.get('write_registers')   # None = any register
         self.log_access = bool(self.config.get('log_access', False))

@@ -123,7 +123,7 @@ Point the scraper (or any other Modbus client) at the proxy instead of the
 inverter:
 
 ```bash
-python3 scrape/src/scraper.py --host 127.0.0.1 --modbus-port 15502
+python3 scrape/bin/modbus_scraper.py --host 127.0.0.1 --modbus-port 15502
 ```
 The scraper auto-detects the diagnostics block and exports it as
 `huawei_cache_*` Prometheus gauges — device-down-behind-cache becomes visible
@@ -452,7 +452,7 @@ The prefix names the writer — `CACHE` (the proxy), `CLI` (cache_cli) and
 `CTL` (cache_ctl):
 
 ```
-2026-11-04T07:16:40Z AUDIT CACHE START version=0.2.1 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
+2026-11-04T07:16:40Z AUDIT CACHE START version=0.3.0 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
 2026-11-04T07:16:43Z AUDIT CACHE WRITE register 47415 = 5 (single register, unit 1)
 2026-11-04T07:17:02Z AUDIT CACHE AUTH-FAIL peer=127.0.0.1:54425
 2026-11-04T07:17:12Z AUDIT CACHE COMMAND peer=127.0.0.1:54426 'clear cache' -> ok
@@ -484,11 +484,11 @@ file is the structured evidence trail, not a duplicate of it.
 
 ## Testing
 
-Three standalone suites live in the suite-root [`tests/`](../tests/) — stdlib only, each starts its
+Four standalone suites live in the suite-root [`tests/`](../tests/) — stdlib only, each starts its
 own fake inverter + proxy on scratch ports and cleans up after itself:
 
 ```bash
-python3 tests/cache-regtest.py    # 98 functional checks (cache + FC4, forwarding,
+python3 tests/cache-regtest.py    # the functional battery (cache + FC4, forwarding,
                                   #   writes/refusals/allow-list, diagnostics registers,
                                   #   device death, poll status, reloads, live
                                   #   set/unset settings, inspect, hostile-upstream
@@ -512,7 +512,8 @@ nix run .#modbus-cache -- --host 192.168.1.100
 
 The package ships three binaries: `modbus-cache` (the proxy),
 `modbus-cache-ctl` (one-shot control commands) and `modbus-cache-cli` (the
-console-style control session).
+console-style control session), plus the man pages
+(`man/modbus-cache.1`, `-ctl.1`, `-cli.1`) under `share/man/man1/`.
 
 ```nix
 imports = [ inputs.pv-dash.nixosModules.modbus-cache ];

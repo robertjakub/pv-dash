@@ -4,7 +4,9 @@ import socket
 import struct
 import threading
 
-from .protocol import MAX_PDU, ModbusError, DeviceError, recv_exact
+from common.protocol import ModbusError, recv_exact
+from .protocol import DeviceError
+from .statics import MAX_PDU
 
 
 class Upstream:

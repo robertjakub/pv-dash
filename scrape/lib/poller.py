@@ -4,7 +4,7 @@ import logging
 import threading
 import time
 
-from .protocol import DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX
+from .statics import DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX
 
 logger = logging.getLogger('scraper')
 

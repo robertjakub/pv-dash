@@ -1,0 +1,70 @@
+.TH MODBUS-FAKE-CLI 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
+.SH NAME
+modbus-fake-cli \- console-style control session for the fake inverter
+.SH SYNOPSIS
+.B modbus-fake-cli
+.RI [ options ]
+.SH DESCRIPTION
+An interactive console on the
+.B modbus-fake-inverter
+JSON-lines control server: on connect it probes the fake and greets you
+with the profile, the uptime, the clock and the battery state; the prompt
+shows the connected port (\fBfake-inverter:5502 >\fR). TAB completes
+commands, settings and their values (the listings split into
+[settings]/[values]/[system] with aligned descriptions); \fB?\fR prints
+the same in any position; \fBhelp <setting>\fR explains one; \fBshutdown\fR
+asks \fBProceed with shutdown? [confirm]\fR first.
+.PP
+While idle the session sends wire pings every 55 s; when the connection
+dies, the console retries (default 3 times, 10 s apart) and resumes on the
+first success. The session is audited with the \fBCLI\fR prefix; the wire
+commands are audited once, by the server.
+.SH OPTIONS
+.TP
+.BI \-\-control-port " TARGET"
+the control target: a unix socket path or a TCP port. Default
+\fB/tmp/fake-inverter-\fR\fI<modbus-port>\fB.socket\fR; the
+\fBFAKE_CTL\fR environment variable is the same knob.
+.TP
+.BI \-\-control-token " TOKEN" ", " \-\-control-token-file " FILE"
+the token for TCP control (mutually exclusive).
+.TP
+.BI \-\-reconnect " N"
+connection-loss retries before giving up. Default \fB3\fR;
+\fB0\fR = die on loss.
+.TP
+.BI \-\-reconnect-wait " S"
+seconds between retries. Default \fB10\fR.
+.TP
+.BI \-\-timeout " S"
+wire timeout, seconds. Default \fB5\fR.
+.TP
+.BI \-\-audit-log " FILE|\-"
+the console's own audit trail
+(\fB~/.local/state/fake-inverter/audit.log\fR by default).
+.TP
+.BI \-\-audit-max-mb " N ", \-\-audit-files " N"
+the file sink's gated rotation (defaults \fB10\fR / \fB3\fR).
+.TP
+.B \-\-no-audit-log
+disable the console's audit trail.
+.SH ENVIRONMENT
+.TP
+.B FAKE_CLI_KEEPALIVE
+idle ping interval, seconds (default \fB55\fR); \fB0\fR = off.
+.TP
+.B FAKE_CTL ", " FAKE_CONTROL_TOKEN
+the default control target and TCP token.
+.SH EXIT STATUS
+.TP
+.B 0
+the session ended cleanly.
+.TP
+.B 1
+connection or control error.
+.TP
+.B 2
+command-line misuse.
+.SH SEE ALSO
+.BR modbus-fake-inverter (1),
+.BR modbus-fake-ctl (1)

@@ -3,10 +3,11 @@
 
 The simulator computes NAMED physical values (pv-power, device-temperature,
 grid-power, battery-soc, ...); a profile maps each name onto a wire address
-and an encoding. The shipped profiles/sun2000.json reproduces the classic
-SUN2000/Meter/LUNA2000 layout byte for byte; a custom profile reuses the
-names on different registers to emulate a different inverter, battery or
-meter. Everything about an entry lives in the JSON — no hardcoded tables:
+and an encoding. The shipped sun2000 profile (profiles/profiles/sun2000.json)
+reproduces the classic SUN2000/Meter/LUNA2000 layout byte for byte; a custom
+profile reuses the names on different registers to emulate a different
+inverter, battery or meter. Everything about an entry lives in the JSON —
+no hardcoded tables:
 
     {"description": "...", "registers": [
         {"name": "pv-power", "register": 40001, "type": "i32", "scale": 1, "desc": "PV power (W)"},
@@ -24,15 +25,18 @@ i16/u16 (one word) and i32/u32 (two words, hi/lo)."""
 import json
 import os
 
-# The suite's shared device profiles live in the profiles/ subproject at the
-# repository root; a packaged tool carries its own copy two levels up.
-# Every profile there is addressable by its bare name (deye -> deye.json).
+# The suite's shared device profiles live in the profiles/profiles/ data dir
+# of the profiles/ subproject at the repository root; a packaged tool carries
+# the JSON files flat, as a profiles/ dir of its own. Every profile there is
+# addressable by its bare name (deye -> deye.json).
 
 
 def _profile_candidates(name):
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the inverter/
-    return [os.path.join(here, 'profiles', name),                        # inverter/profiles (the embedded)
-            os.path.join(os.path.dirname(here), 'profiles', name)]       # the repo profiles/ (the suite)
+    up = os.path.dirname(here)
+    return [os.path.join(here, 'profiles', name),            # the embedded copy (the nix share tree)
+            os.path.join(up, 'profiles', name),              # the suite's data dir, flat (the docker image)
+            os.path.join(up, 'profiles', 'profiles', name)]  # the dev tree (the subproject's data dir)
 
 
 def resolve_profile(text):

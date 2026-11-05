@@ -2,9 +2,11 @@
 # Runs as the unprivileged user `pvsuite`; the profiles come from the shared
 # profiles/ directory via a named build context.
 #
-# Build (the context = ../inverter, the profiles = ../profiles):
+# Build (the context = ../inverter, the profiles = ../profiles, the entrypoint
+# = ../docker, the shared code = ../common):
 #   cd docker
-#   docker build -t fake-inverter --build-context profiles=../profiles ../inverter
+#   docker build -t fake-inverter --build-context profiles=../profiles \
+#       --build-context scripts=../docker --build-context common=../common ../inverter
 #   # or: docker compose up -d
 #
 # Run:
@@ -13,23 +15,29 @@
 #   docker run --rm -p 5502:5502 fake-inverter \
 #       fake-inverter --profile deye-sg04lp3 --no-battery    # any flags via the CMD override
 #
-# The same pattern extends to the scraper and the cache: swap the COPY/CMD
-# lines for their src/ trees.
+# The config volume: the entrypoint seeds /config with the bundled defaults
+# on start (files the volume lacks are copied in, existing ones stay). The
+# fake has no file configs yet — the volume is there for symmetry with the
+# scraper and cache images and for future use.
 FROM alpine:3.20
 
-RUN apk add --no-cache python3 bash \
+RUN apk add --no-cache python3 bash su-exec \
     && adduser -D pvsuite
 
 WORKDIR /pv-suite
-COPY --chown=pvsuite --from=profiles profiles/ profiles/
+COPY --chown=pvsuite --from=profiles profiles/profiles/ profiles/
+COPY --from=scripts entrypoint.sh /usr/local/bin/pv-entrypoint
+COPY --from=common *.py common/
 COPY --chown=pvsuite bin/ inverter/bin/
 COPY --chown=pvsuite lib/ inverter/lib/
-RUN chmod +x inverter/bin/*.py \
+RUN chmod +x inverter/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/inverter/bin/fake_inverter.py /usr/local/bin/fake-inverter \
     && ln -s /pv-suite/inverter/bin/fake_ctl.py /usr/local/bin/fake-ctl \
     && ln -s /pv-suite/inverter/bin/fake_cli.py /usr/local/bin/fake-cli
 
-USER pvsuite
+# The entrypoint runs as root only to seed /config, then drops to pvsuite.
+VOLUME /config
+ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 5502
 CMD ["fake-inverter", "--host", "0.0.0.0", "--port", "5502", "--audit-log", "-"]

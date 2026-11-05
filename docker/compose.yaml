@@ -1,16 +1,26 @@
 # The pv-suite Modbus tools as compose services. The build contexts are
-# ../inverter and ../cache; the shared profiles/ directory rides in as a
-# named context. Run one service: docker compose up -d fake-inverter
-# Run the stack:         docker compose up -d (inverter + cache + CLI image)
+# ../inverter, ../cache and ../scrape; the shared profiles/ directory, the
+# entrypoint and the common/ package ride in as named contexts. Run one service: docker compose up -d fake-inverter
+# Run the stack:         docker compose up -d (inverter + cache + scraper)
+#
+# All three share the external `config` volume mounted at /config: on start
+# the entrypoint seeds it with the bundled defaults (every file the volume
+# lacks is copied in, existing ones stay) — edits to /config survive
+# container recreation. `docker compose exec` sessions bypass the entrypoint
+# and run as root; add --user pvsuite to land as pvsuite.
 services:
   fake-inverter:
     build:
       context: ../inverter
       additional_contexts:
         profiles: ../profiles
+        scripts: ../docker
+        common: ../common
     image: fake-inverter
     ports:
       - "5502:5502"
+    volumes:
+      - config:/config
     restart: unless-stopped
 
   modbus-cache:
@@ -18,9 +28,30 @@ services:
       context: ../cache
       additional_contexts:
         profiles: ../profiles
+        scripts: ../docker
+        common: ../common
     image: modbus-cache
     ports:
       - "15502:15502"
+    volumes:
+      - config:/config
     depends_on:
       - fake-inverter
     restart: unless-stopped
+
+  modbus-scraper:
+    build:
+      context: ../scrape
+      additional_contexts:
+        profiles: ../profiles
+        scripts: ../docker
+        common: ../common
+    image: modbus-scraper
+    ports:
+      - "9350:9350"
+    depends_on:
+      - modbus-cache
+    restart: unless-stopped
+
+volumes:
+  config:

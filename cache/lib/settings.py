@@ -47,7 +47,7 @@ SETTINGS = (
              'INFO': 'lifecycle, control commands, writes',
              'WARNING': 'problems only',
              'ERROR': 'quietest'}),
-    Setting('profile', 'device profile JSON: the register ranges to cache (a bare name resolves in profiles/)', ('default',), '<file>',
+    Setting('profile', 'device profile JSON: the register ranges to cache (a bare name resolves in profiles/profiles/)', ('default',), '<file>',
             {'default': 'the bundled sun2000 profile'}),
     Setting('selection', 'selection JSON: which profile names to fetch ("all" = every entry, "none" = cache nothing)', ('all', 'none'), '<file>|all|none',
             {'all': 'every profile entry (the default)',

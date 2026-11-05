@@ -7,6 +7,7 @@ import math
 import os
 import re
 
+from common.config import default_profile_path, parse_listen, resolve_profile_file
 from .metrics import Metrics
 from .statics import DEFAULTS, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
@@ -19,19 +20,6 @@ def check_register(value, label):
     if not 0 <= value <= MAX_REGISTERS:
         raise SystemExit('invalid %s = %d: must be 0..%d' % (label, MAX_REGISTERS))
     return value
-
-
-def parse_listen(text):
-    host, sep, port = text.rpartition(':')
-    if not sep:
-        raise SystemExit('--listen must be HOST:PORT, got %r' % text)
-    try:
-        port = int(port)
-    except ValueError:
-        raise SystemExit('--listen port must be a number, got %r' % port)
-    if not 0 <= port <= 65535:
-        raise SystemExit('--listen port out of range, got %d' % port)
-    return host.strip('[]'), port
 
 
 def str_to_bool(value):
@@ -111,34 +99,6 @@ def validate_config(cfg):
     check_hostname(parse_listen(cfg['listen'])[0], 'listen')
 
 
-def _profile_candidates(name):
-    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return [os.path.join(here, 'profiles', name),
-            os.path.join(os.path.dirname(os.path.dirname(here)), 'profiles', name)]
-
-
-def default_profile_path(name='sun2000.json'):
-    """The bundled device profile (packaged two levels up) or the shared
-    profiles/ subproject at the repository root (dev tree)."""
-    for candidate in _profile_candidates(name):
-        if os.path.exists(candidate):
-            return candidate
-    return name
-
-
-def resolve_profile_file(text):
-    """A profile name (sun2000, deye -> the shared profiles/ subproject) or
-    a JSON path, passed through."""
-    t = (text or '').strip()
-    if os.path.exists(t):
-        return t
-    if '/' not in t and not t.endswith('.json'):
-        for candidate in _profile_candidates(t + '.json'):
-            if os.path.exists(candidate):
-                return candidate
-    return t
-
-
 def load_device_profile(path):
     """Device profile (the shared profiles/ schema) -> {name: (register, type, scale)}."""
     try:
@@ -191,7 +151,7 @@ def load_mapping(path):
     return out
 
 
-def resolve_config(args, script_dir):
+def resolve_config(args, script_dir=None):
     """Effective settings: CLI flags > SCRAPER_* env > [scraper] ini >
     device profile (the shared profiles/ schema) > defaults."""
     cfg = load_config(args.config)
@@ -213,7 +173,8 @@ def resolve_config(args, script_dir):
     profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'SCRAPER_PROFILE',
                                                 'profile', default_profile_path(), str))
     profile = load_device_profile(profile_path)
-    spec = Metrics(os.path.join(script_dir, 'metrics.json'))
+    spec = Metrics(resolve(getattr(args, 'metrics_spec', None), 'SCRAPER_METRICS_SPEC',
+                           'metrics_spec', None, str))
 
     # the metrics spec's "profile" fields pick the device registers feeding
     # the register-backed metrics; each source carries register/type/gain

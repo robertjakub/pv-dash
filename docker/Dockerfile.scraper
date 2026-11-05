@@ -1,0 +1,46 @@
+# modbus-scraper in an alpine container — stdlib-only, no pip.
+# Runs as the unprivileged user `pvsuite`; the profiles come from the shared
+# profiles/ directory via a named build context.
+#
+# Build (the context = ../scrape, the profiles = ../profiles, the entrypoint
+# = ../docker, the shared code = ../common):
+#   cd docker
+#   docker build -t modbus-scraper --build-context profiles=../profiles \
+#       --build-context scripts=../docker --build-context common=../common ../scrape
+#   # or: docker compose up -d modbus-scraper
+#
+# Run:
+#   docker run --rm -p 9350:9350 modbus-scraper    # upstream defaults to the
+#                                                  # modbus-cache service name
+#   docker run --rm -it modbus-scraper bash        # poke around as pvsuite
+#   docker run --rm -p 9350:9350 modbus-scraper \
+#       modbus-scraper --host 192.168.1.100        # any flags via the CMD override
+#
+# The config volume: the entrypoint seeds /config with the bundled defaults
+# on start (files the volume lacks are copied in, existing ones stay) — edit
+# /config/scraper.ini and /config/metrics.json there, they survive
+# recreation. The ENV vars below point the tool at the volume copies.
+FROM alpine:3.20
+
+RUN apk add --no-cache python3 bash su-exec \
+    && adduser -D pvsuite
+
+WORKDIR /pv-suite
+COPY --chown=pvsuite --from=profiles profiles/profiles/ profiles/
+COPY --from=scripts entrypoint.sh /usr/local/bin/pv-entrypoint
+COPY --from=common *.py common/
+COPY --chown=pvsuite bin/ scrape/bin/
+COPY --chown=pvsuite lib/ scrape/lib/
+COPY --chown=pvsuite scraper.ini metrics.json scrape/
+COPY --chown=pvsuite scraper.ini metrics.json config-defaults/
+RUN chmod +x scrape/bin/*.py /usr/local/bin/pv-entrypoint \
+    && ln -s /pv-suite/scrape/bin/modbus_scraper.py /usr/local/bin/modbus-scraper
+
+# The entrypoint runs as root only to seed /config, then drops to pvsuite.
+ENV SCRAPER_CONFIG=/config/scraper.ini \
+    SCRAPER_METRICS_SPEC=/config/metrics.json
+VOLUME /config
+ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
+
+EXPOSE 9350
+CMD ["modbus-scraper", "--host", "modbus-cache", "--modbus-port", "15502", "--listen", "0.0.0.0:9350"]

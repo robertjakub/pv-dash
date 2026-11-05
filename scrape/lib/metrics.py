@@ -3,7 +3,7 @@
 
 The file is keyed by the exported metric name itself; an entry with a
 "profile" field is register-fed — the field names the device-profile
-register (profiles/sun2000.json schema) the metric is read from. Entries
+register (profiles/profiles/sun2000.json schema) the metric is read from. Entries
 without one are derived by the poller (home, export/import split, ...)."""
 import json
 import os

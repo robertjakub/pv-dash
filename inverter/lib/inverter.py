@@ -7,9 +7,9 @@ import struct
 import threading
 import time
 
-from .protocol import recv_exact
+from common.protocol import recv_exact
 from .statics import MAX_PDU
-from .version import version_string
+from common.version import version_string
 
 logger = logging.getLogger('fake-inverter')
 

@@ -1,0 +1,35 @@
+.TH PROFILE-LINT 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
+.SH NAME
+profile-lint \- lint the pv-suite device profiles
+.SH SYNOPSIS
+.B profile-lint.py
+.RI [ FILE ...]
+.SH DESCRIPTION
+Lints the pv-suite device-profile JSON files \(em the shared register maps
+consumed by
+.BR modbus-fake-inverter (1),
+.BR modbus-cache (1)
+and
+.BR modbus-scraper (1).
+Without arguments it lints every \fBprofiles/profiles/*.json\fR in the
+suite checkout; named files win.
+.PP
+The checks: valid JSON and the top-level shape; a non-empty
+\fBdescription\fR; the required keys and their family order (\fBname\fR
+\(-> \fBregister\fR \-> \fBtype\fR \-> \fBscale\fR \-> \fBdesc\fR); the
+register bounds (0\(en65536 minus the type width); the valid types
+(\fBi16/u16/i32/u32\fR); \fBfc\fR \(is {3, 4}; a numeric \fBttl\fR \(>= 0;
+terse-ASCII \fBdesc\fRs; the mappings against a profile register word;
+duplicate names; same-fc register overlaps. One issue per line, exit
+non-zero on the first failure.
+.SH EXIT STATUS
+.TP
+.B 0
+every file lints clean.
+.TP
+.B 1
+an invalid file (the reason is printed).
+.SH SEE ALSO
+.BR profile-format (1)
+.PP
+\fBprofiles/README.md\fR in the suite checkout \(em the profile format.

@@ -6,33 +6,54 @@ dashboard expects at /metrics in the Prometheus text format.
 
 Layout: lib/protocol (Modbus client), lib/config (settings resolution),
 lib/metrics (metric specs), lib/poller (poller + sanity checks),
-lib/server (exposition endpoint), this file (CLI, logging, signals).
+lib/server (exposition endpoint), lib/version, this file (CLI, logging,
+signals).
 """
 import argparse
 import logging
 import os
 import signal
+import sys
 import threading
 import time
 
-from lib.config import parse_listen, resolve_config
+here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the image symlinks the entry onto PATH)
+sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
+sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
+
+from common.config import parse_listen
+from common.logutil import UtcFormatter
+from common.version import version_string
+from lib.config import resolve_config
 from lib.metrics import Metrics
 from lib.poller import Scraper
 from lib.protocol import ModbusTCP
 from lib.server import Handler, Server
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def default_config_path():
+    """$SCRAPER_CONFIG wins (the docker config volume); then a user's ini
+    next to the script (the flattened package layout); then the dev
+    checkout's sample at the subproject root."""
+    env = os.environ.get('SCRAPER_CONFIG')
+    if env and env.strip():
+        return env.strip()
+    for candidate in (os.path.join(SCRIPT_DIR, 'scraper.ini'),
+                      os.path.join(os.path.dirname(SCRIPT_DIR), 'scraper.ini')):
+        if os.path.exists(candidate):
+            return candidate
+    return os.path.join(SCRIPT_DIR, 'scraper.ini')
+
+
 logger = logging.getLogger('scraper')
-
-
-class UtcFormatter(logging.Formatter):
-    converter = staticmethod(time.gmtime)
 
 
 def parse_args():
     ap = argparse.ArgumentParser(description='Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP).')
-    ap.add_argument('--config', default=os.path.join(SCRIPT_DIR, 'scraper.ini'),
-                    help='config file (default: scraper.ini next to this script)')
+    ap.add_argument('--config', default=default_config_path(),
+                    help='config file (default: $SCRAPER_CONFIG, then scraper.ini next to this script, then the subproject root)')
     ap.add_argument('--host', help='inverter Modbus TCP address (default: config, $SCRAPER_HOST or 127.0.0.1)')
     ap.add_argument('--modbus-port', type=int, help='inverter Modbus TCP port (default: config, $SCRAPER_MODBUS_PORT or 5502)')
     ap.add_argument('--unit', type=int, help='Modbus unit id (default: config, $SCRAPER_UNIT or 1)')
@@ -40,6 +61,8 @@ def parse_args():
     ap.add_argument('--timeout', type=float, help='Modbus timeout in seconds (default: config, $SCRAPER_TIMEOUT or 3)')
     ap.add_argument('--profile', dest='profile',
                     help='device profile JSON (the shared profiles/ schema; scrape-marked entries feed the metric registers) (default: config, $SCRAPER_PROFILE or the bundled sun2000 profile)')
+    ap.add_argument('--metrics-spec', dest='metrics_spec',
+                    help='metrics spec JSON: metric name -> {help, type, profile?} (default: config, $SCRAPER_METRICS_SPEC or the bundled metrics.json)')
     ap.add_argument('--pv-register', type=int, help='PV power register, signed I32 watts (default: config, $SCRAPER_PV_REGISTER, the profile or 32064)')
     ap.add_argument('--grid-register', type=int, help='grid power register, signed I32 watts (default: config, $SCRAPER_GRID_REGISTER or 37113)')
     ap.add_argument('--scale', type=float, help='PV register multiplier (default: config, $SCRAPER_SCALE or 1)')
@@ -90,7 +113,7 @@ def describe(cfg, args):
     listen_host, listen_port = parse_listen(cfg['listen'])
     return ('polling %s:%d unit %d (registers pv=%d grid=%d, scale pv=%g grid=%g, positive=%s%s) every %gs; '
             '%s /metrics on %s:%d (config: %s, log level: %s, log time: %s, log access: %s, auth: %s, '
-            'limits: %s, caps: %s)' % (
+            'limits: %s, caps: %s, version: %s)' % (
                 cfg['host'], cfg['modbus_port'], cfg['unit'], cfg['pv_register'], cfg['grid_register'],
                 cfg['scale'], cfg['grid_scale'],
                 'import' if cfg['grid_positive_import'] else 'export',
@@ -103,7 +126,8 @@ def describe(cfg, args):
                 'on' if cfg['log_access'] else 'off',
                 'bearer' if cfg['auth_token'] else 'none',
                 ', '.join(limits) if limits else 'off',
-                ', '.join(caps) if caps else 'none'))
+                ', '.join(caps) if caps else 'none',
+                version_string()))
 
 
 def install_signal_handlers(scraper, httpd, args, started):
@@ -156,9 +180,12 @@ def install_signal_handlers(scraper, httpd, args, started):
 
 
 def main():
+    if '--version' in sys.argv:
+        print(version_string())
+        raise SystemExit(0)
     args = parse_args()
     cfg = resolve_config(args, SCRIPT_DIR)
-    spec = Metrics(os.path.join(SCRIPT_DIR, 'metrics.json'))
+    spec = Metrics()
 
     setup_logging(cfg)
 

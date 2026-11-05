@@ -2,9 +2,11 @@
 # Runs as the unprivileged user `pvsuite`; the profiles come from the shared
 # profiles/ directory via a named build context.
 #
-# Build (the context = ../cache, the profiles = ../profiles):
+# Build (the context = ../cache, the profiles = ../profiles, the entrypoint
+# = ../docker, the shared code = ../common):
 #   cd docker
-#   docker build -t modbus-cache --build-context profiles=../profiles ../cache
+#   docker build -t modbus-cache --build-context profiles=../profiles \
+#       --build-context scripts=../docker --build-context common=../common ../cache
 #   # or: docker compose up -d modbus-cache
 #
 # Run:
@@ -14,24 +16,33 @@
 #   docker run --rm -p 15502:15502 modbus-cache \
 #       modbus-cache --host 192.168.1.100          # any flags via the CMD override
 #
-# The inverter image (Dockerfile.inverter) is the pattern; the cache swaps
-# the COPY/symlink/CMD lines for its bin/ + lib/ trees.
+# The config volume: the entrypoint seeds /config with the bundled defaults
+# on start (files the volume lacks are copied in, existing ones stay) — edit
+# /config/modbus_cache.ini and /config/selection.json there, they survive
+# recreation. The ENV vars below point the tool at the volume copies.
 FROM alpine:3.20
 
-RUN apk add --no-cache python3 bash \
+RUN apk add --no-cache python3 bash su-exec \
     && adduser -D pvsuite
 
 WORKDIR /pv-suite
-COPY --chown=pvsuite --from=profiles profiles/ profiles/
+COPY --chown=pvsuite --from=profiles profiles/profiles/ profiles/
+COPY --from=scripts entrypoint.sh /usr/local/bin/pv-entrypoint
+COPY --from=common *.py common/
 COPY --chown=pvsuite bin/ cache/bin/
 COPY --chown=pvsuite lib/ cache/lib/
 COPY --chown=pvsuite modbus_cache.ini selection.json cache/
-RUN chmod +x cache/bin/*.py \
+COPY --chown=pvsuite modbus_cache.ini selection.json config-defaults/
+RUN chmod +x cache/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/cache/bin/modbus_cache.py /usr/local/bin/modbus-cache \
     && ln -s /pv-suite/cache/bin/cache_ctl.py /usr/local/bin/modbus-cache-ctl \
     && ln -s /pv-suite/cache/bin/cache_cli.py /usr/local/bin/modbus-cache-cli
 
-USER pvsuite
+# The entrypoint runs as root only to seed /config, then drops to pvsuite.
+ENV MODBUS_CACHE_CONFIG=/config/modbus_cache.ini \
+    MODBUS_CACHE_SELECTION=/config/selection.json
+VOLUME /config
+ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 15502
 CMD ["modbus-cache", "--host", "fake-inverter", "--listen", "0.0.0.0:15502", "--audit-log", "-"]

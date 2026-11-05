@@ -18,9 +18,9 @@ import socket
 import threading
 import time
 
-from .audit import AuditLog
+from common.audit import AuditLog
 from .profile import load_profile, profile_label, resolve_profile
-from .version import version_string
+from common.version import version_string
 from .settings import SETTING_NAMES, SETTING_BY_NAME, describe_setting
 from .simulator import CLOUD_MACHINES, format_clock
 from .statics import CONTROL_IDLE_TIMEOUT_S, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
@@ -175,7 +175,7 @@ class ControlServer:
 
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None):
         self.log_replies = log_replies   # DEBUG also logs the full command output
-        self.audit = audit               # the INV audit trail (lib.audit), None = off
+        self.audit = audit               # the INV audit trail (common.audit), None = off
         self.token = token               # the TCP auth token; None = no auth (the unix = the perms)
         self.simulator = simulator
         self.chaos = chaos

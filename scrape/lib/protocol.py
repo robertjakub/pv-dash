@@ -4,25 +4,8 @@ The limits come from lib/static.json (see statics.py)."""
 import socket
 import struct
 
-from .statics import MAX_PDU, MAX_COUNT, DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX
-
-# Diagnostics registers served by modbus-cache (see static.json): magic,
-# device flag, cache age in seconds (0xFFFF = no successful read yet),
-# cache uptime in seconds.
-
-
-class ModbusError(Exception):
-    pass
-
-
-def recv_exact(sock, n):
-    buf = b''
-    while len(buf) < n:
-        chunk = sock.recv(n - len(buf))
-        if not chunk:
-            raise ModbusError('connection closed by peer')
-        buf += chunk
-    return buf
+from common.protocol import ModbusError, recv_exact
+from .statics import MAX_PDU, MAX_COUNT
 
 
 class ModbusTCP:

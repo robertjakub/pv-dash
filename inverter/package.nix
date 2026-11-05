@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-fake-inverter";
-  version = "0.2.1";
+  version = "0.3.0";
 
   src = lib.cleanSource ./.;
 
@@ -25,8 +25,12 @@ stdenv.mkDerivation (finalAttrs: {
     install -Dm755 bin/fake_cli.py $out/share/modbus-fake-inverter/fake_cli.py
     install -dm755 $out/share/modbus-fake-inverter/lib
     install -m644 lib/*.py lib/static.json $out/share/modbus-fake-inverter/lib/
+    install -dm755 $out/share/modbus-fake-inverter/common
+    install -m644 ${../common}/*.py $out/share/modbus-fake-inverter/common/
     install -dm755 $out/share/modbus-fake-inverter/profiles
-    install -m644 ${../profiles}/*.json $out/share/modbus-fake-inverter/profiles/
+    install -m644 ${../profiles/profiles}/*.json $out/share/modbus-fake-inverter/profiles/
+    install -dm755 $out/share/man/man1
+    install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-fake-inverter \
       --add-flags "$out/share/modbus-fake-inverter/fake_inverter.py"
     makeWrapper ${lib.getExe python3} $out/bin/modbus-fake-ctl \

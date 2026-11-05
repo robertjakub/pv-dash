@@ -1,0 +1,242 @@
+.TH MODBUS-CACHE 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
+.SH NAME
+modbus-cache \- Modbus TCP caching proxy for single-client devices
+.SH SYNOPSIS
+.B modbus-cache
+.RI [ options ]
+.br
+.B modbus-cache \-\-dry-run
+.RI [ options ]
+.SH DESCRIPTION
+.B modbus-cache
+owns the single Modbus TCP client connection a device allows (Huawei
+SUN2000 inverters and their SDongle/EMMA radios accept exactly one) and
+multiplexes it: a background loop polls the configured register ranges
+into an in-memory cache, any number of clients are served FC3/FC4 reads
+from the cache, reads outside the map and other function codes are
+forwarded live, and writes (FC05/06/15/16/22/23) are forwarded when
+explicitly enabled and audited. A synthesized diagnostics block at
+registers 65000\(en65003 lets clients tell cached data from live data.
+.PP
+Resilience: when the device dies, cached reads keep serving last-known
+values and forwarded reads get exception 0x0B; when the device rejects a
+range, the poll status is remembered instead of hammering it; garbage from
+either side is answered one line at a time and never fatal. Verified
+against the fake inverter, fuzzing and stress suites \-\- not against real
+hardware.
+.SH OPTIONS
+.TP
+.BI \-\-config " FILE"
+config file (ini, \fB[cache]\fR section, snake_case keys). Default:
+\fBmodbus_cache.ini\fR next to the script, then the packaged sample; a
+missing file is fine. A malformed file is fatal.
+.TP
+.BI \-\-host " HOST"
+upstream inverter/dongle address. Default \fB127.0.0.1\fR.
+.TP
+.BI \-\-port " N"
+upstream Modbus TCP port. Default \fB5502\fR.
+.TP
+.BI \-\-unit " N"
+Modbus unit id (1\(en247). Default \fB1\fR.
+.TP
+.BI \-\-timeout " S"
+upstream connect/read timeout, seconds. Default \fB3\fR.
+.TP
+.BI \-\-listen " HOST:PORT"
+proxy listen address. Default \fB127.0.0.1:15502\fR (loopback only).
+.TP
+.BI \-\-profile " NAME|PATH"
+device profile: a bare name resolved against the shared
+\fBprofiles/profiles/\fR directory or a JSON path. Default the bundled
+\fBsun2000\fR. Re-read on SIGHUP.
+.TP
+.BI \-\-selection " all|none|PATH"
+which profile entries to fetch: every entry (\fBall\fR, the default), an
+empty map (\fBnone\fR \(em every read forwards, nothing is stored), or a
+JSON file \fB{"registers": ["pv-power", ...]}\fR.
+.TP
+.BI \-\-interval " S"
+seconds between cache polls. Default \fB10\fR.
+.TP
+.BI \-\-cache-ttl " S"
+per-register cache TTL; entries older than this are refetched on the next
+read. Default \fB3\(en\fR\fBinterval\fR; \fB0\fR = never expire. Profile
+entries may override per entry (\fBttl\fR field).
+.TP
+.BI \-\-read-delay " S"
+seconds between consecutive device reads within a poll cycle. Default
+\fB0.05\fR.
+.TP
+.BI \-\-merge-gap " N"
+maximum register gap when merging ranges into block reads (\fB0\fR = read
+separately). Default \fB8\fR.
+.TP
+.B \-\-allow-write
+forward write requests to the device. Off by default (they are refused
+with a Modbus illegal-function exception).
+.TP
+.BI \-\-write-registers " RANGES"
+register ranges a forwarded write may touch: comma-separated
+\fBSTART:COUNT\fR (e.g. \fB47400:100,47600:100\fR). Default \fBany\fR.
+.TP
+.BI \-\-connect-acl " LIST"
+clients allowed to connect: \fBany\fR (the default) or comma-separated
+IPs/CIDR prefixes, IPv4 or IPv6.
+.TP
+.BI \-\-write-acl " LIST"
+clients allowed to write; still requires \fB--allow-write\fR. Default
+\fBany\fR.
+.TP
+.BI \-\-control-port " TARGET"
+the JSON-lines control server: a unix socket path or a TCP port (bound to
+127.0.0.1). Default \fB/tmp/modbus-cache-\fR\fI<listen-port>\fB.socket\fR;
+\fB0\fR = off.
+.TP
+.BI \-\-control-token " TOKEN"
+require a token on TCP control connections (the first command must be
+\fB{"cmd": "auth", "token": "..."}\fR). The unix socket needs no token.
+.TP
+.BI \-\-control-token-file " FILE"
+the token from a file (the first line; a systemd \fBLoadCredential\fR) \(em
+instead of \fB--control-token\fR; giving both is an error.
+.TP
+.BI \-\-reads-audit " S"
+audit one READS tally per client per this many seconds (default
+\fB300\fR); \fB0\fR = off.
+.TP
+.BI \-\-metrics-port " N"
+serve the cache's own Prometheus \fB/metrics\fR on 127.0.0.1:\fIN\fR (the
+\fBmodbus_cache_*\fR gauges). Off by default.
+.TP
+.BI \-\-metrics-token " TOKEN"
+require \fBAuthorization: Bearer\fR on the metrics endpoint.
+.TP
+.BI \-\-metrics-token-file " FILE"
+the metrics bearer token from a file (the first line); mutually exclusive
+with \fB--metrics-token\fR.
+.TP
+.BI \-\-audit-log " FILE|\-"
+the append-only audit trail. Default the XDG state home
+(\fB~/.local/state/modbus-cache/audit.log\fR); \fB\-\fR = stdout (docker
+logs / journald); the trail falls back to stdout when the file is
+unwritable.
+.TP
+.BI \-\-audit-max-mb " N"
+rotate the audit trail at this size (default \fB10\fR); \fB0\fR =
+unbounded.
+.TP
+.B \-\-audit-daily
+also rotate the audit trail at UTC midnight.
+.TP
+.BI \-\-audit-files " N"
+rotated audit backups to keep. Default \fB3\fR.
+.TP
+.B \-\-no-audit-log
+disable the audit trail.
+.TP
+.BI \-\-max-clients " N"
+refuse further connections past this many simultaneous clients (default
+\fB64\fR; \fB0\fR = unlimited).
+.TP
+.BI \-\-client-timeout " S"
+disconnect clients silent for this many seconds (default \fB300\fR;
+\fB0\fR = never).
+.TP
+.BI \-\-log-level " LEVEL"
+\fBDEBUG\fR adds per-client traffic and per-poll detail. Default
+\fBINFO\fR.
+.TP
+.B \-\-log-access
+log client connects/disconnects at INFO instead of DEBUG.
+.TP
+.B \-\-local-time
+log timestamps in the system time zone instead of UTC.
+.TP
+.B \-\-dry-run
+validate the configuration and the register map, print the effective
+settings and exit without binding or contacting anything.
+.TP
+.B \-\-version
+print the version.
+.SH SIGNALS
+.TP
+.B SIGHUP
+reload the configuration and the register map without dropping clients
+(the file always wins over live settings; a broken file keeps the previous
+state). The listen address and the log level need a restart.
+.TP
+.B SIGUSR1
+clean the cache: all cached values, on-demand entries and poll-status
+errors are dropped; the poller repopulates immediately.
+.TP
+.BR SIGTERM ", " SIGINT
+graceful shutdown.
+.SH CONTROL
+The control server speaks JSON lines: one request
+\fB{"cmd": "..."}\fR per line, one reply
+\fB{"status": "ok|err|bye", "text": "..."}\fR per line. Commands
+(the settings registry drives the grammar):
+.BR set ", " unset ", " show ", " help ,
+the reports
+.BR inspect ", " "show status" ", " "show connections" ", " "show cache" " [all]" ", " "show version" ,
+the ops
+.BR clear\ cache ", " restart ", " shutdown ", " quit .
+.RS
+.IP \(bu 2
+.B set <setting> <value>
+changes a setting live (interval, ttl, read-delay, merge-gap,
+allow-write, write-registers, max-clients, client-timeout, reads-audit,
+log-level, profile, selection, connect-acl, write-acl, timeout); a
+SIGHUP re-applies the config (the file always wins).
+.IP \(bu 2
+.B show cache all
+prints every cached entry: name, words, age, expiry, poll status.
+.IP \(bu 2
+.B clear cache
+/ SIGUSR1, \fBrestart\fR (drop the upstream + the cache, repoll),
+\fBshutdown\fR (the same as SIGTERM).
+.RE
+.PP
+See
+.BR modbus-cache-ctl (1)
+and
+.BR modbus-cache-cli (1)
+for the clients.
+.SH ENVIRONMENT
+.TP
+.B MODBUS_CACHE_CTL
+default control target for the daemon's clients (flag \fB--control-port\fR
+wins).
+.TP
+.B MODBUS_CACHE_*
+every flag has an environment twin (\fBMODBUS_CACHE_HOST\fR,
+\fBMODBUS_CACHE_LISTEN\fR, \fBMODBUS_CACHE_ALLOW_WRITE\fR, ...); the flag
+wins over the env, the env over the ini.
+.SH FILES
+.TP
+.I /tmp/modbus-cache-<port>.socket
+the default control socket (stale files replaced, unlinked on shutdown).
+.TP
+.I ~/.local/state/modbus-cache/audit.log
+the default audit trail.
+.TP
+.I cache/modbus_cache.ini ", " cache/selection.json
+the packaged sample config and the example selection.
+.SH EXIT STATUS
+.TP
+.B 0
+success (\fB--dry-run\fR: valid configuration).
+.TP
+.B 1
+invalid configuration (reason on stderr; \fB--dry-run\fR only).
+.TP
+.B 2
+command-line misuse.
+.SH SEE ALSO
+.BR modbus-cache-ctl (1),
+.BR modbus-cache-cli (1),
+.BR modbus-scraper (1),
+.BR modbus-fake-inverter (1)
+.PP
+\fBcache/README.md\fR in the suite checkout \(em the full documentation.

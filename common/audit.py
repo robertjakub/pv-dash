@@ -1,43 +1,47 @@
-#!/usr/bin/env python3
-"""Append-only audit trail for the fake and its control CLIs: one line per
-event — who, when, what, result. Every line carries the AUDIT level between
-the stamp and the writer prefix ('<stamp> AUDIT <PREFIX> <EVENT> ...') so the
-trail filters cleanly out of a mixed log. ping/pong keepalives are never
-logged. The file is opened append-only and flushed per event, so a crash
-keeps everything up to the last command.
+"""Append-only audit trail shared by the tools and their control CLIs: one
+line per event — who, when, what, result. Every line carries the AUDIT level
+between the stamp and the writer prefix ('<stamp> AUDIT <PREFIX> <EVENT> ...')
+so the trail filters cleanly out of a mixed log. ping/pong keepalives are
+never logged. The file is opened append-only and flushed per event, so a
+crash keeps everything up to the last command.
 
-The default location is the user's XDG state directory
-(~/.local/state/fake-inverter/audit.log), NOT the current directory: a
-packaged install (nix store, container) has a read-only working directory.
-Rotation is gated: size-based (--audit-max-mb, default 10 MB, 0 = off)
-keeps 3 backups; time-based (--audit-daily) rotates at UTC midnight. A path
-of "-" sends the trail to stdout — what docker logs / journald capture
-(stdout, not stderr: the audit is data, not an error, and it stays in the
-single ordered stream the service manager captures). When the sink is
-stdout, rotation is disabled by definition. The rotation depth is
-configurable: --audit-files N (the default 3)."""
+The default location is the tool's XDG state directory
+(~/.local/state/<app>/audit.log), NOT the current directory: a packaged
+install (nix store, container) has a read-only working directory. Rotation
+is gated: size-based (--audit-max-mb, default 10 MB, 0 = off) keeps N
+backups; time-based (--audit-daily) rotates at UTC midnight. A path of "-"
+sends the trail to stdout — what docker logs / journald capture (stdout,
+not stderr: the audit is data, not an error, and it stays in the single
+ordered stream the service manager captures). When the sink is stdout,
+rotation is disabled by definition. The rotation depth is configurable:
+--audit-files N (the default 3)."""
 import os
 import sys
 import threading
 import time
 
 
+def default_path(app):
+    """The XDG state dir for app (the fallback base = ~/.local/state);
+    created on demand."""
+    base = os.environ.get('XDG_STATE_HOME') or os.path.expanduser('~/.local/state')
+    d = os.path.join(base, app)
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, 'audit.log')
+
+
 class AuditLog:
     """'<UTC stamp> AUDIT <PREFIX> <EVENT> [detail]' per line. PREFIX
-    distinguishes the writer (INV / CLI / CTL). Opening failure = fatal: an
-    audit trail that silently vanishes is worse than no session."""
+    distinguishes the writer (CACHE / INV / CLI / CTL). Opening failure =
+    fatal: an audit trail that silently vanishes is worse than no session.
+    All writers share one process-wide file, so every write+flush+rotate
+    cycle is serialized — without the lock, a rotation (size/daily) races a
+    concurrent writer into an ENOENT and kills the caller's connection."""
 
-    @staticmethod
-    def default_path():
-        """The XDG state home (the fallback = ~/.local/state); created on demand."""
-        base = os.environ.get('XDG_STATE_HOME') or os.path.expanduser('~/.local/state')
-        d = os.path.join(base, 'fake-inverter')
-        os.makedirs(d, exist_ok=True)
-        return os.path.join(d, 'audit.log')
-
-    def __init__(self, path=None, prefix='INV', max_mb=10.0, daily=False, files=3):
+    def __init__(self, path=None, prefix='AUDIT', app='pv-suite',
+                 max_mb=10.0, daily=False, files=3):
         self.prefix = prefix
-        self.path = path or self.default_path()
+        self.path = path or default_path(app)
         self.max_bytes = int(max_mb * 1024 * 1024) if max_mb and max_mb > 0 else 0
         self.daily = daily
         self.keep = max(1, int(files))   # the rotated backups kept (audit.log.1 .. .N)

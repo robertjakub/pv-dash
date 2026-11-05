@@ -1,0 +1,162 @@
+.TH MODBUS-FAKE-INVERTER 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
+.SH NAME
+modbus-fake-inverter \- simulated PV inverter for testing the pv-suite stack
+.SH SYNOPSIS
+.B modbus-fake-inverter
+.RI [ options ]
+.br
+.B modbus-fake-inverter \-\-static
+.RI [ options ]
+.SH DESCRIPTION
+A stdlib-only Modbus TCP server that plays an inverter \(em with a
+battery, a smart meter, the modbus-cache diagnostics block and the
+pv-suite's register-map profiles \(em so the scraper, the cache and the
+whole stack can be exercised without hardware. The default profile is the
+Huawei SUN2000 map; Deye hybrids are included. This is a test instrument:
+synthetic data only, no state worth protecting beyond its LAN segment.
+.PP
+By default it simulates a sunny day: a double-shouldered PV curve over
+two MPPT strings (east/west), a home load with morning/evening peaks, a
+battery state machine (95 % charge efficiency, self-discharge, an 80 %
+discharge cap, temperature derating), per-phase grid voltages and load
+shares (mean-reverting wanderers), a grid-frequency machine, and a grid
+outage machine (random blackouts). All machines integrate with a simulated
+clock \(em UTC by default, freezable (\fB--time\fR) and scalable
+(\fB--time-scale\fR for time-lapse). \fB--static\fR replaces the day with
+constant demo values. Writes (FC06/FC16) land in an overlay the scrapers
+read; \fB--chaos\fR answers a fraction of requests hostile.
+.SH OPTIONS
+.TP
+.BI \-\-host " HOST" ", " \-\-port " N"
+the Modbus TCP listener. Defaults \fB127.0.0.1:5502\fR.
+.TP
+.BI \-\-unit " N"
+the unit id served. Default \fB1\fR.
+.TP
+.BI \-\-profile " NAME|PATH"
+the register-map profile (a bare name or a JSON path). Default the
+bundled \fBsun2000\fR.
+.TP
+.B \-\-static
+constant demo values (PV 4000 W, home 4300 W, grid \-1500 W, battery
++1200 W at 65 % SoC) instead of the day simulation.
+.TP
+.BI \-\-max-kwp " KW"
+PV array size; the peak is 75 % of it. Default \fB6\fR.
+.TP
+.BI \-\-battery-kwh " KWH"
+usable battery capacity. Default \fB6.9\fR.
+.TP
+.B \-\-battery " / " \-\-no-battery
+simulate the battery (the default) or not.
+.TP
+.BI \-\-timezone " utc|local"
+the clock the machines integrate over. Default \fButc\fR.
+.TP
+.BI \-\-time " HH:MM"
+freeze the simulated clock at this time (zone-independent).
+.TP
+.BI \-\-time-scale " N"
+the simulated clock runs N\(en real time (a full simulated day takes
+24/N real hours). Default \fB1\fR.
+.TP
+.BI \-\-grid-voltage " V"
+nominal phase voltage, \fB120\fR or \fB230\fR (the per-phase machine
+wanders +/-10 %). Default \fB230\fR.
+.TP
+.BI \-\-grid-frequency " HZ"
+nominal frequency (the machine wanders +/-0.2 Hz). Default \fB50\fR.
+.TP
+.B \-\-strict
+reject undefined registers with exception 02.
+.TP
+.BI \-\-chaos " P"
+probability 0..1 that a request is answered hostile (garbage, short/lying
+lengths, wrong ids, stalls, dropouts, raw exceptions) and dropped.
+.TP
+.BI \-\-seed " N"
+the chaos/cloud RNG seed for reproducible runs.
+.TP
+.BI \-\-control-port " TARGET"
+the JSON-lines control server: a unix socket path or a TCP port. Default
+\fB/tmp/fake-inverter-\fR\fI<modbus-port>\fB.socket\fR; \fB0\fR = off.
+.TP
+.BI \-\-control-token " TOKEN" ", " \-\-control-token-file " FILE"
+require the token auth handshake on TCP control connections (mutually
+exclusive).
+.TP
+.B \-\-control-log-replies
+DEBUG-log the full reply of every control command.
+.TP
+.BI \-\-metrics-port " N"
+serve the fake's own Prometheus \fB/metrics\fR on 127.0.0.1:\fIN\fR. Off
+by default.
+.TP
+.BI \-\-metrics-token " TOKEN" ", " \-\-metrics-token-file " FILE"
+require \fBAuthorization: Bearer\fR on the metrics endpoint (mutually
+exclusive).
+.TP
+.BI \-\-audit-log " FILE|\-"
+the audit trail (default
+\fB~/.local/state/fake-inverter/audit.log\fR; \fB\-\fR = stdout).
+.TP
+.BI \-\-audit-max-mb " N ", \-\-audit-daily ", " \-\-audit-files " N", " \-\-no-audit-log"
+the file sink's gated rotation (defaults \fB10\fR / off / \fB3\fR).
+.TP
+.B \-\-dry-run
+validate the configuration, print the effective settings and exit.
+.TP
+.BI \-\-log-level " LEVEL"
+default \fBINFO\fR.
+.TP
+.B \-\-version
+print the version.
+.SH SIGNALS
+.TP
+.B SIGHUP
+re-apply the \fBFAKE_*\fR environment layer (all-or-nothing).
+.TP
+.B SIGUSR1
+reset the scenario: runtime pins, the cloud machine and the write overlay
+are dropped.
+.TP
+.BR SIGTERM ", " SIGINT
+graceful shutdown with a session summary.
+.SH CONTROL
+The control server speaks JSON lines
+(\fB{"cmd": "..."}\fR -> \fB{"status": "ok|err|bye", "text": "..."}\fR;
+TCP requires the token when configured). Commands: \fBset\fR/\fBunset\fR/
+\fBshow\fR/\fBhelp\fR (24 settings: pv, load, batt, grid, grid-voltage,
+grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
+scenario, chaos, seed, battery, battery-state, strict, static, max-kwp,
+battery-kwh, register, profile, log-level), \fBshow status\fR,
+\fBshow settings\fR, \fBshow registers\fR, \fBshow version\fR,
+\fBinspect\fR, \fBreset\fR, \fBshutdown\fR, \fBquit\fR. See
+.BR modbus-fake-ctl (1)
+and
+.BR modbus-fake-cli (1).
+.SH ENVIRONMENT
+.TP
+.B FAKE_CHAOS ", " FAKE_MAX_KWP ", " FAKE_PROFILE ", " FAKE_BATTERY ", " FAKE_STRICT ", " FAKE_TIME ", " FAKE_TIME_SCALE ", " FAKE_LOG_LEVEL
+the SIGHUP-reloadable layer.
+.TP
+.B FAKE_CTL
+the default control target for the clients.
+.TP
+.B FAKE_CONTROL_TOKEN ", " FAKE_CLI_KEEPALIVE
+the clients' TCP token and idle-ping interval.
+.SH FILES
+.TP
+.I /tmp/fake-inverter-<port>.socket
+the default control socket.
+.TP
+.I ~/.local/state/fake-inverter/audit.log
+the default audit trail.
+.SH SEE ALSO
+.BR modbus-fake-ctl (1),
+.BR modbus-fake-cli (1),
+.BR modbus-cache (1),
+.BR modbus-scraper (1)
+.PP
+\fBinverter/README.md\fR in the suite checkout \(em the full documentation,
+including the state machines.

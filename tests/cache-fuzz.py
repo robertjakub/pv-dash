@@ -39,7 +39,7 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
                                    '--listen', '127.0.0.1:%d' % CACHE_PORT, '--interval', '1',
                                    '--allow-write', '--profile',
-                                   os.path.join(REPO, 'profiles', 'sun2000.json')],
+                                   os.path.join(REPO, 'profiles', 'profiles', 'sun2000.json')],
                                   stdout=open('/tmp/fuzz_cache.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)
 

@@ -23,7 +23,9 @@ Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.
 """
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the src/ — the lib/ lives next to bin/
+here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the image symlinks the entry onto PATH)
+sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
+sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 import argparse
 import getpass
@@ -35,14 +37,15 @@ import sys
 import threading
 import time
 
-from lib.audit import AuditLog
+from common.audit import AuditLog
+from common.config import load_token_file
 
 try:
     import readline
 except ImportError:
     readline = None
 
-from lib.paths import load_token_file, resolve_control_target
+from lib.paths import resolve_control_target
 from lib.settings import COMMAND_HELP, SETTING_BY_NAME, SETTING_NAMES, describe_value
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, \
     CLI_TIMEOUT_S
@@ -280,7 +283,7 @@ def main():
     p.add_argument('--no-audit-log', action='store_true', help='disable the audit trail')
     args = p.parse_args()
 
-    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CLI')
+    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CLI', app='fake-inverter')
 
     if args.control_token and args.control_token_file:
         p.error('--control-token and --control-token-file are mutually exclusive')

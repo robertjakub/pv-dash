@@ -1,8 +1,6 @@
 {
   "description": "Deye SUN single-phase hybrid (SG01/SG03LP1 family) with battery",
-  "mappings": [
-
-  ],
+  "mappings": [],
   "registers": [
     {"name": "pv-power", "register": 186, "type": "u16", "scale": 1, "desc": "PV1 power (W)"},
     {"name": "grid-power", "register": 169, "type": "i16", "scale": 1, "desc": "grid power (W, + = export)"},

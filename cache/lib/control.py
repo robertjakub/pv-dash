@@ -16,11 +16,12 @@ import socket
 import threading
 import time
 
-from .version import version_string
+from common.version import version_string
+from common.config import default_profile_path, resolve_profile_file
 from .statics import CONTROL_IDLE_TIMEOUT_S
 from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .cache import build_blocks
-from .config import parse_write_registers, parse_acl, parse_selection, resolve_profile_file, default_profile_path
+from .config import parse_write_registers, parse_acl, parse_selection
 
 logger = logging.getLogger('modbus-cache')
 
@@ -39,7 +40,7 @@ class ControlServer:
 
     def __init__(self, proxy, target, stopper=None, audit=None, token=None, defaults=None):
         self.proxy = proxy
-        self.audit = audit               # the CACHE audit trail (lib.audit), None = off
+        self.audit = audit               # the CACHE audit trail (common.audit), None = off
         self.token = token               # the TCP auth token; None = no auth (the unix = the perms)
         self.is_unix = not isinstance(target, int)
         self.port = None if self.is_unix else int(target)

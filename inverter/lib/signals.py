@@ -32,7 +32,7 @@ class SignalBox:
         self.chaos = chaos
         self.fake = fake
         self.control = control
-        self.audit = audit               # the INV audit trail (lib.audit), None = off
+        self.audit = audit               # the INV audit trail (common.audit), None = off
         self.started = time.monotonic()
         self.received = []          # signal names, drained by the watcher
         self.stop = False

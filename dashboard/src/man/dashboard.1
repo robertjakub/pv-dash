@@ -1,0 +1,86 @@
+.TH DASHBOARD 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
+.SH NAME
+dashboard \- single-page solar energy-flow dashboard with a Prometheus proxy
+.SH SYNOPSIS
+.B dashboard
+.RI [ options ]
+.SH DESCRIPTION
+Serves the pv-suite dashboard (a single static page: the animated
+energy-flow diagram, the energy summary, the zoomable time-series chart,
+the CSV exports, dark/light themes, EN/PL i18n) and proxies
+\fB/prom/*\fR to a Prometheus upstream with the query string preserved \(em
+same-origin for the browser, no CORS and no mixed content. The page is
+read-only; when Prometheus is unreachable it falls back to a DEMO DATA
+mode so the layout still renders.
+.PP
+The page expects the \fBhuawei_*\fR metrics from
+.BR modbus-scraper (1)
+(Prometheus job name \fBsun2000\fR). User settings live in
+\fBconfig.js\fR next to the server (served at \fB/config.js\fR): the
+Prometheus URL, the metric selectors, the scrape/smoothing/refresh
+windows, the battery switch. URL parameters override everything for
+testing (\fB?prom=...&pv=...&battery=1&lang=...\fR).
+.SH OPTIONS
+.TP
+.BI \-\-config " FILE"
+the server ini (same keys, snake_case, \fB[server]\fR section). Default
+\fBserver.ini\fR next to the script.
+.TP
+.BI \-\-port " N"
+listen port. Default \fB8080\fR.
+.TP
+.BI \-\-bind " HOST"
+bind address. Default \fB0.0.0.0\fR \-\- pass \fB127.0.0.1\fR for
+loopback-only.
+.TP
+.BI \-\-upstream " URL"
+the Prometheus base URL. Default \fBhttp://localhost:9090\fR.
+.TP
+.BI \-\-prom-prefix " PATH"
+the path prefix proxied to Prometheus. Default \fB/prom\fR; empty proxies
+every unmatched path.
+.TP
+.BI \-\-static-dir " DIR"
+the directory to serve. Default \fBstatic\fR next to the script.
+.TP
+.BI \-\-config-js " FILE"
+the user settings file to serve at \fB/config.js\fR. Default
+\fBconfig.js\fR next to the script; a missing file makes
+\fB/config.js\fR 404 and the page boots with built-in defaults.
+.TP
+.B \-\-battery
+inject \fBbattery: true\fR into the served \fBconfig.js\fR (the Battery
+node, the three-way energy split).
+.TP
+.BI \-\-log-level " LEVEL" ", " \-\-log-queries
+default \fBINFO\fR; proxied queries log at DEBUG, or at INFO with
+\fB--log-queries\fR.
+.SH SIGNALS
+.TP
+.BR SIGTERM ", " SIGINT
+shutdown.
+.SH ENVIRONMENT
+.TP
+.B PORT ", " BIND ", " PROM_URL ", " PROM_PREFIX
+the flag twins (the flags win).
+.SH FILES
+.TP
+.I dashboard/src/server.ini
+the packaged sample config.
+.TP
+.I dashboard/src/config.js
+the user settings (served at \fB/config.js\fR).
+.TP
+.I dashboard/src/static/vendor/echarts.min.js
+the vendored Apache ECharts 5.5.1 (Apache-2.0) \(em the suite's only
+third-party code.
+.SH SECURITY
+The page and the proxy carry no authentication. Widen the bind
+deliberately and put an authenticating reverse proxy in front for LAN or
+internet exposure (nginx/Caddy examples in \fBdashboard/README.md\fR).
+.SH SEE ALSO
+.BR modbus-scraper (1),
+.BR modbus-cache (1)
+.PP
+\fBdashboard/README.md\fR in the suite checkout \(em the config keys, the
+URL parameters and the reverse-proxy recipes.

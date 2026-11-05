@@ -1,0 +1,79 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-05T00:00:00Z",
+    "component": {
+      "bom-ref": "pv-suite",
+      "type": "application",
+      "name": "pv-suite",
+      "version": "0.3.0",
+      "licenses": [{ "expression": "BSD-3-Clause" }],
+      "properties": [
+        { "name": "pv-suite:scope", "value": "the whole flake: dashboard, scrape, cache, inverter, profiles, common" }
+      ]
+    }
+  },
+  "components": [
+    { "bom-ref": "pv-suite:common", "type": "library", "name": "common", "version": "0.3.0",
+      "licenses": [{ "expression": "BSD-3-Clause" }],
+      "properties": [{ "name": "pv-suite:deps", "value": "python-stdlib only" }] },
+    { "bom-ref": "pv-suite:profiles", "type": "file", "name": "profiles", "version": "0.3.0",
+      "licenses": [{ "expression": "BSD-3-Clause" }],
+      "properties": [{ "name": "pv-suite:content", "value": "4 device-profile JSONs + profile-lint.py + profile-format.py (stdlib only)" }] },
+    { "bom-ref": "pv-suite:modbus-cache", "type": "application", "name": "modbus-cache", "version": "0.3.0",
+      "licenses": [{ "expression": "BSD-3-Clause" }] },
+    { "bom-ref": "pv-suite:modbus-scraper", "type": "application", "name": "modbus-scraper", "version": "0.3.0",
+      "licenses": [{ "expression": "BSD-3-Clause" }] },
+    { "bom-ref": "pv-suite:modbus-fake-inverter", "type": "application", "name": "modbus-fake-inverter", "version": "0.3.0",
+      "licenses": [{ "expression": "BSD-3-Clause" }] },
+    { "bom-ref": "pv-suite:dashboard", "type": "application", "name": "dashboard", "version": "0.3.0",
+      "licenses": [{ "expression": "BSD-3-Clause" }] },
+    { "bom-ref": "echarts", "type": "library", "name": "echarts", "version": "5.5.1",
+      "purl": "pkg:npm/echarts@5.5.1",
+      "licenses": [{ "expression": "Apache-2.0" }],
+      "properties": [
+        { "name": "pv-suite:vendored-at", "value": "dashboard/src/static/vendor/echarts.min.js" },
+        { "name": "pv-suite:note", "value": "the only third-party code in the suite" }
+      ] },
+    { "bom-ref": "nixpkgs", "type": "framework", "name": "nixpkgs", "version": "nixos-unstable @ 1c89083e451e891152365b799595cf7790a43325",
+      "purl": "pkg:github/NixOS/nixpkgs@1c89083e451e891152365b799595cf7790a43325",
+      "properties": [{ "name": "pv-suite:provides", "value": "the pinned CPython interpreter and the stdenv build wrappers; no Python libraries fetched" }] },
+    { "bom-ref": "alpine", "type": "operating-system", "name": "alpine", "version": "3.20",
+      "purl": "pkg:oci/alpine@3.20",
+      "properties": [{ "name": "pv-suite:note", "value": "the base of all three container images" }] },
+    { "bom-ref": "apk:python3", "type": "library", "name": "python3", "version": "alpine 3.20 pin",
+      "purl": "pkg:apk/alpine/python3",
+      "licenses": [{ "expression": "PSF-2.0" }] },
+    { "bom-ref": "apk:bash", "type": "library", "name": "bash", "version": "alpine 3.20 pin",
+      "purl": "pkg:apk/alpine/bash",
+      "licenses": [{ "expression": "GPL-3.0-or-later" }] },
+    { "bom-ref": "apk:su-exec", "type": "library", "name": "su-exec", "version": "alpine 3.20 pin",
+      "purl": "pkg:apk/alpine/su-exec",
+      "properties": [{ "name": "pv-suite:note", "value": "drops the entrypoint from root to the unprivileged pvsuite user" }] },
+    { "bom-ref": "image:fake-inverter", "type": "container", "name": "fake-inverter", "version": "0.3.0",
+      "properties": [{ "name": "pv-suite:dockerfile", "value": "docker/Dockerfile.inverter" }] },
+    { "bom-ref": "image:modbus-cache", "type": "container", "name": "modbus-cache", "version": "0.3.0",
+      "properties": [{ "name": "pv-suite:dockerfile", "value": "docker/Dockerfile.cache" }] },
+    { "bom-ref": "image:modbus-scraper", "type": "container", "name": "modbus-scraper", "version": "0.3.0",
+      "properties": [{ "name": "pv-suite:dockerfile", "value": "docker/Dockerfile.scraper" }] }
+  ],
+  "dependencies": [
+    { "ref": "pv-suite", "dependsOn": [
+      "pv-suite:dashboard", "pv-suite:modbus-scraper", "pv-suite:modbus-cache", "pv-suite:modbus-fake-inverter", "pv-suite:profiles", "pv-suite:common"
+    ] },
+    { "ref": "pv-suite:modbus-cache", "dependsOn": ["pv-suite:common", "pv-suite:profiles"] },
+    { "ref": "pv-suite:modbus-scraper", "dependsOn": ["pv-suite:common", "pv-suite:profiles"] },
+    { "ref": "pv-suite:modbus-fake-inverter", "dependsOn": ["pv-suite:common", "pv-suite:profiles"] },
+    { "ref": "pv-suite:dashboard", "dependsOn": ["echarts"] },
+    { "ref": "pv-suite:common", "dependsOn": [] },
+    { "ref": "pv-suite:profiles", "dependsOn": [] },
+    { "ref": "image:fake-inverter", "dependsOn": ["alpine", "apk:python3", "apk:bash", "apk:su-exec", "pv-suite:modbus-fake-inverter"] },
+    { "ref": "image:modbus-cache", "dependsOn": ["alpine", "apk:python3", "apk:bash", "apk:su-exec", "pv-suite:modbus-cache"] },
+    { "ref": "image:modbus-scraper", "dependsOn": ["alpine", "apk:python3", "apk:bash", "apk:su-exec", "pv-suite:modbus-scraper"] },
+    { "ref": "echarts", "dependsOn": [] },
+    { "ref": "alpine", "dependsOn": [] },
+    { "ref": "nixpkgs", "dependsOn": [] }
+  ]
+}

@@ -1,0 +1,25 @@
+#!/bin/sh
+# pv-suite docker entrypoint: seed the config volume, then run the tool as
+# the unprivileged pvsuite user.
+#
+# The image carries its bundled configs in /pv-suite/config-defaults; every
+# file the config volume (/config) does not have yet is copied in on start —
+# the bundled ones are the defaults, the copies in /config are the live ones
+# (edit them there, they survive container recreation). Runs as root only for
+# the seeding and drops to pvsuite via su-exec; the tool never runs as root.
+set -eu
+
+mkdir -p /config
+for src in /pv-suite/config-defaults/*; do
+    [ -e "$src" ] || continue
+    dst="/config/${src##*/}"
+    if [ -e "$dst" ]; then
+        echo "pv-entrypoint: keeping $dst"
+    else
+        cp "$src" "$dst"
+        chown pvsuite:pvsuite "$dst"
+        echo "pv-entrypoint: seeded $dst"
+    fi
+done
+
+exec su-exec pvsuite "$@"

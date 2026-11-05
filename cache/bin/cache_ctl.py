@@ -17,7 +17,9 @@ Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.
 """
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the checkout — the lib/ lives next to bin/
+here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the image symlinks the entry onto PATH)
+sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
+sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 import argparse
 import getpass
@@ -26,8 +28,9 @@ import os
 import socket
 import sys
 
-from lib.audit import AuditLog
-from lib.config import load_token_file, resolve_control_target
+from common.audit import AuditLog
+from common.config import load_token_file
+from lib.config import resolve_control_target
 
 
 def main():
@@ -43,7 +46,8 @@ def main():
     p.add_argument('--no-audit-log', action='store_true', help='disable the audit trail')
     args = p.parse_args()
 
-    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CTL', args.audit_max_mb, files=args.audit_files)
+    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CTL', app='modbus-cache',
+                                                    max_mb=args.audit_max_mb, files=args.audit_files)
 
     commands = [' '.join(args.command)] if args.command else None
     if not commands:

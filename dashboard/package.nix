@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "dashboard";
-  version = "0.2.1";
+  version = "0.3.0";
 
   src = lib.cleanSource ./src;
 
@@ -25,6 +25,8 @@ stdenv.mkDerivation (finalAttrs: {
     cp -r lib $out/share/dashboard/lib
     install -Dm755 server.py $out/share/dashboard/server.py
     install -Dm644 config.js $out/share/dashboard/config.js
+    install -dm755 $out/share/man/man1
+    install -m644 man/*.1 $out/share/man/man1/
 
     makeWrapper ${lib.getExe python3} $out/bin/dashboard \
       --add-flags "$out/share/dashboard/server.py"

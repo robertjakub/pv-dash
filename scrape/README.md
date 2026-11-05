@@ -19,7 +19,7 @@ id **1**.
 ## Run
 
 ```bash
-python3 scrape/src/scraper.py --host 192.168.1.100
+python3 scrape/bin/modbus_scraper.py --host 192.168.1.100
 curl http://localhost:9350/metrics
 ```
 
@@ -106,7 +106,8 @@ shared schema the [fake inverter](../inverter/README.md) serves and the
 [cache](../cache/README.md) polls; the shipped profiles live in the suite's
 [`profiles/`](../profiles/) subproject (`sun2000.json` by default); the JSON
 format is documented in [profiles/README.md](../profiles/README.md). WHICH entries feed the
-register-backed metrics comes from **`src/metrics.json`** itself: an entry
+register-backed metrics comes from **`metrics.json`** (the subproject root)
+itself: an entry
 carries a `profile` field naming the device-profile register it is read
 from (`"huawei_pv_generation_watts": {"profile": "pv-power", ...}`); the
 file is keyed by the exported metric name directly — no separate key layer.
@@ -120,7 +121,7 @@ on `SIGHUP`. The explicit register flags (`--pv-register`,
 `--grid-register`, `--battery-register`, `--battery-soc-register`,
 `--scale`, `--grid-scale`) override the profile when set.
 
-Metric names, help texts and types live in **`scrape/src/metrics.json`**
+Metric names, help texts and types live in **`scrape/metrics.json`**
 next to the script and are loaded at startup — edit it to rename metrics or
 reword `# HELP` lines without touching the code. A missing or corrupt spec
 fails cleanly at startup (one-line error, exit 1), never a traceback.
@@ -131,7 +132,8 @@ Settings are resolved in this order (first hit wins), mirroring
 `modbus-cache`:
 
 1. CLI flags (`--host`, `--listen`, …)
-2. Environment variables — same names prefixed: `SCRAPER_HOST`,
+2. Environment variables — same names prefixed: `SCRAPER_CONFIG`,
+   `SCRAPER_METRICS_SPEC`, `SCRAPER_HOST`,
    `SCRAPER_MODBUS_PORT`, `SCRAPER_UNIT`, `SCRAPER_MODBUS_OFFSET`,
    `SCRAPER_TIMEOUT`, `SCRAPER_PV_REGISTER`, `SCRAPER_GRID_REGISTER`,
    `SCRAPER_SCALE`, `SCRAPER_GRID_SCALE`, `SCRAPER_MAX_KWP`, `SCRAPER_MAX_GRID_KW`,
@@ -141,7 +143,9 @@ Settings are resolved in this order (first hit wins), mirroring
    `SCRAPER_LOG_LEVEL`, `SCRAPER_AUTH_TOKEN`, `SCRAPER_AUTH_TOKEN_FILE`,
    `SCRAPER_MAX_CLIENTS`, `SCRAPER_CLIENT_TIMEOUT`
 3. Config file (snake_case keys, `[scraper]` section) — `--config` picks the
-   file (default: `scraper.ini` next to `scraper.py`; missing file is fine)
+   file (default: `$SCRAPER_CONFIG`, then `scraper.ini` next to the script —
+   the packaged layout — then the subproject root's sample; missing file is
+   fine)
 4. Built-in defaults
 
 Every setting is **sanitized and validated** before use: whitespace is
@@ -155,7 +159,7 @@ one-line error instead of failing later at runtime. The only soft spot is
 `timeout > interval`: that logs a warning (polls run back-to-back) instead
 of failing.
 
-`scrape/src/scraper.ini` is a sample with the defaults:
+`scrape/scraper.ini` is a sample with the defaults:
 
 ```ini
 [scraper]
@@ -211,7 +215,8 @@ journald adds one.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--config` | `scraper.ini` next to the script | config file path |
+| `--config` | `$SCRAPER_CONFIG`, then `scraper.ini` next to the script, then the subproject root's | config file path |
+| `--metrics-spec` | `$SCRAPER_METRICS_SPEC` or the bundled `metrics.json` | metrics spec JSON: metric name → {help, type, profile?} |
 | `--host` | `127.0.0.1` | inverter/dongle Modbus TCP address |
 | `--modbus-port` | `5502` | Modbus TCP port |
 | `--unit` | `1` | Modbus unit id |
@@ -257,7 +262,7 @@ Definitions* (Issue 04, 2023-01-10):
 
 ## Test inverter
 
-The demo inverter lives in its own subproject now: [inverter/](../inverter/README.md) — a Modbus TCP server with day/static demo values, battery + meter simulation, a runtime control server (`set`/`show` values, chaos injection) and the `fake_ctl` CLI. Both regression suites start it automatically.
+The fake inverter lives in its own subproject: [inverter/](../inverter/README.md) — a Modbus TCP server with day/static demo values, battery + meter simulation, a runtime control server (`set`/`show` values, chaos injection) and the `fake_ctl` CLI. Both regression suites start it automatically.
 
 ## Battery
 
@@ -295,7 +300,7 @@ The consistency checks adapt:
   charging and export together cannot exceed the PV input.
 
 The fake inverter can emulate the battery for testing:
-`python3 inverter/src/fake_inverter.py --battery`.
+`python3 inverter/bin/fake_inverter.py --battery`.
 
 ## Nix
 
@@ -304,7 +309,8 @@ nix run .#modbus-scraper -- --host 192.168.1.100
 ```
 
 NixOS module (same flake, service runs with a dynamic user and systemd
-hardening):
+hardening); the package installs the man page too (`man/modbus-scraper.1`
+under `share/man/man1/`):
 
 ```nix
 services.modbus-scraper = {
@@ -331,16 +337,17 @@ token and the upstream address are picked up live. Changes to
 
 ## Testing
 
-Two standalone suites live in the suite-root [`tests/`](../tests/) — stdlib only, each starts its
-own fake inverter + exporters on scratch ports and cleans up after itself:
+Three standalone suites live in the suite-root [`tests/`](../tests/) — stdlib only, each starts
+its own fake inverter + exporters on scratch ports and cleans up after itself:
 
 ```bash
-python3 tests/scrape-regtest.py   # 70 functional checks (values, export/import
-                                 #   split, battery on/off, caps 503 + recovery,
-                                 #   auth + token rotation, limits, diagnostics,
-                                 #   SIGHUP, inverter death, hostile-inverter
-                                 #   phase, dry-run exit codes)
-  # n client-garbage HTTP frames (default 3000)
+python3 tests/scrape-regtest.py   # the functional battery (values, export/import
+                                  #   split, battery on/off, caps 503 + recovery,
+                                  #   auth + token rotation, limits, diagnostics,
+                                  #   SIGHUP, inverter death, hostile-inverter
+                                  #   phase, dry-run exit codes — plus the fake's
+                                  #   own control/machine coverage)
+python3 tests/scrape-fuzz.py [n]  # n client-garbage HTTP frames (default 3000)
 ```
 
 Every scenario must end with the exporter serving correct metrics and
@@ -349,23 +356,20 @@ Every scenario must end with the exporter serving correct metrics and
 ## Source layout
 
 ```
-scrape/src/
-├── scraper.py          # CLI, logging setup, signal handling
-├── scraper.ini         # sample config
-├── metrics.json        # metric names / HELP / TYPE specs
-├── fake_inverter.py    # Modbus TCP demo server (entry; see fake/)
-├── fake/
-│   ├── simulator.py    # day curves, runtime overrides, register map
-│   ├── chaos.py        # seeded hostile-reply dice layer
-│   └── server.py       # Modbus server + line-protocol control server
+scrape/
+├── bin/
+│   └── modbus_scraper.py  # CLI, logging setup, signal handling
+├── scraper.ini            # sample config (the default --config target)
+├── metrics.json           # metric names / HELP / TYPE specs
 └── lib/
-    ├── static.json     # the static constants: protocol limits, diagnostics block, defaults
-    ├── statics.py      # its loader (the STATIC dict + the named aliases)
-    ├── protocol.py     # Modbus TCP client (hardened framing)
-    ├── config.py       # settings resolution + validation
-    ├── metrics.py      # metrics.json loader
-    ├── poller.py       # poll loop + sanity checks + cache diagnostics
-    └── server.py       # Prometheus exposition endpoint (auth, limits)
+    ├── static.json        # the static constants: protocol limits, diagnostics block, defaults
+    ├── statics.py         # its loader (the STATIC dict + the named aliases)
+    ├── protocol.py        # Modbus TCP client (hardened framing)
+    ├── config.py          # settings resolution + validation
+    ├── metrics.py         # metrics.json loader
+    ├── poller.py          # poll loop + sanity checks + cache diagnostics
+    ├── server.py          # Prometheus exposition endpoint (auth, limits)
+    └── version.py         # the suite version
 ```
 
 ## License

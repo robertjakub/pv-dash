@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
-"""Modbus TCP wire format: constants, errors and frame helpers (stdlib only).
-The limits and codes come from lib/static.json (see statics.py)."""
+"""Modbus TCP wire format: the cache's frame layer on the common core
+(stdlib only). The limits and codes come from lib/static.json (see statics.py)."""
 import struct
 
-from .statics import MAX_PDU, MAX_COUNT, WRITE_FUNCS, ILLEGAL_FUNCTION, \
-    ILLEGAL_ADDRESS, ILLEGAL_VALUE, GATEWAY_FAILED
-
-
-class ModbusError(Exception):
-    pass
+from common.protocol import ModbusError
 
 
 class DeviceError(ModbusError):
@@ -17,22 +12,6 @@ class DeviceError(ModbusError):
     def __init__(self, msg, code):
         super().__init__(msg)
         self.code = code
-
-
-def recv_exact(sock, n):
-    buf = b''
-    while len(buf) < n:
-        chunk = sock.recv(n - len(buf))
-        if not chunk:
-            raise ConnectionError('connection closed by peer')
-        buf += chunk
-    return buf
-
-
-def exception_frame(txn, proto, unit, func, code):
-    code = max(0, min(0xFF, code))
-    body = struct.pack('>BB', func | 0x80, code)
-    return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
 
 
 def describe_write(pdu, unit):

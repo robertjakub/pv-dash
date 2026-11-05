@@ -8,6 +8,22 @@
 - **the user-defined scenarios** — scene files (the time + the pins + the
   machines) loadable with `set scenario <file>`; the audit trail of a
   manual session could *record* one.
+- **the dongle latency profile** — a persistent slow-reply mode (the
+  laggy-modem character: every response delayed, not dropped) to exercise
+  read-delay and poll pacing against a realistic SDongle — the chaos
+  `stall` is a one-shot, a real dongle is a lifestyle.
+- **the machine gauges on /metrics** — the state machines' internals as
+  Prometheus gauges (cloud factor, outage state, per-string power, the
+  battery's decision): dashboards and the scrape fuzzing could watch the
+  machines, not just the registers they feed.
+- **the fake's client limits** — mirror the cache's `--max-clients` /
+  `--client-timeout` on the Modbus surface, and cap a declared read count
+  by the remaining frame (a truncated 0xFFFF-count frame makes the fake
+  assemble an oversized reply today — docs/AUDIT.md F11).
+- **the token-file env honored** — the clients' help promises
+  `FAKE_CONTROL_TOKEN_FILE`, the code never reads it: honor it (like
+  `FAKE_CONTROL_TOKEN`) or drop the claim from the help. Same check for
+  `FAKE_METRICS_TOKEN_FILE`.
 - **the frequency-based derate** — the machine already wanders ±0.2 Hz
   around `--grid-frequency`; beyond a deviation bound the output power
   should derate (exposed on /metrics too).
@@ -23,7 +39,8 @@
 - **the forecast curve** — the PV/cloud machines follow a day-ahead
   forecast file, so a demo runs repeatable weather instead of the RNG.
 - **the CI** — GitHub Actions: the six suites + `nix flake check` on the
-  push; the release workflow on the tag.
+  push; the release workflow on the tag. (Family-wide, see the root
+  [TODO](../docs/TODO.md).)
 
 ## Done (the highlights; the git history has the details)
 
@@ -53,4 +70,5 @@ device-side counterpart). The console: the TAB/? listings split into
 [settings]/[values]/[system] with the descriptions aligned, `set`/`unset`
 confirm `% ok`, `show <setting>` prints the bare value — and the daemon
 announces its exit (`bye daemon-exit`) so the console closes instead of
-reconnecting.
+reconnecting. The shared core: the audit trail, the token loader and the
+wire helpers moved to `common/` (one implementation for the whole family).

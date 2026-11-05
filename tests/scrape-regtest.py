@@ -22,7 +22,7 @@ import urllib.request
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRAPE_DIR = os.path.join(REPO, 'scrape')
 
-P = os.path.join(SCRAPE_DIR, 'src', 'scraper.py')
+P = os.path.join(SCRAPE_DIR, 'bin', 'modbus_scraper.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'fake_inverter.py')
 FAKE_PORT = 15541
 PORT_A, PORT_B = 19441, 19442
@@ -596,7 +596,7 @@ try:
                        capture_output=True, text=True)
     check('inspect: the version, the profile, the machines, the overlay, the pins',
           r.returncode == 0 and r.stdout.startswith('ok inspect')
-          and '\nversion   0.2.1' in r.stdout and '\nprofile   SUN2000' in r.stdout
+          and '\nversion   0.3.0' in r.stdout and '\nprofile   SUN2000' in r.stdout
           and '\nmppt      both' in r.stdout and '\npinned    ' in r.stdout
           and 'V nominal, 50 Hz nominal' in r.stdout, r.stdout.strip()[:120])
 
@@ -721,7 +721,7 @@ try:
     check('fake_cli: the help is bare, the tables ride under % ok, inspect dumps', r.returncode == 0
           and any(l == 'soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' for l in lines)
           and any(l == '% ok registers (49)' for l in lines) and 'pv-power' in ''.join(lines)
-          and any('0.2.1' in l and 'version' in l for l in lines)
+          and any('0.3.0' in l and 'version' in l for l in lines)
           and not any(l.startswith('% ok inspect') for l in lines), repr(r.stdout[:120]))
 
     # 2g3. the audit trail: the UTC stamp, the CLI/CTL prefix, the who-when-what,
@@ -859,7 +859,7 @@ try:
           and r.stdout.startswith('err unknown setting bogus'), r.stdout.strip())
 
     # 2f. register-map profiles: the fake serves the SUN2000 layout from
-    # profiles/sun2000.json by default; a custom profile remaps names onto
+    # profiles/profiles/sun2000.json by default; a custom profile remaps names onto
     # different registers (with per-entry type/scale) to emulate other devices
     import json as _json
     prof = '/tmp/scr_prof_custom.json'
@@ -988,12 +988,12 @@ try:
           and max(len(l) for l in rows) <= 60, r.stdout.strip()[:80])
 
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'version'], capture_output=True, text=True)
-    check('show version: ok fake-inverter 0.2.1-<git>', r.returncode == 0
-          and r.stdout.strip().startswith('ok fake-inverter 0.2.1-'), r.stdout.strip())
+    check('show version: ok fake-inverter 0.3.0-<git>', r.returncode == 0
+          and r.stdout.strip().startswith('ok fake-inverter 0.3.0-'), r.stdout.strip())
     r = subprocess.run([sys.executable, F, '--version'], capture_output=True, text=True)
-    check('fake_inverter: --version reports 0.2.1-<short git>', r.returncode == 0
-          and r.stdout.strip().startswith('0.2.1-') and len(r.stdout.strip()) > 10
-          and r.stdout.strip() == '0.2.1-' + r.stdout.strip().split('-', 1)[1], r.stdout.strip())
+    check('fake_inverter: --version reports 0.3.0-<short git>', r.returncode == 0
+          and r.stdout.strip().startswith('0.3.0-') and len(r.stdout.strip()) > 10
+          and r.stdout.strip() == '0.3.0-' + r.stdout.strip().split('-', 1)[1], r.stdout.strip())
     check('fake_ctl/fake_cli are executable', os.access(FCTL, os.X_OK) if 'FCTL' in dir() else True)
 
     # the battery is on by default (no flag): the status shows a real SoC, and
@@ -1095,7 +1095,7 @@ try:
     status, _ = get('/metrics', 19443)
     check('cap exceeded -> HTTP 503', status == 503)
     write_ini('/tmp/scr_cap.ini', 'max_kwp = 6')
-    pid = int(subprocess.run(['pgrep', '-f', 'scraper.py.*19443'], capture_output=True,
+    pid = int(subprocess.run(['pgrep', '-f', 'modbus_scraper.py.*19443'], capture_output=True,
                              text=True).stdout.split()[0])
     os.kill(pid, signal.SIGHUP)
     time.sleep(1.5)
@@ -1159,7 +1159,7 @@ try:
     check('token file: works as bearer token', status == 200)
     with open('/tmp/scr_token.txt', 'w') as fh:
         fh.write('second-token\n')
-    pid = int(subprocess.run(['pgrep', '-f', 'scraper.py.*19447'], capture_output=True,
+    pid = int(subprocess.run(['pgrep', '-f', 'modbus_scraper.py.*19447'], capture_output=True,
                              text=True).stdout.split()[0])
     os.kill(pid, signal.SIGHUP)
     time.sleep(1)
@@ -1239,7 +1239,7 @@ try:
     r = subprocess.run([sys.executable, '-c',
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; Metrics(%r)'
-                        % (os.path.join(REPO, 'scrape', 'src'), '/nonexistent/metrics.json')],
+                        % (os.path.join(REPO, 'scrape'), '/nonexistent/metrics.json')],
                        capture_output=True)
     check('missing metrics.json: clean rc=1', r.returncode == 1 and b'metrics spec /nonexistent/metrics.json not found' in r.stderr)
     with open('/tmp/bad_spec.json', 'w') as fh:
@@ -1247,7 +1247,7 @@ try:
     r = subprocess.run([sys.executable, '-c',
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; Metrics(%r)'
-                        % (os.path.join(REPO, 'scrape', 'src'), '/tmp/bad_spec.json')],
+                        % (os.path.join(REPO, 'scrape'), '/tmp/bad_spec.json')],
                        capture_output=True)
     check('corrupt metrics.json: clean rc=1', r.returncode == 1 and b'not valid JSON' in r.stderr)
 

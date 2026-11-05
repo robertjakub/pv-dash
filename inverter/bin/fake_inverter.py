@@ -28,7 +28,9 @@ FAKE_LOG_LEVEL, keep-last-good), SIGUSR1 resets the scenario (releases pins
 """
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the src/ — the lib/ lives next to bin/
+here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the image symlinks the entry onto PATH)
+sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
+sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 import argparse
 import logging
@@ -36,16 +38,17 @@ import math
 import os
 import threading
 
+from common.audit import AuditLog, default_path as default_audit_path
+from common.config import load_token_file
+from common.version import version_string
 from lib.chaos import Chaos
-from lib.audit import AuditLog
-from lib.paths import load_token_file, resolve_control_target
+from lib.paths import resolve_control_target
 from lib.control import ControlServer
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
 from lib.statics import (AUDIT_FILES, AUDIT_MAX_MB, DEFAULT_BATTERY_KWH, DEFAULT_CHAOS, DEFAULT_HOST,
                          DEFAULT_LOG_LEVEL, DEFAULT_MAX_KWP, DEFAULT_MODBUS_PORT, DEFAULT_TIME_SCALE,
                          DEFAULT_UNIT, GRID_FREQUENCY_HZ, GRID_VOLTAGE_V, PEAK_RATIO, TIME_SCALE_MAX)
-from lib.version import version_string
 from lib.signals import SignalBox, parse_time
 from lib.metrics import MetricsServer
 from lib.simulator import Simulator
@@ -131,12 +134,12 @@ def main():
     p.add_argument('--metrics-token', default=None, help='require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks)')
     p.add_argument('--metrics-token-file', default=None, help='the metrics bearer token from a file (the first line) — takes the place of --metrics-token; giving both is an error (env FAKE_METRICS_TOKEN_FILE)')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path (default: /tmp/fake-inverter-<modbus-port>.socket) or TCP port number on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with fake_ctl.py')
-    p.add_argument('--profile', default=None, help='inverter profile JSON: name -> register (+ optional type/scale), e.g. profiles/sun2000.json (the default); FAKE_PROFILE when unset')
+    p.add_argument('--profile', default=None, help='inverter profile JSON: name -> register (+ optional type/scale), e.g. profiles/profiles/sun2000.json (the default); FAKE_PROFILE when unset')
     p.add_argument('--chaos', type=float, default=DEFAULT_CHAOS, help='probability 0..1 that a request is answered hostile and dropped (default: off); seed with --seed for reproducibility')
     p.add_argument('--seed', type=int, help='chaos RNG seed (default: random)')
     p.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
     p.add_argument('--log-level', default=DEFAULT_LOG_LEVEL, choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'])
-    p.add_argument('--audit-log', default=None, help='INV audit trail: a file path or - for stdout (the docker/journald way); default: %s — the XDG state home' % AuditLog.default_path())
+    p.add_argument('--audit-log', default=None, help='INV audit trail: a file path or - for stdout (the docker/journald way); default: %s — the XDG state home' % default_audit_path('fake-inverter'))
     p.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation (default %(default)s)')
     p.add_argument('--audit-daily', action='store_true', help='also rotate the audit log at UTC midnight')
     p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
@@ -192,8 +195,9 @@ def main():
                     ('127.0.0.1:' + target) if target.isdigit() else ('unix:' + target) if target != '0' else 'off')
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
-    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'INV', args.audit_max_mb,
-                                                    args.audit_daily, args.audit_files)
+    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'INV', app='fake-inverter',
+                                                    max_mb=args.audit_max_mb,
+                                                    daily=args.audit_daily, files=args.audit_files)
     fake = FakeInverter(args.unit, simulator, strict=args.strict, chaos=chaos)
     control = None
     if target != '0':

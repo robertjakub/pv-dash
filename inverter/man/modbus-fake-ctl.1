@@ -1,0 +1,67 @@
+.TH MODBUS-FAKE-CTL 1 "2026-11-05" "pv-suite 0.3.0" "User Commands"
+.SH NAME
+modbus-fake-ctl \- one-shot control client for the fake inverter
+.SH SYNOPSIS
+.B modbus-fake-ctl
+.RI [ options ]
+.IB command " [args ...]"
+.br
+.B modbus-fake-ctl
+.RI [ options ]
+< commands
+.SH DESCRIPTION
+Sends one control command (or a batch piped on stdin, one per line) to the
+.B modbus-fake-inverter
+JSON-lines control server and prints the replies on stdout, one per line.
+Every invocation lands in the audit trail (prefix \fBCTL\fR).
+.PP
+The command grammar is the fake's: \fBset\fR/\fBunset\fR/\fBshow\fR/
+\fBhelp\fR (the 24-setting registry), \fBshow status\fR,
+\fBshow settings\fR, \fBshow registers\fR, \fBshow version\fR,
+\fBinspect\fR, \fBreset\fR, \fBshutdown\fR, \fBquit\fR. See
+.BR modbus-fake-inverter (1)
+CONTROL.
+.SH OPTIONS
+.TP
+.BI \-\-control-port " TARGET"
+the control target: a unix socket path or a TCP port. Default
+\fB/tmp/fake-inverter-\fR\fI<modbus-port>\fB.socket\fR; the
+\fBFAKE_CTL\fR environment variable is the same knob.
+.TP
+.BI \-\-timeout " S"
+wire timeout, seconds. Default \fB5\fR.
+.TP
+.BI \-\-control-token " TOKEN" ", " \-\-control-token-file " FILE"
+the token for TCP control (mutually exclusive).
+.TP
+.BI \-\-audit-log " FILE|\-"
+the client's own audit trail
+(\fB~/.local/state/fake-inverter/audit.log\fR by default).
+.TP
+.BI \-\-audit-max-mb " N ", \-\-audit-files " N"
+the file sink's gated rotation (defaults \fB10\fR / \fB3\fR).
+.TP
+.B \-\-no-audit-log
+disable the client's audit trail.
+.SH EXAMPLES
+.RS
+.IP \(bu 2
+.B modbus-fake-ctl set pv 2500
+.IP \(bu 2
+.B modbus-fake-ctl show settings
+.IP \(bu 2
+.B printf 'set pv 2500\\nset soc 30\\nshow status\\n' | modbus-fake-ctl
+.RE
+.SH EXIT STATUS
+.TP
+.B 0
+every command answered \fBok\fR.
+.TP
+.B 1
+connection or control error.
+.TP
+.B 2
+command-line misuse.
+.SH SEE ALSO
+.BR modbus-fake-inverter (1),
+.BR modbus-fake-cli (1)

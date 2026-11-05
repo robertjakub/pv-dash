@@ -200,8 +200,8 @@ multi-line reply (`show status`, `show registers`) keeps its newlines inside
 token when `--control-token <secret>` is set**: the first request must be
 `{"cmd": "auth", "token": "..."}`; the unix socket needs no token (the
 filesystem permissions are the auth). The clients take `--control-token`
-/ **`FAKE_CONTROL_TOKEN`** — or the hardened way, `--control-token-file`
-/ **`FAKE_CONTROL_TOKEN_FILE`** (the first line of a key file or a systemd
+/ **`FAKE_CONTROL_TOKEN`** — or the hardened way, **`--control-token-file`**
+(the first line of a key file or a systemd
 `LoadCredential`) — and authenticate automatically:
 
 | Command | Effect |
@@ -213,7 +213,7 @@ filesystem permissions are the auth). The clients take `--control-token`
 | `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `chaos`, `chaos_hits`, `pinned`, `profile`, `timezone`) — scriptable |
 | `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins — the baton for a bug report |
 | `show registers` | the loaded profile's register map, one register per line: `name \| register \| type \| value`, columns aligned; the value = what the registers serve right now, `NaN` = not calculated (e.g. the battery block with the battery off) |
-| `show version` | the fake-inverter version (`0.2.1`, or `0.2.1-<short git>` from a checkout) |
+| `show version` | the fake-inverter version (`0.3.0`, or `0.3.0-<short git>` from a checkout) |
 | `set scenario <name>` | apply a scenario preset (below) |
 | `reset` | clear **all** pinned settings and the Modbus write overlay at once (like SIGUSR1, per-connection) |
 | `shutdown` | gracefully stop the fake inverter (same as SIGTERM: session summary, control socket unlinked) |
@@ -229,6 +229,7 @@ filesystem permissions are the auth). The clients take `--control-token`
 | `batt` | `W` \| `auto` | pin the battery power, +charge/−discharge (the state machine integrates it into the SoC) |
 | `grid` | `W` \| `auto` | pin the **grid setpoint** (+export/−import): the battery balances to hold it (`set grid 0` = zero-export) |
 | `grid-voltage` | `120` \| `230` | nominal grid phase voltage (V); the per-phase machine wanders ±10 % around it |
+| `grid-frequency` | Hz | nominal grid frequency (Hz); the machine wanders ±0.2 Hz around it |
 | `grid-outage` | `on` \| `off` \| `outage` | the grid-outage machine: random blackouts over the simulated clock (the phases collapse, the inverter stands by); `outage` forces one now |
 | `soc` | `%` \| `auto` | pin the state of charge (also seeds the machine) |
 | `mppt` | `both` \| `east` \| `west` \| `none` | enabled PV strings: string-1 = the east array (the morning peak), string-2 = the west array (the afternoon peak); `both` = the default, `none` = PV 0 |
@@ -250,7 +251,7 @@ filesystem permissions are the auth). The clients take `--control-token`
 | `log-level` | `DEBUG\|INFO\|WARNING\|ERROR` | live log level |
 
 The commands and settings — including their descriptions — live in one shared
-registry (`src/lib/settings.py`) that both the control server and the CLIs
+registry (`lib/settings.py`) that both the control server and the CLIs
 read, so the wire grammar, the help texts and the completions can never drift.
 
 ### `fake_ctl` — one-shot / batch client
@@ -377,19 +378,13 @@ Reloadable environment variables: `FAKE_CHAOS` (0..1), `FAKE_MAX_KWP`,
 ## Docker
 
 The fake ships as an alpine container — stdlib-only, no pip, running as
-the unprivileged `pvsuite` user with the tools on `PATH`. The files live
-in [`docker/`](../docker/) (`Dockerfile.inverter` + `compose.yaml`; the
-shared [`profiles/`](../profiles/README.md) directory is copied in):
+the unprivileged `pvsuite` user with the tools on `PATH`. Build + run
+(`Dockerfile.inverter` + `compose.yaml`; the shared
+[`profiles/`](../profiles/README.md) directory is copied in):
+[`docker/README.md`](../docker/README.md).
 
-```bash
-cd docker
-docker compose up -d fake-inverter              # build + serve on 0.0.0.0:5502
-docker compose exec fake-inverter fake-cli      # console session on the control server
-docker compose down
-```
-
-The version reports as `0.2.1` inside the image (no git metadata; a
-checkout shows `0.2.1-<short git>`).
+The version reports as `0.3.0` inside the image (no git metadata; a
+checkout shows `0.3.0-<short git>`).
 
 ### Audit trail
 
@@ -410,7 +405,7 @@ cannot be opened, the trail falls back to stdout rather than vanishing. **Rotati
 (the fake), `CLI` (fake_cli), `CTL` (fake_ctl):
 
 ```
-2026-11-03T20:10:06Z INV START version=0.2.1 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
+2026-11-03T20:10:06Z INV START version=0.3.0 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
 2026-11-03T20:10:07Z AUDIT INV COMMAND peer=127.0.0.1:54425 'set soc 40' -> ok
 2026-11-03T20:10:08Z INV RESET SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
 2026-11-03T20:10:08Z INV SHUTDOWN SIGTERM: uptime=2s conns=0 requests=0 chaos_hits=0
@@ -460,7 +455,9 @@ nix run .#modbus-fake-inverter -- --static --control-port 15599
 ```
 
 The flake exposes the package with three binaries (`modbus-fake-inverter`,
-`modbus-fake-ctl`, `modbus-fake-cli`); there is no NixOS service module — the
+`modbus-fake-ctl`, `modbus-fake-cli`) and their man pages
+(`man/modbus-fake-inverter.1`, `-ctl.1`, `-cli.1` under
+`share/man/man1/`); there is no NixOS service module — the
 fake is a test/demo tool, not a daemon you deploy.
 
 ## Source layout

@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""The profile linter: validate every profiles/*.json against the family
-schema and the shared vocabulary — the shapes the cache/fake/scraper all
-trust. Checks: the required keys and their order, the register bounds, the
-type width, the fc, the per-entry ttl, the mappings, the duplicate names,
+"""The profile linter: validate every profiles/profiles/*.json against the
+family schema and the shared vocabulary — the shapes the cache/fake/scraper
+all trust. Checks: the required keys and their order, the register bounds,
+the type width, the fc, the per-entry ttl, the mappings, the duplicate names,
 the same-fc overlaps, the terse-ASCII style. Exits 1 when anything is off.
 
-  python3 tests/profile-lint.py            # lint profiles/*.json
-  python3 tests/profile-lint.py my.json    # lint specific files
+  python3 profiles/bin/profile-lint.py            # lint profiles/profiles/*.json
+  python3 profiles/bin/profile-lint.py my.json    # lint specific files
 """
 import glob
 import json
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, 'cache'))
 
 from lib.statics import MAX_REGISTERS, REGISTER_TYPES   # noqa: E402
@@ -111,7 +111,7 @@ def lint(path):
 
 
 def main():
-    paths = sys.argv[1:] or sorted(glob.glob(os.path.join(ROOT, 'profiles', '*.json')))
+    paths = sys.argv[1:] or sorted(glob.glob(os.path.join(ROOT, 'profiles', 'profiles', '*.json')))
     n_issues = 0
     for path in paths:
         n, issues = lint(path)

@@ -2,24 +2,45 @@
 
 ## Open
 
+- **the audit-finding fixes** — the cache owns the audit's prompt pair and
+  most of the cheap gaps: F2 the audit-trail injection (fold the control
+  characters — the writer is now the shared `common/audit.py`, the two
+  control servers fold their COMMAND echoes), F3 the write allow-list
+  failing open on unparseable frames (fail closed), F4 the uncapped
+  pre-auth control buffer, F5 the token-less TCP control (refuse or warn),
+  F6 the metrics endpoint (token mandatory when enabled + a handler
+  timeout), F8 the socket mode (`chmod 0600` after bind). See
+  [AUDIT.md](../docs/AUDIT.md); each closes in a few lines, then re-run the
+  audit.
 - **the CI** — GitHub Actions: the four suites + `nix flake check` on the
-  push; the release workflow on the tag. (Family-wide, see the inverter's
-  TODO.)
+  push; the release workflow on the tag. (Family-wide, see the root
+  [TODO](../docs/TODO.md).)
 - **the hardware verification** — everything so far is verified against the
   fake inverter, fuzzing and stress only; a real SUN2000/SDongle session
   (poll pacing, the dongle's single-client behaviour, real exception codes,
   the FC4 input registers on a real device) is the last mile. Also worth
   testing: the Deye profiles against the cache.
+- **the cache persistence** — an optional state file (write-behind) so a
+  daemon restart serves last-known values instead of cold misses: the
+  device-down story survives the restart, not just the reconnect.
 - **the scraper's FC4 awareness** — the profile schema now carries the `fc`
   field (the cache polls/caches FC4 independently); the scraper still reads
   everything with FC3 — a profile that marks an FC4 entry `scrape` needs
-  the scraper to follow the field.
+  the scraper to follow the field. Related gap: no shipped profile
+  exercises `fc: 4` yet (the linter and the cache are ready, the data
+  isn't).
 - **the read-only control role** — a second token granting only the
   show/clear verbs (no `set`, no `shutdown`): the ops shift versus the
   admin key, both audited.
 - **the peer-cred auth on the unix control socket** — SO_PEERCRED: a local
   systemd unit connects without a token, the socket name already does half
   the job.
+- **the module gaps** — the NixOS module has no `selection` option (the
+  `--selection` flag/env exist), and its `profile` option description still
+  speaks of `"cache": true` marks from an older schema — refresh both.
+- **the alert rules** — the cache's own gauges (poll down, age spikes,
+  write-refusal bursts) belong in the family's shipped Prometheus rules
+  pack (the scraper's TODO grows the file; the cache contributes rules).
 
 ## Done (the highlights; the git history has the details)
 
@@ -78,4 +99,6 @@ the control options (`controlPort`/`controlToken`/`controlTokenFile` via
 LoadCredential), the stress + fuzz suites. The console: the settings in
 the TAB/? completion (set/unset/show all list the tunables, the value
 positions show the shapes and hints), the libedit tab-tab fix and the
-welcome banner parsing the report.
+welcome banner parsing the report. The shared core: the audit trail, the
+token loader, the wire helpers and the profile resolution moved to
+`common/` (one implementation for the whole family).

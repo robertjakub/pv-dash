@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-scraper";
-  version = "0.2.1";
+  version = "0.3.0";
 
   src = lib.cleanSource ./.;
 
@@ -20,14 +20,19 @@ stdenv.mkDerivation (finalAttrs: {
   installPhase = ''
     runHook preInstall
 
-    install -Dm755 src/scraper.py $out/share/modbus-scraper/scraper.py
+    install -Dm755 bin/modbus_scraper.py $out/share/modbus-scraper/modbus_scraper.py
     install -dm755 $out/share/modbus-scraper/lib
-    install -m644 src/lib/*.py src/lib/static.json $out/share/modbus-scraper/lib/
-    install -Dm644 src/metrics.json $out/share/modbus-scraper/metrics.json
+    install -m644 lib/*.py lib/static.json $out/share/modbus-scraper/lib/
+    install -dm755 $out/share/modbus-scraper/common
+    install -m644 ${../common}/*.py $out/share/modbus-scraper/common/
+    install -Dm644 metrics.json $out/share/modbus-scraper/metrics.json
+    install -Dm644 scraper.ini $out/share/modbus-scraper/scraper.ini
     install -dm755 $out/share/modbus-scraper/profiles
-    install -m644 ${../profiles}/*.json $out/share/modbus-scraper/profiles/
+    install -m644 ${../profiles/profiles}/*.json $out/share/modbus-scraper/profiles/
+    install -dm755 $out/share/man/man1
+    install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper \
-      --add-flags "$out/share/modbus-scraper/scraper.py"
+      --add-flags "$out/share/modbus-scraper/modbus_scraper.py"
 
     runHook postInstall
   '';

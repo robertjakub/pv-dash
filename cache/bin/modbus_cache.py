@@ -8,11 +8,10 @@ connect and are served FC3 reads from the in-memory cache. Reads outside the
 cached ranges and every other function code are forwarded to the inverter
 (serialized, one at a time).
 
-Layout: lib/protocol (wire format), lib/config (settings + register map),
-lib/upstream (inverter connection), lib/cache (register cache + block plan),
-lib/proxy (poller + client handling), lib/control (JSON-lines control
-server), lib/audit (the append-only audit trail), lib/version, this file
-(CLI, logging, signals).
+Layout: common/protocol (the wire core), lib/upstream (inverter connection),
+lib/cache (register cache + block plan), lib/proxy (poller + client
+handling), lib/control (JSON-lines control server), common/audit (the
+append-only audit trail), common/version, this file (CLI, logging, signals).
 """
 import argparse
 import logging
@@ -22,24 +21,32 @@ import sys
 import threading
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the checkout — the lib/ lives next to bin/
+here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the image symlinks the entry onto PATH)
+sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
+sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from lib.protocol import exception_frame
-from lib.config import default_profile_path, load_registers_file, load_selection, load_token_file, parse_listen, resolve_config, parse_control_target
+from common.audit import AuditLog, default_path as default_audit_path
+from common.config import default_profile_path, load_token_file, parse_listen
+from common.logutil import UtcFormatter
+from common.protocol import exception_frame
+from common.version import version_string
+from lib.config import load_registers_file, load_selection, resolve_config, parse_control_target
 from lib.upstream import Upstream
 from lib.cache import Cache
 from lib.proxy import Proxy
 from lib.control import ControlServer
-from lib.audit import AuditLog
 from lib.metrics import MetricsServer
-from lib.version import version_string
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def default_config_path():
-    """A user's ini next to the script (the flattened package layout) wins;
-    then the dev checkout's sample at the subproject root."""
+    """$MODBUS_CACHE_CONFIG wins (the docker config volume); then a user's
+    ini next to the script (the flattened package layout); then the dev
+    checkout's sample at the subproject root."""
+    env = os.environ.get('MODBUS_CACHE_CONFIG')
+    if env and env.strip():
+        return env.strip()
     for candidate in (os.path.join(SCRIPT_DIR, 'modbus_cache.ini'),
                       os.path.join(os.path.dirname(SCRIPT_DIR), 'modbus_cache.ini')):
         if os.path.exists(candidate):
@@ -49,14 +56,10 @@ def default_config_path():
 logger = logging.getLogger('modbus-cache')
 
 
-class UtcFormatter(logging.Formatter):
-    converter = staticmethod(time.gmtime)
-
-
 def parse_args():
     ap = argparse.ArgumentParser(description='Modbus TCP caching proxy for Huawei SUN2000 inverters.')
     ap.add_argument('--config', default=default_config_path(),
-                    help='config file (default: modbus_cache.ini next to this script, then the subproject root)')
+                    help='config file (default: $MODBUS_CACHE_CONFIG, then modbus_cache.ini next to this script, then the subproject root)')
     ap.add_argument('--host', help='inverter Modbus TCP address (default: config, $MODBUS_CACHE_HOST or 127.0.0.1)')
     ap.add_argument('--port', type=int, help='inverter Modbus TCP port (default: config, $MODBUS_CACHE_PORT or 5502)')
     ap.add_argument('--unit', type=int, help='Modbus unit id (default: config, $MODBUS_CACHE_UNIT or 1)')
@@ -94,7 +97,7 @@ def parse_args():
     ap.add_argument('--metrics-token-file', dest='metrics_token_file',
                     help='the metrics bearer token from a file (the first line) — takes the place of --metrics-token; giving both is an error (env MODBUS_CACHE_METRICS_TOKEN_FILE)')
     ap.add_argument('--audit-log', dest='audit_log',
-                    help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MODBUS_CACHE_AUDIT_LOG or %s — the XDG state home' % AuditLog.default_path())
+                    help='CACHE audit trail: a file path or - for stdout (the docker/journald way); default: config, $MODBUS_CACHE_AUDIT_LOG or %s — the XDG state home' % default_audit_path('modbus-cache'))
     ap.add_argument('--audit-max-mb', dest='audit_max_mb', type=float,
                     help='rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation (default: config, $MODBUS_CACHE_AUDIT_MAX_MB or 10)')
     ap.add_argument('--audit-daily', dest='audit_daily', action='store_true',
@@ -236,7 +239,7 @@ def main():
     elif cfg['audit_log'] == '-':
         audit_display = 'stdout'
     else:
-        audit_display = cfg['audit_log'] or AuditLog.default_path()
+        audit_display = cfg['audit_log'] or default_audit_path('modbus-cache')
     upstream = Upstream(cfg['host'], cfg['port'], cfg['unit'], cfg['timeout'])
     cache = Cache(ranges, cfg['cache_ttl'], range_names, range_ttls)
     proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
@@ -265,8 +268,8 @@ def main():
                     ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target))
         return
     audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'] or None, 'CACHE',
-                                                      cfg['audit_max_mb'], cfg['audit_daily'],
-                                                      cfg['audit_files'])
+                                                      app='modbus-cache', max_mb=cfg['audit_max_mb'],
+                                                      daily=cfg['audit_daily'], files=cfg['audit_files'])
     proxy.audit = audit
     if audit:
         audit.event('START', 'version=%s upstream=%s:%d unit=%d listen=%s:%d control=%s profile=%s'

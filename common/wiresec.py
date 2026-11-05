@@ -16,9 +16,70 @@ frames are refused. Over the unix socket it is verify-if-present — a
 peer-cred trusted peer speaks without holding the token (SO_PEERCRED is the
 boundary there), and a tamper attempt still fails the check. Without a
 token there is nothing to key: the wire stays unsigned (the filesystem
-permissions are the boundary). Stdlib only."""
+permissions are the boundary).
+
+A daemon may carry a **second token, the read-only ops role**
+(ROLE_ADMIN / ROLE_OPS): the admin key keeps every verb, the ops key
+authenticates into its policy's verbs only — by default the show/clear
+verbs (ROLE_POLICIES, per daemon configurable with --control-ops-verbs) —
+no set/unset, no request dump/restore or reload, no restart, no shutdown
+(the ops shift can look, flush a cache, and leave; the admin key steers).
+The gate is the command's head verb against the role's policy
+(role_allows), the session's replies are mac'd with the key it
+authenticated with, and the audit trail names the role on every COMMAND
+entry (role_tag) — both keys audited, the denials included. Stdlib only."""
 import hashlib
 import hmac
+
+# The control roles — the RBAC table: a role is a policy over the wire
+# verbs. ROLE_ADMIN is the full-access key (None = every verb the server's
+# grammar speaks); ROLE_OPS is the read-only shift, its policy the verb set
+# below — configurable per daemon (--control-ops-verbs, a comma list
+# validated against the tool's grammar at startup). The session verbs
+# (help/?/ping/quit) are the housekeeping every role speaks: they touch
+# nothing. A peer-cred trusted peer (SO_PEERCRED — the kernel vouches)
+# counts as ROLE_ADMIN.
+ROLE_ADMIN = 'admin'
+ROLE_OPS = 'ops'
+OPS_VERBS = frozenset(('show', 'clear'))
+SESSION_VERBS = frozenset(('help', '?', 'ping', 'quit'))
+ROLE_POLICIES = {
+    ROLE_ADMIN: None,            # None = the full verb set
+    ROLE_OPS: OPS_VERBS,         # the read-only shift's default policy
+}
+
+
+def command_verb(cmd):
+    """The head verb of one command line (lowercased), '' when empty —
+    the thing the role gate decides on."""
+    parts = cmd.strip().split()
+    return parts[0].lower() if parts else ''
+
+
+def role_allows(role, cmd, ops_verbs=None):
+    """True when the role may run this command: admin runs everything, ops
+    its policy (the daemon's configured verb set, or the shared default) plus
+    the session housekeeping. `None` = the session never authenticated
+    because no token is configured (the filesystem/peer-cred boundary
+    governs) — everything is allowed. An unknown role is denied everything
+    but the housekeeping (fail closed)."""
+    verb = command_verb(cmd)
+    if verb in SESSION_VERBS:
+        return True
+    if role is None:
+        return True
+    policy = ROLE_POLICIES.get(role, frozenset())
+    if policy is None:
+        return True
+    if role == ROLE_OPS and ops_verbs:
+        policy = ops_verbs
+    return verb in policy
+
+
+def role_tag(role):
+    """The audit-trail fragment naming the session's role: ' role=ops' —
+    '' when the session spoke without a role (no token configured)."""
+    return ' role=%s' % role if role else ''
 
 
 def frame_mac(token, payload):

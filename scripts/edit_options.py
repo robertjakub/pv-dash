@@ -132,19 +132,25 @@ def row_kind(row):
 
 ORDERS = ('name', 'kind', 'live', 'group', 'registry')
 VIEWS = ('all', 'live', 'other')   # the view gate: everything / the '*' rows / the rest
+KINDS = ('knob', 'control-only', 'node', 'show', 'cmd')   # the kind gate: the row_kind families
+KCYCLE = ('all',) + KINDS   # the dialog's kind cycle (all → knob → ... → cmd → all)
 
 
-def view_rows(rows, filt='', order='name', kind=row_kind, vmode='all'):
+def view_rows(rows, filt='', order='name', kind=row_kind, vmode='all', kmode='all'):
     """The rows as listed: gated by the view first — `live` keeps the '*'
     rows (the cli-visible ones: the live-settable knobs and the listing
     show/cmd words), `other` the rest (the startup-only, the hidden, the
-    bare nodes) — then filtered (the substring over the name, the live
-    path, the kind, the bucket and the descriptions) and ordered: by name
-    (the default), kind/live/group, or the registry order."""
+    bare nodes) — then by the kind (the row_kind family, star or not:
+    knob/control-only/node/show/cmd) — then filtered (the substring over
+    the name, the live path, the kind, the bucket and the descriptions)
+    and ordered: by name (the default), kind/live/group, or the registry
+    order."""
     if vmode == 'live':
         rows = [r for r in rows if kind(r).endswith('*')]
     elif vmode == 'other':
         rows = [r for r in rows if not kind(r).endswith('*')]
+    if kmode != 'all':
+        rows = [r for r in rows if kind(r).rstrip('*') == kmode]
     if filt:
         q = filt.lower()
         rows = [r for r in rows
@@ -463,8 +469,9 @@ def dialog(editor, screen):
     def draw_list(cursor, top, msg):
         screen.erase()
         note = ((' — view %s' % vmode) if vmode != 'all' else '') + \
+               ((' — kind %s' % kmode) if kmode != 'all' else '') + \
                ((' — filter %r, order %s' % (filt, order)) if (filt or order != 'name') else '')
-        frame('pv-dash registry editor — %s — %d of %d rows%s (v views, o sorts, / filters, Enter edits, q quits)'
+        frame('pv-dash registry editor — %s — %d of %d rows%s (v views, k kinds, o sorts, / filters, Enter edits, q quits)'
               % (editor.path, len(view), len(editor.rows) + len(editor.show), note))
         height = curses.LINES - 4
         top = fit(top, cursor, view, height)
@@ -477,7 +484,7 @@ def dialog(editor, screen):
             line = '  %-23s %-26s %-13s %s' % (r['name'], bucket, editor.kind(r),
                                                (r.get('setting-help') or r.get('help') or ''))
             put(2 + i, 0, line, curses.A_REVERSE if idx == cursor else 0)
-        status(msg or 'type / to filter, v to see all/live/other, o to sort, Enter to open a row', dim=not msg)
+        status(msg or 'type / to filter, v view, k kind, o sort, Enter opens a row', dim=not msg)
         screen.refresh()
         return top
 
@@ -663,8 +670,8 @@ def dialog(editor, screen):
 
     cursor, top, msg = 0, 0, ''
     fcursor, ftop = 0, 0
-    filt, order, vmode = '', 'name', 'all'
-    view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode)
+    filt, order, vmode, kmode = '', 'name', 'all', 'all'
+    view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
     while True:
         if editor.row is None:
             cursor = min(cursor, len(view) - 1)
@@ -687,7 +694,7 @@ def dialog(editor, screen):
                     msg = ''
                 else:
                     filt = q.strip()
-                    view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode)
+                    view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
                     cursor = 0
                     msg = '' if not filt or view else 'no row matches %r' % filt
             elif k in (ord('a'), ord('A')):   # add a hierarchy node
@@ -714,18 +721,23 @@ def dialog(editor, screen):
                         else:
                             ok, msg = editor.add_node(name.strip(), section.strip(), desc.strip())
                             if ok:
-                                view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode)
+                                view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
                                 cursor = [i for i, r in enumerate(view) if r['name'] == name.strip()][0]
             elif k == ord('o'):
                 order = ORDERS[(ORDERS.index(order) + 1) % len(ORDERS)]
-                view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode)
+                view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
                 cursor = 0
                 msg = 'order: %s' % order
             elif k in (ord('v'), ord('V')):
                 vmode = VIEWS[(VIEWS.index(vmode) + 1) % len(VIEWS)]
-                view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode)
+                view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
                 cursor = 0
                 msg = 'view: %s (all, live, other)' % vmode
+            elif k in (ord('k'), ord('K')):
+                kmode = KCYCLE[(KCYCLE.index(kmode) + 1) % len(KCYCLE)]
+                view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
+                cursor = 0
+                msg = 'kind: %s (%s)' % (kmode, ' | '.join(KCYCLE))
             elif k in (10, 13, curses.KEY_ENTER):
                 editor.open(view[cursor]['name'])
                 fcursor, ftop, msg = 0, 0, ''
@@ -778,7 +790,7 @@ def dialog(editor, screen):
                     ok, msg = editor.write_row()
                     if ok:
                         editor.row = None
-                        view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode)
+                        view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
                         cursor = [i for i, r in enumerate(view) if r['name'] == name][0]
             elif k == 27:   # Esc = the cancel, straight — c keeps the confirm
                 editor.cancel()
@@ -791,7 +803,7 @@ def dialog(editor, screen):
                     ok, msg = editor.delete_node()
                     if ok:
                         editor.row = None
-                        view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode)
+                        view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
                         cursor = min(cursor, max(0, len(view) - 1))
                         ftop = 0
                 else:
@@ -841,8 +853,8 @@ def show_row(editor, row):
 
 def line_mode(editor):
     """The line face: the same flow as the dialog, one prompt per step."""
-    filt, order, vmode = '', 'name', 'all'
-    editor.index_lines(filt, order, vmode)
+    filt, order, vmode, kmode = '', 'name', 'all', 'all'
+    editor.index_lines(filt, order, vmode, kmode)
     while True:
         try:
             line = input('name > ').strip()
@@ -855,11 +867,11 @@ def line_mode(editor):
         if low in ('quit', 'exit'):
             return 0
         if low == 'list':
-            editor.index_lines(filt, order, vmode)
+            editor.index_lines(filt, order, vmode, kmode)
             continue
         if low.startswith('filter'):
             filt = line.split(None, 1)[1].strip() if len(line.split(None, 1)) > 1 else ''
-            editor.index_lines(filt, order, vmode)
+            editor.index_lines(filt, order, vmode, kmode)
             continue
         if low.startswith('view'):
             arg = line.split(None, 1)[1].strip().lower() if len(line.split(None, 1)) > 1 else ''
@@ -870,7 +882,20 @@ def line_mode(editor):
             else:
                 print('err view is one of %s' % ', '.join(VIEWS))
                 continue
-            editor.index_lines(filt, order, vmode)
+            editor.index_lines(filt, order, vmode, kmode)
+            continue
+        if low.startswith('kind'):
+            arg = line.split(None, 1)[1].strip().lower() if len(line.split(None, 1)) > 1 else ''
+            if not arg:
+                kmode = KCYCLE[(KCYCLE.index(kmode) + 1) % len(KCYCLE)]
+            elif arg in KINDS:
+                kmode = arg
+            elif arg == 'all':
+                kmode = 'all'
+            else:
+                print('err kind is one of %s' % ' | '.join(KCYCLE))
+                continue
+            editor.index_lines(filt, order, vmode, kmode)
             continue
         if low.startswith('sort'):
             arg = line.split(None, 1)[1].strip().lower() if len(line.split(None, 1)) > 1 else ''
@@ -881,7 +906,7 @@ def line_mode(editor):
             else:
                 print('err sort order is one of %s' % ', '.join(ORDERS))
                 continue
-            editor.index_lines(filt, order, vmode)
+            editor.index_lines(filt, order, vmode, kmode)
             continue
         row = editor.by_name().get(line.split()[0])
         if row is None:
@@ -917,7 +942,7 @@ def line_mode(editor):
                 ok, msg = editor.write_row()
                 print(msg)
                 if ok:
-                    editor.index_lines(filt, order, vmode)
+                    editor.index_lines(filt, order, vmode, kmode)
                     break
             elif field in ('cancel', 'list'):
                 editor.cancel()
@@ -934,12 +959,14 @@ def line_mode(editor):
                 print(msg)
 
 
-def index_lines(self, filt='', order='name', vmode='all'):
+def index_lines(self, filt='', order='name', vmode='all', kmode='all'):
     """The line-mode knob index: the name, its live-or-group bucket, the
-    kind, the setting-help — viewed, filtered and ordered like the dialog.
-    The `show` rows list beside the knobs (their bucket: show)."""
-    rows = view_rows(self.rows + self.show + self.cmds, filt, order, self.kind, vmode)
+    kind, the setting-help — viewed, kind-gated, filtered and ordered
+    like the dialog. The `show` rows list beside the knobs (their
+    bucket: show)."""
+    rows = view_rows(self.rows + self.show + self.cmds, filt, order, self.kind, vmode, kmode)
     note = ((' — view %s' % vmode) if vmode != 'all' else '') + \
+           ((' — kind %s' % kmode) if kmode != 'all' else '') + \
            ((' — filter %r, order %s' % (filt, order)) if (filt or order != 'name') else '')
     print('# %s — %d of %d rows%s (type a name to edit it, quit leaves)'
           % (self.path, len(rows), len(self.rows) + len(self.show) + len(self.cmds), note))

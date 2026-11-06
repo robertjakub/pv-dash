@@ -51,7 +51,7 @@ from common.options import setting_path_pool
 from common.options import word_groups
 from common.wiresec import sign_request, verify_reply
 from lib.config import resolve_control_target
-from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, HIDDEN_SETTINGS, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES, describe_value, NODE_BY_NAME
+from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, HIDDEN_SETTINGS, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES, LIVE_SETTINGS, describe_value, NODE_BY_NAME
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
@@ -95,9 +95,15 @@ class DaemonExit(Exception):
 
 def daemon_exit_notice(text):
     """The '% daemon exit: ... — console closing' line, from the wire's JSON
-    frame or the internal 'bye daemon-exit: ...' form."""
-    m = re.search(r'daemon-exit: ([^"\n]*)', text or '')
-    print('\n%% daemon exit: %s — console closing' % (m.group(1).rstrip() if m else 'the daemon is gone'))
+    frame or the internal 'bye daemon-exit: ...' form — the frame decodes
+    first, so the wire's unicode escapes never render raw."""
+    raw = (text or '').strip()
+    try:
+        raw = json.loads(raw.splitlines()[-1]).get('text', raw)
+    except (ValueError, IndexError, AttributeError):
+        pass
+    m = re.search(r'daemon-exit: (.*)', raw)
+    print('\n%% daemon exit: %s — console closing' % (m.group(1).strip() if m else 'the daemon is gone'))
     sys.stdout.flush()
 
 
@@ -117,8 +123,8 @@ def candidates(buf):
     """Valid next words for the buffer being completed or questioned:
     (matches, hint about the following word, describer of each word, the
     listing groups — the settings under their registry groups
-    ([ungrouped] where a row carries none), the values of one setting
-    ([values]), [system] beside). A live setting's name may be a '/'-path
+    (ungrouped rows bare, no header), the values of one setting
+    ([values])). A live setting's name may be a '/'-path
     (`inverter/profile`): set/unset/show spell it as words — the completion
     offers the next segment until the path is whole, then the values."""
     end_space = buf.endswith(' ')
@@ -133,6 +139,10 @@ def candidates(buf):
         names = tuple(n for n in POOL_NAMES if n not in SHOW_LIVES)   # the show reports answer show, never set/unset
         by = {n: SETTING_BY_NAME[n] for n in names if n in SETTING_BY_NAME}
         s, segs = setting_path_pool(done[1:], names, by)
+        if s is None:   # the hidden knobs (the secrets) never walk, but the typed whole path still describes
+            s = SETTING_BY_NAME.get('/'.join(w.lower() for w in done[1:]))
+            if s is not None and s.name not in LIVE_SETTINGS - SHOW_LIVES:
+                s = None   # a show report never offers a value
         if s is not None:
             if head == 'unset':
                 return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole; unset takes no value — ? describes it
@@ -146,10 +156,12 @@ def candidates(buf):
     elif head == 'request' and len(done) == 1:
         pool, hint, desc = ('reload',), None, describe_word
     elif head == 'show':
-        s, segs = setting_path_pool(done[1:], SETTING_NAMES + ALIAS_NAMES, SETTING_BY_NAME)
+        s, segs = setting_path_pool(done[1:], POOL_NAMES, SETTING_BY_NAME)
         base = '/'.join(w.lower() for w in done[1:])   # a segment's description lives on the full live name
+        if s is None:   # the hidden knobs never walk, but the typed whole path still describes (the wire's help answers it)
+            s = SETTING_BY_NAME.get('/'.join(w.lower() for w in done[1:]))
         if s is not None:
-            _, cont = setting_path_pool(done[1:] + [''], SETTING_NAMES + ALIAS_NAMES, SETTING_BY_NAME)
+            _, cont = setting_path_pool(done[1:] + [''], POOL_NAMES, SETTING_BY_NAME)
             if not cont:
                 return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole and childless; ? describes the report
             pool, hint = cont, None   # a namespace too: the report answers on Enter, TAB walks on
@@ -168,14 +180,14 @@ def candidates(buf):
 def _sections(head, done_len, matches, values=False, base=''):
     """The listing groups: every word under its display group — a setting's
     row group (the full live name when the base path prefixes it, else the
-    word; the row's `group`, else [ungrouped] — no header, the top of the
-    listing), a hierarchy node's group (its `group`, else bare beside it),
-    everything else ([system]: the report words, the commands)."""
+    word; ungrouped words render bare — no header, the top of the listing),
+    a hierarchy node's group (its `group`, else bare beside it), everything
+    else bare (the report words, the commands)."""
     if values:
         return [('values', matches)]
     if head in ('set', 'unset', 'show') and done_len >= 1:
         return _grouped(matches, base)
-    return [('system', matches)]
+    return [('', matches)]
 
 
 def _grouped(matches, base):
@@ -184,21 +196,20 @@ def _grouped(matches, base):
     (no section header) and the listing renders them at the top; a
     namespace word (a hierarchy node, or the walk-on first segment of an
     aliased row) groups with the row it walks into; a word no row answers
-    for lands [system]."""
+    for rides the bare bucket too."""
     buckets = {}
     for w in matches:
         full = (base + '/' + w) if base else w
         s = SETTING_BY_NAME.get(full) or SETTING_BY_NAME.get(w)
         if s is not None:
-            label = '' if s.display_group == 'ungrouped' else s.display_group
+            label = s.display_group
         else:
             n = NODE_BY_NAME.get(w)
             if n is not None:
                 label = n.group or ''
             else:
                 walk = next((s for k, s in SETTING_BY_NAME.items() if k.startswith(w + '/')), None)
-                label = ('' if walk.display_group == 'ungrouped' else walk.display_group) \
-                    if walk is not None else 'system'   # no section fallback
+                label = walk.display_group if walk is not None else ''   # no group, bare
         buckets.setdefault(label, []).append(w)
     bare = buckets.pop('', None)
     secs = [('', sorted(bare, key=str.lower))] if bare else []
@@ -252,7 +263,8 @@ def aligned_rows(matches, desc, hint, width=None):
     return rows
 
 
-POOL_NAMES = tuple(n for n in SETTING_NAMES + ALIAS_NAMES if n not in HIDDEN_SETTINGS)
+POOL_NAMES = tuple(n for n in SETTING_NAMES + ALIAS_NAMES if n not in HIDDEN_SETTINGS
+                   and (n in LIVE_SETTINGS or n in ALIAS_NAMES))   # a not-yet-live knob never lists
 
 _last_listed = None   # the completer is called several times per attempt;
                       # list each distinct buffer only once
@@ -278,7 +290,7 @@ def keepalive(sock, interval, audit=None):
                                          ensure_ascii=False) + '\n').encode())
         except OSError:
             try:
-                sock.setblocking(False)
+                sock.settimeout(1.0)   # an announced exit sent the bye before closing: give it a moment to land
                 data = sock.recv(4096).decode('utf-8', 'replace')
             except OSError:
                 data = ''
@@ -329,8 +341,9 @@ def complete(text, state):
 
 def print_options(buf):
     """`<prefix>?`: one candidate per line, grouped into the registry's
-    section groups ([device]/[serving]/...) plus [values]/[system]; a value
-    shape with no completable words still shows its hint."""
+    display groups (`# --- group ---` headers; the ungrouped words bare on
+    top) plus [values]; a value shape with no completable words still shows
+    its hint."""
     matches, hint, desc, sections = candidates(buf)
     rows = sectioned_rows(sections, desc, hint)
     if not rows:
@@ -505,6 +518,16 @@ def welcome(sock):
     print('%   TAB completes, ? lists the commands, quit leaves')
 
 
+def display(text):
+    """console-style: every non-value reply line gets the '% ' prefix — the
+    ok/err verdicts and the bye notices (the multi-line tables keep their
+    raw continuation lines: only the reply's status line is prefixed)."""
+    out = []
+    for line in text.splitlines():
+        out.append(('% ' + line) if line.startswith(('ok', 'err', 'bye')) else line)
+    print('\n'.join(out))
+
+
 def _loop(sock, prompt, audit=None):
     """The typed-command loop. A dead connection (an exchange that raises
     ConnectionLost) surfaces out of the loop so the session can run its
@@ -527,7 +550,7 @@ def _loop(sock, prompt, audit=None):
                 audit.command(cmd, 'local')
             return
         if low == 'ping':               # local: the wire pings belong to the keepalive thread
-            print('ok pong')
+            print('% ok pong')
             continue
         if low in ('?', 'help'):
             if audit:
@@ -554,9 +577,12 @@ def _loop(sock, prompt, audit=None):
         if reply is None:
             raise ConnectionLost('the control connection closed without a bye')
         if low.startswith(('set ', 'unset ')):
-            print('% ok' if reply.startswith('ok') else '% ' + reply)
+            if 'restart required' in reply:
+                print('% ' + reply.split(' ', 1)[1])   # the startup-only note: a note, not a verdict
+            else:
+                print('% ok' if reply.startswith('ok') else '% ' + reply)
         elif low == 'request reload' and reply.startswith('ok'):
-            print('ok')                 # confirm silently
+            print('% ok')               # confirm silently
         elif low.startswith('show ') and reply.startswith('ok '):
             body = reply.split(' ', 1)[1]
             head, _, rest = body.partition('\n')
@@ -569,7 +595,7 @@ def _loop(sock, prompt, audit=None):
         elif low == 'inspect' and reply.startswith('ok inspect\n'):
             print('\n'.join(reply.splitlines()[1:]))   # the dump itself is the answer
         else:
-            print(reply)
+            display(reply)
 
 
 def confirm_shutdown(sock):
@@ -588,7 +614,7 @@ def confirm_shutdown(sock):
     except ConnectionLost:
         return True   # the wire died right after the confirm; the server is stopping either way
     if reply is not None:
-        print(reply)
+        display(reply)
     return True   # 'bye shutdown' is out; the server is stopping either way
 
 

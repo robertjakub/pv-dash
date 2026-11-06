@@ -14,6 +14,7 @@ import logging
 import os
 
 from common.options import parse_config_script
+from .options import OPTIONS
 from common.config import load_token_file
 from .statics import DEFAULTS, DEFAULT_PORT, LOG_LEVELS
 
@@ -55,7 +56,7 @@ def load_config(path):
     except OSError as e:
         raise SystemExit('cannot read config file %s: %s' % (path, e))
     try:
-        rows = parse_config_script(text, path)
+        rows = parse_config_script(text, path, OPTIONS)   # the registry: the CLI spelling + the unknown-setting fail fast
     except ValueError as e:
         raise SystemExit(str(e))
     out = {}

@@ -226,7 +226,8 @@ Commands: `set <setting> <value>` / `unset <setting>` (the live settings:
 `log-queries`, `battery`, `log-level`), `show <setting>` / `show status` /
 `show connections` (the live HTTP clients per peer IP) /
 `show version` / `show knobs` (the dictionary of every registry knob: its
-flag, its env twin, its section, how it changes), `inspect` (the one-page
+flag, its env twin, how it changes — under its display group, ungrouped
+rows bare), `inspect` (the one-page
 dump for a bug report), `request
 reload` (re-read `server.conf` — the SIGHUP path; the listen address and
 port are bound and stay), `shutdown`, `quit`; `help <setting>` describes a

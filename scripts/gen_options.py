@@ -67,6 +67,15 @@ def live_cell(rows_by_tool):
     return ', '.join('`set %s`' % n.replace('/', ' ') for n in names)
 
 
+def group_cell(rows_by_tool):
+    """The group column: the row's optional finer display bucket (the
+    registry's group field — the surfaces file the knob under it instead of
+    the section), the tools' names joined when they diverge. Blank = the
+    function (the section) groups it."""
+    names = sorted({opt.group for opt in rows_by_tool.values() if opt.group})
+    return ', '.join('`%s`' % n for n in names)
+
+
 def main():
     registries = {key: load(d) for key, d in TOOLS}
     names = {key: t for key, t in TOOLS}
@@ -80,8 +89,9 @@ def main():
     out = ['# The knobs of the family (options.md)',
            '',
            'One alphabetical table of every knob of the four daemons — the kind,',
-           'the name, the function it files under and the control command that',
-           'changes it on a running daemon — with a mark per',
+           'the name, the function it files under, the finer group it renders',
+           'under and the control command that changes it on a running daemon —',
+           'with a mark per',
            'tool. **Generated** from the per-tool `lib/options.json` registries (the',
            'one-knob-one-source rows) by `scripts/gen_options.py` — edit the',
            'registries and re-run `python3 scripts/gen_options.py`, never this file.',
@@ -99,7 +109,7 @@ def main():
     out.append('shared nearly verbatim; the audit, limits and metrics blocks follow the')
     out.append('family shape with per-tool defaults.')
     out.append('')
-    cols = ['kind', 'name', 'function', 'live'] + [t for _, t in TOOLS]
+    cols = ['kind', 'name', 'function', 'group', 'live'] + [t for _, t in TOOLS]
     out.append('| ' + ' | '.join(cols) + ' |')
     out.append('|' + '---|' * len(cols))
     # one alphabetical run over the whole merged universe — the section only
@@ -113,9 +123,9 @@ def main():
         first = next(iter(by_tool.values()))
         cells = marks(by_tool)
         kind = 'c' if not first.flag else 'k'
-        out.append('| %s | `%s` | %s | %s | %s |'
-                   % (kind, name, first.group or section, live_cell(by_tool),
-                      ' | '.join(cells)))
+        out.append('| %s | `%s` | %s | %s | %s | %s |'
+                   % (kind, name, section, group_cell(by_tool),
+                      live_cell(by_tool), ' | '.join(cells)))
     out.append('')
     out.append('Legend: `k` = a knob — the flag/env/config-file rows; '
                '`c` = control-only — a setting that lives on the control wire '
@@ -128,6 +138,9 @@ def main():
                '*(startup-only)* = no live form, a restart applies the knob; a cell\'s '
                '`live` mark says the tool takes the knob live (a cell without one = '
                'that tool applies the knob at startup only); '
+               '`group` = the row\'s optional finer display bucket — the tool\'s '
+               'surfaces file the knob under it instead of the function (blank = the '
+               'function groups it); '
                '`secret` = a token — never rendered inline by '
                '`show config` (the `-file` form is). The knob descriptions stay '
                'in the registries — `--help`, the man pages, `show knobs` and '

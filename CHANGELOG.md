@@ -499,6 +499,13 @@ before the repo restructured into one suite.
 
 ### Fixed
 
+- **scraper** — the `show status`/`inspect` uptime mixed the clocks (wall
+  `time.time()` minus a monotonic start): a running scraper reported
+  `uptime 20763.07d` — the epoch rendered in days. Both lines read
+  `time.monotonic() - started` now (the cache/fake/dashboard shape); the
+  `last_poll ... ago` fields keep the wall clock on purpose (the epoch
+  stamp feeds the gauge).
+
 - **the family** — the scraper renames (`huawei_cache_*` ->
   `scraper_cache_*`, `huawei_up` -> `scraper_up`, `huawei_battery` ->
   `scraper_battery` — the metrics wave) had left stale mentions behind:

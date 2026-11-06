@@ -565,7 +565,7 @@ class ControlServer:
             'timeout=%s' % secs(cfg['timeout']),
             'listen=%s' % cfg['listen'],
             'control=%s' % self.describe(),
-            'uptime=%s' % secs(now - self.started),
+            'uptime=%s' % secs(time.monotonic() - self.started),
             'poll=%s' % ('ok' if s.up else 'down'),
             'last_poll=%s' % ('never' if not s.last_poll else secs(now - s.last_poll)),
             'interval=%s' % secs(cfg['interval']),
@@ -611,6 +611,6 @@ class ControlServer:
                                              'on' if cfg['log_access'] else 'off'),
             'audit     %s' % ('off' if self.audit is None
                               else (self.audit.path if self.audit.path != '-' else 'stdout')),
-            'uptime    %s' % secs(now - self.started),
+            'uptime    %s' % secs(time.monotonic() - self.started),
         ]
         return 'ok inspect\n' + '\n'.join(rows)

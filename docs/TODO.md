@@ -1,14 +1,14 @@
 # TODO (one file to rule them all)
 
 Every **open** item lives here — grouped by theme, each tagged
-`[cache]` `[scrape]` `[inverter]` `[dashboard]` `[common]` `[docker]`
+`[cache]` `[scraper]` `[inverter]` `[dashboard]` `[common]` `[docker]`
 (untagged = the whole family). The per-subproject `TODO.md` files keep only
 the **Done/history** records for their tool.
 
 ## The next breaking wave (the interface evolution)
 
 - **the CLI redone: hierarchical commands, one grammar for the family**
-  `[common]` `[cache]` `[inverter]` `[scrape]` — the control vocabulary
+  `[common]` `[cache]` `[inverter]` `[scraper]` — the control vocabulary
   grew organically per tool and it shows: flatten it into namespaces and
   make every tool speak the same shape — `set modbus-client max-per-ip 8`
   (the surface, then the knob) instead of the flat `set max-conn-per-ip`,
@@ -19,17 +19,17 @@ the **Done/history** records for their tool.
 
 ## The security wave (the audit follow-ups)
 
-- **the remaining audit findings** `[cache]` `[scrape]` `[inverter]`
+- **the remaining audit findings** `[cache]` `[scraper]` `[inverter]`
   `[docker]` — all documented trust decisions / deployment stories now
   (F19 closed rev. 5 — the workflow cuts the release after the CI gate,
   see the release-discipline item): F16 (the alert-rules pack — the rules
   item below), F17 (the volume secrets), F14 (TLS — the item below), F15
   (closed — the README privacy note), F1 (accepted) — see
   [AUDIT.md](AUDIT.md); F2–F10, F11–F13, F18 and F19 are closed and
-  verified (§3.1/§4); re-run the audit after the scrape control surface,
+  verified (§3.1/§4); re-run the audit after the scraper control surface,
   the TLS story or the dashboard service (the dashboard is the next audit
   wave).
-- **native TLS on the HTTP surfaces** `[scrape]` `[cache]` `[inverter]` —
+- **native TLS on the HTTP surfaces** `[scraper]` `[cache]` `[inverter]` —
   F14 says "terminate at a proxy"; an opt-in native path
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a
   proxy-less LAN install defensible: the bearer token stops travelling in
@@ -81,19 +81,19 @@ the **Done/history** records for their tool.
 - **the rest of the demo stack** `[docker]` `[dashboard]` — the compose
   chain runs the three Modbus tools (fake inverter → cache → scraper) with
   the seeded `/config` volume, and a **Prometheus** service scrapes the
-  exporter over the internal network (the scrape/token story: a random
+  exporter over the internal network (the scraper/token story: a random
   bearer token generated into the volume, 0600); what is missing is the
   front: a **dashboard** service rendering the Prometheus — plus the demo
   config seeded into the volume (the cache's `allow-write` demo pokes, the
   dashboard's `battery: true`), so `docker compose up` and the whole story
   runs — the write-through pokes land in the charts live, the outages
   banner themselves, the audit trail narrates.
-- **the alert rules pack** `[scrape]` `[cache]` — a shipped Prometheus
+- **the alert rules pack** `[scraper]` `[cache]` — a shipped Prometheus
   rules file next to the exporter: the freshness gap, the poll down, the
   exception-code spikes, the write-refusal bursts (F16) — the cache
   contributes its side (poll down, age spikes, write refusals); the pages
   write themselves from the audit vocabulary.
-- **the multi-target scrape** `[scrape]` — one process polling several
+- **the multi-target scrape** `[scraper]` — one process polling several
   inverters (per-target metrics with a unit/host label) for the
   two-string-roof households; the metrics endpoint and the audit are
   already per-process.
@@ -125,7 +125,7 @@ the **Done/history** records for their tool.
 - **the multi-unit serve** `[inverter]` — one process serving two Modbus
   units (the inverter + the meter as separate unit ids) for the
   gateway-style setups.
-- **the fault/alarm registers** `[inverter]` → `[cache]` `[scrape]`
+- **the fault/alarm registers** `[inverter]` → `[cache]` `[scraper]`
   `[dashboard]` — device health words driven by the machines (an outage
   raises a fault, the derate a warning, the battery cap a SoC notice): the
   cache/scrape export them and the dashboard can banner a fault, not just
@@ -178,7 +178,7 @@ the **Done/history** records for their tool.
   sidecar that sits on a TCP connection and dumps the wire to a file (and
   replays it): debugging the poll planning, the write-through and the
   chaos behavior against real hardware traces without the hardware.
-- **the hardware verification** `[cache]` `[scrape]` — everything is
+- **the hardware verification** `[cache]` `[scraper]` — everything is
   verified against the fake inverter, fuzzing and stress only; a real
   SUN2000/SDongle week (poll pacing, the dongle's single-client
   behaviour, real exception codes, the FC4 input registers, reconnect
@@ -191,6 +191,15 @@ the **Done/history** records for their tool.
 
 ## Done (the highlights; the git history has the details)
 
+- **the env-prefix retirement** — the env twins are the knobs' bare
+  upper-snake names (`HOST`, `PORT`, `LISTEN`, `CTL`, `CONTROL_TOKEN`,
+  ...) — the per-tool prefixes (`MCH_*`/`SCR_*`/`INV_*`/`DSH_*`) retired;
+  the twins are scoped per deployment surface (the systemd unit, the
+  compose service, the dev shell), so the shared names stay safe. The
+  cache is retagged to its device-first tagline ("Modbus TCP caching
+  proxy for single-client devices") and the metrics renames' last stale
+  mentions are fixed (the scrape README's metrics table, the dashboard's
+  `batteryFlag` default); the man pages rebuilt.
 - **the rename + env-prefix wave** — the bins and clients carry their
   man-page names (the dash names: `modbus-cache.py`,
   `modbus-cache-ctl.py`, `modbus-scraper*.py`, `modbus-fake-*.py`,
@@ -208,8 +217,9 @@ the **Done/history** records for their tool.
   regenerates the script from the running daemon (secrets hidden),
   `help config` maps every knob to its control command, the bundled
   samples and the NixOS modules render the set grammar, and the
-  **one-knob-one-source** registry (`lib/options.py` per tool on
-  `common/options.py`) + `scripts/check_options.py` gate the four
+  **one-knob-one-source** registry (`lib/options.json` + its loader
+  `lib/options.py` per tool on `common/options.py`) +
+  `scripts/check_options.py` gate the four
   surfaces against drift. Also closed in the wave: the RBAC verb policy
   (`--control-ops-verbs`), the dashboard's own /metrics endpoint, the
   metrics.json sections + `--metric-prefix` + the `scraper_*` renames
@@ -237,7 +247,7 @@ the **Done/history** records for their tool.
 - **the release tooling** — `scripts/release.py` + the tag-triggered
   release workflow (the pipeline item above is the operational follow-up).
 - **the token-file env honored** `[inverter]` — the help promised
-  `INV_CONTROL_TOKEN_FILE` / `INV_METRICS_TOKEN_FILE`, the code never
+  `CONTROL_TOKEN_FILE` / `METRICS_TOKEN_FILE`, the code never
   read them: both are honored now (the fake and the two clients — flag
   over env, the file over the plain token, both together the
   mutual-exclusion error).
@@ -266,5 +276,5 @@ the **Done/history** records for their tool.
   talks one vocabulary.
 
 Per-tool **Done/history** lives in each subproject's own TODO.md
-([cache](../cache/TODO.md), [scrape](../scrape/TODO.md),
+([cache](../cache/TODO.md), [scraper](../scraper/TODO.md),
 [inverter](../inverter/TODO.md), [dashboard](../dashboard/TODO.md)).

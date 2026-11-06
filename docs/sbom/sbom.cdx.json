@@ -11,7 +11,7 @@
       "version": "0.3.0",
       "licenses": [{ "expression": "BSD-3-Clause" }],
       "properties": [
-        { "name": "pv-suite:scope", "value": "the whole flake: dashboard, scrape, cache, inverter, profiles, common" }
+        { "name": "pv-suite:scope", "value": "the whole flake: dashboard, scraper, cache, inverter, profiles, common" }
       ]
     }
   },

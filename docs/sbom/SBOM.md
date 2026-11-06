@@ -19,7 +19,7 @@ Every `import` in the suite resolves to the Python standard library or to
 first-party code (`common.*`, the subproject's own `lib.*`):
 
 ```bash
-grep -rhE '^import |^from ' --include='*.py' common cache inverter scrape dashboard/bin dashboard/lib profiles/bin \
+grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashboard/bin dashboard/lib profiles/bin \
     | sed -E 's/^(import|from) ([a-zA-Z_0-9.]+).*/\2/' | sort -u
 ```
 
@@ -37,7 +37,7 @@ Every name in that list is stdlib (`argparse`, `configparser`, `hmac`,
 | [`profiles/`](profiles/README.md) | 4 device-profile JSONs + 2 tools | none — stdlib only | data + linter/formatter |
 | [`cache/`](cache/README.md) | `modbus-cache.py` + `lib/` (10 modules) + 2 control clients | none — stdlib only (+ `common`) | proxy daemon |
 | [`inverter/`](inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (14 modules) + 2 control clients | none — stdlib only (+ `common`) | simulator |
-| [`scrape/`](scrape/README.md) | `modbus-scraper.py` + `lib/` (7 modules) | none — stdlib only (+ `common`) | exporter |
+| [`scraper/`](scraper/README.md) | `modbus-scraper.py` + `lib/` (7 modules) | none — stdlib only (+ `common`) | exporter |
 | [`dashboard/`](dashboard/README.md) | `bin/dashboard.py` + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
 
 ## Runtime and deployment layers
@@ -66,7 +66,7 @@ Every name in that list is stdlib (`argparse`, `configparser`, `hmac`,
 
 ```bash
 # the import claim (above) — stdlib + common/lib only
-grep -rhE '^import |^from ' --include='*.py' common cache inverter scrape dashboard/bin dashboard/lib profiles/bin | sort -u
+grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashboard/bin dashboard/lib profiles/bin | sort -u
 
 # the container layer
 docker build -t pv-sbom-check --build-context profiles=../profiles \

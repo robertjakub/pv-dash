@@ -1,3 +1,3 @@
 # modbus-scraper
 
-{{#include ../../../scrape/README.md}}
+{{#include ../../../scraper/README.md}}

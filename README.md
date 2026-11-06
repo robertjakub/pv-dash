@@ -10,7 +10,7 @@ Huawei SUN2000 inverter, packaged together as one Nix flake:
 | Subproject | Package / app | What it is |
 |---|---|---|
 | [`dashboard/`](dashboard/README.md) | `dashboard` | Single-page energy-flow dashboard fed by Prometheus, with a bundled stdlib-only proxy server and a NixOS module |
-| [`scrape/`](scrape/README.md) | `modbus-scraper` | Huawei SUN2000 Prometheus exporter (Modbus TCP, stdlib only) with a NixOS module |
+| [`scraper/`](scraper/README.md) | `modbus-scraper` | Huawei SUN2000 Prometheus exporter (Modbus TCP, stdlib only) with a NixOS module |
 | [`cache/`](cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
 | [`inverter/`](inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
 | [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; the tools select what to fetch/scrape via their own files; a linter and a formatter keep them in shape |
@@ -20,13 +20,15 @@ The tools speak one vocabulary: the fake inverter serves from a profile, the
 cache fetches its selection from it, the scraper binds its metrics to it —
 and the console tools (`*-ctl`, `*-cli`) share the family pattern (a
 JSON-lines control server, a settings registry, an append-only audit trail,
-a reconnecting console session).
+a reconnecting console session). Every knob of the four daemons, side by
+side — name, function, description, who has it: [options.md](options.md)
+(generated from the option registries).
 
 ## The flake
 
 ```bash
 nix run .#dashboard          # the dashboard (bin/dashboard.py + static page)
-nix run .#modbus-scraper -- --host <inverter-lan-ip> --listen 0.0.0.0:9350
+nix run .#modbus-scraper -- --upstream <inverter-lan-ip>:502 --listen 0.0.0.0:9350
 nix run .#modbus-cache       # multiplex the inverter's single Modbus client
 nix run .#modbus-fake-inverter   # fake inverter for development and testing
 ```
@@ -40,7 +42,7 @@ NixOS service modules (`services.dashboard`, `services.modbus-scraper`,
 ```
 pv-suite/
 ├── dashboard/    # the dashboard web UI + proxy server (package + NixOS module)
-├── scrape/       # modbus-scraper exporter (package + NixOS module)
+├── scraper/      # modbus-scraper exporter (package + NixOS module)
 ├── cache/        # modbus-cache proxy (package + NixOS module)
 ├── inverter/     # fake inverter + control clients (package, no service module)
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))

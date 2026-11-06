@@ -5,7 +5,7 @@ src = "src"
 language = "en"
 
 [build]
-extra-watch-dirs = ["../cache", "../scrape", "../inverter", "../dashboard", "../common"]
+extra-watch-dirs = ["../cache", "../scraper", "../inverter", "../dashboard", "../common"]
 
 [output.html]
 git-repository-url = "https://github.com/wework5119/opencode"

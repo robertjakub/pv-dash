@@ -12,6 +12,41 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **everywhere** — **the env twins drop the tool prefixes**: every
+  environment variable is the knob's bare upper-snake name now — `HOST`,
+  `PORT`, `LISTEN`, `INTERVAL`, `CTL`, `CONTROL_TOKEN`, `LOG_LEVEL`, ...
+  (until now every twin wore its tool's prefix: `MCH_HOST`,
+  `SCR_MODBUS_PORT`, `INV_CHAOS`, `DSH_PROM_URL`; the docker-documented
+  generic set — the dashboard's `PORT`/`BIND`/`PROM_URL`/... — keeps its
+  names unchanged). The different tools sharing a shell can now reach for
+  the same name (`HOST` means the cache's device and the scraper's device
+  alike) — the accepted trade: the twins are set per deployment surface
+  (a systemd unit's `Environment=`, a compose service, a dev shell), never
+  in one shared scope; the flags, the config scripts and the control
+  grammar are untouched. The registries (`lib/options.json`), the
+  resolvers, the ctl/cli clients, the docs, the man pages and the test
+  suites follow; `--help` renders the bare `$NAME` forms. (The `HOST`/
+  `PORT`/`MODBUS_PORT`/`UNIT` twins are gone again later in this same
+  unreleased cycle — the inverter endpoint became the one `--upstream`
+  knob and the scraper's unit id `MODBUS_UNIT`.)
+- **everywhere** — **the knobs move to declarative data**: the option
+  registries are `lib/options.json` files now — one row per knob carrying
+  the set-grammar name, the flag, the env twin(s), the section, the
+  live-settable name, the secret marker **and the knob's description**
+  (until now that help text led a second life in the bins' `parse_args`),
+  and the per-tool `lib/options.py` loads the rows onto the common `Option`
+  vocabulary and keeps the Python-side wiring: the control-grammar verb
+  list, the static.json-wired CLI defaults (the fake parses straight off
+  the argv) and the choice vocabularies (log-level; the fake's timezone),
+  the `--no-battery` negation included. `--help` and the man pages render
+  **from the registry** (`common/options.py` `build_parser()` — the types,
+  the choices, the defaults; the CLI-only `--config`/`--dry-run`/`--man`
+  stay in the bins) — the description has exactly one home. `show knobs`,
+  `show config`, `help config`, the bundled configs, the NixOS modules and
+  `scripts/check_options.py` read the same rows as before; the flags in
+  `--help`/the man OPTIONS now follow the registry's section grouping (the
+  texts, types and defaults are unchanged), and the packages ship the new
+  JSON next to the loader.
 - **everywhere** — **`show knobs`, the dictionary of all knobs**: every
   control server answers `show knobs` (the `help knobs` alias too) with
   the whole option registry under its section — one row per knob with the
@@ -305,6 +340,29 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **scraper** — **breaking: the subproject directory is `scraper/`** (was
+  `scrape/`): the flake's package/module paths, the docker build context
+  and the image layout, the mdBook include, the SBOM, the cross-README
+  links and the man pages' rendered paths follow; the test-suite
+  filenames keep their historical `tests/scrape-*.py` names and the
+  binary stays `modbus-scraper`.
+- **cache, scraper** — **breaking: the inverter endpoint is one
+  `--upstream HOST:PORT` knob** (the shared `common/config.py`
+  `parse_upstream()`): `--host` and `--port` retire on the cache,
+  `--host`/`--modbus-port` on the scraper, flags, env twins and config
+  keys alike — `HOST`/`PORT`/`MODBUS_PORT` give way to `UPSTREAM`
+  (a config `set upstream 127.0.0.1:5502`, the NixOS option
+  `upstream`, the docker CMDs), and **`:PORT` = 127.0.0.1:PORT** (the
+  loopback shorthand; `[v6]:PORT` parses like `--listen`). The resolved
+  config keeps its derived `host`/`port` keys — `show status`, the start
+  log and the audit trails report the same fields as before. Anything
+  scripting the retired flags/envs must follow.
+- **scraper** — **breaking: `--unit` is `--modbus-unit`** (env `UNIT` →
+  `MODBUS_UNIT`, config `set modbus-unit`, the NixOS option `modbusUnit`):
+  the Modbus unit id wears the modbus- prefix its siblings on the flag
+  line already carry (`--modbus-port`'s place is taken by `--upstream`,
+  so the family stays grep-able). Anything scripting `--unit` must
+  follow.
 - **everywhere** — **breaking: every environment twin carries the tool's
   prefix now** — `MCH_*` (the cache), `SCR_*` (the scraper), `INV_*` (the
   fake inverter), `DSH_*` (the dashboard) — and each control-port answers
@@ -316,6 +374,15 @@ before the repo restructured into one suite.
   `DSH_STATIC_DIR`/`DSH_CONFIG_JS`/`DSH_BATTERY` — the compose stack, the
   docker docs and the compose's Prometheus wiring follow. Anything
   scripting the old names must follow.
+  (Reversed later in this same unreleased cycle — the prefix retirement
+  above ships the twins as the bare names; this entry is kept for the
+  wave's own story.)
+- **cache** — **retagged: "Modbus TCP caching proxy for single-client
+  devices"** (the man page's NAME has said so; the sources follow): the
+  module docstring and the `--help`/man DESCRIPTION lead with the
+  device-first story (any single-client Modbus TCP device — an inverter or
+  its SDongle/EMMA radio — the bundled sun2000 profile stays the shipped
+  example), not the Huawei-specific one.
 - **everywhere** — the bins are renamed to match their man pages (the
   family's dash names): `cache/bin/modbus_cache.py` → **`modbus-cache.py`**,
   the `*_ctl.py`/`*_cli.py` clients likewise (`modbus-cache-ctl.py`,
@@ -399,6 +466,21 @@ before the repo restructured into one suite.
 
 ### Fixed
 
+- **the family** — the scraper renames (`huawei_cache_*` ->
+  `scraper_cache_*`, `huawei_up` -> `scraper_up`, `huawei_battery` ->
+  `scraper_battery` — the metrics wave) had left stale mentions behind:
+  the cache's `/metrics` docstring and README rows, the docker README, the
+  inverter README (the diag-block note, the chaos chapter), the scrape
+  README's metrics table (now split into the prefixed profile/compute rows
+  and the fixed `scraper_*` rows — the poll-duration gauges included) and
+  its ini-era `[scraper] section` config wording, and the dashboard's
+  shipped `config.js` default `batteryFlag` selector (the UI's battery
+  toggle asked for the retired `huawei_battery` gauge). The man pages are
+  rebuilt from the fixed prose.
+- **dashboard** — the `--config` help (and the `default_config_path`
+  docstring) still said **`server.ini`** — the ini format is gone and the
+  sample is `server.conf`: the help names the set grammar and the right
+  file now (the man page follows the parser).
 - **the family** — the help promised the token-file env vars, the client
   code never read them (the audit's F20, docs/AUDIT.md rev. 6): the ctl/cli
   clients honor their `--control-token-file` env form now —
@@ -422,6 +504,18 @@ before the repo restructured into one suite.
 
 ### Docs
 
+- **everywhere** — **options.md, the knob comparison table**: every knob of
+  the four daemons in one table — the name, the function it files under
+  (device/serving/control plane/own /metrics/limits/audit trail/
+  persistence/logging), the registry description and a ✓ mark per tool
+  (**bold** = common to all four, `live`/`secret` marked) — generated from
+  the per-tool `lib/options.json` registries by the new
+  `scripts/gen_options.py` (edit the registries, re-run, never the
+  markdown). The table's first render flushed two registry helps: the
+  cache's `--restore-on-start` still cited the dead ini key
+  (`ini restore_on_start`) and the dashboard's `--no-audit-log` said
+  "SCR audit trail" — both reworded to the family's default style (the
+  `--help`/man pages follow the registry).
 - this wave's docs: the READMEs updated family-wide (the config grammar —
   the ini is gone —, `show config`/`help config`, the RBAC verbs flag, the
   dashboard's metrics/audit rows, the scrape privacy note), the man pages

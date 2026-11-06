@@ -90,7 +90,22 @@ def check_tool(tool):
     rows = []
     bin_script, tool_dir, module_nix, readme, config = TOOLS[tool]
     options, _verbs = load_registry(tool_dir)
-    flags = {'--' + o.name for o in options}
+    flags = {'--' + o.name for o in options if o.flag}   # control-only settings carry no flag
+
+    # the control grammar's vocabulary rides the same rows: every live name
+    # unique, its short description present, the control-only rows flag/env/
+    # secret-free
+    live_names = [o.live for o in options if o.live]
+    dupes = sorted({n for n in live_names if live_names.count(n) > 1})
+    rows.append((not dupes, '%s: every live setting name is unique%s'
+                 % (tool, ' — duplicated: %s' % ', '.join(dupes) if dupes else '')))
+    no_help = sorted('--' + o.name for o in options if o.live and not (o.setting_help or o.help))
+    rows.append((not no_help, '%s: every live setting carries its description%s'
+                 % (tool, ' — missing: %s' % ', '.join(no_help) if no_help else '')))
+    bad_control_only = sorted(o.name for o in options
+                              if not o.flag and (o.env or o.secret or not o.live))
+    rows.append((not bad_control_only, '%s: the control-only settings are flag/env/secret-free and live%s'
+                 % (tool, ' — bad rows: %s' % ', '.join(bad_control_only) if bad_control_only else '')))
 
     got, err = parser_flags(bin_script)
     if err:
@@ -119,7 +134,7 @@ def check_tool(tool):
 
         renames = NIX_NAMES.get(tool, {})
         missing_nix = sorted('--' + o.name for o in options
-                             if o.flag not in ('--config', '--dry-run', '--man')
+                             if o.flag and o.flag not in ('--config', '--dry-run', '--man')
                              and renames.get(o.name, camel(o.name)) not in nix)
         rows.append((not missing_nix, '%s: the NixOS module defines every option%s'
                      % (tool, ' — missing: %s' % ', '.join(missing_nix) if missing_nix else '')))

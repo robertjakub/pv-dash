@@ -33,11 +33,11 @@ Every name in that list is stdlib (`argparse`, `configparser`, `hmac`,
 
 | Subproject | First-party code | Third-party runtime | Notes |
 |---|---|---|---|
-| [`common/`](common/README.md) | the package (5 modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
+| [`common/`](common/README.md) | the package (12 modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
 | [`profiles/`](profiles/README.md) | 4 device-profile JSONs + 2 tools | none — stdlib only | data + linter/formatter |
-| [`cache/`](cache/README.md) | `modbus-cache.py` + `lib/` (10 modules) + 2 control clients | none — stdlib only (+ `common`) | proxy daemon |
+| [`cache/`](cache/README.md) | `modbus-cache.py` + `lib/` (12 modules) + 2 control clients | none — stdlib only (+ `common`) | proxy daemon |
 | [`inverter/`](inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (14 modules) + 2 control clients | none — stdlib only (+ `common`) | simulator |
-| [`scraper/`](scraper/README.md) | `modbus-scraper.py` + `lib/` (7 modules) | none — stdlib only (+ `common`) | exporter |
+| [`scraper/`](scraper/README.md) | `modbus-scraper.py` + `lib/` (10 modules) | none — stdlib only (+ `common`) | exporter |
 | [`dashboard/`](dashboard/README.md) | `bin/dashboard.py` + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
 
 ## Runtime and deployment layers

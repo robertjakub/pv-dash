@@ -340,6 +340,28 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **the control grammar's vocabulary folds into the option
+  registry (one place to have all knobs)**: `lib/settings.py` is gone —
+  its `SETTINGS` (the live settings' short descriptions, the completable
+  value words, the value-shape hints and the per-value notes) now rides the
+  same `lib/options.json` rows as the flags/envs/sections
+  (`setting-help`/`values`/`hint`/`value-help` beside `live`), and
+  `lib/options.py` derives the wire vocabulary from them
+  (`SETTINGS`/`SETTING_BY_NAME`/`SETTING_NAMES` +
+  `describe_setting`/`describe_value`, the shared
+  `common/options.py` `Setting`/`settings_of()`/`make_describe()`); the
+  ctl/cli clients and the control servers import the same names from
+  `lib/options.py` now. The fake's **control-only settings** (the pins and
+  the machines — `pv`, `load`, `batt`, `grid`, `soc`, `mppt`, `cloud`,
+  `scenario`, `battery-state`, `grid-outage`) ride the registry as flagless
+  rows (a live name, no flag/env) — until now they existed only in the
+  hand-listed settings module; `show knobs` renders them with a
+  `(control-only)` marker. The wire grammar, the completions and the word
+  help are unchanged (the fake's device section lists the pins first, so
+  its help output keeps its shape); check_options.py grows the drift gate
+  (the live names unique, every live row carries its description, the
+  control-only rows flag/env/secret-free) and options.md renders the
+  control-only rows (89 knobs now).
 - **scraper** — **breaking: the subproject directory is `scraper/`** (was
   `scrape/`): the flake's package/module paths, the docker build context
   and the image layout, the mdBook include, the SBOM, the cross-README

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regression suite for modbus-scraper (+ fake inverter).
 
-Run from anywhere: python3 scrape/test/regtest.py
+Run from anywhere: python3 tests/scrape-regtest.py
 Starts its own fake inverter + scraper instances on scratch ports and
 cleans up after itself.
 """
@@ -20,11 +20,11 @@ import urllib.error
 import urllib.request
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRAPE_DIR = os.path.join(REPO, 'scrape')
+SCRAPER_DIR = os.path.join(REPO, 'scraper')
 
-P = os.path.join(SCRAPE_DIR, 'bin', 'modbus-scraper.py')
+P = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
-INV_PORT = 15541
+PORT = 15541
 PORT_A, PORT_B = 19441, 19442
 
 failures = []
@@ -178,12 +178,12 @@ def write_ini(path, extra=''):
 procs = []
 try:
     # 1. baseline: fake with battery + scraper with battery enabled
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(INV_PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     write_ini('/tmp/scr_base.ini')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+                                   '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:%d' % PORT_A, '--battery'],
                                   stdout=open('/tmp/scr_reg.log', 'w'), stderr=subprocess.STDOUT))
     status, m = wait_metrics(PORT_A)
@@ -216,7 +216,7 @@ try:
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', '15590',
+                                    '--upstream', '127.0.0.1:15590',
                                    '--listen', '127.0.0.1:9361', '--battery', '--profile', prof],
                                   stdout=open('/tmp/scr_prof_scraper.log', 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
@@ -244,7 +244,7 @@ try:
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', '15547',
+                                    '--upstream', '127.0.0.1:15547',
                                    '--listen', '127.0.0.1:9362', '--profile', prof4],
                                   stdout=open('/tmp/scr_fc4.log', 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
@@ -260,7 +260,7 @@ try:
     # succeed over FC3.
     evil4 = EvilInverter(15592, {40001: 4000, 40003: 0})
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', '15592',
+                                    '--upstream', '127.0.0.1:15592',
                                    '--listen', '127.0.0.1:9364', '--profile', prof4],
                                   stdout=open('/tmp/scr_fc4_evil.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(1.5)          # a few failed polls at the 0.3s interval
@@ -278,7 +278,7 @@ try:
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', '15596',
+                                    '--upstream', '127.0.0.1:15596',
                                    '--listen', '127.0.0.1:9363', '--battery', '--profile', 'deye-sg03lp1'],
                                   stdout=open('/tmp/scr_deye.log', 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
@@ -299,7 +299,7 @@ try:
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', '15598',
+                                    '--upstream', '127.0.0.1:15598',
                                    '--listen', '127.0.0.1:9365', '--battery', '--profile', 'deye-sg04lp3'],
                                   stdout=open('/tmp/scr_deye3.log', 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
@@ -336,7 +336,7 @@ try:
     # 2. battery disabled: flag 0, no battery metrics
     write_ini('/tmp/scr_nobatt.ini')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_nobatt.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+                                   '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:%d' % PORT_B],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     status, m = wait_metrics(PORT_B)
@@ -365,7 +365,7 @@ try:
                                   stdout=open('/tmp/scr_ctl_fake.log', 'w'), stderr=subprocess.STDOUT))
     write_ini('/tmp/scr_ctl.ini')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_ctl.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', '15570',
+                                    '--upstream', '127.0.0.1:15570',
                                    '--listen', '127.0.0.1:19455', '--battery'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     status, m = wait_metrics(19455)
@@ -440,7 +440,7 @@ try:
           and r.stdout.startswith('commands: set <pv|load|batt|grid|soc') and 'chaos' in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'knobs'], capture_output=True, text=True)
     check('control: show knobs, the dictionary of the registry', r.returncode == 0
-          and '--chaos' in r.stdout and '$INV_CHAOS' in r.stdout and ', secret' in r.stdout
+          and '--chaos' in r.stdout and '$CHAOS' in r.stdout and ', secret' in r.stdout
           and '# ---' in r.stdout, r.stdout.strip()[:200])
 
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'settings'], capture_output=True, text=True)
@@ -481,10 +481,10 @@ try:
     check('fake audit: --control-log-replies logs the full command output',
           ': set soc 30 -> ok' in ctl_full and ': show status -> ok status' in ctl_full, ctl_full[-200:])
 
-    # 2f. INV_CTL environment (short name) drives both tools when the flag is unset
+    # 2f. CTL environment (short name) drives both tools when the flag is unset
     r = subprocess.run([sys.executable, C, 'set', 'pv', '2200'], capture_output=True, text=True,
-                       env={**os.environ, 'INV_CTL': '15571'})
-    check('fake_ctl: INV_CTL env picks the target', r.returncode == 0
+                       env={**os.environ, 'CTL': '15571'})
+    check('fake_ctl: CTL env picks the target', r.returncode == 0
           and r.stdout.startswith('ok pv=2200 '), r.stdout.strip() or r.stderr.strip())
     time.sleep(1)
     m = metrics_dict(get('/metrics', 19455)[1])
@@ -493,12 +493,12 @@ try:
     SIG_SOCK2 = '/tmp/fake-inverter-15577.socket'
     fake_env = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15577'],
                                 stdout=open('/tmp/scr_sig2.log', 'w'), stderr=subprocess.STDOUT,
-                                env={**os.environ, 'INV_CTL': SIG_SOCK2})
+                                env={**os.environ, 'CTL': SIG_SOCK2})
     procs.append(fake_env)
     time.sleep(0.8)
     r = subprocess.run([sys.executable, C, 'show', 'status'], capture_output=True, text=True,
-                       env={**os.environ, 'INV_CTL': SIG_SOCK2})
-    check('fake: INV_CTL env opens the default-flag-less control server',
+                       env={**os.environ, 'CTL': SIG_SOCK2})
+    check('fake: CTL env opens the default-flag-less control server',
           r.returncode == 0 and '\npv=4000\n' in r.stdout and '\ngrid=-1500\n' in r.stdout
           and '\nbattery=1200\n' in r.stdout and '\npinned=none\n' in r.stdout, r.stdout.strip())
     os.kill(fake_env.pid, signal.SIGTERM)
@@ -823,7 +823,7 @@ try:
           and 'ok' not in r.stdout, repr(r.stdout))
     p = subprocess.Popen([sys.executable, K, '--control-port', '15571'],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                         text=True, env={**os.environ, 'INV_CLI_KEEPALIVE': '0.2'})
+                         text=True, env={**os.environ, 'CLI_KEEPALIVE': '0.2'})
     time.sleep(1.2)          # the CLI idles, pinging every 0.2s
     p.stdin.write('show max-kwp\n')
     p.stdin.flush()
@@ -974,11 +974,11 @@ try:
     fake_env = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15594',
                                  '--control-port', '0'],
                                 stdout=open('/tmp/scr_prof2.log', 'w'), stderr=subprocess.STDOUT,
-                                env={**os.environ, 'INV_PROFILE': prof})
+                                env={**os.environ, 'PROFILE': prof})
     procs.append(fake_env)
     time.sleep(0.8)
     r = read3(40001, 2, 15594)
-    check('profile: INV_PROFILE env selects the map', r[0] == 3 and struct.unpack('>i', r[2:6])[0] == 4000, r.hex())
+    check('profile: PROFILE env selects the map', r[0] == 3 and struct.unpack('>i', r[2:6])[0] == 4000, r.hex())
     prof2 = '/tmp/scr_prof_custom2.json'
     _json.dump({'registers': [{'name': 'pv-power', 'register': 40003, 'type': 'i32', 'scale': 1}]},
                open(prof2, 'w'))
@@ -1083,16 +1083,16 @@ try:
           and any(l.startswith('pv-power') and l.split(' | ')[-1].strip() != 'NaN' for l in rows), r.stdout.strip()[:120])
     subprocess.run([sys.executable, C, '--control-port', '15639', 'shutdown'], capture_output=True)
 
-    # 2e. signals, mirroring the scraper/cache family: SIGHUP = INV_* env reload,
+    # 2e. signals, mirroring the scraper/cache family: SIGHUP = env reload,
     # SIGUSR1 = scenario reset (pins + write overlay), SIGTERM = summary + exit 0
     SIG_SOCK = '/tmp/scr_sig_ctl.sock'
     fake_ctl = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15574',
                                  '--control-port', SIG_SOCK],
                                 stdout=open('/tmp/scr_sig.log', 'w'), stderr=subprocess.STDOUT,
-                                env={**os.environ, 'INV_CHAOS': '0.9', 'INV_LOG_LEVEL': 'DEBUG'})
+                                env={**os.environ, 'CHAOS': '0.9', 'LOG_LEVEL': 'DEBUG'})
     procs.append(fake_ctl)
     time.sleep(0.8)
-    check('signals: chaos off by flag despite INV_CHAOS env',
+    check('signals: chaos off by flag despite CHAOS env',
           'chaos=0.00' in subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'show', 'status'], capture_output=True, text=True).stdout)
     s = socket.create_connection(('127.0.0.1', 15574), timeout=5)
     s.sendall(struct.pack('>HHHB', 5, 0, 6, 1) + struct.pack('>BHH', 6, 47415, 99))
@@ -1102,7 +1102,7 @@ try:
     os.kill(fake_ctl.pid, signal.SIGHUP)
     time.sleep(0.8)
     sig_status = subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'show', 'status'], capture_output=True, text=True).stdout
-    check('signals: SIGHUP re-applies the INV_* env layer',
+    check('signals: SIGHUP re-applies the env layer',
           '\nchaos=0.90\n' in sig_status and '\npinned=pv=2500.0\n' in sig_status, sig_status)
     os.kill(fake_ctl.pid, signal.SIGUSR1)
     time.sleep(0.8)
@@ -1135,7 +1135,7 @@ try:
                                   stdout=open('/tmp/scr_chaos_fake.log', 'w'), stderr=subprocess.STDOUT))
     write_ini('/tmp/scr_chaos.ini')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_chaos.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', '15572',
+                                    '--upstream', '127.0.0.1:15572',
                                    '--listen', '127.0.0.1:19456'],
                                   stdout=open('/tmp/scr_chaos.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(6)
@@ -1155,7 +1155,7 @@ try:
     # 3. sanity caps: max_kwp=2 -> 4000 W exceeds -> 503, then reload fixes it
     write_ini('/tmp/scr_cap.ini', 'set max-kwp 2')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_cap.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+                                   '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19443'],
                                   stdout=open('/tmp/scr_cap.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)
@@ -1183,7 +1183,7 @@ try:
     check('access log off by default', '"GET /metrics"' not in base_log)
     write_ini('/tmp/scr_audit.ini', 'set log-access true')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_audit.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+                                   '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19444'],
                                   stdout=open('/tmp/scr_audit.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)
@@ -1197,7 +1197,7 @@ try:
     # 3c. bearer auth: disabled by default (earlier checks pass with no header); enforced when set
     write_ini('/tmp/scr_auth.ini', 'set auth-token s3cret')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_auth.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+                                   '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19446'],
                                   stdout=open('/tmp/scr_auth.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)
@@ -1220,7 +1220,7 @@ try:
     os.chmod('/tmp/scr_token.txt', 0o600)
     write_ini('/tmp/scr_tokfile.ini', 'set auth-token-file /tmp/scr_token.txt')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_tokfile.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+                                   '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19447'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(2)
@@ -1253,7 +1253,7 @@ try:
     # 3e. resource limits: --max-clients 503s the overflow, --client-timeout kicks idle keep-alives
     write_ini('/tmp/scr_lim.ini', 'set max-clients 1\nset client-timeout 1\nset max-conn-per-ip 1')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_lim.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+                                   '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19448'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(2)
@@ -1285,7 +1285,7 @@ try:
     # 3e2. the per-IP cap: two simultaneous connections from 127.0.0.1, the second 503s
     write_ini('/tmp/scr_pip.ini', 'set max-conn-per-ip 1\nset max-clients 0')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_pip.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+                                   '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19449'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(2)
@@ -1326,8 +1326,15 @@ try:
     r = dry('--profile', nanprof)
     check('reject nan scale (the profile gain is the divisor now)', r.returncode == 1
           and b'finite number > 0' in r.stderr, r.stderr.decode('utf-8', 'replace')[:160])
-    r = dry('--host', 'inva lid')
-    check('reject host with spaces', r.returncode == 1 and b'invalid host' in r.stderr)
+    r = dry('--upstream', 'inva lid:5502')
+    check('reject upstream host with spaces', r.returncode == 1 and b'invalid upstream host' in r.stderr)
+    r = dry('--upstream', 'nonsense')
+    check('reject upstream without a port', r.returncode == 1
+          and b'HOST:PORT' in r.stderr and b'127.0.0.1' in r.stderr)
+    r = dry('--upstream', ':99999')
+    check('reject upstream port out of range', r.returncode == 1 and b'out of range' in r.stderr)
+    r = dry('--modbus-unit', '248')
+    check('reject unit id out of range', r.returncode == 1 and b'Modbus unit id' in r.stderr)
     with open('/tmp/scr_broken.ini', 'w') as fh:
         fh.write('# a set line missing its value\nset interval\n')
     r = dry('--config', '/tmp/scr_broken.ini')
@@ -1336,7 +1343,7 @@ try:
     r = dry('--auth-token', 'bad token')
     check('reject token with whitespace', r.returncode == 1 and b'whitespace' in r.stderr)
     r = subprocess.run([sys.executable, P, '--dry-run', '--config', '/tmp/scr_base.ini'],
-                       capture_output=True, env=dict(os.environ, SCR_LOG_LEVEL='  info  '))
+                       capture_output=True, env=dict(os.environ, LOG_LEVEL='  info  '))
     check('log level is stripped/normalized', r.returncode == 0 and b'log level: INFO' in r.stderr)
     r = dry('--interval', '0.5', '--timeout', '2')
     check('timeout > interval warns but starts', r.returncode == 0 and b'back-to-back' in r.stderr)
@@ -1351,7 +1358,7 @@ try:
     r = subprocess.run([sys.executable, '-c',
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; Metrics(%r)'
-                        % (os.path.join(REPO, 'scrape'), '/nonexistent/metrics.json')],
+                        % (os.path.join(REPO, 'scraper'), '/nonexistent/metrics.json')],
                        capture_output=True)
     check('missing metrics.json: clean rc=1', r.returncode == 1 and b'metrics spec /nonexistent/metrics.json not found' in r.stderr)
     with open('/tmp/bad_spec.json', 'w') as fh:
@@ -1359,7 +1366,7 @@ try:
     r = subprocess.run([sys.executable, '-c',
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; Metrics(%r)'
-                        % (os.path.join(REPO, 'scrape'), '/tmp/bad_spec.json')],
+                        % (os.path.join(REPO, 'scraper'), '/tmp/bad_spec.json')],
                        capture_output=True)
     check('corrupt metrics.json: clean rc=1', r.returncode == 1 and b'not valid JSON' in r.stderr)
 
@@ -1369,7 +1376,7 @@ try:
                         'from lib.metrics import Metrics; m = Metrics();'
                         'print(m.section_of("scraper_up"), m.section_of("huawei_pv_generation_watts"),'
                         'list(m.specs)[0], list(m.specs)[-1])'
-                        % SCRAPE_DIR], capture_output=True)
+                        % SCRAPER_DIR], capture_output=True)
     check('default spec: scraper_* merged in, profile first, scraper last',
           r.returncode == 0 and b'scraper profile huawei_pv_generation_watts scraper_cache_uptime_seconds' in r.stdout)
     with open('/tmp/scr_spec_noscraper.json', 'w') as fh:
@@ -1378,7 +1385,7 @@ try:
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; m = Metrics(%r);'
                         'print("scraper_up" in m.specs, list(m.specs)[0], list(m.specs)[-1])'
-                        % (SCRAPE_DIR, '/tmp/scr_spec_noscraper.json')], capture_output=True)
+                        % (SCRAPER_DIR, '/tmp/scr_spec_noscraper.json')], capture_output=True)
     check('custom spec without a scraper section: the built-ins merged in',
           r.returncode == 0 and b'True huawei_pv_generation_watts scraper_cache_uptime_seconds' in r.stdout)
     with open('/tmp/scr_spec_override.json', 'w') as fh:
@@ -1387,7 +1394,7 @@ try:
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; m = Metrics(%r);'
                         'print(m.help["scraper_up"], len(m.specs))'
-                        % (SCRAPE_DIR, '/tmp/scr_spec_override.json')], capture_output=True)
+                        % (SCRAPER_DIR, '/tmp/scr_spec_override.json')], capture_output=True)
     check('custom scraper section: its entries override the built-ins by name',
           r.returncode == 0 and b'custom up help. 10' in r.stdout, r.stdout.decode().strip())
 
@@ -1402,7 +1409,7 @@ try:
     evil = EvilInverter(15542, regs)
     write_ini('/tmp/scr_evil.ini', 'set log-level DEBUG')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_evil.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', '15542',
+                                    '--upstream', '127.0.0.1:15542',
                                    '--listen', '127.0.0.1:19450', '--battery'],
                                   stdout=open('/tmp/scr_evil.log', 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
@@ -1528,7 +1535,7 @@ try:
     check('inverter dead: up=0, still HTTP 200 with last values',
           status == 200 and m.get('scraper_up') == 0 and m.get('huawei_pv_generation_watts') == 4000)
     check('inverter dead: error counter grew', m.get('scraper_modbus_errors_total', 0) >= 1)
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(INV_PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(2)
     status, body = get('/metrics', PORT_A)
@@ -1580,7 +1587,7 @@ try:
             assert obj.get('mac') == want, 'the reply mac does not verify: %r' % obj
         return '%s %s' % (obj.get('status', 'err'), str(obj.get('text', '')))
 
-    procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19457', '--interval', '1',
                                    '--control-port', '15597', '--control-token', STOK,
                                    '--audit-log', '/tmp/scr_regtest_audit.log'],
@@ -1590,7 +1597,7 @@ try:
     check('scraper control: show version', r.startswith('ok modbus-scraper'), r[:80])
     r = sctl('show status', 15597)
     check('scraper control: the status report', r.startswith('ok status\n')
-          and 'upstream=127.0.0.1:%d' % INV_PORT in r and 'metrics' not in r and 'listen=127.0.0.1:19457' in r,
+          and 'upstream=127.0.0.1:%d' % PORT in r and 'metrics' not in r and 'listen=127.0.0.1:19457' in r,
           r[:120])
     r = sctl('show status', 15597, auth=False, unsigned=True)
     check('scraper control: the token server rejects the unauthenticated',
@@ -1637,7 +1644,7 @@ try:
     check('scraper control: the settings report', r.startswith('ok settings\n') and 'log-access=on' in r, r[:120])
     r = sctl('show knobs', 15597)
     check('scraper control: show knobs, the dictionary of the registry — flag, env twin, section, how it changes',
-          r.startswith('ok knobs') and '--metric-prefix' in r and '$SCR_METRIC_PREFIX' in r
+          r.startswith('ok knobs') and '--metric-prefix' in r and '$METRIC_PREFIX' in r
           and 'set interval <value>' in r and ', secret' in r and '# ---' in r, r[:200])
     r = sctl('poll now', 15597)
     check('scraper control: poll now', r.startswith('ok poll now'), r[:80])
@@ -1655,7 +1662,7 @@ try:
     #     daemon forbidden; both roles audited, both mac keys
     OPS_AUDIT = '/tmp/scr_regtest_ops_audit.log'
     open(OPS_AUDIT, 'w').write('')
-    procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19459', '--interval', '1',
                                    '--control-port', '15598', '--control-token', STOK,
                                    '--control-ops-token', 'opssecret', '--audit-log', OPS_AUDIT],
@@ -1682,13 +1689,13 @@ try:
     check('scraper control: both roles audited on the ops server',
           "role=ops 'show status'" in opsaud and "role=ops 'shutdown'" in opsaud
           and "role=admin 'show version'" in opsaud, opsaud[-200:])
-    r = subprocess.run([sys.executable, P, '--dry-run', '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+    r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:%d' % PORT,
                         '--listen', '127.0.0.1:19459', '--control-port', '15598', '--control-ops-token', 'x'],
                        capture_output=True, text=True, timeout=15)
     check('scraper control: an ops token without the admin token is a clean error',
           r.returncode != 0 and 'supplements' in (r.stderr + r.stdout) and 'Traceback' not in (r.stderr + r.stdout),
           (r.stderr + r.stdout)[-160:])
-    r = subprocess.run([sys.executable, P, '--dry-run', '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+    r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:%d' % PORT,
                         '--listen', '127.0.0.1:19459', '--control-port', '15598', '--control-token', 'same',
                         '--control-ops-token', 'same'],
                        capture_output=True, text=True, timeout=15)
@@ -1701,9 +1708,9 @@ try:
     time.sleep(0.6)
 
     # 7. scraper_ctl + scraper_cli (the family clients) + the F5 refusal
-    CTLB = os.path.join(SCRAPE_DIR, 'bin', 'modbus-scraper-ctl.py')
-    CLIB = os.path.join(SCRAPE_DIR, 'bin', 'modbus-scraper-cli.py')
-    procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+    CTLB = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py')
+    CLIB = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-cli.py')
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19457', '--interval', '1',
                                    '--control-port', '15597', '--control-token', STOK],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
@@ -1725,18 +1732,18 @@ try:
     os.chmod(stok_file, 0o600)
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', 'show', 'version'],
                        capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'SCR_CONTROL_TOKEN_FILE': stok_file})
-    check('scraper_ctl: honors SCR_CONTROL_TOKEN_FILE', r.returncode == 0
+                       env={**os.environ, 'CONTROL_TOKEN_FILE': stok_file})
+    check('scraper_ctl: honors CONTROL_TOKEN_FILE', r.returncode == 0
           and 'ok modbus-scraper' in r.stdout, repr(r.stdout[:80]) + repr(r.stderr[-80:]))
     r = subprocess.run([sys.executable, CLIB, '--control-port', '15597'],
                        input='show interval\nquit\n', capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'SCR_CONTROL_TOKEN_FILE': stok_file})
-    check('scraper_cli: honors SCR_CONTROL_TOKEN_FILE', r.returncode == 0 and '5' in r.stdout,
+                       env={**os.environ, 'CONTROL_TOKEN_FILE': stok_file})
+    check('scraper_cli: honors CONTROL_TOKEN_FILE', r.returncode == 0 and '5' in r.stdout,
           repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', 'status'],
                        capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'SCR_CONTROL_TOKEN': 'x',
-                            'SCR_CONTROL_TOKEN_FILE': stok_file})
+                       env={**os.environ, 'CONTROL_TOKEN': 'x',
+                            'CONTROL_TOKEN_FILE': stok_file})
     check('scraper_ctl: the token env + the token-file env is a clean error', r.returncode != 0
           and 'mutually exclusive' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))

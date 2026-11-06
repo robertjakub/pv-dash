@@ -1,5 +1,5 @@
 # The pv-suite Modbus tools as compose services. The build contexts are
-# ../inverter, ../cache, ../scrape and ../dashboard; the shared profiles/
+# ../inverter, ../cache, ../scraper and ../dashboard; the shared profiles/
 # directory, the entrypoint and the common/ package ride in as named
 # contexts. Run one service: docker compose up -d fake-inverter
 # Run the stack:         docker compose up -d (inverter + cache + scraper + prometheus + dashboard)
@@ -18,8 +18,8 @@
 # inside that network: `docker compose exec`, or a collector container
 # attached to the same network by name (see README.md).
 #
-# The scrape/token story ships in the stack: the exporter serves with a
-# bearer token (SCR_AUTH_TOKEN_FILE -> /config/metrics.token — a random
+# The scraper/token story ships in the stack: the exporter serves with a
+# bearer token (AUTH_TOKEN_FILE -> /config/metrics.token — a random
 # value the entrypoint generates on the first seed, 0600, owner pvsuite) and
 # the Prometheus service reads its copy of the same file from the config
 # volume. Read the token: docker compose exec modbus-scraper cat /config/metrics.token
@@ -56,7 +56,7 @@ services:
 
   modbus-scraper:
     build:
-      context: ../scrape
+      context: ../scraper
       additional_contexts:
         profiles: ../profiles
         scripts: ../docker
@@ -65,7 +65,7 @@ services:
     environment:
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the demo exporter never serves unauthenticated (the audit's F13)
-      SCR_AUTH_TOKEN_FILE: /config/metrics.token
+      AUTH_TOKEN_FILE: /config/metrics.token
     networks:
       - modbus
     depends_on:
@@ -96,7 +96,7 @@ services:
     environment:
       # the proxy target: the stack's internal Prometheus service (the
       # dashboard never needs the token — the scrape stays prometheus-side)
-      DSH_PROM_URL: http://prometheus:9090
+      PROM_URL: http://prometheus:9090
     volumes:
       - config:/config
     networks:

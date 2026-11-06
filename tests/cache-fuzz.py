@@ -19,7 +19,7 @@ CACHE_DIR = os.path.join(REPO, 'cache')
 
 P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
-INV_PORT, CACHE_PORT = 15591, 15592
+PORT, CACHE_PORT = 15591, 15592
 ITERATIONS = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
 
 failures = []
@@ -33,10 +33,10 @@ def check(name, cond, detail=''):
 
 procs = []
 try:
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--strict', '--port', str(INV_PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--strict', '--port', str(PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
-    procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:%d' % CACHE_PORT, '--interval', '1',
                                    '--allow-write', '--profile',
                                    os.path.join(REPO, 'profiles', 'profiles', 'sun2000.json')],

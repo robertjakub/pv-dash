@@ -261,21 +261,21 @@ def main():
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
                             '--control-port', '15964', 'show', 'version'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'INV_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
-        check('fuzz: fake_ctl honors INV_CONTROL_TOKEN_FILE', r.returncode == 0
+                           env={**os.environ, 'CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+        check('fuzz: fake_ctl honors CONTROL_TOKEN_FILE', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
                             '--control-port', '15964', 'status'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'INV_CONTROL_TOKEN': 'x',
-                                'INV_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+                           env={**os.environ, 'CONTROL_TOKEN': 'x',
+                                'CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
         check('fuzz: the token env + the token-file env is a clean error', r.returncode != 0
               and 'mutually exclusive' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--port', '15962', '--dry-run', '--control-token', 'a'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'INV_CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+                           env={**os.environ, 'CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
         check('fuzz: flag token + the control token-file env is a clean error', r.returncode != 0
               and 'mutually exclusive' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
@@ -283,14 +283,14 @@ def main():
                             '--port', '15962', '--dry-run', '--metrics-server',
                             '--metrics-listen', '127.0.0.1:15967'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'INV_METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
-        check('fuzz: the fake honors INV_METRICS_TOKEN_FILE', r.returncode == 0
+                           env={**os.environ, 'METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+        check('fuzz: the fake honors METRICS_TOKEN_FILE', r.returncode == 0
               and 'bearer token' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--port', '15962', '--dry-run', '--metrics-token', 'a'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'INV_METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
+                           env={**os.environ, 'METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
         check('fuzz: flag metrics token + the metrics token-file env is a clean error', r.returncode != 0
               and 'mutually exclusive' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))

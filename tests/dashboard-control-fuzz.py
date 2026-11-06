@@ -250,14 +250,14 @@ def main():
         r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
                             '--control-port', str(CTRL_PORT), 'show', 'version'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'DSH_CONTROL_TOKEN_FILE': '/tmp/dash_ctl_fuzz_token'})
-        check('fuzz: dashboard_ctl honors DSH_CONTROL_TOKEN_FILE', r.returncode == 0
+                           env={**os.environ, 'CONTROL_TOKEN_FILE': '/tmp/dash_ctl_fuzz_token'})
+        check('fuzz: dashboard_ctl honors CONTROL_TOKEN_FILE', r.returncode == 0
               and 'dashboard' in r.stdout, repr(r.stdout[:80]))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
                             '--control-port', str(CTRL_PORT), 'status'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'DSH_CONTROL_TOKEN': 'x',
-                                'DSH_CONTROL_TOKEN_FILE': '/tmp/dash_ctl_fuzz_token'})
+                           env={**os.environ, 'CONTROL_TOKEN': 'x',
+                                'CONTROL_TOKEN_FILE': '/tmp/dash_ctl_fuzz_token'})
         check('fuzz: the token env + the token-file env is a clean error', r.returncode != 0
               and 'mutually exclusive' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))

@@ -23,7 +23,7 @@ sys.path.insert(0, REPO)
 # tool -> (bin script, registry module dir, module.nix, README, bundled config, flag-table headings)
 TOOLS = {
     'cache': ('cache/bin/modbus-cache.py', 'cache', 'cache/module.nix', 'cache/README.md', 'cache/modbus_cache.conf'),
-    'scrape': ('scrape/bin/modbus-scraper.py', 'scrape', 'scrape/module.nix', 'scrape/README.md', 'scrape/scraper.conf'),
+    'scraper': ('scraper/bin/modbus-scraper.py', 'scraper', 'scraper/module.nix', 'scraper/README.md', 'scraper/scraper.conf'),
     'inverter': ('inverter/bin/modbus-fake-inverter.py', 'inverter', None, 'inverter/README.md', None),
     'dashboard': ('dashboard/bin/dashboard.py', 'dashboard', 'dashboard/module.nix', 'dashboard/README.md', 'dashboard/server.conf'),
 }
@@ -32,8 +32,8 @@ TOOLS = {
 # the flags a module deliberately covers another way (documented in the
 # module's comments)
 NIX_NAMES = {
-    'cache': {'host': 'inverterHost', 'port': 'inverterPort', 'unit': 'unitId', 'listen': 'listenHost'},
-    'scrape': {'host': 'inverterHost', 'modbus-port': 'inverterPort', 'unit': 'unitId', 'listen': 'listenHost'},
+    'cache': {'unit': 'unitId', 'listen': 'listenHost'},
+    'scraper': {'modbus-unit': 'modbusUnit', 'listen': 'listenHost'},
     'dashboard': {'bind': 'host', 'upstream': 'prometheusUrl', 'config-js': 'configFile'},
 }
 

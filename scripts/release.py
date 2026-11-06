@@ -31,7 +31,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHANGELOG = ROOT / 'CHANGELOG.md'
 PKG_NIX = ['cache/package.nix', 'inverter/package.nix',
-           'scrape/package.nix', 'dashboard/package.nix']
+           'scraper/package.nix', 'dashboard/package.nix']
 SUITES_QUICK = ['tests/cache-regtest.py', 'tests/scrape-regtest.py']
 SUITES_FULL = SUITES_QUICK + ['tests/inverter-regtest.py', 'tests/audit-chain.py',
                               'tests/cache-stress.py', 'tests/cache-fuzz.py',

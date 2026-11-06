@@ -129,7 +129,7 @@ def main():
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15960',
                                        '--control-port', '0'], stdout=subprocess.DEVNULL,
                                       stderr=subprocess.DEVNULL))
-        procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15960',
+        procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15960',
                                        '--listen', '127.0.0.1:15964', '--interval', '1',
                                        '--control-port', '15965', '--control-token', TOKEN],
                                       stdout=open('/tmp/cache_ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
@@ -203,7 +203,7 @@ def main():
         check('fuzz: real command after the flood', st == 'ok', '%s %s' % (st, tx))
 
         # 6. the token server: the auth abuse is rejected, the real token works
-        procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15960',
+        procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15960',
                                        '--listen', '127.0.0.1:15966', '--interval', '1',
                                        '--control-port', '15967', '--control-token', 'sekrit'],
                                       stdout=open('/tmp/cache_ctl_fuzz2.log', 'w'), stderr=subprocess.STDOUT))
@@ -239,7 +239,7 @@ def main():
         #     steers the daemon forbidden; both roles audited, both mac keys
         OPS_AUDIT = '/tmp/cache_ctl_fuzz_ops_audit.log'
         open(OPS_AUDIT, 'w').write('')
-        procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15960',
+        procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15960',
                                        '--listen', '127.0.0.1:15968', '--interval', '1',
                                        '--control-port', str(OPS_PORT), '--control-token', 'admintok2',
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
@@ -276,14 +276,14 @@ def main():
         check('ops: both roles audited (role=ops clear, role=admin set, the denials included)',
               "role=ops 'clear cache'" in aud and "role=admin 'set interval 5'" in aud
               and "role=ops 'shutdown'" in aud and "role=ops 'set interval 5' wire=h" in aud, aud[-300:])
-        r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15960',
+        r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15960',
                             '--listen', '127.0.0.1:15968', '--control-port', str(OPS_PORT),
                             '--control-ops-token', 'x', '--dry-run'],
                            capture_output=True, text=True, timeout=15)
         check('ops: an ops token without the admin token is a clean error', r.returncode != 0
               and 'supplements' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
-        r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15960',
+        r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15960',
                             '--listen', '127.0.0.1:15968', '--control-port', str(OPS_PORT),
                             '--control-token', 'same', '--control-ops-token', 'same', '--dry-run'],
                            capture_output=True, text=True, timeout=15)

@@ -37,7 +37,7 @@ pkgs.testers.nixosTest (
       {
         imports = [
           ../cache/module.nix
-          ../scrape/module.nix
+          ../scraper/module.nix
           ../dashboard/module.nix
         ];
         services.modbus-cache = {

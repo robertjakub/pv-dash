@@ -24,7 +24,7 @@ F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 R = os.path.join(REPO, 'profiles', 'profiles', 'sun2000.json')
 
 CACHE_PORT = 15505
-INV_PORT = 15501
+PORT = 15501
 
 failures = []
 
@@ -164,9 +164,9 @@ class EvilUpstream:
 
 try:
     # 1. baseline: strict fake (undefined regs rejected with 02) + cache
-    start([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(INV_PORT)])
+    start([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(PORT)])
     time.sleep(0.7)
-    start([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT), '--listen', '127.0.0.1:%d' % CACHE_PORT,
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT, '--listen', '127.0.0.1:%d' % CACHE_PORT,
            '--interval', '1', '--cache-ttl', '3', '--allow-write', '--profile', R,
            '--write-acl', 'any', '--write-registers', 'any',
            '--audit-log', '/tmp/reg_audit.log'], log='/tmp/reg_cache.log')
@@ -193,7 +193,7 @@ try:
                     {'name': 'pv-power', 'register': 32064, 'type': 'i32', 'scale': 1, 'cache': True},
                     {'name': 'grid-power', 'register': 37113, 'type': 'i32', 'scale': 1, 'cache': True},
                 ]}, open(mini, 'w'))
-    c3 = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
+    c3 = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                            '--listen', '127.0.0.1:15517', '--interval', '1', '--cache-ttl', '3',
                            '--profile', mini], stdout=open('/tmp/reg_mini.log', 'w'), stderr=subprocess.STDOUT)
     procs.append(c3)
@@ -246,7 +246,7 @@ try:
           struct.unpack('>H', b[2:4])[0] == 5, b.hex())
 
     # write support disabled by default: refused with illegal function, upstream untouched
-    procs.append(subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:15507', '--interval', '1',
                                    '--profile', R],
                                   stdout=open('/tmp/reg_cache_nowrite.log', 'w'), stderr=subprocess.STDOUT))
@@ -312,7 +312,7 @@ try:
           b[0] == 3 and w[:2] == (0xCAFE, 0) and w[2] >= 3, str(w))
 
     # 3. poll status caching: profile variant with a register the device rejects
-    procs[0] = subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(INV_PORT)],
+    procs[0] = subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(PORT)],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(0.7)
     import json as _json
@@ -320,7 +320,7 @@ try:
     map_["registers"].append({'name': 'undefined test register', 'register': 32100, 'type': 'u16', 'cache': True})
     badmap = '/tmp/reg_badmap.json'
     _json.dump(map_, open(badmap, 'w'))
-    c2 = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
+    c2 = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                            '--listen', '127.0.0.1:15506', '--interval', '1', '--cache-ttl', '3',
                            '--profile', badmap], stdout=open('/tmp/reg_cache2.log', 'w'),
                           stderr=subprocess.STDOUT)
@@ -341,7 +341,7 @@ try:
     # 4. hostile upstream: every garbage reply mode must fail clean (0x0B, one-line log) and recover
     evil = EvilUpstream(15509)
     evil.mode = 'garbage'  # cold from the start: no fine-mode poll can fill the cache
-    start([sys.executable, P, '--host', '127.0.0.1', '--port', '15509',
+    start([sys.executable, P, '--upstream', '127.0.0.1:15509',
            '--listen', '127.0.0.1:15508', '--interval', '1', '--cache-ttl', '3',
            '--profile', R], log='/tmp/reg_evil.log')
     time.sleep(2)
@@ -369,7 +369,7 @@ try:
     evil.stop()
 
     # 5. control server: show status/connections/cache, clear cache, restart,
-    #    cache_cli, shutdown (+ the default unix socket / MCH_CTL)
+    #    cache_cli, shutdown (+ the default unix socket / CTL)
     K = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py')
 
     def ctl_cmd(cmd, port):
@@ -403,7 +403,7 @@ try:
     start([sys.executable, F, '--static', '--port', '15512', '--control-port', '0'])
     # the shipped example selection: the essential set, by name
     SEL = os.path.join(CACHE_DIR, 'selection.json')
-    start([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    start([sys.executable, P, '--upstream', '127.0.0.1:15512',
            '--listen', '127.0.0.1:15518', '--interval', '1', '--profile', R,
            '--selection', SEL], log='/tmp/reg_sel.log')
     time.sleep(1.5)
@@ -418,11 +418,11 @@ try:
     check('selection: an unselected register forwards (device-status 512)',
           b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 512, b.hex())
 
-    start([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    start([sys.executable, P, '--upstream', '127.0.0.1:15512',
            '--listen', '127.0.0.1:15513', '--interval', '1', '--profile', R,
            '--write-acl', 'any', '--write-registers', 'any',
            '--control-port', '15514'], log='/tmp/reg_ctl.log',
-          env_extra={'MCH_CONTROL_TOKEN': 'sekrit'})
+          env_extra={'CONTROL_TOKEN': 'sekrit'})
     time.sleep(2)
     r = ctl_cmd('show status', 15514)
     check('control: show status multi-line report', r.startswith('ok status\n')
@@ -477,7 +477,7 @@ try:
     check('control: malformed frame rejected cleanly', r.get('status') == 'err'
           and 'malformed request' in r.get('text', ''), str(r))
 
-    start([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    start([sys.executable, P, '--upstream', '127.0.0.1:15512',
            '--listen', '127.0.0.1:15519', '--interval', '1', '--profile', R,
            '--control-port', '15520', '--control-token', 'sekrit',
            '--audit-log', '/tmp/reg_audit_ctl.log'], log='/tmp/reg_ctl_tok.log')
@@ -536,7 +536,7 @@ try:
         s.close()
 
     def cli(stdin, port=15514, env_extra=None, use_flag=True):
-        env = {**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'}
+        env = {**os.environ, 'CONTROL_TOKEN': 'sekrit'}
         if env_extra:
             env.update(env_extra)
         args = [sys.executable, K]
@@ -556,7 +556,7 @@ try:
     p = subprocess.Popen([sys.executable, K, '--control-port', '15514'],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          text=True,
-                         env={**os.environ, 'MCH_CLI_KEEPALIVE': '0.2', 'MCH_CONTROL_TOKEN': 'sekrit'})
+                         env={**os.environ, 'CLI_KEEPALIVE': '0.2', 'CONTROL_TOKEN': 'sekrit'})
     time.sleep(1.2)          # the CLI idles, pinging every 0.2s
     p.stdin.write('show status\n')
     p.stdin.flush()
@@ -567,7 +567,7 @@ try:
     check('cache_cli: keepalive keeps an idle session alive (pongs absorbed)',
           p.returncode == 0 and 'upstream=127.0.0.1:15512' in out
           and 'ok pong' not in out, repr(out[-120:]))
-    p_unix = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_unix = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                                '--listen', '127.0.0.1:15515', '--interval', '1', '--profile', R],
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     procs.append(p_unix)
@@ -576,21 +576,21 @@ try:
     check('control: the unix socket mode is 0600 (not the umask)',
           os.stat('/tmp/modbus-cache-15515.socket').st_mode & 0o777 == 0o600,
           oct(os.stat('/tmp/modbus-cache-15515.socket').st_mode))
-    r = cli('show status\nquit\n', 15515, {'MCH_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
-    check('cache_cli: MCH_CTL reaches the default socket', r.returncode == 0
+    r = cli('show status\nquit\n', 15515, {'CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+    check('cache_cli: CTL reaches the default socket', r.returncode == 0
           and 'upstream=127.0.0.1:15512' in r.stdout and 'cache:15515 > ' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show status\nquit\n', 15515, {'MCH_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
-    check('cache_cli: short MCH_CTL env works too', r.returncode == 0
+    r = cli('show status\nquit\n', 15515, {'CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+    check('cache_cli: short CTL env works too', r.returncode == 0
           and 'upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show status\nquit\n', 15520, {'MCH_CONTROL_TOKEN': 'sekrit'})
+    r = cli('show status\nquit\n', 15520, {'CONTROL_TOKEN': 'sekrit'})
     check('cache_cli: token env authenticates the TCP control session', r.returncode == 0
           and 'upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show status\nquit\n', 15520, {'MCH_CONTROL_TOKEN': ''})
+    r = cli('show status\nquit\n', 15520, {'CONTROL_TOKEN': ''})
     check('cache_cli: token server refuses the token-less CLI', r.returncode == 0
           and 'err authenticate first' in r.stdout, repr(r.stdout[-160:]))
 
     # the group-accessible unix socket (--control-socket-group): 0660
-    p_unix_g = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_unix_g = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                                  '--listen', '127.0.0.1:15516', '--interval', '1', '--profile', R,
                                  '--control-socket-group'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -599,7 +599,7 @@ try:
     gsock = '/tmp/modbus-cache-15516.socket'
     check('control: --control-socket-group chmods the socket 0660',
           os.stat(gsock).st_mode & 0o777 == 0o660, oct(os.stat(gsock).st_mode))
-    r = cli('show version\nquit\n', 15516, {'MCH_CTL': gsock}, use_flag=False)
+    r = cli('show version\nquit\n', 15516, {'CTL': gsock}, use_flag=False)
     check('control: the group socket speaks (the owner, us)', r.returncode == 0
           and 'modbus-cache 0.3.0' in r.stdout, repr(r.stdout[-120:]))
 
@@ -607,12 +607,12 @@ try:
     ctl = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-ctl.py')
     r = subprocess.run([sys.executable, ctl, '--control-port', '15514', 'show', 'status'],
                        capture_output=True, text=True, timeout=30,
-                       env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
+                       env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     check('cache_ctl: one-shot show status', r.returncode == 0
           and r.stdout.startswith('ok status\nupstream=127.0.0.1:15512'), repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15520'],
                        input='show cache\nclear cache\n', capture_output=True, text=True,
-                       timeout=30, env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
+                       timeout=30, env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     check('cache_ctl: piped batch with the token env', r.returncode == 0
           and r.stdout.startswith('ok cache ') and 'ok cache cleared' in r.stdout, repr(r.stdout[:160]))
 
@@ -661,7 +661,7 @@ try:
     check('dump: the help hides the dump commands without a path', 'request dump' not in r, r[:160])
     r = ctl_cmd('show knobs', 15514)
     check('show knobs: the dictionary of the registry — flag, env twin, section, how it changes',
-          r.startswith('ok knobs') and '--interval' in r and '$MCH_INTERVAL' in r
+          r.startswith('ok knobs') and '--interval' in r and '$INTERVAL' in r
           and 'set interval <value>' in r and 'control-ops-token-file' in r and ', secret' in r
           and '# ---' in r, r[:200])
     r = ctl_cmd('help knobs', 15514)
@@ -689,11 +689,11 @@ try:
     check('unset selection: the map refills', 'ranges=49' in r and 'selection=all' in r, r[:160])
 
     # --selection none at startup: the same, straight from the command line
-    p_none = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_none = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                                '--listen', '127.0.0.1:15526', '--interval', '1', '--profile', R,
                                '--selection', 'none', '--control-port', '15527'],
                               stdout=open('/tmp/reg_cache_none.log', 'w'), stderr=subprocess.STDOUT,
-                              env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
+                              env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_none)
     time.sleep(1.5)
     b = rd(47415, 1, port=15526)
@@ -717,11 +717,11 @@ try:
                     {'name': 'pv-power', 'register': 32064, 'type': 'i32', 'ttl': 2},
                     {'name': 'device-status', 'register': 32089, 'type': 'u16'},
                 ]}, open(ttlmap, 'w'))
-    p_ttl = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_ttl = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                               '--listen', '127.0.0.1:15533', '--interval', '5', '--cache-ttl', '30',
                               '--profile', ttlmap, '--control-port', '15534'],
                              stdout=open('/tmp/reg_cache_ttl.log', 'w'), stderr=subprocess.STDOUT,
-                             env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
+                             env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_ttl)
     time.sleep(1.5)
     rd(32064, 2, port=15533)
@@ -743,7 +743,7 @@ try:
     # the peer-cred auth on the unix control socket: a token gates both transports,
     # but the kernel-vouched peers (root, the daemon's own user) skip the handshake
     cred_sock = '/tmp/reg_cred.socket'
-    p_cred = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_cred = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                                '--listen', '127.0.0.1:15538', '--interval', '1', '--profile', R,
                                '--control-port', cred_sock, '--control-token', 'sekrit'],
                               stdout=open('/tmp/reg_cache_cred.log', 'w'), stderr=subprocess.STDOUT)
@@ -761,12 +761,12 @@ try:
 
     # the state dump (write-behind): the cached words + the live setting overrides
     dumpfile = '/tmp/reg_dump.json'
-    p_dump = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_dump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                                '--listen', '127.0.0.1:15536', '--interval', '1', '--cache-ttl', '30',
                                '--profile', R, '--control-port', '15537',
                                '--dump-path', dumpfile],
                               stdout=open('/tmp/reg_cache_dump.log', 'w'), stderr=subprocess.STDOUT,
-                              env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
+                              env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_dump)
     time.sleep(1.5)
     r = ctl_cmd('request dump', 15537)
@@ -855,12 +855,12 @@ try:
     d = _json.load(open(dumpfile))
     check('shutdown dump: settings-only by default (the override is in it, the words stay out)',
           d.get('registers') == [] and d.get('settings', {}).get('interval') == 3.0, repr(d.get('settings')))
-    p_dump = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_dump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                                '--listen', '127.0.0.1:15536', '--interval', '1', '--cache-ttl', '30',
                                '--profile', R, '--control-port', '15537', '--dump-with-cache',
                                '--dump-path', dumpfile],
                               stdout=open('/tmp/reg_cache_dump2.log', 'w'), stderr=subprocess.STDOUT,
-                              env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
+                              env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_dump)
     time.sleep(1.5)
     log = open('/tmp/reg_cache_dump2.log').read()
@@ -880,12 +880,12 @@ try:
     ctl_cmd('set interval 3', 15537)
     ctl_cmd('shutdown', 15537)
     p_dump.wait(timeout=10)
-    p_dump = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_dump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                                '--listen', '127.0.0.1:15536', '--interval', '1', '--cache-ttl', '30',
                                '--profile', R, '--control-port', '15537', '--dump-with-cache',
                                '--dump-path', dumpfile, '--restore-on-start'],
                               stdout=open('/tmp/reg_cache_dump2.log', 'w'), stderr=subprocess.STDOUT,
-                              env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
+                              env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_dump)
     time.sleep(1.5)
     r = ctl_cmd('show cache', 15537)
@@ -899,13 +899,13 @@ try:
     p_dump.wait(timeout=10)
 
     # the native metrics endpoint: bearer auth + the cache gauges
-    p_metrics = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_metrics = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                                   '--listen', '127.0.0.1:15528', '--interval', '1', '--profile', R,
                                   '--control-port', '15530',
                                   '--metrics-listen', '127.0.0.1:15529', '--metrics-server', '--metrics-token', 'sekrit',
                                   '--metrics-max-clients', '1'],
                                  stdout=open('/tmp/reg_cache_metrics.log', 'w'), stderr=subprocess.STDOUT,
-                                 env={**os.environ, 'MCH_CONTROL_TOKEN': 'sekrit'})
+                                 env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_metrics)
     time.sleep(1.5)
     import urllib.request, urllib.error
@@ -967,7 +967,7 @@ try:
     p_metrics.wait(timeout=10)
 
     # the Modbus per-IP gate: --max-conn-per-ip 1 refuses the second connection from one peer
-    p_pip = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_pip = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                               '--listen', '127.0.0.1:15533', '--interval', '1', '--profile', R,
                               '--max-clients', '0', '--max-conn-per-ip', '1', '--control-port', '15534',
                               '--control-token', 'sekrit'],
@@ -1015,7 +1015,7 @@ try:
     ctl_cmd('unset allow-write', 15514)
     b = wr6(47415, 4, port=15513)
     check('unset allow-write: the gate closes again', b[0] == 0x86 and b[1] == 1, b.hex())
-    r = cli('shutdown\n\n', 15515, {'MCH_CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+    r = cli('shutdown\n\n', 15515, {'CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
     time.sleep(1)
     check('cache_cli: RETURN at [confirm] stops the proxy', r.returncode == 0
           and 'bye shutdown' in r.stdout and p_unix.poll() == 0, repr(r.stdout))
@@ -1038,12 +1038,12 @@ try:
         return txn(struct.pack('>BHH', 4, addr, n), port)
 
     p_fc4 = start([sys.executable, P, '--config', ini4,
-                   '--host', '127.0.0.1', '--port', '15512',
+                    '--upstream', '127.0.0.1:15512',
                    '--listen', '127.0.0.1:15521', '--interval', '1', '--cache-ttl', '3',
                    '--allow-write', '--control-port', '15522',
                    '--profile', fc4map, '--audit-log', '/tmp/reg_audit_fc4.log'],
-                  log='/tmp/reg_fc4.log', env_extra={'MCH_REQUESTS_AUDIT': '1',
-                                                     'MCH_CONTROL_TOKEN': 'sekrit'})
+                  log='/tmp/reg_fc4.log', env_extra={'REQUESTS_AUDIT': '1',
+                                                     'CONTROL_TOKEN': 'sekrit'})
     time.sleep(2.5)
     b = rd(32064, 2, port=15521)
     check('fc3 range polled and served', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
@@ -1098,7 +1098,7 @@ try:
     # the 'none' modes: the write path defaults fully closed (write-acl none +
     # write-registers none — --allow-write alone refuses every write); the
     # connect ACL's none refuses every connection at accept
-    start([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
            '--listen', '127.0.0.1:15531', '--interval', '1', '--profile', R,
            '--allow-write', '--control-port', '15532', '--control-token', 'sekrit'],
           log='/tmp/reg_none.log')
@@ -1126,7 +1126,7 @@ try:
     b = wr6(47415, 5, port=15531)
     check('write-acl none again: refused', b[0] == 0x86 and b[1] == 1, b.hex())
 
-    start([sys.executable, P, '--host', '127.0.0.1', '--port', str(INV_PORT),
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
            '--listen', '127.0.0.1:15539', '--interval', '1', '--profile', R,
            '--connect-acl', 'none', '--control-port', '15540', '--control-token', 'sekrit'],
           log='/tmp/reg_noconn.log')
@@ -1181,13 +1181,13 @@ try:
     tokfile = '/tmp/reg_token_file'
     open(tokfile, 'w').write('tokensecret\n')
     os.chmod(tokfile, 0o600)
-    r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512',
                         '--listen', '127.0.0.1:15523', '--interval', '1', '--profile', fc4map,
                         '--control-port', '15524', '--control-token', 'a', '--control-token-file', tokfile],
                        capture_output=True, text=True, timeout=15)
     check('token file: both token sources is a clean error', r.returncode != 0
           and 'not both' in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
-    p_tok = subprocess.Popen([sys.executable, P, '--host', '127.0.0.1', '--port', '15512',
+    p_tok = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                               '--listen', '127.0.0.1:15523', '--interval', '1', '--profile', fc4map,
                               '--control-port', '15524', '--control-token-file', tokfile],
                              stdout=open('/tmp/reg_tok.log', 'w'), stderr=subprocess.STDOUT)
@@ -1200,13 +1200,13 @@ try:
           and r.stdout.startswith('ok modbus-cache'), repr(r.stdout[:80]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'show', 'version'],
                        capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'MCH_CONTROL_TOKEN_FILE': tokfile})
-    check('token file: cache_ctl honors MCH_CONTROL_TOKEN_FILE', r.returncode == 0
+                       env={**os.environ, 'CONTROL_TOKEN_FILE': tokfile})
+    check('token file: cache_ctl honors CONTROL_TOKEN_FILE', r.returncode == 0
           and r.stdout.startswith('ok modbus-cache'), repr(r.stdout[:80]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'status'],
                        capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'MCH_CONTROL_TOKEN': 'x',
-                            'MCH_CONTROL_TOKEN_FILE': tokfile})
+                       env={**os.environ, 'CONTROL_TOKEN': 'x',
+                            'CONTROL_TOKEN_FILE': tokfile})
     check('token file: the token env + the token-file env is a clean error', r.returncode != 0
           and 'mutually exclusive' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
@@ -1214,7 +1214,7 @@ try:
                        capture_output=True, text=True, timeout=15)
     check('token file: token-less ctl refused', r.returncode == 0
           and 'err authenticate first' in r.stdout, repr(r.stdout[:80]))
-    r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512', '--listen', '127.0.0.1:15525',
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--listen', '127.0.0.1:15525',
                         '--control-token-file', '/tmp/reg_no_such_token_file', '--dry-run'],
                        capture_output=True, text=True, timeout=15)
     check('token file: a missing file fails fast, one line', r.returncode != 0
@@ -1222,7 +1222,7 @@ try:
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
     lax = '/tmp/reg_token_file_lax'
     open(lax, 'w').write('laxsecret\n')                                 # the umask default (0644)
-    r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512', '--listen', '127.0.0.1:15525',
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--listen', '127.0.0.1:15525',
                         '--control-token-file', lax, '--dry-run'],
                        capture_output=True, text=True, timeout=15)
     check('token file: a group/world-readable file refuses to start (F12)',
@@ -1231,13 +1231,13 @@ try:
 
     # the audit-finding refusals (F5/F6 in docs/AUDIT.md): the token-less
     # TCP control and the token-less metrics endpoint refuse to start
-    r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512', '--dry-run',
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--dry-run',
                         '--listen', '127.0.0.1:15599', '--control-port', '15599', '--profile', R],
                        capture_output=True, text=True, timeout=15)
     check('control: a TCP control port without a token refuses to start',
           r.returncode != 0 and 'TCP control port' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
-    r = subprocess.run([sys.executable, P, '--host', '127.0.0.1', '--port', '15512', '--dry-run',
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--dry-run',
                         '--listen', '127.0.0.1:15599', '--metrics-listen', '127.0.0.1:15598', '--metrics-server', '--profile', R],
                        capture_output=True, text=True, timeout=15)
     check('metrics: the metrics endpoint without a token refuses to start',

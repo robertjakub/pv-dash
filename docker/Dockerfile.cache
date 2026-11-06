@@ -14,7 +14,7 @@
 #                                                            # compose stack publishes nothing
 #   docker run --rm -it modbus-cache bash                    # poke around as pvsuite
 #   docker run --rm -p 127.0.0.1:15502:15502 modbus-cache \
-#       modbus-cache --host 192.168.1.100          # any flags via the CMD override
+#       modbus-cache --upstream 192.168.1.100:5502          # any flags via the CMD override
 #
 # The config volume: the entrypoint seeds /config with the bundled defaults
 # on start (files the volume lacks are copied in, existing ones stay) — edit
@@ -39,10 +39,10 @@ RUN chmod +x cache/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/cache/bin/modbus-cache-cli.py /usr/local/bin/modbus-cache-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
-ENV MCH_CONFIG=/config/modbus_cache.conf \
-    MCH_SELECTION=/config/selection.json
+ENV CONFIG=/config/modbus_cache.conf \
+    SELECTION=/config/selection.json
 VOLUME /config
 ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 15502
-CMD ["modbus-cache", "--host", "fake-inverter", "--listen", "0.0.0.0:15502", "--audit-log", "-"]
+CMD ["modbus-cache", "--upstream", "fake-inverter:5502", "--listen", "0.0.0.0:15502", "--audit-log", "-"]

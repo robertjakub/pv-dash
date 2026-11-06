@@ -21,7 +21,7 @@
         in
         {
           dashboard = pkgs.callPackage ./dashboard/package.nix { };
-          modbus-scraper = pkgs.callPackage ./scrape/package.nix { };
+          modbus-scraper = pkgs.callPackage ./scraper/package.nix { };
           modbus-cache = pkgs.callPackage ./cache/package.nix { };
           modbus-fake-inverter = pkgs.callPackage ./inverter/package.nix { };
           default = self.packages.${system}.dashboard;
@@ -67,7 +67,7 @@
 
       nixosModules = {
         dashboard = import ./dashboard/module.nix;
-        modbus-scraper = import ./scrape/module.nix;
+        modbus-scraper = import ./scraper/module.nix;
         modbus-cache = import ./cache/module.nix;
         default = self.nixosModules.dashboard;
       };

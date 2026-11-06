@@ -4,7 +4,7 @@
 Fires hostile client traffic (binary junk, huge request lines, wrong methods,
 pipelined+nulls, partial requests, slow trickle) at a live scraper instance
 and verifies it stays up, keeps serving correct metrics and never prints a
-traceback. Run from anywhere: python3 scrape/test/fuzz.py
+traceback. Run from anywhere: python3 tests/scrape-fuzz.py
 """
 import os
 import random
@@ -14,8 +14,8 @@ import time
 import urllib.request
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRAPE_DIR = os.path.join(REPO, 'scrape')
-P = os.path.join(SCRAPE_DIR, 'bin', 'modbus-scraper.py')
+SCRAPER_DIR = os.path.join(REPO, 'scraper')
+P = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 INV_PORT, PORT = 15545, 19455
 ROUNDS = 3000
@@ -59,7 +59,7 @@ try:
         fh.write('# the set grammar (the ini format is gone)\nset interval 1\nset timeout 1\n'
                  'set client-timeout 2\nset max-clients 16\nset log-level DEBUG\n')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_fuzz.ini',
-                                   '--host', '127.0.0.1', '--modbus-port', str(INV_PORT),
+                                   '--upstream', '127.0.0.1:%d' % INV_PORT,
                                    '--listen', '127.0.0.1:%d' % PORT],
                                   stdout=open('/tmp/scr_fuzz.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)

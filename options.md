@@ -17,7 +17,7 @@ shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults.
 
 | knob | function | description | cache | scraper | inverter | dashboard |
-|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|
 | `--allow-write` | device | forward write requests (FC05/06/15/16) to the inverter; default: refuse them with a Modbus illegal-function exception | ✓ live |  |  |  |
 | `--battery` | device | enable battery support (default: config, $BATTERY or off) |  | ✓ | ✓ |  |
 | `--battery-kwh` | device | usable battery capacity in kWh (default 6.9) |  |  | ✓ |  |

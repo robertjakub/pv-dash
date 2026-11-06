@@ -117,8 +117,9 @@ def main():
     out.append('shared nearly verbatim; the audit, limits and metrics blocks follow the')
     out.append('family shape with per-tool defaults.')
     out.append('')
-    out.append('| knob | function | description | ' + ' | '.join(t for _, t in TOOLS) + ' |')
-    out.append('|---|---|---|---|---|---|---|---|')
+    cols = ['knob', 'function', 'description'] + [t for _, t in TOOLS]
+    out.append('| ' + ' | '.join(cols) + ' |')
+    out.append('|' + '---|' * len(cols))
     for section, _title in SECTIONS:
         if section not in merged:
             continue

@@ -1,9 +1,8 @@
 # The knobs of the family (options.md)
 
 One alphabetical table of every knob of the four daemons — the kind,
-the name, the function it files under, the finer group it renders
-under and the control command that changes it on a running daemon —
-with a mark per
+the name, the group it renders under, and the control command that
+changes it on a running daemon — with a mark per
 tool. **Generated** from the per-tool `lib/options.json` registries (the
 one-knob-one-source rows) by `scripts/gen_options.py` — edit the
 registries and re-run `python3 scripts/gen_options.py`, never this file.
@@ -18,96 +17,98 @@ Common to **all four** tools (15): `audit-files`, `audit-log`, `audit-max-mb`, `
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults.
 
-| kind | name | function | group | live | cache | scraper | inverter | dashboard |
-|---|---|---|---|---|---|---|---|---|
-| k | `allow-write` | device |  | `set allow-write` | ✓ live |  |  |  |
-| k | `audit-daily` | audit |  | *(startup-only)* | ✓ |  | ✓ |  |
-| k | `audit-files` | audit |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `audit-log` | audit |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `audit-max-mb` | audit |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `auth-token` | metrics |  | *(startup-only)* |  | ✓ secret |  |  |
-| k | `auth-token-file` | metrics |  | *(startup-only)* |  | ✓ secret |  |  |
-| c | `batt` | device |  | `set batt` |  |  | ✓ live |  |
-| k | `battery` | device |  | `set battery` |  | ✓ | ✓ live |  |
-| k | `battery` | serving |  | `set battery` |  |  |  | ✓ live |
-| k | `battery-kwh` | device |  | `set battery-kwh` |  |  | ✓ live |  |
-| c | `battery-state` | device |  | `set battery-state` |  |  | ✓ live |  |
-| k | `bind` | serving |  | *(startup-only)* |  |  |  | ✓ |
-| k | `cache-ttl` | device |  | `set ttl` | ✓ live |  |  |  |
-| k | `chaos` | device |  | `set chaos` |  |  | ✓ live |  |
-| k | `client-timeout` | limits |  | `set client-timeout` | **✓** live | **✓** live | **✓** live | **✓** live |
-| c | `cloud` | device |  | `set cloud` |  |  | ✓ live |  |
-| k | `config-js` | serving |  | *(startup-only)* |  |  |  | ✓ |
-| k | `connect-acl` | device |  | `set connect-acl` | ✓ live |  | ✓ live |  |
-| k | `control-log-replies` | control |  | *(startup-only)* |  |  | ✓ |  |
-| k | `control-ops-token` | control |  | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
-| k | `control-ops-token-file` | control |  | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
-| k | `control-ops-verbs` | control |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `control-port` | control |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `control-socket-group` | control |  | *(startup-only)* | ✓ |  | ✓ |  |
-| k | `control-token` | control |  | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
-| k | `control-token-file` | control |  | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
-| k | `control-trust-uids` | control |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `dump-interval` | persistence |  | `set dump-interval` | ✓ live |  |  |  |
-| k | `dump-path` | persistence |  | *(startup-only)* | ✓ |  |  |  |
-| k | `dump-with-cache` | persistence |  | *(startup-only)* | ✓ |  |  |  |
-| c | `grid` | device |  | `set grid` |  |  | ✓ live |  |
-| k | `grid-frequency` | device |  | `set grid-frequency` |  |  | ✓ live |  |
-| c | `grid-outage` | device |  | `set grid-outage` |  |  | ✓ live |  |
-| k | `grid-positive-import` | device |  | *(startup-only)* |  | ✓ |  |  |
-| k | `grid-voltage` | device |  | `set grid-voltage` |  |  | ✓ live |  |
-| k | `host` | device |  | *(startup-only)* |  |  | ✓ |  |
-| k | `interval` | device |  | `set interval` | ✓ live |  |  |  |
-| k | `interval` | logging |  | `set interval` |  | ✓ live |  |  |
-| k | `listen` | serving |  | *(startup-only)* | ✓ | ✓ |  |  |
-| c | `load` | device |  | `set load` |  |  | ✓ live |  |
-| k | `local-time` | serving |  | *(startup-only)* | ✓ | ✓ |  |  |
-| k | `local-time` | logging |  | *(startup-only)* |  |  |  | ✓ |
-| k | `log-access` | logging |  | `set log-access` | ✓ | ✓ live |  | ✓ live |
-| k | `log-level` | logging |  | `set log-level` | **✓** live | **✓** live | **✓** live | **✓** live |
-| k | `log-queries` | logging |  | `set log-queries` |  |  |  | ✓ live |
-| k | `max-clients` | limits |  | `set max-clients` | **✓** live | **✓** live | **✓** live | **✓** live |
-| k | `max-conn-per-ip` | limits |  | `set max-conn-per-ip` | **✓** live | **✓** live | **✓** live | **✓** live |
-| k | `max-grid-kw` | device |  | *(startup-only)* |  | ✓ |  |  |
-| k | `max-kwp` | device |  | `set max-kwp` |  | ✓ | ✓ live |  |
-| k | `merge-gap` | device |  | `set merge-gap` | ✓ live |  |  |  |
-| k | `metric-prefix` | device |  | *(startup-only)* |  | ✓ |  |  |
-| k | `metrics-client-timeout` | metrics |  | *(startup-only)* | ✓ |  | ✓ | ✓ |
-| k | `metrics-listen` | metrics |  | *(startup-only)* | ✓ |  | ✓ | ✓ |
-| k | `metrics-max-clients` | metrics |  | *(startup-only)* | ✓ |  | ✓ | ✓ |
-| k | `metrics-max-conn-per-ip` | metrics |  | *(startup-only)* | ✓ |  | ✓ | ✓ |
-| k | `metrics-server` | metrics |  | `set metrics-server` | ✓ live |  | ✓ live | ✓ live |
-| k | `metrics-spec` | device |  | *(startup-only)* |  | ✓ |  |  |
-| k | `metrics-token` | metrics |  | *(startup-only)* | ✓ secret |  | ✓ secret | ✓ secret |
-| k | `metrics-token-file` | metrics |  | *(startup-only)* | ✓ secret |  | ✓ secret | ✓ secret |
-| k | `modbus-offset` | device |  | *(startup-only)* |  | ✓ |  |  |
-| k | `modbus-unit` | device |  | *(startup-only)* |  | ✓ |  |  |
-| c | `mppt` | device |  | `set mppt` |  |  | ✓ live |  |
-| k | `no-audit-log` | audit |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `no-battery` | device |  | *(startup-only)* |  |  | ✓ |  |
-| k | `port` | device |  | *(startup-only)* |  |  | ✓ |  |
-| k | `port` | serving |  | *(startup-only)* |  |  |  | ✓ |
-| k | `profile` | device |  | `set profile` | ✓ live | ✓ live | ✓ live |  |
-| k | `prom-prefix` | serving |  | *(startup-only)* |  |  |  | ✓ |
-| c | `pv` | device |  | `set pv` |  |  | ✓ live |  |
-| k | `read-delay` | device |  | `set read-delay` | ✓ live |  |  |  |
-| k | `requests-audit` | audit |  | `set requests-audit` | ✓ live |  |  |  |
-| k | `restore-on-start` | persistence |  | *(startup-only)* | ✓ |  |  |  |
-| c | `scenario` | device |  | `set scenario` |  |  | ✓ live |  |
-| k | `seed` | device |  | `set seed` |  |  | ✓ live |  |
-| k | `selection` | device |  | `set selection` | ✓ live |  |  |  |
-| c | `soc` | device |  | `set soc` |  |  | ✓ live |  |
-| k | `static` | device |  | `set static` |  |  | ✓ live |  |
-| k | `static-dir` | serving |  | *(startup-only)* |  |  |  | ✓ |
-| k | `strict` | device |  | `set strict` |  |  | ✓ live |  |
-| k | `time` | device |  | `set time` |  |  | ✓ live |  |
-| k | `time-scale` | device |  | `set time-scale` |  |  | ✓ live |  |
-| k | `timeout` | device |  | `set timeout` | ✓ live | ✓ live |  |  |
-| k | `timezone` | device |  | `set timezone` |  |  | ✓ live |  |
-| k | `unit` | device |  | *(startup-only)* | ✓ |  | ✓ |  |
-| k | `upstream` | device | `upstream` | *(startup-only)* | ✓ | ✓ |  |  |
-| k | `upstream` | serving |  | *(startup-only)* |  |  |  | ✓ |
-| k | `write-acl` | device |  | `set write-acl` | ✓ live |  |  |  |
-| k | `write-registers` | device |  | `set write-registers` | ✓ live |  |  |  |
+| kind | name | group | live | cache | scraper | inverter | dashboard |
+|---|---|---|---|---|---|---|---|
+| c | `acl` |  | *(startup-only)* | ✓ |  |  |  |
+| k | `allow-write` |  | `set write allow` | ✓ live |  |  |  |
+| c | `audit` |  | *(startup-only)* | ✓ |  |  |  |
+| k | `audit-daily` |  | `set audit rotate daily` | ✓ live |  | ✓ |  |
+| k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** | **✓** | **✓** |
+| k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** | **✓** | **✓** |
+| k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** | **✓** | **✓** |
+| k | `auth-token` |  | *(startup-only)* |  | ✓ secret |  |  |
+| k | `auth-token-file` |  | *(startup-only)* |  | ✓ secret |  |  |
+| c | `batt` |  | `set batt` |  |  | ✓ live |  |
+| k | `battery` |  | `set battery` |  | ✓ | ✓ live | ✓ live |
+| k | `battery-kwh` |  | `set battery-kwh` |  |  | ✓ live |  |
+| c | `battery-state` |  | `set battery-state` |  |  | ✓ live |  |
+| k | `bind` |  | *(startup-only)* |  |  |  | ✓ |
+| k | `cache-ttl` |  | `set cache ttl` | ✓ live |  |  |  |
+| k | `chaos` |  | `set chaos` |  |  | ✓ live |  |
+| k | `client-timeout` |  | `set client-timeout`, `set limits client-timeout` | **✓** live | **✓** live | **✓** live | **✓** live |
+| c | `cloud` |  | `set cloud` |  |  | ✓ live |  |
+| k | `config-js` |  | *(startup-only)* |  |  |  | ✓ |
+| k | `connect-acl` |  | `set acl connect`, `set connect-acl` | ✓ live |  | ✓ live |  |
+| c | `control` |  | *(startup-only)* | ✓ |  |  |  |
+| k | `control-log-replies` |  | *(startup-only)* |  |  | ✓ |  |
+| k | `control-ops-token` |  | `set control ops token` | **✓** live+secret | **✓** secret | **✓** secret | **✓** secret |
+| k | `control-ops-token-file` |  | `set control ops token-file` | **✓** live+secret | **✓** secret | **✓** secret | **✓** secret |
+| k | `control-ops-verbs` |  | `set control ops-verbs` | **✓** live | **✓** | **✓** | **✓** |
+| k | `control-port` |  | `set control port` | **✓** live | **✓** | **✓** | **✓** |
+| k | `control-socket-group` |  | `set control socket-group` | ✓ live |  | ✓ |  |
+| k | `control-token` |  | `set control token` | **✓** live+secret | **✓** secret | **✓** secret | **✓** secret |
+| k | `control-token-file` |  | `set control token-file` | **✓** live+secret | **✓** secret | **✓** secret | **✓** secret |
+| k | `control-trust-uids` |  | `set control trust-uids` | **✓** live | **✓** | **✓** | **✓** |
+| c | `dump` |  | *(startup-only)* | ✓ |  |  |  |
+| k | `dump-interval` |  | `set dump-interval` | ✓ live |  |  |  |
+| k | `dump-path` |  | `set dump path` | ✓ live |  |  |  |
+| k | `dump-with-cache` |  | `set dump with-cache` | ✓ live |  |  |  |
+| c | `grid` |  | `set grid` |  |  | ✓ live |  |
+| k | `grid-frequency` |  | `set grid-frequency` |  |  | ✓ live |  |
+| c | `grid-outage` |  | `set grid-outage` |  |  | ✓ live |  |
+| k | `grid-positive-import` |  | *(startup-only)* |  | ✓ |  |  |
+| k | `grid-voltage` |  | `set grid-voltage` |  |  | ✓ live |  |
+| k | `host` |  | *(startup-only)* |  |  | ✓ |  |
+| k | `interval` |  | `set interval`, `set modbus interval` | ✓ live | ✓ live |  |  |
+| c | `limits` |  | *(startup-only)* | ✓ | ✓ |  |  |
+| k | `listen` |  | *(startup-only)* | ✓ | ✓ |  |  |
+| c | `load` |  | `set load` |  |  | ✓ live |  |
+| k | `local-time` |  | `set local-time` | ✓ live | ✓ |  | ✓ |
+| k | `log-access` |  | `set log-access` | ✓ | ✓ live |  | ✓ live |
+| k | `log-level` |  | `set log-level` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `log-queries` |  | `set log-queries` |  |  |  | ✓ live |
+| k | `max-clients` | `limits` | `set limits max-clients`, `set max-clients` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `max-conn-per-ip` | `limits` | `set limits max-conn-per-ip`, `set max-conn-per-ip` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `max-grid-kw` |  | *(startup-only)* |  | ✓ |  |  |
+| k | `max-kwp` |  | `set max-kwp` |  | ✓ | ✓ live |  |
+| k | `merge-gap` |  | `set modbus merge-gap` | ✓ live |  |  |  |
+| k | `metric-prefix` |  | *(startup-only)* |  | ✓ |  |  |
+| k | `metrics-client-timeout` |  | `set metrics limits timeout` | ✓ live |  | ✓ | ✓ |
+| k | `metrics-listen` |  | `set metrics listen` | ✓ live |  | ✓ | ✓ |
+| k | `metrics-max-clients` |  | `set metrics limits max-clients` | ✓ live |  | ✓ | ✓ |
+| k | `metrics-max-conn-per-ip` |  | `set metrics limits max-conn-per-ip` | ✓ live |  | ✓ | ✓ |
+| k | `metrics-server` |  | `set metrics-server`, `set metrics enable` | ✓ live |  | ✓ live | ✓ live |
+| k | `metrics-spec` |  | *(startup-only)* |  | ✓ |  |  |
+| k | `metrics-token` |  | `set metrics token` | ✓ live+secret |  | ✓ secret | ✓ secret |
+| k | `metrics-token-file` |  | `set metrics token-file` | ✓ live+secret |  | ✓ secret | ✓ secret |
+| c | `modbus` |  | *(startup-only)* | ✓ | ✓ |  |  |
+| k | `modbus-offset` |  | `set modbus offset` |  | ✓ live |  |  |
+| k | `modbus-unit` | `modbus` | `set modbus unit` |  | ✓ live |  |  |
+| c | `mppt` |  | `set mppt` |  |  | ✓ live |  |
+| k | `no-audit-log` |  | `set audit disable` | **✓** live | **✓** | **✓** | **✓** |
+| k | `no-battery` |  | *(startup-only)* |  |  | ✓ |  |
+| k | `port` |  | *(startup-only)* |  |  | ✓ | ✓ |
+| k | `profile` |  | `set modbus profile`, `set profile` | ✓ live | ✓ live | ✓ live |  |
+| k | `prom-prefix` |  | *(startup-only)* |  |  |  | ✓ |
+| c | `pv` |  | `set pv` |  |  | ✓ live |  |
+| k | `read-delay` |  | `set modbus read-delay` | ✓ live |  |  |  |
+| k | `requests-audit` |  | `set audit requests` | ✓ live |  |  |  |
+| k | `restore-on-start` |  | `set dump restore-on-start` | ✓ live |  |  |  |
+| c | `scenario` |  | `set scenario` |  |  | ✓ live |  |
+| k | `seed` |  | `set seed` |  |  | ✓ live |  |
+| k | `selection` |  | `set modbus selection` | ✓ live |  |  |  |
+| c | `soc` |  | `set soc` |  |  | ✓ live |  |
+| k | `static` |  | `set static` |  |  | ✓ live |  |
+| k | `static-dir` |  | *(startup-only)* |  |  |  | ✓ |
+| k | `strict` |  | `set strict` |  |  | ✓ live |  |
+| k | `time` |  | `set time` |  |  | ✓ live |  |
+| k | `time-scale` |  | `set time-scale` |  |  | ✓ live |  |
+| k | `timeout` |  | `set modbus timeout`, `set timeout` | ✓ live | ✓ live |  |  |
+| k | `timezone` |  | `set timezone` |  |  | ✓ live |  |
+| k | `unit` |  | `set modbus unit` | ✓ live |  | ✓ |  |
+| k | `upstream` | `upstream` | `set modbus upstream` | ✓ live | ✓ live |  | ✓ |
+| c | `write` |  | *(startup-only)* | ✓ |  |  |  |
+| k | `write-acl` |  | `set acl write` | ✓ live |  |  |  |
+| k | `write-registers` |  | `set write registers` | ✓ live |  |  |  |
 
-Legend: `k` = a knob — the flag/env/config-file rows; `c` = control-only — a setting that lives on the control wire alone (the fake's pins and machines — no flag, no env, no config-file row); ✓ = the tool has the knob (**bold** = all four do); the `live` column is the control command itself — `set <name>` over the control plane, the wire name the registry gives the knob (it can differ from the flag: the cache's `cache-ttl` sets `ttl`); *(startup-only)* = no live form, a restart applies the knob; a cell's `live` mark says the tool takes the knob live (a cell without one = that tool applies the knob at startup only); `group` = the row's optional finer display bucket — the tool's surfaces file the knob under it instead of the function (blank = the function groups it); `secret` = a token — never rendered inline by `show config` (the `-file` form is). The knob descriptions stay in the registries — `--help`, the man pages, `show knobs` and `help config` render them per tool.
+Legend: `k` = a knob — the flag/env/config-file rows; `c` = control-only — a setting that lives on the control wire alone (the fake's pins and machines — no flag, no env, no config-file row); ✓ = the tool has the knob (**bold** = all four do); the `live` column is the control command itself — `set <name>` over the control plane, the wire name the registry gives the knob (it can differ from the flag: the cache's `cache-ttl` sets `ttl`); *(startup-only)* = no live form, a restart applies the knob; a cell's `live` mark says the tool takes the knob live (a cell without one = that tool applies the knob at startup only); `group` = the row's display bucket — the tool's surfaces file the knob under it (blank = ungrouped, rendered bare); `secret` = a token — never rendered inline by `show config` (the `-file` form is). The knob descriptions stay in the registries — `--help`, the man pages, `show knobs` and `help config` render them per tool.

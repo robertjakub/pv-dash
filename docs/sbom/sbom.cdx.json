@@ -3,7 +3,7 @@
   "specVersion": "1.5",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-05T00:00:00Z",
+    "timestamp": "2026-11-06T00:00:00Z",
     "component": {
       "bom-ref": "pv-suite",
       "type": "application",
@@ -37,8 +37,8 @@
         { "name": "pv-suite:vendored-at", "value": "dashboard/static/vendor/echarts.min.js" },
         { "name": "pv-suite:note", "value": "the only third-party code in the suite" }
       ] },
-    { "bom-ref": "nixpkgs", "type": "framework", "name": "nixpkgs", "version": "nixos-unstable @ 1c89083e451e891152365b799595cf7790a43325",
-      "purl": "pkg:github/NixOS/nixpkgs@1c89083e451e891152365b799595cf7790a43325",
+    { "bom-ref": "nixpkgs", "type": "framework", "name": "nixpkgs", "version": "nixos-unstable @ 1d060086d60cb76a40cf37109f979d88a5bd6396",
+      "purl": "pkg:github/NixOS/nixpkgs@1d060086d60cb76a40cf37109f979d88a5bd6396",
       "properties": [{ "name": "pv-suite:provides", "value": "the pinned CPython interpreter and the stdenv build wrappers; no Python libraries fetched" }] },
     { "bom-ref": "alpine", "type": "operating-system", "name": "alpine", "version": "3.20",
       "purl": "pkg:oci/alpine@3.20",

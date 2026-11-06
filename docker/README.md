@@ -215,7 +215,7 @@ named volume under all three tools keeps every config in one place.
 ### modbus-scraper (`Dockerfile.scraper`)
 
 The Prometheus exporter — see the [scraper](../scraper/README.md). The live
-configs are `/conf../scraperr.conf` and `/config/metrics.json`
+configs are `/config/scraper.conf` and `/config/metrics.json`
 (`CONFIG` / `METRICS_SPEC`):
 
 ```bash

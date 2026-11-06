@@ -1,4 +1,4 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scrape, /scripts (rev. 8)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 9)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
@@ -188,19 +188,65 @@ All ten suites pass on the revised tree; `scripts/check_options.py` (the
 one-knob-one-source gate) passes; the man pages regenerate
 (`mandoc -Tlint` clean).
 
+**Rev. 9 walks the hierarchical control-grammar wave — one new finding,
+closed in the same wave (F23).** The grammar's live names are `/`-paths
+now and the config scripts speak the CLI spelling (`set modbus upstream
+<value>` — the word-index parser resolves the flat dashed names too and
+fails fast, with the line number, on a name no registry word answers;
+re-read: the fail-fast posture never leaves partial state, the ini-shaped
+lines still answer the pointer error). The per-tool registries dropped
+the `section` field — the display `group` is the one grouping, ungrouped
+rows render bare — and the consoles prefix every non-value reply line
+with `% ` (the show reports and the tables stay bare values); both are
+cosmetic, noted for the record. The security-bearing surfaces of the
+wave, re-read:
+
+- **the whole-daemon `reload` (cache)** — the live overrides serialize to
+  a state file beside the config (`<config>.reload`), the daemon re-execs
+  in place, the fresh start re-applies the saved overrides once and
+  consumes the file (a state older than 120 s discards as stale). The
+  secrets never save (the dump rule — absent by construction; an
+  overridden secret is named in the reply to re-pass by flag/env/
+  token-file), and every restored value re-validates through the live
+  dispatch (a value the current config rejects is skipped, never fatal).
+  **F23** (LOW, raised and closed here): the state file is
+  config-equivalent trust at rest — whoever can write it injects setting
+  overrides into the fresh start — and was created with an umask-derived
+  mode; it is created **`0600` explicitly** now (the F18 posture, the tmp
+  file before the atomic replace).
+- **the live control-plane rebind and token rotation (cache)** —
+  `set control port ...` binds the new socket first (a failed bind
+  restores the attributes; the old listener retires by identity after the
+  swap) and a TCP rebind without a token refuses (the F5 posture holds on
+  the live path too); `control/token` and the ops twins rotate the admin/
+  ops keys live (the old sessions' macs fail and re-authenticate; the
+  ops key must differ from the admin on the wire too).
+- **the backlog** — the control listeners take `listen(64)` (was 16): a
+  connect burst past the backlog got RST on macOS/BSD (an availability
+  fix, not a security one).
+- **the dump-secret guard** — the overrides dump (`dump_settings`) skips
+  the secret keys by construction, so `request dump` and the reload save
+  never carry a token; the secret defaults placeholders are gone from the
+  unset defaults (an unset secret answers `err unknown setting`).
+
+No other new findings; the open set is unchanged
+(F1 accepted, F14/F15/F16/F17, F21 — §3.2). The `scrape/` directory's
+rename to `scraper/` (Nov 2026) is reflected in the title and §1; the
+historical finding records keep their period env names.
+
 ## 1. Assets and trust boundaries
 
 ### The audited tree, directory by directory
 
 | Directory | What | Trust boundary / controls | Findings |
 |---|---|---|---|
-| `/cache` | the Modbus caching proxy: bin/ (the daemon + the ctl/cli clients), lib/ (proxy, cache, upstream, control, metrics, persist, config, settings), man/, the ini sample, the NixOS module | the production-relevant surface: two listeners (Modbus TCP + control), the metrics endpoint, the state dump, the audit trail; the write path quadruple-gated (the parse gate, `allow-write`, `write-acl` none, `write-registers` none); the dump is config-equivalent trust at rest | F2–F5, F8, F18 closed here; F1 accepted |
+| `/cache` | the Modbus caching proxy: bin/ (the daemon + the ctl/cli clients), lib/ (proxy, cache, upstream, control, metrics, persist, config), man/, the set-grammar sample conf, the NixOS module | the production-relevant surface: two listeners (Modbus TCP + control), the metrics endpoint, the state dump, the audit trail; the write path quadruple-gated (the parse gate, `allow-write`, `write-acl` none, `write-registers` none); the dump is config-equivalent trust at rest | F2–F5, F8, F18, F23 closed here; F1 accepted |
 | `/common` | the shared package every tool imports: `audit.py` (the append-only trail + the chained per-writer hashes), `config.py` (parse_listen, is_loopback_host, the profile resolution, the token loading + the 0600 enforcement), `connlimit.py` (the connection gates), `cred.py` (peer-cred), `protocol.py` (recv_exact, exception frames), `human.py`, `logutil.py`, `version.py` | trust amplifier: every tool inherits its guarantees (the fail-closed token modes, the wire discipline, the fold at the audit writer, the admit/release symmetry); a regression here is family-wide — the regtests + the audit-chain suite watch it | F10, F12 closed here |
 | `/dashboard` | the web front: bin/ (the server + the ctl/cli clients), lib/ (the HTTP handler + the Prometheus proxy, the control server, config, settings, the static constants), static/, man/ | the viewer surface: GET-only HTTP — the static page (a realpath-guarded tree, 403 on escape) and the Prometheus proxy under `--prom-prefix` — with the family connection gate (`--max-clients`/`--client-timeout`/`--max-conn-per-ip`, extras 503); the JSON-lines control server in the family shape (the F5 refusal, peer-cred, the signed wire, the DSH trail, the socket `0600` after bind); **no HTTP authentication yet — F21** (binds `0.0.0.0` by default; the loopback/reverse-proxy deployment is documented) | F20 closed (the clients); F21 open |
 | `/docker` | one alpine image per Modbus tool, the Prometheus image, the two entrypoints (the `/config` seeding + the token handoff), the compose demo | the network is the boundary: one `internal: true` network, nothing published on the host; the images run unprivileged (`pvsuite`, the `prometheus` user); root exists only for the volume seeding and drops before exec; the bundled `*.token` defaults materialize as random 0600 values | F7 closed; F17 open (the volume trust) |
 | `/inverter` | the fake: bin/ (the daemon + the ctl/cli clients), lib/ (the simulator, the machines, control, metrics, inverter, profile), man/ | a test instrument on a trusted LAN: the Modbus surface capped (`max-clients`/`client-timeout`/`max-conn-per-ip`, live-settable), the read-count gate, the metrics endpoint optional (warns beyond loopback without a token); deliberately not security-first — documented as such | F11 closed; F1 accepted |
 | `/profiles` | the device profiles (JSON data: sun2000 + three Deye variants) + the linter and the formatter bins | data, not code: the profiles decide what the tools read (and what the cache's write allow-list may touch); the loader validates every entry (the type/width/scale, the address bounds, clean `SystemExit` one-liners), the search path is closed (three fixed candidates, no CWD or `PATH` dependence), the linter checks the schema shape, the overlaps and the bounds — treat a profile file like config: the operator picks it | none (rev. 4 review: the loader, the linter, the formatter) |
-| `/scrape` | the exporter: bin/ (the daemon + the ctl/cli clients), lib/ (server, scraper, poller, control, settings, config, statics), man/, the ini + the sample rules | the read-only consumer: one HTTP GET route set (bearer-gated, capped, the non-loopback refusal) + one outbound Modbus client (FC3/FC4 reads only); the family JSON-lines control server (rev. 6: the unix socket `0600` after bind, the token'd TCP with the F5 refusal, peer-cred, the signed wire, the SCR trail); the SIGHUP reload re-validates everything (the token-file modes too) | F13 closed; F14/F15/F16 open; F20 closed (the clients) |
+| `/scraper` | the exporter: bin/ (the daemon + the ctl/cli clients), lib/ (server, scraper, poller, control, config, statics), man/, the set-grammar sample conf + the sample rules | the read-only consumer: one HTTP GET route set (bearer-gated, capped, the non-loopback refusal) + one outbound Modbus client (FC3/FC4 reads only); the family JSON-lines control server (rev. 6: the unix socket `0600` after bind, the token'd TCP with the F5 refusal, peer-cred, the signed wire, the SCR trail); the SIGHUP reload re-validates everything (the token-file modes too) | F13 closed; F14/F15/F16 open; F20 closed (the clients) |
 | `/scripts` | `release.py` (the release orchestrator: the version sweep, the changelog rename, the verify, the tag, the push; the GH release is the workflow's job, the local cut is the opt-in `--release`) + `audit_verify.py` (the F10 chain verifier) | maintainer-local trust: the orchestrator guards the dirty tree and the main-only rule, verifies (the full suite + the nix build by default), then commits/tags/pushes; the verifier is offline and read-only; no runtime surface; the tag is the release's trust root, signed when a key exists — see F19 | F19 closed (rev. 5: the workflow cuts the release after the gate) |
 
 `flake.nix` (the packaging: the packages, the overlay, the NixOS modules)
@@ -360,9 +406,9 @@ control-server access only.
 
 ## 3. Findings
 
-### 3.1 Closed (F2–F10, F11–F13, F18–F20, F22; fixes verified, see §4)
+### 3.1 Closed (F2–F10, F11–F13, F18–F20, F22, F23; fixes verified, see §4)
 
-Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed in rev. 4: F11, F13, F10, F18. Closed in rev. 6: F20. Closed in rev. 7: F22.
+Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed in rev. 4: F11, F13, F10, F18. Closed in rev. 6: F20. Closed in rev. 7: F22. Closed in rev. 9: F23.
 
 | # | Module | Was | Fix (where) |
 |---|---|---|---|
@@ -382,6 +428,7 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
 | F19 | scripts | LOW — **the release landed before the CI gate reported** (found rev. 4): `scripts/release.py` cut the GitHub release locally right after the tag push — the tag-triggered workflow's test+build jobs start only after the tag exists, so an unverified release could be published and a failing CI could not un-cut it; the local verification defaulted to `--tests quick` (two of the nine suites) and the annotated tag was unsigned. Closed rev. 5 as recommended. | **The defaults flipped**: the GitHub release is the **workflow's** job — `.github/workflows/release.yml`'s `release` job gates on `needs: [test, build]` (the suites + the four-package nix build) and cuts the GH release from the changelog section only after both report; the local cut is the explicit opt-in (`--release`, help + flight print name the bypass). **The local gate defaults to `--tests full`** (all ten suites as of rev. 6; `--tests quick` stays for a re-cut). **The tag is signed** (`git tag -s`) whenever a signing key exists — the unsigned annotated tag is the fallback and the flight prints why. Verified: the dry-run plan and the flight matrix in a scratch repo (§4). |
 | F20 | cache, scrape, inverter, dashboard (the ctl/cli clients) | LOW — **the help promised a control the code did not have** (found rev. 6, re-checking the docs against the code): every ctl/cli `--control-token-file` help — and the man pages rendered from it — promised the env form (`MCH_CONTROL_TOKEN_FILE`, `SCR_CONTROL_TOKEN_FILE`, `INV_CONTROL_TOKEN_FILE`, `DSH_CONTROL_TOKEN_FILE`), and none of the eight clients read it; a script following the documented hardened path ran token-less and failed the handshake. The daemons were unaffected (their config resolution reads the env). Closed rev. 6, in the same wave. | One resolution shape family-wide, in every ctl/cli: `token_file = flag or env`, `token = flag or env`, both together the mutual-exclusion error, the file over the plain token, then the shared `load_token_file` (the F12 0600 gate applies to the env path too). The fake's daemon got the env form of `--control-token-file` / `--metrics-token-file` the same way (the other daemons resolved the env from the start). Documented: the READMEs' env lists and flag tables are true again; the closed TODO item (the token-file env honored) records the wave. Verified: the new env checks in all four affected suites + the live `fake_cli` / `dashboard_cli` smokes (§4, rev. 6). |
 | F22 | cache, scrape, inverter, dashboard (the control servers) + common | LOW — **the control plane had no role separation** (found rev. 7, re-walking the auth story): one token meant one capability — a token holder could steer everything (`set`, the dumps, `restart`, `shutdown`) or only watch; there was nothing in between, so the ops shift (monitoring, freshness checks) had to hold the full-power key, and the audit trail could not tell a looker from a steerer. Closed rev. 7, in the same wave. | A second, read-only token per control server (`--control-ops-token`/`--control-ops-token-file`, ini + env twins): its sessions run the show/clear verbs only. The gate lives once — `common/wiresec.py`'s roles (`ROLE_ADMIN`/`ROLE_OPS`, `role_allows` on the command's head verb, the session verbs `help`/`?`/`ping`/`quit` open to every role) — and runs after the wire-integrity checks, so a denied frame is still an authenticated, mac-verified frame. Both audited: the COMMAND entries carry `role=ops`/`role=admin` with the denials included, and each session's frames are mac'd with the key it authenticated with (an ops client verifies its own replies against the ops token). Fail-fast configs: the ops token without the admin token, or equal to it, refuses to start; the F12 0600 gate covers the ops token-file. The clients are unchanged (the role is the server's decision — their env claims stay true). Verified: the ops matrices in `tests/control-fuzz.py`, `tests/cache-control-fuzz.py` (`clear cache` honored, steering denied), `tests/dashboard-control-fuzz.py` and `tests/scrape-regtest.py` §6c, plus the role-carrying trail lines (§4, rev. 7). |
+| F23 | cache | LOW — **the reload state file was config-equivalent trust at rest with an umask-derived mode** (found rev. 9, walking the hierarchical control-grammar wave): the whole-daemon `reload` serializes the live setting overrides to `<config>.reload` and the fresh start re-applies them once — whoever could write the file could inject overrides (`acl connect` included) into the restarted daemon, and the umask-derived creation mode (0644 on a typical umask) let every local user read the operator's override set. Closed rev. 9, in the same wave. | **The F18 posture, one surface over**: the state file's tmp is created **`0600` explicitly** (`os.open` mode 0600 before the atomic `os.replace` — never the umask, `cache/lib/control.py` `_save_reload_state`). The contents already carried the guard rails: the secrets never save (the dump rule — absent by construction, the overridden ones named in the reply), every restored value re-validates through the live dispatch, and a state older than 120 s discards as stale (a failed start in between cannot resurrect old overrides on a much later manual start). The file lives beside the config and dies on the first successful start — own it like the config file. Verified: the reload round-trips in `tests/cache-regtest.py` (§4, rev. 9) plus the mode check on the saved state file. |
 
 ### 3.2 Open findings
 
@@ -619,8 +666,38 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   (poll now/restart/shutdown forbidden). All four print ALL PASS on the
   revised tree; the man pages regenerated (`mandoc -Tlint` clean).
 
-## 5. NIS2 / DORA mapping (all modules; cache is the production-relevant one)
+### Rev. 9 (this revision)
 
+- **F23 (the reload state file's mode) closed with the wave it was raised
+  in** — the read was: `cache/lib/control.py`'s reload path end to end
+  (`_save_reload_state` — the tmp-then-`os.replace` dance now on an
+  `os.open(..., 0o600)` handle; `_restore_reload_state` — the one-shot
+  consume, the 120 s staleness discard; `apply_dump_settings` — every
+  restored value re-validates through the live dispatch, failures skip
+  never fatal; `dump_settings` — the secret keys absent by construction,
+  so the state file never carries a token), then the wire side (the
+  `reload` verb is admin-only — the ops denial comes free from the F22
+  gate; the reply leaves before the re-exec, the session loop breaks on
+  the pending flag).
+- **The live control-plane rebind re-read** — `control/port`'s
+  bind-first swap (a failed bind restores the attributes; the accept loop
+  retires by identity), the TCP rebind's token refusal (the F5 posture on
+  the live path), `control/token`/`control/ops/token` rotation (the old
+  sessions' macs fail and re-authenticate; `compare_digest` keeps the
+  ops≠admin rule on the wire).
+- **The verified evidence**: the reload round-trips in
+  `tests/cache-regtest.py` (the override survives the exec, the config
+  edit takes on the restart-marked style, the state file is consumed) —
+  plus the new white-box mode check (`_save_reload_state` on a stub
+  server: the saved file stats `0600` on a permissive umask). The
+  control-fuzz suites exercise the rebind/rotation paths on the revised
+  grammar. All ten suites print ALL PASS on the revised tree;
+  `scripts/check_options.py` passes (the bundled configs parse against
+  the registries' word index — the CLI spellings resolve, an unknown name
+  fails the gate); `scripts/lint_options.py --check` clean; the man pages
+  regenerate (`mandoc -Tlint` clean).
+
+## 5. NIS2 / DORA mapping (all modules; cache is the production-relevant one)
 | Requirement | Status | Where |
 |---|---|---|
 | NIS2 21.2(a) risk-management policies | yes (scoped) | defaults-as-security documented (writes quadruple-gated with the ACL/allow-list defaulting to none, localhost binds, tokens mandatory on the control/metrics surfaces, token files 0600, dry-run); this audit is the written analysis |
@@ -725,6 +802,14 @@ control plane its least-privilege shape: **F22** LOW (one token, one
 capability — no role separation) raised and closed in the same wave — a
 second, read-only ops token per control server, its sessions scoped to
 the show/clear verbs, both keys audited with the denials in the trail.
+Rev. 8 re-walked the config/RBAC/metrics wave (the set-grammar configs,
+the RBAC policy table, the dashboard's own /metrics endpoint — no new
+findings). Rev. 9 walked the hierarchical control-grammar wave — the
+`/`-path live names, the CLI-spelled config scripts, the cache's
+whole-daemon `reload` with its state-file handoff — and found **F23**
+LOW (the reload state file was config-equivalent trust at rest with an
+umask-derived mode) raised and closed in the same wave: created `0600`
+explicitly, the secrets never saved, every restored value re-validated.
 The remaining open set is otherwise the documented trust decisions and the
 deployment stories: the state-dump trust is owned now (F18 closed) — the
 dump file deserves the ini's care (the hash catches tampering, not a

@@ -23,10 +23,10 @@ grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashb
     | sed -E 's/^(import|from) ([a-zA-Z_0-9.]+).*/\2/' | sort -u
 ```
 
-Every name in that list is stdlib (`argparse`, `configparser`, `hmac`,
-`http.server`, `ipaddress`, `json`, `logging`, `math`, `mimetypes`, `os`,
-`random`, `re`, `signal`, `socket`, `struct`, `subprocess`, `sys`,
-`threading`, `time`, `urllib`, `collections`, `getpass`, `glob`) or
+Every name in that list is stdlib (`argparse`, `collections`, `getpass`,
+`glob`, `hashlib`, `hmac`, `http.server`, `ipaddress`, `json`, `logging`,
+`math`, `mimetypes`, `os`, `random`, `re`, `signal`, `socket`, `struct`,
+`subprocess`, `sys`, `textwrap`, `threading`, `time`, `urllib`) or
 `common`/`lib`. Nothing else. No `requests`, no `pyserial`, no `prometheus_client`.
 
 ## Per subproject
@@ -36,7 +36,7 @@ Every name in that list is stdlib (`argparse`, `configparser`, `hmac`,
 | [`common/`](common/README.md) | the package (12 modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
 | [`profiles/`](profiles/README.md) | 4 device-profile JSONs + 2 tools | none — stdlib only | data + linter/formatter |
 | [`cache/`](cache/README.md) | `modbus-cache.py` + `lib/` (12 modules) + 2 control clients | none — stdlib only (+ `common`) | proxy daemon |
-| [`inverter/`](inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (14 modules) + 2 control clients | none — stdlib only (+ `common`) | simulator |
+| [`inverter/`](inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (13 modules) + 2 control clients | none — stdlib only (+ `common`) | simulator |
 | [`scraper/`](scraper/README.md) | `modbus-scraper.py` + `lib/` (10 modules) | none — stdlib only (+ `common`) | exporter |
 | [`dashboard/`](dashboard/README.md) | `bin/dashboard.py` + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
 
@@ -45,7 +45,7 @@ Every name in that list is stdlib (`argparse`, `configparser`, `hmac`,
 - **Python** — any CPython 3 with the standard library; the suite does not
   pin a minor (the Nix and Docker builds each pin their own).
   - **Nix**: the interpreter comes from the pinned **nixpkgs**
-    (`nixos-unstable` @ `1c89083e451e891152365b799595cf7790a43325`,
+    (`nixos-unstable` @ `1d060086d60cb76a40cf37109f979d88a5bd6396`,
     [`flake.lock`](flake.lock)); the packages are built as stdenv
     wrappers — no Python libraries are fetched.
   - **Docker**: base image `alpine:3.20`, `apk add --no-cache python3 bash

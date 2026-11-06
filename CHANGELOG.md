@@ -12,6 +12,112 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **everywhere** — **the registries drop the `section` field; the display
+  `group` is the one grouping**: a row's `group` files it in show config,
+  show knobs, help config and the cli ?/TAB listings; a row without one
+  renders ungrouped — bare, no header, at the top of the listing (the
+  `[system]` and `[ungrouped]` buckets are gone from the consoles
+  entirely, and the registry rows that carried `group: system` dropped
+  it). The dictionaries render a raw `# --- group ---` header per real
+  group and nothing for the bare block; options.md's table loses the
+  function column (the merged table keys by knob name; the group and the
+  live command carry the story). check_options's bundled-config gate
+  parses through the registries' word index now (a CLI-spelled sample
+  line resolves to its knob — the node words are no longer false
+  unknowns), and the editor's add-node flow no longer asks for a section.
+- **cache** — **the control plane, the audit trail and the state dump are
+  live**: the control rows carry their path lives and the dispatch answers
+  them — `control/port` rebinds the listener (the new socket binds before
+  the old closes, a failed bind leaves the listener untouched; `off`
+  retires it, the running sessions keep their threads; a TCP rebind needs
+  the token — F5), `control/token` and `control/ops/token` (either the
+  value or the `-file` spelling) rotate without a restart — the value
+  never renders back (`show` answers `<set>`, `unset` refuses, the dump
+  carries no secret), and the ops token must differ from the admin token
+  on the wire too; `control/ops-verbs` re-validates against the grammar,
+  `control/trust-uids` swaps the trusted peer set, `control/socket-group`
+  re-modes the live unix socket; `audit/log-file` moves the CACHE trail
+  (the fresh writer re-chains from the file's own tail),
+  `audit/rotate/{max-size,daily,files}` rebuild the rotation,
+  `audit/disable` is the kill switch; `dump/path` lands the dump target on
+  a running daemon (`request dump` works without a restart now),
+  `dump/with-cache` and `dump/restore-on-start` flip alongside. The
+  `control`, `audit` and `dump` node rows file the namespaces (`show
+  control` describes them), the unset defaults rekey to the path
+  spellings (the secret rows carry no entry), and a dump of an override
+  set holding a secret skips it instead of crashing the session. The
+  regtest pins the rebind, the rotations, the audit swap and the dump
+  path.
+- **everywhere** — **the startup-only knobs join the set space, marked
+  `restart`**: a registry row may carry `"restart": true` — the mark and
+  the no-live state agree both ways (check_options gates it). The knobs
+  complete in the console set/unset pools now; `show <knob>` renders the
+  configured value (the secrets answer `<set>`/`off` — the value never
+  renders back); a set/unset attempt answers the note
+  `% restart required (startup-only knob)` — the config (and a SIGHUP)
+  changes them. edit_options.py toggles the mark like `hidden` (the
+  show/command rows refuse it — it is an option-row mark).
+- **everywhere** — **the config file speaks the CLI spelling**: a config
+  line names its knob the way the console does — the live path as words
+  (`set modbus upstream <value>`) — and `show config` renders the same,
+  so its output really does pipe straight back through the ctl client
+  (the flat dashed knob name — `set upstream <value>`, every older
+  file's form — reads too; both normalize to the canonical name, and an
+  unknown name now fails fast with the line number instead of dying
+  silently in the resolver). The shipped confs flip to the path
+  spelling (value-identical; the scraper's and the dashboard's flat
+  lives keep their flat lines) and gain the missing `no-audit-log`
+  default; the cache's also documents the metrics token pair.
+- **cache** — **`reload` restarts the whole daemon and keeps the sets**:
+  the new control verb saves the live overrides to a state file beside
+  the config (`<config>.reload`, the dump-settings form — the secrets
+  never land there), replies, then re-execs in place with the same argv;
+  the fresh daemon re-resolves the config file (the `restart: true`
+  knobs take their configured values — the workflow the restart mark
+  wanted), re-applies the saved overrides once at control start and
+  consumes the state file (a state older than two minutes is stale and
+  is discarded — a later manual start stays pure). The cache starts
+  empty; an overridden secret is named in the reply, to re-pass by
+  flag/env/token-file. The ops role may not reload (the wiresec table
+  already named it); the console word-help and the man page carry the
+  verb.
+- **everywhere** — **the knob dictionary says how a restart-marked knob
+  changes**: `control_command` appends `, restart` to the live recipe
+  (`set modbus upstream <value>, restart`) — `show knobs` and
+  `help config` render the suffix for every registry row marked
+  `restart: true`; the no-live startup knobs keep the
+  `restart required (startup-only knob)` note.
+- **everywhere** — **the console `?` describes a typed hidden leaf
+  instead of lying**: the ?-walk resolves the exact typed path against
+  the full registry (a hidden knob's `help`/`show <path> ?` describes —
+  the wire always answered it), while the segment walk and the listings
+  stay visible-only (the secrets never list); the set/unset fallback is
+  knob-gated, so a show report never offers a value.
+- **everywhere** — **the registries' control prose and value shapes are
+  complete**: every knob carries its setting-help and a hint or an on/off
+  vocabulary — the console value completion never falls back to a bare
+  `value` line (the audit/dump rows' prose filled beside the metrics').
+- **cache** — **the metrics knobs are live**: the seven metrics rows carry
+  their path lives (`metrics/enable`, `metrics/listen`, `metrics/token`,
+  `metrics/token-file`, `metrics/limits/{max-clients,timeout,
+  max-conn-per-ip}`) and the dispatch answers them — enable stops/starts
+  the endpoint (the F6 token gate stands), listen rebinds (the old
+  address closes, the new serves; the bind is probed first), the limits
+  trio applies to the running gate and the handler caps, and the token
+  rotates without a restart (the value never renders back — `show`
+  answers `<set>`, `unset` refuses: set the new one; the dump and the
+  unset defaults carry no secret). The TODO placeholder helps are real
+  prose now and the limit rows carry min/max; the regtest pins the caps,
+  the rotation and the rebind.
+- **scripts** — **the editor toggles the hidden mark on every row kind — the
+  knobs can hide now**: edit_options.py's option-row form gains the
+  `hidden` field (the same on/off toggle the show and command rows had —
+  on = the cli ?/TAB pools drop the row, the wire still answers it; off =
+  the mark cleared; a hierarchy node refuses). The list view follows: the
+  kind mark rides bare on a hidden row (the `*` = the cli-visible — a
+  hidden knob leaves the `live` view for `other`), and `hidden` filters
+  in the `/`-needle as before.
+
 - **everywhere** — **a row may carry an `alias` — a second spelling for the
   same knob on the wire**: the cache's write-acl answers as `write/acl`
   beside its live `acl/write` — `set|unset|show|help write acl <value>`
@@ -391,6 +497,14 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **the consoles prefix every non-value line with `% `**:
+  the ok/err verdicts, the bye notices and the local echoes (`% ok pong`,
+  the clear/restart/reload confirms, the shutdown's `% bye shutdown`) all
+  carry the prefix now — the show reports, the tables and the bare values
+  are the values and print bare (the fake's console already spoke this
+  rule; the other three follow, and its `help <setting>` no longer prints
+  the verdict twice). The README transcripts and the man prose follow.
+
 - **cache** — **the wire vocabulary aligns with the scraper's namespaces**:
   the live names are paths now — `modbus/interval`, `modbus/read-delay`,
   `modbus/merge-gap`, `modbus/profile`, `modbus/selection`,
@@ -628,6 +742,12 @@ before the repo restructured into one suite.
 
 ### Fixed
 
+- **cache** — **the reload state file saves `0600` explicitly (F23,
+  docs/AUDIT.md rev. 9)**: the whole-daemon `reload`'s
+  `<config>.reload` handoff is config-equivalent trust at rest (whoever
+  writes it injects overrides into the fresh start) and was created with
+  an umask-derived mode — the tmp file is created 0600 now, the F18
+  posture, one surface over; the regtest stats the saved mode.
 - **everywhere** — **the set/unset pools no longer offer the show reports**:
   the show words live in the setting space (one pool machinery), but the
   set/unset completions drew from the same space unchecked — `set config ?`

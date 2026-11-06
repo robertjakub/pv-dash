@@ -5,34 +5,29 @@ Every **open** item lives here — grouped by theme, each tagged
 (untagged = the whole family). The per-subproject `TODO.md` files keep only
 the **Done/history** records for their tool.
 
-## The next breaking wave (the interface evolution)
+## The control plane (the grammar follow-through)
 
-- **the CLI redone: hierarchical commands, one grammar for the family**
-  `[common]` `[cache]` `[inverter]` `[scraper]` — the control vocabulary
-  grew organically per tool and it shows: flatten it into namespaces and
-  make every tool speak the same shape — `set modbus-client max-per-ip 8`
-  (the surface, then the knob) instead of the flat `set max-conn-per-ip`,
-  `set metrics-server off` / `set metrics listen 0.0.0.0:9252` on all
-  three control servers, the same verbs everywhere
-  (set/unset/show/request/...), the same reply shapes. Breaking: every
-   script and unit file speaking the old flat grammar follows. (The ground
-   work stands now — Nov 2026: the registry `live` name is a `/`-path
-   spelled as words on the wire — the daemon dispatch keys the live name,
-   `_apply`/`_get`/`defaults` follow the rename — and every row may carry
-   a display `group` — the cli `?`/TAB listings group by it alone,
-   `[ungrouped]` when a row carries none; the first group rows are filed
-   (the `upstream` knobs) and the first paths too (the scraper's
-   `limits/max-conn-per-ip`; the cache's `write/allow` + `write/registers`
-   under the new `write` node — the dispatch, the dump keys and the unset
-   defaults rekeyed, the config scripts keeping the flat names) — and a
-   row may carry an `alias`, a second wire spelling for the same knob
-   (the cache's `write/acl` — the dispatch canonicalizes, the consoles
-   complete both spellings, the node's namespace help lists the aliased
-   child) — and a typed row (`int`/`float`/`str`)
-   dispatches itself now: the conv parses, the config key takes the
-   value, no `_apply`/`_get` branch needed (the branches stay for the
-   range gates and the runtime plumbing; the `unset` defaults generate
-   from the rows) — the renames below are still open.)
+- **the reload family-wide** `[scraper]` `[inverter]` `[dashboard]` — the
+  cache's whole-daemon `reload` (the live overrides serialize to
+  `<config>.reload` 0600, the daemon re-execs, the fresh start re-applies
+  once and consumes the file) waits for `dump_settings`/
+  `apply_dump_settings` on the other three control servers — the state
+  dump machinery is the prerequisite; the verb row + `KNOWN_VERBS` land
+  with it (the ops denial comes free).
+- **file the display groups** `[common]` `[cache]` `[inverter]`
+  `[dashboard]` `[scraper]` — the registries lost their `section` field
+  (the `group` is the one grouping now; ungrouped rows render bare, no
+  header), and only the scraper carries real groups so far (`upstream`,
+  `modbus`, `limits`): the show config / show knobs / help config
+  dictionaries and the cli ?/TAB listings render mostly bare. File the
+  groups row by row (`scripts/set_group.py <project> <name> <group>`) so
+  the dictionaries read filed again.
+- **the secret lives for the other three consoles** `[scraper]`
+  `[inverter]` `[dashboard]` — the console-? rule (a hidden leaf
+  describes instead of lying Invalid input) is wired in all four clis,
+  but only the cache's registry carries hidden+live rows (the six
+  secrets): the other three patches stay inert until their TUI grants
+  secret lives.
 
 ## The security wave (the audit follow-ups)
 
@@ -208,6 +203,22 @@ the **Done/history** records for their tool.
 
 ## Done (the highlights; the git history has the details)
 
+- **the hierarchical control grammar** — the live names are `/`-paths
+  spelled as words on the wire (`set modbus upstream <value>`, however
+  deep; the alias rows answer a second spelling, the canonical renders);
+  the config scripts speak the CLI spelling too (the word-index parser —
+  values may carry spaces, an unknown name fails fast with the line
+  number, the flat dashed names still read); a typed row dispatches
+  itself (the conv parses, no `_apply`/`_get` branch); the registries
+  dropped the `section` field — the display `group` is the one grouping,
+  ungrouped rows render bare with no header, and the cli listings have no
+  `[system]`/`[ungrouped]` buckets anymore; the consoles prefix every
+  non-value reply line with `% ` (the show reports and tables stay bare
+  values); the cache gained the whole-daemon `reload` (the overrides to
+  `<config>.reload`, re-exec, re-apply once — the restart-marked knobs
+  take their configured values) and the live control-plane rebind/token
+  rotation; docs/AUDIT.md rev. 9 walked it (F23 raised and closed: the
+  reload state file is 0600 explicitly).
 - **the env-prefix retirement** — the env twins are the knobs' bare
   upper-snake names (`HOST`, `PORT`, `LISTEN`, `CTL`, `CONTROL_TOKEN`,
   ...) — the per-tool prefixes (`MCH_*`/`SCR_*`/`INV_*`/`DSH_*`) retired;

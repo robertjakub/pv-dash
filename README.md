@@ -14,14 +14,16 @@ Huawei SUN2000 inverter, packaged together as one Nix flake:
 | [`cache/`](cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
 | [`inverter/`](inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
 | [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; the tools select what to fetch/scrape via their own files; a linter and a formatter keep them in shape |
-| [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`): version string, audit trail, config plumbing, Modbus wire core |
+| [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`): the option registry (one knob, one source), the signed wire + RBAC, the audit trail, the config plumbing, the Modbus wire core, the man-page builder |
 
 The tools speak one vocabulary: the fake inverter serves from a profile, the
 cache fetches its selection from it, the scraper binds its metrics to it —
 and the console tools (`*-ctl`, `*-cli`) share the family pattern (a
 JSON-lines control server, a settings registry, an append-only audit trail,
-a reconnecting console session). Every knob of the four daemons, side by
-side — name, function, the live `set` command, who has it: [options.md](options.md)
+a reconnecting console session — TAB/`?` complete and describe every word,
+the registry's display groups file the listings, the non-value reply lines
+ride the `% ` prefix). Every knob of the four daemons, side by
+side — name, group, the live `set` command, who has it: [options.md](options.md)
 (generated from the option registries).
 
 ## The flake
@@ -48,7 +50,7 @@ pv-suite/
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))
 ├── common/       # the shared Python package (version, audit, config, wire core; [docs](common/README.md))
 ├── tests/        # the test suites, one or more per Modbus tool
-├── scripts/      # release.py — the release orchestrator; audit_verify.py — the audit trails' hash-chain verifier
+├── scripts/      # the registry gates + editors (check/lint/gen/edit_options, set_group/set_live), gen_man.py, release.py, audit_verify.py
 ├── docker/       # one alpine image per Modbus tool + the compose demo stack ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
 ├── docs/         # the family-level docs: the [security audit](docs/AUDIT.md), the

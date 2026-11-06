@@ -240,21 +240,21 @@ class ControlServer:
 
     def config_mapping(self):
         """The knob -> control-command mapper (help config): every option of
-        the registry under its display group (the row's `group`, else its
-        section), with the command that changes it on a running daemon — or
+        the registry under its display group (the row's `group`, ungrouped
+        rows headerless), with the command that changes it on a running daemon — or
         the restart note when the knob is startup-only."""
         from .options import OPTIONS
-        from common.options import section_title
         lines = ['ok config mapping']
         for key, rows in grouped_rows(OPTIONS):
-            lines.append('# --- %s ---' % section_title(key))
+            if key:
+                lines.append('# --- %s ---' % key)
             for o in rows:
                 lines.append('%-24s %s' % (o.name, control_command(o)))
         return '\n'.join(lines)
 
     def knobs_dictionary(self):
         """The dictionary of all knobs (show knobs): every option of the
-        registry under its section, with its flag, its env twin(s), its home
+        registry under its display group, with its flag, its env twin(s),
         section, the control command that changes it and the secret marker."""
         from common.options import knob_dictionary
         return knob_dictionary(OPTIONS, who='the modbus-scraper')
@@ -280,7 +280,8 @@ class ControlServer:
         bye frame (the consoles print the notice and exit instead of trying
         to reconnect to a dead scraper) and close their sockets."""
         frame = (json.dumps({'status': 'bye',
-                             'text': 'daemon-exit: the modbus-scraper is shutting down (%s)' % reason})
+                             'text': 'daemon-exit: the modbus-scraper is shutting down (%s)' % reason},
+                            ensure_ascii=False)   # the frame is utf-8 like every other reply
                  + '\n').encode()
         with self.clients_lock:
             clients, self.clients = list(self.clients), set()
@@ -372,6 +373,8 @@ class ControlServer:
             if not args:
                 return 'err unset needs a setting (try help)'
             key, rest = match_setting_path(args, SETTING_BY_NAME)
+            if key is not None and not rest and getattr(SETTING_BY_NAME.get(key), 'restart', False):
+                return 'err restart required (startup-only knob)'
             if key is None or rest or key not in self.defaults:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             try:
@@ -390,6 +393,8 @@ class ControlServer:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             if not rest:
                 return 'err set needs a setting and a value (try help)'
+            if getattr(SETTING_BY_NAME.get(key), 'restart', False):
+                return 'err restart required (startup-only knob)'
             value = ' '.join(rest)
             try:
                 shown = self._apply(key, value)
@@ -404,7 +409,7 @@ class ControlServer:
             return 'ok connections ' + self.connections_line()
         if low == 'show version':
             return 'ok modbus-scraper %s' % version_string()
-        if low == 'show config':
+        if low in ('show config', 'show config all'):   # 'all' rides along: the script IS the full config
             return self.show_config()
         if low == 'show knobs':
             return self.knobs_dictionary()
@@ -601,6 +606,9 @@ class ControlServer:
         opt = OPTION_BY_LIVE.get(key)
         if opt is not None and opt.conv in TYPED_CONVS and opt.name.replace('-', '_') in cfg:
             return str(cfg[opt.name.replace('-', '_')])
+        s = SETTING_BY_NAME.get(key)
+        if s is not None and s.restart:   # a startup-only knob: the configured value
+            return self.defaults.get(key, '?')   # renders (the secrets answer '<set>'/'off')
         return '?'
 
     def clear_overrides(self):

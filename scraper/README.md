@@ -199,10 +199,10 @@ of failing.
 scraper):
 
 ```conf
-# modbus-scraper configuration — every line is a set command
-set upstream 127.0.0.1:5502
-set modbus-unit 1
-set modbus-offset 0
+# modbus-scraper configuration — every line is a set command (the CLI spelling)
+set modbus upstream 127.0.0.1:5502
+set modbus unit 1
+set modbus offset 0
 set timeout 3
 set max-kwp 6
 set max-grid-kw 12
@@ -212,7 +212,7 @@ set listen 127.0.0.1:9350
 set interval 10
 set max-clients 64
 set client-timeout 300
-set max-conn-per-ip 0
+set limits max-conn-per-ip 0
 set log-level INFO
 ```
 
@@ -251,8 +251,8 @@ clients of /metrics), `poll now` (the loop wakes immediately), `request
 reload` (the SIGHUP path — the token file re-reads, so the bearer token
 rotates too), `restart` (the Modbus session drops; the next poll
 reconnects), `inspect`, `show version`, `show knobs` (the dictionary of
-the registry: every knob with its flag, its env twin, its section, how it
-changes), `shutdown`.
+the registry: every knob with its flag, its env twin, how it changes,
+under its display group — ungrouped rows bare), `shutdown`.
 
 A **TCP control port refuses to start without a token** (the audit's F5 —
 the same rule as the cache): `--control-token`/`--control-token-file`

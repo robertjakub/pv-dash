@@ -11,6 +11,7 @@ import os
 import re
 
 from common.options import parse_config_script
+from .options import OPTIONS
 from common.config import check_token_file_mode, default_profile_path, is_loopback_host, load_token_file, \
     parse_listen, parse_upstream, resolve_profile_file
 from .metrics import Metrics
@@ -62,7 +63,7 @@ def load_config(path):
     except OSError as e:
         raise SystemExit('cannot read config file %s: %s' % (path, e))
     try:
-        rows = parse_config_script(text, path)
+        rows = parse_config_script(text, path, OPTIONS)   # the registry: the CLI spelling + the unknown-setting fail fast
     except ValueError as e:
         raise SystemExit(str(e))
     out = {}

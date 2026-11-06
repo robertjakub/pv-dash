@@ -195,6 +195,23 @@ def main():
                 key = o.name.replace('-', '_')
                 if key in cfg:
                     defaults[o.live] = str(cfg[key])
+            if o.restart:   # the startup-only knobs: what `show <knob>` answers
+                key = o.name.replace('-', '_')
+                v = cfg.get(key, getattr(args, key, None))
+                if o.name == 'audit-log':
+                    defaults[o.name] = ('off' if args.no_audit_log
+                                        else 'stdout' if args.audit_log == '-'
+                                        else (args.audit_log or 'the XDG state home'))
+                elif o.name == 'control-port':
+                    defaults[o.name] = 'off' if control_target == '0' else control_target
+                elif o.secret:
+                    defaults[o.name] = '<set>' if v else 'off'
+                elif o.conv is bool:
+                    defaults[o.name] = 'on' if v else 'off'
+                elif o.name == 'control-trust-uids':
+                    defaults[o.name] = ','.join(str(u) for u in sorted(trust_uids or [])) or 'off'
+                else:
+                    defaults[o.name] = str(v) if v not in (None, '') else 'off'
         control = ControlServer(scraper, httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
                                 ops_token=control_ops_token, ops_verbs=ops_verbs)

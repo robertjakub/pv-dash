@@ -54,14 +54,15 @@ def default_text(opt):
 
 
 def description(opt):
-    """The registry help with the %(default)s placeholders filled and the
-    markdown-hostile characters escaped — pipes and bare angle-bracket
-    placeholders (<token>, <listen-port>) render literally in the table
-    instead of vanishing as unknown HTML tags. Code spans stay untouched."""
+    """The row's text — the flag help, or the setting help on a control-only
+    row — with the %(default)s placeholders filled and the markdown-hostile
+    characters escaped — pipes and bare angle-bracket placeholders (<token>,
+    <listen-port>) render literally in the table instead of vanishing as
+    unknown HTML tags. Code spans stay untouched."""
     try:
-        text = opt.help % {'default': default_text(opt)}
+        text = (opt.help or opt.setting_help or '') % {'default': default_text(opt)}
     except (KeyError, TypeError, ValueError):
-        text = opt.help
+        text = opt.help or opt.setting_help or ''
     parts = text.split('`')
     for i, part in enumerate(parts):
         if i % 2 == 0:  # the segments outside the backtick code spans
@@ -86,6 +87,18 @@ def marks(rows_by_tool):
     return cells
 
 
+def live_cell(rows_by_tool):
+    """The live column: the control command the knob answers to on a running
+    daemon — `set <name>` from the registry's live field (the wire name, which
+    can differ from the flag: the cache's --cache-ttl sets ttl), the tools'
+    names joined when they diverge. No live name = *(startup-only)*: a restart
+    applies it."""
+    names = sorted({opt.live for opt in rows_by_tool.values() if opt.live})
+    if not names:
+        return '*(startup-only)*'
+    return ', '.join('`set %s`' % n for n in names)
+
+
 def main():
     registries = {key: load(d) for key, d in TOOLS}
     names = {key: t for key, t in TOOLS}
@@ -99,7 +112,8 @@ def main():
     out = ['# The knobs of the family (options.md)',
            '',
            'One table comparing every knob of the four daemons — the name, the',
-           'function it files under and the registry description — with a mark per',
+           'function it files under, the control command that changes it on a',
+           'running daemon and the registry description — with a mark per',
            'tool. **Generated** from the per-tool `lib/options.json` registries (the',
            'one-knob-one-source rows) by `scripts/gen_options.py` — edit the',
            'registries and re-run `python3 scripts/gen_options.py`, never this file.',
@@ -117,7 +131,7 @@ def main():
     out.append('shared nearly verbatim; the audit, limits and metrics blocks follow the')
     out.append('family shape with per-tool defaults.')
     out.append('')
-    cols = ['knob', 'function', 'description'] + [t for _, t in TOOLS]
+    cols = ['knob', 'function', 'live', 'description'] + [t for _, t in TOOLS]
     out.append('| ' + ' | '.join(cols) + ' |')
     out.append('|' + '---|' * len(cols))
     for section, _title in SECTIONS:
@@ -127,14 +141,22 @@ def main():
             by_tool = merged[section][name]
             first = next(iter(by_tool.values()))
             cells = marks(by_tool)
-            out.append('| `--%s` | %s | %s | %s |'
-                       % (name, SECTION_TAG.get(section, section), description(first),
-                          ' | '.join(cells)))
+            knob = ('`%s` (control-only)' % name) if not first.flag else ('`--%s`' % name)
+            out.append('| %s | %s | %s | %s | %s |'
+                       % (knob, SECTION_TAG.get(section, section), live_cell(by_tool),
+                          description(first), ' | '.join(cells)))
     out.append('')
     out.append('Legend: ✓ = the tool has the knob (**bold** = all four do); '
-               '`live` = settable on a running daemon (`set <name> <value>` over the '
-               'control plane); `secret` = a token — never rendered inline by '
-               '`show config` (the `-file` form is). The description is the shared '
+               'the `live` column is the control command itself — `set <name>` over '
+               'the control plane, the wire name the registry gives the knob (it can '
+               'differ from the flag: the cache\'s `--cache-ttl` sets `ttl`); '
+               '*(startup-only)* = no live form, a restart applies the knob; a cell\'s '
+               '`live` mark says the tool takes the knob live (a cell without one = '
+               'that tool applies the knob at startup only); '
+               '`secret` = a token — never rendered inline by '
+               '`show config` (the `-file` form is); *(control-only)* = a setting '
+               'that lives on the control wire alone (the fake\'s pins and machines '
+               '— no flag, no env, no config-file row). The description is the shared '
                'registry text (the same one `--help`, the man pages, `show knobs` '
                'and the bundled configs render), taken from the first tool that '
                'defines the knob and with its default filled in — where the tools '

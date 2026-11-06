@@ -58,10 +58,12 @@ the ops
 .RS
 .IP \\(bu 2
 .B set <setting> <value>
-changes a setting live (interval, ttl, read-delay, merge-gap,
-allow-write, write-registers, max-clients, client-timeout, requests-audit,
-dump-interval, log-level, profile, selection, connect-acl, write-acl,
-timeout); a SIGHUP re-applies the config (the file always wins).
+changes a setting live (modbus interval, cache ttl, modbus read-delay,
+modbus merge-gap, write allow, write registers, limits max-clients,
+limits client-timeout, modbus upstream, modbus unit, requests-audit,
+dump-interval, log-level, local-time, modbus profile, modbus selection,
+acl connect, acl write, modbus timeout); a SIGHUP re-applies the config
+(the file always wins).
 .IP \\(bu 2
 .B show cache all
 prints every cached entry: name, words, values, age, expiry, poll status.

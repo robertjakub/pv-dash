@@ -20,14 +20,15 @@ import threading
 import time
 
 from common.version import version_string
-from common.config import default_profile_path, resolve_profile_file
+from common.config import default_profile_path, parse_upstream, resolve_profile_file
 from common.cred import peer_uid, parse_trust_uids
 from common.human import secs
+from common.logutil import UtcFormatter
 from common.protocol import ModbusError
 from common.wiresec import frame_mac, sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
-from .options import OPTIONS, SETTING_BY_NAME, SETTING_NAMES, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME
+from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME
 from .cache import build_blocks
 from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection
 from .metrics import MetricsServer, describe_metrics
@@ -70,7 +71,7 @@ class ControlServer:
         self.stopper = stopper
         self.shutdown_pending = False
         self.defaults = defaults or {}   # setting -> configured startup value (what `unset` restores)
-        self.overridden = set()          # settings changed live (`show settings` marks them with *)
+        self.overridden = set()          # settings changed live (`show status` carries the overridden= row)
         self.clients = set()             # the live control sockets (announce_exit)
         self.clients_lock = threading.Lock()
 
@@ -101,7 +102,7 @@ class ControlServer:
             else:
                 srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 srv.bind(('127.0.0.1', self.port))
-            srv.listen(16)
+            srv.listen(64)   # the backlog above the client limit: a connect burst must not RST
         except OSError as e:
             logger.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
             return
@@ -281,7 +282,7 @@ class ControlServer:
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|cache|'
-                'uplink|settings|version|config|knobs>')
+                'uplink|version|config|knobs>')
         if self.proxy.dump_path:
             cmds += ', request dump [with-cache], request restore'
         cmds += ', clear cache, restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
@@ -394,8 +395,6 @@ class ControlServer:
             return self.uplink_report()
         if low == 'show cache':
             return 'ok ' + self.cache_line()
-        if low == 'show settings':
-            return self.settings_report()
         if low == 'show version':
             return 'ok modbus-cache %s' % version_string()
         if low == 'show config':
@@ -472,14 +471,14 @@ class ControlServer:
             except ValueError:
                 raise ValueError('%s must be %s, got %r' % (label, what, text))
 
-        if key == 'interval':
+        if key == 'modbus/interval':
             v = num(val, 'interval', 'seconds')
             if not 0 < v <= 86400:
                 raise ValueError('interval must be 0 < N <= 86400 seconds')
             p.interval = v
             p.poll_wake.set()
             return secs(v)
-        if key == 'ttl':
+        if key == 'cache/ttl':
             if val in ('off', 'none', '0'):
                 p.cache.cache_ttl = 0
                 return 'off'
@@ -487,24 +486,41 @@ class ControlServer:
             self._gate_range(key, v, 'seconds')
             p.cache.cache_ttl = v
             return secs(v)
-        if key == 'read-delay':
+        if key == 'modbus/read-delay':
             v = num(val, 'read-delay', 'seconds')
             self._gate_range(key, v, 'seconds')
             p.read_delay = v
             return secs(v)
-        if key == 'merge-gap':
+        if key == 'modbus/merge-gap':
             v = numi(val, 'merge-gap', 'registers')
             self._gate_range(key, v, 'registers')
             p.merge_gap = v
             p.blocks = build_blocks(p.cache.ranges, v)
             p.poll_wake.set()
             return '%d' % v
-        if key == 'allow-write':
+        if key == 'modbus/upstream':
+            try:
+                host, port = parse_upstream(val, label='modbus/upstream')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            p.upstream.host, p.upstream.port = host, port
+            p.upstream.close()   # the session drops; the next exchange dials the new endpoint
+            p.config['upstream'] = '%s:%d' % (host, port)
+            p.config['host'], p.config['port'] = host, port
+            return '%s:%d' % (host, port)
+        if key == 'modbus/unit':
+            v = numi(val, 'unit', 'unit id')
+            self._gate_range(key, v)
+            p.upstream.unit = v
+            p.upstream.close()   # the in-flight session spoke the old unit
+            p.config['unit'] = v
+            return '%d' % v
+        if key == 'write/allow':
             if val not in ('on', 'off'):
                 raise ValueError('allow-write must be on|off')
             p.allow_write = val == 'on'
             return val
-        if key == 'write-registers':
+        if key == 'write/registers':
             p.write_ranges = parse_write_registers(val, 'write-registers')
             return p.describe_write_ranges()
         if key == 'limits/max-clients':
@@ -512,7 +528,7 @@ class ControlServer:
             self._gate_range(key, v)
             p.max_clients = v
             return '%d' % v
-        if key == 'client-timeout':
+        if key == 'limits/client-timeout':
             v = num(val, 'client-timeout', 'seconds')
             self._gate_range(key, v, 'seconds')
             p.client_timeout = v
@@ -564,13 +580,30 @@ class ControlServer:
             p.dump_interval = v
             p.dump_wake.set()
             return secs(v)
+        if key == 'local-time':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('local-time must be on|off')
+            swapped = 0
+            for h in logging.getLogger().handlers:
+                f = h.formatter
+                if f is None or not getattr(f, '_fmt', None):
+                    continue
+                h.setFormatter(logging.Formatter(f._fmt) if on else UtcFormatter(f._fmt))
+                swapped += 1
+            if not swapped:
+                raise ValueError('no log handler to re-format')
+            return 'on' if on else 'off'
         if key == 'log-level':
             lvl = val.upper()
             if lvl not in LOG_LEVELS:
                 raise ValueError('log-level must be one of %s' % ', '.join(LOG_LEVELS))
             logging.getLogger().setLevel(getattr(logging, lvl))
             return lvl
-        if key == 'timeout':
+        if key == 'modbus/timeout':
             v = num(val, 'timeout', 'seconds')
             if not 0 < v <= 60:
                 raise ValueError('timeout must be 0 < N <= 60 seconds')
@@ -587,9 +620,9 @@ class ControlServer:
             p.write_acl = acl
             p.config['write_acl'] = acl
             return self._acl_text(acl)
-        if key in ('profile', 'selection'):
+        if key in ('modbus/profile', 'modbus/selection'):
             cfg = self._live_cfg()
-            if key == 'profile':
+            if key == 'modbus/profile':
                 cfg['profile'] = default_profile_path() if val in ('default', 'auto') \
                     else resolve_profile_file(val)
             else:
@@ -601,7 +634,7 @@ class ControlServer:
             except Exception:
                 p.config = saved
                 raise
-            return cfg['profile'] if key == 'profile' else (cfg['selection'] or 'all')
+            return cfg['profile'] if key == 'modbus/profile' else (cfg['selection'] or 'all')
         raise ValueError('unknown setting %s' % key)
 
     def _live_cfg(self):
@@ -613,7 +646,9 @@ class ControlServer:
                    cache_ttl=p.cache.cache_ttl, allow_write=p.allow_write,
                    write_registers=p.write_ranges, max_clients=p.max_clients,
                    client_timeout=p.client_timeout, requests_audit_s=p.requests_audit_s,
-                   connect_acl=p.connect_acl, write_acl=p.write_acl, timeout=p.upstream.timeout)
+                   connect_acl=p.connect_acl, write_acl=p.write_acl, timeout=p.upstream.timeout,
+                   upstream='%s:%d' % (p.upstream.host, p.upstream.port),
+                   host=p.upstream.host, port=p.upstream.port, unit=p.upstream.unit)
         return cfg
 
     @staticmethod
@@ -629,21 +664,25 @@ class ControlServer:
 
     def _get(self, key):
         p = self.proxy
-        if key == 'interval':
+        if key == 'modbus/interval':
             return secs(p.interval)
-        if key == 'ttl':
+        if key == 'cache/ttl':
             return 'off' if not p.cache.cache_ttl else secs(p.cache.cache_ttl)
-        if key == 'read-delay':
+        if key == 'modbus/read-delay':
             return secs(p.read_delay)
-        if key == 'merge-gap':
+        if key == 'modbus/merge-gap':
             return '%d' % p.merge_gap
-        if key == 'allow-write':
+        if key == 'modbus/upstream':
+            return '%s:%d' % (p.upstream.host, p.upstream.port)
+        if key == 'modbus/unit':
+            return '%d' % p.upstream.unit
+        if key == 'write/allow':
             return 'on' if p.allow_write else 'off'
-        if key == 'write-registers':
+        if key == 'write/registers':
             return p.describe_write_ranges()
         if key == 'limits/max-clients':
             return '%d' % p.max_clients
-        if key == 'client-timeout':
+        if key == 'limits/client-timeout':
             return 'none' if not p.client_timeout else secs(p.client_timeout)
         if key == 'limits/max-conn-per-ip':
             return '%d' % p.conn_gate.max_per_ip
@@ -653,17 +692,23 @@ class ControlServer:
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
         if key == 'dump-interval':
             return 'off' if not p.dump_interval else secs(p.dump_interval)
+        if key == 'local-time':
+            for h in logging.getLogger().handlers:
+                f = h.formatter
+                if f is not None and getattr(f, '_fmt', None):
+                    return 'off' if isinstance(f, UtcFormatter) else 'on'
+            return 'off'
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
-        if key == 'timeout':
+        if key == 'modbus/timeout':
             return secs(p.upstream.timeout)
         if key == 'acl/connect':
             return self._acl_text(p.connect_acl)
         if key == 'acl/write':
             return self._acl_text(p.write_acl)
-        if key == 'profile':
+        if key == 'modbus/profile':
             return p.config.get('profile') or p.profile
-        if key == 'selection':
+        if key == 'modbus/selection':
             return p.config.get('selection') or 'all'
         return '?'
 
@@ -711,15 +756,6 @@ class ControlServer:
             'overridden=%s' % (','.join(sorted(self.overridden)) or 'none'),
         ]
         return 'ok status\n' + '\n'.join(rows)
-
-    def settings_report(self):
-        """Every tunable setting with its live value: one key=value per line
-        (scriptable). A live-overridden setting carries a `*` on the value —
-        a SIGHUP re-applies the config and clears the markers. The
-        state-dump tunables show only when a dump path is configured."""
-        names = [k for k in SETTING_NAMES if k != 'dump-interval' or self.proxy.dump_path]
-        return 'ok settings\n' + '\n'.join('%s=%s%s' % (k, self._get(k), '*' if k in self.overridden else '')
-                                           for k in names)
 
     def clear_overrides(self):
         """The config was re-applied (SIGHUP): nothing is live-overridden anymore."""
@@ -853,16 +889,20 @@ class ControlServer:
         SIGHUP clears the override set — the dump follows)."""
         p = self.proxy
         raw = {
-            'interval': p.interval, 'ttl': p.cache.cache_ttl, 'read-delay': p.read_delay,
-            'merge-gap': p.merge_gap, 'allow-write': 'on' if p.allow_write else 'off',
-            'write-registers': p.describe_write_ranges(), 'limits/max-clients': p.max_clients,
-            'client-timeout': p.client_timeout, 'limits/max-conn-per-ip': p.conn_gate.max_per_ip,
+            'modbus/interval': p.interval, 'cache/ttl': p.cache.cache_ttl,
+            'modbus/read-delay': p.read_delay,
+            'modbus/merge-gap': p.merge_gap, 'write/allow': 'on' if p.allow_write else 'off',
+            'write/registers': p.describe_write_ranges(), 'limits/max-clients': p.max_clients,
+            'limits/client-timeout': p.client_timeout, 'limits/max-conn-per-ip': p.conn_gate.max_per_ip,
             'metrics-server': 'on' if p.metrics_srv else 'off',
             'requests-audit': p.requests_audit_s,
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
-            'profile': p.config.get('profile'), 'selection': p.config.get('selection') or 'all',
+            'modbus/profile': p.config.get('profile'), 'modbus/selection': p.config.get('selection') or 'all',
             'acl/connect': self._acl_text(p.connect_acl), 'acl/write': self._acl_text(p.write_acl),
-            'timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,
+            'modbus/upstream': '%s:%d' % (p.upstream.host, p.upstream.port),
+            'modbus/unit': p.upstream.unit,
+            'modbus/timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,
+            'local-time': self._get('local-time'),
         }
         return {k: raw[k] for k in sorted(self.overridden)}
 

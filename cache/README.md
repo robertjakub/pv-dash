@@ -303,10 +303,9 @@ token, an admin client against the admin token. The peer-cred trusted peers
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `interval`, `ttl`, `read-delay`, `merge-gap` (the poll plan rebuilds), `allow-write`, `write-registers`, `max-clients`, `client-timeout`, `max-conn-per-ip`, `metrics-server`, `requests-audit`, `dump-interval`, `log-level`, `profile`/`selection` (the register map swaps atomically), `connect-acl`, `write-acl`, `timeout` — the reply carries the compact state summary |
+| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers`, `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics-server`, `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write`, `modbus timeout` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
 | `show <setting>` | the bare live value of one tunable |
-| `show settings` | every tunable with its live value — one stable `key=value` line per setting (scriptable); a value set live carries a `*`, and a SIGHUP re-applies the config (the file always wins) and clears the markers — see [Live settings](#live-settings) |
 | `help <setting>` | the registry description of one setting |
 | `inspect` | one pretty multi-line dump of everything — version, upstream, listen/control, profile, cache state, poll plan, counters, the write gate, the audit sink: the baton for a bug report |
 | `show status` | the **effective state report**: one stable `key=value` line per field (`upstream`, `unit`, `listen`, `control`, `uptime`, `poll`, `last_poll`, `interval`, `ttl`, `merge_gap`, `ranges`, `fc4_ranges`, `map_version`, `hits`, `misses`, `clients`, `writes`, `write_allow_list`, `requests_audit`, `dump`, `profile`, `selection`) — scriptable |
@@ -329,9 +328,9 @@ token, an admin client against the admin token. The peer-cred trusted peers
 Every `set` applies immediately and keeps working until the daemon stops —
 **or** the next `SIGHUP`, which re-resolves the config (flags, env, ini) and
 re-applies it wholesale: the file always wins on reload. A setting changed
-live is marked with a `*` in `show settings` (`interval=5s*`) and listed in
-`show status`'s `overridden=` row; `unset <setting>` restores the configured
-value and clears the mark. This makes the policy explicit: live settings are
+live is listed in `show status`'s `overridden=` row; `unset <setting>`
+restores the configured value and clears the entry. This makes the policy
+explicit: live settings are
 runtime nudges, the config files stay the source of truth.
 
 ### `modbus-cache-ctl` — one-shot commands
@@ -482,7 +481,7 @@ same gate a `set` speaks (`interval=2.00s` survives the restart, a moved
 profile file is skipped with a note). With `selection none` the word-restore
 is a no-op (the cache stays empty by design). The dump commands (and the
 `dump-interval` setting) show up in the listings — the completions, `?`,
-`help`, `show settings` — only when a dump path is configured.
+`help` — only when a dump path is configured.
 
 **The dump is config-equivalent trust at rest** (the audit's F18) — and it
 is treated that way: the file is created **`0600`** explicitly (never the

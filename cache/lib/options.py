@@ -71,7 +71,8 @@ def _load_options():
     for row in rows:
         opt = Option(row['name'], row.get('flag'), row.get('env'), row['section'],
                      help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
-                     live=row.get('live'), secret=bool(row.get('secret', False)),
+                     live=row.get('live'), alias=row.get('alias'),
+                     secret=bool(row.get('secret', False)),
                      group=row.get('group'),
                      setting_help=row.get('setting-help'), values=row.get('values'),
                      hint=row.get('hint'), value_help=row.get('value-help'),
@@ -114,9 +115,18 @@ CFG_KEYS = {'log-level': 'level', 'requests-audit': 'requests_audit_s', 'cache-t
 # spells no hierarchy), so ?/TAB/the groups run one machinery for both
 SETTINGS = settings_of(OPTIONS) + settings_of(SHOW_OPTIONS)
 SETTING_BY_NAME = {s.name: s for s in SETTINGS}
-SETTING_NAMES = tuple(s.name for s in SETTINGS)
+alias_names = []
+for s in SETTINGS:   # the row's `alias` spelling answers the same Setting — the canonical renders
+    if s.alias and s.alias not in SETTING_BY_NAME:
+        SETTING_BY_NAME[s.alias] = s
+        alias_names.append(s.alias)
+SETTING_NAMES = tuple(s.name for s in SETTINGS)   # the canonical spellings — the dump keys and the unset defaults iterate these
+ALIAS_NAMES = tuple(alias_names)                  # the ?/TAB pools ride them beside the canonicals
+SHOW_LIVES = frozenset(o.live for o in SHOW_OPTIONS)   # the show reports' lives: show answers them, set/unset never offers them
 HIDDEN_SETTINGS = frozenset(o.live for o in OPTIONS if o.hidden and o.live) \
-    | frozenset(o.live for o in SHOW_OPTIONS if o.hidden and o.live)
+    | frozenset(o.live for o in SHOW_OPTIONS if o.hidden and o.live) \
+    | frozenset(o.alias for o in OPTIONS if o.hidden and o.alias) \
+    | frozenset(o.alias for o in SHOW_OPTIONS if o.hidden and o.alias)
    # the rows that never list in the ?/TAB pools (the wire still answers)
 
 NODE_BY_NAME = {o.name: o for o in OPTIONS if o.node}   # the hierarchy nodes (help-only)

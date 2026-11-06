@@ -4,6 +4,26 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[cache]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The namespace-alignment wave: the wire vocabulary follows the scraper's —
+the live names are paths (`modbus/interval`, `cache/ttl`,
+`limits/client-timeout`, ... beside the landed `write/*`/`acl/*` paths;
+the `modbus` node describes the namespace) and the upstream endpoint +
+the unit id are live-settable (`set modbus upstream HOST:PORT` re-targets
+and drops the session); the dump's override keys and the unset defaults
+rekey, the config scripts and the flags keep the flat registry names.
+
+The show-settings retirement: `show settings` is gone — the per-setting
+`show <setting>` and `show status`'s `overridden=` row carry the same
+truth, the command answers `err unknown setting` (the registry row, the
+daemon help lines, the man pages, the README and the suites follow; the
+dump's settings section stays).
+
+The write-path wave: the write knobs spell as paths on the wire —
+`allow-write` is `write/allow`, `write-registers` is `write/registers`
+(`set write allow on`, `show write registers`; the new `write` node
+carries the namespace) — the dispatch, the dump's override keys and the
+unset defaults rekey, the config scripts keep the flat registry names.
+
 The registry-folding wave: `lib/settings.py` is gone — the control
 grammar's vocabulary (the live settings' short descriptions, the value
 words, the shape hints, the per-value notes) rides the same

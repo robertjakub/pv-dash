@@ -722,7 +722,9 @@ def dialog(editor, screen):
                             ok, msg = editor.add_node(name.strip(), section.strip(), desc.strip())
                             if ok:
                                 view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
-                                cursor = [i for i, r in enumerate(view) if r['name'] == name.strip()][0]
+                                names = [r['name'] for r in view]
+                                new_name = name.strip()
+                                cursor = names.index(new_name) if new_name in names else min(cursor, max(0, len(names) - 1))
             elif k == ord('o'):
                 order = ORDERS[(ORDERS.index(order) + 1) % len(ORDERS)]
                 view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
@@ -791,7 +793,8 @@ def dialog(editor, screen):
                     if ok:
                         editor.row = None
                         view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
-                        cursor = [i for i, r in enumerate(view) if r['name'] == name][0]
+                        names = [r['name'] for r in view]
+                        cursor = names.index(name) if name in names else min(cursor, max(0, len(names) - 1))
             elif k == 27:   # Esc = the cancel, straight — c keeps the confirm
                 editor.cancel()
                 msg = 'cancelled'

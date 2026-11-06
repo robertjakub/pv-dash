@@ -148,6 +148,18 @@ def check_tool(tool):
                       | {n for n in show_lives if n in knob_lives})
     rows.append((not live_bad, '%s: every show live name is a clean word-path unique in the setting space%s'
                  % (tool, ' — bad: %s' % ', '.join(live_bad) if live_bad else '')))
+    # the alias: a second spelling for the same knob on the wire — one clean
+    # word-path, unique in the shared setting space (no live name, no other
+    # alias answers twice; the canonical live name renders in the replies)
+    every = list(options) + show_opts
+    alias_rows = [(o.name, o.alias) for o in every if o.alias]
+    taken = {o.live for o in every if o.live}
+    alias_names = [a for _, a in alias_rows]
+    alias_bad = sorted({n for n, a in alias_rows if any(c.isspace() for c in a)}
+                       | {n for n, a in alias_rows if a in taken}
+                       | {a for a in alias_names if alias_names.count(a) > 1})
+    rows.append((not alias_bad, '%s: every alias is a clean word-path unique in the setting space%s'
+                 % (tool, ' — bad: %s' % ', '.join(alias_bad) if alias_bad else '')))
 
     got, err = parser_flags(bin_script)
     if err:

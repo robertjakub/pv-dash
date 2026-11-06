@@ -124,6 +124,30 @@ def configured_defaults(args, frozen, profile_text):
         'metrics-server': 'on' if args.metrics_server else 'off',
         'profile': profile_text,
         'log-level': args.log_level,
+        # the startup-only knobs (restart: true) — what `show <knob>` answers
+        'host': args.host, 'port': str(args.port), 'unit': str(args.unit),
+        'no-battery': 'on' if not args.battery else 'off',   # the no-battery flag store_falses battery
+        'control-port': args.control_port or 'off',
+        'control-token': '<set>' if (args.control_token or args.control_token_file) else 'off',
+        'control-token-file': '<set>' if args.control_token_file else 'off',
+        'control-ops-token': '<set>' if (args.control_ops_token or args.control_ops_token_file) else 'off',
+        'control-ops-token-file': '<set>' if args.control_ops_token_file else 'off',
+        'control-ops-verbs': args.control_ops_verbs or 'off',
+        'control-trust-uids': args.control_trust_uids or 'off',
+        'control-socket-group': 'on' if args.control_socket_group else 'off',
+        'control-log-replies': 'on' if args.control_log_replies else 'off',
+        'metrics-listen': args.metrics_listen or 'off',
+        'metrics-token': '<set>' if (args.metrics_token or args.metrics_token_file) else 'off',
+        'metrics-token-file': '<set>' if args.metrics_token_file else 'off',
+        'metrics-max-clients': str(args.metrics_max_clients),
+        'metrics-client-timeout': '%g' % args.metrics_client_timeout,
+        'metrics-max-conn-per-ip': str(args.metrics_max_conn_per_ip),
+        'audit-log': 'off' if args.no_audit_log else ('stdout' if args.audit_log == '-'
+                                                      else (args.audit_log or 'the XDG state home')),
+        'audit-max-mb': '%g' % args.audit_max_mb,
+        'audit-daily': 'on' if args.audit_daily else 'off',
+        'audit-files': str(args.audit_files),
+        'no-audit-log': 'on' if args.no_audit_log else 'off',
     }
 
 

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """The fake's option registry — the one row per knob (docs/TODO.md, "one
 knob, one source"): the rows live in lib/options.json next to this loader —
-the registry name, the flag, the env twin(s), the section it files under
-(common/options.py SECTIONS), the optional finer display group (a row may
-carry a `group` — the surfaces bucket it under it instead of its section),
-the knob's description (the shared help text
+the registry name, the flag, the env twin(s), the optional display group
+(a row may carry a `group` — the surfaces bucket it under it; ungrouped
+rows render bare), the knob's description (the shared help text
 --help and the man pages render), the live control name when the knob is
 live-settable (a '/'-path — `inverter/profile` spells as its words on the
 wire: `set inverter profile <value>`), and the secret flag. This module
@@ -78,7 +77,7 @@ def _load_options():
         SHOW_GROUPS = {w: g for w, _, _, g in SHOW_COMMANDS}
         # the show commands expand into the live-path space: the row's own
         # `live` when it spells the hierarchy, else the word itself
-        SHOW_OPTIONS = tuple(Option(r['name'], None, None, None,
+        SHOW_OPTIONS = tuple(Option(r['name'], None, None,
                                     help=r.get('setting-help') or r.get('help', ''),
                                     live=r.get('live') or r['name'],
                                     group=r.get('group'),
@@ -96,7 +95,7 @@ def _load_options():
         COMMAND_HIDDEN = frozenset(r['name'] for r in cmd_rows if r.get('hidden'))
     out = []
     for row in rows:
-        opt = Option(row['name'], row.get('flag'), row.get('env'), row['section'],
+        opt = Option(row['name'], row.get('flag'), row.get('env'),
                      help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
                      live=row.get('live'), alias=row.get('alias'),
                      secret=bool(row.get('secret', False)),
@@ -105,6 +104,7 @@ def _load_options():
                      setting_help=row.get('setting-help'), values=row.get('values'),
                      hint=row.get('hint'), value_help=row.get('value-help'),
                      min=row.get('min'), max=row.get('max'), check=row.get('check'), hidden=bool(row.get('hidden', False)),
+                     restart=bool(row.get('restart', False)),
                      node=bool(row.get('node', False)))
         if opt.name in static_defaults:
             opt.default = static_defaults[opt.name]
@@ -143,10 +143,13 @@ for s in SETTINGS:   # the row's `alias` spelling answers the same Setting — t
 SETTING_NAMES = tuple(s.name for s in SETTINGS)   # the canonical spellings — the dump keys and the unset defaults iterate these
 ALIAS_NAMES = tuple(alias_names)                  # the ?/TAB pools ride them beside the canonicals
 SHOW_LIVES = frozenset(o.live for o in SHOW_OPTIONS)   # the show reports' lives: show answers them, set/unset never offers them
+LIVE_SETTINGS = frozenset(o.live for o in OPTIONS if o.live) | SHOW_LIVES   # the live-named settings: the pools list these — a row the registry spells
+# without a `live` name (the restart-marked startup knobs, mid-grant) never lists
 HIDDEN_SETTINGS = frozenset(o.live for o in OPTIONS if o.hidden and o.live) \
     | frozenset(o.live for o in SHOW_OPTIONS if o.hidden and o.live) \
     | frozenset(o.alias for o in OPTIONS if o.hidden and o.alias) \
-    | frozenset(o.alias for o in SHOW_OPTIONS if o.hidden and o.alias)
+    | frozenset(o.alias for o in SHOW_OPTIONS if o.hidden and o.alias) \
+    | frozenset(o.name for o in OPTIONS if o.hidden and not o.live)   # the flat hidden knobs (the restart ones)
    # the rows that never list in the ?/TAB pools (the wire still answers)
 
 NODE_BY_NAME = {o.name: o for o in OPTIONS if o.node}   # the hierarchy nodes (help-only)

@@ -283,9 +283,11 @@ read-only ops token the same way):
 | `profile` | `<file>` | swap the register-map profile live |
 | `log-level` | `DEBUG\|INFO\|WARNING\|ERROR` | live log level |
 
-The commands and settings — including their descriptions — live in one shared
-registry (`lib/settings.py`) that both the control server and the CLIs
-read, so the wire grammar, the help texts and the completions can never drift.
+The commands and settings — including their descriptions — live in the one
+option registry (`lib/options.json` + its loader `lib/options.py`) that both
+the control server and the CLIs read, so the wire grammar, the help texts
+and the completions can never drift (the control-only pins and machines ride
+the same rows — no flag, just the live name).
 
 ### `modbus-fake-ctl` — one-shot / batch client
 
@@ -539,7 +541,8 @@ inverter/bin/
 ├── modbus-fake-ctl.py         # control-server CLI client (one-shot / batch)
 ├── modbus-fake-cli.py         # console-style interactive control session
 └── lib/
-    ├── settings.py     # shared command/setting registry (grammar + descriptions)
+    ├── options.json    # the knob registry: the flags, the env twins, the live settings + their control vocabulary
+    ├── options.py      # its loader: the Option rows, the control-grammar vocabulary, the wiring
     ├── profile.py      # register-map profiles: name registry, encoding, loading
     ├── simulator.py    # day curves, runtime overrides, named values, cloud machines
     ├── battery.py      # the battery state machine (SoC state, decision, integration)

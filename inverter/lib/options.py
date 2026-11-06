@@ -18,7 +18,7 @@ scripts/check_options.py."""
 import json
 import os
 
-from common.options import Option
+from common.options import Option, make_describe, settings_of
 
 _CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 
@@ -34,10 +34,12 @@ def _load_options():
     """The rows from lib/options.json (next to this loader). A bool knob
     without an explicit default parses as the argparse store_true native
     (False) unless the row negates one (--no-battery); a value knob
-    defaults to None. The CLI defaults come from static.json (the same
-    defaults block lib/statics.py serves the rest of the tool) — read
-    directly here so the module also imports flat (scripts/check_options.py
-    walks lib/ on sys.path)."""
+    defaults to None. Control-only settings (the pins and the machines —
+    a live `set` name, no flag) ride the same rows with their control
+    vocabulary. The CLI defaults come from static.json (the same defaults
+    block lib/statics.py serves the rest of the tool) — read directly here
+    so the module also imports flat (scripts/check_options.py walks lib/
+    on sys.path)."""
     here = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
@@ -62,16 +64,20 @@ def _load_options():
         rows = json.load(f)['options']
     out = []
     for row in rows:
-        opt = Option(row['name'], row['flag'], row.get('env'), row['section'],
+        opt = Option(row['name'], row.get('flag'), row.get('env'), row['section'],
                      help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
                      live=row.get('live'), secret=bool(row.get('secret', False)),
-                     choices=choices.get(row['name']), negates=row.get('negates'))
+                     choices=choices.get(row['name']), negates=row.get('negates'),
+                     setting_help=row.get('setting-help'), values=row.get('values'),
+                     hint=row.get('hint'), value_help=row.get('value-help'))
         if opt.name in static_defaults:
             opt.default = static_defaults[opt.name]
         elif 'default' in row:
             opt.default = row['default']
         elif opt.conv is bool and not opt.negates:
             opt.default = False
+        if opt.name == 'log-level':
+            opt.values = choices['log-level']   # the control grammar's completable words
         out.append(opt)
     return tuple(out)
 
@@ -79,3 +85,27 @@ def _load_options():
 OPTIONS = _load_options()
 
 OPTION_BY_NAME = {o.name: o for o in OPTIONS}
+
+# the control grammar's live settings — the SAME rows, viewed from the wire
+# (the `set`/`unset` vocabulary: the pins, the machines, the live knobs;
+# the console completions and word-help)
+SETTINGS = settings_of(OPTIONS)
+SETTING_BY_NAME = {s.name: s for s in SETTINGS}
+SETTING_NAMES = tuple(s.name for s in SETTINGS)
+describe_setting, describe_value = make_describe(SETTING_BY_NAME)
+
+# command -> short description (the CLI's first-word completions)
+COMMANDS = (
+    ('set', 'configure a setting: set <setting> <value>'),
+    ('unset', 'restore a setting to its configured value: unset <setting>'),
+    ('show', 'display a setting, the status report, or all: show <setting|status|connections|settings|config|knobs>'),
+    ('reset', 'clear all pins + the write overlay'),
+    ('shutdown', 'stop the fake inverter (asks to confirm)'),
+    ('quit', 'close the session'),
+    ('exit', 'close the session'),
+    ('logout', 'close the session'),
+    ('inspect', 'one pretty dump of everything: the status, the machines, the overlay'),
+    ('?', 'this help'),
+)
+
+COMMAND_HELP = dict(COMMANDS)

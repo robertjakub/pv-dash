@@ -4,6 +4,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[inverter]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The registry-folding wave: `lib/settings.py` is gone — the pins and the
+machines (`pv`, `load`, `batt`, `grid`, `soc`, `mppt`, `cloud`, `scenario`,
+`battery-state`, `grid-outage`) ride the `lib/options.json` registry as
+control-only rows (a live name, no flag) beside the live knobs, and
+`lib/options.py` derives the control vocabulary from the same rows (the
+wire, the completions and the word help unchanged).
+
 The env-prefix retirement wave: the env layer is the bare upper-snake
 names now (`CHAOS`, `MAX_KWP`, `BATTERY`, `STRICT`, `TIME`, `TIME_SCALE`,
 `LOG_LEVEL`, `CTL`, the token twins, ...) — the SIGHUP reload reads the

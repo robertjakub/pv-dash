@@ -30,7 +30,7 @@ from common.options import control_command
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
 from common.version import version_string
-from .settings import SETTING_NAMES, SETTING_BY_NAME, describe_setting
+from .options import SETTING_NAMES, SETTING_BY_NAME, describe_setting
 from .simulator import CLOUD_MACHINES, format_clock
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
 

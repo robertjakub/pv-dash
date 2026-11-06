@@ -48,7 +48,7 @@ except ImportError:
     readline = None
 
 from lib.paths import resolve_control_target
-from lib.settings import COMMAND_HELP, SETTING_BY_NAME, SETTING_NAMES, describe_value
+from lib.options import COMMAND_HELP, SETTING_BY_NAME, SETTING_NAMES, describe_value
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, \
     CLI_TIMEOUT_S
 

@@ -6,7 +6,7 @@
 
 The dialog: the knob index is the menu — arrows walk it, Enter opens the
 row as a form; arrows walk the fields, Enter edits an editable one
-(group, live, setting-help, hint; value-help opens its own key menu —
+(group, live, alias, setting-help, hint; value-help opens its own key menu —
 Enter edits a value's text, a adds a key, d deletes it), Esc leaves the
 input line empty-handed, s saves the row (surgically: the touched row
 re-renders in the house format, the rest of the file stays
@@ -15,7 +15,9 @@ warned away while a row holds unsaved edits. The view-only fields (flag,
 env, section, conv, default, help — the one-knob-one-source surfaces
 render them elsewhere) show with the rest; edited fields are marked.
 A live RENAME is a wave, not an edit: the daemon's _apply/defaults
-dispatch keys the live name (docs/TODO.md).
+dispatch keys the live name (docs/TODO.md). An alias is an edit: the
+dispatch canonicalizes through the map, so a second spelling rides
+alone.
 
 Exit 0 = done, 1 = error. Stdlib only."""
 import json
@@ -36,11 +38,11 @@ except ImportError:
 
 
 PROJECTS = ('cache', 'scraper', 'inverter', 'dashboard')
-INLINE = ('name', 'flag', 'env', 'section', 'conv', 'group', 'live', 'negates')
-EDITABLE = ('group', 'live', 'setting-help', 'hint', 'value-help')
-SHOW_EDITABLE = ('group', 'live', 'setting-help', 'hidden')   # the registry's `show` rows: the
-                                                              # bucket, the live hierarchy, the word's
-                                                              # description, the mark
+INLINE = ('name', 'flag', 'env', 'section', 'conv', 'group', 'live', 'alias', 'negates')
+EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hint', 'value-help')
+SHOW_EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hidden')   # the registry's `show` rows: the
+                                                                       # bucket, the live hierarchy, the
+                                                                       # alias, the word's description, the mark
 CMD_EDITABLE = ('group', 'help', 'hidden')   # the `commands` rows: the bucket, the description, the mark
 BEFORE_HELP = ('setting-help', 'values', 'hint', 'value-help', 'default')
 
@@ -132,26 +134,50 @@ ORDERS = ('name', 'kind', 'live', 'group', 'registry')
 
 
 def view_rows(rows, filt='', order='name', kind=row_kind):
-    """The rows as listed: filtered (the substring over the name, the live
-    path, the kind, the bucket and the descriptions) and ordered — by name
-    (the default), kind/live/group, or the registry order."""
+    """The rows as listed: filtered — the exact tokens `live` / `not-live`
+    pick the live-settable rows / the rest, anything else is the substring
+    over the name, the live path, the kind, the bucket and the descriptions —
+    and ordered: by name (the default), kind/live/group, or the registry
+    order."""
     if filt:
         q = filt.lower()
-        rows = [r for r in rows
-                if q in r['name'].lower()
-                or q in (r.get('live') or '').lower()
-                or q in kind(r)
-                or (r.get('live') and 'live' in q)   # `live` = the live-settable ones
-                or (r.get('hidden') and 'hidden' in q)   # `hidden` = the wire-only ones
-                or q in (r.get('group') or r.get('section') or '').lower()
-                or q in (r.get('setting-help') or r.get('help') or '').lower()]
+        if q == 'live':   # the exact tokens: the live-settable ones / the rest
+            rows = [r for r in rows if r.get('live')]
+        elif q == 'not-live':
+            rows = [r for r in rows if not r.get('live')]
+        else:
+            rows = [r for r in rows
+                    if q in r['name'].lower()
+                    or q in (r.get('live') or '').lower()
+                    or q in (r.get('alias') or '').lower()
+                    or q in kind(r)
+                    or (r.get('live') and 'live' in q)   # `live` = the live-settable ones
+                    or (r.get('hidden') and 'hidden' in q)   # `hidden` = the wire-only ones
+                    or q in (r.get('group') or '').lower()
+                    or q in (r.get('setting-help') or r.get('help') or '').lower()]
     if order != 'registry':
         key = {'name': lambda r: r['name'],
                'kind': lambda r: (kind(r), r['name']),
                'live': lambda r: (r.get('live') or '', r['name']),
-               'group': lambda r: (r.get('group') or r.get('section') or '', r['name'])}[order]
+               'group': lambda r: (r.get('group') or '', r['name'])}[order]
         rows = sorted(rows, key=key)
     return rows
+
+
+def bucket_of(editor, r):
+    """The list view's bucket column: the live path when the row has one,
+    else the group — the section never fills in (the cli listings group by
+    the group field alone) — else the family mark (cmd/show), '-' on a
+    bare option row."""
+    if r.get('live'):
+        return r['live']
+    if r.get('group'):
+        return r['group']
+    if editor.is_cmd(r):
+        return 'cmd'
+    if editor.is_show(r):
+        return 'show'
+    return '-'
 
 
 def row_keys(row, editable=EDITABLE):
@@ -351,6 +377,8 @@ class Editor:
                 return False, 'err group must be one clean word'
             if key == 'live' and not clean_path(value):
                 return False, 'err live must be one clean word-path'
+            if key == 'alias' and not clean_path(value):
+                return False, 'err alias must be one clean word-path'
         was = self.row.get(key)
         if value == (was or ''):
             return False, '%s: %s already %r' % (name, key, was)
@@ -443,11 +471,11 @@ def dialog(editor, screen):
             if idx >= len(view):
                 break
             r = view[idx]
-            bucket = r.get('live') or r.get('group') or r.get('section') or ('show' if editor.is_show(r) else '-')
+            bucket = bucket_of(editor, r)
             line = '  %-23s %-26s %-13s %s' % (r['name'], bucket, editor.kind(r),
                                                (r.get('setting-help') or r.get('help') or ''))
             put(2 + i, 0, line, curses.A_REVERSE if idx == cursor else 0)
-        status(msg or 'type / to filter, o to sort, Enter to open a row', dim=not msg)
+        status(msg or 'type / to filter (live, not-live), o to sort, Enter to open a row', dim=not msg)
         screen.refresh()
         return top
 
@@ -889,18 +917,15 @@ def line_mode(editor):
 
 
 def index_lines(self, filt='', order='name'):
-    """The line-mode knob index: the name, its live/group/section bucket,
-    the kind, the setting-help — filtered and ordered like the dialog.
+    """The line-mode knob index: the name, its live-or-group bucket, the
+    kind, the setting-help — filtered and ordered like the dialog.
     The `show` rows list beside the knobs (their bucket: show)."""
     rows = view_rows(self.rows + self.show + self.cmds, filt, order, self.kind)
     note = (' — filter %r, order %s' % (filt, order)) if (filt or order != 'name') else ''
     print('# %s — %d of %d rows%s (type a name to edit it, quit leaves)'
           % (self.path, len(rows), len(self.rows) + len(self.show) + len(self.cmds), note))
     for r in rows:
-        if self.is_cmd(r):
-            bucket = r.get('group') or 'cmd'
-        else:
-            bucket = r.get('live') or r.get('group') or r.get('section') or ('show' if self.is_show(r) else '-')
+        bucket = bucket_of(self, r)
         help_text = r.get('setting-help') or r.get('help') or ''
         print('  %-23s %-26s %-13s %s' % (r['name'], bucket, self.kind(r), help_text[:56]))
     print()

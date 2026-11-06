@@ -95,14 +95,13 @@ and
 for the clients."""
     environment = """.SH ENVIRONMENT
 .TP
-.B MCH_CTL
+.B CTL
 default control target for the daemon's clients (flag \\fB--control-port\\fR
 wins).
 .TP
-.B MCH_*
-every flag has an environment twin (\\fBMCH_HOST\\fR,
-\\fBMCH_LISTEN\\fR, \\fBMCH_ALLOW_WRITE\\fR, ...); the flag
-wins over the env, the env over the ini."""
+.B HOST ", " LISTEN ", " ALLOW_WRITE ", " ...
+every flag has an environment twin of the same bare name (no tool
+prefix); the flag wins over the env, the env over the config script."""
     files = """.SH FILES
 .TP
 .I /tmp/modbus-cache-<port>.socket
@@ -195,10 +194,10 @@ audited with the \\fBCLI\\fR prefix; the wire commands are audited once, by
 the server."""
     environment = """.SH ENVIRONMENT
 .TP
-.B MCH_CLI_KEEPALIVE
+.B CLI_KEEPALIVE
 idle ping interval, seconds (default \\fB55\\fR); \\fB0\\fR = off.
 .TP
-.B MCH_CTL ", " MCH_CONTROL_TOKEN
+.B CTL ", " CONTROL_TOKEN
 the default control target and TCP token."""
     exit_status = """.SH EXIT STATUS
 .TP

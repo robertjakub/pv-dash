@@ -5,7 +5,7 @@ Serves the cache's self-observability in the
 Prometheus text format: the hit/miss counters, the poll health and age, the
 poll-cycle durations, the client count, the uplink session counters and the
 per-block poll latency/errors — without depending on the scraper's
-`huawei_cache_*` export path. Requests need
+`scraper_cache_*` export path. Requests need
 `Authorization: Bearer <token>` (the same scheme the scraper speaks)."""
 import hmac
 import http.server

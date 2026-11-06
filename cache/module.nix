@@ -26,8 +26,7 @@ let
     "# rendered by services.modbus-cache; the flags and the env still win over this file"
     ""
     "# --- the device (upstream inverter) and the register map ---"
-    (setLine "host" cfg.inverterHost)
-    (setLine "port" (toString cfg.inverterPort))
+    (setLine "upstream" cfg.upstream)
     (setLine "unit" (toString cfg.unitId))
     (setLine "timeout" (toString cfg.timeout))
     (setLine "listen" "${cfg.listenHost}:${toString cfg.listenPort}")
@@ -116,16 +115,10 @@ in
       description = "The modbus-cache package to run.";
     };
 
-    inverterHost = lib.mkOption {
+    upstream = lib.mkOption {
       type = lib.types.str;
-      default = "127.0.0.1";
-      description = "Inverter/dongle Modbus TCP address (set to its LAN IP).";
-    };
-
-    inverterPort = lib.mkOption {
-      type = lib.types.port;
-      default = 5502;
-      description = "Inverter Modbus TCP port.";
+      default = "127.0.0.1:5502";
+      description = "The inverter Modbus TCP endpoint HOST:PORT (`:PORT` = 127.0.0.1:PORT) — set HOST to the inverter/dongle's LAN IP.";
     };
 
     unitId = lib.mkOption {

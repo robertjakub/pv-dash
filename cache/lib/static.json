@@ -29,8 +29,7 @@
     "max_age": 65535
   },
   "defaults": {
-    "host": "127.0.0.1",
-    "modbus_port": 5502,
+    "upstream": "127.0.0.1:5502",
     "unit": 1,
     "timeout_s": 3.0,
     "listen": "127.0.0.1:15502",

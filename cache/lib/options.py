@@ -1,76 +1,59 @@
 #!/usr/bin/env python3
 """The cache's option registry — the one row per knob (docs/TODO.md, "one
-knob, one source"): the registry name (the set-grammar config key and the
-`set <name>` control name, dashes included), the flag, the env twin(s), the
-section it files under (common/options.py SECTIONS), whether the knob is
-live-settable (the control `set` name when it is) and whether it is a
-secret. The config script (the ini's replacement), `show config`, the
-knob -> control-command mapper and scripts/check_options.py all read this
-table; --help and the man pages render from the argparse parser built in
-bin/modbus-cache.py, and this table cross-references it (the check gate
-keeps the four surfaces honest)."""
+knob, one source"): the rows live in lib/options.json next to this loader —
+the registry name (the set-grammar config key and the `set <name>` control
+name, dashes included), the flag, the env twin(s), the section it files
+under (common/options.py SECTIONS), the knob's description (the shared help
+text --help and the man pages render), whether the knob is live-settable
+(the control `set` name when it is) and whether it is a secret. This module
+loads the JSON into the common Option rows and keeps the Python-side wiring:
+the control-grammar vocabulary, the resolved-config key renames and the
+set-grammar rendering of the effective values. The config script (the ini's
+replacement), `show config`, the knob -> control-command mapper, the
+argparse parser (--help, built from these rows — common/options.py
+build_parser) and scripts/check_options.py all read this table."""
+import json
+import os
+
 from common.options import Option
+
+_CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
+
+
+def _load_options():
+    """The rows from lib/options.json (next to this loader). A bool knob
+    without an explicit default parses as the argparse store_true native
+    (False); a value knob defaults to None — the resolution layers decide.
+    The log-level row takes its choices from lib/static.json (the constants
+    audit's home — the same LOG_LEVELS the control grammar validates
+    against); the loader reads it directly so the module also imports flat
+    (scripts/check_options.py walks lib/ on sys.path)."""
+    here = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
+        log_levels = tuple(json.load(f)['log_levels'])
+    with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
+        rows = json.load(f)['options']
+    out = []
+    for row in rows:
+        opt = Option(row['name'], row['flag'], row.get('env'), row['section'],
+                     help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
+                     live=row.get('live'), secret=bool(row.get('secret', False)))
+        if 'default' in row:
+            opt.default = row['default']
+        elif opt.conv is bool:
+            opt.default = False
+        if opt.name == 'log-level':
+            opt.choices = log_levels
+        out.append(opt)
+    return tuple(out)
+
 
 # The verbs the control grammar speaks (the RBAC vocabulary — an ops verb
 # set must name verbs this server knows).
 KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'request', 'clear', 'restart', 'shutdown',
                'help', 'ping', 'quit')
 
-# section, name, flag, env twin(s), live name (None = startup-only), secret
-OPTIONS = (
-    Option('host', '--host', 'MCH_HOST', 'device'),
-    Option('port', '--port', 'MCH_PORT', 'device'),
-    Option('unit', '--unit', 'MCH_UNIT', 'device'),
-    Option('timeout', '--timeout', 'MCH_TIMEOUT', 'device', live='timeout'),
-    Option('interval', '--interval', 'MCH_INTERVAL', 'device', live='interval'),
-    Option('read-delay', '--read-delay', 'MCH_READ_DELAY', 'device', live='read-delay'),
-    Option('merge-gap', '--merge-gap', 'MCH_MERGE_GAP', 'device', live='merge-gap'),
-    Option('cache-ttl', '--cache-ttl', 'MCH_TTL', 'device', live='ttl'),
-    Option('allow-write', '--allow-write', 'MCH_ALLOW_WRITE', 'device', live='allow-write'),
-    Option('write-registers', '--write-registers', 'MCH_WRITE_REGISTERS', 'device', live='write-registers'),
-    Option('profile', '--profile', 'MCH_PROFILE', 'device', live='profile'),
-    Option('selection', '--selection', 'MCH_SELECTION', 'device', live='selection'),
-    Option('connect-acl', '--connect-acl', 'MCH_CONNECT_ACL', 'device', live='connect-acl'),
-    Option('write-acl', '--write-acl', 'MCH_WRITE_ACL', 'device', live='write-acl'),
-
-    Option('listen', '--listen', 'MCH_LISTEN', 'serving'),
-    Option('local-time', '--local-time', 'MCH_LOCAL_TIME', 'serving'),
-
-    Option('max-clients', '--max-clients', 'MCH_MAX_CLIENTS', 'limits', live='max-clients'),
-    Option('client-timeout', '--client-timeout', 'MCH_CLIENT_TIMEOUT', 'limits', live='client-timeout'),
-    Option('max-conn-per-ip', '--max-conn-per-ip', 'MCH_MAX_CONN_PER_IP', 'limits', live='max-conn-per-ip'),
-
-    Option('control-port', '--control-port', 'MCH_CTL', 'control'),
-    Option('control-token', '--control-token', 'MCH_CONTROL_TOKEN', 'control', secret=True),
-    Option('control-token-file', '--control-token-file', 'MCH_CONTROL_TOKEN_FILE', 'control', secret=True),
-    Option('control-ops-token', '--control-ops-token', 'MCH_CONTROL_OPS_TOKEN', 'control', secret=True),
-    Option('control-ops-token-file', '--control-ops-token-file', 'MCH_CONTROL_OPS_TOKEN_FILE', 'control', secret=True),
-    Option('control-ops-verbs', '--control-ops-verbs', 'MCH_CONTROL_OPS_VERBS', 'control'),
-    Option('control-trust-uids', '--control-trust-uids', 'MCH_CONTROL_TRUST_UIDS', 'control'),
-    Option('control-socket-group', '--control-socket-group', 'MCH_CONTROL_SOCKET_GROUP', 'control'),
-
-    Option('metrics-server', '--metrics-server', 'MCH_METRICS_SERVER', 'metrics', live='metrics-server'),
-    Option('metrics-listen', '--metrics-listen', 'MCH_METRICS_LISTEN', 'metrics'),
-    Option('metrics-token', '--metrics-token', 'MCH_METRICS_TOKEN', 'metrics', secret=True),
-    Option('metrics-token-file', '--metrics-token-file', 'MCH_METRICS_TOKEN_FILE', 'metrics', secret=True),
-    Option('metrics-max-clients', '--metrics-max-clients', 'MCH_METRICS_MAX_CLIENTS', 'metrics'),
-    Option('metrics-client-timeout', '--metrics-client-timeout', 'MCH_METRICS_CLIENT_TIMEOUT', 'metrics'),
-    Option('metrics-max-conn-per-ip', '--metrics-max-conn-per-ip', 'MCH_METRICS_MAX_CONN_PER_IP', 'metrics'),
-
-    Option('audit-log', '--audit-log', 'MCH_AUDIT_LOG', 'audit'),
-    Option('audit-max-mb', '--audit-max-mb', 'MCH_AUDIT_MAX_MB', 'audit'),
-    Option('audit-daily', '--audit-daily', 'MCH_AUDIT_DAILY', 'audit'),
-    Option('audit-files', '--audit-files', 'MCH_AUDIT_FILES', 'audit'),
-    Option('no-audit-log', '--no-audit-log', 'MCH_NO_AUDIT_LOG', 'audit'),
-    Option('requests-audit', '--requests-audit', 'MCH_REQUESTS_AUDIT', 'audit', live='requests-audit'),
-
-    Option('log-level', '--log-level', 'MCH_LOG_LEVEL', 'logging', live='log-level'),
-    Option('log-access', '--log-access', 'MCH_LOG_ACCESS', 'logging', live=None),
-    Option('dump-path', '--dump-path', 'MCH_DUMP_PATH', 'persistence'),
-    Option('dump-with-cache', '--dump-with-cache', 'MCH_DUMP_WITH_CACHE', 'persistence'),
-    Option('dump-interval', '--dump-interval', 'MCH_DUMP_INTERVAL', 'persistence', live='dump-interval'),
-    Option('restore-on-start', '--restore-on-start', 'MCH_RESTORE_ON_START', 'persistence'),
-)
+OPTIONS = _load_options()
 
 OPTION_BY_NAME = {o.name: o for o in OPTIONS}
 
@@ -103,6 +86,4 @@ def config_value(name, cfg):
         return ','.join(str(u) for u in v) if v else None
     if key == 'selection':
         return v or 'all'
-    if key == 'port' or key == 'unit':
-        return str(v)
     return str(v)

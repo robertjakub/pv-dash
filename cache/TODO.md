@@ -4,6 +4,35 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[cache]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The upstream-knob wave: the inverter endpoint is the one
+`--upstream HOST:PORT` knob now (`:5502` = 127.0.0.1:5502, the shared
+`common/config.py` `parse_upstream()`) — `--host`/`--port` and their
+`HOST`/`PORT` env twins retire (the flag, the env, the config key
+`set upstream`, the NixOS option `upstream`, the docker CMD, the bundled
+conf sample); the resolved config keeps the derived `host`/`port` keys,
+so `show status`, the start log and the audit trail read unchanged.
+
+The env-prefix retirement + the retag wave: the env twins drop the tool
+prefixes — `HOST`, `PORT`, `TTL`, `CTL`, ... (the knob's bare upper-snake
+name; `--help` renders the `$NAME` forms) — the twins are set per
+deployment surface (a systemd unit, a compose service, a dev shell), so
+the shared names stay safe. The tool is retagged: the docstring and
+`--help`/the man DESCRIPTION say "Modbus TCP caching proxy for
+single-client devices" now (the bundled sun2000 profile stays the shipped
+example), and the `/metrics` docstring + the README rows name the
+scraper's `scraper_cache_*` path (the metrics wave's rename, propagated).
+
+The declarative-registry wave: the knob rows (the name, the flag, the env
+twin, the section, the live/secret markers and the descriptions) moved to
+`lib/options.json` — `lib/options.py` loads them onto the common `Option`
+rows and keeps the Python-side wiring (the control-grammar verb list, the
+config-key renames, the log-level choices read from `static.json`) — and
+`--help`/the man pages render from the registry now
+(`common/options.py` `build_parser()`): the knob description lives exactly
+once. The flags in `--help` order by the registry's sections; the texts,
+types and defaults are unchanged; `scripts/check_options.py` gates as
+before and the package ships the JSON next to the loader.
+
 The rename + env-prefix wave: the bins carry the man-page names now
 (`modbus-cache.py`, `modbus-cache-ctl.py`, `modbus-cache-cli.py` — the
 docs and the package descriptions follow), and every env twin wears the

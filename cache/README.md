@@ -7,7 +7,7 @@
 A dependency-free (Python stdlib only) **Modbus TCP caching proxy** for devices
 that accept only a single client — Huawei SUN2000 inverters and their
 SDongle/EMMA radios are limited to one Modbus TCP connection, so the
-[modbus-scraper](../scrape/README.md) cannot share them with anything else.
+[modbus-scraper](../scraper/README.md) cannot share them with anything else.
 
 > **Experimental — so far verified only against simulated data**
 > (fake inverter, fuzzing and regression/stress suites), not against real
@@ -62,11 +62,11 @@ Resilience:
 
 The proxy caches the registers listed in the **device profile** — the same
 shared schema the [fake inverter](../inverter/README.md) serves and the
-[scraper](../scrape/README.md) scrapes; the shipped profiles live in the
+[scraper](../scraper/README.md) scrapes; the shipped profiles live in the
 suite's [`profiles/`](../profiles/) subproject (`sun2000.json` by default).
 The profile JSON format is documented in
 [profiles/README.md](../profiles/README.md).
-Resolution: `--profile` flag, env `MCH_PROFILE`, ini `profile`,
+Resolution: `--profile` flag, env `PROFILE`, ini `profile`,
 then the bundled copy; the file is re-read on `SIGHUP`. Entry `type`
 (i16/u16/i32/u32) gives the word width, `name` decorates the poll logs, and
 the optional **`fc`** field picks the address space: `3` (holding
@@ -82,7 +82,7 @@ entries without their own, never a floor.
 
 Which registers are actually **fetched** comes from a selection file —
 `{"registers": ["pv-power", "grid-power", ...]}`, profile names only —
-resolved as `--selection` flag, env `MCH_SELECTION`, ini
+resolved as `--selection` flag, env `SELECTION`, ini
 `selection`; the default fetches **every** profile entry (`all`), and
 **`none`** empties the map: every read forwards to the inverter and nothing
 is stored (a pass-through proxy, the cache gauges go quiet). The shipped
@@ -106,7 +106,7 @@ the device actually answers.
 ## Usage
 
 ```bash
-python3 cache/bin/modbus-cache.py --host 192.168.1.100
+python3 cache/bin/modbus-cache.py --upstream 192.168.1.100:5502
 ```
 
 By default the proxy **binds to 127.0.0.1:15502** (loopback only) — pass
@@ -123,10 +123,10 @@ Point the scraper (or any other Modbus client) at the proxy instead of the
 inverter:
 
 ```bash
-python3 scrape/bin/modbus-scraper.py --host 127.0.0.1 --modbus-port 15502
+python3 scraper/bin/modbus-scraper.py --upstream :15502
 ```
 The scraper auto-detects the diagnostics block and exports it as
-`huawei_cache_*` Prometheus gauges — device-down-behind-cache becomes visible
+`scraper_cache_*` Prometheus gauges — device-down-behind-cache becomes visible
 downstream instead of flowing through as fresh data.
 
 ## Configuration
@@ -134,22 +134,22 @@ downstream instead of flowing through as fresh data.
 Settings are resolved in this order (first hit wins), mirroring
 `modbus-scraper`:
 
-1. CLI flags (`--host`, `--listen`, …)
-2. Environment variables — same names prefixed: `MCH_HOST`,
-   `MCH_PORT`, `MCH_UNIT`, `MCH_TIMEOUT`,
-   `MCH_LISTEN`, `MCH_INTERVAL`, `MCH_READ_DELAY`,
-   `MCH_MERGE_GAP`, `MCH_PROFILE`,
-   `MCH_TTL`, `MCH_ALLOW_WRITE`, `MCH_LOCAL_TIME`,
-   `MCH_LOG_ACCESS`, `MCH_MAX_CLIENTS`,
-   `MCH_CLIENT_TIMEOUT`, `MCH_CONNECT_ACL`,
-   `MCH_WRITE_ACL`, `MCH_WRITE_REGISTERS`,
-   `MCH_LOG_LEVEL`, `MCH_CONTROL_TOKEN`,
-   `MCH_CONTROL_TOKEN_FILE`, `MCH_CONTROL_TRUST_UIDS`,
-   `MCH_DUMP_PATH`, `MCH_DUMP_INTERVAL`,
-   `MCH_AUDIT_LOG`,
-   `MCH_AUDIT_MAX_MB`, `MCH_AUDIT_DAILY`,
-   `MCH_AUDIT_FILES`, `MCH_NO_AUDIT_LOG`,
-   `MCH_REQUESTS_AUDIT`
+1. CLI flags (`--upstream`, `--listen`, …)
+2. Environment variables — the same names, bare (no tool prefix): `UPSTREAM`,
+   `UNIT`, `TIMEOUT`,
+   `LISTEN`, `INTERVAL`, `READ_DELAY`,
+   `MERGE_GAP`, `PROFILE`,
+   `TTL`, `ALLOW_WRITE`, `LOCAL_TIME`,
+   `LOG_ACCESS`, `MAX_CLIENTS`,
+   `CLIENT_TIMEOUT`, `CONNECT_ACL`,
+   `WRITE_ACL`, `WRITE_REGISTERS`,
+   `LOG_LEVEL`, `CONTROL_TOKEN`,
+   `CONTROL_TOKEN_FILE`, `CONTROL_TRUST_UIDS`,
+   `DUMP_PATH`, `DUMP_INTERVAL`,
+   `AUDIT_LOG`,
+   `AUDIT_MAX_MB`, `AUDIT_DAILY`,
+   `AUDIT_FILES`, `NO_AUDIT_LOG`,
+   `REQUESTS_AUDIT`
 3. Config file (snake_case keys, `[cache]` section) — `--config` picks the
    file (default: `modbus_cache.conf` next to `modbus-cache.py` — the
    packaged layout — then the subproject root's sample; a missing file
@@ -162,8 +162,7 @@ with a clean one-line error instead of failing later at runtime.
 | Flag | Default | Meaning |
 |---|---|---|
 | **Upstream** | | |
-| `--host` | `127.0.0.1` | inverter/dongle Modbus TCP address |
-| `--port` | `5502` | inverter Modbus TCP port |
+| `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--unit` | `1` | Modbus unit id (1–247) |
 | `--timeout` | `3` | Modbus connect/read timeout, seconds |
 | **Proxy** | | |
@@ -174,31 +173,31 @@ with a clean one-line error instead of failing later at runtime.
 | `--read-delay` | `0.05` | seconds between consecutive inverter reads within a poll cycle (`0` = no wait) |
 | `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Behaviour toggles** | | |
-| `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (ini `allow_write`, env `MCH_ALLOW_WRITE` accept `true`/`false`) |
-| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default) (ini `write_registers`, env `MCH_WRITE_REGISTERS`) |
+| `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (ini `allow_write`, env `ALLOW_WRITE` accept `true`/`false`) |
+| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default) (ini `write_registers`, env `WRITE_REGISTERS`) |
 | `--connect-acl` | `any` | clients allowed to connect: `any`, `none` (refuse everyone) or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `none` | clients allowed to write — still requires `--allow-write`; `none` = no client writes (the default) — see [Access control](#access-control) |
-| `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (ini `control_token`, env `MCH_CONTROL_TOKEN`) |
-| `--control-token-file` | none | the token from a file (the first line; a systemd `LoadCredential` or a key file, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12) — instead of `--control-token`, giving both is an error (ini `control_token_file`, env `MCH_CONTROL_TOKEN_FILE`) |
-| `--control-ops-token` | none | a **second, read-only control token**: sessions authenticating with it may run the `show`/`clear` verbs only — no `set`/`unset`, no `request dump`/`restore`, no `restart`, no `shutdown` — the ops shift against the admin key, both audited (`role=ops`/`role=admin` in the CACHE trail); needs `--control-token`/`--control-token-file` and must differ from it — see [Runtime control](#runtime-control---control-port) (ini `control_ops_token`, env `MCH_CONTROL_OPS_TOKEN`) |
-| `--control-ops-token-file` | none | the read-only ops token from a file (the first line; **owner-only `0600`**, F12) — instead of `--control-ops-token`, giving both is an error (ini `control_ops_token_file`, env `MCH_CONTROL_OPS_TOKEN_FILE`) |
-| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (ini `control_ops_verbs`, env `MCH_CONTROL_OPS_VERBS`) |
-| `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user (ini `control_socket_group`, env `MCH_CONTROL_SOCKET_GROUP`) |
-| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (ini `control_trust_uids`, env `MCH_CONTROL_TRUST_UIDS`) |
+| `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (ini `control_token`, env `CONTROL_TOKEN`) |
+| `--control-token-file` | none | the token from a file (the first line; a systemd `LoadCredential` or a key file, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12) — instead of `--control-token`, giving both is an error (ini `control_token_file`, env `CONTROL_TOKEN_FILE`) |
+| `--control-ops-token` | none | a **second, read-only control token**: sessions authenticating with it may run the `show`/`clear` verbs only — no `set`/`unset`, no `request dump`/`restore`, no `restart`, no `shutdown` — the ops shift against the admin key, both audited (`role=ops`/`role=admin` in the CACHE trail); needs `--control-token`/`--control-token-file` and must differ from it — see [Runtime control](#runtime-control---control-port) (ini `control_ops_token`, env `CONTROL_OPS_TOKEN`) |
+| `--control-ops-token-file` | none | the read-only ops token from a file (the first line; **owner-only `0600`**, F12) — instead of `--control-ops-token`, giving both is an error (ini `control_ops_token_file`, env `CONTROL_OPS_TOKEN_FILE`) |
+| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (ini `control_ops_verbs`, env `CONTROL_OPS_VERBS`) |
+| `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user (ini `control_socket_group`, env `CONTROL_SOCKET_GROUP`) |
+| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (ini `control_trust_uids`, env `CONTROL_TRUST_UIDS`) |
 | **Persistence** | | |
-| `--dump-path` | off | the state dump (write-behind): the live setting overrides and — with `--dump-with-cache` — the cached words + their stamps, as one JSON, created `0600` with an integrity hash — written on shutdown, by the `request dump` command and every `--dump-interval` seconds; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (ini `dump_path`, env `MCH_DUMP_PATH`) |
-| `--dump-with-cache` | off | dump the cached words too: the `request dump` command and the `--dump-interval` loop write the words + the settings (the default off = settings only; `request dump with-cache` always includes them; the restore takes either shape) (ini `dump_with_cache`, env `MCH_DUMP_WITH_CACHE`) |
-| `--dump-interval` | `0` | seconds between the automatic state dumps, `0` = on request (the `request dump` command and the shutdown); needs `--dump-path`; live-settable (`set dump-interval`, ini `dump_interval`, env `MCH_DUMP_INTERVAL`) |
+| `--dump-path` | off | the state dump (write-behind): the live setting overrides and — with `--dump-with-cache` — the cached words + their stamps, as one JSON, created `0600` with an integrity hash — written on shutdown, by the `request dump` command and every `--dump-interval` seconds; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (ini `dump_path`, env `DUMP_PATH`) |
+| `--dump-with-cache` | off | dump the cached words too: the `request dump` command and the `--dump-interval` loop write the words + the settings (the default off = settings only; `request dump with-cache` always includes them; the restore takes either shape) (ini `dump_with_cache`, env `DUMP_WITH_CACHE`) |
+| `--dump-interval` | `0` | seconds between the automatic state dumps, `0` = on request (the `request dump` command and the shutdown); needs `--dump-path`; live-settable (`set dump-interval`, ini `dump_interval`, env `DUMP_INTERVAL`) |
 | **Audit trail** | | |
 | `--audit-log` | XDG state | the CACHE audit trail: a file path or `-` for stdout (docker logs / journald); default `~/.local/state/modbus-cache/audit.log` — see [Audit logging](#audit-logging) |
 | `--audit-max-mb` | `10` | rotate the audit log at this size, keeping `--audit-files` backups; `0` = off |
 | `--audit-daily` | off | also rotate the audit log at UTC midnight |
 | `--audit-files` | `3` | rotated audit backups to keep |
 | `--no-audit-log` | off | disable the audit trail |
-| `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds (who is hammering the cache), `0` = off (ini `requests_audit_s`, env `MCH_REQUESTS_AUDIT`) |
+| `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds (who is hammering the cache), `0` = off (ini `requests_audit_s`, env `REQUESTS_AUDIT`) |
 | **Metrics** | | |
-| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `huawei_cache_*` path); **live-settable** (`set metrics-server on/off`) and **refuses to start without `--metrics-token`/`--metrics-token-file`** (ini `metrics_server`, env `MCH_METRICS_SERVER`) |
-| `--metrics-listen` | `127.0.0.1:9252` | the metrics bind address `HOST:PORT` — `0.0.0.0:PORT` serves every interface, **a token is mandatory regardless** (ini `metrics_listen`, env `MCH_METRICS_LISTEN`) |
+| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `scraper_cache_*` path); **live-settable** (`set metrics-server on/off`) and **refuses to start without `--metrics-token`/`--metrics-token-file`** (ini `metrics_server`, env `METRICS_SERVER`) |
+| `--metrics-listen` | `127.0.0.1:9252` | the metrics bind address `HOST:PORT` — `0.0.0.0:PORT` serves every interface, **a token is mandatory regardless** (ini `metrics_listen`, env `METRICS_LISTEN`) |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-server` is on |
 | `--metrics-token-file` | off | the metrics bearer token from a file (the first line; owner-only `0600`, F12) — instead of `--metrics-token`, giving both is an error |
 | **Limits** | | |
@@ -255,8 +254,8 @@ A JSON-lines control server runs **by default on the unix socket
 files replaced, nothing ever lands in the working directory. Pass a TCP port
 number to bind `127.0.0.1:PORT` instead, or `0` to switch the control server
 off. Both the proxy and the CLI tool resolve the target the same way: flag >
-**`MCH_CTL`** (or the short **`MCH_CTL`**, like the fake
-inverter's `INV_CTL`) environment variable > default socket.
+**`CTL`** (or the short **`CTL`**, like the fake
+inverter's `CTL`) environment variable > default socket.
 
 One command per line, one reply per line. Every request and reply is one
 JSON object: the request = `{"cmd": "<command>"}`, the reply =
@@ -299,8 +298,8 @@ token, an admin client against the admin token. The peer-cred trusted peers
 > local user can read them in `ps` output or `/proc/*/cmdline` (the audit's
 > F9; the same applies to the ctl/cli clients). Prefer the **`-file`**
 > variants — the file must be **owner-only (`0600`)**: group/world-accessible
-> token files refuse to start (F12) — or the `MCH_CONTROL_TOKEN` /
-> `MCH_METRICS_TOKEN` env vars. The flag form is for quick tests.
+> token files refuse to start (F12) — or the `CONTROL_TOKEN` /
+> `METRICS_TOKEN` env vars. The flag form is for quick tests.
 
 | Command | Effect |
 |---|---|
@@ -346,8 +345,8 @@ python3 cache/bin/modbus-cache-ctl.py --control-port 15509 clear cache
 printf 'show cache\nclear cache\n' | python3 cache/bin/modbus-cache-ctl.py --control-port 15509
 ```
 
-Same `--control-port` flag / `MCH_CTL` env as the proxy itself; the
-TCP token comes from `--control-token` or `MCH_CONTROL_TOKEN` —
+Same `--control-port` flag / `CTL` env as the proxy itself; the
+TCP token comes from `--control-token` or `CONTROL_TOKEN` —
 the ops staff pass the **read-only ops token** the same way and the server
 assigns the `show`/`clear` role to what the token opens.
 Exit codes: `0` = ok, `1` = connection/control error, `2` = CLI misuse.
@@ -401,7 +400,7 @@ settings/version, `?` does the same in any position), `clear cache` and
 `restart` confirm with a plain
 `ok`, and `shutdown` asks `Proceed with shutdown? [confirm]` first — RETURN
 or `y` proceeds, anything else aborts with `% Aborted.`. While it idles the
-CLI sends wire pings (every 55 s, `MCH_CLI_KEEPALIVE` to tune, `0` = off)
+CLI sends wire pings (every 55 s, `CLI_KEEPALIVE` to tune, `0` = off)
 so the control server's idle timeout never drops a live session. When the
 connection dies anyway (the proxy was killed, the socket went dark), the
 CLI retries **`--reconnect` times (default 3)** with **`--reconnect-wait`
@@ -412,7 +411,7 @@ The session itself (connect/disconnect, the local commands, an aborted
 shutdown) is appended to the CLI's own audit trail (prefix `CLI`,
 `--audit-log` / `--no-audit-log`); the commands themselves are audited by
 the server (prefix `CACHE`, with the client peer). TCP targets authenticate
-with `--control-token` or the `MCH_CONTROL_TOKEN` env — the same
+with `--control-token` or the `CONTROL_TOKEN` env — the same
 token the proxy was started with.
 
 ## Access control
@@ -503,7 +502,7 @@ admin who rechashes.
 on/off`) serves the cache's own Prometheus `/metrics` on the
 `--metrics-listen HOST:PORT` address (default `127.0.0.1:9252`; `0.0.0.0`
 serves every interface) — the self-observability without the
-scraper's `huawei_cache_*` export path: `modbus_cache_hits_total` /
+scraper's `scraper_cache_*` export path: `modbus_cache_hits_total` /
 `modbus_cache_misses_total`, `modbus_cache_poll_up` +
 `modbus_cache_last_poll_age_seconds`, `modbus_cache_age_seconds` (the
 oldest cached word), `modbus_cache_words` / `modbus_cache_ranges` (the
@@ -652,7 +651,7 @@ mode, including recovery when the device starts answering sanely again.
 ## Nix / NixOS
 
 ```bash
-nix run .#modbus-cache -- --host 192.168.1.100
+nix run .#modbus-cache -- --upstream 192.168.1.100:5502
 ```
 
 The package ships three binaries: `modbus-cache` (the proxy),
@@ -665,18 +664,18 @@ imports = [ inputs.pv-dash.nixosModules.modbus-cache ];
 
 services.modbus-cache = {
   enable = true;
-  inverterHost = "192.168.1.100";   # the inverter's LAN IP
+  upstream = "192.168.1.100:5502";  # the inverter's LAN IP (:PORT)
   listenHost = "0.0.0.0";           # only when Modbus clients live on other hosts
   openFirewall = true;              # together with a non-loopback listenHost
 };
 services.modbus-scraper = {
   enable = true;
-  inverterHost = "127.0.0.1";       # the proxy
-  inverterPort = 15502;
+  upstream = "127.0.0.1:15502";     # the proxy
 };
 ```
 
-Options: `inverterHost`, `inverterPort`, `unitId`, `timeout`, `interval`,
+Options: `upstream` (`HOST:PORT`, `:PORT` = loopback), `unitId`, `timeout`,
+`interval`,
 `readDelay`, `mergeGap`, `profile` (device-profile JSON path; null = the
 bundled `sun2000` profile), `cacheTtl` (unset = 3× `interval`),
 `listenHost`, `listenPort`, `allowWrite`, `writeRegisters` (the

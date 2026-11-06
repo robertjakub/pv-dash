@@ -15,7 +15,7 @@ mid-session (an unanswered ping, the proxy gone), the CLI retries:
 --reconnect attempts, --reconnect-wait seconds apart.
 
   python3 modbus-cache-cli.py --control-port 15509
-  MCH_CTL=15509 python3 modbus-cache-cli.py
+  CTL=15509 python3 modbus-cache-cli.py
 
 Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.
 """
@@ -46,7 +46,7 @@ from lib.config import resolve_control_target
 from lib.settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from lib.statics import CLI_KEEPALIVE_S, CLI_TIMEOUT_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S
 
-KEEPALIVE_ENV = 'MCH_CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
+KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
 DEFAULT_KEEPALIVE = CLI_KEEPALIVE_S     # well under the control server's idle timeout
 
 COMMANDS = ('set', 'unset', 'show', 'inspect', 'clear', 'restart', 'shutdown', 'quit')
@@ -308,12 +308,12 @@ def print_options(buf):
 
 def main():
     p = argparse.ArgumentParser(description='console-style CLI for the modbus-cache control server (TCP or unix socket).')
-    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/modbus-cache-15502.socket; env MCH_CTL when unset) — same flag as the proxy itself')
+    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/modbus-cache-15502.socket; env CTL when unset) — same flag as the proxy itself')
     p.add_argument('--timeout', type=float, default=CLI_TIMEOUT_S, help='socket timeout in seconds (default %(default)s)')
     p.add_argument('--reconnect', type=int, default=CLI_RECONNECT, help='when the connection dies (an unanswered ping, a reset, a timeout), retry this many times before giving up; 0 = off (default %(default)s)')
     p.add_argument('--reconnect-wait', type=float, default=CLI_RECONNECT_WAIT_S, help='seconds between the reconnect attempts (default %(default)s)')
-    p.add_argument('--control-token', default=None, help='control auth token for TCP (env MCH_CONTROL_TOKEN)')
-    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env MCH_CONTROL_TOKEN_FILE)')
+    p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN)')
+    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
     p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = off (default %(default)s)')
     p.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
@@ -327,8 +327,8 @@ def main():
 
     audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CLI', app='modbus-cache',
                                                     max_mb=args.audit_max_mb, files=args.audit_files)
-    token_file = args.control_token_file or os.environ.get('MCH_CONTROL_TOKEN_FILE')
-    token = args.control_token or os.environ.get('MCH_CONTROL_TOKEN')
+    token_file = args.control_token_file or os.environ.get('CONTROL_TOKEN_FILE')
+    token = args.control_token or os.environ.get('CONTROL_TOKEN')
     if token and token_file:
         p.error('--control-token and --control-token-file are mutually exclusive')
     if token_file:

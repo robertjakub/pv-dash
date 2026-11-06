@@ -55,12 +55,18 @@ def default_text(opt):
 
 def description(opt):
     """The registry help with the %(default)s placeholders filled and the
-    markdown pipes escaped."""
+    markdown-hostile characters escaped — pipes and bare angle-bracket
+    placeholders (<token>, <listen-port>) render literally in the table
+    instead of vanishing as unknown HTML tags. Code spans stay untouched."""
     try:
         text = opt.help % {'default': default_text(opt)}
     except (KeyError, TypeError, ValueError):
         text = opt.help
-    return text.replace('|', '\\|').replace('\n', ' ')
+    parts = text.split('`')
+    for i, part in enumerate(parts):
+        if i % 2 == 0:  # the segments outside the backtick code spans
+            parts[i] = part.replace('|', '\\|').replace('<', '\\<')
+    return ''.join(parts)
 
 
 def marks(rows_by_tool):

@@ -21,7 +21,7 @@ cache fetches its selection from it, the scraper binds its metrics to it —
 and the console tools (`*-ctl`, `*-cli`) share the family pattern (a
 JSON-lines control server, a settings registry, an append-only audit trail,
 a reconnecting console session). Every knob of the four daemons, side by
-side — name, function, the live `set` command, description, who has it: [options.md](options.md)
+side — name, function, the live `set` command, who has it: [options.md](options.md)
 (generated from the option registries).
 
 ## The flake

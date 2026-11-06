@@ -41,35 +41,6 @@ def load(tool_dir):
     return rows
 
 
-def default_text(opt):
-    """The argparse-rendered default for the %(default)s helps."""
-    v = opt.default
-    if v is None:
-        return 'unset'
-    if isinstance(v, bool):
-        return 'on' if v else 'off'
-    if isinstance(v, float):
-        return '%g' % v
-    return str(v)
-
-
-def description(opt):
-    """The row's text — the flag help, or the setting help on a control-only
-    row — with the %(default)s placeholders filled and the markdown-hostile
-    characters escaped — pipes and bare angle-bracket placeholders (<token>,
-    <listen-port>) render literally in the table instead of vanishing as
-    unknown HTML tags. Code spans stay untouched."""
-    try:
-        text = (opt.help or opt.setting_help or '') % {'default': default_text(opt)}
-    except (KeyError, TypeError, ValueError):
-        text = opt.help or opt.setting_help or ''
-    parts = text.split('`')
-    for i, part in enumerate(parts):
-        if i % 2 == 0:  # the segments outside the backtick code spans
-            parts[i] = part.replace('|', '\\|').replace('<', '\\<')
-    return ''.join(parts)
-
-
 def marks(rows_by_tool):
     """One cell per tool: ✓ (bold when every tool has the knob), plus the
     live/secret markers."""
@@ -112,8 +83,8 @@ def main():
     out = ['# The knobs of the family (options.md)',
            '',
            'One table comparing every knob of the four daemons — the name, the',
-           'function it files under, the control command that changes it on a',
-           'running daemon and the registry description — with a mark per',
+           'function it files under and the control command that changes it on',
+           'a running daemon — with a mark per',
            'tool. **Generated** from the per-tool `lib/options.json` registries (the',
            'one-knob-one-source rows) by `scripts/gen_options.py` — edit the',
            'registries and re-run `python3 scripts/gen_options.py`, never this file.',
@@ -131,7 +102,7 @@ def main():
     out.append('shared nearly verbatim; the audit, limits and metrics blocks follow the')
     out.append('family shape with per-tool defaults.')
     out.append('')
-    cols = ['knob', 'function', 'live', 'description'] + [t for _, t in TOOLS]
+    cols = ['knob', 'function', 'live'] + [t for _, t in TOOLS]
     out.append('| ' + ' | '.join(cols) + ' |')
     out.append('|' + '---|' * len(cols))
     for section, _title in SECTIONS:
@@ -142,9 +113,9 @@ def main():
             first = next(iter(by_tool.values()))
             cells = marks(by_tool)
             knob = ('`%s` (control-only)' % name) if not first.flag else ('`--%s`' % name)
-            out.append('| %s | %s | %s | %s | %s |'
+            out.append('| %s | %s | %s | %s |'
                        % (knob, SECTION_TAG.get(section, section), live_cell(by_tool),
-                          description(first), ' | '.join(cells)))
+                          ' | '.join(cells)))
     out.append('')
     out.append('Legend: ✓ = the tool has the knob (**bold** = all four do); '
                'the `live` column is the control command itself — `set <name>` over '
@@ -156,11 +127,9 @@ def main():
                '`secret` = a token — never rendered inline by '
                '`show config` (the `-file` form is); *(control-only)* = a setting '
                'that lives on the control wire alone (the fake\'s pins and machines '
-               '— no flag, no env, no config-file row). The description is the shared '
-               'registry text (the same one `--help`, the man pages, `show knobs` '
-               'and the bundled configs render), taken from the first tool that '
-               'defines the knob and with its default filled in — where the tools '
-               'word a knob differently, the tool\'s own `--help`/man page wins.')
+               '— no flag, no env, no config-file row). The knob descriptions stay '
+               'in the registries — `--help`, the man pages, `show knobs` and '
+               '`help config` render them per tool.')
     out.append('')
 
     path = os.path.join(REPO, 'options.md')

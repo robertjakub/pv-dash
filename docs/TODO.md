@@ -15,10 +15,12 @@ the **Done/history** records for their tool.
   `set metrics-server off` / `set metrics listen 0.0.0.0:9252` on all
   three control servers, the same verbs everywhere
   (set/unset/show/request/...), the same reply shapes. Breaking: every
-  script and unit file speaking the old flat grammar follows. (The ground
-  work stands now — Nov 2026: the registry `live` name is a `/`-path
-  spelled as words on the wire and every row may carry a display `group`;
-  no row uses either yet — the renames below are still open.)
+   script and unit file speaking the old flat grammar follows. (The ground
+   work stands now — Nov 2026: the registry `live` name is a `/`-path
+   spelled as words on the wire and every row may carry a display `group` —
+   the cli `?`/TAB listings group by it alone, `[ungrouped]` when a row
+   carries none; the first group rows are filed (the `upstream` knobs), no
+   row spells a path yet — the renames below are still open.)
 
 ## The security wave (the audit follow-ups)
 

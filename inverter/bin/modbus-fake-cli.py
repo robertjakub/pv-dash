@@ -105,8 +105,8 @@ def candidates(buf):
     """Valid next words for the buffer being completed or questioned:
     (matches, hint about the following word, describer of each word, the
     listing groups — the settings under their registry groups
-    ([device]/[serving]/...), the values of one setting ([values]),
-    [system] beside). A live setting's name may be a '/'-path
+    ([ungrouped] where a row carries none), the values of one setting
+    ([values]), [system] beside). A live setting's name may be a '/'-path
     (`inverter/profile`): set/unset/show spell it as words — the completion
     offers the next segment until the path is whole, then the values."""
     end_space = buf.endswith(' ')
@@ -141,9 +141,9 @@ def candidates(buf):
 
 def _sections(head, done_len, matches, values=False):
     """The listing groups: the settings under their registry groups (the
-    row's `group`, else its section — [device]/[serving]/...), the values
-    of one setting ([values]), everything else ([system]: the report words,
-    the commands, the register pseudo-setting)."""
+    row's `group`, else [ungrouped]), the values of one setting
+    ([values]), everything else ([system]: the report words, the
+    commands, the register pseudo-setting)."""
     if values:
         return [('values', matches)]
     if head in ('set', 'unset', 'show') and done_len >= 1:

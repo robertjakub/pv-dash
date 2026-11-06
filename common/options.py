@@ -243,10 +243,10 @@ class Setting:
     description the wire help answers with, the completable value words, the
     value-shape hint (shown after the words), the per-value short
     descriptions, the registry section the setting files under and the
-    display group it renders in (the row's `group`, else the section — the
-    [device]/[serving]/... groups the console word-help and the completions
-    render). Derived from the Option rows (settings_of) — the registry is
-    the one place a knob's vocabulary lives."""
+    display group it renders in (the row's `group`, else [ungrouped] —
+    the console word-help and the completions group by the `group`
+    field alone). Derived from the Option rows (settings_of) — the
+    registry is the one place a knob's vocabulary lives."""
 
     def __init__(self, name, help, values=(), hint=None, value_help=None, section=None, group=None):
         self.name = name
@@ -260,8 +260,9 @@ class Setting:
     @property
     def display_group(self):
         """The bucket the setting renders under: the registry's `group`,
-        else its section."""
-        return self.group or self.section
+        else [ungrouped] — the console listings group by the `group`
+        field alone, the section never fills in."""
+        return self.group or 'ungrouped'
 
     @property
     def value_shape(self):
@@ -290,9 +291,9 @@ def settings_of(options):
 
 def setting_groups(names, by_name):
     """The live settings grouped under their display groups (the row's
-    `group`, else its section) — the [device]/[serving]/... groups the
-    console word-help and the completions render in place of the one flat
-    [settings] group (the [values] and [system] groups stay the callers').
+    `group`, else [ungrouped] — the console word-help and the completions
+    group by the `group` field alone, the section never fills in; the
+    [values] and [system] groups stay the callers').
     First-appearance order over the given names, only the non-empty groups;
     a name no Setting answers for belongs to the caller's [system] group,
     never here."""

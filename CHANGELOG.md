@@ -355,6 +355,17 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **the console listings group by the `group` field
+  alone**: the cli `?`/TAB listings bucket a setting under its registry
+  `group`, and a row that carries none renders under `[ungrouped]`
+  (until now the section filled in — `[device]/[serving]/...`;
+  `Setting.display_group` holds the rule, `setting_groups()` the
+  grouping). The `[values]`/`[system]` groups stay the callers'; the
+  daemon-side surfaces (`show config`, `show knobs`, `help config`)
+  keep the section fallback for their groupless rows. (The Added entry
+  "the registry learns to group" above said the console listings group
+  "the same way" as the daemon surfaces — they split here.)
+
 - **everywhere** — **the sections render as their registry names**: the
   console `?`/TAB listings group the settings under the registry's own
   section heads — `[device]`, `[serving]`, `[control]`, `[metrics]`,

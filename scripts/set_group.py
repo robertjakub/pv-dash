@@ -8,7 +8,7 @@ resolves to <repo root>/<project>/lib/options.json (cache, scraper,
 inverter, dashboard); `<name>` is the row's option name (the exact "name"
 value, e.g. cache-ttl); `<group>` is the display group — one clean word,
 no whitespace (the check_options gate) — or `-` to clear it (the row then
-groups under its section — [ungrouped] on the cli listings). The edit is
+renders ungrouped — bare, no header — on the cli listings). The edit is
 surgical: the file's hand-wrapped formatting outside the touched row is
 preserved byte-for-byte.
 

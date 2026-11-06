@@ -6,13 +6,16 @@
 
 The dialog: the knob index is the menu — arrows walk it, Enter opens the
 row as a form; arrows walk the fields, Enter edits an editable one
-(group, live, alias, setting-help, hint; value-help opens its own key menu —
+row as a form; arrows walk the fields, Enter edits an editable one
+(group, live, alias, setting-help, hint, the marks: hidden hides the row
+from the ?/TAB pools, restart marks the startup-only knob; value-help
+opens its own key menu —
 Enter edits a value's text, a adds a key, d deletes it), Esc leaves the
 input line empty-handed, s saves the row (surgically: the touched row
 re-renders in the house format, the rest of the file stays
 byte-for-byte; parse-back guarded), c cancels back to the menu, q quits —
 warned away while a row holds unsaved edits. The view-only fields (flag,
-env, section, conv, default, help — the one-knob-one-source surfaces
+env, conv, default, help — the one-knob-one-source surfaces
 render them elsewhere) show with the rest; edited fields are marked.
 A live RENAME is a wave, not an edit: the daemon's _apply/defaults
 dispatch keys the live name (docs/TODO.md). An alias is an edit: the
@@ -26,9 +29,8 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)   # the common/ vocabulary (SECTIONS) and the sibling lint_options
+sys.path.insert(0, ROOT)   # the sibling lint_options (the canonical renderer, the drafts)
 
-from common.options import SECTIONS
 from lint_options import lint, proposals, render_registry
 
 try:
@@ -38,8 +40,8 @@ except ImportError:
 
 
 PROJECTS = ('cache', 'scraper', 'inverter', 'dashboard')
-INLINE = ('name', 'flag', 'env', 'section', 'conv', 'group', 'live', 'alias', 'negates')
-EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hint', 'value-help')
+INLINE = ('name', 'flag', 'env', 'conv', 'group', 'live', 'alias', 'negates')
+EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hint', 'value-help', 'hidden', 'restart')
 SHOW_EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hidden')   # the registry's `show` rows: the
                                                                        # bucket, the live hierarchy, the
                                                                        # alias, the word's description, the mark
@@ -123,11 +125,13 @@ def render_row(row):
 def row_kind(row):
     """The row's kind: a hierarchy node (a live-path prefix, help-only) or
     a knob (the flag/env twin exists) or control-only (wire-settable only,
-    no flag) — `*` marks the live-settable ones (the live name rides the
-    bucket column beside); a node can only be `node*` by hand-editing —
-    the editor refuses live on a node, a live node is a registry bug."""
+    no flag) — `*` marks the cli-visible ones (the live name rides the
+    bucket column beside; a hidden row rides bare — the wire answers it,
+    the ?/TAB pools never list it); a node can only be `node*` by
+    hand-editing — the editor refuses live on a node, a live node is a
+    registry bug."""
     kind = 'node' if row.get('node') else ('knob' if row.get('flag') else 'control-only')
-    return kind + ('*' if row.get('live') else '')
+    return kind + ('*' if row.get('live') and not row.get('hidden') else '')
 
 
 ORDERS = ('name', 'kind', 'live', 'group', 'registry')
@@ -193,7 +197,8 @@ def row_keys(row, editable=EDITABLE):
     keys = list(row.keys()) + [k for k in editable if k not in row]
     rank = {k: i for i, k in enumerate(INLINE)}
     rank.update({k: 100 + i for i, k in enumerate(BEFORE_HELP)})
-    rank['hidden'] = 105   # the show rows: the mark after the setting vocabulary
+    rank['hidden'] = 105   # the marks after the setting vocabulary (every kind)
+    rank['restart'] = 106
     rank['help'] = 999
     return sorted(keys, key=lambda k: rank.get(k, 50))
 
@@ -232,13 +237,13 @@ class Editor:
         st = os.stat(self.path)
         return (st.st_mtime_ns, st.st_size)
 
-    def add_node(self, name, section, desc):
+    def add_node(self, name, desc):
         """A brand-new hierarchy node: the minimal row (the name, the node
-        mark, the section, the description) appended to `options`, the file
+        mark, the description) appended to `options`, the file
         rewritten in the canonical layout. (ok, message)."""
         if any(r['name'] == name for r in self.rows + self.show + self.cmds):
             return False, 'err the name %r is taken' % name
-        row = {'name': name, 'node': True, 'section': section, 'setting-help': desc}
+        row = {'name': name, 'node': True, 'setting-help': desc}
         meta = json.loads(self.text)
         meta.setdefault('options', []).append(row)
         new_text = render_registry(meta)
@@ -248,7 +253,7 @@ class Editor:
             f.write(new_text)
         self.stamp = self._stamp()
         self.__init__(self.project)   # the fresh parse: the rows, the show-names, the marks
-        return True, 'ok the node %s added (files under %s)' % (name, section)
+        return True, 'ok the node %s added' % name
 
     def delete_node(self):
         """The open hierarchy-node row removed from the registry (the file
@@ -283,7 +288,8 @@ class Editor:
         """The listing's kind mark: show for the `show` rows — starred
         when the word lists (hidden false/absent), bare when the row
         hides from the ?/TAB pools — row_kind's node/knob*/control-only
-        for the option rows."""
+        for the option rows (the same hidden rule: a hidden knob is
+        wire-only, the pools never list it)."""
         if self.is_cmd(r):
             return 'cmd' + ('*' if not r.get('hidden') else '')
         if self.is_show(r):
@@ -311,7 +317,8 @@ class Editor:
         """The fields one may edit: the `show` rows carry the live
         hierarchy, the bucket, the word's description and the hidden mark;
         the `commands` rows the bucket, the description and the mark; the
-        option rows the five."""
+        option rows the vocabulary plus the marks (hidden — the wire-only
+        toggle, every kind but a node; restart — the startup-only knob)."""
         if self.is_cmd(row):
             return CMD_EDITABLE
         return SHOW_EDITABLE if self.is_show(row) else EDITABLE
@@ -360,20 +367,26 @@ class Editor:
         name = self.row['name']
         if key == 'name':
             return False, 'err the name is the row\'s identity — it does not edit'
+        if key == 'hidden' or key == 'restart':   # the bool marks — hidden on the knobs, the
+            if key == 'restart' and self.is_show(self.row):   # show rows and the command rows too;
+                return False, 'err %s is a show row — only %s edit' % (name, ' | '.join(SHOW_EDITABLE))   # restart: option rows only
+            if key == 'restart' and self.is_cmd(self.row):
+                return False, 'err %s is a command row — only %s edit' % (name, ' | '.join(CMD_EDITABLE))
+            if self.row.get('node'):
+                return False, 'err %s is a hierarchy node — only its setting-help and group edit' % name
+            v = (value or 'off').lower()   # the empty = the clear = off
+            if v not in ('on', 'off', 'true', 'false', '1', '0', 'yes', 'no'):
+                return False, 'err %s must be on or off' % key
+            if v in ('on', 'true', '1', 'yes'):
+                self.row[key] = True
+                return True, 'ok %s.%s on%s' % (name, key, '' if key == 'restart' else ' (the pools drop it, the wire answers)')
+            if key not in self.row:
+                return False, '%s: %s already off' % (name, key)
+            del self.row[key]   # off = the field's absence
+            return True, 'ok %s.%s off (the mark cleared)' % (name, key)
         if self.is_show(self.row):
             if key not in SHOW_EDITABLE:
                 return False, 'err %s is a show row — only %s edit' % (name, ' | '.join(SHOW_EDITABLE))
-            if key == 'hidden':
-                v = (value or 'off').lower()   # the empty = the clear = off
-                if v not in ('on', 'off', 'true', 'false', '1', '0', 'yes', 'no'):
-                    return False, 'err hidden must be on or off'
-                if v in ('on', 'true', '1', 'yes'):
-                    self.row['hidden'] = True
-                    return True, 'ok %s.hidden on' % name
-                if 'hidden' not in self.row:
-                    return False, '%s: hidden already off' % name
-                del self.row['hidden']   # off = the field's absence
-                return True, 'ok %s.hidden off (the mark cleared)' % name
         if self.is_cmd(self.row):
             if key not in CMD_EDITABLE:
                 return False, 'err %s is a command row — only %s edit' % (name, ' | '.join(CMD_EDITABLE))
@@ -704,27 +717,20 @@ def dialog(editor, screen):
                 elif not name.strip() or any(c.isspace() for c in name.strip()) or '/' in name.strip():
                     msg = 'err the node name must be one clean word'
                 else:
-                    section = input_line('section (%s): ' % '|'.join(s for s, _ in SECTIONS), '')
-                    titles = dict(SECTIONS)
-                    if section is None:
+                    draft = next((d for f, d, _ in proposals({'name': name.strip(), 'node': True})
+                                  if f == 'setting-help'), '')
+                    desc = input_line('setting-help: ', draft)   # the draft = the ack-inline
+                    if desc is None:
                         msg = ''
-                    elif section.strip() not in titles:
-                        msg = 'err the section must be one of: %s' % '|'.join(s for s, _ in SECTIONS)
+                    elif not desc.strip():
+                        msg = 'err the node needs its description'
                     else:
-                        draft = next((d for f, d, _ in proposals({'name': name.strip(), 'node': True})
-                                      if f == 'setting-help'), '')
-                        desc = input_line('setting-help: ', draft)   # the draft = the ack-inline
-                        if desc is None:
-                            msg = ''
-                        elif not desc.strip():
-                            msg = 'err the node needs its description'
-                        else:
-                            ok, msg = editor.add_node(name.strip(), section.strip(), desc.strip())
-                            if ok:
-                                view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
-                                names = [r['name'] for r in view]
-                                new_name = name.strip()
-                                cursor = names.index(new_name) if new_name in names else min(cursor, max(0, len(names) - 1))
+                        ok, msg = editor.add_node(name.strip(), desc.strip())
+                        if ok:
+                            view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
+                            names = [r['name'] for r in view]
+                            new_name = name.strip()
+                            cursor = names.index(new_name) if new_name in names else min(cursor, max(0, len(names) - 1))
             elif k == ord('o'):
                 order = ORDERS[(ORDERS.index(order) + 1) % len(ORDERS)]
                 view = view_rows(editor.rows + editor.show + editor.cmds, filt, order, editor.kind, vmode, kmode)
@@ -760,7 +766,7 @@ def dialog(editor, screen):
                     msg = '%s is view-only (the registry renders it elsewhere)' % key
                 elif key == 'value-help':
                     msg = vh_menu()
-                elif key == 'hidden' or isinstance(editor.row.get(key), bool):
+                elif key in ('hidden', 'restart') or isinstance(editor.row.get(key), bool):
                     msg = bool_menu(key)   # a bool picks from the menu, not the string
                 else:
                     msg = edit_value(key)

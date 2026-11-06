@@ -13,8 +13,6 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, REPO)
 
-from common.options import SECTIONS                              # noqa: E402
-
 # the daemons, in the chain order the README tells: fake -> cache -> scraper,
 # then the dashboard that renders the numbers
 TOOLS = (('cache', 'cache'),
@@ -68,10 +66,9 @@ def live_cell(rows_by_tool):
 
 
 def group_cell(rows_by_tool):
-    """The group column: the row's optional finer display bucket (the
-    registry's group field — the surfaces file the knob under it instead of
-    the section), the tools' names joined when they diverge. Blank = the
-    function (the section) groups it."""
+    """The group column: the row's display bucket (the registry's group
+    field — the surfaces file the knob under it; blank = ungrouped, the
+    surfaces render it bare), the tools' names joined when they diverge."""
     names = sorted({opt.group for opt in rows_by_tool.values() if opt.group})
     return ', '.join('`%s`' % n for n in names)
 
@@ -80,18 +77,17 @@ def main():
     registries = {key: load(d) for key, d in TOOLS}
     names = {key: t for key, t in TOOLS}
 
-    # the merged knob universe: section -> name -> {tool: opt}
+    # the merged knob universe: name -> {tool: opt}
     merged = {}
     for key, _ in TOOLS:
         for opt in registries[key]:
-            merged.setdefault(opt.section, {}).setdefault(opt.name, {})[key] = opt
+            merged.setdefault(opt.name, {})[key] = opt
 
     out = ['# The knobs of the family (options.md)',
            '',
            'One alphabetical table of every knob of the four daemons — the kind,',
-           'the name, the function it files under, the finer group it renders',
-           'under and the control command that changes it on a running daemon —',
-           'with a mark per',
+           'the name, the group it renders under, and the control command that',
+           'changes it on a running daemon — with a mark per',
            'tool. **Generated** from the per-tool `lib/options.json` registries (the',
            'one-knob-one-source rows) by `scripts/gen_options.py` — edit the',
            'registries and re-run `python3 scripts/gen_options.py`, never this file.',
@@ -102,29 +98,24 @@ def main():
            'here. The ctl/cli clients speak the control plane only',
            '(`--control-port`, the token file/env pair) and are not compared.',
            '']
-    all_four = sorted(name for section in merged.values() for name, by_tool in section.items()
+    all_four = sorted(name for name, by_tool in merged.items()
                       if len(by_tool) == len(TOOLS))
     out.append('Common to **all four** tools (%d): %s. The control-plane block is'
                % (len(all_four), ', '.join('`%s`' % n for n in all_four)))
     out.append('shared nearly verbatim; the audit, limits and metrics blocks follow the')
     out.append('family shape with per-tool defaults.')
     out.append('')
-    cols = ['kind', 'name', 'function', 'group', 'live'] + [t for _, t in TOOLS]
+    cols = ['kind', 'name', 'group', 'live'] + [t for _, t in TOOLS]
     out.append('| ' + ' | '.join(cols) + ' |')
     out.append('|' + '---|' * len(cols))
-    # one alphabetical run over the whole merged universe — the section only
-    # breaks the ties (the same name files twice: interval on the cache's
-    # device and the scraper's logging)
-    order = {key: i for i, (key, _title) in enumerate(SECTIONS)}
-    flat = [(name, section, by_tool)
-            for section in merged for name, by_tool in merged[section].items()]
-    flat.sort(key=lambda row: (row[0], order.get(row[1], len(order))))
-    for name, section, by_tool in flat:
+    # one alphabetical run over the whole merged universe
+    for name in sorted(merged):
+        by_tool = merged[name]
         first = next(iter(by_tool.values()))
         cells = marks(by_tool)
         kind = 'c' if not first.flag else 'k'
-        out.append('| %s | `%s` | %s | %s | %s | %s |'
-                   % (kind, name, section, group_cell(by_tool),
+        out.append('| %s | `%s` | %s | %s | %s |'
+                   % (kind, name, group_cell(by_tool),
                       live_cell(by_tool), ' | '.join(cells)))
     out.append('')
     out.append('Legend: `k` = a knob — the flag/env/config-file rows; '
@@ -138,9 +129,8 @@ def main():
                '*(startup-only)* = no live form, a restart applies the knob; a cell\'s '
                '`live` mark says the tool takes the knob live (a cell without one = '
                'that tool applies the knob at startup only); '
-               '`group` = the row\'s optional finer display bucket — the tool\'s '
-               'surfaces file the knob under it instead of the function (blank = the '
-               'function groups it); '
+               '`group` = the row\'s display bucket — the tool\'s '
+               'surfaces file the knob under it (blank = ungrouped, rendered bare); '
                '`secret` = a token — never rendered inline by '
                '`show config` (the `-file` form is). The knob descriptions stay '
                'in the registries — `--help`, the man pages, `show knobs` and '
@@ -150,7 +140,7 @@ def main():
     path = os.path.join(REPO, 'options.md')
     with open(path, 'w', encoding='utf-8') as fh:
         fh.write('\n'.join(out))
-    total = sum(len(s) for s in merged.values())
+    total = len(merged)
     print('options.md: %d knobs, %d common to all four' % (total, len(all_four)))
 
 

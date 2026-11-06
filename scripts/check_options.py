@@ -72,18 +72,14 @@ def readme_flags(readme):
     return text
 
 
-def bundled_config_names(config):
-    """The `set <name>` lines (comments stripped) the bundled script carries."""
-    names = set()
-    for raw in open(os.path.join(REPO, config)):
-        line = raw.strip()
-        if not line or line.startswith('#'):
-            continue
-        body = line[4:] if line.startswith('set ') else line
-        parts = body.split(None, 1)
-        if parts:
-            names.add(parts[0])
-    return names
+def bundled_config_names(config, options):
+    """The registry names the bundled script's set lines resolve to — the
+    CLI spelling (`set modbus upstream <value>`) via the same word-index
+    parser the daemons load their configs with (a line no registry word
+    answers raises ValueError)."""
+    from common.options import parse_config_script
+    text = open(os.path.join(REPO, config)).read()
+    return {name for name, _ in parse_config_script(text, config, options)}
 
 
 def check_tool(tool):
@@ -122,11 +118,19 @@ def check_tool(tool):
                             or not any(x.live and x.live.startswith(o.name + '/') for x in options)))
     rows.append((not bad_nodes, '%s: every hierarchy node describes its namespace and has a live child%s'
                  % (tool, ' — bad rows: %s' % ', '.join(bad_nodes) if bad_nodes else '')))
-    # the hidden rows: a hidden knob is a wire-only listing mark — it needs
-    # a live name to be worth hiding
-    bad_hidden = sorted(o.name for o in options if o.hidden and not o.live)
+    # the hidden rows: a hidden knob is a wire-only listing mark — the pools
+    # hide it either way (a flat row is a transient: the registry pass grants
+    # its live name); a node row has no wire face to hide
+    bad_hidden = sorted(o.name for o in options if o.hidden and o.node)
     rows.append((not bad_hidden, '%s: every hidden option carries a live name%s'
                  % (tool, ' — bad rows: %s' % ', '.join(bad_hidden) if bad_hidden else '')))
+    # the restart knobs: the mark is a behavior mark, independent of the live
+    # name (a live-named knob may still answer the restart note) — it rides
+    # option rows only, never a node/show/command row
+    bad_restart = sorted(o.name for o in options
+                         if o.restart and (o.node or not o.flag))
+    rows.append((not bad_restart, '%s: every restart mark rides an option knob%s'
+                 % (tool, ' — bad rows: %s' % ', '.join(bad_restart) if bad_restart else '')))
     # the registry's `show` section: the custom show words — clean unique
     # words, a description each
     mod = sys.modules['options']
@@ -194,10 +198,14 @@ def check_tool(tool):
                      % (tool, ' — missing: %s' % ', '.join(missing_nix) if missing_nix else '')))
 
     if config:
-        names = bundled_config_names(config)
-        unknown = sorted(n for n in names if n not in {o.name for o in options})
-        rows.append((not unknown, '%s: the bundled config names registry options only%s'
-                     % (tool, ' — unknown: %s' % ', '.join(unknown) if unknown else '')))
+        try:
+            names = bundled_config_names(config, options)
+        except ValueError as e:
+            rows.append((False, '%s: the bundled config does not parse against the registry: %s' % (tool, e)))
+        else:
+            unknown = sorted(n for n in names if n not in {o.name for o in options})
+            rows.append((not unknown, '%s: the bundled config names registry options only%s'
+                         % (tool, ' — unknown: %s' % ', '.join(unknown) if unknown else '')))
     return rows
 
 

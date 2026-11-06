@@ -19,7 +19,7 @@ id **1**.
 ## Run
 
 ```bash
-python3 scrape/bin/modbus-scraper.py --host 192.168.1.100
+python3 scraper/bin/modbus-scraper.py --upstream 192.168.1.100:502
 curl http://localhost:9350/metrics
 ```
 
@@ -49,7 +49,7 @@ compose service scrapes `modbus-scraper:9350` over the internal network
 with the generated token file — see [docker/README.md](../docker/README.md).)
 
 **Authentication is disabled by default.** Set **`--auth-token <secret>`**
-(config script `set auth-token`, env `SCR_AUTH_TOKEN`) to require
+(config script `set auth-token`, env `AUTH_TOKEN`) to require
 `Authorization: Bearer <token>` on every request — anything else gets `401`
 with a `WWW-Authenticate: Bearer` challenge. Keep the token out of the
 world-readable Nix store with **`--auth-token-file`** (NixOS: `authTokenFile`) —
@@ -61,7 +61,7 @@ the file is re-read on every SIGHUP, so rotation is `rewrite file` +
 > `ps` output or `/proc/*/cmdline` (the audit's F9). Prefer
 > **`--auth-token-file`** — the file must be **owner-only (`0600`)**;
 > group/world-accessible token files refuse to start (F12) — or the
-> `SCR_AUTH_TOKEN` env var. The flag form is for quick tests.
+> `AUTH_TOKEN` env var. The flag form is for quick tests.
 
 Pass the token to Prometheus with — the file form is the shipped way (one
 secret per line, `0600`; `credentials:` with the literal secret works too):
@@ -78,6 +78,10 @@ curl -H 'Authorization: Bearer <secret>' http://localhost:9350/metrics
 
 ## Metrics
 
+The profile- and compute-fed names carry the `--metric-prefix` prefix (the
+rows below show the default `huawei_`); the `scraper_*` self-observability
+names are fixed.
+
 | Metric | Meaning |
 |---|---|
 | `huawei_pv_generation_watts` | PV (inverter input) power |
@@ -85,13 +89,14 @@ curl -H 'Authorization: Bearer <secret>' http://localhost:9350/metrics
 | `huawei_grid_import_watts` | power imported from the grid (≥ 0) |
 | `huawei_home_consumption_watts` | home load, derived as `PV − net grid` (− battery when enabled) |
 | `huawei_grid_net_watts` | signed net grid power (debugging aid) |
-| `huawei_up` | 1 if the last poll succeeded |
-| `huawei_modbus_errors_total` / `huawei_last_poll_timestamp_seconds` | poller health |
-| `huawei_battery` | 1 if battery support is enabled (always exported); the dashboard treats 0 / missing as "no battery" and dims its battery node |
 | `huawei_battery_net_watts` | signed battery power, +charge/−discharge (`--battery` only) |
 | `huawei_battery_charge_watts` / `huawei_battery_discharge_watts` | the split, ≥ 0, for stacked graphs (`--battery` only) |
 | `huawei_battery_soc_percent` | battery state of charge (`--battery` only) |
-| `huawei_cache_device_up` / `huawei_cache_age_seconds` / `huawei_cache_uptime_seconds` | modbus-cache diagnostics, **auto-detected**: exported only when the polled endpoint serves the cache's diag block (registers 65000–65003, magic-checked). `device_up 0` / a growing `age_seconds` mean the device is down **behind the cache** while the cache keeps serving last-known values |
+| `scraper_battery` | 1 if battery support is enabled (always exported); the dashboard treats 0 / missing as "no battery" and dims its battery node |
+| `scraper_up` | 1 if the last poll succeeded |
+| `scraper_modbus_errors_total` / `scraper_last_poll_timestamp_seconds` | poller health |
+| `scraper_poll_duration_seconds` / `_mean` / `_max` | the last poll cycle's duration (the reads + the sanity checks) and its running mean/maximum |
+| `scraper_cache_device_up` / `scraper_cache_age_seconds` / `scraper_cache_uptime_seconds` | modbus-cache diagnostics, **auto-detected**: exported only when the polled endpoint serves the cache's diag block (registers 65000–65003, magic-checked). `device_up 0` / a growing `age_seconds` mean the device is down **behind the cache** while the cache keeps serving last-known values |
 
 Sign conventions and sanity caps:
 
@@ -133,7 +138,7 @@ export/import split, ...). Each bound entry's `type`/`scale` drive the
 decode — a `scale: 1` SoC is read as plain percent, a `scale: 10` one as
 percent×10. A `profile` field pointing at a register the device profile
 does not define leaves the metric absent (logged at startup). Profile resolution: `--profile`
-flag, env `SCR_PROFILE`, config script `set profile`, then the bundled copy;
+flag, env `PROFILE`, config script `set profile`, then the bundled copy;
 re-read on `SIGHUP`. The register map itself — addresses, types, gains,
 function codes — comes from the device profile **alone**: there are no
 register override knobs. The live control surface swaps it at runtime:
@@ -142,11 +147,11 @@ register override knobs. The live control surface swaps it at runtime:
 metric sources and rolls back cleanly when the profile lacks the registers
 the power math depends on.
 
-Metric names, help texts and types live in **`scrape/metrics.json`**
+Metric names, help texts and types live in **`scraper/metrics.json`**
 next to the script and are loaded at startup — edit it to rename metrics or
 reword `# HELP` lines without touching the code. The exporter's own
 observability specs (the `scraper_*` gauges, the `scraper` section) ship
-separately in **`scrape/lib/metrics.json`** and are merged in over the
+separately in **`scraper/lib/metrics.json`** and are merged in over the
 configured spec in memory at startup: a custom `--metrics-spec` only needs
 the `profile`/`compute` entries it cares about, and its `scraper` entries —
 when it has any — override the built-ins by name. A missing or corrupt spec
@@ -157,19 +162,20 @@ fails cleanly at startup (one-line error, exit 1), never a traceback.
 Settings are resolved in this order (first hit wins), mirroring
 `modbus-cache`:
 
-1. CLI flags (`--host`, `--listen`, …)
-2. Environment variables — same names prefixed: `SCR_CONFIG`,
-   `SCR_METRICS_SPEC`, `SCR_HOST`,
-   `SCR_MODBUS_PORT`, `SCR_UNIT`, `SCR_MODBUS_OFFSET`,
-   `SCR_TIMEOUT`, `SCR_PROFILE`, `SCR_METRIC_PREFIX`,
-   `SCR_MAX_KWP`, `SCR_MAX_GRID_KW`,
-   `SCR_BATTERY`,
-   `SCR_GRID_POSITIVE_IMPORT`, `SCR_LISTEN`,
-   `SCR_INTERVAL`, `SCR_LOCAL_TIME`, `SCR_LOG_ACCESS`,
-   `SCR_LOG_LEVEL`, `SCR_AUTH_TOKEN`, `SCR_AUTH_TOKEN_FILE`,
-   `SCR_MAX_CLIENTS`, `SCR_CLIENT_TIMEOUT`
-3. Config file (snake_case keys, `[scraper]` section) — `--config` picks the
-   file (default: `$SCR_CONFIG`, then `scraper.conf` next to the script —
+1. CLI flags (`--upstream`, `--listen`, …)
+2. Environment variables — the same names, bare (no tool prefix): `CONFIG`,
+   `METRICS_SPEC`, `UPSTREAM`,
+   `MODBUS_UNIT`, `MODBUS_OFFSET`,
+   `TIMEOUT`, `PROFILE`, `METRIC_PREFIX`,
+   `MAX_KWP`, `MAX_GRID_KW`,
+   `BATTERY`,
+   `GRID_POSITIVE_IMPORT`, `LISTEN`,
+   `INTERVAL`, `LOCAL_TIME`, `LOG_ACCESS`,
+   `LOG_LEVEL`, `AUTH_TOKEN`, `AUTH_TOKEN_FILE`,
+   `MAX_CLIENTS`, `CLIENT_TIMEOUT`
+3. Config file — the set-grammar script (`set <name> <value>` lines) —
+   `--config` picks the
+   file (default: `$CONFIG`, then `scraper.conf` next to the script —
    the packaged layout — then the subproject root's sample; missing file is
    fine)
 4. Built-in defaults
@@ -187,16 +193,15 @@ one-line error instead of failing later at runtime. The only soft spot is
 `timeout > interval`: that logs a warning (polls run back-to-back) instead
 of failing.
 
-`scrape/scraper.conf` is a sample in the set grammar (every line a
+`scraper/scraper.conf` is a sample in the set grammar (every line a
 `set <name> <value>`, `#` comments stay comments — the file pipes through
 `modbus-scraper-ctl` unchanged, and `show config` regenerates it from the running
 scraper):
 
 ```conf
 # modbus-scraper configuration — every line is a set command
-set host 127.0.0.1
-set modbus-port 5502
-set unit 1
+set upstream 127.0.0.1:5502
+set modbus-unit 1
 set modbus-offset 0
 set timeout 3
 set max-kwp 6
@@ -231,9 +236,9 @@ is just a path). Talk to it with **`modbus-scraper-ctl`** (one-shot / batch) or
 **`modbus-scraper-cli`** (the console session):
 
 ```bash
-python3 scrape/bin/modbus-scraper-ctl.py show status
-printf 'set interval 5\npoll now\n' | python3 scrape/bin/modbus-scraper-ctl.py
-python3 scrape/bin/modbus-scraper-cli.py            # TAB completes, ? lists
+python3 scraper/bin/modbus-scraper-ctl.py show status
+printf 'set interval 5\npoll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
+python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
 ```
 
 Commands: `set`/`unset` over the live settings (**`profile`** (the device
@@ -304,17 +309,16 @@ journald adds one.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--config` | `$SCR_CONFIG`, then `scraper.conf` next to the script, then the subproject root's | config file path (the set grammar) |
-| `--metrics-spec` | `$SCR_METRICS_SPEC` or the bundled `metrics.json` | metrics spec JSON: metric name → {help, type, profile?} — merged in memory over the built-in `lib/metrics.json` scraper_* block |
-| `--host` | `127.0.0.1` | inverter/dongle Modbus TCP address |
-| `--modbus-port` | `5502` | Modbus TCP port |
-| `--unit` | `1` | Modbus unit id |
+| `--config` | `$CONFIG`, then `scraper.conf` next to the script, then the subproject root's | config file path (the set grammar) |
+| `--metrics-spec` | `$METRICS_SPEC` or the bundled `metrics.json` | metrics spec JSON: metric name → {help, type, profile?} — merged in memory over the built-in `lib/metrics.json` scraper_* block |
+| `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
+| `--modbus-unit` | `1` | Modbus unit id |
 | `--modbus-offset` | `0` | added to register addresses (set `-1` for gateways that need 0-based addressing) |
 | `--profile` | the bundled `sun2000` profile | device profile JSON (the shared profiles/ schema): the whole register map — addresses, types, gains, function codes; a bare name resolves in `profiles/profiles/`; live-swappable with `set profile` |
 | `--max-kwp` | `6` | PV input power check against the array size: above `max-kwp × 1000` W → HTTP 503 + error log; `0` = off. Negative PV and export above the PV cap always error |
 | `--max-grid-kw` | `12` | power line grid exchange check: \|grid power\| above `max-grid-kw × 1000` W (either direction) → HTTP 503 + error log; `0` = off |
 | `--battery` | off | enable battery support: battery term in the home derivation + battery metrics |
-| `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names (`<prefix>_pv_generation_watts`, ...); the bundled `scraper_*` names are fixed (env `SCR_METRIC_PREFIX`) |
+| `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names (`<prefix>_pv_generation_watts`, ...); the bundled `scraper_*` names are fixed (env `METRIC_PREFIX`) |
 | `--grid-positive-import` | off | grid register positive means import |
 | `--timeout` | `3` | Modbus connect/read timeout, seconds |
 | `--listen` | `127.0.0.1:9350` | exporter bind address `HOST:PORT` (loopback by default) |
@@ -324,12 +328,12 @@ journald adds one.
 | `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; token compared timing-safe) |
 | `--auth-token-file` | disabled | read the bearer token from a file instead (single line, trimmed; **re-read on every SIGHUP** — rotate by rewriting the file and reloading; **owner-only `0600`** — a group/world-accessible token file refuses to start, F12); mutually exclusive with `--auth-token` |
 | `--control-port` | `/tmp/modbus-scraper-<listen-port>.socket` | the JSON-lines control server target (unix socket path or TCP port on 127.0.0.1), `0` = off |
-| `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `SCR_CONTROL_TOKEN`); a TCP control port refuses to start without one (F5) |
+| `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `CONTROL_TOKEN`); a TCP control port refuses to start without one (F5) |
 | `--control-token-file` | off | the control token from a file (the first line; a key file or a systemd `LoadCredential`, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12), instead of `--control-token`; giving both is an error |
-| `--control-ops-token` | off | a second, **read-only** control token: its sessions run the `show`/`clear` verbs only (no `set`/`unset`, no `poll now`, no `request reload`, no `restart`, no `shutdown`) — needs `--control-token`/`--control-token-file`, must differ from it; both roles audited (`SCR_CONTROL_OPS_TOKEN`) |
+| `--control-ops-token` | off | a second, **read-only** control token: its sessions run the `show`/`clear` verbs only (no `set`/`unset`, no `poll now`, no `request reload`, no `restart`, no `shutdown`) — needs `--control-token`/`--control-token-file`, must differ from it; both roles audited (`CONTROL_OPS_TOKEN`) |
 | `--control-ops-token-file` | off | the read-only ops token from a file (the first line; **owner-only `0600`**, F12), instead of `--control-ops-token`; giving both is an error |
-| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (`SCR_CONTROL_OPS_VERBS`) |
-| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `SCR_CONTROL_TRUST_UIDS`) |
+| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (`CONTROL_OPS_VERBS`) |
+| `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `CONTROL_TRUST_UIDS`) |
 | `--audit-log` | the XDG state home | the SCR audit trail: a file path or `-` for stdout (the docker/journald way) |
 | `--audit-max-mb` / `--audit-files` / `--no-audit-log` | `10` / `3` / off | the audit trail's rotation and the off switch |
 | `--man` | off | print the generated man page (roff) to stdout and exit (`modbus-scraper --man \| man -l -`) |
@@ -369,7 +373,7 @@ The fake inverter lives in its own subproject: [inverter/](../inverter/README.md
 mock Prometheus), not against real hardware.
 
 When a battery is present, enable support with `--battery` (env
-`SCR_BATTERY`, config script `set battery true`). The energy balance gains a battery
+`BATTERY`, config script `set battery true`). The energy balance gains a battery
 term and the home load derivation becomes:
 
 ```
@@ -405,7 +409,7 @@ The fake inverter can emulate the battery for testing:
 ## Nix
 
 ```bash
-nix run .#modbus-scraper -- --host 192.168.1.100
+nix run .#modbus-scraper -- --upstream 192.168.1.100:502
 ```
 
 NixOS module (same flake, service runs with a dynamic user and systemd
@@ -415,14 +419,15 @@ under `share/man/man1/`):
 ```nix
 services.modbus-scraper = {
   enable = true;
-  inverterHost = "192.168.1.100";
-  listenHost = "0.0.0.0";        # only if Prometheus runs on another host
+  upstream = "192.168.1.100:502";  # the inverter's LAN IP (:PORT)
+  listenHost = "0.0.0.0";          # only if Prometheus runs on another host
   listenPort = 9350;
-  battery = true;               # once a battery is installed
+  battery = true;                  # once a battery is installed
 };
 ```
 
-Options: `enable`, `package`, `inverterHost`, `inverterPort` (502), `unitId`,
+Options: `enable`, `package`, `upstream` (`HOST:PORT`, `:PORT` = loopback),
+`modbusUnit`,
 `modbusOffset`, `pvRegister`, `gridRegister`, `scale`, `gridScale`, `maxKwp`,
 `maxGridKw`, `battery`, `batteryRegister`, `batterySocRegister`,
 `gridPositiveImport`, `timeout`, `interval`, `listenHost`, `listenPort`,
@@ -456,7 +461,7 @@ Every scenario must end with the exporter serving correct metrics and
 ## Source layout
 
 ```
-scrape/
+scraper/
 ├── bin/
 │   ├── modbus-scraper.py  # CLI, logging setup, signal handling, the control wiring
 │   ├── modbus-scraper-ctl.py     # one-shot / batch control client

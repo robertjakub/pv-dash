@@ -9,7 +9,6 @@ lib/metrics (metric specs), lib/poller (poller + sanity checks),
 lib/server (exposition endpoint), lib/version, this file (CLI, logging,
 signals).
 """
-import argparse
 import logging
 import os
 import signal
@@ -25,12 +24,12 @@ from common.audit import AuditLog
 from common.config import parse_listen
 from common.cred import parse_trust_uids
 from common.logutil import UtcFormatter
+from common.options import build_parser
 from common.version import version_string
 from lib.config import resolve_config, resolve_control_target
 from lib.control import ControlServer
 from lib.metrics import Metrics
-from lib.options import KNOWN_VERBS
-from lib.statics import LOG_LEVELS
+from lib.options import KNOWN_VERBS, OPTIONS
 from lib.poller import Scraper
 from lib.protocol import ModbusTCP
 from lib.server import Handler, Server
@@ -39,10 +38,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def default_config_path():
-    """$SCR_CONFIG wins (the docker config volume); then a user's
+    """$CONFIG wins (the docker config volume); then a user's
     config script next to the bin (the flattened package layout); then the
     dev checkout's sample at the subproject root."""
-    env = os.environ.get('SCR_CONFIG')
+    env = os.environ.get('CONFIG')
     if env and env.strip():
         return env.strip()
     for candidate in (os.path.join(SCRIPT_DIR, 'scraper.conf'),
@@ -56,66 +55,9 @@ logger = logging.getLogger('scraper')
 
 
 def parse_args():
-    ap = argparse.ArgumentParser(description='Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP).')
+    ap = build_parser(OPTIONS, description='Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP).')
     ap.add_argument('--config', default=default_config_path(),
-                    help='config file — the set grammar: every line a `set <name> <value>`, comments start with # (default: $SCR_CONFIG, then scraper.conf next to this script, then the subproject root)')
-    ap.add_argument('--host', help='inverter Modbus TCP address (default: config, $SCR_HOST or 127.0.0.1)')
-    ap.add_argument('--modbus-port', type=int, help='inverter Modbus TCP port (default: config, $SCR_MODBUS_PORT or 5502)')
-    ap.add_argument('--unit', type=int, help='Modbus unit id (default: config, $SCR_UNIT or 1)')
-    ap.add_argument('--modbus-offset', type=int, help='added to register addresses (default: config, $SCR_MODBUS_OFFSET or 0)')
-    ap.add_argument('--timeout', type=float, help='Modbus timeout in seconds (default: config, $SCR_TIMEOUT or 3)')
-    ap.add_argument('--profile', dest='profile',
-                    help='device profile JSON (the shared profiles/ schema; scrape-marked entries feed the metric registers) (default: config, $SCR_PROFILE or the bundled sun2000 profile)')
-    ap.add_argument('--metrics-spec', dest='metrics_spec',
-                    help='metrics spec JSON, sectioned: {profile: {key: {help, profile?}}, compute: ..., scraper: ...} — merged in memory over the built-in lib/metrics.json scraper_* block (default: config, $SCR_METRICS_SPEC or the bundled metrics.json)')
-    ap.add_argument('--metric-prefix', dest='metric_prefix',
-                    help="the prefix on the profile- and compute-fed metric names (default: config, $SCR_METRIC_PREFIX or 'huawei'); the bundled scraper_* names are fixed")
-    ap.add_argument('--max-kwp', type=float, help='maximum PV array kWp (default: config, $SCR_MAX_KWP or 6; 0 = no checking)')
-    ap.add_argument('--max-grid-kw', type=float, help='maximum grid kW, either direction (default: config, $SCR_MAX_GRID_KW or 12; 0 = no checking)')
-    ap.add_argument('--battery', action='store_true', default=None,
-                    help='enable battery support (default: config, $SCR_BATTERY or off)')
-    ap.add_argument('--grid-positive-import', action='store_true', default=None,
-                    help='grid register positive when importing (default: config, $SCR_GRID_POSITIVE_IMPORT or positive = export)')
-    ap.add_argument('--listen', help='listen address HOST:PORT (default: config, $SCR_LISTEN or 127.0.0.1:9350)')
-    ap.add_argument('--interval', type=float, help='seconds between polls (default: config, $SCR_INTERVAL or 10)')
-    ap.add_argument('--max-clients', type=int, help='maximum concurrent HTTP clients; extras get an immediate 503 '
-                    '(default: config, $SCR_MAX_CLIENTS or 64; 0 = unlimited)')
-    ap.add_argument('--client-timeout', type=float, help='seconds an idle keep-alive HTTP client is kept before '
-                    'being kicked (default: config, $SCR_CLIENT_TIMEOUT or 300; 0 = off)')
-    ap.add_argument('--max-conn-per-ip', dest='max_conn_per_ip', type=int, help='maximum concurrent HTTP connections '
-                    'from one peer IP; extras get an immediate 503 '
-                    '(default: config, $SCR_MAX_CONN_PER_IP or 0 = no per-IP limit)')
-    ap.add_argument('--local-time', action='store_true', help='log timestamps in the system time zone instead of UTC')
-    ap.add_argument('--control-port', dest='control_port',
-                    help='JSON-lines control server target: unix socket path (default: /tmp/modbus-scraper-<listen-port>.socket) or TCP port number on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with modbus-scraper-ctl.py (default: config, $SCR_CTL)')
-    ap.add_argument('--control-token', dest='control_token',
-                    help='require a token on control connections: the client authenticates with {"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s own user or --control-trust-uids — SO_PEERCRED) skips the token (default: config, $SCR_CONTROL_TOKEN or none)')
-    ap.add_argument('--control-token-file', dest='control_token_file',
-                    help='the control token from a file (the first line; e.g. a systemd LoadCredential or a key file; must be owner-only 0600) — takes the place of --control-token; giving both is an error (env SCR_CONTROL_TOKEN_FILE)')
-    ap.add_argument('--control-ops-token', dest='control_ops_token',
-                    help='a second, read-only control token: sessions authenticating with it may run the show/clear verbs only (no set/unset, no poll now, no request reload, no restart, no shutdown) — the ops shift against the admin key, both audited (default: config, $SCR_CONTROL_OPS_TOKEN or none)')
-    ap.add_argument('--control-ops-token-file', dest='control_ops_token_file',
-                    help="the read-only ops token from a file (the first line; must be owner-only 0600) — takes the place of --control-ops-token; giving both is an error (env SCR_CONTROL_OPS_TOKEN_FILE)")
-    ap.add_argument('--control-ops-verbs', dest='control_ops_verbs',
-                    help="the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated (default: show,clear; validated against the control grammar at start)")
-    ap.add_argument('--control-trust-uids', dest='control_trust_uids',
-                    help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon\'s own user are always trusted (default: config, $SCR_CONTROL_TRUST_UIDS or none)')
-    ap.add_argument('--audit-log', default=None,
-                    help='SCR audit trail: a file path or - for stdout (the docker/journald way); '
-                         'default: the XDG state home (~/.local/state/modbus-scraper/audit.log)')
-    ap.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation (default %(default)s)')
-    ap.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
-    ap.add_argument('--no-audit-log', action='store_true', help='disable the SCR audit trail')
-    ap.add_argument('--log-access', action='store_true', default=None,
-                    help='log every HTTP request at INFO (default: config, $SCR_LOG_ACCESS or quiet)')
-    ap.add_argument('--auth-token', help='require Authorization: Bearer <token> on all requests '
-                     '(default: config, $SCR_AUTH_TOKEN or disabled)')
-    ap.add_argument('--auth-token-file', help='read the bearer token from this file instead (single line, '
-                    'trimmed; re-read on every SIGHUP — rotate by rewriting the file and reloading; '
-                    'must be owner-only 0600); '
-                    'mutually exclusive with --auth-token')
-    ap.add_argument('--log-level', choices=list(LOG_LEVELS),
-                    help='log level (default: config, $SCR_LOG_LEVEL or INFO)')
+                    help='config file — the set grammar: every line a `set <name> <value>`, comments start with # (default: $CONFIG, then scraper.conf next to this script, then the subproject root)')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
     ap.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-scraper --man | man -l -)')
     args = ap.parse_args()
@@ -146,7 +88,7 @@ def describe(cfg, args, control_desc):
     return ('polling %s:%d unit %d (profile %s, %d registers, positive=%s%s) every %gs; '
             '%s /metrics on %s:%d (config: %s, log level: %s, log time: %s, log access: %s, auth: %s, '
             'limits: %s, caps: %s, control server: %s, version: %s)' % (
-                cfg['host'], cfg['modbus_port'], cfg['unit'], cfg['profile'], len(cfg['sources']),
+                cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['profile'], len(cfg['sources']),
                 'import' if cfg['grid_positive_import'] else 'export',
                 ', battery on' if cfg['battery'] else '',
                 cfg['interval'],
@@ -227,7 +169,7 @@ def main():
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target) \
         + (', read-only ops token accepted' if control_ops_token else '')
-    client = ModbusTCP(cfg['host'], cfg['modbus_port'], cfg['unit'], cfg['timeout'], cfg['modbus_offset'])
+    client = ModbusTCP(cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['timeout'], cfg['modbus_offset'])
     scraper = Scraper(cfg, client, spec)
     Handler.scraper = scraper
     Handler.log_access = cfg['log_access']
@@ -273,10 +215,10 @@ def main():
             control.clear_overrides()   # the config won: nothing is live-overridden
         if audit:
             audit.event('RELOAD', 'upstream %s:%d unit %d, interval %gs, auth %s'
-                        % (new_cfg['host'], new_cfg['modbus_port'], new_cfg['unit'], new_cfg['interval'],
+                        % (new_cfg['host'], new_cfg['modbus_port'], new_cfg['modbus_unit'], new_cfg['interval'],
                            'bearer' if new_cfg['auth_token'] else 'none'))
         return 'upstream %s:%d unit %d, interval %gs' % (new_cfg['host'], new_cfg['modbus_port'],
-                                                         new_cfg['unit'], new_cfg['interval'])
+                                                         new_cfg['modbus_unit'], new_cfg['interval'])
 
     control.reloader = apply_reload   # the control server's `request reload` runs the same path
 
@@ -296,7 +238,7 @@ def main():
     install_signal_handlers(scraper, httpd, args, started, apply_reload=apply_reload, graceful_stop=graceful_stop)
     if audit:
         audit.event('START', 'version=%s upstream=%s:%d unit %d listen=%s control=%s'
-                    % (version_string(), cfg['host'], cfg['modbus_port'], cfg['unit'], cfg['listen'],
+                    % (version_string(), cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['listen'],
                        control_desc))
     try:
         threading.Thread(target=scraper.poll_loop, daemon=True).start()

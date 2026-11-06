@@ -560,7 +560,7 @@ class ControlServer:
         gate = self.httpd.gate if self.httpd else None
         rows = [
             'upstream=%s:%d' % (cfg['host'], cfg['modbus_port']),
-            'unit=%d' % cfg['unit'],
+            'unit=%d' % cfg['modbus_unit'],
             'offset=%d' % cfg['modbus_offset'],
             'timeout=%s' % secs(cfg['timeout']),
             'listen=%s' % cfg['listen'],
@@ -594,7 +594,7 @@ class ControlServer:
         rows = [
             'version   modbus-scraper %s' % version_string(),
             'upstream  %s:%d unit %d (offset %d), timeout %s, last poll %s%s'
-            % (cfg['host'], cfg['modbus_port'], cfg['unit'], cfg['modbus_offset'], secs(cfg['timeout']),
+            % (cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['modbus_offset'], secs(cfg['timeout']),
                'never' if not last_poll else '%s ago' % secs(now - last_poll),
                '' if s.up else ' (FAILING)'),
             'listen    %s, control %s' % (cfg['listen'], self.describe()),

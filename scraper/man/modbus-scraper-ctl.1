@@ -19,8 +19,8 @@ the frame, keyed by the token).
 .TP
 .B \-\-control\-port
 control server target: unix socket path or TCP port on 127.0.0.1,
-auto\-detected (default: /tmp/modbus\-scraper\-9350.socket; env SCR_CTL
-when unset) — same flag as the scraper itself
+auto\-detected (default: /tmp/modbus\-scraper\-9350.socket; env CTL when
+unset) — same flag as the scraper itself
 .TP
 .B command
 control command, e.g. inspect, show status, set interval 5, poll now,
@@ -30,11 +30,11 @@ request reload, restart, shutdown
 socket timeout in seconds (default 5.0)
 .TP
 .B \-\-control\-token
-control auth token for TCP (env SCR_CONTROL_TOKEN)
+control auth token for TCP (env CONTROL_TOKEN)
 .TP
 .B \-\-control\-token\-file
 the token from a file (the first line; must be owner\-only 0600); not
-for use with \-\-control\-token (env SCR_CONTROL_TOKEN_FILE)
+for use with \-\-control\-token (env CONTROL_TOKEN_FILE)
 .TP
 .B \-\-audit\-log
 audit trail: a file path or \- for stdout; default: the XDG state home

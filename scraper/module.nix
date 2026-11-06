@@ -16,9 +16,10 @@ let
     "# rendered by services.modbus-scraper; the flags and the env still win over this file"
     ""
     "# --- the device (upstream inverter) and the register map ---"
-    (setLine "host" cfg.inverterHost)
-    (setLine "modbus-port" (toString cfg.inverterPort))
-    (setLine "unit" (toString cfg.unitId))
+    # the register map itself (addresses, types, gains, function codes) comes
+    # from the device profile alone — `set profile <file-or-name>` swaps it live
+    (setLine "upstream" cfg.upstream)
+    (setLine "modbus-unit" (toString cfg.modbusUnit))
     (setLine "modbus-offset" (toString cfg.modbusOffset))
     (setLine "timeout" (toString cfg.timeout))
     (setLine "max-kwp" (toString cfg.maxKwp))
@@ -81,19 +82,13 @@ in
       description = "The modbus-scraper package to run.";
     };
 
-    inverterHost = lib.mkOption {
+    upstream = lib.mkOption {
       type = lib.types.str;
-      default = "127.0.0.1";
-      description = "Inverter/dongle Modbus TCP address (set to its LAN IP).";
+      default = "127.0.0.1:5502";
+      description = "The inverter Modbus TCP endpoint HOST:PORT (`:PORT` = 127.0.0.1:PORT) — set HOST to the inverter/dongle's LAN IP.";
     };
 
-    inverterPort = lib.mkOption {
-      type = lib.types.port;
-      default = 5502;
-      description = "Inverter Modbus TCP port.";
-    };
-
-    unitId = lib.mkOption {
+    modbusUnit = lib.mkOption {
       type = lib.types.int;
       default = 1;
       description = "Modbus unit id.";

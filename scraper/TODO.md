@@ -1,9 +1,39 @@
-# TODO (scrape — the Done/history records)
+# TODO (scraper — the Done/history records)
 
 The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
-`[scrape]`); this file keeps the tool's shipped history.
+`[scraper]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The upstream-knob + directory wave: the subproject is `scraper/` now (was
+`scrape/` — the flake, the docker context, the book include and the
+cross-links follow; the suites keep their `tests/scrape-*.py` names), the
+inverter endpoint is the one `--upstream HOST:PORT` knob (`:5502` =
+127.0.0.1:5502, the shared `common/config.py` `parse_upstream()`) —
+`--host`/`--modbus-port` and their `HOST`/`MODBUS_PORT` env twins retire —
+and `--unit` is `--modbus-unit` (env `MODBUS_UNIT`, config `set
+modbus-unit`, the NixOS option `modbusUnit`). The resolved config keeps
+the derived `host`/`modbus_port` keys, so `show status`, the reload audit
+and the Prometheus story read unchanged.
+
+The env-prefix retirement wave: the env twins are the bare upper-snake
+names (`CONFIG`, `MODBUS_PORT`, `METRIC_PREFIX`, `AUTH_TOKEN`, ...) — the
+registry, the resolver, the ctl/cli clients, the docs and the man pages
+follow. The README's metrics table documents the sectioned reality now
+(the prefixed profile/compute rows vs the fixed `scraper_*` rows — the
+poll-duration gauges included), its ini-era `[scraper] section` config
+wording is gone, and the man DESCRIPTION names `scraper_up`.
+
+The declarative-registry wave: the knob rows (the name, the flag, the env
+twin, the section, the live/secret markers and the descriptions) moved to
+`lib/options.json` — `lib/options.py` loads them onto the common `Option`
+rows and keeps the Python-side wiring (the control-grammar verb list, the
+audit defaults and the log-level choices read from `static.json`) — and
+`--help`/the man pages render from the registry now
+(`common/options.py` `build_parser()`): the knob description lives exactly
+once. The flags in `--help` order by the registry's sections; the texts,
+types and defaults are unchanged; `scripts/check_options.py` gates as
+before and the package ships the JSON next to the loader.
+
 The rename + env-prefix wave: the bins carry the man-page names now
 (`modbus-scraper.py`, `modbus-scraper-ctl.py`, `modbus-scraper-cli.py`),
 and every env twin wears the tool's prefix (`SCR_*`), the control-port

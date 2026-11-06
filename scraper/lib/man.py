@@ -19,7 +19,7 @@ only). Polls the inverter over Modbus TCP and serves the huawei_* metrics
 the dashboard expects at /metrics in the Prometheus text format: the PV
 generation, the grid exchange (import/export split), the home consumption
 implied by the balance, the battery (optional) and the health gauges
-(huawei_up, the error counter, the last poll age).
+(scraper_up, the error counter, the last poll age).
 .PP
 Every poll is sanity-checked: a negative PV reading, an array larger than
 \\fB--max-kwp\\fR, a grid line beyond \\fB--max-grid-kw\\fR or a negative
@@ -94,7 +94,7 @@ the default audit trail."""
         description,
         options_section(parser),
         extra_sections=(signals, control, security, files),
-        see_also='.BR modbus-scraper-ctl (1),\n.BR modbus-scraper-cli (1),\n.BR modbus-cache (1),\n.BR modbus-fake-inverter (1)\n.PP\nscrape/README.md in the suite checkout \\(em the full documentation.')
+        see_also='.BR modbus-scraper-ctl (1),\n.BR modbus-scraper-cli (1),\n.BR modbus-cache (1),\n.BR modbus-fake-inverter (1)\n.PP\nscraper/README.md in the suite checkout \\(em the full documentation.')
 
 
 def ctl_page(parser):
@@ -130,10 +130,10 @@ apart). With a control token configured the wire is HMAC-signed: the
 console signs every command and verifies every reply."""
     env = """.SH ENVIRONMENT
 .TP
-.B SCR_CTL
+.B CTL
 the default control target for the clients.
 .TP
-.B SCR_CONTROL_TOKEN ", " SCR_CLI_KEEPALIVE
+.B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off)."""
     return page(
         "console-style session on the modbus-scraper control server",

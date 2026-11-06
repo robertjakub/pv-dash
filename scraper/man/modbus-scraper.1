@@ -12,7 +12,7 @@ only). Polls the inverter over Modbus TCP and serves the huawei_* metrics
 the dashboard expects at /metrics in the Prometheus text format: the PV
 generation, the grid exchange (import/export split), the home consumption
 implied by the balance, the battery (optional) and the health gauges
-(huawei_up, the error counter, the last poll age).
+(scraper_up, the error counter, the last poll age).
 .PP
 Every poll is sanity-checked: a negative PV reading, an array larger than
 \fB--max-kwp\fR, a grid line beyond \fB--max-grid-kw\fR or a negative
@@ -41,109 +41,96 @@ and over TCP the signed commands are mandatory. A second, read-only token
 
 .SH OPTIONS
 .TP
-.B \-\-config
-config file — the set grammar: every line a `set <name> <value>`,
-comments start with # (default: $SCR_CONFIG, then scraper.conf next to
-this script, then the subproject root) (default:
-/Users/oom/GensparkCode/pv\-dash/scrape/scraper.conf)
+.B \-\-upstream
+the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502)
+(default: config, $UPSTREAM or 127.0.0.1:5502)
 .TP
-.B \-\-host
-inverter Modbus TCP address (default: config, $SCR_HOST or 127.0.0.1)
-.TP
-.BI \-\-modbus\-port " N"
-inverter Modbus TCP port (default: config, $SCR_MODBUS_PORT or 5502)
-.TP
-.BI \-\-unit " N"
-Modbus unit id (default: config, $SCR_UNIT or 1)
+.BI \-\-modbus\-unit " N"
+Modbus unit id (default: config, $MODBUS_UNIT or 1)
 .TP
 .BI \-\-modbus\-offset " N"
-added to register addresses (default: config, $SCR_MODBUS_OFFSET or 0)
+added to register addresses (default: config, $MODBUS_OFFSET or 0)
 .TP
 .BI \-\-timeout " N"
-Modbus timeout in seconds (default: config, $SCR_TIMEOUT or 3)
+Modbus timeout in seconds (default: config, $TIMEOUT or 3)
 .TP
 .B \-\-profile
 device profile JSON (the shared profiles/ schema; scrape\-marked entries
-feed the metric registers) (default: config, $SCR_PROFILE or the bundled
+feed the metric registers) (default: config, $PROFILE or the bundled
 sun2000 profile)
 .TP
 .B \-\-metrics\-spec
 metrics spec JSON, sectioned: {profile: {key: {help, profile?}},
 compute: ..., scraper: ...} — merged in memory over the built\-in
-lib/metrics.json scraper_* block (default: config, $SCR_METRICS_SPEC or
-the bundled metrics.json)
+lib/metrics.json scraper_* block (default: config, $METRICS_SPEC or the
+bundled metrics.json)
 .TP
 .B \-\-metric\-prefix
 the prefix on the profile\- and compute\-fed metric names (default:
-config, $SCR_METRIC_PREFIX or 'huawei'); the bundled scraper_* names are
+config, $METRIC_PREFIX or 'huawei'); the bundled scraper_* names are
 fixed
 .TP
 .BI \-\-max\-kwp " N"
-maximum PV array kWp (default: config, $SCR_MAX_KWP or 6; 0 = no
-checking)
+maximum PV array kWp (default: config, $MAX_KWP or 6; 0 = no checking)
 .TP
 .BI \-\-max\-grid\-kw " N"
-maximum grid kW, either direction (default: config, $SCR_MAX_GRID_KW or
-12; 0 = no checking)
+maximum grid kW, either direction (default: config, $MAX_GRID_KW or 12;
+0 = no checking)
 .TP
 .B \-\-battery
-enable battery support (default: config, $SCR_BATTERY or off)
+enable battery support (default: config, $BATTERY or off)
 .TP
 .B \-\-grid\-positive\-import
 grid register positive when importing (default: config,
-$SCR_GRID_POSITIVE_IMPORT or positive = export)
+$GRID_POSITIVE_IMPORT or positive = export)
 .TP
 .B \-\-listen
-listen address HOST:PORT (default: config, $SCR_LISTEN or
-127.0.0.1:9350)
-.TP
-.BI \-\-interval " N"
-seconds between polls (default: config, $SCR_INTERVAL or 10)
-.TP
-.BI \-\-max\-clients " N"
-maximum concurrent HTTP clients; extras get an immediate 503 (default:
-config, $SCR_MAX_CLIENTS or 64; 0 = unlimited)
-.TP
-.BI \-\-client\-timeout " N"
-seconds an idle keep\-alive HTTP client is kept before being kicked
-(default: config, $SCR_CLIENT_TIMEOUT or 300; 0 = off)
-.TP
-.BI \-\-max\-conn\-per\-ip " N"
-maximum concurrent HTTP connections from one peer IP; extras get an
-immediate 503 (default: config, $SCR_MAX_CONN_PER_IP or 0 = no per\-IP
-limit)
+listen address HOST:PORT (default: config, $LISTEN or 127.0.0.1:9350)
 .TP
 .B \-\-local\-time
 log timestamps in the system time zone instead of UTC (default: off)
+.TP
+.BI \-\-max\-clients " N"
+maximum concurrent HTTP clients; extras get an immediate 503 (default:
+config, $MAX_CLIENTS or 64; 0 = unlimited)
+.TP
+.BI \-\-client\-timeout " N"
+seconds an idle keep\-alive HTTP client is kept before being kicked
+(default: config, $CLIENT_TIMEOUT or 300; 0 = off)
+.TP
+.BI \-\-max\-conn\-per\-ip " N"
+maximum concurrent HTTP connections from one peer IP; extras get an
+immediate 503 (default: config, $MAX_CONN_PER_IP or 0 = no per\-IP
+limit)
 .TP
 .B \-\-control\-port
 JSON\-lines control server target: unix socket path (default:
 /tmp/modbus\-scraper\-<listen\-port>.socket) or TCP port number on
 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with modbus\-scraper\-ctl.py
-(default: config, $SCR_CTL)
+(default: config, $CTL)
 .TP
 .B \-\-control\-token
 require a token on control connections: the client authenticates with
 {"cmd": "auth", "token": ...}; over the unix socket a trusted peer
 (root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
-skips the token (default: config, $SCR_CONTROL_TOKEN or none)
+skips the token (default: config, $CONTROL_TOKEN or none)
 .TP
 .B \-\-control\-token\-file
 the control token from a file (the first line; e.g. a systemd
 LoadCredential or a key file; must be owner\-only 0600) — takes the
 place of \-\-control\-token; giving both is an error (env
-SCR_CONTROL_TOKEN_FILE)
+CONTROL_TOKEN_FILE)
 .TP
 .B \-\-control\-ops\-token
 a second, read\-only control token: sessions authenticating with it may
 run the show/clear verbs only (no set/unset, no poll now, no request
 reload, no restart, no shutdown) — the ops shift against the admin key,
-both audited (default: config, $SCR_CONTROL_OPS_TOKEN or none)
+both audited (default: config, $CONTROL_OPS_TOKEN or none)
 .TP
 .B \-\-control\-ops\-token\-file
 the read\-only ops token from a file (the first line; must be
 owner\-only 0600) — takes the place of \-\-control\-ops\-token; giving
-both is an error (env SCR_CONTROL_OPS_TOKEN_FILE)
+both is an error (env CONTROL_OPS_TOKEN_FILE)
 .TP
 .B \-\-control\-ops\-verbs
 the read\-only ops role's RBAC policy: the verbs its sessions may run,
@@ -154,7 +141,16 @@ grammar at start)
 extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
 the daemon's own user are always trusted (default: config,
-$SCR_CONTROL_TRUST_UIDS or none)
+$CONTROL_TRUST_UIDS or none)
+.TP
+.B \-\-auth\-token
+require Authorization: Bearer <token> on all requests (default: config,
+$AUTH_TOKEN or disabled)
+.TP
+.B \-\-auth\-token\-file
+read the bearer token from this file instead (single line, trimmed;
+re\-read on every SIGHUP — rotate by rewriting the file and reloading;
+must be owner\-only 0600); mutually exclusive with \-\-auth\-token
 .TP
 .B \-\-audit\-log
 SCR audit trail: a file path or \- for stdout (the docker/journald way);
@@ -170,21 +166,20 @@ rotated audit backups to keep (default 3)
 .B \-\-no\-audit\-log
 disable the SCR audit trail (default: off)
 .TP
+.BI \-\-interval " N"
+seconds between polls (default: config, $INTERVAL or 10)
+.TP
 .B \-\-log\-access
-log every HTTP request at INFO (default: config, $SCR_LOG_ACCESS or
-quiet)
-.TP
-.B \-\-auth\-token
-require Authorization: Bearer <token> on all requests (default: config,
-$SCR_AUTH_TOKEN or disabled)
-.TP
-.B \-\-auth\-token\-file
-read the bearer token from this file instead (single line, trimmed;
-re\-read on every SIGHUP — rotate by rewriting the file and reloading;
-must be owner\-only 0600); mutually exclusive with \-\-auth\-token
+log every HTTP request at INFO (default: config, $LOG_ACCESS or quiet)
 .TP
 .B \-\-log\-level
-log level (default: config, $SCR_LOG_LEVEL or INFO)
+log level (default: config, $LOG_LEVEL or INFO)
+.TP
+.B \-\-config
+config file — the set grammar: every line a `set <name> <value>`,
+comments start with # (default: $CONFIG, then scraper.conf next to this
+script, then the subproject root) (default:
+/Users/oom/GensparkCode/pv\-dash/scraper/scraper.conf)
 .TP
 .B \-\-dry\-run
 validate the configuration, print the effective settings and exit
@@ -243,4 +238,4 @@ the default audit trail.
 .BR modbus-cache (1),
 .BR modbus-fake-inverter (1)
 .PP
-scrape/README.md in the suite checkout \(em the full documentation.
+scraper/README.md in the suite checkout \(em the full documentation.

@@ -12,7 +12,7 @@ import re
 
 from common.options import parse_config_script
 from common.config import check_token_file_mode, default_profile_path, is_loopback_host, load_token_file, \
-    parse_listen, resolve_profile_file
+    parse_listen, parse_upstream, resolve_profile_file
 from .metrics import Metrics
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
@@ -23,11 +23,11 @@ HOST_RE = re.compile(r'[A-Za-z0-9._:\[\]-]+')
 
 def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
     """The control server target for the daemon and the clients: the flag
-    wins, then SCR_CTL, then the default unix socket named after the
+    wins, then CTL, then the default unix socket named after the
     listen port (/tmp/modbus-scraper-9350.socket)."""
     if explicit is not None and str(explicit).strip():
         return str(explicit).strip()
-    env = os.environ.get('SCR_CTL')
+    env = os.environ.get('CTL')
     if env and env.strip():
         return env.strip()
     return '/tmp/modbus-scraper-%d.socket' % int(listen_port)
@@ -94,8 +94,8 @@ def validate_config(cfg):
 
     if not 1 <= cfg['modbus_port'] <= 65535:
         fail('modbus_port', 'must be 1..65535')
-    if not UNIT_ID_RANGE[0] <= cfg['unit'] <= UNIT_ID_RANGE[1]:
-        fail('unit', 'must be %d..%d (Modbus unit id)' % UNIT_ID_RANGE)
+    if not UNIT_ID_RANGE[0] <= cfg['modbus_unit'] <= UNIT_ID_RANGE[1]:
+        fail('modbus-unit', 'must be %d..%d (Modbus unit id)' % UNIT_ID_RANGE)
     if not -100000 <= cfg['modbus_offset'] <= 100000:
         fail('modbus_offset', 'must be within +/-100000')
     if cfg['timeout'] <= 0:
@@ -118,9 +118,7 @@ def validate_config(cfg):
     if cfg['timeout'] > cfg['interval']:
         logger.warning('timeout (%gs) > interval (%gs): one poll can take longer than the poll '
                        'interval; the loop simply runs back-to-back', cfg['timeout'], cfg['interval'])
-    check_hostname(cfg['host'], 'host')
-    if not cfg['host']:
-        fail('host', 'must not be empty')
+    check_hostname(cfg['host'], 'upstream host')
     listen_host, _listen_port = parse_listen(cfg['listen'])
     check_hostname(listen_host, 'listen')
     if not is_loopback_host(listen_host) and not cfg['auth_token']:
@@ -220,7 +218,7 @@ def build_sources(profile, spec, profile_path):
 
 
 def resolve_config(args, script_dir=None):
-    """Effective settings: CLI flags > SCR_* env > config script >
+    """Effective settings: CLI flags > env > config script >
     device profile (the shared profiles/ schema) > defaults. The register
     map itself — addresses, types, gains, function codes — comes from the
     device profile alone: there are no register override knobs."""
@@ -240,12 +238,12 @@ def resolve_config(args, script_dir=None):
             logger.error('invalid %s = %r: %s (using %r)', cfg_key, raw, e, default)
             return default
 
-    profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'SCR_PROFILE',
+    profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'PROFILE',
                                                 'profile', default_profile_path(), str))
     profile = load_device_profile(profile_path)
-    metric_prefix = (resolve(getattr(args, 'metric_prefix', None), 'SCR_METRIC_PREFIX',
+    metric_prefix = (resolve(getattr(args, 'metric_prefix', None), 'METRIC_PREFIX',
                              'metric_prefix', 'huawei', str) or 'huawei').strip() or 'huawei'
-    spec = Metrics(resolve(getattr(args, 'metrics_spec', None), 'SCR_METRICS_SPEC',
+    spec = Metrics(resolve(getattr(args, 'metrics_spec', None), 'METRICS_SPEC',
                            'metrics_spec', None, str), prefix=metric_prefix)
 
     # the metrics spec's "profile" fields pick the device registers feeding
@@ -256,50 +254,54 @@ def resolve_config(args, script_dir=None):
     except ValueError as e:
         raise SystemExit(str(e))
 
-    battery = resolve(args.battery, 'SCR_BATTERY', 'battery', False, str_to_bool)
+    battery = resolve(args.battery, 'BATTERY', 'battery', False, str_to_bool)
+    upstream = resolve(getattr(args, 'upstream', None), 'UPSTREAM', 'upstream',
+                       DEFAULTS['upstream'], str)
+    host, modbus_port = parse_upstream(upstream or DEFAULTS['upstream'])
     cfg = {
         'profile': profile_path,
-        'host': resolve(args.host, 'SCR_HOST', 'host', DEFAULTS['host'], str),
-        'modbus_port': resolve(args.modbus_port, 'SCR_MODBUS_PORT', 'modbus_port',
-                               DEFAULTS['modbus_port'], int),
-        'unit': resolve(args.unit, 'SCR_UNIT', 'unit', DEFAULTS['unit'], int),
-        'modbus_offset': resolve(args.modbus_offset, 'SCR_MODBUS_OFFSET', 'modbus_offset', 0, int),
-        'timeout': resolve(args.timeout, 'SCR_TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
-        'max_kwp': resolve(args.max_kwp, 'SCR_MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float),
-        'max_grid_kw': resolve(args.max_grid_kw, 'SCR_MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float),
+        'upstream': '%s:%d' % (host, modbus_port),
+        'host': host,
+        'modbus_port': modbus_port,
+        'modbus_unit': resolve(getattr(args, 'modbus_unit', None), 'MODBUS_UNIT',
+                               'modbus_unit', DEFAULTS['modbus_unit'], int),
+        'modbus_offset': resolve(args.modbus_offset, 'MODBUS_OFFSET', 'modbus_offset', 0, int),
+        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
+        'max_kwp': resolve(args.max_kwp, 'MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float),
+        'max_grid_kw': resolve(args.max_grid_kw, 'MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float),
         'battery': battery,
-        'grid_positive_import': resolve(args.grid_positive_import, 'SCR_GRID_POSITIVE_IMPORT',
+        'grid_positive_import': resolve(args.grid_positive_import, 'GRID_POSITIVE_IMPORT',
                                         'grid_positive_import', False, str_to_bool),
-        'listen': resolve(args.listen, 'SCR_LISTEN', 'listen', DEFAULTS['listen'], str),
-        'interval': resolve(args.interval, 'SCR_INTERVAL', 'interval', DEFAULTS['interval_s'], float),
-        'max_clients': resolve(args.max_clients, 'SCR_MAX_CLIENTS', 'max_clients',
+        'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
+        'interval': resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval_s'], float),
+        'max_clients': resolve(args.max_clients, 'MAX_CLIENTS', 'max_clients',
                                DEFAULTS['max_clients'], int),
-        'client_timeout': resolve(args.client_timeout, 'SCR_CLIENT_TIMEOUT', 'client_timeout',
+        'client_timeout': resolve(args.client_timeout, 'CLIENT_TIMEOUT', 'client_timeout',
                                   DEFAULTS['client_timeout_s'], float),
-        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'SCR_MAX_CONN_PER_IP',
+        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MAX_CONN_PER_IP',
                                    'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
-        'local_time': resolve(args.local_time, 'SCR_LOCAL_TIME', 'local_time', False, str_to_bool),
-        'log_access': resolve(args.log_access, 'SCR_LOG_ACCESS', 'log_access', False, str_to_bool),
+        'local_time': resolve(args.local_time, 'LOCAL_TIME', 'local_time', False, str_to_bool),
+        'log_access': resolve(args.log_access, 'LOG_ACCESS', 'log_access', False, str_to_bool),
         'metric_prefix': metric_prefix,
-        'auth_token': (resolve(args.auth_token, 'SCR_AUTH_TOKEN', 'auth_token', None, str) or '').strip() or None,
-        'auth_token_file': resolve(args.auth_token_file, 'SCR_AUTH_TOKEN_FILE', 'auth_token_file',
+        'auth_token': (resolve(args.auth_token, 'AUTH_TOKEN', 'auth_token', None, str) or '').strip() or None,
+        'auth_token_file': resolve(args.auth_token_file, 'AUTH_TOKEN_FILE', 'auth_token_file',
                                    None, str),
-        'level': resolve(args.log_level, 'SCR_LOG_LEVEL', 'log_level',
+        'level': resolve(args.log_level, 'LOG_LEVEL', 'log_level',
                          DEFAULTS['log_level'], str).strip().upper(),
     }
-    cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'SCR_CTL',
+    cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'CTL',
                                   'control_port', None, str)
-    cfg['control_token'] = (resolve(getattr(args, 'control_token', None), 'SCR_CONTROL_TOKEN',
+    cfg['control_token'] = (resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
                                     'control_token', None, str) or '').strip() or None
-    control_token_file = resolve(getattr(args, 'control_token_file', None), 'SCR_CONTROL_TOKEN_FILE',
+    control_token_file = resolve(getattr(args, 'control_token_file', None), 'CONTROL_TOKEN_FILE',
                                  'control_token_file', None, str)
-    cfg['control_ops_token'] = (resolve(getattr(args, 'control_ops_token', None), 'SCR_CONTROL_OPS_TOKEN',
+    cfg['control_ops_token'] = (resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
                                         'control_ops_token', None, str) or '').strip() or None
-    control_ops_token_file = resolve(getattr(args, 'control_ops_token_file', None), 'SCR_CONTROL_OPS_TOKEN_FILE',
+    control_ops_token_file = resolve(getattr(args, 'control_ops_token_file', None), 'CONTROL_OPS_TOKEN_FILE',
                                      'control_ops_token_file', None, str)
-    cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'SCR_CONTROL_OPS_VERBS',
+    cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
                                         'control_ops_verbs', 'show,clear', str) or 'show,clear').strip() or 'show,clear'
-    cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'SCR_CONTROL_TRUST_UIDS',
+    cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'CONTROL_TRUST_UIDS',
                                         'control_trust_uids', None, str)
     if cfg['control_token'] and control_token_file:
         raise SystemExit('--control-token and --control-token-file are mutually exclusive')
@@ -339,7 +341,6 @@ def resolve_config(args, script_dir=None):
         if not token:
             raise SystemExit('auth_token_file %s is empty' % cfg['auth_token_file'])
         cfg['auth_token'] = token
-    cfg['host'] = cfg['host'].strip()
     cfg['listen'] = cfg['listen'].strip()
     cfg['sources'] = sources
     validate_config(cfg)

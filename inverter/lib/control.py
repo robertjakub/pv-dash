@@ -112,7 +112,7 @@ class ControlServer:
             else:
                 srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 srv.bind(('127.0.0.1', self.port))
-            srv.listen(16)
+            srv.listen(64)   # the backlog above the client limit: a connect burst must not RST
         except OSError as e:
             logger.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
             return
@@ -278,7 +278,7 @@ class ControlServer:
         self.shutdown_pending = False
         self.scenario = None        # last applied preset, or None = 'custom'
         self.defaults = defaults or {}   # setting -> configured startup value ('unset')
-        self.overridden = set()          # settings changed live (`show settings` marks them with *)
+        self.overridden = set()          # settings changed live (`show status` carries the overridden= row)
         self.clients = set()             # the live control sockets (announce_exit)
         self.clients_lock = threading.Lock()
         self.target = str(target)
@@ -313,7 +313,7 @@ class ControlServer:
     def show_config(self):
         """The startup options as a set-grammar script — the argv that would
         restart this fake (the secrets never render; the live `set` values
-        are the `show settings` view, not here)."""
+        are runtime state, not here)."""
         from .options import OPTIONS
         from common.options import render_config_script
         script = render_config_script(OPTIONS, dict(self.startup_values),
@@ -576,13 +576,6 @@ class ControlServer:
             return self.scenario or 'custom'
         return '?'
 
-    def settings(self):
-        """Every setting with its value: one key=value per line (scriptable).
-        A live-overridden setting carries a `*` on the value — `unset`
-        returns the configured value."""
-        return 'ok settings\n' + '\n'.join('%s=%s%s' % (k, self._get(k), '*' if k in self.overridden else '')
-                                           for k in self.SETTING_KEYS)
-
     def command(self, line):
         if not line:
             return 'err empty command'
@@ -600,7 +593,7 @@ class ControlServer:
                 if key is not None and not rest:
                     return 'ok %s' % describe_setting(key)
                 return 'err unknown setting %s (try help)' % ' '.join(args)
-            return ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|connections|settings|config|knobs>, '
+            return ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|connections|config|knobs>, '
                     'reset, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
                     'show knobs prints the full dictionary'
                     % '|'.join(self.SETTING_KEYS))
@@ -639,7 +632,7 @@ class ControlServer:
             return 'bye'
         if cmd == 'show':
             if not args:
-                return 'err show what? (a setting, "status", or "settings")'
+                return 'err show what? (a setting, "status", or "registers")'
             what = args[0].lower()
             if what == 'status':
                 return self.status_report()
@@ -647,8 +640,6 @@ class ControlServer:
                 return 'ok connections ' + self.connections_line()
             if what == 'version':
                 return 'ok fake-inverter %s' % version_string()
-            if what in ('settings', 'all'):
-                return 'ok ' + self.settings()
             if what == 'registers':
                 entries = self.simulator.profile.entries
                 if not entries:

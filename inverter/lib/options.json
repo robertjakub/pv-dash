@@ -203,7 +203,6 @@
     { "name": "status", "setting-help": "the effective state report (key=value lines)" },
     { "name": "connections", "setting-help": "connected clients: peer, age, requests served" },
     { "name": "registers", "setting-help": "the loaded profile's register map with the current values" },
-    { "name": "settings", "setting-help": "every setting, one per line" },
     { "name": "version", "setting-help": "the fake-inverter version" },
     { "name": "config", "setting-help": "the startup options as a set-grammar script (the secrets hidden)",
       "hidden": true },

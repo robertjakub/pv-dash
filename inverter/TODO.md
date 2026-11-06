@@ -4,6 +4,12 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[inverter]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The show-settings retirement: `show settings` (and its `show all`
+spelling) is gone — the per-setting `show <setting>` and `show status`'s
+`overridden=` row carry the same truth, the command answers
+`err unknown setting` (the registry row, the daemon help lines, the man
+pages, the README and the suites follow).
+
 The registry-folding wave: `lib/settings.py` is gone — the pins and the
 machines (`pv`, `load`, `batt`, `grid`, `soc`, `mppt`, `cloud`, `scenario`,
 `battery-state`, `grid-outage`) ride the `lib/options.json` registry as

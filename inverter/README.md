@@ -235,7 +235,6 @@ read-only ops token the same way):
 | `set <setting> <value>` | configure a setting (below) |
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
-| `show settings` | every setting and its value — one stable `key=value` line per setting (scriptable) |
 | `show knobs` | the dictionary of all knobs: every registry knob under its section — its flag, its env twin(s) when it has one, its home section, the command that changes it live (or the restart note) |
 | `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `clients`, `chaos`, `chaos_hits`, `pinned`, `profile`, `metrics`, `timezone`) — scriptable |
 | `show connections` | the fake's live **Modbus** clients: peer, connection age, requests served (`none` when idle) — the cache's `show connections`, pointed at the simulator |
@@ -293,7 +292,6 @@ the same rows — no flag, just the live name).
 
 ```bash
 python3 inverter/bin/modbus-fake-ctl.py set pv 2500
-python3 inverter/bin/modbus-fake-ctl.py show settings
 printf 'set pv 2500\nset soc 30\nshow status\n' | python3 inverter/bin/modbus-fake-ctl.py --control-port 15599
 ```
 
@@ -315,8 +313,8 @@ the first connect it probes the status and greets you —
 ```
 
 The prompt shows the connected port, `set`/`unset` print only the `ok`
-confirmation, `show <setting>` prints the bare value, `show settings` prints
-one setting per line, and `shutdown` asks `Proceed with shutdown? [confirm]`
+confirmation, `show <setting>` prints the bare value, and `shutdown` asks
+`Proceed with shutdown? [confirm]`
 first — RETURN or `y` proceeds, anything else aborts with `% Aborted.`.
 While it idles the CLI sends wire pings (every 55 s, `CLI_KEEPALIVE` to
 tune, `0` = off) so the control server's idle timeout never drops a live

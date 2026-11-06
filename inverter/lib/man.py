@@ -54,7 +54,7 @@ scenario, chaos, seed, battery, battery-state, strict, static, max-kwp,
 battery-kwh, max-clients, client-timeout, max-conn-per-ip, metrics-server,
 register, profile, log-level),
 \\fBshow status\\fR, \\fBshow connections\\fR (the live Modbus clients: peer,
-age, requests), \\fBshow settings\\fR, \\fBshow registers\\fR,
+age, requests), \\fBshow registers\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
 \\fBinspect\\fR, \\fBreset\\fR, \\fBshutdown\\fR,
 \\fBquit\\fR. A second, read-only token (\\fB--control-ops-token\\fR)
@@ -114,7 +114,7 @@ replies on stdout, one per line. Every invocation lands in the audit trail
 The command grammar is the fake's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
 \\fBhelp\\fR (the 26-setting registry), \\fBshow status\\fR,
 \\fBshow connections\\fR (the live Modbus clients: peer, age, requests),
-\\fBshow settings\\fR, \\fBshow registers\\fR, \\fBshow version\\fR,
+\\fBshow registers\\fR, \\fBshow version\\fR,
 \\fBshow knobs\\fR (the dictionary of the registry),
 \\fBinspect\\fR, \\fBreset\\fR, \\fBshutdown\\fR, \\fBquit\\fR. See
 .BR modbus-fake-inverter (1)
@@ -123,8 +123,6 @@ CONTROL."""
 .RS
 .IP \\(bu 2
 .B modbus-fake-ctl set pv 2500
-.IP \\(bu 2
-.B modbus-fake-ctl show settings
 .IP \\(bu 2
 .B printf 'set pv 2500\\\\nset soc 30\\\\nshow status\\\\n' | modbus-fake-ctl
 .RE"""

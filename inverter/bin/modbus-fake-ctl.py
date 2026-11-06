@@ -43,7 +43,7 @@ from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S
 def main():
     p = argparse.ArgumentParser(description='Send commands to the fake inverter control server (TCP or unix socket).')
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/fake-inverter-5502.socket; env CTL when unset) — same flag as the fake itself')
-    p.add_argument('command', nargs='*', help='control command, e.g. set pv 2500, set scenario noon, show settings, status, reset, shutdown')
+    p.add_argument('command', nargs='*', help='control command, e.g. set pv 2500, set scenario noon, show status, reset, shutdown')
     p.add_argument('--timeout', type=float, default=CLI_TIMEOUT_S, help='socket timeout in seconds (default %(default)s)')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN)')
     p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env CONTROL_TOKEN_FILE)')

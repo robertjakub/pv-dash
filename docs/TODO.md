@@ -17,10 +17,16 @@ the **Done/history** records for their tool.
   (set/unset/show/request/...), the same reply shapes. Breaking: every
    script and unit file speaking the old flat grammar follows. (The ground
    work stands now — Nov 2026: the registry `live` name is a `/`-path
-   spelled as words on the wire and every row may carry a display `group` —
-   the cli `?`/TAB listings group by it alone, `[ungrouped]` when a row
-   carries none; the first group rows are filed (the `upstream` knobs), no
-   row spells a path yet — the renames below are still open.)
+   spelled as words on the wire — the daemon dispatch keys the live name,
+   `_apply`/`_get`/`defaults` follow the rename — and every row may carry
+   a display `group` — the cli `?`/TAB listings group by it alone,
+   `[ungrouped]` when a row carries none; the first group rows are filed
+   (the `upstream` knobs) and the first path too (the scraper's
+   `limits/max-conn-per-ip`) — and a typed row (`int`/`float`/`str`)
+   dispatches itself now: the conv parses, the config key takes the
+   value, no `_apply`/`_get` branch needed (the branches stay for the
+   range gates and the runtime plumbing; the `unset` defaults generate
+   from the rows) — the renames below are still open.)
 
 ## The security wave (the audit follow-ups)
 

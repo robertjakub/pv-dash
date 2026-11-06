@@ -12,6 +12,27 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **everywhere** — **the custom show words ride the registries, and a row
+  may hide**: the `show` verb's non-knob views (`show status`,
+  `show connections`, ...) file in each registry's `show` section
+  (options.json — the word, the ?/TAB description, the `hidden` mark);
+  the loaders read them into SHOW_WORDS/SHOW_HIDDEN/SHOW_VALUES and the
+  clis pool from them — no cli hardcodes a show word. An option row may
+  carry `"hidden": true` — a live knob that answers on the wire but
+  never lists in the ?/TAB pools (the completion pools drop it;
+  `show settings` keeps listing — the scriptable view stays whole).
+  `config`/`knobs` are the hidden show words family-wide. check_options
+  gates both: a hidden option carries a live name, every show word is a
+  clean unique word with a description.
+- **everywhere** — **the registries learn hierarchy nodes**: a row may be a
+  bare node — no flag/env/conv/live, a `name` that is a live-path prefix
+  (`modbus`), the namespace's `setting-help`. The nodes are help-only:
+  `help modbus` answers the namespace (the row's setting-help, then one
+  line per child live path — the path suffix as the word), while
+  `show config`, `show knobs` and `--help` ride them out (they are not
+  knobs); check_options gates them (a node describes its namespace and
+  has a live child). The scraper files the first one (`modbus` over
+  `modbus/upstream`, `modbus/unit`, `modbus/offset`).
 - **everywhere** — **the registry learns to group and the grammar to spell
   paths**: an option row may carry a `group` — the finer display bucket the
   surfaces file the knob under (until now the shared sections were the only
@@ -355,6 +376,40 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **a `/`-path live name dispatches now**: the wire resolves
+  the path (`set limits max-conn-per-ip <value>` — the registry's `live`
+  spells as its words) and the daemon dispatches it — the control.py
+  `_apply`/`_get` branches and the bin's `defaults` dict key the **live
+  name** (the family rule all along: the cache's `cache-ttl` knob already
+  dispatched as `ttl`). Until now a path resolved on the wire and then
+  fell through the dispatch (`show` answered the `_get` fallback `?`).
+  The first rename rides in: the scraper's `max-conn-per-ip` is
+  `limits/max-conn-per-ip` — the set/unset/show replies render the path
+  (`ok limits/max-conn-per-ip=2`), `show settings` lists it under the
+  same live name. And the dispatch drives itself now: a registry row
+  with a typed conv (`int`/`float`/`str`) needs no `_apply`/`_get`
+  branch at all — the conv parses the value, the row's config key takes
+  it, and the bin's `unset` defaults generate from the same rows; the
+  row's `min`/`max` (inclusive bounds) gate the value in the same
+  breath, so validation lives in the registry too (the branches stay
+  for the runtime plumbing a bare config write cannot reach — the
+  client, the gate, the logger — and shrink to a `_typed` call plus the
+  plumbing; the bool/choice knobs keep theirs). The scraper's
+  `modbus-unit` rides it live as `modbus/unit` (`set modbus unit 5`
+  applies through the client's `apply(unit=...)` branch, the 0..255
+  gate reads off the row; a future typed row dispatches with the JSON
+  row alone). A row may also name a `check` — the tool's validator for
+  the value's shape: it validates (the clean one-liner becomes the err
+  reply), normalizes (`set modbus upstream :5502` stores
+  `127.0.0.1:5502`) and hands back the config keys derived from the
+  knob (the scraper's upstream updates `host`/`modbus_port` with it —
+  the status line stays truthful). The bounds are family-wide now: the
+  four registries carry `min`/`max` on every ranged live row (19 rows)
+  and all four control servers gate through the same `_gate_range`
+  helper (NaN included — a `nan` value is rejected like any other
+  out-of-bounds one); the branch keeps the parse, the plumbing and the
+  message's unit, the row owns the numbers.
+
 - **everywhere** — **the console listings group by the `group` field
   alone**: the cli `?`/TAB listings bucket a setting under its registry
   `group`, and a row that carries none renders under `[ungrouped]`
@@ -524,6 +579,32 @@ before the repo restructured into one suite.
   wire (packed, and validated in the reply).
 
 ### Fixed
+
+- **everywhere** — **the console descriptions for the path-named settings**: a
+  knob whose live name is a `/`-path (`limits/max-clients`) spelled as its
+  words described nothing in the cli `?`/TAB listings — the describer
+  resolved the bare segment (`max-clients`) against the registry's full live
+  names and dropped the column (the cache's `show limits ?` listed
+  `max-clients`/`max-conn-per-ip` bare; the scraper console carried the
+  base-path-aware describer, the cache/dashboard/fake consoles match it
+  now). A whole path's `?` describes the setting instead of `% Invalid
+  input.` (`show limits max-clients ?` prints `limits/max-clients -
+  simultaneous client limit`; `unset`'s too) — and the fake falls in line:
+  `unset <setting> ?` no longer offers the value words (the grammar takes
+  the name only) and its `?` renders the hint line like the family. The
+  cache's `limits` node rides a real namespace description (the lint
+  placeholder rode the row).
+
+- **inverter** — the fake's control server now tracks the live-overridden
+  settings like the family (cache/scraper/dashboard had it, the fake did
+  not): `set` marks the setting, `unset`/`reset` release it again
+  (`reset` releases the pins, the cloud/outage/battery machines and the
+  scenario — the knobs it actually restores), `show settings` renders the
+  `*` on an overridden value (`soc=50*`) and `show status` carries the
+  family's `overridden=` row. The set/unset shape the console renders is
+  one rule now: a knob with a `live` field renders in the cli's set/unset
+  listings, `set <name> <value>` changes the value, `unset <name>` returns
+  the configured startup value.
 
 - **scraper** — the `show status`/`inspect` uptime mixed the clocks (wall
   `time.time()` minus a monotonic start): a running scraper reported

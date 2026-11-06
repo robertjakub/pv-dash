@@ -642,11 +642,11 @@ try:
     check('unset: restores the configured value', r.startswith('ok interval=1.00s'), r[:110])
     r = ctl_cmd('show status', 15514)
     check('unset: the override marker clears', 'overridden=none' in r, r[-160:])
-    r = ctl_cmd('show cache all', 15514)
-    check('show cache all: per-entry rows with age, expiry and status', r.startswith('ok cache all\n')
+    r = ctl_cmd('show cache-all', 15514)
+    check('show cache-all: per-entry rows with age, expiry and status', r.startswith('ok cache-all\n')
           and 'pv-power' in r and 'expires' in r and 'fc3' in r and '2/2' in r, r[:200])
     rows = r.splitlines()
-    check('show cache all: the values column carries the cached words',
+    check('show cache-all: the values column carries the cached words',
           'values' in rows[1] and any(len(row.split()) > 3 and row.split()[3].isdigit()
                                       for row in rows[2:]), r[:200])
     r = ctl_cmd('show cache', 15514)
@@ -735,8 +735,8 @@ try:
                         capture_output=True, text=True).stdout.strip()
     check('per-entry ttl: the fast entry re-forwards, the global one stays cached',
           int(f2) == int(f1) + 1, '%s -> %s' % (f1, f2))
-    r = ctl_cmd('show cache all', 15534)
-    check('show cache all: the entry ttl is marked', 'pv-power' in r and '[ttl 2.00s]' in r, r[:200])
+    r = ctl_cmd('show cache-all', 15534)
+    check('show cache-all: the entry ttl is marked', 'pv-power' in r and '[ttl 2.00s]' in r, r[:200])
     p_ttl.send_signal(signal.SIGTERM)
     p_ttl.wait(timeout=10)
 
@@ -987,8 +987,8 @@ try:
         refused = False
     check('per-IP: the second connection from the same IP is refused (EOF)', refused)
     check('per-IP: the first connection keeps serving', g1r[7:8] == b'\x03', g1r.hex())
-    r = ctl_cmd('set max-conn-per-ip 2', 15534)
-    check('per-IP: raised live', r.startswith('ok max-conn-per-ip=2'), r[:80])
+    r = ctl_cmd('set limits max-conn-per-ip 2', 15534)
+    check('per-IP: raised live (the path form)', r.startswith('ok limits/max-conn-per-ip=2'), r[:80])
     g2 = socket.create_connection(('127.0.0.1', 15533), timeout=5)
     g2.sendall(struct.pack('>HHHB', 2, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 1))
     g2r = g2.recv(512)
@@ -1112,17 +1112,17 @@ try:
     none_log = open('/tmp/reg_none.log').read()
     check('write-acl none: the refusal names the ACL',
           'not on the write ACL' in none_log)
-    r = ctl_cmd('set write-acl any', 15532)
+    r = ctl_cmd('set acl write any', 15532)
     check('write-acl any: the write is still refused (write-registers none)',
-          r.startswith('ok write-acl=any'), r[:80])
+          r.startswith('ok acl/write=any'), r[:80])
     b = wr6(47415, 5, port=15531)
     check('write-registers none: refused via the allow-list', b[0] == 0x86 and b[1] == 1, b.hex())
     r = ctl_cmd('set write-registers any', 15532)
     b = wr6(47415, 5, port=15531)
     check('write-acl any + write-registers any: the write passes',
           b == bytes.fromhex('06b9370005'), b.hex())
-    r = ctl_cmd('unset write-acl', 15532)
-    check('unset write-acl restores the default none', r.startswith('ok write-acl=none'), r[:80])
+    r = ctl_cmd('unset acl write', 15532)
+    check('unset write-acl restores the default none', r.startswith('ok acl/write=none'), r[:80])
     b = wr6(47415, 5, port=15531)
     check('write-acl none again: refused', b[0] == 0x86 and b[1] == 1, b.hex())
 
@@ -1137,8 +1137,8 @@ try:
     except (ConnectionError, OSError):
         ok = True
     check('connect-acl none: the connection is rejected at accept', ok)
-    r = ctl_cmd('set connect-acl any', 15540)
-    check('set connect-acl any', r.startswith('ok connect-acl=any'), r[:80])
+    r = ctl_cmd('set acl connect any', 15540)
+    check('set connect-acl any', r.startswith('ok acl/connect=any'), r[:80])
     b = rd(32064, 2, port=15539)
     check('connect-acl any: the client connects again',
           b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
@@ -1156,7 +1156,7 @@ try:
     # the audit trail folds control characters: a \n inside a command cannot
     # forge a second, attacker-crafted trail line
     r = ctl_cmd('show status\n2026-01-01T00:00:00Z AUDIT CACHE WRITE forged line', 15522)
-    check('control: the injection attempt is a clean err', r.startswith('err unknown command'), r[:100])
+    check('control: the injection attempt is a clean err', r.startswith('err status: unexpected'), r[:100])
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     forged = [line for line in fc4_audit.splitlines() if 'AUDIT CACHE WRITE forged' in line]
     check('audit: the trail injection folds to one physical line',
@@ -1173,8 +1173,8 @@ try:
     time.sleep(0.5)
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     check('audit: per-client REQUESTS tallies (periodic + disconnect)',
-          'REQUESTS peer=127.0.0.1:' in fc4_audit and '(last 1s:' in fc4_audit
-          and 'connected=' in fc4_audit, fc4_audit[-160:])
+          'AUDIT CACHE REQUESTS' in fc4_audit and 'peer=127.0.0.1:' in fc4_audit
+          and '(last 1s:' in fc4_audit and 'connected=' in fc4_audit, fc4_audit[-160:])
 
     # the control token from a file (the LoadCredential pattern);
     # the file must be owner-only 0600 (F12 in docs/AUDIT.md)

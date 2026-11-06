@@ -29,15 +29,43 @@ from common.cred import peer_uid
 from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.options import control_command, grouped_rows, match_setting_path
-from common.config import default_profile_path, resolve_profile_file
+from common.options import control_command, describe_node, grouped_rows, match_setting_path
+from common.config import default_profile_path, parse_upstream, resolve_profile_file
 from .config import build_sources, load_device_profile
-from .options import SETTING_BY_NAME, SETTING_NAMES, describe_setting
+from .options import OPTIONS, SETTING_BY_NAME, SETTING_NAMES, describe_setting, SHOW_BY_LIVE
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 
 logger = logging.getLogger('scraper')
 
 MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
+
+# The registry-driven dispatch: a typed row (int/float/str conv) sets,
+# shows and unsets itself — the conv parses, the config key takes it, no
+# branch needed. The explicit branches stay first-class for the range
+# gates and the runtime plumbing a bare config write cannot reach (the
+# client, the gate, the logger); bool/choice knobs keep theirs.
+OPTION_BY_LIVE = {o.live: o for o in OPTIONS if o.live}
+TYPED_CONVS = (int, float, str)
+
+
+def _check_upstream(text):
+    """The `upstream` row's check: the HOST:PORT shape (the :PORT loopback
+    shorthand included), normalized — and the keys derived from the knob
+    (the endpoint renders as host:port in the status, the client dials
+    host and port separately). Returns the config updates."""
+    try:
+        host, port = parse_upstream(text, label='modbus/upstream')
+    except SystemExit as e:
+        raise ValueError(str(e))
+    return {'upstream': '%s:%d' % (host, port), 'host': host, 'modbus_port': port}
+
+
+CHECKS = {'upstream': _check_upstream}
+
+# The hierarchy nodes (`help modbus`): the rows that name a live-path
+# prefix and describe the namespace — never knobs, never on the wire
+# grammar, help-only.
+NODE_BY_NAME = {o.name: o for o in OPTIONS if o.node}
 
 
 class ControlServer:
@@ -228,7 +256,6 @@ class ControlServer:
         """The dictionary of all knobs (show knobs): every option of the
         registry under its section, with its flag, its env twin(s), its home
         section, the control command that changes it and the secret marker."""
-        from .options import OPTIONS
         from common.options import knob_dictionary
         return knob_dictionary(OPTIONS, who='the modbus-scraper')
 
@@ -237,7 +264,7 @@ class ControlServer:
         pipes straight back into a config file or through a ctl client).
         Secrets never render; the live overrides ride in as their current
         values."""
-        from .options import OPTIONS, config_value
+        from .options import config_value
         from common.options import render_config_script
         cfg = dict(self.scraper.cfg or {})
         values = {}
@@ -329,6 +356,8 @@ class ControlServer:
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
                 return 'ok %s' % describe_setting(key)
+            if len(args) == 1 and args[0].lower() in NODE_BY_NAME:
+                return 'ok %s' % describe_node(OPTIONS, args[0].lower())
             if args:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             return 'ok ' + self.command_help()
@@ -385,7 +414,14 @@ class ControlServer:
             args = cmd.split()[1:]
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
+                word = SHOW_BY_LIVE.get(key)
+                if word:
+                    return self.command('show ' + word)   # a show command's report, by its word
                 return 'ok %s=%s' % (key, self._get(key))
+            if key is not None and rest:
+                return 'err %s: unexpected %s' % (key, ' '.join(rest))
+            if len(args) == 1 and args[0].lower() in NODE_BY_NAME:
+                return 'ok %s' % describe_node(OPTIONS, args[0].lower())
             if len(args) == 1:
                 return 'err unknown setting %s (try help)' % args[0].lower()
         if low == 'inspect':
@@ -410,6 +446,15 @@ class ControlServer:
             logger.info('control: shutdown requested')
             return 'bye shutdown'
         return 'err unknown command %r (try help)' % cmd
+
+    def _gate_range(self, key, v, what=''):
+        """The row's min/max (inclusive) — the registry is the one home for
+        a knob's bounds; the branch parses and plumbs, the row gates."""
+        opt = OPTION_BY_LIVE.get(key)
+        if opt is None or opt.conv not in TYPED_CONVS:
+            return
+        if (opt.min is not None and not v >= opt.min) or (opt.max is not None and not v <= opt.max):
+            raise ValueError('%s must be %s..%s%s' % (key, opt.min, opt.max, (' ' + what) if what else ''))
 
     def _apply(self, key, value):
         """Apply a live setting; returns the display string or raises
@@ -445,28 +490,29 @@ class ControlServer:
                 s.cfg['timeout'] = v
             s.client.apply(timeout=v)
             return secs(v)
+        if key == 'modbus/unit':
+            v = self._typed(key, val)
+            s.client.apply(unit=v)
+            return '%d' % v
         if key == 'max-clients':
             v = numi(val, 'max-clients', 'clients')
-            if not 0 <= v <= 4096:
-                raise ValueError('max-clients must be 0..4096')
+            self._gate_range(key, v)
             if not self.httpd:
                 raise ValueError('no http server attached')
             self.httpd.gate.max_total = v
             return '%d' % v
         if key == 'client-timeout':
             v = num(val, 'client-timeout', 'seconds')
-            if not 0 <= v <= 86400:
-                raise ValueError('client-timeout must be 0..86400 seconds')
+            self._gate_range(key, v, 'seconds')
             if not self.httpd:
                 raise ValueError('no http server attached')
             with s.lock:
                 s.cfg['client_timeout'] = v
             self.httpd.RequestHandlerClass.timeout = v or None
             return secs(v)
-        if key == 'max-conn-per-ip':
+        if key == 'limits/max-conn-per-ip':
             v = numi(val, 'max-conn-per-ip', 'connections')
-            if not 0 <= v <= 4096:
-                raise ValueError('max-conn-per-ip must be 0..4096')
+            self._gate_range(key, v)
             if not self.httpd:
                 raise ValueError('no http server attached')
             self.httpd.gate.max_per_ip = v
@@ -499,7 +545,37 @@ class ControlServer:
                 s.cfg['profile'], s.cfg['sources'] = path, sources
             logger.info('control: profile set to %s (the next poll reads the new register map)', path)
             return path
+        # the generic path: a typed row (int/float/str conv) needs no branch
+        # — the row's conv parses, the row's min/max gate, the config key
+        # takes the value; the value takes effect wherever the config is
+        # next consumed (a client rebuild, a reload)
+        opt = OPTION_BY_LIVE.get(key)
+        if opt is not None and opt.conv in TYPED_CONVS:
+            return str(self._typed(key, val))
         raise ValueError('unknown setting %s' % key)
+
+    def _typed(self, key, val):
+        """The registry-driven typed write: the row's conv parses, the
+        row's check validates the shape (and hands back the config
+        updates — a check normalizes and fills the keys derived from the
+        knob), the row's min/max gate, the config keys take the values.
+        Returns the canonical display value — the caller adds any
+        runtime plumbing a bare config write cannot reach."""
+        s = self.scraper
+        opt = OPTION_BY_LIVE.get(key)
+        try:
+            v = opt.conv(val)
+        except ValueError:
+            raise ValueError('%s must be %s' % (key, {int: 'an integer', float: 'a number'}.get(opt.conv, 'text')))
+        if opt.check:
+            updates = CHECKS[opt.check](v)
+        else:
+            if (opt.min is not None and not v >= opt.min) or (opt.max is not None and not v <= opt.max):
+                raise ValueError('%s must be %s..%s' % (key, opt.min, opt.max))
+            updates = {opt.name.replace('-', '_'): v}
+        with s.lock:
+            s.cfg.update(updates)
+        return updates[opt.name.replace('-', '_')]
 
     def _get(self, key):
         s = self.scraper
@@ -514,7 +590,7 @@ class ControlServer:
         if key == 'client-timeout':
             ct = self.httpd.RequestHandlerClass.timeout if self.httpd else cfg['client_timeout'] or None
             return 'off' if not ct else secs(ct)
-        if key == 'max-conn-per-ip':
+        if key == 'limits/max-conn-per-ip':
             return '%d' % (self.httpd.gate.max_per_ip if self.httpd else cfg['max_conn_per_ip'])
         if key == 'log-access':
             return 'on' if (self.httpd.RequestHandlerClass.log_access if self.httpd else cfg['log_access']) else 'off'
@@ -522,6 +598,11 @@ class ControlServer:
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         if key == 'profile':
             return cfg['profile']
+        # the generic path: a registry row with a typed conv reads its
+        # config key with no branch at all
+        opt = OPTION_BY_LIVE.get(key)
+        if opt is not None and opt.conv in TYPED_CONVS and opt.name.replace('-', '_') in cfg:
+            return str(cfg[opt.name.replace('-', '_')])
         return '?'
 
     def settings_report(self):

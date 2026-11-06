@@ -78,7 +78,8 @@ class Option:
 
     def __init__(self, name, flag, env, section, help='', conv=str, default=None, live=None,
                  secret=False, choices=None, negates=None, group=None,
-                 setting_help=None, values=None, hint=None, value_help=None):
+                 setting_help=None, values=None, hint=None, value_help=None,
+                 min=None, max=None, check=None, node=False, hidden=False):
         self.name = name
         self.flag = flag
         self.env = env
@@ -95,6 +96,13 @@ class Option:
         self.values = tuple(values) if values else ()
         self.hint = hint
         self.value_help = dict(value_help or {})
+        self.min = min            # the inclusive bounds the live dispatch gates
+        self.max = max            # a typed value with (the control path; None = unbounded)
+        self.check = check        # the named shape validator (the tool's CHECKS registry;
+                                  # None = the conv parse is the whole validation)
+        self.node = bool(node)    # a hierarchy node: no flag/env/conv/live — the row
+                                  # names a live-path prefix and carries its setting-help
+        self.hidden = bool(hidden)   # never lists in the ?/TAB pools (the wire still answers)
 
     @property
     def optname(self):
@@ -173,11 +181,29 @@ def grouped_rows(options):
     the SECTIONS tuple no longer orders these surfaces). The one grouping
     show config, show knobs and help config render: a bucket key that is a
     SECTIONS key keeps its long title (section_title), a bare group key
-    renders raw."""
+    renders raw. The hierarchy nodes ride out (they name live-path
+    prefixes, they are not knobs)."""
     buckets = {}
     for o in options:
+        if o.node:
+            continue
         buckets.setdefault(o.group or o.section, []).append(o)
     return list(buckets.items())
+
+
+def describe_node(options, name):
+    """The hierarchy node's wire help (`help modbus`): the node row's
+    setting-help, then the child settings the node namespaces — one per
+    line, the path suffix as the word (the console completes it). None
+    when the name is no node."""
+    node = next((o for o in options if o.node and o.name == name), None)
+    if node is None:
+        return None
+    lines = ['%s - %s' % (name, node.setting_help or node.help)]
+    for o in options:
+        if o.live and o.live.startswith(name + '/'):
+            lines.append('  %s - %s' % (o.live[len(name) + 1:], o.setting_help or o.help))
+    return '\n'.join(lines)
 
 
 def render_config_script(options, values, comment=None):
@@ -305,6 +331,17 @@ def setting_groups(names, by_name):
     return list(buckets.items())
 
 
+def word_groups(words, groups):
+    """The command words bucketed under their `group` field (the
+    first-appearance order; a word the map misses, or one filed under no
+    group, rides the '' bare-top bucket — the console renders bare words
+    unheadered, above the filed groups)."""
+    buckets = {}
+    for w in words:
+        buckets.setdefault(groups.get(w, ''), []).append(w)
+    return list(buckets.items())
+
+
 def match_setting_path(words, by_name):
     """The live setting a set/unset/show/help word list names: a `live` path
     (`inverter/profile`) spells as its segments' words on the wire — the
@@ -324,11 +361,15 @@ def setting_path_pool(typed, names, by_name):
     words already name (exact — the caller completes its values) or the
     distinct next path segments of `names` under the '/'-joined prefix so
     far (the pool's order kept — `inverter` completes before `profile`).
-    Returns (exact, segments); exact is None while the path is still
-    partial (a flat registry keeps the whole name one segment: the pool
-    itself)."""
-    path = '/'.join(w.lower() for w in typed)
-    if path in by_name:
+    A trailing empty word asks for the children of the named path — the
+    exact match does not short-circuit (the caller wants the walk-on:
+    a word can be both a report and a namespace). Returns (exact,
+    segments); exact is None while the path is still partial (a flat
+    registry keeps the whole name one segment: the pool itself)."""
+    ask_children = bool(typed) and typed[-1] == ''
+    words = [w.lower() for w in typed if w]
+    path = '/'.join(words)
+    if not ask_children and path in by_name:
         return by_name[path], ()
     prefix = path + '/' if path else ''
     segs, seen = [], set()

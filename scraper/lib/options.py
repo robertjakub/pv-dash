@@ -48,7 +48,35 @@ def _load_options():
     static_defaults = {'audit-max-mb': defaults['audit_max_mb'],
                        'audit-files': defaults['audit_files']}
     with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
-        rows = json.load(f)['options']
+        meta = json.load(f)
+    rows = meta['options']
+    global SHOW_COMMANDS, SHOW_WORDS, SHOW_HIDDEN, SHOW_VALUES, SHOW_GROUPS, SHOW_OPTIONS, SHOW_BY_LIVE
+    global COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
+    SHOW_COMMANDS = tuple((r['name'], r.get('setting-help') or r.get('help', ''), bool(r.get('hidden', False)),
+                           r.get('group'))
+                          for r in meta.get('show') or [])
+    SHOW_WORDS = tuple(w for w, _, _, _ in SHOW_COMMANDS)
+    SHOW_HIDDEN = frozenset(w for w, _, hid, _ in SHOW_COMMANDS if hid)
+    SHOW_VALUES = tuple((w, d) for w, d, _, _ in SHOW_COMMANDS)
+    SHOW_GROUPS = {w: g for w, _, _, g in SHOW_COMMANDS}
+    # the show commands expand into the live-path space: the row's own
+    # `live` when it spells the hierarchy, else the word itself
+    SHOW_OPTIONS = tuple(Option(r['name'], None, None, None,
+                                help=r.get('setting-help') or r.get('help', ''),
+                                live=r.get('live') or r['name'],
+                                group=r.get('group'),
+                                setting_help=r.get('setting-help'),
+                                hidden=bool(r.get('hidden', False)))
+                         for r in meta.get('show') or [])
+    SHOW_BY_LIVE = {o.live: o.name for o in SHOW_OPTIONS}   # the hierarchy live -> the report's word
+    # the control commands: the registries' `commands` rows (the wire's
+    # verb list — the console help, the completion pools and the editor
+    # read these)
+    cmd_rows = meta.get('commands') or []
+    COMMANDS = tuple(r['name'] for r in cmd_rows)
+    COMMAND_HELP = {r['name']: r.get('help', '') for r in cmd_rows}
+    COMMAND_GROUPS = {r['name']: r.get('group', '') for r in cmd_rows}
+    COMMAND_HIDDEN = frozenset(r['name'] for r in cmd_rows if r.get('hidden'))
     out = []
     for row in rows:
         opt = Option(row['name'], row.get('flag'), row.get('env'), row['section'],
@@ -56,7 +84,9 @@ def _load_options():
                      live=row.get('live'), secret=bool(row.get('secret', False)),
                      group=row.get('group'),
                      setting_help=row.get('setting-help'), values=row.get('values'),
-                     hint=row.get('hint'), value_help=row.get('value-help'))
+                     hint=row.get('hint'), value_help=row.get('value-help'),
+                     min=row.get('min'), max=row.get('max'), check=row.get('check'),
+                     node=bool(row.get('node', False)), hidden=bool(row.get('hidden', False)))
         if 'default' in row:
             opt.default = row['default']
         elif opt.conv is bool:
@@ -70,6 +100,14 @@ def _load_options():
     return tuple(out)
 
 
+# the control commands (the registries' `commands` rows — _load_options
+# fills these from lib/options.json; the module-level empties keep the
+# import flat when a walk skips the loader's registry)
+COMMANDS = ()
+COMMAND_HELP = {}
+COMMAND_GROUPS = {}
+COMMAND_HIDDEN = frozenset()
+
 OPTIONS = _load_options()
 
 OPTION_BY_NAME = {o.name: o for o in OPTIONS}
@@ -79,32 +117,27 @@ CFG_KEYS = {'log-level': 'level'}
 
 # the control grammar's live settings — the SAME rows, viewed from the wire
 # (the `set`/`unset` vocabulary, the console completions and word-help)
-SETTINGS = settings_of(OPTIONS)
+SETTINGS = settings_of(OPTIONS) + settings_of(SHOW_OPTIONS)
 SETTING_BY_NAME = {s.name: s for s in SETTINGS}
 SETTING_NAMES = tuple(s.name for s in SETTINGS)
+# The custom show words ride the registry's `show` section (the loader
+# reads them into SHOW_COMMANDS/SHOW_WORDS/SHOW_HIDDEN/SHOW_VALUES): the
+# non-knob, non-control-grammar views the show verb answers — the hidden
+# ones answer on the wire but never list in the ?/TAB pools.
+
+NODE_BY_NAME = {o.name: o for o in OPTIONS if o.node}   # the hierarchy nodes (help-only)
+HIDDEN_SETTINGS = frozenset(o.live for o in OPTIONS if o.hidden and o.live) \
+    | frozenset(o.live for o in SHOW_OPTIONS if o.hidden and o.live)
 describe_setting, describe_value = make_describe(SETTING_BY_NAME)
 
-COMMANDS = ('set', 'unset', 'show', 'inspect', 'request', 'restart', 'shutdown', 'quit')
 
-COMMAND_HELP = {
-    'set': 'configure a setting live: set <setting> <value>',
-    'unset': 'restore a setting to its configured value: unset <setting>',
-    'inspect': 'one pretty dump of everything (the state, the counters, the caps)',
-    'show': 'runtime state: show <setting|status|connections|settings|version|knobs>',
-    'request': 'request reload: re-read the config (the SIGHUP path, the token file included)',
-    'restart': 'drop the Modbus session (reconnects on the next poll)',
-    'shutdown': 'stop the scraper gracefully',
-    'quit': 'close the session',
-    'ping': 'keep-alive: answers pong',
-}
-
-SHOW_VALUES = (
-    ('status', 'multi-line effective state report: one key=value per field'),
-    ('connections', 'the live HTTP clients of /metrics: the gate counters, one row per peer IP'),
-    ('settings', 'every tunable setting with its live value, one per line'),
-    ('version', 'the modbus-scraper version'),
-    ('knobs', 'the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes'),
-)
+# The custom show words: the non-knob, non-control-grammar views the show
+# verb answers (`show status`, `show connections`, ...) — the word, the
+# short description the ?/TAB listing renders, and the hidden mark (the
+# word answers on the wire but never lists in the ?/TAB pool — the
+# power-user views; `help config`/`help knobs` map them).
+# the knob -> the ?/TAB descriptions the show words render (the registry's
+# `show` section feeds them; nothing hardcodes a show word here)
 
 
 def config_value(name, cfg):

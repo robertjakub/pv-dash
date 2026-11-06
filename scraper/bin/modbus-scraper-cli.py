@@ -47,31 +47,40 @@ except ImportError:
 from common.audit import AuditLog
 from common.config import load_token_file
 from common.human import secs
-from common.options import setting_groups, setting_path_pool
+from common.options import setting_path_pool
 from common.wiresec import sign_request, verify_reply
+from common.options import word_groups
 from lib.config import resolve_control_target
-from lib.options import COMMAND_HELP, COMMANDS, SETTING_BY_NAME, SETTING_NAMES, SHOW_VALUES, describe_value
+from lib.options import COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, HIDDEN_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, describe_value
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
 DEFAULT_KEEPALIVE = CLI_KEEPALIVE_S     # well under the control server's idle timeout
 
-HELP_ROWS = (
-    ('set', 'configure a setting (set interval 5, set log-access on)'),
-    ('unset', 'restore a setting to its configured value (unset interval, unset log-level)'),
-    ('show', 'print a setting, the status report, or all of them'),
-    ('poll now', 'wake the poll loop immediately'),
-    ('request reload', 're-read the config (the SIGHUP path; the token file included)'),
-    ('restart', 'drop the Modbus session (reconnects on the next poll)'),
-    ('shutdown', 'stop the scraper (asks to confirm)'),
-    ('quit', 'close the session'),
-    ('?', 'this help'),
+HELP_PINS = (
     ('help <setting>', "the setting's description"),
+    ('?', 'this help'),
 )
 
-HELP = 'commands (TAB completes, ? lists the options + descriptions in any position):\n' \
-     + '\n'.join('    %-*s %s' % (max(len(n) for n, _ in HELP_ROWS) + 1, n, d)
-                 for n, d in HELP_ROWS)
+
+def _help_text():
+    """The `?` listing — the same shape as the setting help: bare words on
+    top, then the filed groups, soft-alphabetical within; the pins ride
+    last (they are syntax, not words)."""
+    rows = [(n, d) for n, d in COMMAND_HELP.items() if n not in COMMAND_HIDDEN]
+    width = max([len(n) for n, _ in rows] + [len(n) for n, _ in HELP_PINS]) + 1
+    out = ['commands (TAB completes, ? lists the options + descriptions in any position):']
+    for g, ws in word_groups([n for n, _ in rows], COMMAND_GROUPS):
+        if g:
+            out.append('[%s]' % g)
+        for n in sorted(ws, key=str.lower):
+            out.append('    %-*s %s' % (width, n, COMMAND_HELP[n]))
+    for n, d in HELP_PINS:
+        out.append('    %-*s %s' % (width, n, d))
+    return '\n'.join(out)
+
+
+HELP = _help_text()
 
 
 class ConnectionLost(Exception):
@@ -119,63 +128,89 @@ def candidates(buf):
     head = done[0].lower() if done else ''
     values_mode = False
     if not done:
-        pool, hint, desc = COMMANDS, None, describe_word
+        pool, hint, desc = tuple(n for n in COMMANDS if n not in COMMAND_HIDDEN), None, describe_word
     elif head in ('set', 'unset'):
-        s, segs = setting_path_pool(done[1:], SETTING_NAMES, SETTING_BY_NAME)
+        s, segs = setting_path_pool(done[1:], POOL_NAMES, SETTING_BY_NAME)
         if s is not None:
             if head == 'unset':
-                return [], None, None, []   # the path is whole; unset takes no value
+                return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole; unset takes no value — ? describes it
             values_mode = True
             pool, hint = tuple(s.values), s.value_shape
             desc = lambda w, s=s: s.value_help.get(w, s.value_help.get(w.lower(), '')) or None
         else:
-            pool, hint, desc = segs, None, setting_help
+            base = '/'.join(w.lower() for w in done[1:])   # the path spelled so far — a segment's
+            pool, hint = segs, None                        # description lives on the full live name
+            desc = lambda w, base=base: describe_word((base + '/' if base else '') + w)
     elif head == 'request' and len(done) == 1:
         pool, hint, desc = ('reload',), None, describe_word
     elif head == 'poll' and len(done) == 1:
         pool, hint, desc = ('now',), None, describe_word
     elif head == 'show':
-        fixed = ('status', 'connections', 'settings', 'version') if len(done) == 1 else ()
         s, segs = setting_path_pool(done[1:], SETTING_NAMES, SETTING_BY_NAME)
+        base = '/'.join(w.lower() for w in done[1:])   # a segment's description lives on the full live name
         if s is not None:
-            return [], None, None, []   # the path is whole; show takes no value
-        pool, hint, desc = segs + fixed, None, describe_word
+            _, cont = setting_path_pool(done[1:] + [''], SETTING_NAMES, SETTING_BY_NAME)
+            if not cont:
+                return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole and childless; ? describes the report
+            pool, hint = cont, None   # a namespace too: the report answers on Enter, TAB walks on
+        else:
+            pool, hint = segs, None
+        desc = lambda w, base=base: describe_word((base + '/' if base else '') + w)
     else:
         return [], None, None, []
     if pool is None:                      # a value shape with no completable words
         return [], hint, desc, [('values', [])]
     matches = [w for w in pool if w.startswith(text.lower())]
-    return matches, hint, desc, _sections(head, len(done), matches, values_mode)
+    return matches, hint, desc, _sections(head, len(done), matches, values_mode,
+                                          base='/'.join(w.lower() for w in done[1:]))
 
 
-def _sections(head, done_len, matches, values=False):
-    """The listing groups: the settings under their registry groups (the
-    row's `group`, else [ungrouped]), the values of one setting
-    ([values]), everything else ([system]: the report words,
-    the commands)."""
+def _sections(head, done_len, matches, values=False, base=''):
+    """The listing groups: every word under its display group — a setting's
+    row group (the full live name when the base path prefixes it, else the
+    word; the row's `group`, else [ungrouped] — no header, the top of the
+    listing), a hierarchy node's group (its `group`, else bare beside it),
+    everything else ([system]: the report words, the commands)."""
     if values:
         return [('values', matches)]
-    if head in ('set', 'unset') and done_len >= 1:
-        mine = [w for w in matches if w in SETTING_BY_NAME]
-        rest = [w for w in matches if w not in SETTING_BY_NAME]
-        return setting_groups(mine, SETTING_BY_NAME) + [('system', rest)]
-    if head == 'show' and done_len == 1:
-        mine = [w for w in matches if w in SETTING_BY_NAME]
-        rest = [w for w in matches if w not in SETTING_BY_NAME]
-        return setting_groups(mine, SETTING_BY_NAME) + [('system', rest)]
+    if head in ('set', 'unset', 'show') and done_len >= 1:
+        return _grouped(matches, base)
     return [('system', matches)]
+
+
+def _grouped(matches, base):
+    """The matches bucketed by their display group: the ungrouped rows —
+    the knobs and the show commands without a group — take the '' bucket
+    (no section header) and the listing renders them at the top; a word no
+    row answers for lands [system]."""
+    buckets = {}
+    for w in matches:
+        full = (base + '/' + w) if base else w
+        s = SETTING_BY_NAME.get(full) or SETTING_BY_NAME.get(w)
+        if s is not None:
+            label = '' if s.display_group == 'ungrouped' else s.display_group
+        else:
+            n = NODE_BY_NAME.get(w)
+            label = (n.group or '') if n is not None else 'system'   # no section fallback
+        buckets.setdefault(label, []).append(w)
+    bare = buckets.pop('', None)
+    secs = [('', sorted(bare, key=str.lower))] if bare else []
+    return secs + [(label, sorted(ws, key=str.lower)) for label, ws in buckets.items()]
 
 
 def sectioned_rows(sections, desc, hint):
     """The listing: a blank line, then each [section] header, its entries
-    padded two spaces under it, descriptions aligned among themselves."""
+    padded two spaces under it — the descriptions aligned to one column across all the sections."""
     rows = []
     for label, words in sections:
         if not words:
             continue
-        rows.append('')
-        rows.append('  [%s]' % label)
-        rows.extend('  ' + r for r in aligned_rows(words, desc, None))
+        if label:   # the '' bucket = the ungrouped words: bare, at the top, no header
+            rows.append('')
+            rows.append('  [%s]' % label)
+        flat = [w for _, ws in sections for w in ws]
+        width = max((len(w) for w in flat if desc(w)), default=0)
+        rows.extend('  ' + r for r in aligned_rows(words, desc, None, width))
     if hint:
         rows.append('    ' + hint)
     return rows
@@ -183,18 +218,22 @@ def sectioned_rows(sections, desc, hint):
 
 def describe_word(w):
     """The short description from the registry, if there is one."""
-    return COMMAND_HELP.get(w) or dict(SHOW_VALUES).get(w) or setting_help(w)
+    return COMMAND_HELP.get(w) or setting_help(w)
 
 
 def setting_help(name):
     s = SETTING_BY_NAME.get(name)
-    return s.help if s else None
+    if s:
+        return s.help
+    n = NODE_BY_NAME.get(name)          # a hierarchy node describes its namespace
+    return (n.setting_help or n.help) if n else None
 
 
-def aligned_rows(matches, desc, hint):
+def aligned_rows(matches, desc, hint, width=None):
     """One candidate per line with the descriptions aligned to the longest
     described word. The hint line keeps its own indent."""
-    width = max((len(w) for w in matches if desc(w)), default=0)
+    if width is None:   # the caller's width: one column for every section of the listing
+        width = max((len(w) for w in matches if desc(w)), default=0)
     rows = []
     for w in matches:
         d = desc(w)
@@ -203,6 +242,8 @@ def aligned_rows(matches, desc, hint):
         rows.append('  ' + hint)
     return rows
 
+
+POOL_NAMES = tuple(n for n in SETTING_NAMES if n not in HIDDEN_SETTINGS)
 
 _last_listed = None   # the completer is called several times per attempt;
                       # list each distinct buffer only once

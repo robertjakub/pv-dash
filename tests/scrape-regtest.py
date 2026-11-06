@@ -1618,8 +1618,14 @@ try:
     check('scraper control: unset restores the configured value', r.startswith('ok interval='), r[:80])
     r = sctl('set log-access on', 15597)
     check('scraper control: set log-access', r.startswith('ok log-access=on'), r[:80])
-    r = sctl('set max-conn-per-ip 2', 15597)
-    check('scraper control: the per-IP cap live', r.startswith('ok max-conn-per-ip=2'), r[:80])
+    r = sctl('set limits max-conn-per-ip 2', 15597)
+    check('scraper control: the per-IP cap live (the path form)', r.startswith('ok limits/max-conn-per-ip=2'), r[:80])
+    r = sctl('set limits max-conn-per-ip 9999', 15597)
+    check('scraper control: the row bounds gate (min/max off the registry row)',
+          r.startswith('err limits/max-conn-per-ip must be 0..4096'), r[:80])
+    r = sctl('help modbus', 15597)
+    check('scraper control: the hierarchy node answers its namespace',
+          r.startswith('ok modbus - ') and '\n  unit - ' in r, r[:80])
     # 6b-2. the register map lives in the device profile: `set profile` swaps
     #        it live, a profile without the power registers rolls back
     r = sctl('show profile', 15597)

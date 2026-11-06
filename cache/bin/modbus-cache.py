@@ -311,8 +311,8 @@ def main():
                     'log-level': cfg['level'],
                     'profile': cfg['profile'],
                     'selection': cfg['selection'] or 'all',
-                    'connect-acl': acl_text(cfg['connect_acl']),
-                    'write-acl': acl_text(cfg['write_acl']),
+                    'acl/connect': acl_text(cfg['connect_acl']),
+                    'acl/write': acl_text(cfg['write_acl']),
                     'timeout': '%g' % cfg['timeout']}
         proxy.control = ControlServer(proxy, control_target, stop, audit=audit,
                                       token=control_token, defaults=defaults,

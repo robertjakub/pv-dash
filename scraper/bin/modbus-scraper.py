@@ -185,16 +185,16 @@ def main():
 
     control = None
     if control_target != '0':
-        defaults = {
-            'profile': cfg['profile'],
-            'interval': '%g' % cfg['interval'],
-            'timeout': '%g' % cfg['timeout'],
-            'max-clients': str(cfg['max_clients']),
-            'client-timeout': '%g' % cfg['client_timeout'],
-            'max-conn-per-ip': str(cfg['max_conn_per_ip']),
-            'log-access': 'on' if cfg['log_access'] else 'off',
-            'log-level': cfg['level'],
-        }
+        # `unset` restores these: the typed knobs read straight from the
+        # registry rows (live name, config key, conv), the choice/bool
+        # knobs stay hand-rendered (their convs do not round-trip a string)
+        defaults = {'log-access': 'on' if cfg['log_access'] else 'off',
+                    'log-level': cfg['level']}
+        for o in OPTIONS:
+            if o.live and o.conv in (int, float, str):
+                key = o.name.replace('-', '_')
+                if key in cfg:
+                    defaults[o.live] = str(cfg[key])
         control = ControlServer(scraper, httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
                                 ops_token=control_ops_token, ops_verbs=ops_verbs)

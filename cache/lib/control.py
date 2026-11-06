@@ -25,15 +25,20 @@ from common.cred import peer_uid, parse_trust_uids
 from common.human import secs
 from common.protocol import ModbusError
 from common.wiresec import frame_mac, sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.options import control_command, grouped_rows, match_setting_path
+from common.options import control_command, grouped_rows, match_setting_path, describe_node
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
-from .options import SETTING_BY_NAME, SETTING_NAMES, describe_setting
+from .options import OPTIONS, SETTING_BY_NAME, SETTING_NAMES, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME
 from .cache import build_blocks
 from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection
 from .metrics import MetricsServer, describe_metrics
 from . import persist
 
 logger = logging.getLogger('modbus-cache')
+
+# The registry-driven bounds: the row's min/max (inclusive) are the one
+# home for a knob's range — the branches parse and plumb, the row gates.
+OPTION_BY_LIVE = {o.live: o for o in OPTIONS if o.live}
+TYPED_CONVS = (int, float, str)
 
 MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
 
@@ -383,7 +388,7 @@ class ControlServer:
             return self.status_report()
         if low == 'show connections':
             return 'ok connections ' + self.connections_line()
-        if low == 'show cache all':
+        if low == 'show cache-all':
             return self.cache_all_report()
         if low == 'show uplink':
             return self.uplink_report()
@@ -401,9 +406,16 @@ class ControlServer:
             args = cmd.split()[1:]
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
+                word = SHOW_BY_LIVE.get(key)
+                if word:
+                    return self.command('show ' + word)   # a show command's report, by its word
                 if key == 'dump-interval' and not self.proxy.dump_path:
                     return 'err dump-interval needs a dump path (set --dump-path)'
                 return 'ok %s=%s' % (key, self._get(key))
+            if key is not None and rest:
+                return 'err %s: unexpected %s' % (key, ' '.join(rest))
+            if len(args) == 1 and args[0].lower() in NODE_BY_NAME:
+                return 'ok %s' % describe_node(OPTIONS, args[0].lower())
             if len(args) == 1:
                 return 'err unknown setting %s (try help)' % args[0].lower()
         if low == 'inspect':
@@ -432,6 +444,15 @@ class ControlServer:
             logger.info('control: shutdown requested')
             return 'bye shutdown'
         return 'err unknown command %r (try help)' % cmd
+
+    def _gate_range(self, key, v, what=''):
+        """The row's min/max (inclusive) — the registry is the one home for
+        a knob's bounds; the branch parses and plumbs, the row gates."""
+        opt = OPTION_BY_LIVE.get(key)
+        if opt is None or opt.conv not in TYPED_CONVS:
+            return
+        if (opt.min is not None and not v >= opt.min) or (opt.max is not None and not v <= opt.max):
+            raise ValueError('%s must be %s..%s%s' % (key, opt.min, opt.max, (' ' + what) if what else ''))
 
     def _apply(self, key, value):
         """Apply a live setting; returns the display string or raises
@@ -463,20 +484,17 @@ class ControlServer:
                 p.cache.cache_ttl = 0
                 return 'off'
             v = num(val, 'ttl', 'seconds or off')
-            if not 0 <= v <= 86400 * 7:
-                raise ValueError('ttl must be 0..604800 seconds')
+            self._gate_range(key, v, 'seconds')
             p.cache.cache_ttl = v
             return secs(v)
         if key == 'read-delay':
             v = num(val, 'read-delay', 'seconds')
-            if not 0 <= v <= 60:
-                raise ValueError('read-delay must be 0..60 seconds')
+            self._gate_range(key, v, 'seconds')
             p.read_delay = v
             return secs(v)
         if key == 'merge-gap':
             v = numi(val, 'merge-gap', 'registers')
-            if not 0 <= v <= 100:
-                raise ValueError('merge-gap must be 0..100 registers')
+            self._gate_range(key, v, 'registers')
             p.merge_gap = v
             p.blocks = build_blocks(p.cache.ranges, v)
             p.poll_wake.set()
@@ -489,22 +507,19 @@ class ControlServer:
         if key == 'write-registers':
             p.write_ranges = parse_write_registers(val, 'write-registers')
             return p.describe_write_ranges()
-        if key == 'max-clients':
+        if key == 'limits/max-clients':
             v = numi(val, 'max-clients', 'clients')
-            if not 0 <= v <= 4096:
-                raise ValueError('max-clients must be 0..4096')
+            self._gate_range(key, v)
             p.max_clients = v
             return '%d' % v
         if key == 'client-timeout':
             v = num(val, 'client-timeout', 'seconds')
-            if not 0 <= v <= 86400:
-                raise ValueError('client-timeout must be 0..86400 seconds')
+            self._gate_range(key, v, 'seconds')
             p.client_timeout = v
             return secs(v)
-        if key == 'max-conn-per-ip':
+        if key == 'limits/max-conn-per-ip':
             v = numi(val, 'max-conn-per-ip', 'connections')
-            if not 0 <= v <= 4096:
-                raise ValueError('max-conn-per-ip must be 0..4096')
+            self._gate_range(key, v)
             p.conn_gate.max_per_ip = v
             return '%d' % v
         if key == 'metrics-server':
@@ -534,8 +549,7 @@ class ControlServer:
                 p.requests_audit_s = 0
                 return 'off'
             v = num(val, 'requests-audit', 'seconds or off')
-            if not 1 <= v <= 86400:
-                raise ValueError('requests-audit must be 1..86400 seconds')
+            self._gate_range(key, v, 'seconds')
             p.requests_audit_s = v
             return secs(v)
         if key == 'dump-interval':
@@ -546,8 +560,7 @@ class ControlServer:
                 p.dump_wake.set()
                 return 'off'
             v = num(val, 'dump-interval', 'seconds or off')
-            if not 1 <= v <= 86400:
-                raise ValueError('dump-interval must be 1..86400 seconds')
+            self._gate_range(key, v, 'seconds')
             p.dump_interval = v
             p.dump_wake.set()
             return secs(v)
@@ -564,13 +577,13 @@ class ControlServer:
             p.upstream.timeout = v
             p.config['timeout'] = v
             return secs(v)
-        if key == 'connect-acl':
-            acl = self._acl(val, 'connect-acl')
+        if key == 'acl/connect':
+            acl = self._acl(val, 'acl/connect')
             p.connect_acl = acl
             p.config['connect_acl'] = acl
             return self._acl_text(acl)
-        if key == 'write-acl':
-            acl = self._acl(val, 'write-acl')
+        if key == 'acl/write':
+            acl = self._acl(val, 'acl/write')
             p.write_acl = acl
             p.config['write_acl'] = acl
             return self._acl_text(acl)
@@ -628,11 +641,11 @@ class ControlServer:
             return 'on' if p.allow_write else 'off'
         if key == 'write-registers':
             return p.describe_write_ranges()
-        if key == 'max-clients':
+        if key == 'limits/max-clients':
             return '%d' % p.max_clients
         if key == 'client-timeout':
             return 'none' if not p.client_timeout else secs(p.client_timeout)
-        if key == 'max-conn-per-ip':
+        if key == 'limits/max-conn-per-ip':
             return '%d' % p.conn_gate.max_per_ip
         if key == 'metrics-server':
             return 'on' if p.metrics_srv else 'off'
@@ -644,9 +657,9 @@ class ControlServer:
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         if key == 'timeout':
             return secs(p.upstream.timeout)
-        if key == 'connect-acl':
+        if key == 'acl/connect':
             return self._acl_text(p.connect_acl)
-        if key == 'write-acl':
+        if key == 'acl/write':
             return self._acl_text(p.write_acl)
         if key == 'profile':
             return p.config.get('profile') or p.profile
@@ -829,7 +842,7 @@ class ControlServer:
         rows = ['  '.join(h.ljust(w) for h, w in zip(head, widths))]
         for r in cells:
             rows.append('  '.join(v.ljust(w) for v, w in zip(r, widths)))
-        return 'ok cache all\n' + '\n'.join(rows)
+        return 'ok cache-all\n' + '\n'.join(rows)
 
     @staticmethod
     def _bytes(n):
@@ -842,13 +855,13 @@ class ControlServer:
         raw = {
             'interval': p.interval, 'ttl': p.cache.cache_ttl, 'read-delay': p.read_delay,
             'merge-gap': p.merge_gap, 'allow-write': 'on' if p.allow_write else 'off',
-            'write-registers': p.describe_write_ranges(), 'max-clients': p.max_clients,
-            'client-timeout': p.client_timeout, 'max-conn-per-ip': p.conn_gate.max_per_ip,
+            'write-registers': p.describe_write_ranges(), 'limits/max-clients': p.max_clients,
+            'client-timeout': p.client_timeout, 'limits/max-conn-per-ip': p.conn_gate.max_per_ip,
             'metrics-server': 'on' if p.metrics_srv else 'off',
             'requests-audit': p.requests_audit_s,
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'profile': p.config.get('profile'), 'selection': p.config.get('selection') or 'all',
-            'connect-acl': self._acl_text(p.connect_acl), 'write-acl': self._acl_text(p.write_acl),
+            'acl/connect': self._acl_text(p.connect_acl), 'acl/write': self._acl_text(p.write_acl),
             'timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,
         }
         return {k: raw[k] for k in sorted(self.overridden)}

@@ -12,6 +12,21 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **everywhere** — **a row may carry an `alias` — a second spelling for the
+  same knob on the wire**: the cache's write-acl answers as `write/acl`
+  beside its live `acl/write` — `set|unset|show|help write acl <value>`
+  resolves the alias and renders the CANONICAL name in the reply
+  (`ok acl/write=any`; the dump keys and the unset defaults keep the
+  canonical too). The consoles complete and list both
+  spellings — `show write ?` walks into the aliased row, and the alias's
+  first word groups and describes through the row it walks into (the
+  node's rule) — and the node's namespace help (`show write`/`help
+  write`) lists the aliased child, the line marked `(the alias of
+  acl/write)`; `help config`/`show knobs` name the alias beside the
+  command (`set acl write <value> (alias: write acl)`). One clean
+  word-path, unique in the setting space (check_options gates it; the
+  loader keeps the first row on a collision); edit_options.py edits the
+  field (the option, the show and the control-only rows).
 - **everywhere** — **the custom show words ride the registries, and a row
   may hide**: the `show` verb's non-knob views (`show status`,
   `show connections`, ...) file in each registry's `show` section
@@ -20,7 +35,7 @@ before the repo restructured into one suite.
   clis pool from them — no cli hardcodes a show word. An option row may
   carry `"hidden": true` — a live knob that answers on the wire but
   never lists in the ?/TAB pools (the completion pools drop it;
-  `show settings` keeps listing — the scriptable view stays whole).
+  `show <setting>` still answers on the wire).
   `config`/`knobs` are the hidden show words family-wide. check_options
   gates both: a hidden option carries a live name, every show word is a
   clean unique word with a description.
@@ -376,6 +391,39 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **cache** — **the wire vocabulary aligns with the scraper's namespaces**:
+  the live names are paths now — `modbus/interval`, `modbus/read-delay`,
+  `modbus/merge-gap`, `modbus/profile`, `modbus/selection`,
+  `modbus/upstream`, `modbus/unit`, `cache/ttl`,
+  `limits/client-timeout` (`set modbus interval 2`, `show cache ttl`;
+  the new `modbus` node describes the namespace) — beside the landed
+  `write/*`, `limits/max-*` and `acl/*` paths. **The upstream endpoint and
+  the unit id are live-settable**: `set modbus upstream HOST:PORT`
+  re-targets the inverter and drops the session (the next exchange dials
+  the new endpoint), `set modbus unit N` likewise. The replies render the
+  paths (`ok modbus/interval=2.00s`), the dump's override keys and the
+  unset defaults rekey, the config scripts and the flags keep the flat
+  registry names; the regtest and the control fuzz speak the path forms.
+
+- **everywhere** — **`show settings` is gone**: the one-line-per-setting
+  listing retires (no longer in use) — a per-setting `show <setting>`
+  and `show status`'s `overridden=` row carry the same truth, and the
+  command answers `err unknown setting` now. The registry rows drop the
+  word (the ?/TAB pools follow), the daemon help lines lose the
+  `settings` view, and the man pages, the READMEs and the suites
+  follow; the `overridden` tracking and the dump's settings section
+  stay (the SIGHUP/reload marker clearing rides `show status`).
+
+- **cache** — **the write knobs spell as paths**: `allow-write` is
+  `write/allow` and `write-registers` is `write/registers` on the wire —
+  `set|unset|show|help write allow <on|off>`, `write registers
+  <START:COUNT,...|any|none>` (the new `write` node carries the namespace
+  — `show write ?` lists the two children, `help write` describes it);
+  the replies render the path (`ok write/allow=on`), the dispatch, the
+  dump's override keys and the unset defaults rekey (a pre-rename dump's
+  write overrides restore as skipped — re-set them), the config scripts
+  keep the flat registry names, and cache-regtest speaks the path forms.
+
 - **everywhere** — **a `/`-path live name dispatches now**: the wire resolves
   the path (`set limits max-conn-per-ip <value>` — the registry's `live`
   spells as its words) and the daemon dispatches it — the control.py
@@ -579,6 +627,41 @@ before the repo restructured into one suite.
   wire (packed, and validated in the reply).
 
 ### Fixed
+
+- **everywhere** — **the set/unset pools no longer offer the show reports**:
+  the show words live in the setting space (one pool machinery), but the
+  set/unset completions drew from the same space unchecked — `set config ?`
+  and `set connections ?` offered a value slot the daemon then refused
+  (`set config 5` → `err unknown setting config`), and `set ?` listed the
+  reports beside the knobs. The four consoles pool set/unset from the live
+  knobs only now — the exact-match obeys the pool (a report never offers a
+  value), while `show` keeps the whole space (the reports and the
+  namespaces still walk and describe).
+- **cache** — **`set modbus timeout` was dead on the wire**: the live-path
+  wave rekeyed every `_apply`/`_get`/dump/defaults branch but left the
+  timeout flat — `set timeout 5` and `set modbus timeout 5` both answered
+  `err unknown setting` (no suite covered the knob). The branches, the
+  defaults key and the dump key carry `modbus/timeout` now (the range gate
+  keeps the row's 0 < N <= 60), the README set-table and the man prose
+  spell `modbus timeout`, and the regtest pins set/unset/show/range.
+- **cache** — **`local-time` is a live setting now**: the row carried a
+  live name with no branch — `set local-time on` answered `err unknown
+  setting`. The toggle is wired (the log handlers' formatters swap live:
+  UtcFormatter ⇄ the system-zone Formatter, per handler's own format), the
+  row carries the on/off values and the per-value notes, the defaults/dump
+  keys follow (`unset local-time` restores the configured zone), and the
+  regtest pins set/unset/show/validation.
+
+- **everywhere** — **the control servers take a connect burst**: the listen
+  backlog is 64 now (was 16) — on macOS/BSD a burst past the backlog gets
+  RST (the client sees a broken pipe before it sends); the 20-parallel-
+  client control fuzz tripped it.
+
+- **everywhere** — **the console listing breaks the line before the list**:
+  the TAB listing printed at the cursor — the first row landed beside the
+  echoed prompt+buffer and its description column shifted by the prompt's
+  length (the rows behind it kept their own column) — the list starts on a
+  fresh line now and every description sits in one column.
 
 - **everywhere** — **the console descriptions for the path-named settings**: a
   knob whose live name is a `/`-path (`limits/max-clients`) spelled as its

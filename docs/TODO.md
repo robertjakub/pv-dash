@@ -21,8 +21,14 @@ the **Done/history** records for their tool.
    `_apply`/`_get`/`defaults` follow the rename — and every row may carry
    a display `group` — the cli `?`/TAB listings group by it alone,
    `[ungrouped]` when a row carries none; the first group rows are filed
-   (the `upstream` knobs) and the first path too (the scraper's
-   `limits/max-conn-per-ip`) — and a typed row (`int`/`float`/`str`)
+   (the `upstream` knobs) and the first paths too (the scraper's
+   `limits/max-conn-per-ip`; the cache's `write/allow` + `write/registers`
+   under the new `write` node — the dispatch, the dump keys and the unset
+   defaults rekeyed, the config scripts keeping the flat names) — and a
+   row may carry an `alias`, a second wire spelling for the same knob
+   (the cache's `write/acl` — the dispatch canonicalizes, the consoles
+   complete both spellings, the node's namespace help lists the aliased
+   child) — and a typed row (`int`/`float`/`str`)
    dispatches itself now: the conv parses, the config key takes the
    value, no `_apply`/`_get` branch needed (the branches stay for the
    range gates and the runtime plumbing; the `unset` defaults generate

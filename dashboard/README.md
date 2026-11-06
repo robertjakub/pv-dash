@@ -217,21 +217,21 @@ authenticated with).
 python3 bin/dashboard.py --control-port /tmp/dashboard-8080.socket &
 python3 bin/dashboard-ctl.py show status          # one-shot
 python3 bin/dashboard-ctl.py request reload       # the SIGHUP path
-printf 'set battery on\nshow settings\n' | python3 bin/dashboard-ctl.py
+printf 'set battery on\nshow status\n' | python3 bin/dashboard-ctl.py
 python3 bin/dashboard-cli.py                      # the console: TAB completion, ?, reconnect
 ```
 
 Commands: `set <setting> <value>` / `unset <setting>` (the live settings:
 `max-clients`, `client-timeout`, `max-conn-per-ip`, `log-access`,
 `log-queries`, `battery`, `log-level`), `show <setting>` / `show status` /
-`show connections` (the live HTTP clients per peer IP) / `show settings` /
+`show connections` (the live HTTP clients per peer IP) /
 `show version` / `show knobs` (the dictionary of every registry knob: its
 flag, its env twin, its section, how it changes), `inspect` (the one-page
 dump for a bug report), `request
 reload` (re-read `server.conf` — the SIGHUP path; the listen address and
 port are bound and stay), `shutdown`, `quit`; `help <setting>` describes a
-setting. A SIGHUP or `request reload` also clears the live-override marks
-(`show settings` marks an overridden value with `*`).
+setting. A SIGHUP or `request reload` also clears the live overrides
+(`show status`'s `overridden=` row lists them).
 
 Every control command, auth failure, reload and shutdown lands in the audit
 trail (prefix `DSH`, default `~/.local/state/dashboard/audit.log`;

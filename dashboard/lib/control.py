@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """JSON-lines control server for the dashboard: inspect and steer the running
-server — show status/connections/settings/version, the live settings (the
+server — show status/connections/version, the live settings (the
 connection caps, the log surface, the battery flag), the config reload (the
 SIGHUP path), graceful shutdown. One command per line, one reply line. Every
 request and reply is one JSON object per line (the stdlib json module): the
@@ -29,7 +29,7 @@ from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
-from .options import OPTIONS, SETTING_BY_NAME, SETTING_NAMES, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME
+from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
@@ -74,7 +74,7 @@ class ControlServer:
         self.stopper = stopper
         self.shutdown_pending = False
         self.defaults = defaults or {}   # setting -> configured startup value (what `unset` restores)
-        self.overridden = set()          # settings changed live (`show settings` marks them with *)
+        self.overridden = set()          # settings changed live (`show status` carries the overridden= row)
         self.clients = set()             # the live control sockets (announce_exit)
         self.clients_lock = threading.Lock()
         self.started = time.monotonic()
@@ -105,7 +105,7 @@ class ControlServer:
             else:
                 srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 srv.bind(('127.0.0.1', self.port))
-            srv.listen(16)
+            srv.listen(64)   # the backlog above the client limit: a connect burst must not RST
         except OSError as e:
             logger.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
             return
@@ -334,8 +334,6 @@ class ControlServer:
             return self.status_report()
         if low == 'show connections':
             return 'ok connections ' + self.connections_line()
-        if low == 'show settings':
-            return self.settings_report()
         if low == 'show version':
             return 'ok dashboard %s' % version_string()
         if low == 'show config':
@@ -374,7 +372,7 @@ class ControlServer:
     def command_help(self):
         """The one-line command reference."""
         return ('commands: set <setting> <value>, unset <setting>, inspect, '
-                'show <setting|status|connections|settings|version|config|knobs>, request reload, shutdown, quit; '
+                'show <setting|status|connections|version|config|knobs>, request reload, shutdown, quit; '
                 'help <setting> describes it, help config maps every knob to its control command, '
                 'show knobs prints the full dictionary')
 
@@ -530,13 +528,6 @@ class ControlServer:
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         return '?'
-
-    def settings_report(self):
-        """Every tunable setting with its live value: one key=value per line
-        (scriptable). A live-overridden setting carries a `*` on the value —
-        a SIGHUP re-applies the config and clears the markers."""
-        return 'ok settings\n' + '\n'.join('%s=%s%s' % (k, self._get(k), '*' if k in self.overridden else '')
-                                           for k in SETTING_NAMES)
 
     def clear_overrides(self):
         """The config was re-applied (SIGHUP/request reload): nothing is

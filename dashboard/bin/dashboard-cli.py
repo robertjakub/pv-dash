@@ -4,8 +4,8 @@
 A session front-end on top of the control socket: prompt with the connected
 port, TAB completion and `?` in every position (with the short descriptions
 from the shared command registry), `set` commands print only the
-confirmation, `show <setting>` prints the bare value, `show settings` one
-setting per line, `show status` the key=value report, and `shutdown` asks
+confirmation, `show <setting>` prints the bare value,
+`show status` the key=value report, and `shutdown` asks
 before it stops the server.
 
 The session itself (connect/disconnect, the local commands like quit and
@@ -51,7 +51,7 @@ from common.options import setting_path_pool
 from common.options import word_groups
 from common.wiresec import sign_request, verify_reply
 from lib.config import resolve_control_target
-from lib.options import COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, HIDDEN_SETTINGS, SETTING_BY_NAME, SETTING_NAMES, describe_value, NODE_BY_NAME
+from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, HIDDEN_SETTINGS, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES, describe_value, NODE_BY_NAME
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
@@ -130,7 +130,9 @@ def candidates(buf):
     if not done:
         pool, hint, desc = tuple(n for n in COMMANDS if n not in COMMAND_HIDDEN), None, describe_word
     elif head in ('set', 'unset'):
-        s, segs = setting_path_pool(done[1:], POOL_NAMES, SETTING_BY_NAME)
+        names = tuple(n for n in POOL_NAMES if n not in SHOW_LIVES)   # the show reports answer show, never set/unset
+        by = {n: SETTING_BY_NAME[n] for n in names if n in SETTING_BY_NAME}
+        s, segs = setting_path_pool(done[1:], names, by)
         if s is not None:
             if head == 'unset':
                 return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole; unset takes no value — ? describes it
@@ -144,10 +146,10 @@ def candidates(buf):
     elif head == 'request' and len(done) == 1:
         pool, hint, desc = ('reload',), None, describe_word
     elif head == 'show':
-        s, segs = setting_path_pool(done[1:], SETTING_NAMES, SETTING_BY_NAME)
+        s, segs = setting_path_pool(done[1:], SETTING_NAMES + ALIAS_NAMES, SETTING_BY_NAME)
         base = '/'.join(w.lower() for w in done[1:])   # a segment's description lives on the full live name
         if s is not None:
-            _, cont = setting_path_pool(done[1:] + [''], SETTING_NAMES, SETTING_BY_NAME)
+            _, cont = setting_path_pool(done[1:] + [''], SETTING_NAMES + ALIAS_NAMES, SETTING_BY_NAME)
             if not cont:
                 return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole and childless; ? describes the report
             pool, hint = cont, None   # a namespace too: the report answers on Enter, TAB walks on
@@ -179,8 +181,10 @@ def _sections(head, done_len, matches, values=False, base=''):
 def _grouped(matches, base):
     """The matches bucketed by their display group: the ungrouped rows —
     the knobs and the show commands without a group — take the '' bucket
-    (no section header) and the listing renders them at the top; a word no
-    row answers for lands [system]."""
+    (no section header) and the listing renders them at the top; a
+    namespace word (a hierarchy node, or the walk-on first segment of an
+    aliased row) groups with the row it walks into; a word no row answers
+    for lands [system]."""
     buckets = {}
     for w in matches:
         full = (base + '/' + w) if base else w
@@ -189,7 +193,12 @@ def _grouped(matches, base):
             label = '' if s.display_group == 'ungrouped' else s.display_group
         else:
             n = NODE_BY_NAME.get(w)
-            label = (n.group or '') if n is not None else 'system'   # no section fallback
+            if n is not None:
+                label = n.group or ''
+            else:
+                walk = next((s for k, s in SETTING_BY_NAME.items() if k.startswith(w + '/')), None)
+                label = ('' if walk.display_group == 'ungrouped' else walk.display_group) \
+                    if walk is not None else 'system'   # no section fallback
         buckets.setdefault(label, []).append(w)
     bare = buckets.pop('', None)
     secs = [('', sorted(bare, key=str.lower))] if bare else []
@@ -223,7 +232,10 @@ def describe_word(w):
 
 def setting_help(name):
     s = SETTING_BY_NAME.get(name)
-    return s.help if s else None
+    if s:
+        return s.help
+    walk = next((s for k, s in SETTING_BY_NAME.items() if k.startswith(name + '/')), None)
+    return walk.help if walk else None   # a namespace walk-on (an alias's first segment)
 
 
 def aligned_rows(matches, desc, hint, width=None):
@@ -240,7 +252,7 @@ def aligned_rows(matches, desc, hint, width=None):
     return rows
 
 
-POOL_NAMES = tuple(n for n in SETTING_NAMES if n not in HIDDEN_SETTINGS)
+POOL_NAMES = tuple(n for n in SETTING_NAMES + ALIAS_NAMES if n not in HIDDEN_SETTINGS)
 
 _last_listed = None   # the completer is called several times per attempt;
                       # list each distinct buffer only once
@@ -305,7 +317,7 @@ def complete(text, state):
             rows = sectioned_rows(sections, desc, hint)
             # the list, a blank line, then the prompt + line again — editline
             # does NOT redraw after the completer, so we do it ourselves
-            print('\n'.join(rows) + '\n')
+            print('\n' + '\n'.join(rows) + '\n')
             sys.stdout.write(_prompt + buf)
             sys.stdout.flush()
         return None

@@ -10,9 +10,9 @@ A session front-end on top of the dashboard's JSON-lines control socket:
 prompt with the connected port, TAB completion and \fB?\fR in every
 position (with the short descriptions from the shared command registry),
 \fBset\fR commands print only the confirmation, \fBshow <setting>\fR
-prints the bare value, \fBshow settings\fR one setting per line,
-\fBshow status\fR the key=value report, and \fBshutdown\fR asks before
-it stops the server. When the connection dies mid-session the console
+prints the bare value, \fBshow status\fR the key=value report, and
+\fBshutdown\fR asks before it stops the server. When the connection dies
+mid-session the console
 retries (\fB--reconnect\fR attempts, \fB--reconnect-wait\fR seconds
 apart). With a control token configured the wire is HMAC-signed: the
 console signs every command and verifies every reply.

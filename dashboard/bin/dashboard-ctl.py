@@ -10,9 +10,9 @@ reply.
 
   python3 dashboard-ctl.py --control-port 15598 show status
   python3 dashboard-ctl.py --control-port 15598 request reload
-  printf 'set battery on\\nshow settings\\n' | python3 dashboard-ctl.py --control-port 15598
+  printf 'set battery on\\nshow status\\n' | python3 dashboard-ctl.py --control-port 15598
 
-Commands (see the server's help): show <status|connections|settings|version>,
+Commands (see the server's help): show <status|connections|version>,
 set/unset, inspect, request reload, shutdown, quit.
 
 Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.

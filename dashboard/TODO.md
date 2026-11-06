@@ -4,6 +4,11 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[dashboard]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The show-settings retirement: `show settings` is gone — the per-setting
+`show <setting>` and `show status`'s `overridden=` row carry the same
+truth, the command answers `err unknown setting` (the registry row, the
+daemon help lines, the man pages, the README and the suites follow).
+
 The registry-folding wave: `lib/settings.py` is gone — the control
 grammar's vocabulary rides the `lib/options.json` rows and `lib/options.py`
 derives `SETTINGS`/`describe_setting` from them (the wire, the completions

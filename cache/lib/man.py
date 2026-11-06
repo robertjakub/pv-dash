@@ -183,7 +183,8 @@ server: on connect it probes the daemon and greets you with the upstream,
 the poll health and the uptime; the prompt shows the connected port
 (\\fBcache:15502 >\\fR). TAB completes commands, settings and values with
 their descriptions (the listings group the settings under the registry's
-own sections, [device]/[serving]/..., with [values]/[system] beside);
+own groups \\(em a row's group, else its section \\(em
+[device]/[serving]/..., with [values]/[system] beside);
 \\fB?\\fR prints the same in any position; \\fBclear cache\\fR/\\fBrestart\\fR
 confirm; \\fBshutdown\\fR asks \\fBProceed with shutdown? [confirm]\\fR first.
 .PP

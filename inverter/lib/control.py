@@ -26,7 +26,7 @@ from common.config import acl_summary, acl_text, parse_acl
 from common.cred import peer_uid
 from common.human import secs
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.options import control_command
+from common.options import control_command, grouped_rows, match_setting_path
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
 from common.version import version_string
@@ -283,16 +283,14 @@ class ControlServer:
 
     def config_mapping(self):
         """The knob -> control-command mapper (help config): every option of
-        the registry under its section, with the command that changes it on
-        a running fake — or the restart note when the knob is startup-only."""
+        the registry under its display group (the row's `group`, else its
+        section), with the command that changes it on a running fake — or
+        the restart note when the knob is startup-only."""
         from .options import OPTIONS
-        from common.options import SECTIONS, section_title
+        from common.options import section_title
         lines = ['ok config mapping']
-        for section, _title in SECTIONS:
-            rows = [o for o in OPTIONS if o.section == section]
-            if not rows:
-                continue
-            lines.append('# --- %s ---' % section_title(section))
+        for key, rows in grouped_rows(OPTIONS):
+            lines.append('# --- %s ---' % section_title(key))
             for o in rows:
                 lines.append('%-24s %s' % (o.name, control_command(o)))
         return '\n'.join(lines)
@@ -581,14 +579,14 @@ class ControlServer:
             return 'ok pong'
         if cmd in ('help', '?'):
             if args:
-                what = args[0].lower()
-                if what == 'config':
+                if args[0].lower() == 'config':
                     return self.config_mapping()
-                if what == 'knobs':
+                if args[0].lower() == 'knobs':
                     return self.knobs_dictionary()
-                if what in SETTING_BY_NAME:
-                    return 'ok %s' % describe_setting(what)
-                return 'err unknown setting %s (try help)' % what
+                key, rest = match_setting_path(args, SETTING_BY_NAME)
+                if key is not None and not rest:
+                    return 'ok %s' % describe_setting(key)
+                return 'err unknown setting %s (try help)' % ' '.join(args)
             return ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|connections|settings|config|knobs>, '
                     'reset, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
                     'show knobs prints the full dictionary'
@@ -600,9 +598,9 @@ class ControlServer:
         if cmd == 'unset':
             if not args:
                 return 'err unset needs a setting (try help)'
-            key = args[0].lower()
-            if key not in self.defaults:
-                return 'err unknown setting %s (try help)' % key
+            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            if key is None or rest or key not in self.defaults:
+                return 'err unknown setting %s (try help)' % ' '.join(args)
             shown = self._apply(key, self.defaults[key])
             logger.info('control: unset %s -> ok %s=%s', key, key, shown)
             return 'ok %s=%s %s' % (key, shown, self.status())
@@ -661,14 +659,14 @@ class ControlServer:
                 table = '\n'.join('%-*s | %*s | %*s | %*s' % (w1, a, w2, b, w3, c, w4, d)
                                   for a, b, c, d in rows)
                 return 'ok registers (%d)\n%s' % (len(rows), table)
-            if what not in self.SETTING_KEYS:
-                return 'err unknown setting %s (try help)' % what
-            return 'ok %s=%s' % (what, self._get(what))
+            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            if key is not None and not rest:
+                return 'ok %s=%s' % (key, self._get(key))
+            return 'err unknown setting %s (try help)' % ' '.join(args)
         if cmd == 'set':
             if len(args) < 2:
                 return 'err set needs a setting and a value (try help)'
-            key, value = args[0].lower(), ' '.join(args[1:])
-            if key == 'register':   # the control write = the Modbus write: the same
+            if args[0].lower() == 'register':   # the control write = the Modbus write: the same
                 if not self.fake:   # overlay FC06/FC16 land in, so the scrapers see it
                     return 'err no modbus device attached'
                 if len(args) < 3:
@@ -682,8 +680,12 @@ class ControlServer:
                 self.fake.overlay[addr] = val
                 logger.info('control: set register %d=%d (write overlay)', addr, val)
                 return 'ok register %d=%d (the write overlay, the scrapers read it)' % (addr, val)
-            if key not in self.SETTING_KEYS:
-                return 'err unknown setting %s (try help)' % key
+            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            if key is None:
+                return 'err unknown setting %s (try help)' % ' '.join(args)
+            if not rest:
+                return 'err set needs a setting and a value (try help)'
+            value = ' '.join(rest)
             try:
                 shown = self._apply(key, value)
             except ValueError as e:

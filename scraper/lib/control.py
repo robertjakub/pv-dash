@@ -29,7 +29,7 @@ from common.cred import peer_uid
 from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.options import control_command
+from common.options import control_command, grouped_rows, match_setting_path
 from common.config import default_profile_path, resolve_profile_file
 from .config import build_sources, load_device_profile
 from .options import SETTING_BY_NAME, SETTING_NAMES, describe_setting
@@ -212,16 +212,14 @@ class ControlServer:
 
     def config_mapping(self):
         """The knob -> control-command mapper (help config): every option of
-        the registry under its section, with the command that changes it on a
-        running daemon — or the restart note when the knob is startup-only."""
+        the registry under its display group (the row's `group`, else its
+        section), with the command that changes it on a running daemon — or
+        the restart note when the knob is startup-only."""
         from .options import OPTIONS
-        from common.options import SECTIONS, section_title
+        from common.options import section_title
         lines = ['ok config mapping']
-        for section, _title in SECTIONS:
-            rows = [o for o in OPTIONS if o.section == section]
-            if not rows:
-                continue
-            lines.append('# --- %s ---' % section_title(section))
+        for key, rows in grouped_rows(OPTIONS):
+            lines.append('# --- %s ---' % section_title(key))
             for o in rows:
                 lines.append('%-24s %s' % (o.name, control_command(o)))
         return '\n'.join(lines)
@@ -323,15 +321,16 @@ class ControlServer:
         if not low:
             return 'err empty command'
         if low.split()[0] in ('help', '?') and low != '?':
-            what = cmd[4:].strip().lower()
-            if what == 'config':
+            args = cmd.split()[1:]
+            if args and args[0].lower() == 'config':
                 return self.config_mapping()
-            if what == 'knobs':
+            if args and args[0].lower() == 'knobs':
                 return self.knobs_dictionary()
-            if what and what in SETTING_BY_NAME:
-                return 'ok %s' % describe_setting(what)
-            if what:
-                return 'err unknown setting %s (try help)' % what
+            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            if key is not None and not rest:
+                return 'ok %s' % describe_setting(key)
+            if args:
+                return 'err unknown setting %s (try help)' % ' '.join(args)
             return 'ok ' + self.command_help()
         if low == '?':
             return 'ok ' + self.command_help()
@@ -343,9 +342,9 @@ class ControlServer:
             args = cmd.split()[1:]
             if not args:
                 return 'err unset needs a setting (try help)'
-            key = args[0].lower()
-            if key not in self.defaults:
-                return 'err unknown setting %s (try help)' % key
+            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            if key is None or rest or key not in self.defaults:
+                return 'err unknown setting %s (try help)' % ' '.join(args)
             try:
                 shown = self._apply(key, self.defaults[key])
             except ValueError as e:
@@ -357,10 +356,12 @@ class ControlServer:
             args = cmd.split()[1:]
             if len(args) < 2:
                 return 'err set needs a setting and a value (try help)'
-            key = args[0].lower()
-            value = ' '.join(args[1:])
-            if key not in SETTING_BY_NAME:
-                return 'err unknown setting %s (try help)' % key
+            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            if key is None:
+                return 'err unknown setting %s (try help)' % ' '.join(args)
+            if not rest:
+                return 'err set needs a setting and a value (try help)'
+            value = ' '.join(rest)
             try:
                 shown = self._apply(key, value)
             except ValueError as e:
@@ -380,11 +381,13 @@ class ControlServer:
             return self.show_config()
         if low == 'show knobs':
             return self.knobs_dictionary()
-        if low.startswith('show') and len(cmd.split()) == 2:
-            what = cmd.split()[1].lower()
-            if what in SETTING_BY_NAME:
-                return 'ok %s=%s' % (what, self._get(what))
-            return 'err unknown setting %s (try help)' % what
+        if low.startswith('show'):
+            args = cmd.split()[1:]
+            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            if key is not None and not rest:
+                return 'ok %s=%s' % (key, self._get(key))
+            if len(args) == 1:
+                return 'err unknown setting %s (try help)' % args[0].lower()
         if low == 'inspect':
             return self.inspect()
         if low == 'poll now':

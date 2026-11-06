@@ -47,7 +47,7 @@ except ImportError:
 from common.audit import AuditLog
 from common.config import load_token_file
 from common.human import secs
-from common.options import section_groups
+from common.options import setting_groups, setting_path_pool
 from common.wiresec import sign_request, verify_reply
 from lib.config import resolve_control_target
 from lib.options import COMMAND_HELP, COMMANDS, SETTING_BY_NAME, SETTING_NAMES, SHOW_VALUES, describe_value
@@ -105,45 +105,60 @@ def prompt_for(target, is_unix):
 def candidates(buf):
     """Valid next words for the buffer being completed or questioned:
     (matches, hint about the following word, describer of each word, the
-    registry section groups ([device]/[serving]/...), [values]/[system]
-    included, for the listing)."""
+    listing groups — the settings under their registry groups
+    ([device]/[serving]/...), the values of one setting ([values]),
+    [system] beside). A live setting's name may be a '/'-path
+    (`inverter/profile`): set/unset/show spell it as words — the completion
+    offers the next segment until the path is whole, then the values."""
     end_space = buf.endswith(' ')
     parts = buf.split()
     text = '' if end_space else (parts[-1] if parts else '')
     done = parts if end_space else parts[:-1]
     head = done[0].lower() if done else ''
+    values_mode = False
     if not done:
         pool, hint, desc = COMMANDS, None, describe_word
-    elif head in ('set', 'unset') and len(done) == 1:
-        pool, hint, desc = SETTING_NAMES, None, setting_help
-    elif head == 'set' and len(done) == 2 and done[1].lower() in SETTING_BY_NAME:
-        s = SETTING_BY_NAME[done[1].lower()]
-        pool, hint = tuple(s.values), s.value_shape
-        desc = lambda w, s=s: s.value_help.get(w, s.value_help.get(w.lower(), '')) or None
+    elif head in ('set', 'unset'):
+        s, segs = setting_path_pool(done[1:], SETTING_NAMES, SETTING_BY_NAME)
+        if s is not None:
+            if head == 'unset':
+                return [], None, None, []   # the path is whole; unset takes no value
+            values_mode = True
+            pool, hint = tuple(s.values), s.value_shape
+            desc = lambda w, s=s: s.value_help.get(w, s.value_help.get(w.lower(), '')) or None
+        else:
+            pool, hint, desc = segs, None, setting_help
     elif head == 'request' and len(done) == 1:
         pool, hint, desc = ('reload',), None, describe_word
-    elif head == 'show' and len(done) == 1:
-        pool, hint, desc = SETTING_NAMES + ('status', 'connections', 'settings', 'version'), None, describe_word
+    elif head == 'show':
+        fixed = ('status', 'connections', 'settings', 'version') if len(done) == 1 else ()
+        s, segs = setting_path_pool(done[1:], SETTING_NAMES, SETTING_BY_NAME)
+        if s is not None:
+            return [], None, None, []   # the path is whole; show takes no value
+        pool, hint, desc = segs + fixed, None, describe_word
     else:
         return [], None, None, []
     if pool is None:                      # a value shape with no completable words
         return [], hint, desc, [('values', [])]
     matches = [w for w in pool if w.startswith(text.lower())]
-    return matches, hint, desc, _sections(head, len(done), matches)
+    return matches, hint, desc, _sections(head, len(done), matches, values_mode)
 
 
-def _sections(head, done_len, matches):
-    """The listing groups: the settings under their registry sections
-    ([device]/[serving]/...), the values of one setting ([values]), everything
-    else ([system]: the report words, the commands)."""
-    if done_len >= 2 and head in ('set', 'unset'):
+def _sections(head, done_len, matches, values=False):
+    """The listing groups: the settings under their registry groups (the
+    row's `group`, else its section — [device]/[serving]/...), the values
+    of one setting ([values]), everything else ([system]: the report words,
+    the commands)."""
+    if values:
         return [('values', matches)]
-    if head in ('set', 'unset') and done_len == 1:
-        return section_groups(matches, SETTING_BY_NAME)
+    if head in ('set', 'unset') and done_len >= 1:
+        mine = [w for w in matches if w in SETTING_BY_NAME]
+        rest = [w for w in matches if w not in SETTING_BY_NAME]
+        return setting_groups(mine, SETTING_BY_NAME) + [('system', rest)]
     if head == 'show' and done_len == 1:
         mine = [w for w in matches if w in SETTING_BY_NAME]
         rest = [w for w in matches if w not in SETTING_BY_NAME]
-        return section_groups(mine, SETTING_BY_NAME) + [('system', rest)]
+        return setting_groups(mine, SETTING_BY_NAME) + [('system', rest)]
     return [('system', matches)]
 
 

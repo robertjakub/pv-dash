@@ -3,9 +3,13 @@
 knob, one source"): the rows live in lib/options.json next to this loader —
 the registry name (the set-grammar config key and the `set <name>` control
 name), the flag, the env twin(s), the section it files under
-(common/options.py SECTIONS), the knob's description (the shared help text
+(common/options.py SECTIONS), the optional finer display group (a row may
+carry a `group` — the surfaces bucket it under it instead of its section),
+the knob's description (the shared help text
 --help and the man pages render), the live control name when the knob is
-live-settable, and the secret flag. This module loads the JSON into the
+live-settable (a '/'-path — `inverter/profile` spells as its words on the
+wire: `set inverter profile <value>`), and the secret flag. This module
+loads the JSON into the
 common Option rows and keeps the Python-side wiring: the control-grammar
 vocabulary, the static.json-wired defaults and choices, the resolved-config
 key renames and the set-grammar rendering of the effective values. The
@@ -50,6 +54,7 @@ def _load_options():
         opt = Option(row['name'], row.get('flag'), row.get('env'), row['section'],
                      help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
                      live=row.get('live'), secret=bool(row.get('secret', False)),
+                     group=row.get('group'),
                      setting_help=row.get('setting-help'), values=row.get('values'),
                      hint=row.get('hint'), value_help=row.get('value-help'))
         if 'default' in row:

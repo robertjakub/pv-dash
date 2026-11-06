@@ -56,14 +56,15 @@ def marks(rows_by_tool):
 
 def live_cell(rows_by_tool):
     """The live column: the control command the knob answers to on a running
-    daemon — `set <name>` from the registry's live field (the wire name, which
-    can differ from the flag: the cache's --cache-ttl sets ttl), the tools'
-    names joined when they diverge. No live name = *(startup-only)*: a restart
+    daemon — `set <name>` from the registry's live field (the wire name,
+    which can differ from the flag: the cache's --cache-ttl sets ttl; a
+    '/'-path spells as its words: `set inverter profile`), the tools' names
+    joined when they diverge. No live name = *(startup-only)*: a restart
     applies it."""
     names = sorted({opt.live for opt in rows_by_tool.values() if opt.live})
     if not names:
         return '*(startup-only)*'
-    return ', '.join('`set %s`' % n for n in names)
+    return ', '.join('`set %s`' % n.replace('/', ' ') for n in names)
 
 
 def main():
@@ -113,7 +114,7 @@ def main():
         cells = marks(by_tool)
         kind = 'c' if not first.flag else 'k'
         out.append('| %s | `%s` | %s | %s | %s |'
-                   % (kind, name, section, live_cell(by_tool),
+                   % (kind, name, first.group or section, live_cell(by_tool),
                       ' | '.join(cells)))
     out.append('')
     out.append('Legend: `k` = a knob — the flag/env/config-file rows; '

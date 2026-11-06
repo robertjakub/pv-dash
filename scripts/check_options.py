@@ -5,7 +5,8 @@ NixOS module options and the README flag tables — against the option
 registry (per-tool lib/options.py, the common Option rows). The bundled
 config script and the man pages ride the same check (the man OPTIONS render
 from the parser; the bundled config's `set` lines must name registry
-options).
+options); the control-grammar vocabulary rides the rows too (every live
+name unique and one word-path, every `group` a clean word).
 
   python3 scripts/check_options.py           # the whole family
   python3 scripts/check_options.py cache     # one tool
@@ -93,12 +94,21 @@ def check_tool(tool):
     flags = {'--' + o.name for o in options if o.flag}   # control-only settings carry no flag
 
     # the control grammar's vocabulary rides the same rows: every live name
-    # unique, its short description present, the control-only rows flag/env/
-    # secret-free
+    # unique and one spellable word-path (a '/'-path spells as its words on
+    # the wire — whitespace could never parse), its short description
+    # present, the control-only rows flag/env/secret-free
     live_names = [o.live for o in options if o.live]
     dupes = sorted({n for n in live_names if live_names.count(n) > 1})
     rows.append((not dupes, '%s: every live setting name is unique%s'
                  % (tool, ' — duplicated: %s' % ', '.join(dupes) if dupes else '')))
+    spaced = sorted(o.live for o in options if o.live and any(c.isspace() for c in o.live))
+    rows.append((not spaced, '%s: every live name is one word-path, no whitespace%s'
+                 % (tool, ' — bad: %s' % ', '.join(spaced) if spaced else '')))
+    bad_groups = sorted(o.name for o in options if o.group is not None
+                        and (not isinstance(o.group, str) or not o.group
+                             or any(c.isspace() for c in o.group)))
+    rows.append((not bad_groups, '%s: every option group is a clean word%s'
+                 % (tool, ' — bad rows: %s' % ', '.join(bad_groups) if bad_groups else '')))
     no_help = sorted('--' + o.name for o in options if o.live and not (o.setting_help or o.help))
     rows.append((not no_help, '%s: every live setting carries its description%s'
                  % (tool, ' — missing: %s' % ', '.join(no_help) if no_help else '')))

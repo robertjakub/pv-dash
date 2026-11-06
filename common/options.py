@@ -4,8 +4,9 @@
 Every knob of every tool lives here ONCE as an `Option`: its registry name
 (the set-grammar config key and the ini-era key, dashes included), the
 argparse flag, the environment twin, the **section** it belongs to, its
-help text, its converter and its default. From this one row the surfaces
-are built or checked:
+optional **group** (the finer display bucket — the section when the row
+carries none), its help text, its converter and its default. From this one
+row the surfaces are built or checked:
 
 - the **configuration file** — the set grammar the control servers already
   speak (`parse_config_script` / `render_config_script`): a config file is a
@@ -17,10 +18,12 @@ are built or checked:
   (`knob_dictionary` below — registry data only, no values render);
 - the **control grammar's live settings** — the `Setting` rows the `set`/
   `unset` verbs, the console completions and the word-help speak, derived
-  from the same rows (`settings_of`/`make_describe`: a row's `live` name,
-  its `setting_help`, its completable `values`, the value-shape `hint` and
-  the per-value `value_help`; a flagless row is a control-only setting —
-  the fake's pins and machines);
+  from the same rows (`settings_of`/`make_describe`: a row's `live` name —
+  a `/`-path, `inverter/profile` — its `setting_help`, its completable
+  `values`, the value-shape `hint` and the per-value `value_help`; a
+  flagless row is a control-only setting — the fake's pins and machines;
+  the path spells as its words on the wire: `set inverter profile <value>`,
+  however deep — `a/b/c` → `set a b c <value>`);
 - `scripts/check_options.py` — the CI gate that the four surfaces (the
   flags, the env names, the bundled config, the NixOS module and the README
   tables) agree with the registry.
@@ -56,27 +59,31 @@ class Option:
     """One knob: `name` (the config/set-grammar key), `flag` ('--interval';
     None on a control-only setting — a live `set` name with no flag), `env`
     (the twin — a str or a tuple of fallbacks), `section` (a SECTIONS key),
-    `help` (the shared help text — the parser's help and the docs render
-    it), `conv` (the value shape: str/int/float/bool — bool flags are
-    store_true, int/float type the argparse value), `default` (the argparse
-    default — None = unset, the resolution layers decide), `live` (the
-    control `set` name when the knob is live-settable — the knob ->
-    control-command mapper), `secret` (a token: rendered into a config file
-    only in its -file form), `choices` (the values the parser accepts) and
-    `negates` (the name of the boolean knob this row switches off — the
-    --no-x form of an --x flag). A control-only setting (the fake's pins and
-    machines) carries the live name and no flag/env; its `setting_help`,
-    `values`, `hint` and `value_help` are the control grammar's vocabulary
-    (the short description, the completable words, the value shape and the
-    per-value notes)."""
+    `group` (the optional finer display bucket — the surfaces group the rows
+    under it instead of the section when it is set), `help` (the shared help
+    text — the parser's help and the docs render it), `conv` (the value
+    shape: str/int/float/bool — bool flags are store_true, int/float type
+    the argparse value), `default` (the argparse default — None = unset, the
+    resolution layers decide), `live` (the control `set` name when the knob
+    is live-settable — a '/'-path whose segments spell as words on the wire:
+    `inverter/profile` is `set inverter profile <value>`), `secret` (a
+    token: rendered into a config file only in its -file form), `choices`
+    (the values the parser accepts) and `negates` (the name of the boolean
+    knob this row switches off — the --no-x form of an --x flag). A
+    control-only setting (the fake's pins and machines) carries the live
+    name and no flag/env; its `setting_help`, `values`, `hint` and
+    `value_help` are the control grammar's vocabulary (the short
+    description, the completable words, the value shape and the per-value
+    notes)."""
 
     def __init__(self, name, flag, env, section, help='', conv=str, default=None, live=None,
-                 secret=False, choices=None, negates=None,
+                 secret=False, choices=None, negates=None, group=None,
                  setting_help=None, values=None, hint=None, value_help=None):
         self.name = name
         self.flag = flag
         self.env = env
         self.section = section
+        self.group = group        # the display bucket; None = the section groups it
         self.help = help
         self.conv = conv
         self.default = default
@@ -159,19 +166,30 @@ def parse_config_script(text, label):
     return out
 
 
+def grouped_rows(options):
+    """The rows bucketed under their display group — the row's `group`, its
+    section when it carries none — in registry first-appearance order (the
+    order the registries file the rows in — the same order --help renders;
+    the SECTIONS tuple no longer orders these surfaces). The one grouping
+    show config, show knobs and help config render: a bucket key that is a
+    SECTIONS key keeps its long title (section_title), a bare group key
+    renders raw."""
+    buckets = {}
+    for o in options:
+        buckets.setdefault(o.group or o.section, []).append(o)
+    return list(buckets.items())
+
+
 def render_config_script(options, values, comment=None):
-    """The set-grammar form of the current values, grouped under the section
-    comments — `show config` prints this, and the output pipes straight back
-    into a config file (or a ctl client). Options whose value is None are
-    skipped (unset / off)."""
+    """The set-grammar form of the current values, grouped under the
+    display-group comments — `show config` prints this, and the output
+    pipes straight back into a config file (or a ctl client). Options whose
+    value is None are skipped (unset / off)."""
     header = '# pv-suite configuration — every line is a set command (pipe it back through the ctl client)'
     if comment:
         header += '\n# %s' % comment
     lines = [header, '']
-    for section, title in SECTIONS:
-        rows = [o for o in options if o.section == section]
-        if not rows:
-            continue
+    for key, rows in grouped_rows(options):
         rows_left = []
         for o in rows:
             v = values.get(o.name)
@@ -179,7 +197,7 @@ def render_config_script(options, values, comment=None):
                 continue
             rows_left.append('set %s %s' % (o.name, v))
         if rows_left:
-            lines.append('# --- %s ---' % title)
+            lines.append('# --- %s ---' % section_title(key))
             lines.extend(rows_left)
             lines.append('')
     return '\n'.join(lines).rstrip() + '\n'
@@ -187,54 +205,63 @@ def render_config_script(options, values, comment=None):
 
 def control_command(opt):
     """The knob -> control-command mapper: the command that changes this knob
-    on a running daemon (`set interval 10`), or the note that the knob is
+    on a running daemon (`set interval 10`; a live path spells as its words:
+    `set inverter profile <value>`), or the note that the knob is
     startup-only (restart to apply)."""
     if opt.live:
-        return 'set %s <value>' % opt.live
+        return 'set %s <value>' % opt.live.replace('/', ' ')
     return 'restart required (startup-only knob)'
 
 
 def knob_dictionary(options, who='the tool'):
     """The dictionary of all knobs (`show knobs`): every option of the
-    registry under its section, one row per knob with every surface — the
-    config/set-grammar name, the argparse flag (control-only settings show
-    the set command in their flag's place), the env twin(s), the home
-    section, the control command that changes it (or the restart note) and
-    the secret marker. Registry data only — no values render here (`show
-    config` is the values view), so secrets are named, never shown."""
+    registry under its display group (the row's `group`, else its section),
+    one row per knob with every surface — the config/set-grammar name, the
+    argparse flag (control-only settings show the set command in their
+    flag's place), the env twin(s), the home section, the control command
+    that changes it (or the restart note) and the secret marker. Registry
+    data only — no values render here (`show config` is the values view),
+    so secrets are named, never shown."""
     lines = ['ok knobs — the registry of %s: every knob, its flag, its env twin, '
              'its section, how it changes' % who]
-    for section, title in SECTIONS:
-        rows = [o for o in options if o.section == section]
-        if not rows:
-            continue
-        lines.append('# --- %s ---' % title)
+    for key, rows in grouped_rows(options):
+        lines.append('# --- %s ---' % section_title(key))
         for o in rows:
             env = '/'.join('$' + e for e in o.env_names()) if o.env else '-'
             notes = control_command(o)
             if o.secret:
                 notes += ', secret'
             lines.append('%-23s %-26s %-30s %-11s %s'
-                         % (o.name, o.flag or '(control-only)', env, section, notes))
+                         % (o.name, o.flag or '(control-only)', env, o.section, notes))
     return '\n'.join(lines)
 
 
 class Setting:
     """One live control setting — the registry's control-grammar view: the
-    `set <name>` name, the short description the wire help answers with, the
-    completable value words, the value-shape hint (shown after the words),
-    the per-value short descriptions and the registry section the setting
-    files under (the [device]/[serving]/... groups the console word-help and
-    the completions render). Derived from the Option rows (settings_of) —
-    the registry is the one place a knob's vocabulary lives."""
+    `set <name>` name (a '/'-path: the wire spells its segments as words —
+    `inverter/profile` is `set inverter profile <value>`), the short
+    description the wire help answers with, the completable value words, the
+    value-shape hint (shown after the words), the per-value short
+    descriptions, the registry section the setting files under and the
+    display group it renders in (the row's `group`, else the section — the
+    [device]/[serving]/... groups the console word-help and the completions
+    render). Derived from the Option rows (settings_of) — the registry is
+    the one place a knob's vocabulary lives."""
 
-    def __init__(self, name, help, values=(), hint=None, value_help=None, section=None):
+    def __init__(self, name, help, values=(), hint=None, value_help=None, section=None, group=None):
         self.name = name
         self.help = help
         self.values = values              # completable words
         self.hint = hint                  # free-text value shape shown after the list
         self.value_help = value_help or {}   # per-value short description
         self.section = section
+        self.group = group                # the display bucket; None = the section groups it
+
+    @property
+    def display_group(self):
+        """The bucket the setting renders under: the registry's `group`,
+        else its section."""
+        return self.group or self.section
 
     @property
     def value_shape(self):
@@ -257,23 +284,61 @@ def settings_of(options):
             continue
         seen.add(o.live)
         out.append(Setting(o.live, o.setting_help or o.help, o.values, o.hint, o.value_help,
-                           o.section))
+                           o.section, o.group))
     return tuple(out)
 
 
-def section_groups(names, by_name):
-    """The live settings grouped under their registry sections — the
-    [device]/[serving]/... groups the console word-help and the completions
-    render in place of the one flat [settings] group (the [values] and
-    [system] groups stay the callers'). SECTIONS order, only the non-empty
-    groups, the names keeping their given order inside a group; a name no
-    Setting answers for belongs to the caller's [system] group, never here."""
-    buckets = {key: [] for key, _title in SECTIONS}
+def setting_groups(names, by_name):
+    """The live settings grouped under their display groups (the row's
+    `group`, else its section) — the [device]/[serving]/... groups the
+    console word-help and the completions render in place of the one flat
+    [settings] group (the [values] and [system] groups stay the callers').
+    First-appearance order over the given names, only the non-empty groups;
+    a name no Setting answers for belongs to the caller's [system] group,
+    never here."""
+    buckets = {}
     for n in names:
         s = by_name.get(n)
-        if s is not None and s.section in buckets:
-            buckets[s.section].append(n)
-    return [(key, buckets[key]) for key, _title in SECTIONS if buckets[key]]
+        if s is not None:
+            buckets.setdefault(s.display_group, []).append(n)
+    return list(buckets.items())
+
+
+def match_setting_path(words, by_name):
+    """The live setting a set/unset/show/help word list names: a `live` path
+    (`inverter/profile`) spells as its segments' words on the wire — the
+    longest '/'-joined prefix of `words` that `by_name` answers wins, the
+    remaining words belong to the value (`set inverter profile <value>`;
+    however deep: `a/b/c` → `set a b c <value>`). Returns (path, rest
+    words); (None, words) when the words name no setting."""
+    for k in range(len(words), 0, -1):
+        cand = '/'.join(words[:k]).lower()
+        if cand in by_name:
+            return cand, words[k:]
+    return None, words
+
+
+def setting_path_pool(typed, names, by_name):
+    """The completion pool for a set/unset/show word list: the Setting the
+    words already name (exact — the caller completes its values) or the
+    distinct next path segments of `names` under the '/'-joined prefix so
+    far (the pool's order kept — `inverter` completes before `profile`).
+    Returns (exact, segments); exact is None while the path is still
+    partial (a flat registry keeps the whole name one segment: the pool
+    itself)."""
+    path = '/'.join(w.lower() for w in typed)
+    if path in by_name:
+        return by_name[path], ()
+    prefix = path + '/' if path else ''
+    segs, seen = [], set()
+    for n in names:
+        if path and not n.startswith(prefix):
+            continue
+        seg = n[len(prefix):].split('/')[0]
+        if seg not in seen:
+            seen.add(seg)
+            segs.append(seg)
+    return None, tuple(segs)
 
 
 def make_describe(by_name):

@@ -12,6 +12,21 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **everywhere** — **the registry learns to group and the grammar to spell
+  paths**: an option row may carry a `group` — the finer display bucket the
+  surfaces file the knob under (until now the shared sections were the only
+  grouping); `show config`, `show knobs` and `help config` bucket under the
+  row's group (the section when it carries none, registry first-appearance
+  order; a section key keeps its long title, a bare group key renders raw),
+  and the console `?`/TAB listings group the settings the same way. And the
+  control-grammar `live` name is a `/`-path now — `inverter/profile` spells
+  as its words on the wire (`set|unset|show|help inverter profile <value>`;
+  however deep: `a/b/c` → `set a b c <value>`), the consoles complete it
+  segment by segment, and the knob -> command renderers (help config, show
+  knobs, the knob table's live column) print the spaced form. No registry
+  row carries a group or a path yet — the renames land in the hierarchical
+  grammar wave (docs/TODO.md); every surface behaves exactly as before
+  until then.
 - **everywhere** — **the env twins drop the tool prefixes**: every
   environment variable is the knob's bare upper-snake name now — `HOST`,
   `PORT`, `LISTEN`, `INTERVAL`, `CTL`, `CONTROL_TOKEN`, `LOG_LEVEL`, ...

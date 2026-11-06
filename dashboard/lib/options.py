@@ -16,7 +16,7 @@ read this table."""
 import json
 import os
 
-from common.options import Option
+from common.options import Option, make_describe, settings_of
 
 _CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 
@@ -32,8 +32,11 @@ def _load_options():
     """The rows from lib/options.json (next to this loader). A bool knob
     without an explicit default parses as the argparse store_true native
     (False); a value knob defaults to None — the resolution layers decide.
-    The static.json-wired bits ride here (the audit log's rotation defaults,
-    the log-level choices) so the constants keep their one home."""
+    The control-grammar vocabulary (the live setting's short description,
+    the completable value words, the shape hint, the per-value notes) rides
+    the same rows. The static.json-wired bits ride here too (the audit
+    log's rotation defaults, the log-level choices) so the constants keep
+    their one home."""
     here = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
@@ -44,9 +47,11 @@ def _load_options():
         rows = json.load(f)['options']
     out = []
     for row in rows:
-        opt = Option(row['name'], row['flag'], row.get('env'), row['section'],
+        opt = Option(row['name'], row.get('flag'), row.get('env'), row['section'],
                      help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
-                     live=row.get('live'), secret=bool(row.get('secret', False)))
+                     live=row.get('live'), secret=bool(row.get('secret', False)),
+                     setting_help=row.get('setting-help'), values=row.get('values'),
+                     hint=row.get('hint'), value_help=row.get('value-help'))
         if 'default' in row:
             opt.default = row['default']
         elif opt.conv is bool:
@@ -55,6 +60,7 @@ def _load_options():
             opt.default = static_defaults[opt.name]
         if opt.name == 'log-level':
             opt.choices = tuple(static['log_levels'])
+            opt.values = opt.choices   # the control grammar's completable words
         out.append(opt)
     return tuple(out)
 
@@ -66,6 +72,34 @@ OPTION_BY_NAME = {o.name: o for o in OPTIONS}
 # the resolved-config keys that do not follow the name.replace('-', '_') rule
 CFG_KEYS = {'log-level': 'level', 'prom-prefix': 'prom_prefix', 'static-dir': 'static_dir',
             'config-js': 'config_js'}
+
+# the control grammar's live settings — the SAME rows, viewed from the wire
+# (the `set`/`unset` vocabulary, the console completions and word-help)
+SETTINGS = settings_of(OPTIONS)
+SETTING_BY_NAME = {s.name: s for s in SETTINGS}
+SETTING_NAMES = tuple(s.name for s in SETTINGS)
+describe_setting, describe_value = make_describe(SETTING_BY_NAME)
+
+COMMANDS = ('set', 'unset', 'show', 'inspect', 'request', 'shutdown', 'quit')
+
+COMMAND_HELP = {
+    'set': 'configure a setting live: set <setting> <value>',
+    'unset': 'restore a setting to its configured value: unset <setting>',
+    'inspect': 'one pretty dump of everything (the state, the counters, the caps)',
+    'show': 'runtime state: show <setting|status|connections|settings|version|knobs>',
+    'request': 'request reload: re-read the config (the SIGHUP path)',
+    'shutdown': 'stop the dashboard server gracefully',
+    'quit': 'close the session',
+    'ping': 'keep-alive: answers pong',
+}
+
+SHOW_VALUES = (
+    ('status', 'multi-line effective state report: one key=value per field'),
+    ('connections', 'the live HTTP clients: the gate counters, one row per peer IP'),
+    ('settings', 'every tunable setting with its live value, one per line'),
+    ('version', 'the dashboard version'),
+    ('knobs', 'the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes'),
+)
 
 
 def config_value(name, cfg):

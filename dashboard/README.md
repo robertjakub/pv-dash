@@ -25,7 +25,7 @@ and packaging overview live in the [suite root](../README.md).
 | `bin/dashboard.py` / `server.conf` | static server + Prometheus proxy (serves `static/` by default) |
 | `bin/dashboard-ctl.py` / `bin/dashboard-cli.py` | control clients: the one-shot / batch and the console-style session (see [Control](#control)) |
 | `lib/config.py` | settings resolution (CLI > env > the `server.conf` set grammar > defaults) and the control-target resolution |
-| `lib/settings.py` | the control grammar registry (the settings, their help — one source for the wire, the completions and the docs) |
+| `lib/options.json` + `lib/options.py` | the knob registry (the flags, the env twins, the live settings + their control vocabulary — one source for the wire, the completions and the docs) and its loader |
 | `lib/control.py` | the JSON-lines control server (the signed wire, the peer-cred shortcut) |
 | `config.js` | user settings (`SOLAR_CONFIG`) — at the subproject root, served at `/config.js` |
 | `man/*.1` | the man pages — **generated** (`scripts/gen_man.py` / the tools' `--man`), installed by the Nix package under `share/man/man1/` |

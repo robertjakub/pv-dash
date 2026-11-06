@@ -29,7 +29,7 @@ from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command
-from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
+from .options import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')

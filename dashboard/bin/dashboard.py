@@ -5,9 +5,9 @@ serving surface, the family shape: the connection gate (--max-clients,
 control server (--control-port, talked to with dashboard-ctl / dashboard-cli)
 and the SIGHUP config reload. Stdlib only.
 
-Layout: lib/config (settings resolution), lib/settings (the control grammar
-registry), lib/control (the control server), lib/man (the man pages),
-lib/statics, this file (CLI, logging, signals).
+Layout: lib/config (settings resolution), lib/options (the knob registry and
+the control grammar's vocabulary), lib/control (the control server),
+lib/man (the man pages), lib/statics, this file (CLI, logging, signals).
 """
 import logging
 import mimetypes

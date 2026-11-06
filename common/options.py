@@ -22,6 +22,7 @@ are built or checked:
 Sections are shared here so the whole family files its knobs under the same
 heads: device, serving, control plane, metrics, audit, limits, persistence,
 logging. Stdlib only."""
+import argparse
 import os
 
 
@@ -49,11 +50,17 @@ class Option:
     """One knob: `name` (the config/set-grammar key), `flag` ('--interval'),
     `env` (the twin — a str or a tuple of fallbacks), `section` (a SECTIONS
     key), `help` (the shared help text — the parser's help and the docs
-    render it), `live` (the control `set` name when the knob is
-    live-settable — the knob -> control-command mapper), `secret` (a token:
-    rendered into a config file only in its -file form)."""
+    render it), `conv` (the value shape: str/int/float/bool — bool flags are
+    store_true, int/float type the argparse value), `default` (the argparse
+    default — None = unset, the resolution layers decide), `live` (the
+    control `set` name when the knob is live-settable — the knob ->
+    control-command mapper), `secret` (a token: rendered into a config file
+    only in its -file form), `choices` (the values the parser accepts) and
+    `negates` (the name of the boolean knob this row switches off — the
+    --no-x form of an --x flag)."""
 
-    def __init__(self, name, flag, env, section, help='', conv=str, default=None, live=None, secret=False):
+    def __init__(self, name, flag, env, section, help='', conv=str, default=None, live=None,
+                 secret=False, choices=None, negates=None):
         self.name = name
         self.flag = flag
         self.env = env
@@ -63,6 +70,8 @@ class Option:
         self.default = default
         self.live = live          # the live control setting name, or None = startup-only
         self.secret = bool(secret)
+        self.choices = tuple(choices) if choices else None
+        self.negates = negates
 
     @property
     def optname(self):
@@ -72,17 +81,25 @@ class Option:
         return self.env if isinstance(self.env, tuple) else (self.env,)
 
 
-def build_parser(options, prog, description, epilog=None, add_help=True):
+def build_parser(options, prog=None, description=None, epilog=None, add_help=True):
     """The argparse parser for one tool, built from its registry: the one
     source renders --help (and the man pages render from the parser —
-    common/manpage.py). Boolean flags become store_true; everything else
-    takes a value."""
+    common/manpage.py). Boolean flags become store_true (a `negates` row
+    becomes the matching store_false on the negated knob's dest), int/float
+    convs type the value, `choices` constrains it; everything else takes a
+    free string. The rows carry the defaults (None = unset)."""
     p = argparse.ArgumentParser(prog=prog, description=description, epilog=epilog, add_help=add_help)
     for opt in options:
-        if opt.conv is bool:
-            p.add_argument(opt.flag, dest=opt.name.replace('-', '_'), action='store_true', default=None, help=opt.help)
+        if opt.negates:
+            p.add_argument(opt.flag, dest=opt.negates.replace('-', '_'), action='store_false',
+                           help=opt.help)
+        elif opt.conv is bool:
+            p.add_argument(opt.flag, dest=opt.name.replace('-', '_'), action='store_true',
+                           default=opt.default, help=opt.help)
         else:
-            p.add_argument(opt.flag, dest=opt.name.replace('-', '_'), default=None, help=opt.help)
+            p.add_argument(opt.flag, dest=opt.name.replace('-', '_'), default=opt.default,
+                           type=(opt.conv if opt.conv in (int, float) else None),
+                           choices=opt.choices, help=opt.help)
     return p
 
 

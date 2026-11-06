@@ -41,6 +41,26 @@ def parse_listen(text):
     return host.strip('[]'), port
 
 
+def parse_upstream(text, label='--upstream'):
+    """The Modbus upstream endpoint HOST:PORT -> (host, port) — the shared
+    knob of the cache and the scraper. ``:PORT`` = 127.0.0.1:PORT (the
+    loopback shorthand); ``[v6]:PORT`` works like --listen. A malformed
+    value exits with a clean one-liner."""
+    host, sep, port = str(text).rpartition(':')
+    if not sep:
+        raise SystemExit('%s must be HOST:PORT, got %r — :PORT = 127.0.0.1:PORT' % (label, text))
+    try:
+        port = int(port)
+    except ValueError:
+        raise SystemExit('%s port must be a number, got %r' % (label, port))
+    if not 1 <= port <= 65535:
+        raise SystemExit('%s port out of range, got %d' % (label, port))
+    host = host.strip('[]').strip()
+    if not host:
+        host = '127.0.0.1'
+    return host, port
+
+
 def is_loopback_host(host):
     """True when the listen host is loopback: the loopback addresses
     (127.0.0.0/8, ::1), 'localhost', or an empty bracket form of ::1. An

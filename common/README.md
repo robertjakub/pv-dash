@@ -1,7 +1,7 @@
 # common — the code shared by the Modbus subprojects
 
 One stdlib-only Python package (imported as `common`) used by
-[modbus-scraper](../scrape/README.md), [modbus-cache](../cache/README.md)
+[modbus-scraper](../scraper/README.md), [modbus-cache](../cache/README.md)
 and the [fake inverter](../inverter/README.md):
 
 | module | what |

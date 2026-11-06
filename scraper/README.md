@@ -478,7 +478,8 @@ scraper/
     ├── poller.py          # poll loop + sanity checks + cache diagnostics
     ├── server.py          # Prometheus exposition endpoint (auth, limits)
     ├── control.py         # JSON-lines control server (the cache's shape, mirrored)
-    ├── settings.py        # the live-settings registry (the control grammar's single source)
+    ├── options.json       # the knob registry: the flags, the env twins, the live settings + their control vocabulary
+    ├── options.py         # its loader: the Option rows, the control-grammar vocabulary, the wiring
     ├── man.py             # the generated man pages' prose (common/manpage.py renders)
     └── version.py         # the suite version
 ```

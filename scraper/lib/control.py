@@ -32,7 +32,7 @@ from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN
 from common.options import control_command
 from common.config import default_profile_path, resolve_profile_file
 from .config import build_sources, load_device_profile
-from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
+from .options import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 
 logger = logging.getLogger('scraper')

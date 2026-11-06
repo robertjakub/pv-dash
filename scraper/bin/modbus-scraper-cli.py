@@ -49,7 +49,7 @@ from common.config import load_token_file
 from common.human import secs
 from common.wiresec import sign_request, verify_reply
 from lib.config import resolve_control_target
-from lib.settings import COMMAND_HELP, COMMANDS, SETTING_BY_NAME, SETTING_NAMES, SHOW_VALUES, describe_value
+from lib.options import COMMAND_HELP, COMMANDS, SETTING_BY_NAME, SETTING_NAMES, SHOW_VALUES, describe_value
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off

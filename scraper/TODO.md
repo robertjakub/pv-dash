@@ -4,6 +4,11 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[scraper]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The registry-folding wave: `lib/settings.py` is gone — the control
+grammar's vocabulary rides the `lib/options.json` rows and `lib/options.py`
+derives `SETTINGS`/`describe_setting` from them (the wire, the completions
+and the word help unchanged).
+
 The upstream-knob + directory wave: the subproject is `scraper/` now (was
 `scrape/` — the flake, the docker context, the book include and the
 cross-links follow; the suites keep their `tests/scrape-*.py` names), the

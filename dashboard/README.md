@@ -56,7 +56,7 @@ and packaging overview live in the [suite root](../README.md).
   (e.g. `de: { ... }`) — it appears in the switcher automatically and is merged
   over the built-in English fallback.
  - **Battery (optional, experimental)** — enable with `battery: true` in `config.js`
-  (or `dashboard.py --battery` / `DSH_BATTERY=1` / `set battery true` in `server.conf`,
+  (or `dashboard.py --battery` / `BATTERY=1` / `set battery true` in `server.conf`,
   which injects it into the served config.js, or `?battery=1` for testing):
   a Battery node joins the flow diagram (teal particles up = discharging,
   down = charging, state line with SoC %), the energy splits become three-way
@@ -67,7 +67,7 @@ and packaging overview live in the [suite root](../README.md).
   consumption / Consumed from PV** (charge counts into consumption and
   PV-side series, discharge into the output), and the KPIs count the battery
   too: self-consumption includes charging, self-sustainment includes
-  discharge. When `huawei_battery` is `0` or missing (the scraper exports
+  discharge. When `scraper_battery` is `0` or missing (the scraper exports
   the flag only when battery support is enabled there), the Battery node is
   dimmed and a warning banner appears.
   **Experimental: untested against real hardware** — verified only against
@@ -77,7 +77,7 @@ and packaging overview live in the [suite root](../README.md).
 
 ## Configuration
 
-All settings live in `config.js` at the subproject root (served at `/config.js`; relocate with `--config-js`, `$DSH_CONFIG_JS` or `set config-js <file>` in `server.conf` — if the override file is missing, `/config.js` 404s and the page boots with built-in defaults):
+All settings live in `config.js` at the subproject root (served at `/config.js`; relocate with `--config-js`, `$CONFIG_JS` or `set config-js <file>` in `server.conf` — if the override file is missing, `/config.js` 404s and the page boots with built-in defaults):
 
 ```js
 const SOLAR_CONFIG = {
@@ -90,7 +90,7 @@ const SOLAR_CONFIG = {
     load: 'huawei_home_consumption_watts{job="sun2000"}',
     battery: 'huawei_battery_net_watts{job="sun2000"}',
     batterySoC: 'huawei_battery_soc_percent{job="sun2000"}',
-    batteryFlag: 'huawei_battery{job="sun2000"}'
+    batteryFlag: 'scraper_battery{job="sun2000"}'
   },
   scrapeSec: 10,
   smoothMin: 30,
@@ -135,7 +135,7 @@ Prometheus directly:
 python3 bin/dashboard.py                          # upstream http://localhost:9090
 python3 bin/dashboard.py --port 8080 --upstream http://192.168.1.50:9090
 python3 bin/dashboard.py --bind 127.0.0.1         # localhost only
-DSH_PROM_URL=http://pi:9090 python3 bin/dashboard.py  # via env
+PROM_URL=http://pi:9090 python3 bin/dashboard.py  # via env
 # open http://localhost:8080
 ```
 
@@ -158,18 +158,19 @@ DEBUG level only (or at INFO when `--log-queries` is passed / set in
    `--no-audit-log`, `--metrics-server`, `--metrics-listen`, `--metrics-token`,
    `--metrics-token-file`, `--metrics-max-clients`, `--metrics-client-timeout`,
    `--metrics-max-conn-per-ip`, `--dry-run`, `--man`
-2. Environment: every env twin carries the tool's `DSH_` prefix —
-   `DSH_PORT`, `DSH_BIND`, `DSH_PROM_URL`, `DSH_PROM_PREFIX` (the
-   docker-documented set), `DSH_STATIC_DIR`, `DSH_CONFIG_JS`, `DSH_BATTERY`,
-   `DSH_MAX_CLIENTS`, `DSH_CLIENT_TIMEOUT`,
-   `DSH_MAX_CONN_PER_IP`, `DSH_LOG_ACCESS`, `DSH_CTL`,
-   `DSH_CONTROL_TOKEN`, `DSH_CONTROL_TOKEN_FILE`,
-   `DSH_CONTROL_OPS_TOKEN`, `DSH_CONTROL_OPS_TOKEN_FILE`,
-   `DSH_CONTROL_OPS_VERBS`, `DSH_METRICS_SERVER`,
-   `DSH_METRICS_LISTEN`, `DSH_METRICS_TOKEN`,
-   `DSH_METRICS_TOKEN_FILE`, `DSH_METRICS_MAX_CLIENTS`,
-   `DSH_METRICS_CLIENT_TIMEOUT`, `DSH_METRICS_MAX_CONN_PER_IP`,
-   `DSH_CONTROL_TRUST_UIDS`
+2. Environment: every env twin is the knob's bare upper-snake name (no
+   tool prefix) —
+   `PORT`, `BIND`, `PROM_URL`, `PROM_PREFIX` (the
+   docker-documented set), `STATIC_DIR`, `CONFIG_JS`, `BATTERY`,
+   `MAX_CLIENTS`, `CLIENT_TIMEOUT`,
+   `MAX_CONN_PER_IP`, `LOG_ACCESS`, `CTL`,
+   `CONTROL_TOKEN`, `CONTROL_TOKEN_FILE`,
+   `CONTROL_OPS_TOKEN`, `CONTROL_OPS_TOKEN_FILE`,
+   `CONTROL_OPS_VERBS`, `METRICS_SERVER`,
+   `METRICS_LISTEN`, `METRICS_TOKEN`,
+   `METRICS_TOKEN_FILE`, `METRICS_MAX_CLIENTS`,
+   `METRICS_CLIENT_TIMEOUT`, `METRICS_MAX_CONN_PER_IP`,
+   `CONTROL_TRUST_UIDS`
 3. `server.conf` — the set grammar, every line a `set <name> <value>`:
 
 ```conf
@@ -327,12 +328,12 @@ config); put a reverse proxy in front for LAN/HTTPS.
 ## Metrics source
 
 This page expects Huawei SUN2000 inverter metrics in Prometheus
-(`huawei_*_watts`). The `scrape/` subproject ships a dependency-free Python
+(`huawei_*_watts`). The `scraper/` subproject ships a dependency-free Python
 exporter that polls the inverter over Modbus TCP and serves exactly those
-metrics — see [`../scrape/README.md`](../scrape/README.md):
+metrics — see [`../scraper/README.md`](../scrape/README.md):
 
 ```bash
-python3 scrape/bin/modbus-scraper.py --host <inverter-lan-ip> --listen 0.0.0.0:9350
+python3 scraper/bin/modbus-scraper.py --upstream <inverter-lan-ip>:502 --listen 0.0.0.0:9350
 ```
 
 ```yaml
@@ -351,7 +352,7 @@ scraper can share it with other tools: [`../cache/README.md`](../cache/README.md
 ## License
 
 The dashboard code (server, page, Nix packaging) is licensed under the
-**BSD 3-Clause License** — see the `LICENSE` file. The `scrape/` and `cache/`
+**BSD 3-Clause License** — see the `LICENSE` file. The `scraper/` and `cache/`
 subprojects are also licensed under the **BSD 3-Clause License**.
 
 The bundled chart library `static/vendor/echarts.min.js` is

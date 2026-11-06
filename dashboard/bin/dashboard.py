@@ -9,7 +9,6 @@ Layout: lib/config (settings resolution), lib/settings (the control grammar
 registry), lib/control (the control server), lib/man (the man pages),
 lib/statics, this file (CLI, logging, signals).
 """
-import argparse
 import logging
 import mimetypes
 import os
@@ -31,14 +30,15 @@ from common.audit import AuditLog
 from common.cred import parse_trust_uids
 from common.connlimit import GatedHTTPServer
 from common.logutil import UtcFormatter
+from common.options import build_parser
 from common.version import version_string
 from common.config import load_token_file, parse_listen
 from lib.config import resolve_config, resolve_control_target
 from lib.control import ControlServer
 from lib.man import daemon_page
 from lib.metrics import MetricsServer, describe_metrics
-from lib.options import KNOWN_VERBS
-from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, DEFAULTS, LOG_LEVELS, PROXY_TIMEOUT_S
+from lib.options import KNOWN_VERBS, OPTIONS
+from lib.statics import DEFAULTS, PROXY_TIMEOUT_S
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -56,10 +56,10 @@ def next_to_script(name):
 
 
 def default_config_path():
-    """$DSH_CONFIG wins (the docker config volume); then a user's ini
-    next to the script (the flattened package layout); then the dev
+    """$CONFIG wins (the docker config volume); then a user's config
+    script next to the script (the flattened package layout); then the dev
     checkout's sample at the subproject root."""
-    env = os.environ.get('DSH_CONFIG')
+    env = os.environ.get('CONFIG')
     if env and env.strip():
         return env.strip()
     for candidate in (os.path.join(SCRIPT_DIR, 'server.conf'),
@@ -299,89 +299,9 @@ def install_signal_handlers(httpd, apply_reload=None, graceful_stop=None):
 
 
 def parse_args():
-    ap = argparse.ArgumentParser(description='Static file server with a Prometheus proxy at /prom')
+    ap = build_parser(OPTIONS, description='Static file server with a Prometheus proxy at /prom')
     ap.add_argument('--config', default=default_config_path(),
-                    help='config file (default: $DSH_CONFIG, then server.ini next to this script, then the subproject root)')
-    ap.add_argument('--port', type=int, help='listen port (default: config file, $DSH_PORT or 8080)')
-    ap.add_argument('--bind', help='address to bind (default: config file, $BIND or 0.0.0.0)')
-    ap.add_argument('--static-dir', help='directory to serve (default: config file, $DSH_STATIC_DIR or static next to the script)')
-    ap.add_argument('--config-js', help='config.js to serve at /config.js (default: config file, $DSH_CONFIG_JS or config.js next to the script)')
-    ap.add_argument('--prom-prefix', help='path under which Prometheus is proxied (default: config file, $DSH_PROM_PREFIX or /prom); empty string proxies everything')
-    ap.add_argument('--upstream', help='upstream Prometheus URL (default: config file, $DSH_PROM_URL or http://localhost:9090)')
-    ap.add_argument('--max-clients', type=int, help='maximum concurrent HTTP clients (pages + proxy); extras get an immediate 503 '
-                    '(default: config file, $DSH_MAX_CLIENTS or 64; 0 = unlimited)')
-    ap.add_argument('--client-timeout', type=float, help='seconds an idle keep-alive HTTP client is kept before '
-                    'being kicked (default: config file, $DSH_CLIENT_TIMEOUT or 300; 0 = off)')
-    ap.add_argument('--max-conn-per-ip', dest='max_conn_per_ip', type=int, help='maximum concurrent HTTP connections '
-                    'from one peer IP; extras get an immediate 503 '
-                    '(default: config file, $DSH_MAX_CONN_PER_IP or 0 = no per-IP limit)')
-    ap.add_argument('--log-level', choices=list(LOG_LEVELS),
-                    help='log level (default: config file or INFO); DEBUG logs every request')
-    ap.add_argument('--log-queries', action='store_true', default=None,
-                    help='log proxied Prometheus queries at INFO level')
-    ap.add_argument('--log-access', action='store_true', default=None,
-                    help='log every HTTP request at INFO (default: config file, $DSH_LOG_ACCESS or quiet)')
-    ap.add_argument('--local-time', action='store_true', help='log timestamps in the system time zone instead of UTC')
-    ap.add_argument('--battery', action='store_true', default=None,
-                    help='enable battery support in the served config.js (default: config file, $DSH_BATTERY or off)')
-    ap.add_argument('--control-port', dest='control_port',
-                    help='JSON-lines control server target: unix socket path (default: /tmp/dashboard-<port>.socket) '
-                         'or TCP port number on 127.0.0.1 (e.g. 15598); 0 = off. Talk to it with dashboard-ctl.py '
-                         '(default: config file, $DSH_CTL)')
-    ap.add_argument('--control-token', dest='control_token',
-                    help='require a token on control connections: the client authenticates with '
-                         '{"cmd": "auth", "token": ...}; over the unix socket a trusted peer (root, the daemon\'s '
-                         'own user or --control-trust-uids — SO_PEERCRED) skips the token '
-                         '(default: config file, $DSH_CONTROL_TOKEN or none)')
-    ap.add_argument('--control-token-file', dest='control_token_file',
-                    help='the control token from a file (the first line; e.g. a systemd LoadCredential or a key '
-                         'file; must be owner-only 0600) — takes the place of --control-token; giving both is an '
-                         'error (env DSH_CONTROL_TOKEN_FILE)')
-    ap.add_argument('--control-ops-token', dest='control_ops_token',
-                    help='a second, read-only control token: sessions authenticating with it may run the '
-                         'show/clear verbs only (no set/unset, no request reload, no shutdown) — the ops shift '
-                         'against the admin key, both audited (default: config file, $DSH_CONTROL_OPS_TOKEN '
-                         'or none)')
-    ap.add_argument('--control-ops-token-file', dest='control_ops_token_file',
-                    help='the read-only ops token from a file (the first line; must be owner-only 0600) — takes '
-                         'the place of --control-ops-token; giving both is an error '
-                         '(env DSH_CONTROL_OPS_TOKEN_FILE)')
-    ap.add_argument('--control-trust-uids', dest='control_trust_uids',
-                    help='extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local '
-                         'systemd unit speaks without the secret); root and the daemon\'s own user are always '
-                         'trusted (default: config file, $DSH_CONTROL_TRUST_UIDS or none)')
-    ap.add_argument('--control-ops-verbs', dest='control_ops_verbs',
-                    help="the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated "
-                         '(default: show,clear; validated against the control grammar at start)')
-    ap.add_argument('--metrics-server', dest='metrics_server', action='store_true', default=None,
-                    help="serve the dashboard's own Prometheus /metrics endpoint (the uptime, the request "
-                         'counters, the proxied query total, the client gate) — off by default and a token is '
-                         'mandatory when on (default: config file, $DSH_METRICS_SERVER or off)')
-    ap.add_argument('--metrics-listen', dest='metrics_listen',
-                    help='the metrics bind address HOST:PORT (default: config file, $DSH_METRICS_LISTEN or '
-                         '127.0.0.1:9452)')
-    ap.add_argument('--metrics-token', dest='metrics_token',
-                    help='require Authorization: Bearer <token> on the /metrics endpoint — mandatory when '
-                         '--metrics-server is on (default: config file, $DSH_METRICS_TOKEN)')
-    ap.add_argument('--metrics-token-file', dest='metrics_token_file',
-                    help='the metrics bearer token from a file (the first line; must be owner-only 0600) — takes '
-                         'the place of --metrics-token; giving both is an error (env DSH_METRICS_TOKEN_FILE)')
-    ap.add_argument('--metrics-max-clients', dest='metrics_max_clients', type=int,
-                    help='maximum concurrent /metrics clients; extras get an immediate 503, 0 = unlimited '
-                         '(default: config file, $DSH_METRICS_MAX_CLIENTS or 16)')
-    ap.add_argument('--metrics-client-timeout', dest='metrics_client_timeout', type=float,
-                    help='seconds an idle /metrics client is kept before the socket times out, 0 = the built-in '
-                         '5 s cap (default: config file, $DSH_METRICS_CLIENT_TIMEOUT or 5)')
-    ap.add_argument('--metrics-max-conn-per-ip', dest='metrics_max_conn_per_ip', type=int,
-                    help='maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit '
-                         '(default: config file, $DSH_METRICS_MAX_CONN_PER_IP or 0)')
-    ap.add_argument('--audit-log', default=None,
-                    help='DSH audit trail: a file path or - for stdout (the docker/journald way); '
-                         'default: the XDG state home (~/.local/state/dashboard/audit.log)')
-    ap.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB,
-                    help='rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation (default %(default)s)')
-    ap.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
-    ap.add_argument('--no-audit-log', action='store_true', help='disable the SCR audit trail')
+                    help='config file — the set grammar: every line a `set <name> <value>`, comments start with # (default: $CONFIG, then server.conf next to this script, then the subproject root)')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound)')
     ap.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (dashboard --man | man -l -)')
     args = ap.parse_args()

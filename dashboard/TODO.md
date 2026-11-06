@@ -4,6 +4,25 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[dashboard]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The env-prefix retirement wave: the env twins are the bare upper-snake
+names — the docker-documented generic set (`PORT`, `BIND`, `PROM_URL`,
+`CONFIG_JS`, ...) IS the set now, no `DSH_` duplicates beside it; the
+registry, the resolver, the ctl/cli clients, the docs and the man pages
+follow. The shipped `config.js` `batteryFlag` selector asks for
+`scraper_battery` (the metrics wave's rename, propagated — the retired
+`huawei_battery` gauge no longer answers).
+
+The declarative-registry wave: the knob rows (the name, the flag, the env
+twin, the section, the live/secret markers and the descriptions) moved to
+`lib/options.json` — `lib/options.py` loads them onto the common `Option`
+rows and keeps the Python-side wiring (the control-grammar verb list, the
+audit defaults and the log-level choices read from `static.json`) — and
+`--help`/the man pages render from the registry now
+(`common/options.py` `build_parser()`): the knob description lives exactly
+once. The flags in `--help` order by the registry's sections; the texts,
+types and defaults are unchanged; `scripts/check_options.py` gates as
+before and the package ships the JSON next to the loader.
+
 The rename + env-prefix wave: the bins carry the man-page names now
 (`dashboard.py`, `dashboard-ctl.py`, `dashboard-cli.py`), and every env
 twin wears the tool's prefix (`DSH_*`) — the generic docker envs

@@ -24,7 +24,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -Dm755 bin/dashboard-ctl.py $out/share/dashboard/dashboard-ctl.py
     install -Dm755 bin/dashboard-cli.py $out/share/dashboard/dashboard-cli.py
     install -dm755 $out/share/dashboard/lib
-    install -m644 lib/*.py lib/static.json $out/share/dashboard/lib/
+    install -m644 lib/*.py lib/static.json lib/options.json $out/share/dashboard/lib/
     install -dm755 $out/share/dashboard/common
     install -m644 ${../common}/*.py $out/share/dashboard/common/
     cp -r static $out/share/dashboard/static

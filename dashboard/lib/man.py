@@ -123,10 +123,10 @@ apart). With a control token configured the wire is HMAC-signed: the
 console signs every command and verifies every reply."""
     env = """.SH ENVIRONMENT
 .TP
-.B DSH_CTL
+.B CTL
 the default control target for the clients.
 .TP
-.B DSH_CONTROL_TOKEN ", " DSH_CLI_KEEPALIVE
+.B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off)."""
     return page(
         "console-style session on the dashboard control server",

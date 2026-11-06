@@ -19,7 +19,7 @@ the token).
 .TP
 .B \-\-control\-port
 control server target: unix socket path or TCP port on 127.0.0.1,
-auto\-detected (default: /tmp/dashboard\-8080.socket; env DSH_CTL when
+auto\-detected (default: /tmp/dashboard\-8080.socket; env CTL when
 unset) — same flag as the server itself
 .TP
 .B command
@@ -30,11 +30,11 @@ reload, shutdown
 socket timeout in seconds (default 5.0)
 .TP
 .B \-\-control\-token
-control auth token for TCP (env DSH_CONTROL_TOKEN)
+control auth token for TCP (env CONTROL_TOKEN)
 .TP
 .B \-\-control\-token\-file
 the token from a file (the first line; must be owner\-only 0600); not
-for use with \-\-control\-token (env DSH_CONTROL_TOKEN_FILE)
+for use with \-\-control\-token (env CONTROL_TOKEN_FILE)
 .TP
 .B \-\-audit\-log
 audit trail: a file path or \- for stdout; default: the XDG state home

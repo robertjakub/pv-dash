@@ -1,14 +1,26 @@
 #!/usr/bin/env python3
 """The fake's option registry — the one row per knob (docs/TODO.md, "one
-knob, one source"): the registry name, the flag, the env twin(s), the
-section it files under (common/options.py SECTIONS), the live control name
-when the knob is live-settable, and the secret flag. The fake is a test
-instrument (F11) and never carried a config file — its startup surface is
-the flags and the INV_* env layer — so unlike the serving tools it has no
---config; the registry still drives `show config` (the set-grammar form of
-the running fake's startup options — the argv that would restart it), the
-knob -> control-command mapper and scripts/check_options.py."""
+knob, one source"): the rows live in lib/options.json next to this loader —
+the registry name, the flag, the env twin(s), the section it files under
+(common/options.py SECTIONS), the knob's description (the shared help text
+--help and the man pages render), the live control name when the knob is
+live-settable, and the secret flag. This module loads the JSON into the
+common Option rows and keeps the Python-side wiring: the control-grammar
+vocabulary, the static.json-wired CLI defaults (the fake parses its
+settings straight off the argv — F11: no config file) and the choice
+vocabularies (log-level from static.json, the timezone from the settings
+registry's values). The fake is a test instrument (F11) and never carried a
+config file — its startup surface is the flags and the env layer — so
+unlike the serving tools it has no --config; the registry still drives
+`show config` (the set-grammar form of the running fake's startup options —
+the argv that would restart it), the knob -> control-command mapper and
+scripts/check_options.py."""
+import json
+import os
+
 from common.options import Option
+
+_CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 
 # The verbs the control grammar speaks (the RBAC vocabulary — an ops verb
 # set must name verbs this server knows). 'clear' rides along: the family's
@@ -17,55 +29,53 @@ from common.options import Option
 KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'reset', 'clear', 'shutdown',
                'help', 'ping', 'quit')
 
-OPTIONS = (
-    Option('host', '--host', None, 'device'),
-    Option('port', '--port', None, 'device'),
-    Option('unit', '--unit', None, 'device'),
-    Option('profile', '--profile', 'INV_PROFILE', 'device'),
-    Option('max-kwp', '--max-kwp', 'INV_MAX_KWP', 'device'),
-    Option('timezone', '--timezone', None, 'device'),
-    Option('time', '--time', 'INV_TIME', 'device'),
-    Option('time-scale', '--time-scale', 'INV_TIME_SCALE', 'device'),
-    Option('static', '--static', None, 'device'),
-    Option('battery', '--battery', 'INV_BATTERY', 'device'),
-    Option('no-battery', '--no-battery', None, 'device'),
-    Option('battery-kwh', '--battery-kwh', None, 'device'),
-    Option('strict', '--strict', 'INV_STRICT', 'device'),
-    Option('chaos', '--chaos', 'INV_CHAOS', 'device'),
-    Option('grid-voltage', '--grid-voltage', None, 'device'),
-    Option('grid-frequency', '--grid-frequency', None, 'device'),
-    Option('seed', '--seed', None, 'device'),
-    Option('connect-acl', '--connect-acl', 'INV_CONNECT_ACL', 'device'),
 
-    Option('max-clients', '--max-clients', None, 'limits'),
-    Option('client-timeout', '--client-timeout', None, 'limits'),
-    Option('max-conn-per-ip', '--max-conn-per-ip', None, 'limits'),
+def _load_options():
+    """The rows from lib/options.json (next to this loader). A bool knob
+    without an explicit default parses as the argparse store_true native
+    (False) unless the row negates one (--no-battery); a value knob
+    defaults to None. The CLI defaults come from static.json (the same
+    defaults block lib/statics.py serves the rest of the tool) — read
+    directly here so the module also imports flat (scripts/check_options.py
+    walks lib/ on sys.path)."""
+    here = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
+        static = json.load(f)
+    d = static['defaults']
+    static_defaults = {'host': d['host'], 'port': d['modbus_port'], 'unit': d['unit'],
+                       'max-kwp': d['max_kwp'], 'battery-kwh': d['battery_kwh'],
+                       'time-scale': d['time_scale'], 'chaos': d['chaos'],
+                       'max-clients': d['max_clients'], 'client-timeout': d['client_timeout_s'],
+                       'max-conn-per-ip': d['max_conn_per_ip'],
+                       'metrics-listen': d['metrics_listen'],
+                       'metrics-max-clients': d['metrics_max_clients'],
+                       'metrics-client-timeout': d['metrics_client_timeout_s'],
+                       'metrics-max-conn-per-ip': d['metrics_max_conn_per_ip'],
+                       'audit-max-mb': d['audit_max_mb'], 'audit-files': d['audit_files'],
+                       'log-level': d['log_level'],
+                       'grid-voltage': static['grid']['voltage_v'],
+                       'grid-frequency': static['grid']['frequency_hz'],
+                       'timezone': 'utc',       # the settings registry's default
+                       'battery': True}         # --no-battery turns it off
+    choices = {'log-level': tuple(static['log_levels']), 'timezone': ('utc', 'local')}
+    with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
+        rows = json.load(f)['options']
+    out = []
+    for row in rows:
+        opt = Option(row['name'], row['flag'], row.get('env'), row['section'],
+                     help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
+                     live=row.get('live'), secret=bool(row.get('secret', False)),
+                     choices=choices.get(row['name']), negates=row.get('negates'))
+        if opt.name in static_defaults:
+            opt.default = static_defaults[opt.name]
+        elif 'default' in row:
+            opt.default = row['default']
+        elif opt.conv is bool and not opt.negates:
+            opt.default = False
+        out.append(opt)
+    return tuple(out)
 
-    Option('control-port', '--control-port', 'INV_CTL', 'control'),
-    Option('control-token', '--control-token', 'INV_CONTROL_TOKEN', 'control', secret=True),
-    Option('control-token-file', '--control-token-file', 'INV_CONTROL_TOKEN_FILE', 'control', secret=True),
-    Option('control-ops-token', '--control-ops-token', 'INV_CONTROL_OPS_TOKEN', 'control', secret=True),
-    Option('control-ops-token-file', '--control-ops-token-file', 'INV_CONTROL_OPS_TOKEN_FILE', 'control', secret=True),
-    Option('control-ops-verbs', '--control-ops-verbs', 'INV_CONTROL_OPS_VERBS', 'control'),
-    Option('control-trust-uids', '--control-trust-uids', 'INV_CONTROL_TRUST_UIDS', 'control'),
-    Option('control-socket-group', '--control-socket-group', None, 'control'),
-    Option('control-log-replies', '--control-log-replies', None, 'control'),
 
-    Option('metrics-server', '--metrics-server', None, 'metrics'),
-    Option('metrics-listen', '--metrics-listen', None, 'metrics'),
-    Option('metrics-token', '--metrics-token', 'INV_METRICS_TOKEN', 'metrics', secret=True),
-    Option('metrics-token-file', '--metrics-token-file', 'INV_METRICS_TOKEN_FILE', 'metrics', secret=True),
-    Option('metrics-max-clients', '--metrics-max-clients', None, 'metrics'),
-    Option('metrics-client-timeout', '--metrics-client-timeout', None, 'metrics'),
-    Option('metrics-max-conn-per-ip', '--metrics-max-conn-per-ip', None, 'metrics'),
-
-    Option('audit-log', '--audit-log', None, 'audit'),
-    Option('audit-max-mb', '--audit-max-mb', None, 'audit'),
-    Option('audit-daily', '--audit-daily', None, 'audit'),
-    Option('audit-files', '--audit-files', None, 'audit'),
-    Option('no-audit-log', '--no-audit-log', None, 'audit'),
-
-    Option('log-level', '--log-level', 'INV_LOG_LEVEL', 'logging'),
-)
+OPTIONS = _load_options()
 
 OPTION_BY_NAME = {o.name: o for o in OPTIONS}

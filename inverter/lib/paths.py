@@ -7,9 +7,9 @@ instance per Modbus port, nothing ever lands in a working directory or a
 source tree.
 
 Both programs resolve the control target the same way: --control-port flag
-> INV_CTL environment variable > default socket for the Modbus port.
-The control token comes from --control-token / INV_CONTROL_TOKEN, or —
-the hardened way — from --control-token-file / INV_CONTROL_TOKEN_FILE:
+> CTL environment variable > default socket for the Modbus port.
+The control token comes from --control-token / CONTROL_TOKEN, or —
+the hardened way — from --control-token-file / CONTROL_TOKEN_FILE:
 a key file or a systemd LoadCredential, first line = the token (the
 loader itself is the shared common.config.load_token_file)."""
 import os
@@ -24,7 +24,7 @@ def default_socket(modbus_port=DEFAULT_MODBUS_PORT):
 def resolve_control_target(explicit, modbus_port=DEFAULT_MODBUS_PORT):
     if explicit is not None and str(explicit).strip():
         return str(explicit).strip()
-    env = os.environ.get('INV_CTL')
+    env = os.environ.get('CTL')
     if env and env.strip():
         return env.strip()
     return default_socket(modbus_port)

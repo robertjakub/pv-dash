@@ -4,6 +4,25 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[inverter]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The env-prefix retirement wave: the env layer is the bare upper-snake
+names now (`CHAOS`, `MAX_KWP`, `BATTERY`, `STRICT`, `TIME`, `TIME_SCALE`,
+`LOG_LEVEL`, `CTL`, the token twins, ...) — the SIGHUP reload reads the
+same names; the registry, the docs and the man pages follow (the README
+names the scraper's `scraper_cache_*` auto-detection and `scraper_up`).
+
+The declarative-registry wave: the knob rows (the name, the flag, the env
+twin, the section, the live/secret markers and the descriptions) moved to
+`lib/options.json` — `lib/options.py` loads them onto the common `Option`
+rows and keeps the Python-side wiring: the control-grammar verb list, the
+CLI defaults read from `static.json` (the fake parses straight off the
+argv — F11, no config file) and the choice vocabularies (the log-level
+ladder, the timezone), the `--no-battery` negation included. `--help`/the
+man pages render from the registry now (`common/options.py`
+`build_parser()`): the knob description lives exactly once. The flags in
+`--help` order by the registry's sections; the texts, types and defaults
+are unchanged; `scripts/check_options.py` gates as before and the package
+ships the JSON next to the loader.
+
 The rename + env-prefix wave: the bins carry the man-page names now
 (`modbus-fake-inverter.py`, `modbus-fake-ctl.py`, `modbus-fake-cli.py`),
 and every env twin wears the tool's prefix (`INV_*` — the `FAKE_*` era

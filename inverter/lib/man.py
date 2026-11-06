@@ -36,7 +36,7 @@ read; \\fB--chaos\\fR answers a fraction of requests hostile."""
     signals = """.SH SIGNALS
 .TP
 .B SIGHUP
-re-apply the \\fBINV_*\\fR environment layer (all-or-nothing).
+re-apply the environment layer (all-or-nothing).
 .TP
 .B SIGUSR1
 reset the scenario: runtime pins, the cloud machine and the write overlay
@@ -75,17 +75,17 @@ reply. The control surface can still carry the family's read-only ops
 token (\\fB--control-ops-token\\fR) when the ops shift only ever watches."""
     environment = """.SH ENVIRONMENT
 .TP
-.B INV_CHAOS ", " INV_MAX_KWP ", " INV_PROFILE ", " INV_BATTERY ,
-.B INV_STRICT ", " INV_TIME ", " INV_TIME_SCALE ", " INV_LOG_LEVEL
+.B CHAOS ", " MAX_KWP ", " PROFILE ", " BATTERY ,
+.B STRICT ", " TIME ", " TIME_SCALE ", " LOG_LEVEL
 the SIGHUP-reloadable layer.
 .TP
-.B INV_CTL
+.B CTL
 the default control target for the clients.
 .TP
-.B INV_CONTROL_TOKEN ", " INV_CLI_KEEPALIVE
+.B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the clients' TCP token and idle-ping interval.
 .TP
-.B INV_CONTROL_OPS_TOKEN ", " INV_CONTROL_OPS_TOKEN_FILE
+.B CONTROL_OPS_TOKEN ", " CONTROL_OPS_TOKEN_FILE
 the daemon's read-only ops token (the flagless start; the OPTIONS above)."""
     files = """.SH FILES
 .TP
@@ -165,10 +165,10 @@ first success. The session is audited with the \\fBCLI\\fR prefix; the wire
 commands are audited once, by the server."""
     environment = """.SH ENVIRONMENT
 .TP
-.B INV_CLI_KEEPALIVE
+.B CLI_KEEPALIVE
 idle ping interval, seconds (default \\fB55\\fR); \\fB0\\fR = off.
 .TP
-.B INV_CTL ", " INV_CONTROL_TOKEN
+.B CTL ", " CONTROL_TOKEN
 the default control target and TCP token."""
     exit_status = """.SH EXIT STATUS
 .TP

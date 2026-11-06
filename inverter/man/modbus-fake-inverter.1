@@ -39,21 +39,17 @@ Modbus TCP port (default 5502)
 .BI \-\-unit " N"
 Modbus unit id served (default 1)
 .TP
+.B \-\-profile
+inverter profile JSON: name \-> register (+ optional type/scale), e.g.
+profiles/profiles/sun2000.json (the default); PROFILE when unset
+.TP
+.BI \-\-max\-kwp " N"
+PV array size in kWp, peak = 75%% of it (default 6.0)
+.TP
 .B \-\-timezone
 clock the state machines integrate over (the PV bell, the home load, the
 clouds, the battery, the grid voltage): UTC (the default) or the local
 wall clock (default: utc)
-.TP
-.BI \-\-grid\-voltage " N"
-nominal grid phase voltage in V (120 or 230; the per\-phase machine
-wanders ±10 %% around it, default 230.0)
-.TP
-.BI \-\-grid\-frequency " N"
-nominal grid frequency in Hz (the machine wanders ±0.2 Hz around it,
-default 50.0)
-.TP
-.BI \-\-max\-kwp " N"
-PV array size in kWp, peak = 75%% of it (default 6.0)
 .TP
 .B \-\-time
 freeze simulated time HH:MM (default: real clock)
@@ -73,12 +69,33 @@ simulate a battery (the default) (default: on)
 .B \-\-no\-battery
 no battery values (default: on)
 .TP
+.BI \-\-battery\-kwh " N"
+usable battery capacity in kWh (default 6.9)
+.TP
 .B \-\-strict
 reject reads of undefined registers with exception 02 (like the real
 device) (default: off)
 .TP
-.BI \-\-battery\-kwh " N"
-usable battery capacity in kWh (default 6.9)
+.BI \-\-chaos " N"
+probability 0..1 that a request is answered hostile and dropped
+(default: off); seed with \-\-seed for reproducibility (default: 0.0)
+.TP
+.BI \-\-grid\-voltage " N"
+nominal grid phase voltage in V (120 or 230; the per\-phase machine
+wanders ±10 %% around it, default 230.0)
+.TP
+.BI \-\-grid\-frequency " N"
+nominal grid frequency in Hz (the machine wanders ±0.2 Hz around it,
+default 50.0)
+.TP
+.BI \-\-seed " N"
+chaos RNG seed (default: random)
+.TP
+.B \-\-connect\-acl
+the Modbus clients allowed to connect (the cache's connect\-acl,
+mirrored): "any" (the default — the trusted\-LAN posture), "none", or a
+comma\-separated list of IPs and CIDR prefixes, e.g.
+127.0.0.1,10.48.0.0/16 (env CONNECT_ACL)
 .TP
 .BI \-\-max\-clients " N"
 refuse further Modbus connections past this many simultaneous clients, 0
@@ -93,11 +110,47 @@ closing
 refuse further Modbus connections from one peer IP past this many
 simultaneous connections, 0 = no per\-IP limit (default 0)
 .TP
-.B \-\-connect\-acl
-the Modbus clients allowed to connect (the cache's connect\-acl,
-mirrored): "any" (the default — the trusted\-LAN posture), "none", or a
-comma\-separated list of IPs and CIDR prefixes, e.g.
-127.0.0.1,10.48.0.0/16 (env INV_CONNECT_ACL)
+.B \-\-control\-port
+control server target: unix socket path (default:
+/tmp/fake\-inverter\-<modbus\-port>.socket) or TCP port number on
+127.0.0.1 (e.g. 15599); 0 = off. Talk to it with modbus\-fake\-ctl.py
+.TP
+.B \-\-control\-token
+require a token on control connections: the client authenticates with
+{"cmd": "auth", "token": ...}; over the unix socket a trusted peer
+(root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
+skips the token
+.TP
+.B \-\-control\-token\-file
+the token from a file (the first line; e.g. a systemd LoadCredential or
+a key file; must be owner\-only 0600) — takes the place of
+\-\-control\-token; giving both is an error (env CONTROL_TOKEN_FILE)
+.TP
+.B \-\-control\-ops\-token
+a second, read\-only control token: sessions authenticating with it may
+run the show/clear verbs only (no set/unset, no reset, no shutdown) —
+the ops shift against the admin key, both audited (env
+CONTROL_OPS_TOKEN)
+.TP
+.B \-\-control\-ops\-token\-file
+the read\-only ops token from a file (the first line; must be
+owner\-only 0600) — takes the place of \-\-control\-ops\-token; giving
+both is an error (env CONTROL_OPS_TOKEN_FILE)
+.TP
+.B \-\-control\-ops\-verbs
+the read\-only ops role's RBAC policy: the verbs its sessions may run,
+comma\-separated (default: show,clear; validated against the control
+grammar at start; env CONTROL_OPS_VERBS)
+.TP
+.B \-\-control\-trust\-uids
+extra peer uids the unix control socket trusts without the token
+(SO_PEERCRED — a local systemd unit speaks without the secret); root and
+the daemon's own user are always trusted (env CONTROL_TRUST_UIDS)
+.TP
+.B \-\-control\-socket\-group
+leave the unix control socket group\-accessible (chmod 0660 instead of
+the default 0600): a local group may speak to the control without being
+the service user (default: off)
 .TP
 .B \-\-control\-log\-replies
 DEBUG\-log the full output of every control command (the default logs
@@ -117,7 +170,7 @@ scheme the scraper speaks)
 .B \-\-metrics\-token\-file
 the metrics bearer token from a file (the first line; must be
 owner\-only 0600) — takes the place of \-\-metrics\-token; giving both
-is an error (env INV_METRICS_TOKEN_FILE)
+is an error (env METRICS_TOKEN_FILE)
 .TP
 .BI \-\-metrics\-max\-clients " N"
 maximum concurrent HTTP clients on the /metrics endpoint; extras get an
@@ -130,29 +183,6 @@ the built\-in 5 s cap (default 5.0)
 .BI \-\-metrics\-max\-conn\-per\-ip " N"
 maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
 limit (default 0)
-.TP
-.B \-\-control\-port
-control server target: unix socket path (default:
-/tmp/fake\-inverter\-<modbus\-port>.socket) or TCP port number on
-127.0.0.1 (e.g. 15599); 0 = off. Talk to it with modbus\-fake\-ctl.py
-.TP
-.B \-\-profile
-inverter profile JSON: name \-> register (+ optional type/scale), e.g.
-profiles/profiles/sun2000.json (the default); INV_PROFILE when unset
-.TP
-.BI \-\-chaos " N"
-probability 0..1 that a request is answered hostile and dropped
-(default: off); seed with \-\-seed for reproducibility (default: 0.0)
-.TP
-.BI \-\-seed " N"
-chaos RNG seed (default: random)
-.TP
-.B \-\-dry\-run
-validate the configuration, print the effective settings and exit
-(nothing is bound or connected) (default: off)
-.TP
-.B \-\-log\-level
- (default: INFO)
 .TP
 .B \-\-audit\-log
 INV audit trail: a file path or \- for stdout (the docker/journald way);
@@ -171,48 +201,18 @@ rotated audit backups to keep (default 3)
 .B \-\-no\-audit\-log
 disable the INV audit trail (default: off)
 .TP
-.B \-\-control\-token
-require a token on control connections: the client authenticates with
-{"cmd": "auth", "token": ...}; over the unix socket a trusted peer
-(root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
-skips the token
+.B \-\-log\-level
+ (default: INFO)
 .TP
-.B \-\-control\-token\-file
-the token from a file (the first line; e.g. a systemd LoadCredential or
-a key file; must be owner\-only 0600) — takes the place of
-\-\-control\-token; giving both is an error (env INV_CONTROL_TOKEN_FILE)
-.TP
-.B \-\-control\-ops\-token
-a second, read\-only control token: sessions authenticating with it may
-run the show/clear verbs only (no set/unset, no reset, no shutdown) —
-the ops shift against the admin key, both audited (env
-INV_CONTROL_OPS_TOKEN)
-.TP
-.B \-\-control\-ops\-token\-file
-the read\-only ops token from a file (the first line; must be
-owner\-only 0600) — takes the place of \-\-control\-ops\-token; giving
-both is an error (env INV_CONTROL_OPS_TOKEN_FILE)
-.TP
-.B \-\-control\-ops\-verbs
-the read\-only ops role's RBAC policy: the verbs its sessions may run,
-comma\-separated (default: show,clear; validated against the control
-grammar at start; env INV_CONTROL_OPS_VERBS)
-.TP
-.B \-\-control\-trust\-uids
-extra peer uids the unix control socket trusts without the token
-(SO_PEERCRED — a local systemd unit speaks without the secret); root and
-the daemon's own user are always trusted (env INV_CONTROL_TRUST_UIDS)
-.TP
-.B \-\-control\-socket\-group
-leave the unix control socket group\-accessible (chmod 0660 instead of
-the default 0600): a local group may speak to the control without being
-the service user (default: off)
+.B \-\-dry\-run
+validate the configuration, print the effective settings and exit
+(nothing is bound or connected) (default: off)
 
 
 .SH SIGNALS
 .TP
 .B SIGHUP
-re-apply the \fBINV_*\fR environment layer (all-or-nothing).
+re-apply the environment layer (all-or-nothing).
 .TP
 .B SIGUSR1
 reset the scenario: runtime pins, the cloud machine and the write overlay
@@ -254,17 +254,17 @@ token (\fB--control-ops-token\fR) when the ops shift only ever watches.
 
 .SH ENVIRONMENT
 .TP
-.B INV_CHAOS ", " INV_MAX_KWP ", " INV_PROFILE ", " INV_BATTERY ,
-.B INV_STRICT ", " INV_TIME ", " INV_TIME_SCALE ", " INV_LOG_LEVEL
+.B CHAOS ", " MAX_KWP ", " PROFILE ", " BATTERY ,
+.B STRICT ", " TIME ", " TIME_SCALE ", " LOG_LEVEL
 the SIGHUP-reloadable layer.
 .TP
-.B INV_CTL
+.B CTL
 the default control target for the clients.
 .TP
-.B INV_CONTROL_TOKEN ", " INV_CLI_KEEPALIVE
+.B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the clients' TCP token and idle-ping interval.
 .TP
-.B INV_CONTROL_OPS_TOKEN ", " INV_CONTROL_OPS_TOKEN_FILE
+.B CONTROL_OPS_TOKEN ", " CONTROL_OPS_TOKEN_FILE
 the daemon's read-only ops token (the flagless start; the OPTIONS above).
 
 .SH FILES

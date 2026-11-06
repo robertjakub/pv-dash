@@ -77,7 +77,7 @@ class Option:
     notes)."""
 
     def __init__(self, name, flag, env, section, help='', conv=str, default=None, live=None,
-                 secret=False, choices=None, negates=None, group=None,
+                 secret=False, choices=None, negates=None, group=None, alias=None,
                  setting_help=None, values=None, hint=None, value_help=None,
                  min=None, max=None, check=None, node=False, hidden=False):
         self.name = name
@@ -85,6 +85,8 @@ class Option:
         self.env = env
         self.section = section
         self.group = group        # the display bucket; None = the section groups it
+        self.alias = alias        # a second wire spelling for the same knob (a '/'-path
+                                  # like live: acl/write and writer/acl both answer)
         self.help = help
         self.conv = conv
         self.default = default
@@ -194,8 +196,10 @@ def grouped_rows(options):
 def describe_node(options, name):
     """The hierarchy node's wire help (`help modbus`): the node row's
     setting-help, then the child settings the node namespaces — one per
-    line, the path suffix as the word (the console completes it). None
-    when the name is no node."""
+    line, the path suffix as the word (the console completes it); a row
+    that reaches the node through its `alias` lists too, the line marked
+    with the canonical name (one knob, two spellings). None when the name
+    is no node."""
     node = next((o for o in options if o.node and o.name == name), None)
     if node is None:
         return None
@@ -203,6 +207,9 @@ def describe_node(options, name):
     for o in options:
         if o.live and o.live.startswith(name + '/'):
             lines.append('  %s - %s' % (o.live[len(name) + 1:], o.setting_help or o.help))
+        elif o.alias and o.alias.startswith(name + '/'):
+            lines.append('  %s - %s (the alias of %s)'
+                         % (o.alias[len(name) + 1:], o.setting_help or o.help, o.live))
     return '\n'.join(lines)
 
 
@@ -232,10 +239,13 @@ def render_config_script(options, values, comment=None):
 def control_command(opt):
     """The knob -> control-command mapper: the command that changes this knob
     on a running daemon (`set interval 10`; a live path spells as its words:
-    `set inverter profile <value>`), or the note that the knob is
-    startup-only (restart to apply)."""
+    `set inverter profile <value>`; an aliased row names its second spelling
+    too), or the note that the knob is startup-only (restart to apply)."""
     if opt.live:
-        return 'set %s <value>' % opt.live.replace('/', ' ')
+        cmd = 'set %s <value>' % opt.live.replace('/', ' ')
+        if opt.alias:
+            cmd += ' (alias: %s)' % opt.alias.replace('/', ' ')
+        return cmd
     return 'restart required (startup-only knob)'
 
 
@@ -274,7 +284,7 @@ class Setting:
     field alone). Derived from the Option rows (settings_of) — the
     registry is the one place a knob's vocabulary lives."""
 
-    def __init__(self, name, help, values=(), hint=None, value_help=None, section=None, group=None):
+    def __init__(self, name, help, values=(), hint=None, value_help=None, section=None, group=None, alias=None):
         self.name = name
         self.help = help
         self.values = values              # completable words
@@ -282,6 +292,7 @@ class Setting:
         self.value_help = value_help or {}   # per-value short description
         self.section = section
         self.group = group                # the display bucket; None = the section groups it
+        self.alias = alias                # the row's second wire spelling (the canonical renders)
 
     @property
     def display_group(self):
@@ -311,7 +322,7 @@ def settings_of(options):
             continue
         seen.add(o.live)
         out.append(Setting(o.live, o.setting_help or o.help, o.values, o.hint, o.value_help,
-                           o.section, o.group))
+                           o.section, o.group, o.alias))
     return tuple(out)
 
 
@@ -347,12 +358,15 @@ def match_setting_path(words, by_name):
     (`inverter/profile`) spells as its segments' words on the wire — the
     longest '/'-joined prefix of `words` that `by_name` answers wins, the
     remaining words belong to the value (`set inverter profile <value>`;
-    however deep: `a/b/c` → `set a b c <value>`). Returns (path, rest
-    words); (None, words) when the words name no setting."""
+    however deep: `a/b/c` → `set a b c <value>`). The map also answers a
+    row's `alias` spelling — the return is the CANONICAL live name either
+    way (the replies, the dump keys and the defaults render one name).
+    Returns (path, rest words); (None, words) when the words name no
+    setting."""
     for k in range(len(words), 0, -1):
         cand = '/'.join(words[:k]).lower()
         if cand in by_name:
-            return cand, words[k:]
+            return by_name[cand].name, words[k:]
     return None, words
 
 

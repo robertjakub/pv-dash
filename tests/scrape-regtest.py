@@ -440,8 +440,8 @@ try:
           and r.stdout.startswith('commands: set <pv|load|batt|grid|soc') and 'chaos' in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'knobs'], capture_output=True, text=True)
     check('control: show knobs, the dictionary of the registry', r.returncode == 0
-          and '--chaos' in r.stdout and '$CHAOS' in r.stdout and ', secret' in r.stdout
-          and '# ---' in r.stdout, r.stdout.strip()[:200])
+          and '--chaos' in r.stdout and '$CHAOS' in r.stdout and ', secret' in r.stdout,
+          r.stdout.strip()[:200])
 
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'settings'], capture_output=True, text=True)
     check('control: show settings is retired (err)', r.returncode == 0
@@ -818,7 +818,9 @@ try:
     r = cli('set ?\n')
     check('fake_cli: ? lists the options for the position', r.returncode == 0
           and 'scenario' in r.stdout and 'max-kwp' in r.stdout
-          and 'ok' not in r.stdout, repr(r.stdout))
+          and not any(line.startswith('ok') for line in r.stdout.splitlines()),
+          repr(r.stdout[:400]))   # the token rows' prose carries the letters 'ok' — the check
+                                  # anchors the ok-REPLY to the line head, not the substring
     p = subprocess.Popen([sys.executable, K, '--control-port', '15571'],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          text=True, env={**os.environ, 'CLI_KEEPALIVE': '0.2'})
@@ -1647,7 +1649,7 @@ try:
     r = sctl('show settings', 15597)
     check('scraper control: show settings is retired (err)', r.startswith('err'), r[:80])
     r = sctl('show knobs', 15597)
-    check('scraper control: show knobs, the dictionary of the registry — flag, env twin, section, how it changes',
+    check('scraper control: show knobs, the dictionary of the registry — flag, env twin, how it changes',
           r.startswith('ok knobs') and '--metric-prefix' in r and '$METRIC_PREFIX' in r
           and 'set interval <value>' in r and ', secret' in r and '# ---' in r, r[:200])
     r = sctl('poll now', 15597)

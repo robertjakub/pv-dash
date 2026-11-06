@@ -262,6 +262,8 @@ def main():
         check('ops: request restore is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('restart')
         check('ops: restart is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('reload')
+        check('ops: reload is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('shutdown')
         check('ops: shutdown is forbidden', st == 'err' and 'forbidden' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show status', unsigned=True)

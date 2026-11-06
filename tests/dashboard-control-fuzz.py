@@ -278,7 +278,7 @@ def main():
         check('ops: show version honored', st == 'ok' and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show knobs')
         check('ops: show knobs honored (the dictionary of the registry, a show verb)',
-              st == 'ok' and macok and '--port' in tx and '# ---' in tx, '%s %s' % (st, tx[:160]))
+              st == 'ok' and macok and '--port' in tx, '%s %s' % (st, tx[:160]))
         st, tx, macok = ops_roundtrip('set log-level DEBUG')
         check('ops: set is forbidden', st == 'err' and 'forbidden' in tx and 'admin' in tx and macok,
               '%s %s' % (st, tx))

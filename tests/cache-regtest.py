@@ -395,7 +395,7 @@ try:
                 break
             buf += b2
         s.close()
-        obj = _json.loads(buf.decode())
+        obj = _json.loads(buf.split(b'\n', 1)[0].decode())   # one reply line — the reload's bye frame may race into the buffer
         assert obj.get('mac') == wiremac('%s %s' % (obj.get('status'), obj.get('text', ''))), \
             'the reply mac does not verify: %r' % obj
         return '%s %s' % (obj.get('status'), obj.get('text', ''))
@@ -549,7 +549,12 @@ try:
           and '\ncache:15514 > upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-160:]))
     r = cli('clear cache\nquit\n')
     check('cache_cli: clear cache confirms silently', r.returncode == 0
-          and '\ncache:15514 > ok\n' in r.stdout, repr(r.stdout[-120:]))
+          and '\ncache:15514 > % ok\n' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('show control token ?\nshow control ops ?\nset connections ?\nquit\n')
+    check("cache_cli: ? at a hidden leaf describes it (the wire's help answer)",
+          'control/token - require a token on control connections' in r.stdout, repr(r.stdout[-300:]))
+    check("cache_cli: ? at a hidden-only namespace stays Invalid input (the secrets never list)",
+          r.stdout.count('% Invalid input.') == 2, repr(r.stdout[-300:]))
     r = cli('shutdown\nn\n')
     check('cache_cli: shutdown refuses without confirming', r.returncode == 0
           and 'Proceed with shutdown? [confirm]' in r.stdout and '% Aborted.' in r.stdout, repr(r.stdout))
@@ -676,10 +681,10 @@ try:
     r = ctl_cmd('help', 15514)
     check('dump: the help hides the dump commands without a path', 'request dump' not in r, r[:160])
     r = ctl_cmd('show knobs', 15514)
-    check('show knobs: the dictionary of the registry — flag, env twin, section, how it changes',
+    check('show knobs: the dictionary of the registry — flag, env twin, how it changes',
           r.startswith('ok knobs') and '--interval' in r and '$INTERVAL' in r
           and 'set modbus interval <value>' in r and 'control-ops-token-file' in r and ', secret' in r
-          and '# ---' in r, r[:200])
+          and 'set modbus upstream <value>, restart' in r, r[:200])   # the restart-marked knob carries the suffix
     r = ctl_cmd('help knobs', 15514)
     check('help knobs: the same dictionary under the help verb', r.startswith('ok knobs'), r[:80])
     r = ctl_cmd('show uplink', 15514)
@@ -966,19 +971,195 @@ try:
           reply.split(b'\r\n')[0].decode() if reply else 'empty reply')
     over.close()
     parked.close()
-    # the live metrics-server switch: off stops the endpoint, on restarts it
-    r = ctl_cmd('set metrics-server off', 15530)
-    check('metrics-server: set off stops the endpoint', r.startswith('ok metrics-server=off'), r[:80])
+    # the live metrics enable switch: off stops the endpoint, on restarts it
+    r = ctl_cmd('set metrics enable off', 15530)
+    check('metrics enable: set off stops the endpoint', r.startswith('ok metrics/enable=off'), r[:80])
     srv_down = False
     try:
         socket.create_connection(('127.0.0.1', 15529), timeout=1).close()
     except OSError:
         srv_down = True
-    check('metrics-server: the port is closed after set off', srv_down)
-    r = ctl_cmd('set metrics-server on', 15530)
-    check('metrics-server: set on serves again', r.startswith('ok metrics-server=on'), r[:80])
+    check('metrics enable: the port is closed after set off', srv_down)
+    r = ctl_cmd('set metrics enable on', 15530)
+    check('metrics enable: set on serves again', r.startswith('ok metrics/enable=on'), r[:80])
     st, _ = get_metrics('sekrit')
-    check('metrics-server: the gauges are back', st == 200, str(st))
+    check('metrics enable: the gauges are back', st == 200, str(st))
+    # the live caps: raising the cap serves the second concurrent client, lowering 503s it again
+    r = ctl_cmd('set metrics limits max-clients 2', 15530)
+    check('metrics limits: the live cap set', r.startswith('ok metrics/limits/max-clients=2'), r[:90])
+    parked = socket.create_connection(('127.0.0.1', 15529), timeout=5)
+    time.sleep(0.3)
+    over = socket.create_connection(('127.0.0.1', 15529), timeout=5)
+    over.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\nAuthorization: Bearer sekrit\r\n\r\n')
+    reply = over.recv(64)
+    check('metrics limits: the raised cap serves the second client', reply.startswith(b'HTTP/1.0 200'),
+          reply.split(b'\r\n')[0].decode() if reply else 'empty reply')
+    over.close()
+    parked.close()
+    r = ctl_cmd('set metrics limits max-clients 1', 15530)
+    check('metrics limits: the cap lowered again', r.startswith('ok metrics/limits/max-clients=1'), r[:90])
+    parked = socket.create_connection(('127.0.0.1', 15529), timeout=5)
+    time.sleep(0.3)
+    over = socket.create_connection(('127.0.0.1', 15529), timeout=5)
+    over.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\nAuthorization: Bearer sekrit\r\n\r\n')
+    reply = over.recv(64)
+    check('metrics limits: 503 past the lowered cap', reply.startswith(b'HTTP/1.1 503'),
+          reply.split(b'\r\n')[0].decode() if reply else 'empty reply')
+    over.close()
+    parked.close()
+    # the live token rotation: the old token is refused the moment the new one lands
+    r = ctl_cmd('set metrics token sekrit2', 15530)
+    check('metrics token: rotated live', r.startswith('ok metrics/token=<set>'), r[:90])
+    st, _ = get_metrics('sekrit')
+    check('metrics token: the old token is a 401', st == 401, str(st))
+    st, _ = get_metrics('sekrit2')
+    check('metrics token: the new token serves', st == 200, str(st))
+    r = ctl_cmd('show metrics token', 15530)
+    check('metrics token: the secret never renders back', r == 'ok metrics/token=<set>', r)
+    # the live rebind: the endpoint moves to the new address
+    r = ctl_cmd('set metrics listen 127.0.0.1:15535', 15530)
+    check('metrics listen: rebound live', r.startswith('ok metrics/listen=127.0.0.1:15535'), r[:90])
+    old_closed = False
+    try:
+        socket.create_connection(('127.0.0.1', 15529), timeout=1).close()
+    except OSError:
+        old_closed = True
+    check('metrics listen: the old address is closed', old_closed)
+    try:
+        req = urllib.request.Request('http://127.0.0.1:15535/metrics')
+        req.add_header('Authorization', 'Bearer sekrit2')
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            st = resp.status
+    except urllib.error.HTTPError as e:
+        st = e.code
+    check('metrics listen: the new address serves the gauges', st == 200, str(st))
+
+    # the control plane, audit trail and dump lives (the same metrics pattern:
+    # set/show/unset on the wire, the secrets never render, the rebind moves it)
+    def ctl_tok(cmd, port, tok):
+        """ctl_cmd with a custom token (the rotation pins re-key the session)."""
+        mac = hmac.new(tok.encode(), cmd.encode(), hashlib.sha256).hexdigest()
+        s = socket.create_connection(('127.0.0.1', port), timeout=5)
+        s.sendall(_json.dumps({'cmd': 'auth', 'token': tok}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            buf += s.recv(4096)
+        obj = _json.loads(buf.decode())
+        assert obj.get('status') == 'ok', obj
+        s.sendall(_json.dumps({'cmd': cmd, 'mac': mac}).encode() + b'\n')
+        buf = b''
+        while not buf.endswith(b'\n'):
+            b2 = s.recv(4096)
+            if not b2:
+                break
+            buf += b2
+        s.close()
+        obj = _json.loads(buf.decode())
+        assert obj.get('mac') == hmac.new(tok.encode(), ('%s %s' % (obj.get('status'), obj.get('text', ''))).encode(),
+                                          hashlib.sha256).hexdigest(), 'the reply mac does not verify: %r' % obj
+        return '%s %s' % (obj.get('status'), obj.get('text', ''))
+
+    r = ctl_cmd('show control ops-verbs', 15530)
+    check('control ops-verbs: show answers the policy', r == 'ok control/ops-verbs=clear,show', r)
+    r = ctl_cmd('set control ops-verbs show, ping', 15530)
+    check('control ops-verbs: set takes the comma list', r.startswith('ok control/ops-verbs=ping,show'), r[:90])
+    r = ctl_cmd('set control ops-verbs bogus', 15530)
+    check('control ops-verbs: an unknown verb is a clean err', r.startswith('err the ops policy needs at least one'),
+          r[:80])
+    ctl_cmd('unset control ops-verbs', 15530)
+    r = ctl_cmd('show control token', 15530)
+    check('control token: the secret never renders back', r == 'ok control/token=<set>', r)
+    r = ctl_cmd('unset control token', 15530)
+    check('control token: unset refuses (a secret has no defaults)', r.startswith('err unknown setting'), r[:80])
+    r = ctl_cmd('set control trust-uids 1000, 1001', 15530)
+    check('control trust-uids: set takes the uid list', r.startswith('ok control/trust-uids=1000,1001'), r[:90])
+    r = ctl_cmd('unset control trust-uids', 15530)
+    check('control trust-uids: unset restores the configured none', r.startswith('ok control/trust-uids=off'), r[:90])
+    r = ctl_cmd('set control socket-group on', 15530)
+    check('control socket-group: set answers on', r.startswith('ok control/socket-group=on'), r[:90])
+    ctl_cmd('unset control socket-group', 15530)
+    r = ctl_cmd('show audit rotate max-size', 15530)
+    check('audit rotate: show answers the configured MB', r == 'ok audit/rotate/max-size=10', r)
+    r = ctl_cmd('set audit rotate max-size 5', 15530)
+    check('audit rotate: max-size set', r.startswith('ok audit/rotate/max-size=5'), r[:90])
+    r = ctl_cmd('show audit log-file', 15530)
+    check('audit log-file: the XDG default renders', r.startswith('ok audit/log-file=')
+          and r.endswith('modbus-cache/audit.log'), r)
+    live_audit = '/tmp/reg_live_audit.log'
+    if os.path.exists(live_audit):
+        os.remove(live_audit)
+    r = ctl_cmd('set audit log-file %s' % live_audit, 15530)
+    check('audit log-file: the trail moves live', r.startswith('ok audit/log-file=%s' % live_audit), r[:120])
+    ctl_cmd('show version', 15530)
+    check('audit log-file: the new sink takes the commands', ' CACHE COMMAND' in open(live_audit).read(),
+          open(live_audit).read()[-120:])
+    r = ctl_cmd('set audit rotate daily on', 15530)
+    check('audit rotate: daily set', r.startswith('ok audit/rotate/daily=on'), r[:90])
+    r = ctl_cmd('set audit rotate files 7', 15530)
+    check('audit rotate: files set', r.startswith('ok audit/rotate/files=7'), r[:90])
+    r = ctl_cmd('set audit disable on', 15530)
+    check('audit disable: set answers on', r.startswith('ok audit/disable=on'), r[:90])
+    r = ctl_cmd('show audit log-file', 15530)
+    check('audit disable: the trail is off', r == 'ok audit/log-file=off', r)
+    n_lines = len(open(live_audit).read().splitlines())
+    ctl_cmd('show version', 15530)
+    check('audit disable: no command lands while off', len(open(live_audit).read().splitlines()) == n_lines,
+          open(live_audit).read()[-120:])
+    ctl_cmd('set audit disable off', 15530)
+    r = ctl_cmd('show audit log-file', 15530)
+    check('audit disable: off rebuilds the trail', r == 'ok audit/log-file=%s' % live_audit, r)
+    ctl_cmd('show version', 15530)
+    check('audit disable: the commands land again', len(open(live_audit).read().splitlines()) > n_lines,
+          open(live_audit).read()[-120:])
+    r = ctl_cmd('unset audit log-file', 15530)
+    check('audit log-file: unset restores the configured sink', r.startswith('ok audit/log-file=')
+          and 'modbus-cache/audit.log' in r, r[:120])
+    live_dump = '/tmp/reg_live_dump.json'
+    r = ctl_cmd('set dump/path %s' % live_dump, 15530)
+    check('dump path: set live', r.startswith('ok dump/path=%s' % live_dump), r[:120])
+    r = ctl_cmd('request dump', 15530)
+    check('dump path: request dump writes the live path', r.startswith('ok dumped') and live_dump in r, r[:90])
+    r = ctl_cmd('set dump with-cache on', 15530)
+    check('dump with-cache: set answers on', r.startswith('ok dump/with-cache=on'), r[:90])
+    r = ctl_cmd('unset dump with-cache', 15530)
+    check('dump with-cache: unset restores off', r.startswith('ok dump/with-cache=off'), r[:90])
+    r = ctl_cmd('set dump restore-on-start on', 15530)
+    check('dump restore-on-start: set answers on', r.startswith('ok dump/restore-on-start=on'), r[:90])
+    ctl_cmd('unset dump restore-on-start', 15530)
+    r = ctl_cmd('unset dump/path', 15530)
+    check('dump path: unset restores off', r.startswith('ok dump/path=off'), r[:90])
+    r = ctl_cmd('request dump', 15530)
+    check('dump path: request dump without a path is a clean err', r.startswith('err no dump path configured'),
+          r[:80])
+    r = ctl_cmd('set control port 15536', 15530)
+    check('control port: the control rebinds live', r.startswith('ok control/port=127.0.0.1:15536'), r[:90])
+    old_gone = False
+    try:
+        socket.create_connection(('127.0.0.1', 15530), timeout=1).close()
+    except OSError:
+        old_gone = True
+    check('control port: the old port is closed', old_gone)
+    r = ctl_cmd('show version', 15536)
+    check('control port: the new port speaks', r.startswith('ok modbus-cache'), r[:60])
+    r = ctl_cmd('unset control port', 15536)
+    check('control port: unset restores the configured target', r.startswith('ok control/port=127.0.0.1:15530'), r[:90])
+    r = ctl_cmd('show version', 15530)
+    check('control port: the restored target speaks', r.startswith('ok modbus-cache'), r[:60])
+    r = ctl_cmd('set control token sekrit2', 15530)
+    check('control token: rotated live', r.startswith('ok control/token=<set>'), r[:90])
+    s = socket.create_connection(('127.0.0.1', 15530), timeout=5)
+    s.sendall(_json.dumps({'cmd': 'auth', 'token': 'sekrit'}).encode() + b'\n')
+    buf = b''
+    while not buf.endswith(b'\n'):
+        buf += s.recv(4096)
+    s.close()
+    check('control token: the old token is refused', _json.loads(buf.decode()).get('status') == 'err',
+          buf.decode()[:80])
+    r = ctl_tok('show version', 15530, 'sekrit2')
+    check('control token: the new token speaks', r.startswith('ok modbus-cache'), r[:60])
+    r = ctl_tok('show control token', 15530, 'sekrit2')
+    check('control token: the rotated secret never renders back', r == 'ok control/token=<set>', r)
+
     p_metrics.send_signal(signal.SIGTERM)
     p_metrics.wait(timeout=10)
 
@@ -1110,6 +1291,86 @@ try:
     check('SIGHUP: the reloaded allow-list refuses the old range', b[0] == 0x86 and b[1] == 1, b.hex())
     b = wr6(47615, 9, port=15521)
     check('SIGHUP: the reloaded allow-list accepts the new range', b == bytes.fromhex('06b9ff0009'), b.hex())
+
+    # reload: the whole-daemon restart that keeps the sets (a dedicated daemon):
+    # the overrides save to the state file beside the config, the process
+    # re-execs, the fresh daemon re-resolves the config (the file edit takes
+    # effect — the restart-marked style) and re-applies the saved overrides once
+    ini_r = '/tmp/reg_reload.conf'
+    open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset unit 4\n')
+    p_r = start([sys.executable, P, '--config', ini_r, '--upstream', '127.0.0.1:15512',
+                 '--listen', '127.0.0.1:15581', '--interval', '1', '--cache-ttl', '3',
+                 '--control-port', '15582', '--profile', fc4map],
+                log='/tmp/reg_reload.log', env_extra={'CONTROL_TOKEN': 'sekrit'})
+    time.sleep(2)
+    r = ctl_cmd('set modbus interval 7', 15582)
+    check('reload: the override lands before the reload', r.startswith('ok modbus/interval=7'), r[:120])
+    r = ctl_cmd('reload', 15582)
+    check('reload: the reply reports the saved override', r.startswith('ok reload: 1 override(s) saved'), r[:120])
+    back = None
+    for _ in range(100):     # the exec is fast; a connect that lands on the dying daemon (the bye frame, unsigned) retries
+        try:
+            back = ctl_cmd('show status', 15582)
+            break
+        except Exception:
+            time.sleep(0.1)
+    check('reload: the daemon came back with the override re-applied (above the flag)',
+          back is not None and 'interval=7.00s' in back and 'overridden=modbus/interval' in back, repr((back or '')[-200:]))
+    check('reload: the state file is consumed', not os.path.exists(ini_r + '.reload'), ini_r + '.reload')
+    # F23: the reload state file is config-equivalent trust at rest — it is
+    # created 0600 explicitly, never the umask's (white-box: the round above
+    # consumes the file before a stat could land)
+    r = subprocess.run([sys.executable, '-c', '''
+import os, sys
+sys.path.insert(0, %r)
+sys.path.insert(0, %r)
+import lib.control as C
+class Stub(C.ControlServer):
+    def __init__(self):
+        self.config_path = '/tmp/reg_reload_mode.conf'
+        self.overridden = {'modbus/interval'}
+    def dump_settings(self):
+        return {'modbus/interval': '7'}
+Stub()._save_reload_state()
+st = os.stat('/tmp/reg_reload_mode.conf.reload')
+assert st.st_mode & 0o777 == 0o600, oct(st.st_mode)
+os.unlink('/tmp/reg_reload_mode.conf.reload')
+print('mode 0600 ok')
+''' % (REPO, CACHE_DIR)], capture_output=True, text=True, timeout=15)
+    check('reload: the state file saves 0600 (F23, the F18 posture)',
+          r.returncode == 0 and 'mode 0600 ok' in r.stdout, repr((r.stderr or r.stdout)[-160:]))
+    open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset unit 7\n')   # rewrite: a name set twice fails the start
+    r = ctl_cmd('reload', 15582)
+    back = None
+    for _ in range(100):
+        try:
+            back = ctl_cmd('show status', 15582)
+            break
+        except Exception:
+            time.sleep(0.1)
+    check('reload: the fresh resolve takes the config edit (unit=7), the override still rides',
+          back is not None and 'unit=7' in back and 'interval=7.00s' in back, repr((back or '')[-200:]))
+    # the console path: the reload's bye frame rides utf-8 and the notice decodes it (no raw \u escapes)
+    p = subprocess.Popen([sys.executable, K, '--control-port', '15582'], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                         env={**os.environ, 'CLI_KEEPALIVE': '0.2', 'CONTROL_TOKEN': 'sekrit'})
+    time.sleep(1.0)
+    p.stdin.write('reload\n')
+    p.stdin.flush()
+    time.sleep(3.0)          # stdin stays open: the console lives at the prompt until the bye notice exits it
+    out, _ = p.communicate(timeout=25)
+    check('reload: the console prints the notice and exits clean (utf-8, no raw escapes)',
+          p.returncode == 0 and 'daemon exit: the modbus-cache proxy is reloading' in out
+          and '\u2014' in out and '\\u2014' not in out, repr(out[-160:]))
+    back = None
+    for _ in range(100):
+        try:
+            back = ctl_cmd('show status', 15582)
+            break
+        except Exception:
+            time.sleep(0.1)
+    r = ctl_cmd('shutdown', 15582)
+    check('reload: the re-execed daemon still shuts down clean', r.startswith('bye shutdown'), r[:80])
 
     # the 'none' modes: the write path defaults fully closed (write-acl none +
     # write-registers none — --allow-write alone refuses every write); the

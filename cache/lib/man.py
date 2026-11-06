@@ -54,16 +54,25 @@ the reports
 .BR "show cache" " [all]" ", " "show uplink" ", " "show version" ,
 the ops
 .BR "request dump" ", " "request restore" ", " clear\\ cache ,
-.BR restart ", " shutdown ", " quit .
+.BR reload ", " restart ", " shutdown ", " quit .
 .RS
 .IP \\(bu 2
 .B set <setting> <value>
 changes a setting live (modbus interval, cache ttl, modbus read-delay,
 modbus merge-gap, write allow, write registers, limits max-clients,
-limits client-timeout, modbus upstream, modbus unit, requests-audit,
+limits client-timeout, modbus upstream, modbus unit, metrics enable,
+metrics listen, the metrics limits caps, metrics token, requests-audit,
 dump-interval, log-level, local-time, modbus profile, modbus selection,
-acl connect, acl write, modbus timeout); a SIGHUP re-applies the config
-(the file always wins).
+acl connect, acl write, modbus timeout, control port, control token,
+control ops-token, control ops-verbs, control trust-uids, control
+socket-group, audit log-file, audit rotate max-size, audit disable,
+dump path, dump with-cache); a SIGHUP re-applies the config
+(the file always wins). A knob the registry marks
+.B restart: true
+answers the note
+.B restart required (startup-only knob)
+from set/unset \-\- the config (and a SIGHUP) changes it; show
+renders the configured value (the secrets answer <set>/off).
 .IP \\(bu 2
 .B show cache all
 prints every cached entry: name, words, values, age, expiry, poll status.
@@ -82,12 +91,16 @@ listings only when a dump path is configured.
 .IP \\(bu 2
 .B clear cache
 / SIGUSR1, \\fBrestart\\fR (drop the upstream + the cache, repoll),
+\\fBreload\\fR (save the live overrides to a state file and re-exec the
+whole daemon \\(em the fresh process re-resolves the config, so the
+restart-marked knobs take their configured values, and the saved
+overrides re-apply once; the cache starts empty),
 \\fBshutdown\\fR (the same as SIGTERM).
 .RE
 .PP
 A second, read-only token (\\fB--control-ops-token\\fR) authenticates
 sessions into the show/clear verbs only \\(em no set/unset, no request
-dump/restore, no restart, no shutdown \\(em the ops shift against the
+dump/restore, no reload, no restart, no shutdown \\(em the ops shift against the
 admin key, both roles audited.
 .PP
 See
@@ -185,8 +198,8 @@ server: on connect it probes the daemon and greets you with the upstream,
 the poll health and the uptime; the prompt shows the connected port
 (\\fBcache:15502 >\\fR). TAB completes commands, settings and values with
 their descriptions (the listings group the settings under the registry's
-own groups \\(em a row's group, else [ungrouped] \\(em, with
-[values]/[system] beside);
+own groups \\(em ungrouped rows render bare, no header \\(em, with
+[values] beside);
 \\fB?\\fR prints the same in any position; \\fBclear cache\\fR/\\fBrestart\\fR
 confirm; \\fBshutdown\\fR asks \\fBProceed with shutdown? [confirm]\\fR first.
 .PP

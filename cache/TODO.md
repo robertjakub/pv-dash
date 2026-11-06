@@ -4,6 +4,30 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[cache]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The reload wave: the whole-daemon `reload` verb — the live overrides save
+to `<config>.reload` (created **0600 explicitly**: the file is
+config-equivalent trust at rest, docs/AUDIT.md rev. 9's F23), the process
+re-execs with the same argv, the fresh start re-resolves the config (the
+`restart: true` knobs take their configured values) and re-applies the
+saved overrides once, consuming the file (a state older than two minutes
+discards as stale). The bundled `modbus_cache.conf` rebuilt in the CLI
+spelling (every line `set <path words> <value>`; the sample's
+`set audit requests` line included), and the registry rows lost the
+`section` field — the display `group` is the one grouping.
+
+The control-plane/audit/dump live wave: the whole control family answers
+the wire — `control/port` rebinds the listener live (bind-first, the old
+loop retires by identity; `off` stops accepting while the sessions keep
+serving), the admin and ops tokens rotate on the wire (the secrets answer
+`<set>`, `unset` refuses, the dump never carries one), `control/ops-verbs`
+re-validates the RBAC policy, `control/trust-uids` and
+`control/socket-group` retune the unix socket; `audit/log-file` moves the
+CACHE trail with the chain continuing from the file's tail,
+`audit/rotate/*` rebuild the rotation, `audit/disable` kills it;
+`dump/path` arms `request dump` on a running daemon,
+`dump/with-cache`/`dump/restore-on-start` flip beside it — the `control`,
+`audit` and `dump` nodes describe the namespaces.
+
 The namespace-alignment wave: the wire vocabulary follows the scraper's —
 the live names are paths (`modbus/interval`, `cache/ttl`,
 `limits/client-timeout`, ... beside the landed `write/*`/`acl/*` paths;

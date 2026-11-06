@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """JSON-lines control server for modbus-cache: inspect and steer the running
 proxy — show status/connections/cache/version, clear the cache, restart the
-upstream session, graceful shutdown. One command per line, one reply line.
+upstream session, reload the whole daemon (the overrides saved, then a
+re-exec), graceful shutdown. One command per line, one reply line.
 Every request and reply is one JSON object per line (the stdlib json
 module): the request = {"cmd": "<command>"}, the reply =
 {"status": "ok|err|bye", "text": "<reply text>"}. The target is a TCP port
@@ -16,21 +17,23 @@ import logging
 import os
 import socket
 import struct
+import sys
 import threading
 import time
 
 from common.version import version_string
-from common.config import default_profile_path, parse_upstream, resolve_profile_file
+from common.config import default_profile_path, parse_upstream, resolve_profile_file, load_token_file
 from common.cred import peer_uid, parse_trust_uids
 from common.human import secs
 from common.logutil import UtcFormatter
 from common.protocol import ModbusError
+from common.audit import AuditLog
 from common.wiresec import frame_mac, sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
-from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME
+from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME, KNOWN_VERBS
 from .cache import build_blocks
-from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection
+from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection, parse_listen, parse_control_target
 from .metrics import MetricsServer, describe_metrics
 from . import persist
 
@@ -51,14 +54,16 @@ class ControlServer:
     the token first when one is configured; the unix socket relies on
     filesystem permissions. A second, read-only token (ops_token) may be
     configured beside the admin token: it authenticates into the show/clear
-    verbs only — no set/unset, no request dump/restore, no restart, no
-    shutdown (common/wiresec.py's roles). `stopper` is the graceful-stop
+    verbs only — no set/unset, no request dump/restore, no reload, no
+    restart, no shutdown (common/wiresec.py's roles). `stopper` is the graceful-stop
     callback shared with the signal handlers; it runs after the shutdown
     reply left the wire."""
 
     def __init__(self, proxy, target, stopper=None, audit=None, token=None, defaults=None, trust_uids=None,
-                 socket_group=False, ops_token=None, ops_verbs=None):
+                 socket_group=False, ops_token=None, ops_verbs=None, config_path=None):
         self.proxy = proxy
+        self.config_path = config_path  # the config script the daemon started from — the reload state lives beside it
+        self.reload_pending = False     # a reload saved the state; the exec runs after the reply leaves the wire
         self.audit = audit               # the CACHE audit trail (common.audit), None = off
         self.token = token               # the TCP auth token (the admin role); None = no auth (the unix = the perms)
         self.ops_token = ops_token       # the read-only ops token (the ops role); None = off
@@ -74,11 +79,16 @@ class ControlServer:
         self.overridden = set()          # settings changed live (`show status` carries the overridden= row)
         self.clients = set()             # the live control sockets (announce_exit)
         self.clients_lock = threading.Lock()
+        self._srv = None                 # the current accept() socket — a live control/port rebind swaps it
+        self.stopped = False             # the listener is retired (set control/port off); sessions keep serving
 
     def start(self):
+        self._restore_reload_state()   # a reload exec: the saved overrides re-apply once, the state file is consumed
         threading.Thread(target=self.serve, daemon=True).start()
 
     def describe(self):
+        if self.stopped:
+            return 'off'
         return 'unix:%s' % self.sockpath if self.is_unix else '127.0.0.1:%d' % self.port
 
     def cleanup(self):
@@ -88,7 +98,11 @@ class ControlServer:
             except OSError:
                 pass
 
-    def serve(self):
+    def _open_sock(self):
+        """Bind+listen the control socket per the current target attrs: the
+        unix path is replaced (stale files unlinked), the mode 0600/0660 is
+        not left to the umask, TCP takes SO_REUSEADDR; the listen(64) backlog
+        keeps a connect burst from RSTing."""
         srv = socket.socket(socket.AF_UNIX if self.is_unix else socket.AF_INET, socket.SOCK_STREAM)
         try:
             if self.is_unix:
@@ -96,24 +110,42 @@ class ControlServer:
                     logger.warning('control socket %s exists, replacing it', self.sockpath)
                     os.unlink(self.sockpath)
                 srv.bind(self.sockpath)
-                # the mode is not left to the umask: 0600 = owner only,
-                # 0660 with --control-socket-group (a local group shares it)
                 os.chmod(self.sockpath, 0o660 if self.socket_group else 0o600)
             else:
                 srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 srv.bind(('127.0.0.1', self.port))
-            srv.listen(64)   # the backlog above the client limit: a connect burst must not RST
+            srv.listen(64)
+        except OSError:
+            try:
+                srv.close()
+            except OSError:
+                pass
+            raise
+        return srv
+
+    def serve(self):
+        try:
+            srv = self._open_sock()
         except OSError as e:
             logger.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
             return
+        self._srv = srv
         logger.info('control server listening on %s%s',
                     self.describe(), (', token auth required on TCP' if self.token and not self.is_unix else '')
                     + (', read-only ops token accepted' if self.ops_token else ''))
-        while True:
+        self._accept_loop(srv)
+
+    def _accept_loop(self, srv):
+        """accept() until this socket stops being the current one: a live
+        control/port rebind (or off) swaps self._srv and retires the old
+        listener by identity — this loop exits, the new thread takes over."""
+        while self._srv is srv:
             try:
                 client, addr = srv.accept()
                 threading.Thread(target=self.handle, args=(client, addr), daemon=True).start()
             except (OSError, RuntimeError) as e:
+                if self._srv is not srv:
+                    return   # rebinding or stopped: this listener is retired
                 logger.error('control accept failed (%s), retrying', e)
                 time.sleep(0.1)
 
@@ -210,12 +242,13 @@ class ControlServer:
             reply_obj['mac'] = sign_reply(key, reply)
         return cmd, reply_obj, reply, role
 
-    def announce_exit(self, reason):
+    def announce_exit(self, reason, text=None):
         """The daemon is going down: send every connected control client a
         bye frame (the consoles print the notice and exit instead of trying
-        to reconnect to a dead proxy) and close their sockets."""
+        to reconnect to a dead proxy) and close their sockets. `text`
+        replaces the shutdown wording (the reload speaks of restarting)."""
         frame = (json.dumps({'status': 'bye',
-                             'text': 'daemon-exit: the modbus-cache proxy is shutting down (%s)' % reason})
+                             'text': text or 'daemon-exit: the modbus-cache proxy is shutting down (%s)' % reason}, ensure_ascii=False)
                  + '\n').encode()
         with self.clients_lock:
             clients, self.clients = list(self.clients), set()
@@ -265,8 +298,12 @@ class ControlServer:
                     client.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())
                 if reply.startswith('bye'):
                     break
+                if self.reload_pending:
+                    break   # the reply is out — the post-loop hook re-execs
             if self.shutdown_pending and self.stopper:
                 self.stopper('control command')   # reply is out, now really stop
+            if self.reload_pending:
+                self._exec_reload()               # reply is out, now really re-exec
         except (ConnectionError, OSError):
             pass
         except Exception as e:
@@ -285,27 +322,27 @@ class ControlServer:
                 'uplink|version|config|knobs>')
         if self.proxy.dump_path:
             cmds += ', request dump [with-cache], request restore'
-        cmds += ', clear cache, restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
+        cmds += ', clear cache, reload, restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
         return cmds
 
     def config_mapping(self):
         """The knob -> control-command mapper (help config): every option of
-        the registry under its display group (the row's `group`, else its
-        section), with the command that changes it on a running daemon — or
+        the registry under its display group (the row's `group`, ungrouped
+        rows headerless), with the command that changes it on a running daemon — or
         the restart note when the knob is startup-only."""
         from .options import OPTIONS
-        from common.options import section_title
         lines = ['ok config mapping']
         for key, rows in grouped_rows(OPTIONS):
-            lines.append('# --- %s ---' % section_title(key))
+            if key:
+                lines.append('# --- %s ---' % key)
             for o in rows:
                 lines.append('%-24s %s' % (o.name, control_command(o)))
         return '\n'.join(lines)
 
     def knobs_dictionary(self):
         """The dictionary of all knobs (show knobs): every option of the
-        registry under its section, with its flag, its env twin(s), its home
-        section, the control command that changes it and the secret marker."""
+        registry under its display group, with its flag, its env twin(s),
+        the control command that changes it and the secret marker."""
         from .options import OPTIONS
         from common.options import knob_dictionary
         return knob_dictionary(OPTIONS, who='the modbus-cache')
@@ -343,7 +380,7 @@ class ControlServer:
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
                 if key == 'dump-interval' and not self.proxy.dump_path:
-                    return 'err dump-interval needs a dump path (set --dump-path)'
+                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
                 return 'ok %s' % describe_setting(key)
             if args:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
@@ -359,6 +396,8 @@ class ControlServer:
             if not args:
                 return 'err unset needs a setting (try help)'
             key, rest = match_setting_path(args, SETTING_BY_NAME)
+            if key is not None and not rest and getattr(SETTING_BY_NAME.get(key), 'restart', False):
+                return 'err restart required (startup-only knob)'
             if key is None or rest or key not in self.defaults:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             try:
@@ -377,6 +416,8 @@ class ControlServer:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             if not rest:
                 return 'err set needs a setting and a value (try help)'
+            if getattr(SETTING_BY_NAME.get(key), 'restart', False):
+                return 'err restart required (startup-only knob)'
             value = ' '.join(rest)
             try:
                 shown = self._apply(key, value)
@@ -397,7 +438,7 @@ class ControlServer:
             return 'ok ' + self.cache_line()
         if low == 'show version':
             return 'ok modbus-cache %s' % version_string()
-        if low == 'show config':
+        if low in ('show config', 'show config all'):   # 'all' rides along: the script IS the full config
             return self.show_config()
         if low == 'show knobs':
             return self.knobs_dictionary()
@@ -409,7 +450,7 @@ class ControlServer:
                 if word:
                     return self.command('show ' + word)   # a show command's report, by its word
                 if key == 'dump-interval' and not self.proxy.dump_path:
-                    return 'err dump-interval needs a dump path (set --dump-path)'
+                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
                 return 'ok %s=%s' % (key, self._get(key))
             if key is not None and rest:
                 return 'err %s: unexpected %s' % (key, ' '.join(rest))
@@ -438,6 +479,8 @@ class ControlServer:
             logger.info('control: upstream session restarted (connection dropped, %d register word(s) dropped, repolling now)',
                         dropped)
             return 'ok upstream session restarted (connection dropped, %d register word(s) dropped, repolling now)' % dropped
+        if low == 'reload':
+            return self.reload_daemon()
         if low == 'shutdown':
             self.shutdown_pending = True
             logger.info('control: shutdown requested')
@@ -538,7 +581,88 @@ class ControlServer:
             self._gate_range(key, v)
             p.conn_gate.max_per_ip = v
             return '%d' % v
-        if key == 'metrics-server':
+        if key == 'control/port':
+            try:
+                target = parse_control_target(val)
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if val in ('off', 'none', '0'):
+                target = None
+            if target is not None and not self.stopped and self._is_target(target):
+                return self.describe()   # the same target: nothing to rebind
+            if isinstance(target, int) and self.token is None:
+                raise ValueError('control/port cannot serve TCP without a token (F5 in docs/AUDIT.md): '
+                                 'set control/token first')
+            return self._rebind_control(target)
+        if key == 'control/token':
+            if val in ('off', 'none', ''):
+                if not self.is_unix and not self.stopped:
+                    raise ValueError('the TCP control port needs its token (F5 in docs/AUDIT.md) — '
+                                     'only the unix socket (the filesystem is the auth) may run tokenless')
+                self.token = None
+                return 'off'
+            if self.ops_token and hmac.compare_digest(val, self.ops_token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.token = val   # the rotation is live: the sessions re-auth, the macs verify against the new key
+            return '<set>'
+        if key == 'control/token-file':
+            try:
+                tok = load_token_file(val, 'control-token-file')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if self.ops_token and hmac.compare_digest(tok, self.ops_token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.token = tok
+            return '<set>'
+        if key == 'control/ops/token':
+            if val in ('off', 'none', ''):
+                self.ops_token = None   # the ops shift signs off; the admin role is untouched
+                return 'off'
+            if self.token and hmac.compare_digest(val, self.token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.ops_token = val
+            return '<set>'
+        if key == 'control/ops/token-file':
+            try:
+                tok = load_token_file(val, 'control-ops-token-file')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if self.token and hmac.compare_digest(tok, self.token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.ops_token = tok
+            return '<set>'
+        if key == 'control/ops-verbs':
+            verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
+            unknown = sorted(v for v in verbs if v not in KNOWN_VERBS)
+            if not verbs or unknown:
+                raise ValueError('the ops policy needs at least one verb the grammar speaks%s: %s'
+                                 % ('' if not unknown else ' (unknown: %s)' % ', '.join(unknown),
+                                    ', '.join(sorted(KNOWN_VERBS))))
+            self.ops_verbs = verbs
+            return ','.join(sorted(verbs))
+        if key == 'control/trust-uids':
+            try:
+                uids = parse_trust_uids('none' if val == 'off' else val, 'control/trust-uids')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            self.trust_uids = uids or frozenset()
+            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
+        if key == 'control/socket-group':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('control/socket-group must be on or off')
+            self.socket_group = on
+            if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
+                os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
+            return 'on' if on else 'off'
+        if key == 'metrics/enable':
             if val in ('on', 'true', '1', 'yes'):
                 if p.metrics_srv:
                     return 'on'
@@ -559,7 +683,107 @@ class ControlServer:
                     p.metrics_srv = None
                     p.metrics_desc = 'off'
                 return 'off'
-            raise ValueError('metrics-server must be on or off')
+            raise ValueError('metrics enable must be on or off')
+        if key == 'metrics/listen':
+            try:
+                t = parse_listen(val)
+            except SystemExit as e:
+                raise ValueError(str(e))
+            probe = socket.socket()
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                probe.bind(t)
+            except OSError as e:
+                raise ValueError('cannot bind %s:%d: %s' % (t[0], t[1], e))
+            finally:
+                probe.close()
+            p.metrics_listen = t
+            if p.metrics_srv:
+                p.metrics_srv.stop()
+                p.metrics_srv.listen = t
+                p.metrics_srv.start()
+            p.metrics_desc = describe_metrics(t, p.metrics_token, p.metrics_caps[0], p.metrics_caps[2])
+            return '%s:%d' % t
+        if key == 'metrics/token':
+            if not val or val in ('off', 'none', '0'):
+                raise ValueError('metrics/token is mandatory while the endpoint serves (F6 in docs/AUDIT.md) — set the new token')
+            p.metrics_token = val
+            if p.metrics_srv:
+                p.metrics_srv.token = val   # the handler reads it per request — the swap is live
+            p.metrics_desc = describe_metrics(p.metrics_listen, val, p.metrics_caps[0], p.metrics_caps[2])
+            return '<set>'
+        if key == 'metrics/token-file':
+            token = load_token_file(val, 'metrics-token-file')
+            p.metrics_token = token
+            if p.metrics_srv:
+                p.metrics_srv.token = token
+            p.metrics_desc = describe_metrics(p.metrics_listen, token, p.metrics_caps[0], p.metrics_caps[2])
+            return '<set>'
+        if key == 'metrics/limits/max-clients':
+            v = numi(val, 'max-clients', 'clients')
+            self._gate_range(key, v)
+            p.metrics_caps = (v, p.metrics_caps[1], p.metrics_caps[2])
+            if p.metrics_srv:
+                p.metrics_srv.max_clients = v
+                p.metrics_srv._http.gate.max_total = v   # the gate reads its caps per admit
+            return '%d' % v
+        if key == 'metrics/limits/timeout':
+            v = num(val, 'client-timeout', 'seconds')
+            self._gate_range(key, v, 'seconds')
+            p.metrics_caps = (p.metrics_caps[0], v, p.metrics_caps[2])
+            if p.metrics_srv:
+                p.metrics_srv.client_timeout = v
+                p.metrics_srv._Handler.timeout = v or 5   # 0 = the built-in slowloris cap
+            return secs(v)
+        if key == 'metrics/limits/max-conn-per-ip':
+            v = numi(val, 'max-conn-per-ip', 'connections')
+            self._gate_range(key, v)
+            p.metrics_caps = (p.metrics_caps[0], p.metrics_caps[1], v)
+            if p.metrics_srv:
+                p.metrics_srv.max_per_ip = v
+                p.metrics_srv._http.gate.max_per_ip = v
+            return '%d' % v
+        if key == 'audit/log-file':
+            if val in ('off', 'none'):
+                p.audit_params['disabled'] = True
+                self._rebuild_audit()
+                return 'off'
+            p.audit_params['path'] = None if val in ('-', 'stdout') else val
+            p.audit_params['disabled'] = False
+            self._rebuild_audit()
+            return p.audit.path if p.audit else 'off'
+        if key == 'audit/rotate/max-size':
+            v = num(val, 'max-size', 'MB')
+            self._gate_range(key, v, 'MB')
+            p.audit_params['max_mb'] = v
+            self._rebuild_audit()
+            return '%g' % v
+        if key == 'audit/rotate/daily':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('audit/rotate/daily must be on or off')
+            p.audit_params['daily'] = on
+            self._rebuild_audit()
+            return 'on' if on else 'off'
+        if key == 'audit/rotate/files':
+            v = numi(val, 'files', 'backups')
+            self._gate_range(key, v, 'backups')
+            p.audit_params['files'] = v
+            self._rebuild_audit()
+            return '%d' % v
+        if key == 'audit/disable':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('audit/disable must be on or off')
+            p.audit_params['disabled'] = on
+            self._rebuild_audit()
+            return 'on' if on else 'off'
         if key == 'requests-audit':
             if val in ('off', 'none', '0'):
                 p.requests_audit_s = 0
@@ -570,7 +794,7 @@ class ControlServer:
             return secs(v)
         if key == 'dump-interval':
             if not p.dump_path:
-                raise ValueError('dump-interval needs a dump path (set --dump-path)')
+                raise ValueError('dump-interval needs a dump path (set dump/path or --dump-path)')
             if val in ('off', 'none', '0'):
                 p.dump_interval = 0
                 p.dump_wake.set()
@@ -580,6 +804,30 @@ class ControlServer:
             p.dump_interval = v
             p.dump_wake.set()
             return secs(v)
+        if key == 'dump/path':
+            if val in ('off', 'none', ''):
+                p.dump_path = None
+                return 'off'
+            p.dump_path = val   # the dump loop, request dump and the shutdown write it from here on
+            return val
+        if key == 'dump/with-cache':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('dump/with-cache must be on or off')
+            p.dump_with_cache = on
+            return 'on' if on else 'off'
+        if key == 'dump/restore-on-start':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('dump/restore-on-start must be on or off')
+            p.restore_on_start = on   # prospective: the START behaviour this session already chose stands
+            return 'on' if on else 'off'
         if key == 'local-time':
             if val in ('on', 'true', '1', 'yes'):
                 on = True
@@ -651,6 +899,70 @@ class ControlServer:
                    host=p.upstream.host, port=p.upstream.port, unit=p.upstream.unit)
         return cfg
 
+    def _is_target(self, target):
+        """Whether `target` is the listener already running (a re-set of the
+        same control/port must not bounce the socket)."""
+        if self.stopped:
+            return False
+        if isinstance(target, int):
+            return not self.is_unix and target == self.port
+        return self.is_unix and str(target) == self.sockpath
+
+    def _rebind_control(self, target):
+        """The live control target (the `set control/port` plumb): bind the
+        new socket FIRST (a failed bind leaves the old listener untouched —
+        the attrs roll back), then swap self._srv (the old accept loop exits
+        by identity), close the old listener and start the new accept loop.
+        None retires the listener: the connected sessions keep their threads
+        and their replies, no new connection is accepted."""
+        old_attrs = (self.is_unix, self.port, self.sockpath)
+        if target is None:
+            old = self._srv
+            self._srv = None
+            self.stopped = True
+            if old is not None:
+                try:
+                    old.close()
+                except OSError:
+                    pass
+            logger.info('control: the control server stopped (a control/port set re-enables it)')
+            return 'off'
+        self.is_unix = not isinstance(target, int)
+        self.port = None if self.is_unix else int(target)
+        self.sockpath = str(target) if self.is_unix else None
+        self.stopped = False
+        try:
+            srv = self._open_sock()
+        except OSError as e:
+            self.is_unix, self.port, self.sockpath = old_attrs
+            raise ValueError('cannot bind control/port %s: %s' % (target if target is not None else 'off', e))
+        old = self._srv
+        self._srv = srv
+        if old is not None:
+            try:
+                old.close()
+            except OSError:
+                pass
+        logger.info('control: the control server rebound to %s (the old listener closed)', self.describe())
+        threading.Thread(target=self._accept_loop, args=(srv,), daemon=True).start()
+        return self.describe()
+
+    def _rebuild_audit(self):
+        """Swap the CACHE audit trail for one rebuilt from the proxy's audit
+        params (the live path/rotation changes): the fresh writer re-chains
+        from the file's own tail (common/audit.py tail_hash), so the chain
+        stays verifiable across the swap. The old trail is NOT closed — a
+        session still holding it writes its last commands there, and an
+        in-flight writer must never hit a closed file."""
+        p = self.proxy
+        prm = p.audit_params
+        if prm['disabled']:
+            p.audit = None
+        else:
+            p.audit = AuditLog(prm['path'], 'CACHE', app='modbus-cache',
+                               max_mb=prm['max_mb'], daily=prm['daily'], files=prm['files'])
+        self.audit = p.audit   # this server's new sessions (and this one) audit the new trail
+
     @staticmethod
     def _acl_text(acl):
         """'any' | 'none' | the normalized network list (what `unset` re-parses)."""
@@ -686,8 +998,46 @@ class ControlServer:
             return 'none' if not p.client_timeout else secs(p.client_timeout)
         if key == 'limits/max-conn-per-ip':
             return '%d' % p.conn_gate.max_per_ip
-        if key == 'metrics-server':
+        if key == 'control/port':
+            return 'off' if self.stopped else self.describe()
+        if key in ('control/token', 'control/token-file'):
+            return '<set>' if self.token else 'off'   # the secret never renders
+        if key in ('control/ops/token', 'control/ops/token-file'):
+            return '<set>' if self.ops_token else 'off'   # the secret never renders
+        if key == 'control/ops-verbs':
+            return ','.join(sorted(self.ops_verbs)) or 'off'
+        if key == 'control/trust-uids':
+            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
+        if key == 'control/socket-group':
+            return 'on' if self.socket_group else 'off'
+        if key == 'metrics/enable':
             return 'on' if p.metrics_srv else 'off'
+        if key == 'metrics/listen':
+            return '%s:%d' % p.metrics_listen
+        if key in ('metrics/token', 'metrics/token-file'):
+            return '<set>' if p.metrics_token else 'off'   # the secret never renders
+        if key == 'metrics/limits/max-clients':
+            return '%d' % p.metrics_caps[0]
+        if key == 'metrics/limits/timeout':
+            return secs(p.metrics_caps[1])
+        if key == 'metrics/limits/max-conn-per-ip':
+            return '%d' % p.metrics_caps[2]
+        if key == 'audit/log-file':
+            return p.audit.path if p.audit else 'off'
+        if key == 'audit/rotate/max-size':
+            return '%g' % p.audit_params['max_mb']
+        if key == 'audit/rotate/daily':
+            return 'on' if p.audit_params['daily'] else 'off'
+        if key == 'audit/rotate/files':
+            return '%d' % p.audit_params['files']
+        if key == 'audit/disable':
+            return 'on' if p.audit_params['disabled'] else 'off'
+        if key == 'dump/path':
+            return p.dump_path or 'off'
+        if key == 'dump/with-cache':
+            return 'on' if p.dump_with_cache else 'off'
+        if key == 'dump/restore-on-start':
+            return 'on' if getattr(p, 'restore_on_start', False) else 'off'
         if key == 'requests-audit':
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
         if key == 'dump-interval':
@@ -710,6 +1060,9 @@ class ControlServer:
             return p.config.get('profile') or p.profile
         if key == 'modbus/selection':
             return p.config.get('selection') or 'all'
+        s = SETTING_BY_NAME.get(key)
+        if s is not None and s.restart:   # a startup-only knob: the configured value
+            return self.defaults.get(key, '?')   # renders (the secrets answer '<set>'/'off')
         return '?'
 
     def status_report(self):
@@ -886,15 +1239,23 @@ class ControlServer:
 
     def dump_settings(self):
         """The live-overridden settings as raw, re-appliable values (a
-        SIGHUP clears the override set — the dump follows)."""
+        SIGHUP clears the override set — the dump follows). The secrets
+        (control/token, the ops token) are absent: a dump is a plain JSON
+        file, the secrets never land in it — the restore keeps their
+        current value."""
         p = self.proxy
+        prm = p.audit_params
         raw = {
             'modbus/interval': p.interval, 'cache/ttl': p.cache.cache_ttl,
             'modbus/read-delay': p.read_delay,
             'modbus/merge-gap': p.merge_gap, 'write/allow': 'on' if p.allow_write else 'off',
             'write/registers': p.describe_write_ranges(), 'limits/max-clients': p.max_clients,
             'limits/client-timeout': p.client_timeout, 'limits/max-conn-per-ip': p.conn_gate.max_per_ip,
-            'metrics-server': 'on' if p.metrics_srv else 'off',
+            'metrics/enable': 'on' if p.metrics_srv else 'off',
+            'metrics/listen': '%s:%d' % p.metrics_listen,
+            'metrics/limits/max-clients': p.metrics_caps[0],
+            'metrics/limits/timeout': p.metrics_caps[1],
+            'metrics/limits/max-conn-per-ip': p.metrics_caps[2],
             'requests-audit': p.requests_audit_s,
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'modbus/profile': p.config.get('profile'), 'modbus/selection': p.config.get('selection') or 'all',
@@ -903,8 +1264,20 @@ class ControlServer:
             'modbus/unit': p.upstream.unit,
             'modbus/timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,
             'local-time': self._get('local-time'),
+            'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
+            'control/ops-verbs': ','.join(sorted(self.ops_verbs)) or 'off',
+            'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
+            'control/socket-group': 'on' if self.socket_group else 'off',
+            'audit/log-file': (p.audit.path if p.audit else 'off'),
+            'audit/rotate/max-size': '%g' % prm['max_mb'],
+            'audit/rotate/daily': 'on' if prm['daily'] else 'off',
+            'audit/rotate/files': '%d' % prm['files'],
+            'audit/disable': 'on' if prm['disabled'] else 'off',
+            'dump/path': p.dump_path or 'off',
+            'dump/with-cache': 'on' if p.dump_with_cache else 'off',
+            'dump/restore-on-start': 'on' if getattr(p, 'restore_on_start', False) else 'off',
         }
-        return {k: raw[k] for k in sorted(self.overridden)}
+        return {k: raw[k] for k in sorted(self.overridden) if k in raw}
 
     def apply_dump_settings(self, settings):
         """Re-apply the dumped overrides; returns (applied, failed-name-list).
@@ -923,6 +1296,93 @@ class ControlServer:
                 failed.append('%s (%s)' % (name, e))
         return applied, failed
 
+    # --- the whole-daemon reload (`reload`): the live overrides serialize to
+    # a state file beside the config, the reply leaves the wire, the process
+    # re-execs. The fresh daemon re-resolves the config file (the
+    # restart-marked knobs take their configured values) and re-applies the
+    # saved overrides once (start) — the file and the flags stay the owners
+    # of the base, the state file is consumed, nothing lingers. ---
+
+    def _reload_state_path(self):
+        return self.config_path + '.reload' if self.config_path else None
+
+    def _save_reload_state(self):
+        """The overrides in their wire-parsable form (dump_settings) to the
+        state file — the secrets are absent by construction. Returns
+        (settings, lost-secret-names); raises OSError on an unwritable home."""
+        settings = self.dump_settings()
+        lost = sorted(k for k in self.overridden if k not in settings)
+        path = self._reload_state_path()
+        tmp = path + '.tmp'
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)   # config-equivalent trust: 0600, never the umask's
+        with os.fdopen(fd, 'w') as f:
+            json.dump({'when': time.time(), 'settings': settings}, f, indent=1, sort_keys=True)
+            f.write('\n')
+        os.replace(tmp, path)
+        return settings, lost
+
+    def _restore_reload_state(self):
+        """One-shot, at start: a reload exec re-applies the saved overrides
+        and consumes the state file — a later manual start stays pure (the
+        config file and the flags alone). A state older than two minutes is
+        stale (a failed start in between): discarded, never applied."""
+        path = self._reload_state_path()
+        if not path or not os.path.exists(path):
+            return
+        try:
+            with open(path) as f:
+                state = json.load(f)
+            if time.time() - state.get('when', 0) > 120:
+                logger.warning('reload: the state file %s is stale, discarding it', path)
+                os.unlink(path)
+                return
+            applied, failed = self.apply_dump_settings(state.get('settings'))
+            os.unlink(path)
+            logger.info('reload: %d override(s) re-applied from %s%s', applied, path,
+                        (' (%d skipped: %s)' % (len(failed), ', '.join(failed))) if failed else '')
+            if self.audit:
+                self.audit.event('RELOAD', 'restored %d override(s) from %s' % (applied, path))
+        except (OSError, ValueError) as e:
+            logger.error('reload: the state file %s is unreadable (%s) — starting without it', path, e)
+
+    def reload_daemon(self):
+        """The `reload` verb: save the overrides, then restart the whole
+        daemon. The fresh process re-resolves the config file — the
+        restart-marked knobs (the registry's `restart: true` rows) take
+        their configured values — and start() re-applies the saved
+        overrides once. The secrets never save (the dump rule): an
+        overridden secret is named in the reply, to re-pass by flag/env/
+        token-file."""
+        if not self.config_path:
+            return 'err reload needs a config path (start with --config)'
+        try:
+            settings, lost = self._save_reload_state()
+        except OSError as e:
+            logger.error('control: reload could not save the overrides: %s', e)
+            return 'err reload failed: %s' % e
+        self.reload_pending = True
+        logger.info('control: reload — %d override(s) saved to %s, re-execing',
+                    len(settings), self._reload_state_path())
+        msg = 'ok reload: %s, the daemon restarts now' % (
+            '%d override(s) saved' % len(settings) if settings else 'no overrides to save')
+        if lost:
+            msg += ' (%s: secret, not saved — re-pass by flag/env/token-file)' % ', '.join(lost)
+        return msg
+
+    def _exec_reload(self):
+        """The reply is out (the session loop calls this after it): announce
+        to the consoles and re-exec in place — the same argv re-resolves the
+        config, the fresh daemon rebinds the control target (stale sockets
+        are replaced) and restores the saved overrides."""
+        if self.audit:
+            self.audit.event('RELOAD', 'exec: the daemon re-execs (pid %d)' % os.getpid())
+        self.announce_exit('reload', text='daemon-exit: the modbus-cache proxy is reloading — '
+                                          'the daemon restarts with the saved configuration')
+        sys.stdout.flush()
+        sys.stderr.flush()
+        time.sleep(0.2)   # let the bye frames drain
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
     def dump_state(self, with_cache):
         """The write-behind: the live setting overrides and — when
         with_cache (the `request dump with-cache` command, the
@@ -930,7 +1390,7 @@ class ControlServer:
         words (+ stamps), to the configured dump path."""
         path = self.proxy.dump_path
         if not path:
-            return 'err no dump path configured (set --dump-path)'
+            return 'err no dump path configured (set dump/path or --dump-path)'
         settings = self.dump_settings()
         try:
             n = persist.write_dump(path, self.proxy.cache, settings, with_cache=with_cache)
@@ -947,7 +1407,7 @@ class ControlServer:
         register map still covers — and the setting overrides re-apply."""
         path = self.proxy.dump_path
         if not path:
-            return 'err no dump path configured (set --dump-path)'
+            return 'err no dump path configured (set dump/path or --dump-path)'
         if not os.path.exists(path):
             return 'err no dump at %s yet (run dump first)' % path
         try:

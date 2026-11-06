@@ -616,32 +616,50 @@ try:
     check('cache_ctl: piped batch with the token env', r.returncode == 0
           and r.stdout.startswith('ok cache ') and 'ok cache cleared' in r.stdout, repr(r.stdout[:160]))
 
-    # 5d. set/unset/show settings: the live settings registry (the inverter's pattern)
-    r = ctl_cmd('set interval 2', 15514)
-    check('set: interval applied with the state summary', r.startswith('ok interval=2.00s upstream=127.0.0.1:15512')
+    # 5d. set/unset/show: the live settings registry (the inverter's pattern)
+    r = ctl_cmd('set modbus interval 2', 15514)
+    check('set: interval applied with the state summary', r.startswith('ok modbus/interval=2.00s upstream=127.0.0.1:15512')
           and 'poll=' in r and 'hits=' in r, r[:120])
     r = ctl_cmd('show status', 15514)
     check('set: show status reflects the new interval', 'interval=2.00s' in r, r[:120])
-    r = ctl_cmd('show settings', 15514)
-    check('set: the live override carries the * marker', 'interval=2.00s*' in r, r[:160])
     r = ctl_cmd('show status', 15514)
-    check('set: the overridden row lists the setting', 'overridden=interval' in r, r[-160:])
-    r = ctl_cmd('set interval bogus', 15514)
+    check('set: the overridden row lists the setting', 'overridden=modbus/interval' in r, r[-160:])
+    r = ctl_cmd('set modbus interval bogus', 15514)
     check('set: a bogus value is a clean err', r.startswith('err interval must be seconds'), r[:100])
     r = ctl_cmd('set bogus 1', 15514)
     check('set: unknown setting', r.startswith('err unknown setting'), r[:100])
     r = ctl_cmd('show settings', 15514)
-    check('show settings: every tunable, one per line', r.startswith('ok settings\n')
-          and 'interval=2.00s*' in r and '\nttl=' in r and '\nmerge-gap=' in r
-          and '\nlog-level=INFO' in r, r[:160])
-    r = ctl_cmd('show interval', 15514)
-    check('show <setting>: the bare value', r == 'ok interval=2.00s', r)
-    r = ctl_cmd('help ttl', 15514)
-    check('help <setting>: the registry description', r.startswith('ok ttl - per-register cache TTL'), r[:110])
-    r = ctl_cmd('unset interval', 15514)
-    check('unset: restores the configured value', r.startswith('ok interval=1.00s'), r[:110])
+    check('show settings: retired answers err', r.startswith('err'), r[:80])
+    r = ctl_cmd('show modbus interval', 15514)
+    check('show <setting>: the bare value', r == 'ok modbus/interval=2.00s', r)
+    r = ctl_cmd('show cache ttl', 15514)
+    check('show <setting>: the path spelling answers the live', r == 'ok cache/ttl=3.00s', r)
+    r = ctl_cmd('help cache ttl', 15514)
+    check('help <setting>: the registry description', r.startswith('ok cache/ttl - per-register cache TTL'), r[:110])
+    r = ctl_cmd('unset modbus interval', 15514)
+    check('unset: restores the configured value', r.startswith('ok modbus/interval=1.00s'), r[:110])
     r = ctl_cmd('show status', 15514)
     check('unset: the override marker clears', 'overridden=none' in r, r[-160:])
+    r = ctl_cmd('set modbus timeout 5', 15514)
+    check('set: modbus timeout applied (the rekeyed branch)', r.startswith('ok modbus/timeout=5.00s upstream='), r[:120])
+    r = ctl_cmd('show modbus timeout', 15514)
+    check('show: modbus timeout answers the bare value', r == 'ok modbus/timeout=5.00s', r)
+    r = ctl_cmd('set modbus timeout 99', 15514)
+    check('set: modbus timeout range-gated', r.startswith('err timeout must be 0 < N <= 60'), r[:100])
+    r = ctl_cmd('unset modbus timeout', 15514)
+    check('unset: modbus timeout restores the configured value', r.startswith('ok modbus/timeout=3.00s'), r[:110])
+    r = ctl_cmd('set config 5', 15514)
+    check('set: a show report is not a setting', r.startswith('err unknown setting config'), r[:100])
+    r = ctl_cmd('set connections 5', 15514)
+    check('set: connections is not a setting', r.startswith('err unknown setting connections'), r[:100])
+    r = ctl_cmd('set local-time on', 15514)
+    check('set: local-time toggles live', r.startswith('ok local-time=on'), r[:110])
+    r = ctl_cmd('show local-time', 15514)
+    check('show: local-time answers the bare value', r == 'ok local-time=on', r)
+    r = ctl_cmd('set local-time bogus', 15514)
+    check('set: local-time validates on|off', r.startswith('err local-time must be on|off'), r[:100])
+    r = ctl_cmd('unset local-time', 15514)
+    check('unset: local-time restores the configured value', r.startswith('ok local-time=off'), r[:110])
     r = ctl_cmd('show cache-all', 15514)
     check('show cache-all: per-entry rows with age, expiry and status', r.startswith('ok cache-all\n')
           and 'pv-power' in r and 'expires' in r and 'fc3' in r and '2/2' in r, r[:200])
@@ -653,8 +671,6 @@ try:
     check('show cache: the summary still works beside the dump', r.startswith('ok cache '), r[:80])
     r = ctl_cmd('request dump', 15514)
     check('request dump: no dump path configured is a clean err', r.startswith('err no dump path configured'), r[:80])
-    r = ctl_cmd('show settings', 15514)
-    check('dump: the dump-interval setting hides without a dump path', 'dump-interval' not in r, r[:160])
     r = ctl_cmd('show dump-interval', 15514)
     check('dump: show dump-interval without a path is a clean err', r.startswith('err dump-interval needs a dump path'), r[:80])
     r = ctl_cmd('help', 15514)
@@ -662,7 +678,7 @@ try:
     r = ctl_cmd('show knobs', 15514)
     check('show knobs: the dictionary of the registry — flag, env twin, section, how it changes',
           r.startswith('ok knobs') and '--interval' in r and '$INTERVAL' in r
-          and 'set interval <value>' in r and 'control-ops-token-file' in r and ', secret' in r
+          and 'set modbus interval <value>' in r and 'control-ops-token-file' in r and ', secret' in r
           and '# ---' in r, r[:200])
     r = ctl_cmd('help knobs', 15514)
     check('help knobs: the same dictionary under the help verb', r.startswith('ok knobs'), r[:80])
@@ -672,8 +688,8 @@ try:
           and 'fc3' in r and 'status' in r, r[:200])
 
     # selection none: the map empties, every read forwards, nothing is stored
-    r = ctl_cmd('set selection none', 15514)
-    check('set selection none: accepted', r.startswith('ok selection=none'), r[:100])
+    r = ctl_cmd('set modbus selection none', 15514)
+    check('set modbus selection none: accepted', r.startswith('ok modbus/selection=none'), r[:100])
     r = ctl_cmd('show status', 15514)
     check('set selection none: the map empties', 'ranges=0' in r and 'selection=none' in r, r[:160])
     m1 = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache.log'],
@@ -684,7 +700,7 @@ try:
                         capture_output=True, text=True).stdout.strip()
     check('selection none: repeat reads forward, nothing is stored', int(m2) == int(m1) + 2,
           '%s -> %s' % (m1, m2))
-    ctl_cmd('unset selection', 15514)
+    ctl_cmd('unset modbus selection', 15514)
     r = ctl_cmd('show status', 15514)
     check('unset selection: the map refills', 'ranges=49' in r and 'selection=all' in r, r[:160])
 
@@ -779,8 +795,8 @@ try:
     check('request dump: the file is 0600 (F18) and carries the integrity hash',
           os.stat(dumpfile).st_mode & 0o777 == 0o600 and isinstance(d.get('hash'), str)
           and len(d['hash']) == 64, '%03o %r' % (os.stat(dumpfile).st_mode & 0o777, d.get('hash'))[:80])
-    r = ctl_cmd('show settings', 15537)
-    check('request dump: the dump-interval setting shows with a dump path', 'dump-interval=off' in r, r[:160])
+    r = ctl_cmd('show dump-interval', 15537)
+    check('request dump: the dump-interval setting answers with a dump path', r == 'ok dump-interval=off', r[:80])
     r = ctl_cmd('help', 15537)
     check('request dump: the help lists the dump commands with a path', 'request dump' in r
           and 'request restore' in r, r[:160])
@@ -792,11 +808,11 @@ try:
     r = ctl_cmd('request restore', 15537)
     check('request restore: the words are back without the device', r.startswith('ok restored 91 word(s)')
           and '0 setting(s)' in r, r[:120])
-    ctl_cmd('set interval 2', 15537)
+    ctl_cmd('set modbus interval 2', 15537)
     ctl_cmd('request dump', 15537)
     d = _json.load(open(dumpfile))
     check('request dump: the settings-only dump keeps the words out', d.get('registers') == []
-          and d.get('settings', {}).get('interval') == 2.0, str(d.get('settings')))
+          and d.get('settings', {}).get('modbus/interval') == 2.0, str(d.get('settings')))
     ctl_cmd('clear cache', 15537)
     r = ctl_cmd('show cache', 15537)
     check('request restore: the clear emptied the cache first', '0 word(s) cached' in r, r[:80])
@@ -809,10 +825,10 @@ try:
     r = ctl_cmd('request restore', 15537)
     check('request restore: the with-cache dump brings the words back',
           r.startswith('ok restored 91 word(s), 1 setting(s)'), r[:120])
-    r = ctl_cmd('show interval', 15537)
-    check('request restore: the setting override re-applied', r == 'ok interval=2.00s', r)
-    r = ctl_cmd('show settings', 15537)
-    check('request restore: the override is marked again', 'interval=2.00s*' in r, r[:120])
+    r = ctl_cmd('show modbus interval', 15537)
+    check('request restore: the setting override re-applied', r == 'ok modbus/interval=2.00s', r)
+    r = ctl_cmd('show status', 15537)
+    check('request restore: the override is listed again', 'overridden=modbus/interval' in r, r[-160:])
     r = ctl_cmd('show status', 15537)
     check('dump: the status carries the dump row', 'dump=%s every off' % dumpfile in r, r[-160:])
     # the F18 restore gates: tampering, a group-writable dump and an unsigned dump all refuse
@@ -848,13 +864,13 @@ try:
     r = ctl_cmd('set dump-interval off', 15537)
     check('dump-interval: off again', r.startswith('ok dump-interval=off'), r[:80])
     # the write-behind story: the shutdown dump restores into the next start
-    ctl_cmd('set interval 3', 15537)
+    ctl_cmd('set modbus interval 3', 15537)
     r = ctl_cmd('shutdown', 15537)
     check('shutdown dump: the stopper wrote the file', r.startswith('bye'), r[:40])
     p_dump.wait(timeout=10)
     d = _json.load(open(dumpfile))
     check('shutdown dump: settings-only by default (the override is in it, the words stay out)',
-          d.get('registers') == [] and d.get('settings', {}).get('interval') == 3.0, repr(d.get('settings')))
+          d.get('registers') == [] and d.get('settings', {}).get('modbus/interval') == 3.0, repr(d.get('settings')))
     p_dump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                                '--listen', '127.0.0.1:15536', '--interval', '1', '--cache-ttl', '30',
                                '--profile', R, '--control-port', '15537', '--dump-with-cache',
@@ -866,8 +882,8 @@ try:
     log = open('/tmp/reg_cache_dump2.log').read()
     check('restore-on-start: the gate defaults to off — the dump is not loaded', 'not loaded on start' in log
           and 'restored the state dump' not in log.split('state dumps:')[1], log[-200:])
-    r = ctl_cmd('show interval', 15537)
-    check('restore-on-start: the override in the file did not leak in', r == 'ok interval=1.00s', r)
+    r = ctl_cmd('show modbus interval', 15537)
+    check('restore-on-start: the override in the file did not leak in', r == 'ok modbus/interval=1.00s', r)
     r = ctl_cmd('request dump', 15537)
     check('dump-with-cache: the flag turns the plain request dump full', r.startswith('ok dumped 91 word(s)'),
           r[:120])
@@ -877,7 +893,7 @@ try:
           and 'setting(s) from' in r, r[:120])
     r = ctl_cmd('show cache', 15537)
     check('restore-on-start: the manual restore loaded the words', '91 word(s) cached' in r, r[:80])
-    ctl_cmd('set interval 3', 15537)
+    ctl_cmd('set modbus interval 3', 15537)
     ctl_cmd('shutdown', 15537)
     p_dump.wait(timeout=10)
     p_dump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
@@ -890,11 +906,11 @@ try:
     time.sleep(1.5)
     r = ctl_cmd('show cache', 15537)
     check('restore-on-start: the gate loads the dump', '91 word(s) cached' in r, r[:80])
-    r = ctl_cmd('show interval', 15537)
-    check('restore-on-start: the override came back with the gate', r == 'ok interval=3.00s', r)
-    r = ctl_cmd('show settings', 15537)
-    check('restore-on-start: the override is marked with the gate', 'interval=3.00s*' in r, r[:120])
-    ctl_cmd('unset interval', 15537)
+    r = ctl_cmd('show modbus interval', 15537)
+    check('restore-on-start: the override came back with the gate', r == 'ok modbus/interval=3.00s', r)
+    r = ctl_cmd('show status', 15537)
+    check('restore-on-start: the override is listed with the gate', 'overridden=modbus/interval' in r, r[-160:])
+    ctl_cmd('unset modbus interval', 15537)
     ctl_cmd('shutdown', 15537)
     p_dump.wait(timeout=10)
 
@@ -1000,19 +1016,19 @@ try:
     p_pip.wait(timeout=10)
 
     r_before = ctl_cmd('inspect', 15514)
-    ctl_cmd('set merge-gap 0', 15514)
+    ctl_cmd('set modbus merge-gap 0', 15514)
     r_after = ctl_cmd('inspect', 15514)
     n_before = r_before.split('poll plan ')[1].split(' block(s)')[0]
     n_after = r_after.split('poll plan ')[1].split(' block(s)')[0]
     check('set merge-gap: the poll plan rebuilds live', int(n_after) > int(n_before),
           '%s -> %s' % (n_before, n_after))
-    ctl_cmd('unset merge-gap', 15514)
+    ctl_cmd('unset modbus merge-gap', 15514)
 
-    r = ctl_cmd('set allow-write on', 15514)
-    check('set allow-write: the gate opens', r.startswith('ok allow-write=on'), r[:100])
+    r = ctl_cmd('set write allow on', 15514)
+    check('set allow-write: the gate opens', r.startswith('ok write/allow=on'), r[:100])
     b = wr6(47415, 3, port=15513)
     check('set allow-write: the forwarded write passes', b == bytes.fromhex('06b9370003'), b.hex())
-    ctl_cmd('unset allow-write', 15514)
+    ctl_cmd('unset write allow', 15514)
     b = wr6(47415, 4, port=15513)
     check('unset allow-write: the gate closes again', b[0] == 0x86 and b[1] == 1, b.hex())
     r = cli('shutdown\n\n', 15515, {'CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
@@ -1117,7 +1133,7 @@ try:
           r.startswith('ok acl/write=any'), r[:80])
     b = wr6(47415, 5, port=15531)
     check('write-registers none: refused via the allow-list', b[0] == 0x86 and b[1] == 1, b.hex())
-    r = ctl_cmd('set write-registers any', 15532)
+    r = ctl_cmd('set write registers any', 15532)
     b = wr6(47415, 5, port=15531)
     check('write-acl any + write-registers any: the write passes',
           b == bytes.fromhex('06b9370005'), b.hex())
@@ -1125,6 +1141,22 @@ try:
     check('unset write-acl restores the default none', r.startswith('ok acl/write=none'), r[:80])
     b = wr6(47415, 5, port=15531)
     check('write-acl none again: refused', b[0] == 0x86 and b[1] == 1, b.hex())
+
+    # the alias: the row's second wire spelling — the same knob, the canonical name renders
+    r = ctl_cmd('show write acl', 15532)
+    check('alias: show write acl answers the write-acl', r.startswith('ok acl/write=none'), r[:80])
+    r = ctl_cmd('set write acl any', 15532)
+    check('alias: set write acl any', r.startswith('ok acl/write=any'), r[:80])
+    b = wr6(47415, 5, port=15531)
+    check('alias: the write passes through the aliased set', b == bytes.fromhex('06b9370005'), b.hex())
+    r = ctl_cmd('unset write acl', 15532)
+    check('alias: unset write acl restores none', r.startswith('ok acl/write=none'), r[:80])
+    r = ctl_cmd('help write acl', 15532)
+    check('alias: help write acl describes the row', r.startswith('ok acl/write -'), r[:80])
+    r = ctl_cmd('show write', 15532)
+    check('alias: the write node lists the aliased acl child',
+          r.startswith('ok write - ') and 'acl - clients allowed to write' in r
+          and '(the alias of acl/write)' in r, r[:120])
 
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
            '--listen', '127.0.0.1:15539', '--interval', '1', '--profile', R,

@@ -274,8 +274,8 @@ def main():
         st, tx, macok = ops_roundtrip('show status')
         check('ops: the ops token authenticates, show status honored, mac\'d with the ops key',
               st == 'ok' and macok, '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('show settings')
-        check('ops: show settings honored', st == 'ok' and macok, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('show version')
+        check('ops: show version honored', st == 'ok' and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show knobs')
         check('ops: show knobs honored (the dictionary of the registry, a show verb)',
               st == 'ok' and macok and '--port' in tx and '# ---' in tx, '%s %s' % (st, tx[:160]))
@@ -294,7 +294,7 @@ def main():
               st == 'ok' and macok, '%s %s' % (st, tx))
         aud = open(OPS_AUDIT).read()
         check('ops: both roles audited (role=ops show, role=admin set, the denials included)',
-              "role=ops 'show settings'" in aud and "role=admin 'set log-level DEBUG'" in aud
+              "role=ops 'show status'" in aud and "role=admin 'set log-level DEBUG'" in aud
               and "role=ops 'shutdown'" in aud and '-> err' in aud, aud[-300:])
         r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
                             '--control-port', str(OPS_CTRL_PORT), '--control-token', OPS_TOKEN,
@@ -326,7 +326,7 @@ def main():
         def hammer(i):
             try:
                 if i % 2:
-                    wire = signed('show settings')
+                    wire = signed('show version')
                 else:
                     wire = ('garbage %d\n' % i).encode()
                 st, tx = roundtrip(CTRL_PORT, wire, timeout=15)

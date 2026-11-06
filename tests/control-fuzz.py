@@ -371,7 +371,7 @@ def main():
         def hammer(i):
             try:
                 if i % 2:
-                    wire = b'{"cmd": "show settings"}\n'
+                    wire = b'{"cmd": "show version"}\n'
                 else:
                     wire = ('garbage %d\n' % i).encode()
                 st, tx = roundtrip(15961, wire, timeout=15)

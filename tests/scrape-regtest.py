@@ -444,10 +444,8 @@ try:
           and '# ---' in r.stdout, r.stdout.strip()[:200])
 
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'settings'], capture_output=True, text=True)
-    check('control: show settings lists every setting', r.returncode == 0
-          and all(k in r.stdout for k in ('pv=', 'load=', 'batt=', 'soc=', 'cloud=', 'time=', 'chaos=',
-                                          'seed=', 'battery=', 'strict=', 'static=', 'max-kwp=',
-                                          'battery-kwh=', 'log-level=', 'scenario=')), r.stdout.strip())
+    check('control: show settings is retired (err)', r.returncode == 0
+          and r.stdout.startswith('err'), r.stdout.strip()[:120])
     subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'battery', 'off'], capture_output=True)
     time.sleep(1)
     m = metrics_dict(get('/metrics', 19455)[1])
@@ -812,11 +810,11 @@ try:
           and 'CLI COMMAND ' in cli_rows and "'quit' -> local" in cli_rows
           and 'CLI DISCONNECT' in cli_rows and "CLI COMMAND 'show" not in cli_rows
           and 'ping' not in cli_rows and 'pong' not in cli_rows, cli_rows)
-    r = cli('show settings\nquit\n')
+    r = cli('show status\nquit\n')
     rows = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
-    check('fake_cli: show settings prints one setting per line', r.returncode == 0
-          and len(rows) >= 15 and any(r2.startswith('pv ') for r2 in rows)
-          and any(r2.startswith('log-level ') for r2 in rows), repr(r.stdout))
+    check('fake_cli: show status prints the key=value report', r.returncode == 0
+          and len(rows) >= 15 and any(r2.startswith('pv=') for r2 in rows)
+          and any(r2.startswith('uptime=') for r2 in rows), repr(r.stdout))
     r = cli('set ?\n')
     check('fake_cli: ? lists the options for the position', r.returncode == 0
           and 'scenario' in r.stdout and 'max-kwp' in r.stdout
@@ -1647,7 +1645,7 @@ try:
     check('scraper control: unset profile restores the configured profile',
           r.startswith('ok profile=') and 'sun2000.json' in r, r[:120])
     r = sctl('show settings', 15597)
-    check('scraper control: the settings report', r.startswith('ok settings\n') and 'log-access=on' in r, r[:120])
+    check('scraper control: show settings is retired (err)', r.startswith('err'), r[:80])
     r = sctl('show knobs', 15597)
     check('scraper control: show knobs, the dictionary of the registry — flag, env twin, section, how it changes',
           r.startswith('ok knobs') and '--metric-prefix' in r and '$METRIC_PREFIX' in r
@@ -1676,8 +1674,8 @@ try:
     time.sleep(1.5)
     r = sctl('show status', 15598, token='opssecret')
     check('scraper control: the ops token reads (show status)', r.startswith('ok status'), r[:80])
-    r = sctl('show settings', 15598, token='opssecret')
-    check('scraper control: the ops token reads (show settings)', r.startswith('ok settings\n'), r[:120])
+    r = sctl('show version', 15598, token='opssecret')
+    check('scraper control: the ops token reads (show version)', r.startswith('ok modbus-scraper'), r[:80])
     r = sctl('show knobs', 15598, token='opssecret')
     check('scraper control: the ops token reads (show knobs, a show verb)', r.startswith('ok knobs'), r[:80])
     r = sctl('set interval 5', 15598, token='opssecret')

@@ -47,6 +47,7 @@ except ImportError:
 from common.audit import AuditLog
 from common.config import load_token_file
 from common.human import secs
+from common.options import section_groups
 from common.wiresec import sign_request, verify_reply
 from lib.config import resolve_control_target
 from lib.options import COMMAND_HELP, COMMANDS, SETTING_BY_NAME, SETTING_NAMES, SHOW_VALUES, describe_value
@@ -106,7 +107,8 @@ def prompt_for(target, is_unix):
 def candidates(buf):
     """Valid next words for the buffer being completed or questioned:
     (matches, hint about the following word, describer of each word, the
-    [settings]/[values]/[system] groups for the listing)."""
+    registry section groups ([device]/[serving]/...), [values]/[system]
+    included, for the listing)."""
     end_space = buf.endswith(' ')
     parts = buf.split()
     text = '' if end_space else (parts[-1] if parts else '')
@@ -135,23 +137,23 @@ def candidates(buf):
 
 
 def _sections(head, done_len, matches):
-    """The listing groups: the real tunables ([settings]), the values of one
-    setting ([values]), everything else ([system]: the report words, the
-    commands)."""
+    """The listing groups: the settings under their registry sections
+    ([device]/[serving]/...), the values of one setting ([values]), everything
+    else ([system]: the report words, the commands)."""
     if done_len >= 2 and head in ('set', 'unset'):
         return [('values', matches)]
     if head in ('set', 'unset') and done_len == 1:
-        return [('settings', matches)]
+        return section_groups(matches, SETTING_BY_NAME)
     if head == 'show' and done_len == 1:
-        return [('settings', [w for w in matches if w in SETTING_BY_NAME]),
-                ('system', [w for w in matches if w not in SETTING_BY_NAME])]
+        mine = [w for w in matches if w in SETTING_BY_NAME]
+        rest = [w for w in matches if w not in SETTING_BY_NAME]
+        return section_groups(mine, SETTING_BY_NAME) + [('system', rest)]
     return [('system', matches)]
 
 
 def sectioned_rows(sections, desc, hint):
-    """The listing: a blank line, then the [settings]/[values]/[system]
-    header, its entries padded two spaces under it, descriptions aligned
-    among themselves."""
+    """The listing: a blank line, then each [section] header, its entries
+    padded two spaces under it, descriptions aligned among themselves."""
     rows = []
     for label, words in sections:
         if not words:
@@ -261,9 +263,9 @@ def complete(text, state):
 
 
 def print_options(buf):
-    """`<prefix>?`: one candidate per line, grouped into the [settings] /
-    [values] / [system] sections; a value shape with no completable words
-    still shows its hint."""
+    """`<prefix>?`: one candidate per line, grouped into the registry's
+    section groups ([device]/[serving]/...) plus [values]/[system]; a value
+    shape with no completable words still shows its hint."""
     matches, hint, desc, sections = candidates(buf)
     rows = sectioned_rows(sections, desc, hint)
     if not rows:

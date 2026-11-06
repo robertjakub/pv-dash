@@ -20,12 +20,12 @@ family shape with per-tool defaults.
 | kind | name | function | live | cache | scraper | inverter | dashboard |
 |---|---|---|---|---|---|---|---|
 | k | `allow-write` | device | `set allow-write` | ✓ live |  |  |  |
-| k | `audit-daily` | audit trail | *(startup-only)* | ✓ |  | ✓ |  |
-| k | `audit-files` | audit trail | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `audit-log` | audit trail | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `audit-max-mb` | audit trail | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `auth-token` | own /metrics | *(startup-only)* |  | ✓ secret |  |  |
-| k | `auth-token-file` | own /metrics | *(startup-only)* |  | ✓ secret |  |  |
+| k | `audit-daily` | audit | *(startup-only)* | ✓ |  | ✓ |  |
+| k | `audit-files` | audit | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
+| k | `audit-log` | audit | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
+| k | `audit-max-mb` | audit | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
+| k | `auth-token` | metrics | *(startup-only)* |  | ✓ secret |  |  |
+| k | `auth-token-file` | metrics | *(startup-only)* |  | ✓ secret |  |  |
 | c | `batt` | device | `set batt` |  |  | ✓ live |  |
 | k | `battery` | device | `set battery` |  | ✓ | ✓ live |  |
 | k | `battery` | serving | `set battery` |  |  |  | ✓ live |
@@ -38,15 +38,15 @@ family shape with per-tool defaults.
 | c | `cloud` | device | `set cloud` |  |  | ✓ live |  |
 | k | `config-js` | serving | *(startup-only)* |  |  |  | ✓ |
 | k | `connect-acl` | device | `set connect-acl` | ✓ live |  | ✓ live |  |
-| k | `control-log-replies` | control plane | *(startup-only)* |  |  | ✓ |  |
-| k | `control-ops-token` | control plane | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
-| k | `control-ops-token-file` | control plane | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
-| k | `control-ops-verbs` | control plane | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `control-port` | control plane | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `control-socket-group` | control plane | *(startup-only)* | ✓ |  | ✓ |  |
-| k | `control-token` | control plane | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
-| k | `control-token-file` | control plane | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
-| k | `control-trust-uids` | control plane | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
+| k | `control-log-replies` | control | *(startup-only)* |  |  | ✓ |  |
+| k | `control-ops-token` | control | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
+| k | `control-ops-token-file` | control | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
+| k | `control-ops-verbs` | control | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
+| k | `control-port` | control | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
+| k | `control-socket-group` | control | *(startup-only)* | ✓ |  | ✓ |  |
+| k | `control-token` | control | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
+| k | `control-token-file` | control | *(startup-only)* | **✓** secret | **✓** secret | **✓** secret | **✓** secret |
+| k | `control-trust-uids` | control | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `dump-interval` | persistence | `set dump-interval` | ✓ live |  |  |  |
 | k | `dump-path` | persistence | *(startup-only)* | ✓ |  |  |  |
 | k | `dump-with-cache` | persistence | *(startup-only)* | ✓ |  |  |  |
@@ -71,18 +71,18 @@ family shape with per-tool defaults.
 | k | `max-kwp` | device | `set max-kwp` |  | ✓ | ✓ live |  |
 | k | `merge-gap` | device | `set merge-gap` | ✓ live |  |  |  |
 | k | `metric-prefix` | device | *(startup-only)* |  | ✓ |  |  |
-| k | `metrics-client-timeout` | own /metrics | *(startup-only)* | ✓ |  | ✓ | ✓ |
-| k | `metrics-listen` | own /metrics | *(startup-only)* | ✓ |  | ✓ | ✓ |
-| k | `metrics-max-clients` | own /metrics | *(startup-only)* | ✓ |  | ✓ | ✓ |
-| k | `metrics-max-conn-per-ip` | own /metrics | *(startup-only)* | ✓ |  | ✓ | ✓ |
-| k | `metrics-server` | own /metrics | `set metrics-server` | ✓ live |  | ✓ live | ✓ live |
+| k | `metrics-client-timeout` | metrics | *(startup-only)* | ✓ |  | ✓ | ✓ |
+| k | `metrics-listen` | metrics | *(startup-only)* | ✓ |  | ✓ | ✓ |
+| k | `metrics-max-clients` | metrics | *(startup-only)* | ✓ |  | ✓ | ✓ |
+| k | `metrics-max-conn-per-ip` | metrics | *(startup-only)* | ✓ |  | ✓ | ✓ |
+| k | `metrics-server` | metrics | `set metrics-server` | ✓ live |  | ✓ live | ✓ live |
 | k | `metrics-spec` | device | *(startup-only)* |  | ✓ |  |  |
-| k | `metrics-token` | own /metrics | *(startup-only)* | ✓ secret |  | ✓ secret | ✓ secret |
-| k | `metrics-token-file` | own /metrics | *(startup-only)* | ✓ secret |  | ✓ secret | ✓ secret |
+| k | `metrics-token` | metrics | *(startup-only)* | ✓ secret |  | ✓ secret | ✓ secret |
+| k | `metrics-token-file` | metrics | *(startup-only)* | ✓ secret |  | ✓ secret | ✓ secret |
 | k | `modbus-offset` | device | *(startup-only)* |  | ✓ |  |  |
 | k | `modbus-unit` | device | *(startup-only)* |  | ✓ |  |  |
 | c | `mppt` | device | `set mppt` |  |  | ✓ live |  |
-| k | `no-audit-log` | audit trail | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
+| k | `no-audit-log` | audit | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `no-battery` | device | *(startup-only)* |  |  | ✓ |  |
 | k | `port` | device | *(startup-only)* |  |  | ✓ |  |
 | k | `port` | serving | *(startup-only)* |  |  |  | ✓ |
@@ -90,7 +90,7 @@ family shape with per-tool defaults.
 | k | `prom-prefix` | serving | *(startup-only)* |  |  |  | ✓ |
 | c | `pv` | device | `set pv` |  |  | ✓ live |  |
 | k | `read-delay` | device | `set read-delay` | ✓ live |  |  |  |
-| k | `requests-audit` | audit trail | `set requests-audit` | ✓ live |  |  |  |
+| k | `requests-audit` | audit | `set requests-audit` | ✓ live |  |  |  |
 | k | `restore-on-start` | persistence | *(startup-only)* | ✓ |  |  |  |
 | c | `scenario` | device | `set scenario` |  |  | ✓ live |  |
 | k | `seed` | device | `set seed` |  |  | ✓ live |  |

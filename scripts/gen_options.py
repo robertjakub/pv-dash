@@ -22,10 +22,6 @@ TOOLS = (('cache', 'cache'),
          ('inverter', 'inverter'),
          ('dashboard', 'dashboard'))
 
-SECTION_TAG = {'device': 'device', 'serving': 'serving', 'control': 'control plane',
-               'metrics': 'own /metrics', 'limits': 'limits', 'audit': 'audit trail',
-               'persistence': 'persistence', 'logging': 'logging'}
-
 CLI_ONLY = ('--config', '--dry-run', '--man', '--version', '--help')
 
 
@@ -117,7 +113,7 @@ def main():
         cells = marks(by_tool)
         kind = 'c' if not first.flag else 'k'
         out.append('| %s | `%s` | %s | %s | %s |'
-                   % (kind, name, SECTION_TAG.get(section, section), live_cell(by_tool),
+                   % (kind, name, section, live_cell(by_tool),
                       ' | '.join(cells)))
     out.append('')
     out.append('Legend: `k` = a knob — the flag/env/config-file rows; '

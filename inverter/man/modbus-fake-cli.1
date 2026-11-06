@@ -10,8 +10,9 @@ An interactive console on the \fBmodbus-fake-inverter\fR JSON-lines
 control server: on connect it probes the fake and greets you with the
 profile, the uptime, the clock and the battery state; the prompt shows the
 connected port (\fBfake-inverter:5502 >\fR). TAB completes commands,
-settings and their values (the listings split into
-[settings]/[values]/[system] with aligned descriptions); \fB?\fR prints
+settings and their values (the listings group the settings under the
+registry's own sections, [device]/[serving]/..., with
+[values]/[system] beside, descriptions aligned); \fB?\fR prints
 the same in any position; \fBhelp <setting>\fR explains one; \fBshutdown\fR
 asks \fBProceed with shutdown? [confirm]\fR first.
 .PP

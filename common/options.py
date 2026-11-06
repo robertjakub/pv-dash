@@ -222,17 +222,19 @@ def knob_dictionary(options, who='the tool'):
 class Setting:
     """One live control setting — the registry's control-grammar view: the
     `set <name>` name, the short description the wire help answers with, the
-    completable value words, the value-shape hint (shown after the words)
-    and the per-value short descriptions. Derived from the Option rows
-    (settings_of) — the registry is the one place a knob's vocabulary
-    lives."""
+    completable value words, the value-shape hint (shown after the words),
+    the per-value short descriptions and the registry section the setting
+    files under (the [device]/[serving]/... groups the console word-help and
+    the completions render). Derived from the Option rows (settings_of) —
+    the registry is the one place a knob's vocabulary lives."""
 
-    def __init__(self, name, help, values=(), hint=None, value_help=None):
+    def __init__(self, name, help, values=(), hint=None, value_help=None, section=None):
         self.name = name
         self.help = help
         self.values = values              # completable words
         self.hint = hint                  # free-text value shape shown after the list
         self.value_help = value_help or {}   # per-value short description
+        self.section = section
 
     @property
     def value_shape(self):
@@ -254,8 +256,24 @@ def settings_of(options):
         if not o.live or o.live in seen:
             continue
         seen.add(o.live)
-        out.append(Setting(o.live, o.setting_help or o.help, o.values, o.hint, o.value_help))
+        out.append(Setting(o.live, o.setting_help or o.help, o.values, o.hint, o.value_help,
+                           o.section))
     return tuple(out)
+
+
+def section_groups(names, by_name):
+    """The live settings grouped under their registry sections — the
+    [device]/[serving]/... groups the console word-help and the completions
+    render in place of the one flat [settings] group (the [values] and
+    [system] groups stay the callers'). SECTIONS order, only the non-empty
+    groups, the names keeping their given order inside a group; a name no
+    Setting answers for belongs to the caller's [system] group, never here."""
+    buckets = {key: [] for key, _title in SECTIONS}
+    for n in names:
+        s = by_name.get(n)
+        if s is not None and s.section in buckets:
+            buckets[s.section].append(n)
+    return [(key, buckets[key]) for key, _title in SECTIONS if buckets[key]]
 
 
 def make_describe(by_name):

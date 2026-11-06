@@ -340,6 +340,17 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **the sections render as their registry names**: the
+  console `?`/TAB listings group the settings under the registry's own
+  section heads — `[device]`, `[serving]`, `[control]`, `[metrics]`,
+  `[limits]`, `[audit]`, `[persistence]`, `[logging]` (until now one flat
+  `[settings]` group; `[values]`/`[system]` unchanged) — instead of the
+  translated titles; the knob table (options.md) renders the same raw
+  section keys in its function column. `Setting` carries its section and
+  `common/options.py` `section_groups()` does the grouping; the long
+  titles stay where they were already at home (`show config`, `show
+  knobs`, `help config`).
+
 - **everywhere** — **the control grammar's vocabulary folds into the option
   registry (one place to have all knobs)**: `lib/settings.py` is gone —
   its `SETTINGS` (the live settings' short descriptions, the completable

@@ -1,6 +1,6 @@
 {
   "options": [
-    { "name": "upstream", "flag": "--upstream", "env": "UPSTREAM", "section": "device", "conv": "str",
+    { "name": "upstream", "flag": "--upstream", "env": "UPSTREAM", "section": "device", "conv": "str", "group": "upstream",
       "help": "the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502) (default: config, $UPSTREAM or 127.0.0.1:5502)" },
     { "name": "unit", "flag": "--unit", "env": "UNIT", "section": "device", "conv": "int",
       "help": "Modbus unit id (default: config, $UNIT or 1)" },

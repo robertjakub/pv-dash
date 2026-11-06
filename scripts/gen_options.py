@@ -82,9 +82,9 @@ def main():
 
     out = ['# The knobs of the family (options.md)',
            '',
-           'One table comparing every knob of the four daemons — the name, the',
-           'function it files under and the control command that changes it on',
-           'a running daemon — with a mark per',
+           'One alphabetical table of every knob of the four daemons — the kind,',
+           'the name, the function it files under and the control command that',
+           'changes it on a running daemon — with a mark per',
            'tool. **Generated** from the per-tool `lib/options.json` registries (the',
            'one-knob-one-source rows) by `scripts/gen_options.py` — edit the',
            'registries and re-run `python3 scripts/gen_options.py`, never this file.',
@@ -98,36 +98,41 @@ def main():
     all_four = sorted(name for section in merged.values() for name, by_tool in section.items()
                       if len(by_tool) == len(TOOLS))
     out.append('Common to **all four** tools (%d): %s. The control-plane block is'
-               % (len(all_four), ', '.join('`--%s`' % n for n in all_four)))
+               % (len(all_four), ', '.join('`%s`' % n for n in all_four)))
     out.append('shared nearly verbatim; the audit, limits and metrics blocks follow the')
     out.append('family shape with per-tool defaults.')
     out.append('')
-    cols = ['knob', 'function', 'live'] + [t for _, t in TOOLS]
+    cols = ['kind', 'name', 'function', 'live'] + [t for _, t in TOOLS]
     out.append('| ' + ' | '.join(cols) + ' |')
     out.append('|' + '---|' * len(cols))
-    for section, _title in SECTIONS:
-        if section not in merged:
-            continue
-        for name in sorted(merged[section]):
-            by_tool = merged[section][name]
-            first = next(iter(by_tool.values()))
-            cells = marks(by_tool)
-            knob = ('`%s` (control-only)' % name) if not first.flag else ('`--%s`' % name)
-            out.append('| %s | %s | %s | %s |'
-                       % (knob, SECTION_TAG.get(section, section), live_cell(by_tool),
-                          ' | '.join(cells)))
+    # one alphabetical run over the whole merged universe — the section only
+    # breaks the ties (the same name files twice: interval on the cache's
+    # device and the scraper's logging)
+    order = {key: i for i, (key, _title) in enumerate(SECTIONS)}
+    flat = [(name, section, by_tool)
+            for section in merged for name, by_tool in merged[section].items()]
+    flat.sort(key=lambda row: (row[0], order.get(row[1], len(order))))
+    for name, section, by_tool in flat:
+        first = next(iter(by_tool.values()))
+        cells = marks(by_tool)
+        kind = 'c' if not first.flag else 'k'
+        out.append('| %s | `%s` | %s | %s | %s |'
+                   % (kind, name, SECTION_TAG.get(section, section), live_cell(by_tool),
+                      ' | '.join(cells)))
     out.append('')
-    out.append('Legend: ✓ = the tool has the knob (**bold** = all four do); '
+    out.append('Legend: `k` = a knob — the flag/env/config-file rows; '
+               '`c` = control-only — a setting that lives on the control wire '
+               'alone (the fake\'s pins and machines — no flag, no env, no '
+               'config-file row); '
+               '✓ = the tool has the knob (**bold** = all four do); '
                'the `live` column is the control command itself — `set <name>` over '
                'the control plane, the wire name the registry gives the knob (it can '
-               'differ from the flag: the cache\'s `--cache-ttl` sets `ttl`); '
+               'differ from the flag: the cache\'s `cache-ttl` sets `ttl`); '
                '*(startup-only)* = no live form, a restart applies the knob; a cell\'s '
                '`live` mark says the tool takes the knob live (a cell without one = '
                'that tool applies the knob at startup only); '
                '`secret` = a token — never rendered inline by '
-               '`show config` (the `-file` form is); *(control-only)* = a setting '
-               'that lives on the control wire alone (the fake\'s pins and machines '
-               '— no flag, no env, no config-file row). The knob descriptions stay '
+               '`show config` (the `-file` form is). The knob descriptions stay '
                'in the registries — `--help`, the man pages, `show knobs` and '
                '`help config` render them per tool.')
     out.append('')

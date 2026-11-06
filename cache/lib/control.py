@@ -27,7 +27,7 @@ from common.protocol import ModbusError
 from common.wiresec import frame_mac, sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
-from .settings import SETTING_BY_NAME, SETTING_NAMES, describe_setting
+from .options import SETTING_BY_NAME, SETTING_NAMES, describe_setting
 from .cache import build_blocks
 from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection
 from .metrics import MetricsServer, describe_metrics

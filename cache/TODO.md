@@ -4,6 +4,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[cache]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+The registry-folding wave: `lib/settings.py` is gone — the control
+grammar's vocabulary (the live settings' short descriptions, the value
+words, the shape hints, the per-value notes) rides the same
+`lib/options.json` rows as the flags/envs, and `lib/options.py` derives
+`SETTINGS`/`describe_setting` from them (the wire, the completions and the
+word help unchanged).
+
 The upstream-knob wave: the inverter endpoint is the one
 `--upstream HOST:PORT` knob now (`:5502` = 127.0.0.1:5502, the shared
 `common/config.py` `parse_upstream()`) — `--host`/`--port` and their

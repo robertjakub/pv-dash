@@ -15,7 +15,7 @@ build_parser) and scripts/check_options.py all read this table."""
 import json
 import os
 
-from common.options import Option
+from common.options import Option, make_describe, settings_of
 
 _CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 
@@ -24,10 +24,12 @@ def _load_options():
     """The rows from lib/options.json (next to this loader). A bool knob
     without an explicit default parses as the argparse store_true native
     (False); a value knob defaults to None — the resolution layers decide.
-    The log-level row takes its choices from lib/static.json (the constants
-    audit's home — the same LOG_LEVELS the control grammar validates
-    against); the loader reads it directly so the module also imports flat
-    (scripts/check_options.py walks lib/ on sys.path)."""
+    The control-grammar vocabulary (the live setting's short description,
+    the completable value words, the shape hint, the per-value notes) rides
+    the same rows. The log-level row takes its choices from lib/static.json
+    (the constants audit's home — the same LOG_LEVELS the control grammar
+    validates against); the loader reads it directly so the module also
+    imports flat (scripts/check_options.py walks lib/ on sys.path)."""
     here = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         log_levels = tuple(json.load(f)['log_levels'])
@@ -35,15 +37,18 @@ def _load_options():
         rows = json.load(f)['options']
     out = []
     for row in rows:
-        opt = Option(row['name'], row['flag'], row.get('env'), row['section'],
+        opt = Option(row['name'], row.get('flag'), row.get('env'), row['section'],
                      help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
-                     live=row.get('live'), secret=bool(row.get('secret', False)))
+                     live=row.get('live'), secret=bool(row.get('secret', False)),
+                     setting_help=row.get('setting-help'), values=row.get('values'),
+                     hint=row.get('hint'), value_help=row.get('value-help'))
         if 'default' in row:
             opt.default = row['default']
         elif opt.conv is bool:
             opt.default = False
         if opt.name == 'log-level':
             opt.choices = log_levels
+            opt.values = log_levels   # the control grammar's completable words
         out.append(opt)
     return tuple(out)
 
@@ -59,6 +64,31 @@ OPTION_BY_NAME = {o.name: o for o in OPTIONS}
 
 # the resolved-config keys that do not follow the name.replace('-', '_') rule
 CFG_KEYS = {'log-level': 'level', 'requests-audit': 'requests_audit_s', 'cache-ttl': 'cache_ttl'}
+
+# the control grammar's live settings — the SAME rows, viewed from the wire
+# (the `set`/`unset` vocabulary, the console completions and word-help)
+SETTINGS = settings_of(OPTIONS)
+SETTING_BY_NAME = {s.name: s for s in SETTINGS}
+SETTING_NAMES = tuple(s.name for s in SETTINGS)
+describe_setting, describe_value = make_describe(SETTING_BY_NAME)
+
+# command -> short description (the CLI's first-word completions)
+COMMANDS = (
+    ('set', 'configure a setting live: set <setting> <value>'),
+    ('unset', 'restore a setting to its configured value: unset <setting>'),
+    ('show', 'display a setting, the state or the settings: show <setting|status|connections|cache|settings|version>'),
+    ('inspect', 'one pretty dump of everything: the status, the map, the counters'),
+    ('request dump', 'write the cached words + the live setting overrides to the dump path (write-behind)'),
+    ('request restore', 'load the dump back: the cached words (+ their stamps) and the setting overrides return'),    ('clear', 'drop the cached registers, repoll now (clear cache)'),
+    ('restart', 'restart the upstream session: connection + cache dropped, repoll'),
+    ('shutdown', 'stop the proxy (asks to confirm)'),
+    ('quit', 'close the session'),
+    ('exit', 'close the session'),
+    ('logout', 'close the session'),
+    ('?', 'this help'),
+)
+
+COMMAND_HELP = dict(COMMANDS)
 
 
 def config_value(name, cfg):

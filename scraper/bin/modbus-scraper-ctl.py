@@ -10,9 +10,9 @@ reply.
 
   python3 modbus-scraper-ctl.py --control-port 15509 show status
   python3 modbus-scraper-ctl.py --control-port 15509 poll now
-  printf 'set interval 5\\nshow settings\\n' | python3 modbus-scraper-ctl.py --control-port 15509
+  printf 'set interval 5\\nshow status\\n' | python3 modbus-scraper-ctl.py --control-port 15509
 
-Commands (see the server's help): show <status|connections|settings|version>,
+Commands (see the server's help): show <status|connections|version>,
 set/unset, poll now, request reload, restart, shutdown, quit.
 
 Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.

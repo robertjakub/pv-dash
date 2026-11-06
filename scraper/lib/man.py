@@ -61,7 +61,7 @@ configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: interval,
 timeout, max-clients, client-timeout, max-conn-per-ip, log-access,
 log-level), \\fBshow status\\fR, \\fBshow connections\\fR (the live HTTP
-clients), \\fBshow settings\\fR, \\fBshow version\\fR, \\fBshow knobs\\fR
+clients), \\fBshow version\\fR, \\fBshow knobs\\fR
 (the dictionary of the registry), \\fBpoll now\\fR,
 \\fBinspect\\fR, \\fBrequest reload\\fR, \\fBrestart\\fR, \\fBshutdown\\fR,
 \\fBquit\\fR. See
@@ -122,9 +122,9 @@ A session front-end on top of modbus-scraper's JSON-lines control socket:
 prompt with the connected port, TAB completion and \\fB?\\fR in every
 position (with the short descriptions from the shared command registry),
 \\fBset\\fR commands print only the confirmation, \\fBshow <setting>\\fR
-prints the bare value, \\fBshow settings\\fR one setting per line,
-\\fBshow status\\fR the key=value report, and \\fBshutdown\\fR asks before
-it stops the scraper. When the connection dies mid-session the console
+prints the bare value, \\fBshow status\\fR the key=value report, and
+\\fBshutdown\\fR asks before it stops the scraper. When the connection dies
+mid-session the console
 retries (\\fB--reconnect\\fR attempts, \\fB--reconnect-wait\\fR seconds
 apart). With a control token configured the wire is HMAC-signed: the
 console signs every command and verifies every reply."""

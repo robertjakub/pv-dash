@@ -245,8 +245,7 @@ Commands: `set`/`unset` over the live settings (**`profile`** (the device
 profile: the register map swaps live, `default` restores the bundled
 sun2000 profile), **`interval`**,
 **`timeout`**, **`max-clients`**, **`client-timeout`**,
-**`max-conn-per-ip`**, **`log-access`**, **`log-level`** — `show settings`
-lists them one `key=value` per line, `*` = live-overridden),
+**`max-conn-per-ip`**, **`log-access`**, **`log-level`**),
 `show status` (the key=value report), `show connections` (the live HTTP
 clients of /metrics), `poll now` (the loop wakes immediately), `request
 reload` (the SIGHUP path — the token file re-reads, so the bearer token

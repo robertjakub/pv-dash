@@ -114,7 +114,6 @@
     { "name": "status", "setting-help": "multi-line effective state report: one key=value per field" },
     { "name": "connections", "group": "system",
       "setting-help": "the live HTTP clients of /metrics: the gate counters, one row per peer IP" },
-    { "name": "settings", "setting-help": "every tunable setting with its live value, one per line" },
     { "name": "version", "setting-help": "the modbus-scraper version" },
     { "name": "config", "group": "system",
       "setting-help": "the effective configuration as a set-grammar script (the secrets are hidden)" },

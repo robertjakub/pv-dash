@@ -113,9 +113,41 @@ def check_tool(tool):
     rows.append((not no_help, '%s: every live setting carries its description%s'
                  % (tool, ' — missing: %s' % ', '.join(no_help) if no_help else '')))
     bad_control_only = sorted(o.name for o in options
-                              if not o.flag and (o.env or o.secret or not o.live))
+                              if not o.node and not o.flag and (o.env or o.secret or not o.live))
     rows.append((not bad_control_only, '%s: the control-only settings are flag/env/secret-free and live%s'
                  % (tool, ' — bad rows: %s' % ', '.join(bad_control_only) if bad_control_only else '')))
+    # the hierarchy nodes: a setting-help and at least one live child each
+    bad_nodes = sorted(o.name for o in options if o.node
+                       and (not (o.setting_help or o.help)
+                            or not any(x.live and x.live.startswith(o.name + '/') for x in options)))
+    rows.append((not bad_nodes, '%s: every hierarchy node describes its namespace and has a live child%s'
+                 % (tool, ' — bad rows: %s' % ', '.join(bad_nodes) if bad_nodes else '')))
+    # the hidden rows: a hidden knob is a wire-only listing mark — it needs
+    # a live name to be worth hiding
+    bad_hidden = sorted(o.name for o in options if o.hidden and not o.live)
+    rows.append((not bad_hidden, '%s: every hidden option carries a live name%s'
+                 % (tool, ' — bad rows: %s' % ', '.join(bad_hidden) if bad_hidden else '')))
+    # the registry's `show` section: the custom show words — clean unique
+    # words, a description each
+    mod = sys.modules['options']
+    show_words = list(mod.SHOW_WORDS)
+    show_dupes = sorted({w for w in show_words if show_words.count(w) > 1})
+    show_spaced = sorted(w for w in show_words if any(c.isspace() for c in w))
+    show_bare = sorted(w for w, d in mod.SHOW_VALUES if not d)
+    show_bad = sorted(set(show_dupes) | set(show_spaced) | set(show_bare))
+    rows.append((not show_bad, '%s: every show word is a clean unique word with a description%s'
+                 % (tool, ' — bad: %s' % ', '.join(show_bad) if show_bad else '')))
+    # the show rows may spell the live hierarchy (else the live = the word):
+    # a clean word-path, unique against the knobs' and each other's — two
+    # rows on one live name would shadow in the shared setting space
+    show_opts = list(getattr(mod, 'SHOW_OPTIONS', ()))
+    show_lives = [o.live for o in show_opts]
+    knob_lives = {o.live for o in options if o.live}
+    live_bad = sorted({n for n in show_lives if any(c.isspace() for c in n)}
+                      | {n for n in show_lives if show_lives.count(n) > 1}
+                      | {n for n in show_lives if n in knob_lives})
+    rows.append((not live_bad, '%s: every show live name is a clean word-path unique in the setting space%s'
+                 % (tool, ' — bad: %s' % ', '.join(live_bad) if live_bad else '')))
 
     got, err = parser_flags(bin_script)
     if err:

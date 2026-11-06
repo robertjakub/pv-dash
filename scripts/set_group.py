@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 """Set (or clear) an option row's `group` in a lib/options.json registry.
 
-  python3 scripts/set_group.py <options.json> <name> <group>
+  python3 scripts/set_group.py <project> <name> <group>
 
-`<name>` is the row's option name (the exact "name" value, e.g. cache-ttl);
-`<group>` is the display group — one clean word, no whitespace (the
-check_options gate) — or `-` to clear it so the row falls back to its
-section. The edit is surgical: the file's hand-wrapped formatting outside
-the touched row is preserved byte-for-byte.
+`<project>` is the tool's directory under the repo root — the registry
+resolves to <repo root>/<project>/lib/options.json (cache, scraper,
+inverter, dashboard); `<name>` is the row's option name (the exact "name"
+value, e.g. cache-ttl); `<group>` is the display group — one clean word,
+no whitespace (the check_options gate) — or `-` to clear it (the row then
+groups under its section — [ungrouped] on the cli listings). The edit is
+surgical: the file's hand-wrapped formatting outside the touched row is
+preserved byte-for-byte.
 
 Exit 0 = written, 1 = error. Stdlib only."""
 import json
+import os
 import re
 import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def row_span(text, name):
@@ -35,9 +41,10 @@ def row_span(text, name):
 def main():
     args = sys.argv[1:]
     if len(args) != 3:
-        print('usage: set_group.py <options.json> <name> <group>   (- clears the group)')
+        print('usage: set_group.py <project> <name> <group>   (- clears the group)')
         return 1
-    path, name, group = args
+    project, name, group = args
+    path = os.path.join(ROOT, project, 'lib', 'options.json')
 
     if group != '-' and (not group or any(c.isspace() for c in group)):
         print('set_group.py: group must be one clean word, got %r' % group)
@@ -82,6 +89,7 @@ def main():
     json.loads(new_text)   # never write what we cannot parse back
     with open(path, 'w') as f:
         f.write(new_text)
+    print('changing group for %s to %s in %s' % (name, group, project))
     return 0
 
 

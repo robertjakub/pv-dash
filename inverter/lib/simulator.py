@@ -551,13 +551,16 @@ class Simulator:
             })
         return v
 
-    def registers(self):
-        """The wire register map: the profile maps the named values (above)
-        onto addresses and encodings. The 65000-65003 diagnostics block is
-        not a device register — the cache synthesizes it and discovers the
-        device family by the 0xCAFE magic — so the fake always mocks it."""
+    def registers(self, fc=3):
+        """The wire map for one address space: FC3 holding and FC4 input
+        registers, FC1 coils and FC2 discrete inputs — the profile's per-
+        entry "fc" picks the space each named value lands in. The
+        65000-65003 diagnostics block is not a device register — the cache
+        synthesizes it and discovers the device family by the 0xCAFE magic
+        — so the fake always mocks it, on FC3 only."""
         regs = {}
-        self.profile.encode(regs, self.values())
-        for i, w in enumerate((DIAG_MAGIC, 1, 7, 4242)):
-            regs[DIAG_BASE + i] = w
+        self.profile.encode(regs, self.values(), fc)
+        if fc == 3:
+            for i, w in enumerate((DIAG_MAGIC, 1, 7, 4242)):
+                regs[DIAG_BASE + i] = w
         return regs

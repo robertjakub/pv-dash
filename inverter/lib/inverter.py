@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""The fake inverter's Modbus TCP server: FC3 reads from the simulator
-(strict mode, write overlay), FC06/16 writes, every other function code
-named and refused, chaos injection."""
+"""The fake inverter's Modbus TCP server: FC3/FC4 register reads and
+FC1/FC2 bit reads from the simulator (strict mode, write overlays),
+FC05/FC06/FC15/FC16 writes, every other function code named and refused,
+chaos injection."""
 import ipaddress
 import logging
 import socket
@@ -11,7 +12,7 @@ import time
 
 from common.protocol import auth_handshake_server, describe_fc, recv_exact
 from common.connlimit import ConnGate
-from .statics import MAX_COUNT, MAX_PDU
+from .statics import MAX_BITS, MAX_COUNT, MAX_PDU
 from common.version import version_string
 
 logger = logging.getLogger('fake-inverter')
@@ -24,7 +25,9 @@ class FakeInverter:
         self.simulator = simulator
         self.strict = strict
         self.chaos = chaos
-        self.overlay = {}
+        self.overlay = {}      # FC06/FC16 write overlay on the holding registers
+        self.coils = {}        # FC05/FC15 writes + `set coil`: addr -> 0/1 (FC1 reads)
+        self.discrete = {}     # `set discrete` pins: addr -> 0/1 (FC2 reads)
         self.srv = None
         self.listen_addr = None
         self.stopping = False
@@ -161,12 +164,15 @@ class FakeInverter:
                     entry = self.clients.get(key)
                     if entry:
                         entry['requests'] += 1
-                func, addr_, count = struct.unpack('>BHH', pdu[:5])
+                func = pdu[0]
+                addr_ = count = None
+                if len(pdu) >= 5:
+                    addr_, count = struct.unpack('>HH', pdu[1:5])
                 if unit != self.unit:
                     logger.debug('request for unit %d, serving %d', unit, self.unit)
                 if self.chaos and self.chaos.hit():
                     self._chaos_fault(client, txn, self.unit)
-                if func in (3, 4):   # the same map over holding (FC3) and input (FC4) registers
+                if func in (3, 4) and addr_ is not None:   # holding (FC3) / input (FC4) registers
                     if not 1 <= count <= MAX_COUNT or addr_ + count > 65536:
                         # the read-count gate, the cache's shape: a declared
                         # count beyond the PDU (0xFFFF with a truncated frame)
@@ -176,8 +182,9 @@ class FakeInverter:
                         logger.info('fc%d read %d regs @%d from %s:%d -> exception 03 (illegal data value)',
                                     func, count, addr_, addr[0], addr[1])
                         continue
-                    regs = self.simulator.registers()
-                    regs.update(self.overlay)
+                    regs = self.simulator.registers(func)
+                    if func == 3:
+                        regs.update(self.overlay)
                     if self.strict and any(addr_ + i not in regs for i in range(count)):
                         body = struct.pack('>BB', func + 0x80, 2)
                         client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
@@ -188,10 +195,58 @@ class FakeInverter:
                     body = struct.pack('>BB', func, count * 2) + data
                     client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
                     logger.debug('fc%d read %d regs @%d -> %s', func, count, addr_, words)
+                elif func in (1, 2) and addr_ is not None:   # coils (FC1) / discrete inputs (FC2)
+                    if not 1 <= count <= MAX_BITS or addr_ + count > 65536:
+                        body = struct.pack('>BB', func + 0x80, 3)
+                        client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
+                        logger.info('fc%d read %d bit(s) @%d from %s:%d -> exception 03 (illegal data value)',
+                                    func, count, addr_, addr[0], addr[1])
+                        continue
+                    bits_map = self.simulator.registers(func)
+                    bits_map.update(self.coils if func == 1 else self.discrete)
+                    if self.strict and any(addr_ + i not in bits_map for i in range(count)):
+                        body = struct.pack('>BB', func + 0x80, 2)
+                        client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
+                        logger.debug('fc%d read %d bit(s) @%d -> exception 02 (undefined bit)', func, count, addr_)
+                        continue
+                    bits = [(bits_map.get(addr_ + i, 0) & 1) for i in range(count)]
+                    packed = bytearray((count + 7) // 8)
+                    for i, bit in enumerate(bits):
+                        if bit:
+                            packed[i >> 3] |= 1 << (i & 7)
+                    body = struct.pack('>BB', func, len(packed)) + bytes(packed)
+                    client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
+                    logger.debug('fc%d read %d bit(s) @%d -> %s', func, count, addr_, bits)
+                elif func == 5 and addr_ is not None:   # write single coil: the second word is 0x0000/0xFF00
+                    value = count
+                    if value not in (0x0000, 0xFF00):
+                        body = struct.pack('>BB', func + 0x80, 3)
+                        client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
+                        logger.info('write: coil %d = 0x%04x from %s:%d -> exception 03 (illegal data value)',
+                                    addr_, value, addr[0], addr[1])
+                        continue
+                    self.coils[addr_] = 1 if value else 0
+                    client.sendall(struct.pack('>HHHB', txn, 0, len(pdu) + 1, unit) + pdu)
+                    logger.info('write: coil %d = %d (single coil, unit %d)', addr_, self.coils[addr_], unit)
                 elif func == 6 and len(pdu) == 5:
                     self.overlay[addr_] = struct.unpack('>H', pdu[3:5])[0]
                     client.sendall(struct.pack('>HHHB', txn, 0, len(pdu) + 1, unit) + pdu)
                     logger.info('write: register %d = %d (single register, unit %d)', addr_, self.overlay[addr_], unit)
+                elif func == 15 and addr_ is not None and len(pdu) >= 6 and count \
+                        and pdu[5] == (count + 7) // 8 and len(pdu) == 6 + pdu[5]:
+                    if not 1 <= count <= MAX_BITS or addr_ + count > 65536:
+                        body = struct.pack('>BB', func + 0x80, 3)
+                        client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
+                        logger.info('write: %d coil(s) @%d from %s:%d -> exception 03 (illegal data value)',
+                                    count, addr_, addr[0], addr[1])
+                        continue
+                    bits = ''.join(str((pdu[6 + (i >> 3)] >> (i & 7)) & 1) for i in range(count))
+                    for i in range(count):
+                        self.coils[addr_ + i] = (pdu[6 + (i >> 3)] >> (i & 7)) & 1
+                    body = struct.pack('>BHH', func, addr_, count)
+                    client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
+                    logger.info('write: coils %d:%d = %s (multiple coils, unit %d)',
+                                addr_, count, bits, unit)
                 elif func == 16 and len(pdu) >= 6 and pdu[5] == count * 2 and len(pdu) == 6 + count * 2:
                     values = struct.unpack('>%dH' % count, pdu[6:6 + count * 2])
                     for i, w in enumerate(values):
@@ -201,14 +256,15 @@ class FakeInverter:
                     logger.info('write: registers %d:%d = %s (multiple registers, unit %d)',
                                 addr_, count, list(values), unit)
                 else:
-                    # every other function code is named and refused: a
-                    # malformed shape on an implemented write is exception 03
-                    # (illegal data value), an unimplemented FC is 01
-                    malformed = func in (6, 16)
-                    body = struct.pack('>BB', func + 0x80, 3 if malformed else 1)
+                    # everything the fake does not serve is named and refused:
+                    # a bad shape on an implemented FC (including a frame too
+                    # short to carry its address) is exception 03 (illegal
+                    # data value), an unimplemented FC is 01
+                    implemented = func in (1, 2, 3, 4, 5, 6, 15, 16)
+                    body = struct.pack('>BB', func + 0x80, 3 if implemented else 1)
                     client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
                     logger.info('rejected %s from %s:%d (%s)', describe_fc(func), addr[0], addr[1],
-                                'malformed frame' if malformed else 'illegal function')
+                                'malformed frame' if implemented else 'illegal function')
         except (ConnectionError, OSError) as e:
             logger.info('client %s:%d disconnected (%s)', *addr[:2], e)
         except struct.error as e:

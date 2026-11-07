@@ -128,11 +128,15 @@ class SignalBox:
     def reset(self):
         pins = self.simulator.reset_overrides()
         overlay = len(self.fake.overlay)
+        bits = len(self.fake.coils) + len(self.fake.discrete)
         self.fake.overlay.clear()
-        logger.info('SIGUSR1: scenario reset (%d pin(s), %d overlay register(s) cleared), simulation continues',
-                    pins, overlay)
+        self.fake.coils.clear()
+        self.fake.discrete.clear()
+        logger.info('SIGUSR1: scenario reset (%d pin(s), %d coil/discrete pin(s), %d overlay register(s) cleared), simulation continues',
+                    pins, bits, overlay)
         if self.audit:
-            self.audit.event('RESET', 'SIGUSR1: %d pin(s), %d overlay register(s) cleared' % (pins, overlay))
+            self.audit.event('RESET', 'SIGUSR1: %d pin(s), %d coil/discrete pin(s), %d overlay register(s) cleared'
+                             % (pins, bits, overlay))
 
     # ---- SIGTERM / SIGINT
 

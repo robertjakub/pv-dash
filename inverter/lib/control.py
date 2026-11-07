@@ -781,15 +781,21 @@ class ControlServer:
             return 'ok %s=%s %s' % (key, shown, self.status())
         if cmd == 'reset':
             pins = self.simulator.reset_overrides()
-            overlay = 0
+            overlay = coils = discrete = 0
             if self.fake:
                 overlay = len(self.fake.overlay)
+                coils = len(self.fake.coils)
+                discrete = len(self.fake.discrete)
                 self.fake.overlay.clear()
+                self.fake.coils.clear()
+                self.fake.discrete.clear()
             self.scenario = None
             self.overridden.difference_update(('pv', 'load', 'batt', 'grid', 'soc', 'cloud',
                                                'battery-state', 'grid-outage', 'scenario'))
-            logger.info('control: reset cleared %d pin(s) + %d overlay register(s)', pins, overlay)
-            return 'ok reset (%d pin(s), %d overlay register(s) cleared) %s' % (pins, overlay, self.status())
+            logger.info('control: reset cleared %d pin(s) + %d overlay register(s), %d coil(s), %d discrete input(s)',
+                        pins, overlay, coils, discrete)
+            return 'ok reset (%d pin(s), %d overlay register(s), %d coil(s), %d discrete input(s) cleared) %s' \
+                % (pins, overlay, coils, discrete, self.status())
         if cmd == 'inspect':
             return self.inspect()
         if cmd == 'request' and args and args[0].lower() == 'dump':
@@ -824,7 +830,7 @@ class ControlServer:
                 vals = self.simulator.values()
                 overlay = dict(self.fake.overlay) if self.fake else {}
                 rows = []
-                for name, addr, typ, _scale in entries:
+                for name, addr, typ, _scale, _fc in entries:
                     if addr in overlay:
                         val = '%d *' % overlay[addr]   # a write overlay wins (set register/FC16)
                     elif vals.get(name) is None:
@@ -857,20 +863,34 @@ class ControlServer:
         if cmd == 'set':
             if len(args) < 2:
                 return 'err set needs a setting and a value (try help)'
-            if args[0].lower() == 'register':   # the control write = the Modbus write: the same
-                if not self.fake:   # overlay FC06/FC16 land in, so the scrapers see it
+            if args[0].lower() in ('register', 'coil', 'discrete'):
+                # the control write = the Modbus write: the same overlay the
+                # wire writes land in, so the scrapers see it
+                what = args[0].lower()
+                if not self.fake:
                     return 'err no modbus device attached'
                 if len(args) < 3:
-                    return 'err set register needs an address and a value'
+                    return 'err set %s needs an address and a value%s' % (
+                        what, ' (0 or 1)' if what != 'register' else '')
                 try:
                     addr, val = int(args[1]), int(args[2])
                 except ValueError:
-                    return 'err register address and value must be integers'
-                if not 0 <= addr <= MAX_REGISTERS - 1 or not 0 <= val <= MAX_REGISTERS - 1:
-                    return 'err register address/value out of range (0..%d)' % (MAX_REGISTERS - 1)
-                self.fake.overlay[addr] = val
-                logger.info('control: set register %d=%d (write overlay)', addr, val)
-                return 'ok register %d=%d (the write overlay, the scrapers read it)' % (addr, val)
+                    return 'err %s address and value must be integers' % what
+                if what == 'register':
+                    if not 0 <= addr <= MAX_REGISTERS - 1 or not 0 <= val <= MAX_REGISTERS - 1:
+                        return 'err register address/value out of range (0..%d)' % (MAX_REGISTERS - 1)
+                    self.fake.overlay[addr] = val
+                    logger.info('control: set register %d=%d (write overlay)', addr, val)
+                    return 'ok register %d=%d (the write overlay, the scrapers read it)' % (addr, val)
+                if not 0 <= addr <= MAX_REGISTERS - 1 or val not in (0, 1):
+                    return 'err %s address out of range (0..%d) or value not 0/1' % (what, MAX_REGISTERS - 1)
+                if what == 'coil':
+                    self.fake.coils[addr] = val
+                    logger.info('control: set coil %d=%d', addr, val)
+                    return 'ok coil %d=%d (the coil space, FC1/FC5/FC15 see it)' % (addr, val)
+                self.fake.discrete[addr] = val
+                logger.info('control: set discrete %d=%d', addr, val)
+                return 'ok discrete %d=%d (the discrete-input space, FC2 sees it)' % (addr, val)
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is None:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
@@ -915,6 +935,11 @@ class ControlServer:
             'profile   %s' % sim.profile.description,
             'registers %d served, overlay %d: %s' % (len(sim.profile.entries), len(overlay),
                 ', '.join('%d=%d' % kv for kv in sorted(overlay.items())[:8]) or 'empty'),
+            'bits      coils %d pinned, discrete inputs %d pinned: %s' % (
+                len(self.fake.coils) if self.fake else 0,
+                len(self.fake.discrete) if self.fake else 0,
+                ', '.join('%s%d=%d' % ('c' if k in self.fake.coils else 'd', k, v)
+                          for k, v in sorted({**self.fake.coils, **self.fake.discrete}.items())[:8]) if self.fake else 'none'),
             'now       %s %s%s, uptime %s' % (format_clock(t),
                 'utc' if sim.utc else 'local',
                 ' x%g' % sim.time_scale if sim.time_scale != 1.0 else '',

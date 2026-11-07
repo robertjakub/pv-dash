@@ -18,6 +18,7 @@ PROTOCOL = STATIC['protocol']
 MAX_PDU = PROTOCOL['max_pdu']                  # the largest accepted Modbus frame
 MAX_REGISTERS = PROTOCOL['max_registers']      # the 16-bit register space
 MAX_COUNT = PROTOCOL['max_count']              # max registers per FC3/FC4 read (the cache's cap)
+MAX_BITS = PROTOCOL['max_bits']                # max bits per FC1/FC2 read (the Modbus spec's 0x7D0)
 
 DIAGNOSTICS = STATIC['diagnostics']
 DIAG_BASE = DIAGNOSTICS['base']                # the synthesized diagnostics block

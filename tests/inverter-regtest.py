@@ -33,6 +33,7 @@ F_MODBUS, F_CTL = 15978, 15980        # the live token-less metrics warn (listen
 F_METRICS = 15981
 G_MODBUS, G_SOCK = 15982, '/nonexistent_dir_regtest/x.socket'   # an unbindable control target (the bind guard)
 H_MODBUS, H_CTL = 15983, 15984        # the token'd TCP control (the signed wire)
+S_MODBUS = 15993                      # the fc-split profile (the per-entry address spaces)
 B_METRICS = 15979                     # instance B's /metrics (max-clients 1)
 UNIT = 1
 
@@ -179,6 +180,78 @@ def main():
         time.sleep(0.4)
         tx = ctl(A_CTL, 'show connections')
         check('show connections -> none after the exits', tx == 'ok connections none', tx)
+
+        # ---- instance A: the bit spaces (FC1/FC2) and the coil writes (FC5/FC15)
+        cb = connect(A_MODBUS)
+        tx = ctl(A_CTL, 'set coil 10 1')
+        check('set coil pins the coil space', tx.startswith('ok coil 10=1'), tx)
+        tx = ctl(A_CTL, 'set discrete 11 1')
+        check('set discrete pins the discrete-input space', tx.startswith('ok discrete 11=1'), tx)
+        txn, unit, body = exchange(cb, read_req(1, 1, 10, 1), 1)
+        check('FC1 reads a pinned coil', txn == 1 and body == bytes([1, 1, 1]), body.hex())
+        txn, unit, body = exchange(cb, read_req(2, 2, 11, 1), 2)
+        check('FC2 reads a pinned discrete input', txn == 2 and body == bytes([2, 1, 1]), body.hex())
+        txn, unit, body = exchange(cb, read_req(3, 1, 0, 16), 3)
+        check('FC1 packs 8 bits per byte (the pinned coil 10 -> byte 1 bit 2)',
+              txn == 3 and body[0] == 1 and body[1] == 2 and body[2:] == bytes([0x00, 0x04]), body.hex())
+        txn, unit, body = exchange(cb, frame(4, UNIT, struct.pack('>BHH', 5, 12, 0xFF00)), 4)
+        check('FC5 writes a coil (echo reply)', txn == 4 and body == bytes.fromhex('05000cff00'), body.hex())
+        txn, unit, body = exchange(cb, read_req(5, 1, 12, 1), 5)
+        check('FC1 reads back the FC5 write', txn == 5 and body == bytes([1, 1, 1]), body.hex())
+        txn, unit, body = exchange(cb, frame(6, UNIT, struct.pack('>BHH', 5, 12, 0x0001)), 6)
+        check('FC5 with a value outside 0x0000/0xFF00 -> exception 03', txn == 6 and body == bytes([5 + 0x80, 3]), body.hex())
+        bits10 = bytes([0b10100101, 0b00000011])
+        txn, unit, body = exchange(cb, frame(7, UNIT, struct.pack('>BHHB', 15, 20, 10, 2) + bits10), 7)
+        check('FC15 writes 10 coils (addr+count echo)', txn == 7 and body == struct.pack('>BHH', 15, 20, 10), body.hex())
+        txn, unit, body = exchange(cb, read_req(8, 1, 20, 10), 8)
+        check('FC1 reads the FC15 bits back (LSB first)',
+              txn == 8 and body[0] == 1 and body[1] == 2 and body[2:4] == bits10, body.hex())
+        # a bad shape on an implemented FC answers 03 and the connection lives
+        # (the pre-wave behaviour was a silent connection close)
+        txn, unit, body = exchange(cb, frame(9, UNIT, bytes([6, 0])), 9)
+        check('short FC6 -> exception 03 (no close)', txn == 9 and body == bytes([6 + 0x80, 3]), body.hex())
+        txn, unit, body = exchange(cb, frame(10, UNIT, bytes([3, 0])), 10)
+        check('short FC3 -> exception 03 (no close)', txn == 10 and body == bytes([3 + 0x80, 3]), body.hex())
+        txn, unit, body = exchange(cb, read_req(11, 1, 10, 2001), 11)
+        check('FC1 past the 2000-bit cap -> exception 03', txn == 11 and body == bytes([1 + 0x80, 3]), body.hex())
+        txn, unit, body = exchange(cb, read_req(12, 17, 0, 1), 12)
+        check('an unimplemented FC stays exception 01', txn == 12 and body == bytes([17 + 0x80, 1]), body.hex())
+        txn, unit, body = exchange(cb, read_req(13, 3, 32064, 2), 13)
+        check('the connection survives every refusal', txn == 13 and body[0] == 3, body.hex())
+        tx = ctl(A_CTL, 'reset')
+        check('reset clears the bit pins with the rest', 'coil(s), 1 discrete input(s) cleared' in tx, tx)
+        txn, unit, body = exchange(cb, read_req(14, 1, 10, 1), 14)
+        check('the pinned coil reads 0 after the reset', txn == 14 and body == bytes([1, 1, 0]), body.hex())
+        cb.close()
+
+        # ---- instance I: the profile's per-entry fc picks the address space
+        split_prof = '/tmp/inv_fc_split.json'
+        json.dump({'description': 'fc split demo', 'registers': [
+            {'name': 'pv-power', 'register': 300, 'type': 'i32', 'scale': 1},
+            {'name': 'grid-power', 'register': 400, 'type': 'i32', 'scale': 1, 'fc': 4},
+            {'name': 'device-insulation', 'register': 500, 'type': 'f32', 'scale': 1},
+        ]}, open(split_prof, 'w'))
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(S_MODBUS),
+                                       '--control-port', '0', '--profile', split_prof],
+                                      stdout=open(LOG + '.i', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(1.0)
+        ci = connect(S_MODBUS)
+        txn, unit, body = exchange(ci, read_req(1, 3, 300, 2), 1)
+        check('the fc3 entry is served on FC3 (pv 4000 W)',
+              txn == 1 and struct.unpack('>i', body[2:6])[0] == 4000, body.hex())
+        txn, unit, body = exchange(ci, read_req(2, 4, 400, 2), 2)
+        check('the fc4 entry is served on FC4 (grid -1500 W)',
+              txn == 2 and struct.unpack('>i', body[2:6])[0] == -1500, body.hex())
+        txn, unit, body = exchange(ci, read_req(3, 3, 400, 2), 3)
+        check('the fc4 entry is undefined on FC3 (reads 0, non-strict)',
+              txn == 3 and body[0] == 3 and body[1] == 4 and body[2:6] == b'\x00\x00\x00\x00', body.hex())
+        txn, unit, body = exchange(ci, read_req(4, 4, 300, 2), 4)
+        check('the fc3 entry is undefined on FC4 (reads 0, non-strict)',
+              txn == 4 and body[0] == 4 and body[1] == 4 and body[2:6] == b'\x00\x00\x00\x00', body.hex())
+        txn, unit, body = exchange(ci, read_req(5, 3, 500, 2), 5)
+        check('an f32 entry encodes IEEE 754 big-endian (device-insulation 970.0)',
+              txn == 5 and body[0] == 3 and body[2:6] == struct.pack('>f', 970.0), body.hex())
+        ci.close()
 
         # ---- instance B: the client timeout sheds silent clients
         s1 = connect(B_MODBUS)

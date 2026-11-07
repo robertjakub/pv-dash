@@ -5,7 +5,8 @@
   "protocol": {
     "max_pdu": 260,
     "max_registers": 65536,
-    "max_count": 125
+    "max_count": 125,
+    "max_bits": 2000
   },
 
   "diagnostics": {

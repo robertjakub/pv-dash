@@ -31,8 +31,12 @@ shares (mean-reverting wanderers), a grid-frequency machine, and a grid
 outage machine (random blackouts). All machines integrate with a simulated
 clock \\(em UTC by default, freezable (\\fB--time\\fR) and scalable
 (\\fB--time-scale\\fR for time-lapse). \\fB--static\\fR replaces the day with
-constant demo values. Writes (FC06/FC16) land in an overlay the scrapers
-read; \\fB--chaos\\fR answers a fraction of requests hostile.
+constant demo values. The profile's per-entry \\fBfc\\fR picks each
+entry's address space (FC3 holding / FC4 input registers, FC1 coils /
+FC2 discrete inputs for \\fBbit\\fR entries); writes land in overlays
+the scrapers read (FC06/FC16 the registers, FC05/FC15 the coils, plus
+\\fBset coil\\fR/\\fBset discrete\\fR on the control socket);
+\\fB--chaos\\fR answers a fraction of requests hostile.
 .PP
 Modbus auth (\\fB--auth\\fR): with \\fBsuite\\fR the fake's clients prove
 a shared key (\\fB--auth-key\\fR, min 16 characters) with a crypt
@@ -47,7 +51,8 @@ stands."""
 re-apply the environment layer (all-or-nothing).
 .TP
 .B SIGUSR1
-reset the scenario: runtime pins, the cloud machine and the write overlay
+reset the scenario: runtime pins, the cloud machine, the write overlay
+and the pinned coils/discrete inputs
 are dropped.
 .TP
 .BR SIGTERM ", " SIGINT
@@ -60,7 +65,8 @@ TCP requires the token when configured). Commands: \\fBset\\fR/\\fBunset\\fR/
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
 scenario, chaos, seed, battery, battery-state, strict, static, max-kwp,
 battery-kwh, max-clients, client-timeout, max-conn-per-ip, metrics-server,
-register, profile, log-level, modbus auth (the suite scheme; the key
+register, coil, discrete, profile, log-level, modbus auth (the suite
+scheme; the key
 \\(em modbus auth key \\(em is a secret: \\fBshow\\fR refuses it) \\(em
 and the token lives: control token, the ops token, metrics token, each
 rotating live, the value never rendering \\(em \\fBshow <secret>\\fR

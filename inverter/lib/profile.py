@@ -21,9 +21,15 @@ registers carry their value maps in the "mappings" tree
 serves the device-status codes from it. The 65000-65003 diagnostics block
 is internal to the cache/scraper (the 0xCAFE magic is how they discover
 each other); the fake always mocks it and no profile lists it. Types:
-i16/u16 (one word) and i32/u32 (two words, hi/lo)."""
+i16/u16 (one word), i32/u32 (two words, hi/lo), i32swap/u32swap (two
+words, lo/hi), f32/f32swap (an IEEE 754 float, two words, hi/lo or lo/hi)
+and bit (one address = one binary value, served on the coil/discrete
+spaces). Each entry's "fc" picks its address space: 3 (holding registers)
+or 4 (input registers) for the word types, 1 (coils, the default) or 2
+(discrete inputs) for bit — the fake serves each space separately."""
 import json
 import os
+import struct
 
 # The suite's shared device profiles live in the profiles/profiles/ data dir
 # of the profiles/ subproject at the repository root; a packaged tool carries
@@ -62,23 +68,42 @@ def profile_label(path):
 
 # name -> (type, scale, doc); the type/scale are the defaults a profile
 # entry may override. The addresses live in the profile JSON files.
+# The bit types answer on FC1/FC2 (one packed bit per address), the word
+# types on FC3/FC4; a 32-bit type spans two consecutive addresses.
+WIDTHS = {'i16': 1, 'u16': 1, 'i32': 2, 'u32': 2,
+          'i32swap': 2, 'u32swap': 2, 'f32': 2, 'f32swap': 2, 'bit': 1}
+
+
 def encode_value(regs, typ, addr, value, scale):
     """Encode one physical value at addr per the entry's type and scale."""
+    if typ in ('f32', 'f32swap'):
+        raw = struct.pack('>f', value * scale)
+        hi, lo = raw[:2], raw[2:]
+        if typ == 'f32swap':
+            hi, lo = lo, hi
+        regs[addr] = struct.unpack('>H', hi)[0]
+        regs[addr + 1] = struct.unpack('>H', lo)[0]
+        return
     raw = int(round(value * scale))
     if typ in ('i16', 'u16'):
         regs[addr] = raw & 0xFFFF
+    elif typ == 'bit':
+        regs[addr] = 1 if raw else 0
     elif typ in ('i32', 'u32'):
         regs[addr] = (raw >> 16) & 0xFFFF
         regs[addr + 1] = raw & 0xFFFF
+    elif typ in ('i32swap', 'u32swap'):     # lo word first
+        regs[addr] = raw & 0xFFFF
+        regs[addr + 1] = (raw >> 16) & 0xFFFF
     else:
         raise ValueError('unknown type %r' % typ)
 
 
 class RegisterMap:
-    """An ordered set of named entries: (name, addr, type, scale)."""
+    """An ordered set of named entries: (name, addr, type, scale, fc)."""
 
     def __init__(self, entries, path='<embedded>', description=None, mappings=None, descs=None):
-        self.entries = entries   # [(name, addr, typ, scale)]
+        self.entries = entries   # [(name, addr, typ, scale, fc)]
         self.descs = descs or {}  # name -> description (for show registers)
         self.path = path
         self.description = description or 'unnamed profile'
@@ -98,10 +123,13 @@ class RegisterMap:
                            'standby': standby if standby is not None else
                                       (active if active is not None else 40960)}
 
-    def encode(self, regs, values):
-        """Write the named physical values into a plain {addr: word} dict;
-        values missing or None are skipped (the register stays unset)."""
-        for name, addr, typ, scale in self.entries:
+    def encode(self, regs, values, fc=3):
+        """Write the named physical values for one address space (fc) into
+        a plain {addr: word} dict; values missing or None are skipped (the
+        register stays unset)."""
+        for name, addr, typ, scale, efc in self.entries:
+            if efc != fc:
+                continue
             v = values.get(name)
             if v is None:
                 continue
@@ -130,19 +158,29 @@ def load_profile(path):
         except (KeyError, TypeError, ValueError):
             raise SystemExit('%s (%s) needs an integer "register"' % (label, name))
         typ = str(entry.get('type', ''))
-        width = {'i16': 1, 'u16': 1, 'i32': 2, 'u32': 2}.get(typ)
+        width = WIDTHS.get(typ)
         if width is None:
-            raise SystemExit('%s (%s): needs a "type" i16/u16/i32/u32 (got %r)' % (label, name, entry.get('type')))
+            raise SystemExit('%s (%s): needs a "type" i16/u16/i32/u32/i32swap/u32swap/f32/f32swap/bit (got %r)'
+                             % (label, name, entry.get('type')))
+        try:
+            fc = int(entry.get('fc', 1 if typ == 'bit' else 3))
+        except (TypeError, ValueError):
+            raise SystemExit('%s (%s): bad "fc" %r' % (label, name, entry.get('fc')))
+        if fc not in ((1, 2) if typ == 'bit' else (3, 4)):
+            raise SystemExit('%s (%s): "fc" must be %s, got %d'
+                             % (label, name, '1 (coil) or 2 (discrete input)' if typ == 'bit'
+                                else '3 (holding) or 4 (input)', fc))
         try:
             scale = float(entry['scale'])
         except (KeyError, TypeError, ValueError):
             raise SystemExit('%s (%s): needs a numeric "scale"' % (label, name))
         if not 0 <= addr <= 65536 - width:
             raise SystemExit('%s (%s): register %d out of range' % (label, name, addr))
-        if addr in seen:
-            raise SystemExit('%s (%s): register %d already used by %s' % (label, name, addr, seen[addr]))
-        seen[addr] = name
-        out.append((name, addr, typ, scale))
+        if (fc, addr) in seen:
+            raise SystemExit('%s (%s): register %d already used by %s on fc%d'
+                             % (label, name, addr, seen[(fc, addr)], fc))
+        seen[(fc, addr)] = name
+        out.append((name, addr, typ, scale, fc))
     if not out:
         raise SystemExit('register profile %s: no entries' % path)
     description = data.get('description') if isinstance(data, dict) else None

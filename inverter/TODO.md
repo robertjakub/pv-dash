@@ -5,6 +5,19 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The bit-space + float wave: the fake **serves all four address spaces from
+the profile's per-entry `fc`** — `3` holding / `4` input registers for the
+word types, `1` coils / `2` discrete inputs for `bit` entries (the
+"same map on both codes" shortcut is gone; an `fc: 4` entry is not served
+on FC3) — reads FC1/FC2 from the coil/discrete maps (strict mode rejects
+undefined bits with 02), and takes **FC05/FC15 coil writes** into a coil
+overlay beside the FC06/FC16 register overlay (FC5 demands the spec values
+`0x0000`/`0xFF00`). The control surface gains `set coil <addr> <0|1>` /
+`set discrete <addr> <0|1>` (reset/SIGUSR1 clear the pins), and a frame
+too short to carry its address is answered with exception 03 instead of a
+silent disconnect. The profile encoder learned `f32`/`f32swap` and the
+`i32swap`/`u32swap` word orders.
+
 The Modbus auth wave: the fake **demands the `suite` handshake from its
 Modbus clients when told** — `modbus/auth` + `modbus/auth/key`
 (`--auth`/`AUTH`, `--auth-key`/`AUTH_KEY`): with `suite` every connecting

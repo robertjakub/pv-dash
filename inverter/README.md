@@ -169,10 +169,20 @@ map.
   yield (U32, kWh×100)
 - **37001+** — battery block when the battery is on (the default; power, SoC, lifetime totals)
 
-All of the above addresses come from the profile — remap them freely. Other
-function codes get a Modbus exception; writes (FC06/FC16) stick in an
-overlay: computed registers are recomputed per poll, overlay values win
-until cleared (`reset`, SIGUSR1, `set register`, or shutdown).
+All of the above addresses come from the profile — remap them freely. The
+profile's per-entry **`fc`** picks each entry's address space: `3` (holding
+registers, the default) or `4` (input registers) for the word types, `1`
+(coils, the `bit` default) or `2` (discrete inputs) for `bit` entries — the
+fake serves the four spaces separately (an entry marked `fc: 4` is not
+served on FC3). Bit entries serve `1` when the named value (× `scale`,
+rounded) is nonzero. Function codes the fake does not serve get a Modbus
+exception; writes stick in overlays: computed registers are recomputed per
+poll, overlay values win until cleared (`reset`, SIGUSR1, or shutdown).
+The register writes (FC06/FC16) overlay the holding registers; the coil
+writes (FC05/FC15) overlay the coil space (FC1) — FC5 demands the
+spec values `0x0000`/`0xFF00` (else exception 03). A malformed frame on an
+implemented function code — including one too short to carry its address —
+is answered with exception 03, never a silent disconnect.
 
 ## Internal registers (not in the profile)
 
@@ -242,7 +252,7 @@ read-only ops token the same way):
 | `show registers` | the loaded profile's register map, one register per line: `name \| register \| type \| value`, columns aligned; the value = what the registers serve right now, `NaN` = not calculated (e.g. the battery block with the battery off) |
 | `show version` | the fake-inverter version (`0.3.0`, or `0.3.0-<short git>` from a checkout) |
 | `set scenario <name>` | apply a scenario preset (below) |
-| `reset` | clear **all** pinned settings and the Modbus write overlay at once (like SIGUSR1, per-connection) |
+| `reset` | clear **all** pinned settings, the Modbus write overlay and the pinned coils/discrete inputs at once (like SIGUSR1, per-connection) |
 | `reload` | **restart the whole fake with the pins kept**: the live overrides save to a state file (the XDG state home — the fake has no config file), the process re-execs with the same argv, the fresh fake re-applies the saved overrides once, then consumes the state file. Overridden secrets save as `*** SECRET REMOVED ***` (the value never lands in the file) — the reply names them |
 | `request dump` / `request restore` | with `--dump-path` configured: write the live overrides to the state file (`0600`, integrity-hashed) / load them back (the pins re-apply) — an overridden secret rides as `*** SECRET REMOVED ***`, the restore skips the placeholder and names it; `--dump-key` seals the dump (the state rides encrypted, a restore refuses a wrong or missing key; a dump path without a key warns unsealed at start and on `set`); `--restore-on-start` does the restore automatically at start |
 | `shutdown` | gracefully stop the fake inverter (same as SIGTERM: session summary, control socket unlinked) |
@@ -286,6 +296,8 @@ read-only ops token the same way):
 | `metrics token` / `metrics token-file` | `<token>` \| `off` | rotate the **/metrics bearer token** live; `off` serves tokenless (F11) |
 | `dump path` / `dump restore-on-start` | `<file>` / `on`\|`off` | the state dump's file (the pins, the machines — the tokens apart) and the restore-on-start mark (prospective: the running session's start already chose) |
 | `register` | `addr value` | `set register <addr> <value>` — write a raw register into the **write overlay** (the same store the FC06/FC16 writes use, so the scrapers read it); `reset` clears it, `show registers` marks the rows with `*` |
+| `coil` | `addr 0\|1` | `set coil <addr> <0|1>` — pin a coil in the coil space (what FC1 reads and FC5/FC15 write); `reset` clears the pins |
+| `discrete` | `addr 0\|1` | `set discrete <addr> <0|1>` — pin a discrete input (what FC2 reads); `reset` clears the pins |
 | `profile` | `<file>` | swap the register-map profile live |
 | `log-level` | `DEBUG\|INFO\|WARNING\|ERROR` | live log level |
 
@@ -558,7 +570,7 @@ inverter/bin/
     ├── profile.py      # register-map profiles: name registry, encoding, loading
     ├── simulator.py    # day curves, runtime overrides, named values, cloud machines
     ├── battery.py      # the battery state machine (SoC state, decision, integration)
-    ├── inverter.py     # Modbus TCP server: FC3/FC06/FC16, strict mode, chaos
+    ├── inverter.py     # Modbus TCP server: FC1-FC4 reads, FC05/06/15/16 writes, strict mode, chaos
     ├── control.py      # JSON-lines control server (set/unset/show, scenarios)
     ├── metrics.py      # the fake's own Prometheus /metrics endpoint
     ├── audit.py        # the append-only audit trail (AUDIT INV/CLI/CTL lines)

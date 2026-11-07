@@ -14,8 +14,11 @@ with open(os.path.join(_here, 'static.json'), encoding='utf-8') as _f:
 PROTOCOL = STATIC['protocol']
 MAX_PDU = PROTOCOL['max_pdu']                  # the largest Modbus PDU
 MAX_COUNT = PROTOCOL['max_count']              # max registers per FC3/FC4 read
+MAX_BITS = PROTOCOL['max_bits']                # max bits per FC1/FC2 read (the Modbus spec's 0x7D0)
 MAX_REGISTERS = PROTOCOL['max_registers']      # the 16-bit register space
-READ_FUNCS = tuple(PROTOCOL['read_funcs'])     # cacheable reads: FC3 (holding), FC4 (input)
+READ_FUNCS = tuple(PROTOCOL['read_funcs'])     # cacheable reads: FC1 (coils), FC2 (discrete),
+                                               # FC3 (holding), FC4 (input) — one space each
+BIT_READ_FUNCS = (1, 2)                        # the bit-shaped reads (packed 8 per byte, LSB first)
 WRITE_FUNCS = frozenset(PROTOCOL['write_funcs'])
 ILLEGAL_FUNCTION = PROTOCOL['exceptions']['illegal_function']
 ILLEGAL_ADDRESS = PROTOCOL['exceptions']['illegal_address']

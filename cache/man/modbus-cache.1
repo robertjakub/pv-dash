@@ -104,15 +104,17 @@ from the inverter, 0 = never expire, serve last known values forever
 (default: config, $TTL or 3x interval)
 .TP
 .B \-\-allow\-write
-forward write requests (FC05/06/15/16) to the inverter; default: refuse
-them with a Modbus illegal\-function exception (default: off)
+forward write requests (FC05/06/15/16/22/23) to the inverter; default:
+refuse them with a Modbus illegal\-function exception (default: off)
 .TP
 .B \-\-write\-registers
-register ranges a (forwarded) write may touch: comma\-separated
-START:COUNT, e.g. 47400:100,47600:100; "any" = unrestricted; "none" = no
-register writable; "profile" = the device profile's write acl ("acl":
-{"write": {"allow": [...], "deny": [...]}} — allow minus deny, "any" =
-all registers) (default: config, $WRITE_REGISTERS or none)
+address ranges a (forwarded) write may touch — the register writes
+(FC06/16/22/23) and the coil writes (FC05/15, the coil space) are gated
+by the same ranges: comma\-separated START:COUNT, e.g.
+47400:100,47600:100; "any" = unrestricted; "none" = nothing writable;
+"profile" = the device profile's write acl ("acl": {"write": {"allow":
+[...], "deny": [...]}} — allow minus deny, "any" = all registers)
+(default: config, $WRITE_REGISTERS or none)
 .TP
 .B \-\-profile
 device profile JSON (the shared profiles/ schema) (default: config,

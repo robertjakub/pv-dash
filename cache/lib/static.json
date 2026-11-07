@@ -5,8 +5,9 @@
   "protocol": {
     "max_pdu": 253,
     "max_count": 125,
+    "max_bits": 2000,
     "max_registers": 65536,
-    "read_funcs": [3, 4],
+    "read_funcs": [1, 2, 3, 4],
     "write_funcs": [5, 6, 15, 16, 22, 23],
     "exceptions": {
       "illegal_function": 1,
@@ -19,7 +20,12 @@
     "i16": 1,
     "u16": 1,
     "i32": 2,
-    "u32": 2
+    "u32": 2,
+    "i32swap": 2,
+    "u32swap": 2,
+    "f32": 2,
+    "f32swap": 2,
+    "bit": 1
   },
   "unit_id_range": [1, 247],
   "diagnostics": {

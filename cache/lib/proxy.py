@@ -13,16 +13,59 @@ from common.connlimit import ConnGate
 from .protocol import DeviceError, describe_write
 from .config import load_profile_write_acl, load_registers_file, load_selection
 from .cache import build_blocks, span
-from .statics import (MAX_COUNT, MAX_PDU, WRITE_FUNCS, GATEWAY_FAILED, ILLEGAL_FUNCTION,
+from .statics import (MAX_COUNT, MAX_PDU, MAX_BITS, READ_FUNCS, BIT_READ_FUNCS, WRITE_FUNCS,
+                      GATEWAY_FAILED, ILLEGAL_FUNCTION,
                       ILLEGAL_VALUE, ILLEGAL_ADDRESS, DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX,
                       REQUESTS_AUDIT_S)
 
 logger = logging.getLogger('modbus-cache')
 
 # Diagnostics registers synthesized by the cache (never forwarded, never cached;
-# FC3 only — the input-register space has no synthetic block):
+# FC3 only — the other address spaces have no synthetic block):
 # 65000 magic, 65001 device flag, 65002 cache age in s (0xFFFF = no read yet),
 # 65003 cache uptime in s.
+
+
+def _space_name(fc):
+    """The log spelling of a read space: coils (FC1), discrete inputs
+    (FC2), registers (FC3/FC4 — the historical wording the logs and the
+    regtests quote)."""
+    if fc == 1:
+        return 'coils'
+    if fc == 2:
+        return 'discrete inputs'
+    return 'registers'
+
+
+def _read_shape(fc, count):
+    """The data-byte count a valid FC1-FC4 reply carries for `count`
+    addresses: registers take two bytes each, bits pack 8 per byte."""
+    if fc in BIT_READ_FUNCS:
+        return (count + 7) // 8
+    return count * 2
+
+
+def _write_shape_error(pdu):
+    """None when an FC15/FC16 frame's declared counts are consistent (the
+    byte-count byte matches the data actually present, the register count
+    is at least 1); the reason otherwise. FC5/6/22 carry no byte-count
+    byte and FC23's is the device's call — None for them (the too-short
+    check already answered what it could)."""
+    func = pdu[0]
+    if func not in (15, 16):
+        return None
+    if len(pdu) < 6:
+        return 'the byte-count byte is missing'
+    count = struct.unpack('>H', pdu[3:5])[0]
+    n = pdu[5]
+    want = count * 2 if func == 16 else (count + 7) // 8
+    if count < 1:
+        return 'register count %d is zero' % count
+    if n != want:
+        return 'the byte count is %d, the register count needs %d' % (n, want)
+    if len(pdu) != 6 + n:
+        return 'the frame carries %d data byte(s), the byte count says %d' % (len(pdu) - 6, n)
+    return None
 
 
 def _write_target(pdu):
@@ -472,11 +515,19 @@ class Proxy:
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (registers outside the write allow-list)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
-        if func == 3 or func == 4:
+            shape_err = _write_shape_error(pdu)
+            if shape_err:
+                desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
+                logger.info('write: refused %s (malformed frame: %s)', desc, shape_err)
+                if self.audit:
+                    self.audit.event('WRITE-REFUSED', '%s (malformed frame: %s)' % (desc, shape_err))
+                return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
+        if func in READ_FUNCS:
             if len(pdu) < 5:
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
             addr_, count = struct.unpack('>HH', pdu[1:5])
-            if not 1 <= count <= MAX_COUNT or addr_ + count > 65536:
+            cap = MAX_BITS if func in BIT_READ_FUNCS else MAX_COUNT
+            if not 1 <= count <= cap or addr_ + count > 65536:
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
             if func == 3 and addr_ >= DIAG_BASE:
                 if addr_ + count <= DIAG_BASE + DIAG_COUNT:
@@ -486,14 +537,21 @@ class Proxy:
                 return exception_frame(txn, proto, unit, func, ILLEGAL_ADDRESS)
             code = self.cache.failed_leaf(func, addr_, count)
             if code is not None:
-                logger.info('read: registers %d:%d served from last poll: the device rejects them (modbus exception %d)',
-                            addr_, count, code)
+                logger.info('read: %s %d:%d served from last poll: the device rejects them (modbus exception %d)',
+                            _space_name(func), addr_, count, code)
                 return exception_frame(txn, proto, unit, func, code)
             if self.cache.covers(func, addr_, count):
                 self.cache_hits += 1
-                logger.debug('read: fc%d registers %d:%d served from cache', func, addr_, count)
+                logger.debug('read: fc%d %s %d:%d served from cache', func, _space_name(func), addr_, count)
                 words = self.cache.words(func, addr_, count)
-                body = struct.pack('>BB', func, count * 2) + struct.pack('>%dH' % count, *words)
+                if func in BIT_READ_FUNCS:
+                    packed = bytearray(_read_shape(func, count))
+                    for i, w in enumerate(words):
+                        if w & 1:
+                            packed[i >> 3] |= 1 << (i & 7)
+                    body = struct.pack('>BB', func, len(packed)) + bytes(packed)
+                else:
+                    body = struct.pack('>BB', func, count * 2) + struct.pack('>%dH' % count, *words)
                 return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
             self.cache_misses += 1
         return self.forward(txn, proto, unit, pdu)
@@ -519,14 +577,15 @@ class Proxy:
             logger.info('write: %s', desc)
             if self.audit:
                 self.audit.event('WRITE', desc)
-        is_read = bool(pdu) and pdu[0] in (3, 4) and len(pdu) >= 5
+        is_read = bool(pdu) and pdu[0] in READ_FUNCS and len(pdu) >= 5
         fc = addr = count = None
         if is_read:
             fc = pdu[0]
             addr, count = struct.unpack('>HH', pdu[1:5])
-            logger.info('read: fc%d registers %d:%d not cached, polling the device', fc, addr, count)
+            logger.info('read: fc%d %s %d:%d not cached, polling the device',
+                        fc, _space_name(fc), addr, count)
         else:
-            # the frame carries no cache semantics (FC1/2/7/8/17/…, vendor
+            # the frame carries no cache semantics (FC7/8/17/…, vendor
             # codes) — forward it untouched, named in the log
             logger.info('forwarded %s, %d byte(s) (unit %d)', describe_fc(pdu[0]), len(pdu) - 1, unit)
         frame = struct.pack('>HHHB', txn, proto, len(pdu) + 1, unit) + pdu
@@ -546,28 +605,38 @@ class Proxy:
                     logger.info('forwarded %s rejected by the device (modbus exception %d)',
                                 describe_fc(pdu[0]), code)
             if is_read:
-                if body and body[0] == fc and len(body) >= 2 and body[1] == count * 2:
+                expect = _read_shape(fc, count)
+                if body and body[0] == fc and len(body) >= 2 and body[1] == expect:
                     if not self.no_cache:
-                        self.cache.store(fc, addr, struct.unpack('>%dH' % count, body[2:2 + count * 2]))
-                    logger.info('read: fc%d registers %d:%d ok%s', fc, addr, count,
+                        if fc in BIT_READ_FUNCS:
+                            vals = [(body[2 + (i >> 3)] >> (i & 7)) & 1 for i in range(count)]
+                        else:
+                            vals = struct.unpack('>%dH' % count, body[2:2 + count * 2])
+                        self.cache.store(fc, addr, vals)
+                    logger.info('read: fc%d %s %d:%d ok%s', fc, _space_name(fc), addr, count,
                                 '' if not self.no_cache else ' (not cached: selection none)')
                 elif body and body[0] == fc | 0x80:
-                    logger.warning('read: fc%d registers %d:%d rejected by the device (modbus exception %d)',
-                                   fc, addr, count, body[2] if len(body) > 2 else -1)
+                    logger.warning('read: fc%d %s %d:%d rejected by the device (modbus exception %d)',
+                                   fc, _space_name(fc), addr, count, body[2] if len(body) > 2 else -1)
                 else:
-                    logger.warning('read: fc%d registers %d:%d unexpected response', fc, addr, count)
-            elif desc and body and body[0] == pdu[0] and pdu[0] in (6, 16, 22, 23):
+                    logger.warning('read: fc%d %s %d:%d unexpected response',
+                                   fc, _space_name(fc), addr, count)
+            elif desc and body and body[0] == pdu[0] and pdu[0] in WRITE_FUNCS:
                 # write-through invalidation: the device took the write, so the
                 # cached words of the touched range are stale — drop exactly
-                # them (per-register) and let the poller refill promptly
+                # them (per-register) and let the poller refill promptly. The
+                # register writes (FC6/16/22/23) invalidate both register
+                # spaces (a device is free to mirror), the coil writes
+                # (FC5/15) the coil space.
                 target = _write_target(pdu)
                 if target:
                     waddr, wcount = target
-                    dropped = self.cache.invalidate(3, waddr, wcount)
+                    spaces = (1,) if pdu[0] in (5, 15) else (3, 4)
+                    dropped = sum(self.cache.invalidate(s, waddr, wcount) for s in spaces)
                     if dropped:
                         self.poll_wake.set()
-                        logger.info('write: invalidated %d cached word(s) at registers %d:%d, repolling',
-                                    dropped, waddr, wcount)
+                        logger.info('write: invalidated %d cached word(s) at %s %d:%d, repolling',
+                                    dropped, _space_name(1 if pdu[0] in (5, 15) else 3), waddr, wcount)
             return resp
         except (ModbusError, OSError) as e:
             self.upstream.close()

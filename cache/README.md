@@ -20,13 +20,14 @@ it:
 
 - a background loop **polls the configured register ranges** from the inverter
   at a fixed interval into an in-memory cache;
-- any number of clients connect to the proxy and are **served FC3 reads from
-  the cache** — no per-client inverter traffic;
-- reads **outside the cached ranges** (and any other function code: FC4,
-  writes, …) are **polled from the inverter live**, answered, and — for FC3
-  reads — **cached for `--cache-ttl`** like everything else. Such a read
-  waits for a free slot between poll reads, at most one transaction + read
-  delay;
+- any number of clients connect to the proxy and are **served FC3/FC4
+  register reads and FC1/FC2 bit reads from the cache** — no per-client
+  inverter traffic;
+- reads **outside the cached ranges** are **polled from the inverter live**,
+  answered, and **cached for `--cache-ttl`** like everything else (FC3/FC4
+  words and FC1/FC2 bits alike) — as is any other function code (writes,
+  FC17, vendor codes), forwarded untouched. Such a read waits for a free
+  slot between poll reads, at most one transaction + read delay;
 - **writes** (FC05/06/15/16/22/23) are forwarded when enabled (see
   [Access control](#access-control)) and always logged with register,
   value(s) and outcome;
@@ -67,12 +68,16 @@ suite's [`profiles/`](../profiles/) subproject (`sun2000.json` by default).
 The profile JSON format is documented in
 [profiles/README.md](../profiles/README.md).
 Resolution: `--profile` flag, env `PROFILE`, config `set modbus profile`,
-then the bundled copy; the file is re-read on `SIGHUP`. Entry `type`
-(i16/u16/i32/u32) gives the word width, `name` decorates the poll logs, and
-the optional **`fc`** field picks the address space: `3` (holding
-registers, the default) or `4` (input registers) — the two spaces are
-cached and polled independently, and both are served from the cache on
-their own function code. The optional **`ttl`** field overrides the cache
+then the bundled copy; the file is re-read on `SIGHUP`. Entry `type` gives
+the width and the space: `i16`/`u16` (one word), `i32`/`u32` and the
+lo-word-first `i32swap`/`u32swap`, the IEEE 754 `f32`/`f32swap` (two words
+each), `bit` (one address = one binary value); `name` decorates the poll
+logs, and the optional **`fc`** field picks the address space: `3`
+(holding registers) or `4` (input registers) for the word types (`3` the
+default), `1` (coils, the bit default) or `2` (discrete inputs) for `bit` —
+the four spaces are cached and polled independently, and each is served
+from the cache on its own function code. The optional **`ttl`** field
+overrides the cache
 TTL per entry (seconds; `0` = never expire) — a fast power word at 5s next
 to a nameplate word at 1h, one poll cadence for both; `show cache all`
 marks the entries carrying one (`[ttl 5s]`). The entry TTL **replaces** the
@@ -89,16 +94,16 @@ is stored (a pass-through proxy, the cache gauges go quiet). The shipped
 **`selection.json`** (in the subproject root) is an example — the essential
 SUN2000 monitoring
 set (the classic 13-range map, by name). Reads outside the selected set are
-forwarded to the inverter (FC3 and FC4 alike — a forwarded FC4 read is
-cached on its way through, under its own function code). The 65000-65003
-diagnostics
+forwarded to the inverter (any FC1-FC4 read is cached on its way through,
+under its own function code). The 65000-65003 diagnostics
 block is not a device register — it never appears in a profile and is never
 fetched: the cache synthesizes it from its own poller state (FC3 only).
 
 For slow dongles the poller reads the map in as **few transactions as
 possible**: ranges closer together than `--merge-gap` registers (default 8)
 are merged into one block read, which may also cover registers between the
-listed ones (those are cached too) — never across the FC3/FC4 boundary. A
+listed ones (those are cached too) — never across a function-code boundary
+(a bit block never swallows a register range). A
 block that fails — e.g. because it spans an unmapped register — is split in
 halves and the pieces are retried; the plan converges to the largest blocks
 the device actually answers.
@@ -466,7 +471,11 @@ defaulting to `none`, enabling `--allow-write` alone still refuses every
 write until the operator opens those two deliberately (in the config or
 live with `set`). For FC23 (read/write multiple registers) the touched
 registers are the written span — the request's second address pair; the
-read span riding first is not vetted.
+read span riding first is not vetted. A bulk write whose byte count lies
+about its data (FC15/16) never reaches the device: the cache answers
+exception 03 itself and audits the refusal. The coil writes (FC05/15) are
+gated by the same address ranges as the register writes — the coil space
+shares the numeric range.
 
 ACLs re-resolve on `SIGHUP` like every other setting; a malformed list keeps
 the previous one.
@@ -526,8 +535,11 @@ independently.
 A forwarded write lands on the device, and the cache immediately drops the
 cached words it touched (per-register — the rest of the cache stays warm)
 and wakes the poller. The next read of the written range goes to the device
-instead of serving the pre-write value until the TTL expires. Coils (FC05/15)
-are not cached and need no invalidation.
+instead of serving the pre-write value until the TTL expires. The register
+writes (FC06/16/22/23) drop the touched span in **both** register spaces
+(holding and input — a device is free to mirror); the coil writes (FC05/15)
+drop the touched span in the coil space (FC1), which a profile's `bit`
+entries may cache.
 
 ## Persistence
 
@@ -657,7 +669,7 @@ is set).
 | Write refused (support disabled) | `write: refused register … (write support disabled …)` |
 | Write refused (ACL) | `write: refused register … (client 10.0.0.5 not on the write ACL)` |
 | Device rejects a forwarded write | `write rejected by the device: … (modbus exception N)` |
-| Forwarded frame with no cache semantics (FC01/02/07/08/17/…) | `forwarded FC17 (report slave id), 0 byte(s) (unit 1)` |
+| Forwarded frame with no cache semantics (FC07/08/17/…) | `forwarded FC17 (report slave id), 0 byte(s) (unit 1)` |
 | Device rejects a forwarded frame with no cache semantics | `forwarded FC17 (report slave id) rejected by the device (modbus exception N)` |
 | Uncached read forwarded + cached | `read: registers … not cached, polling the device` / `… ok, cached …` |
 | Device rejects a forwarded read | `read: registers … rejected by the device (modbus exception N)` |

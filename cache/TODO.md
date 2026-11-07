@@ -5,6 +5,20 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The bit-space + float wave: the cache **polls, caches and serves FC1
+(coils) and FC2 (discrete inputs) ranges** beside FC3/FC4 — a profile
+`bit` entry (one address = one binary value) rides the same map, block
+planner (merged per space, 2000 bits per read) and TTL machinery, a
+forwarded FC1/FC2 read caches on the way through (bits stored as 0/1
+words, packed 8-per-byte LSB-first on the wire), and the write-through
+invalidation sweeps **both register spaces** for FC06/16/22/23 and the
+coil space for FC05/15. A forwarded FC15/FC16 frame whose byte count lies
+about its data is refused at the cache (exception 03, audited) instead of
+reaching the device; the exported `READ_FUNCS` static is the actual read
+dispatch now (the FC1-FC4 hardcode is gone); and the `--allow-write`
+help text names all six write codes (FC05/06/15/16/22/23) it has gated
+since the write-acl wave.
+
 The Waveshare upstream-auth wave: **`--auth-upstream waveshare`** — the
 cache presents the shared auth-upstream-key as a **Waveshare
 RS485-to-TCP gateway's connection password** (the upstream-only scheme

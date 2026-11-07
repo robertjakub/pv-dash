@@ -1357,15 +1357,19 @@ try:
                 'registers': [
                     {'name': 'pv-power', 'register': 32064, 'type': 'i32', 'fc': 3, 'cache': True},
                     {'name': 'meter-live', 'register': 40001, 'type': 'u32', 'fc': 4, 'cache': True},
+                    {'name': 'coil-flag', 'register': 47400, 'type': 'bit', 'fc': 1, 'cache': True},
                 ]}, open(fc4map, 'w'))
     # the allow-list rides the config script (the reloadable source: the env is frozen at start)
     ini4 = '/tmp/reg_fc4.conf'
     open(ini4, 'w').write('# the fc4 regtest config: the set grammar\n'
-                          'set write-registers 47400:100\n'
+                          'set write-registers 47400:100,40001:2\n'
                           'set write-acl any\n')
 
     def rd4(addr, n, port=CACHE_PORT):
         return txn(struct.pack('>BHH', 4, addr, n), port)
+
+    def wr5(addr, value, port=CACHE_PORT):
+        return txn(struct.pack('>BHH', 5, addr, value), port)
 
     p_fc4 = start([sys.executable, P, '--config', ini4,
                     '--upstream', '127.0.0.1:15512',
@@ -1394,6 +1398,18 @@ try:
           '%s forwards=%s' % (b.hex(), forwards))
     b = rd(65000, 4, port=15521)
     check('fc3 diagnostics block still synthesized', b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 0xCAFE, b.hex())
+
+    # the bit space: the profile's fc1 entry is polled, cached and served;
+    # the FC5 coil write passes the same allow-list and invalidates the
+    # coil space (the repoll picks the new state)
+    b = txn(struct.pack('>BHH', 1, 47400, 1), port=15521)
+    check('fc1 bit range polled and served from cache', b == bytes.fromhex('010100'), b.hex())
+    b = wr5(47400, 0xFF00, port=15521)
+    check('fc5 coil write forwarded (echo)', b == bytes.fromhex('05b928ff00'), b.hex())
+    time.sleep(0.5)
+    b = txn(struct.pack('>BHH', 1, 47400, 1), port=15521)
+    check('fc5 write invalidates the coil space (the repoll serves the new state)',
+          b == bytes.fromhex('010101'), b.hex())
 
     # the write allow-list: inside passes, outside refuses, a spanning write refuses
     b = wr6(47415, 7, port=15521)
@@ -1425,6 +1441,24 @@ try:
     b = txn(struct.pack('>B', 17), port=15521)   # FC17 report slave id
     check('unknown-FC forward: the frame is named in the log',
           'forwarded FC17 (report slave id)' in open('/tmp/reg_fc4.log').read(), b.hex())
+
+    # the bulk-write shape gate: an FC16 whose byte count lies about its
+    # data is refused at the cache (exception 03), never forwarded
+    b = txn(struct.pack('>BHHB', 16, 47400, 2, 3) + b'\x00\x00\x00', port=15521)
+    check('malformed fc16 (the byte count lies) -> exception 03 at the cache',
+          b == bytes.fromhex('9003'), b.hex())
+    check('malformed fc16: the WRITE-REFUSED names the inconsistency',
+          'the byte count is 3, the register count needs 4' in open('/tmp/reg_audit_fc4.log').read(),
+          open('/tmp/reg_audit_fc4.log').read()[-200:])
+    # write-through invalidation now sweeps both register spaces: the fc4
+    # copy of meter-live is dropped by an fc06 write to the same address
+    b = rd4(40001, 2, port=15521)
+    b = wr6(40001, 7, port=15521)
+    check('write-through: an fc06 write to the fc4 range echoes (dual-space drop)',
+          b == bytes.fromhex('069c410007'), b.hex())
+    check('write-through: the fc4 copy invalidated, the repoll refills',
+          'write: invalidated 1 cached word(s) at registers 40001:1, repolling'
+          in open('/tmp/reg_fc4.log').read(), open('/tmp/reg_fc4.log').read()[-200:])
 
     # inspect: the pretty multi-line dump
     r = ctl_cmd('inspect', 15522)

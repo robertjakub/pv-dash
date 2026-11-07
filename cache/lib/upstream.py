@@ -7,7 +7,7 @@ import time
 
 from common.protocol import ModbusError, auth_handshake_client, recv_exact, waveshare_handshake_client
 from .protocol import DeviceError
-from .statics import MAX_PDU
+from .statics import BIT_READ_FUNCS, MAX_PDU
 
 
 class Upstream:
@@ -82,7 +82,8 @@ class Upstream:
         return txn, proto, length, unit, body
 
     def read(self, fc, addr, count):
-        """One FC3/FC4 read; the caller serializes on .lock."""
+        """One FC1-FC4 read (coils/discrete inputs return 0/1 per address);
+        the caller serializes on .lock."""
         self.txn = (self.txn + 1) & 0xFFFF
         pdu = struct.pack('>BHH', fc, addr, count)
         _, _, _, unit, body = self._exchange(struct.pack('>HHHB', self.txn, 0, len(pdu) + 1, self.unit) + pdu, self.txn)
@@ -97,8 +98,14 @@ class Upstream:
         if len(body) < 2:
             raise ModbusError('short response: function byte only')
         got = body[1]
-        if got != count * 2:
-            raise ModbusError('expected %d register bytes, got %d' % (count * 2, got))
+        if fc in BIT_READ_FUNCS:
+            want = (count + 7) // 8
+            if got != want:
+                raise ModbusError('expected %d data bytes, got %d' % (want, got))
+            return tuple((body[2 + (i >> 3)] >> (i & 7)) & 1 for i in range(count))
+        want = count * 2
+        if got != want:
+            raise ModbusError('expected %d register bytes, got %d' % (want, got))
         return struct.unpack('>%dH' % count, body[2:2 + got])
 
     def forward(self, frame):

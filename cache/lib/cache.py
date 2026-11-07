@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""The in-memory register cache and the poll block planner (stdlib only).
+"""The in-memory cache and the poll block planner (stdlib only).
 
-Registers live in two Modbus address spaces — FC3 (holding registers) and
-FC4 (input registers) — cached separately: every address in this module is
-an (fc, addr) tuple and every range an (fc, start, count) tuple. Blocks
+Four Modbus address spaces — FC1 (coils), FC2 (discrete inputs), FC3
+(holding registers) and FC4 (input registers) — cached separately: every
+address in this module is an (fc, addr) tuple and every range an
+(fc, start, count) tuple. A cached bit is a word 0/1 like any other. Blocks
 never merge across function codes (a read can only serve one)."""
 import threading
 import time
 
 from common.human import secs
 
-from .statics import MAX_COUNT
+from .statics import BIT_READ_FUNCS, MAX_BITS, MAX_COUNT, READ_FUNCS
 
 
 def span(leaves):
@@ -20,18 +21,20 @@ def span(leaves):
 
 
 def build_blocks(ranges, merge_gap):
-    """Merge sorted register ranges into as few read blocks as possible,
+    """Merge sorted address ranges into as few read blocks as possible,
     per function code.
 
     Ranges are merged when they share the function code, the gap between
-    them is at most merge_gap registers and the block stays within the
-    Modbus read limit; 0 disables merging. Blocks may cover registers
-    between the listed ranges — those are cached too. Returns
-    (fc, start, count, leaves) tuples; the leaves are the (fc, start,
-    count) ranges the block covers."""
+    them is at most merge_gap addresses and the block stays within the
+    Modbus read limit (125 registers on FC3/FC4, 2000 bits on FC1/FC2);
+    0 disables merging. Blocks may cover addresses between the listed
+    ranges — those are cached too. Returns (fc, start, count, leaves)
+    tuples; the leaves are the (fc, start, count) ranges the block
+    covers."""
     blocks = []
-    for fc in (3, 4):
+    for fc in READ_FUNCS:
         fc_ranges = sorted(set(r for r in ranges if r[0] == fc))
+        cap = MAX_BITS if fc in BIT_READ_FUNCS else MAX_COUNT
         if not fc_ranges:
             continue
         start = end = None
@@ -40,7 +43,7 @@ def build_blocks(ranges, merge_gap):
             e = s + c
             if start is None:
                 start, end, group = s, e, [(fc, s, c)]
-            elif s - end <= merge_gap and e - start <= MAX_COUNT:
+            elif s - end <= merge_gap and e - start <= cap:
                 end = e
                 group.append((fc, s, c))
             else:

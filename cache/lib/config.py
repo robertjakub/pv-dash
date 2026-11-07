@@ -240,9 +240,12 @@ def load_registers_file(path):
     the shared schema from the profiles/ subproject. Returns the full
     (ranges, names) map; which entries are actually fetched is the
     selection file's job (load_selection). "type" gives the word width
-    (i16/u16 = 1 register word, i32/u32 = 2). "fc" is the function code the
-    device answers for the entry: 3 (holding registers, the default) or 4
-    (input registers); the two address spaces are cached separately."""
+    (i16/u16 = 1 register word, i32/u32 and the swap/float variants = 2,
+    bit = 1 address on the bit spaces). "fc" is the function code the
+    device answers for the entry — 1 (coils) or 2 (discrete inputs) for
+    bit entries (1 the default), 3 (holding registers, the default) or 4
+    (input registers) for the word types; the four address spaces are
+    cached separately."""
     try:
         with open(path, encoding='utf-8') as fh:
             data = json.load(fh)
@@ -263,10 +266,20 @@ def load_registers_file(path):
         typ = str(entry.get('type', 'i32'))
         count = REGISTER_TYPES.get(typ)
         if count is None:
-            raise SystemExit('%s (%s): unknown "type" %r (i16/u16/i32/u32)' % (label, entry['name'], typ))
-        fc = entry.get('fc', 3)
-        if fc not in (3, 4):
-            raise SystemExit('%s (%s): "fc" must be 3 (holding) or 4 (input), got %r' % (label, entry['name'], fc))
+            raise SystemExit('%s (%s): unknown "type" %r (i16/u16/i32/u32/i32swap/u32swap/f32/f32swap/bit)'
+                             % (label, entry['name'], typ))
+        default_fc = 1 if typ == 'bit' else 3
+        fc = entry.get('fc', default_fc)
+        legal = (1, 2) if typ == 'bit' else (3, 4)
+        try:
+            fc = int(fc)
+        except (TypeError, ValueError):
+            raise SystemExit('%s (%s): bad "fc" %r' % (label, entry['name'], entry.get('fc')))
+        if fc not in legal:
+            raise SystemExit('%s (%s): "fc" must be %s, got %d'
+                             % (label, entry['name'],
+                                '1 (coils) or 2 (discrete inputs)' if typ == 'bit'
+                                else '3 (holding) or 4 (input)', fc))
         if not 0 <= start <= MAX_REGISTERS - count:
             raise SystemExit('%s (%s): register %d out of range' % (label, entry['name'], start))
         ttl = entry.get('ttl')

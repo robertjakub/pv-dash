@@ -21,6 +21,7 @@ from lib.statics import MAX_REGISTERS, REGISTER_TYPES   # noqa: E402
 
 KEY_ORDER = ['name', 'register', 'type', 'scale', 'desc']
 WIDTHS = {'i16': 1, 'u16': 1, 'i32': 2, 'u32': 2}
+WORD_TYPES = ('i16', 'u16', 'i32', 'u32', 'i32swap', 'u32swap', 'f32', 'f32swap')
 
 
 def lint_matcher(v, where):
@@ -161,17 +162,19 @@ def lint(path):
             continue
         width = WIDTHS.get(typ) or REGISTER_TYPES.get(typ)
         if width is None:
-            issues.append('%s: unknown "type" %r (i16/u16/i32/u32)' % (label, typ))
+            issues.append('%s: unknown "type" %r (i16/u16/i32/u32/i32swap/u32swap/f32/f32swap/bit)'
+                          % (label, typ))
             continue
-        if typ != typ.strip() or typ not in ('i16', 'u16', 'i32', 'u32'):
+        if typ != typ.strip() or (typ not in WORD_TYPES and typ != 'bit'):
             issues.append('%s: odd "type" %r' % (label, typ))
         end = start + width
         if not 0 <= start <= MAX_REGISTERS - width:
             issues.append('%s: registers %d:%d out of range (0..%d)' % (label, start, end, MAX_REGISTERS))
-        # fc
-        fc = e.get('fc', 3)
-        if fc not in (3, 4):
-            issues.append('%s: "fc" must be 3 or 4, got %r' % (label, fc))
+        # fc: the word types read on FC3/FC4, bit on FC1/FC2 (the type's default)
+        fc = e.get('fc', 1 if typ == 'bit' else 3)
+        if fc not in ((1, 2) if typ == 'bit' else (3, 4)):
+            issues.append('%s: "fc" must be %s, got %r'
+                          % (label, '1 or 2 (the bit spaces)' if typ == 'bit' else '3 or 4', fc))
         # ttl
         ttl = e.get('ttl')
         if ttl is not None and (not isinstance(ttl, (int, float)) or isinstance(ttl, bool) or ttl < 0):

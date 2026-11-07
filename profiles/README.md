@@ -19,9 +19,10 @@ dependencies — `python3 profiles/bin/<tool>.py` from the repo root):
 - **`profile-lint.py`** — the schema and style checks: valid JSON, the
   top-level shape, a non-empty `description`, the required keys and their
   family order (`name` → `register` → `type` → `scale` → `desc`), the
-  register bounds (0…65536 − width), the type width, `fc` ∈ {3, 4}, a
-  numeric `ttl ≥ 0`, terse-ASCII `desc`s, the mappings vs a register word,
-  the write acl tree, duplicate names and same-fc register overlaps. Runs on
+  register bounds (0…65536 − width), the type width, `fc` ∈ {3, 4} for the
+  word types and {1, 2} for `bit`, a numeric `ttl ≥ 0`, terse-ASCII `desc`s,
+  the mappings vs a register word, the write acl tree, duplicate names and
+  same-fc register overlaps. Runs on
   `profiles/profiles/*.json` by default, or the files named on the command
   line; exits non-zero on the first issue found.
 - **`profile-format.py`** — rewrites any profile in place into the
@@ -81,17 +82,24 @@ One JSON object per device:
   - `name` — the suite-wide register name (the shared vocabulary across the
     fake, the cache and the scraper; e.g. `pv-power`, `battery-soc`)
   - `register` — the start address (decimal)
-  - `type` — `i16` / `u16` / `i32` / `u32` (a 32-bit type spans two registers)
-  - `fc` — optional, the Modbus function code the entry is read with:
-    `3` (holding registers, the default) or `4` (input registers). The
-    fake serves the same map on both codes; the cache polls and caches the
-    two spaces independently, and the scraper reads a source-bound entry
-    with the entry's code.
+  - `type` — `i16` / `u16` (one word), `i32` / `u32` (two words, hi/lo),
+    `i32swap` / `u32swap` (two words, lo/hi — the swapped word order some
+    devices ship), `f32` / `f32swap` (an IEEE 754 float, two words, hi/lo
+    or lo/hi), or `bit` (one address = one binary value on the coil or
+    discrete-input space)
+  - `fc` — optional, the Modbus function code the entry is read with; the
+    type picks the legal pair and the default: the word types read on `3`
+    (holding registers, the default) or `4` (input registers), a `bit`
+    entry reads on `1` (coils, the default) or `2` (discrete inputs). The
+    fake serves the four spaces separately (an `fc: 4` entry is not served
+    on FC3); the cache polls and caches the four spaces independently, and
+    the scraper reads a source-bound entry with the entry's code.
   - `ttl` — optional, the cache TTL override for the entry in seconds
     (`0` = never expire); absent = the cache's global TTL. A fast power
     word at 5s next to a nameplate word at 1h — one poll cadence for both.
   - `scale` — the wire gain: wire = value × scale (e.g. the sun2000
-    temperatures ×10, the currents ×100)
+    temperatures ×10, the currents ×100); a `bit` entry serves `1` when
+    the scaled value is nonzero
   - `desc` — what the register holds
 
 ## Semantics

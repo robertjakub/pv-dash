@@ -33,7 +33,7 @@ from common.options import control_command, grouped_rows, match_setting_path, de
 from common.config import parse_secret
 from common.dump import SECRET_REMOVED, dump_filter
 from common import dump as state
-from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, KNOWN_VERBS, NODE_BY_NAME
+from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
@@ -831,7 +831,7 @@ class ControlServer:
     def summary(self):
         """The compact state summary appended to the set/unset replies."""
         total, _ = self.httpd.gate.snapshot()
-        return ('upstream=%s upstream=%s clients=%d'
+        return ('upstream=%s upstream_ok=%s clients=%d'
                 % (self.httpd.RequestHandlerClass.upstream,
                    'ok' if self.httpd.RequestHandlerClass.upstream_ok else 'down', total))
 

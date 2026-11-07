@@ -200,7 +200,9 @@ def read_frame(sock, max_pdu):
 
 def pack_bits(bits):
     """The wire shape of a bit read reply: 8 bits per byte, LSB first —
-    bit i of the span lives in byte i >> 3, bit position i & 7."""
+    bit i of the span lives in byte i >> 3, bit position i & 7. Accepts
+    any iterable of truthy/falsy values (generators included)."""
+    bits = list(bits)
     packed = bytearray((len(bits) + 7) // 8)
     for i, bit in enumerate(bits):
         if bit:

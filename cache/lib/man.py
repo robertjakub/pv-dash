@@ -7,7 +7,7 @@ ctl/cli's --man) prints the same page."""
 from common.manpage import options_section, page
 
 DATE = '2026-11-05'
-VERSION = 'pv-suite 0.3.0'
+VERSION = 'pv-suite 0.4.0'
 MANUAL = 'User Commands'
 
 

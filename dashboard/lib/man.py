@@ -6,7 +6,7 @@ here as roff. scripts/gen_man.py writes the shipped man/*.1 from these;
 from common.manpage import page, options_section
 
 DATE = '2026-11-05'
-VERSION = 'pv-suite 0.3.0'
+VERSION = 'pv-suite 0.4.0'
 MANUAL = 'User Commands'
 
 

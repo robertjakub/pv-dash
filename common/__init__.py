@@ -8,7 +8,7 @@ One package, imported as `common` from everywhere:
 - the docker images: the common/ tree is copied to /pv-suite/common/
 
 Modules:
-- version  — the suite version string (0.3.0 or 0.3.0-<short git>)
+- version  — the suite version string (0.4.0 or 0.4.0-<short git>)
 - audit    — the append-only audit trail (AuditLog)
 - config   — ini/env/CLI plumbing shared by the tools (listen parser,
              token files, device-profile resolution)

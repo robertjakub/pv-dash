@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "dashboard";
-  version = "0.3.0";
+  version = "0.4.0";
 
   src = lib.cleanSource ./.;
 

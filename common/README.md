@@ -6,7 +6,7 @@ the [fake inverter](../inverter/README.md) and the [dashboard](../dashboard/READ
 
 | module | what |
 |---|---|
-| `version.py` | the suite version string: `0.3.0`, or `0.3.0-<short git>` in a checkout |
+| `version.py` | the suite version string: `0.4.0`, or `0.4.0-<short git>` in a checkout |
 | `options.py` | the family's option registry — one knob, one source: the `Option` rows (the flag, the env twin, the display group, the live `/`-path name, the control-grammar vocabulary), the argparse parser builder, the set-grammar config parser/renderer (the CLI spelling), the knob dictionary, the golden `config_value` (the set-grammar form of one knob's effective value over the tool's renames + formatters) and the `Setting` rows the control grammar speaks |
 | `wiresec.py` | the control wire's integrity layer: the full-HMAC frame signing/verification, the token auth, the RBAC roles (admin / the read-only ops shift) |
 | `ctl.py` | the ctl client, one ladder for the family: one command or a stdin batch, the signed exchange, the auth handshake, the daemon-exit bye — the four `*-ctl` bins keep only their prose and constants |

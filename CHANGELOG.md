@@ -6,8 +6,7 @@ tagged commits'. The early tags (before 0.1.0) carried per-tool versions —
 the dashboard, the scraper and the cache each numbered their own releases
 before the repo restructured into one suite.
 
-## Unreleased
-
+## 0.4.0 — 2026-11-07
 ### Changed
 
 - **everywhere** — **the dump/reload family fully rides the common

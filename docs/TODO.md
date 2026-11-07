@@ -307,7 +307,10 @@ the **Done/history** records for their tool.
   byte-for-byte).
 - **the common/ package** — the shared core extracted: version, audit,
   config plumbing, the Modbus wire core, the UTC log formatter; the suite
-  talks one vocabulary.
+  talks one vocabulary — and the control plane followed (the ctl/cli
+  clients, the metrics endpoint skeleton, the resolver pieces, the
+  control-server base: one implementation each, the tools subclass or
+  pass their spec).
 
 Per-tool **Done/history** lives in each subproject's own TODO.md
 ([cache](../cache/TODO.md), [scraper](../scraper/TODO.md),

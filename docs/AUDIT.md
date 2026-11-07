@@ -1,9 +1,17 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 14)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 15)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
 tree after `2db6cfa` (absorbing the former per-subproject `secaudit.md`s);
-**rev. 14** re-audited at main after the modbus-common move — the Modbus
+**rev. 15** re-audited at main after the common-split — the family's shared
+surfaces gather into `common/` (the ctl/cli clients, the metrics endpoint
+skeleton, the resolver pieces, the control-server base); the trust posture
+does not move: the wire tier moved **byte-for-byte** (the HMAC frame gate
+both ways, the admin/ops RBAC roles, the peer-cred trusted-peer shortcut,
+the 0600/0660 socket modes), the token pairing/charset rules are the shared
+helpers now (one wording), and the reload-state files ride the same sealed
+dump writer as before; **rev. 14** re-audited at main after the modbus-common
+move — the Modbus
 sources gather into `common/modbus` (one implementation: the wire core,
 the client ladders, the write shapes; the trust posture does not move —
 same handshakes, same texts), and the fake inverter's Modbus writes are

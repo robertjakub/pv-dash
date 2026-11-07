@@ -31,6 +31,24 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **everywhere** — **the shared control plane gathers into `common/`**: the
+  ctl client is one ladder (`common/ctl.py` — the four `*-ctl` bins keep
+  their prose and constants), the console cli is one implementation
+  (`common/cli.py` — the signed session, the reconnect cycle, the keepalive
+  thread, the readline completer and the typed-command loop; the tools'
+  pools/candidates/welcome/renders ride a spec dict, the fake's verb-first
+  loop included), the metrics endpoint skeleton is one class
+  (`common/metrics_server.py` — the bearer 401, the connlimit 503, the
+  caps; the tools subclass with their snapshot()/render()), the resolver
+  pieces are one set (`load_config_script`, the `Resolver` precedence
+  object, `resolve_target`, `str_to_bool`, the control-token rules in
+  `common/config.py`) and the control server's base is one class
+  (`common/control.py` — the wire tier, the RBAC/mac gate, the registry
+  surfaces, the dump/reload family; the tools subclass with their
+  grammar and reports). Behavior is byte-stable: the clients' `--help`
+  and the man pages diff clean against the old bins, the pinned reply
+  texts stand.
+
 - **everywhere** — **the Modbus sources gather into a `common/modbus`
   package** — one implementation for the family: `protocol.py` (the wire
   core: the `ModbusError`/`DeviceError` types, `recv_exact`, the MBAP

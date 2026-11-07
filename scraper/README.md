@@ -221,7 +221,7 @@ set log-level INFO
 
 | Signal | Effect |
 |---|---|
-| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, caps, the device profile (the whole register map), battery flag, auth token (+ file re-read = rotation), client limits and the upstream address/port/unit/timeout take effect immediately (the Modbus socket reconnects on the next poll). An invalid value keeps the previous settings — the error is logged and the next `SIGHUP` retries. The listen address, log level and `metrics.json` need a restart. |
+| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, caps, the device profile (the whole register map), battery flag, auth token (+ file re-read = rotation), client limits, the Modbus auth scheme/key and the upstream address/port/unit/timeout take effect immediately (the Modbus socket reconnects on the next poll). An invalid value keeps the previous settings — the error is logged and the next `SIGHUP` retries. The listen address, log level and `metrics.json` need a restart. |
 | `SIGTERM` / `SIGINT` | **Graceful shutdown**: the exporter stops, and the shutdown logs a session summary (duration + poll-error count). |
 
 ```bash
@@ -246,7 +246,10 @@ Commands: `set`/`unset` over the live settings (**`profile`** (the device
 profile: the register map swaps live, `default` restores the bundled
 sun2000 profile), **`interval`**,
 **`timeout`**, **`max-clients`**, **`client-timeout`**,
-**`max-conn-per-ip`**, **`log-access`**, **`log-level`** — and the
+**`max-conn-per-ip`**, **`log-access`**, **`log-level`**, **`modbus
+auth`**/`modbus auth key` (the suite scheme + key toward the inverter; a
+change drops the Modbus session — the next poll reconnects and handshakes)
+— and the
 **token lives**: `control token`/`control token-file` and `control ops
 token`/`control ops token-file` rotate the control tokens live (the
 sessions re-auth), `auth token`/`auth token-file` rotate the /metrics
@@ -337,6 +340,8 @@ journald adds one.
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--modbus-unit` | `1` | Modbus unit id |
 | `--modbus-offset` | `0` | added to register addresses (set `-1` for gateways that need 0-based addressing) |
+| `--auth` | `none` | the inverter's Modbus auth scheme the session must speak: `suite` proves the shared key with a crypt handshake (magic + nonce + HMAC proof, the peer answers `OK`, or `ERR` and the connection fails — the poller keeps retrying) right after every connect; `none`/empty = no auth at all (config `set modbus auth`, env `AUTH`) |
+| `--auth-key` | none | the shared key the suite handshake proves, **min 16 characters**; the value may be `file:<path>` — the first line of an owner-only `0600` file (config `set modbus auth key`, env `AUTH_KEY`) — the peer's key must match: the fake inverter serves its side with `--auth suite --auth-key …` |
 | `--profile` | the bundled `sun2000` profile | device profile JSON (the shared profiles/ schema): the whole register map — addresses, types, gains, function codes; a bare name resolves in `profiles/profiles/`; live-swappable with `set profile` |
 | `--max-kwp` | `6` | PV input power check against the array size: above `max-kwp × 1000` W → HTTP 503 + error log; `0` = off. Negative PV and export above the PV cap always error |
 | `--max-grid-kw` | `12` | power line grid exchange check: \|grid power\| above `max-grid-kw × 1000` W (either direction) → HTTP 503 + error log; `0` = off |
@@ -454,7 +459,8 @@ services.modbus-scraper = {
 
 Options: `enable`, `package`, `upstream` (`HOST:PORT`, `:PORT` = loopback),
 `modbusUnit`,
-`modbusOffset`, `pvRegister`, `gridRegister`, `scale`, `gridScale`, `maxKwp`,
+`modbusOffset`, `auth`/`authKey` (the suite scheme + shared key toward the
+inverter; null = no auth), `pvRegister`, `gridRegister`, `scale`, `gridScale`, `maxKwp`,
 `maxGridKw`, `battery`, `batteryRegister`, `batterySocRegister`,
 `gridPositiveImport`, `timeout`, `interval`, `listenHost`, `listenPort`,
 `logLevel`, `localTime`, `logAccess`, `maxClients`, `clientTimeout`, `authToken`, `authTokenFile`, `openFirewall`.
@@ -462,7 +468,8 @@ Options: `enable`, `package`, `upstream` (`HOST:PORT`, `:PORT` = loopback),
 The module renders the **config INI into the store** and runs the service
 with `--config`. A `nixos-rebuild switch` applies changes with
 `systemctl reload` (SIGHUP): interval, caps, registers, battery flag, auth
-token and the upstream address are picked up live. Changes to
+token, the Modbus auth scheme/key and the upstream address are picked up
+live. Changes to
 `listenHost`/`listenPort`/`logLevel` need a manual
 `systemctl restart modbus-scraper`.
 

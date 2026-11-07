@@ -29,6 +29,10 @@ let
     (setLine "upstream" cfg.upstream)
     (setLine "unit" (toString cfg.unitId))
     (setLine "timeout" (toString cfg.timeout))
+    (lib.optionals (cfg.auth != null) [ (setLine "auth" cfg.auth) ])
+    (lib.optionals (cfg.authKey != null) [ (setLine "auth-key" cfg.authKey) ])
+    (lib.optionals (cfg.authUpstream != null) [ (setLine "auth-upstream" cfg.authUpstream) ])
+    (lib.optionals (cfg.authUpstreamKey != null) [ (setLine "auth-upstream-key" cfg.authUpstreamKey) ])
     (setLine "listen" "${cfg.listenHost}:${toString cfg.listenPort}")
     (setLine "interval" (toString cfg.interval))
     (setLine "read-delay" (toString cfg.readDelay))
@@ -134,6 +138,46 @@ in
       type = lib.types.float;
       default = 3.0;
       description = "Modbus connect/read timeout in seconds.";
+    };
+
+    auth = lib.mkOption {
+      type = lib.types.nullOr (lib.types.enum [ "suite" ]);
+      default = null;
+      description = ''
+        The auth scheme the cache's own Modbus clients must speak: "suite"
+        demands the crypt handshake (magic + nonce + HMAC proof of the
+        shared key, min 16 characters) right after every connect and drops
+        the client on ERR/anything else. null = no auth at all.
+      '';
+    };
+
+    authKey = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The shared key the cache's clients prove with the suite handshake
+        (min 16 characters). Needs auth = "suite".
+      '';
+    };
+
+    authUpstream = lib.mkOption {
+      type = lib.types.nullOr (lib.types.enum [ "suite" ]);
+      default = null;
+      description = ''
+        The auth scheme toward the upstream inverter: "suite" proves the
+        shared authUpstreamKey with the same crypt handshake right after
+        every connect (the peer answers OK, or ERR and the connection
+        fails — the poller keeps retrying). null = no auth at all.
+      '';
+    };
+
+    authUpstreamKey = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The shared key the cache proves to the upstream inverter with the
+        suite handshake (min 16 characters). Needs authUpstream = "suite".
+      '';
     };
 
     interval = lib.mkOption {

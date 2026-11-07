@@ -8,10 +8,10 @@ import threading
 import time
 from collections import deque
 
-from common.protocol import ModbusError, describe_fc, exception_frame, recv_exact
+from common.protocol import ModbusError, auth_handshake_server, describe_fc, exception_frame, recv_exact
 from common.connlimit import ConnGate
 from .protocol import DeviceError, describe_write
-from .config import load_registers_file, load_selection
+from .config import load_profile_write_acl, load_registers_file, load_selection
 from .cache import build_blocks, span
 from .statics import (MAX_COUNT, MAX_PDU, WRITE_FUNCS, GATEWAY_FAILED, ILLEGAL_FUNCTION,
                       ILLEGAL_VALUE, ILLEGAL_ADDRESS, DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX,
@@ -59,7 +59,11 @@ class Proxy:
         self.config = config or {}
         self.audit = audit   # the CACHE audit trail (common.audit), None = off
         self.allow_write = bool(self.config.get('allow_write', False))
-        self.write_ranges = self.config.get('write_registers')   # None = any register, () = none
+        self.write_registers = self.config.get('write_registers')   # the knob: None = any, () = none, 'profile' = the profile's acl
+        try:
+            self.write_ranges = self._resolve_write_ranges(self.write_registers)   # the effective gate
+        except ValueError as e:
+            raise SystemExit(str(e))
         self.log_access = bool(self.config.get('log_access', False))
         self.max_clients = max(0, int(self.config.get('max_clients') or 0))
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
@@ -157,6 +161,8 @@ class Proxy:
         self.upstream.port = self.config['port']
         self.upstream.unit = self.config['unit']
         self.upstream.timeout = self.config['timeout']
+        self.upstream.auth = self.config['auth_upstream']
+        self.upstream.auth_key = self.config['auth_upstream_key']
         with self.upstream.lock:
             self.upstream.close()
         ranges, names, ttls = self.load_map()
@@ -165,7 +171,7 @@ class Proxy:
         self.merge_gap = self.config['merge_gap']
         self.interval = self.config['interval']
         self.allow_write = bool(self.config.get('allow_write', False))
-        self.write_ranges = self.config.get('write_registers')
+        self.set_write_registers(self.config.get('write_registers'))
         self.log_access = bool(self.config.get('log_access', False))
         self.max_clients = max(0, int(self.config.get('max_clients') or 0))
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
@@ -298,12 +304,54 @@ class Proxy:
 
     def _write_allowed(self, target):
         """The register-range allow-list: every touched register must land
-        inside one of the configured ranges (None = any register; () = none
+        inside one of the effective ranges (None = any register; () = none
         writable — the 'none' mode)."""
         if self.write_ranges is None or target is None:
             return True
         addr, count = target
         return any(rs <= addr and addr + count <= rs + rc for rs, rc in self.write_ranges)
+
+    def _resolve_write_ranges(self, val):
+        """The knob value -> the effective ranges. 'profile' loads the
+        device profile's write acl against the CURRENT config (ValueError
+        on a missing or bad acl — the start re-raises as SystemExit, the
+        wire answers err); everything else passes through unchanged."""
+        if val != 'profile':
+            return val
+        try:
+            return load_profile_write_acl(self.config.get('profile'))
+        except SystemExit as e:
+            raise ValueError(str(e))
+
+    def set_write_registers(self, val):
+        """Swap the write-registers knob (None/()/(ranges)/'profile'):
+        resolve first — a bad profile acl leaves the old gate standing."""
+        ranges = self._resolve_write_ranges(val)
+        self.write_registers = val
+        self.write_ranges = ranges
+
+    def _ranges_text(self):
+        """The effective ranges for humans: 'any', 'none' or START:COUNT,..."""
+        if self.write_ranges is None:
+            return 'any'
+        if not self.write_ranges:
+            return 'none'
+        return ','.join('%d:%d' % r for r in self.write_ranges)
+
+    def describe_write_ranges(self):
+        """The knob value for the wire and the dumps (re-appliable): 'any',
+        'none', 'profile' or the configured ranges."""
+        if self.write_registers == 'profile':
+            return 'profile'
+        return self._ranges_text()
+
+    def describe_write_gate(self):
+        """The gate for humans (the logs, show status, inspect): like
+        describe_write_ranges, but a profile-mode gate names the effective
+        ranges it resolved to."""
+        if self.write_registers == 'profile':
+            return 'profile (%s)' % self._ranges_text()
+        return self._ranges_text()
 
     def serve(self, host, port):
         srv = socket.socket()
@@ -355,6 +403,19 @@ class Proxy:
         with self.client_lock:
             self.clients[key] = {'since': time.monotonic(), 'requests': 0, 'audited': 0}
         try:
+            # the suite auth (when enabled) gates the Modbus loop: the
+            # client speaks the handshake first, and one that cannot prove
+            # the key is dropped before it ever sees a frame
+            if self.config.get('auth') == 'suite' and self.config.get('auth_key'):
+                try:
+                    proved = auth_handshake_server(client, self.config['auth_key'])
+                except (ConnectionError, OSError) as e:
+                    logger.info('suite auth with %s:%d died mid-handshake (%s)', addr[0], addr[1], e)
+                    return
+                if not proved:
+                    logger.info('suite auth failed for %s:%d, closing', *addr[:2])
+                    return
+                access('client %s:%d passed the suite handshake', *addr[:2])
             while True:
                 head = recv_exact(client, 7)
                 txn, proto, length, unit = struct.unpack('>HHHB', head)
@@ -407,7 +468,7 @@ class Proxy:
             if not self._write_allowed(target):
                 desc = describe_write(pdu, unit) or '%s (unit %d)' % (describe_fc(func), unit)
                 logger.info('write: refused %s (registers outside the write allow-list %s)',
-                            desc, self.describe_write_ranges())
+                            desc, self.describe_write_gate())
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (registers outside the write allow-list)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
@@ -436,14 +497,6 @@ class Proxy:
                 return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
             self.cache_misses += 1
         return self.forward(txn, proto, unit, pdu)
-
-    def describe_write_ranges(self):
-        """The allow-list for humans: 'any', 'none' or the configured ranges."""
-        if self.write_ranges is None:
-            return 'any'
-        if not self.write_ranges:
-            return 'none'
-        return ','.join('%d:%d' % r for r in self.write_ranges)
 
     def _diag(self, txn, proto, unit, addr, count):
         """Answer a diagnostics read from live poller state (no device contact)."""

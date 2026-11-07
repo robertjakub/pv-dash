@@ -1,13 +1,72 @@
 """The Modbus TCP wire core shared by the tools (stdlib only): the error
-type, the recv-exact loop, the exception-frame builder and the function
-code table. The client (scraper, cache upstream) and the servers (cache
-listener, fake inverter) layer their own framing on top; the per-tool
-limits come from each tool's lib/static.json (see its statics.py)."""
+type, the recv-exact loop, the exception-frame builder, the function
+code table and the suite auth handshake. The client (scraper, cache
+upstream) and the servers (cache listener, fake inverter) layer their own
+framing on top; the per-tool limits come from each tool's lib/static.json
+(see its statics.py)."""
+import hashlib
+import hmac
+import secrets
 import struct
 
 
 class ModbusError(Exception):
     pass
+
+
+# --- the suite auth handshake ------------------------------------------------
+# One round trip, client-speaks-first: after the TCP connect (and before any
+# Modbus frame) the client proves the shared key — a fresh 16-byte nonce plus
+# the HMAC-SHA256 of the domain-tagged magic+nonce, 52 bytes on the wire — and
+# waits for the server's verdict. OK and the session speaks plain Modbus; ERR
+# (or anything else) and the connection is dead: the client raises, the
+# connector fails, the usual reconnect logic tries again.
+AUTH_MAGIC = b'PVA1'          # the handshake marker (also the scheme version)
+AUTH_NONCE_LEN = 16           # the fresh challenge bytes
+AUTH_MAC_LEN = 32             # HMAC-SHA256
+AUTH_FRAME_LEN = 4 + AUTH_NONCE_LEN + AUTH_MAC_LEN   # 52 bytes, fixed
+AUTH_MIN_KEY = 16             # the shared key's floor (characters)
+AUTH_DOMAIN = b'pv-suite-modbus-auth\x01'
+AUTH_OK = b'OK'
+AUTH_ERR = b'ERR'
+
+
+def auth_mac(key, nonce):
+    """The handshake proof: HMAC-SHA256 over the domain + magic + nonce,
+    keyed by the shared key (str)."""
+    return hmac.new(key.encode('utf-8'), AUTH_DOMAIN + AUTH_MAGIC + nonce,
+                    hashlib.sha256).digest()
+
+
+def auth_handshake_client(sock, key):
+    """The client side: send magic + nonce + mac, then wait for the verdict.
+    Returns on OK; raises ModbusError on ERR (key mismatch — the peer refuses
+    the session) or on anything else it reads instead (a peer without the
+    suite auth enabled answers a Modbus exception frame, not a verdict)."""
+    nonce = secrets.token_bytes(AUTH_NONCE_LEN)
+    sock.sendall(AUTH_MAGIC + nonce + auth_mac(key, nonce))
+    head = recv_exact(sock, 1)
+    if head == b'O':
+        if recv_exact(sock, 1) == b'K':
+            return
+        raise ModbusError('bad auth handshake reply')
+    if head == b'E' and recv_exact(sock, 2) == b'RR':
+        raise ModbusError('auth handshake rejected by the peer (key mismatch?)')
+    raise ModbusError('bad auth handshake reply')
+
+
+def auth_handshake_server(sock, key):
+    """The server side: read the 52-byte handshake, check the magic and the
+    mac. True (after the OK reply) when the peer proved the key; False
+    (after the ERR reply) when it did not — the caller logs and closes.
+    OSError/ConnectionError propagate (the transport died mid-handshake)."""
+    frame = recv_exact(sock, AUTH_FRAME_LEN)
+    if frame[:4] == AUTH_MAGIC and \
+       hmac.compare_digest(frame[4 + AUTH_NONCE_LEN:], auth_mac(key, frame[4:4 + AUTH_NONCE_LEN])):
+        sock.sendall(AUTH_OK)
+        return True
+    sock.sendall(AUTH_ERR)
+    return False
 
 
 # Every standard Modbus function code (the spec's public list, serial-line

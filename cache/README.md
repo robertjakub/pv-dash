@@ -166,6 +166,10 @@ with a clean one-line error instead of failing later at runtime.
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--unit` | `1` | Modbus unit id (1–247) |
 | `--timeout` | `3` | Modbus connect/read timeout, seconds |
+| `--auth` | `none` | the auth scheme the cache's **own Modbus clients** must speak: `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect — the cache answers `OK` and the session speaks plain Modbus, or `ERR` and the client is dropped before it ever sees a frame; `none`/empty = no auth at all — see [Modbus auth](#modbus-auth) (config `set modbus auth`, env `AUTH`) |
+| `--auth-key` | none | the shared key the cache's clients prove with the suite handshake, **min 16 characters**; the value may be `file:<path>` — the first line of an owner-only `0600` file (config `set modbus auth key`, env `AUTH_KEY`) |
+| `--auth-upstream` | `none` | the auth scheme **toward the upstream inverter**: `suite` proves the shared key with the same handshake after every connect — the peer answers `OK`, or `ERR` and the connection fails (the poller keeps retrying); `none`/empty = no auth at all — see [Modbus auth](#modbus-auth) (config `set modbus auth-upstream`, env `AUTH_UPSTREAM`) |
+| `--auth-upstream-key` | none | the shared key the cache proves to the upstream inverter, **min 16 characters**; the value may be `file:<path>` (config `set modbus auth-upstream-key`, env `AUTH_UPSTREAM_KEY`) |
 | **Proxy** | | |
 | `--listen` | `127.0.0.1:15502` | proxy listen address `HOST:PORT` (loopback by default) |
 | `--profile` | the bundled `sun2000` profile | device profile JSON to cache (see above) |
@@ -175,7 +179,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Behaviour toggles** | | |
 | `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (config `set write allow`, env `ALLOW_WRITE` accepts `true`/`false`) |
-| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default) (config `set write registers`, env `WRITE_REGISTERS`) |
+| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default), `profile` = the device profile's `acl`/`write` gate (the allow/deny object or the ordered rule chain, allow minus deny; `any` = all registers) (config `set write registers`, env `WRITE_REGISTERS`) |
 | `--connect-acl` | `any` | clients allowed to connect: `any`, `none` (refuse everyone) or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `none` | clients allowed to write — still requires `--allow-write`; `none` = no client writes (the default) — see [Access control](#access-control) |
 | `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (config `set control token`, env `CONTROL_TOKEN`) |
@@ -308,7 +312,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers`, `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token`/`metrics token-file` (rotate live; the value never renders back), `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write`, `modbus timeout`, `control port` (rebinds the listener live), `control token`/`control token-file` and `control ops token`/`control ops token-file` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
+| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token`/`metrics token-file` (rotate live; the value never renders back), `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write`, `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the suite schemes and keys, both legs), `control port` (rebinds the listener live), `control token`/`control token-file` and `control ops token`/`control ops token-file` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
 | `set`/`unset` a startup-only knob | the registry's `restart: true` rows answer the note: `% restart required (startup-only knob)` — the config (and a SIGHUP, or a restart) changes them; `show <knob>` renders the configured value (a **secret knob refuses to show** — the value renders nowhere) |
 | `show <setting>` | the bare live value of one tunable |
@@ -443,7 +447,17 @@ restrict all); the config-file/env/NixOS forms are
   working. `none` (the default) refuses every client's writes.
 - **Write registers** (`write-registers`) — the ranges a forwarded write
   may touch; `none` (the default) refuses every write regardless of the
-  client, `any` lifts the register check entirely.
+  client, `any` lifts the register check entirely. **`profile`** takes the
+  gate from the device profile: the profile's `"acl"` → `"write"` tree —
+  an `allow`/`deny` object (the deny wins, an absent allow is `any`) or an
+  ordered rule list (`{"allow"|"deny"|"defer": "START:COUNT"|[...]|{"START:COUNT": "desc"}|"any"}`
+  — the last matching rule decides, `defer` resets the decision, an
+  undecided register refuses), each range optionally described by a
+  terse-ASCII `desc` (per gate, per rule, or per entry in the range map).
+  `deye-sg05lp3`, for example, allows only the TOU schedule slots
+  (148–177) and the grid-start registers (127–128). A profile without an
+  `acl`/`write` section refuses the `profile` value (a gate that is not
+  there would be silent).
 
 Writing is therefore gated four times: `--allow-write` **and** the client
 on the write ACL **and** every touched register inside the allow-list
@@ -456,6 +470,44 @@ read span riding first is not vetted.
 
 ACLs re-resolve on `SIGHUP` like every other setting; a malformed list keeps
 the previous one.
+
+## Modbus auth
+
+Beyond the address-based ACLs the cache speaks the family's **`suite`**
+Modbus auth — a proof-of-key handshake on the Modbus TCP wire itself, one
+round trip after the TCP connect and before any Modbus frame:
+
+- the client sends 52 bytes: the 4-byte magic `PVA1`, a fresh 16-byte nonce
+  and the HMAC-SHA256 of the domain-tagged magic+nonce keyed by the shared
+  key (stdlib only — the same HMAC discipline the state dumps seal with);
+- the server recomputes the proof and answers **`OK`** (the session then
+  speaks plain Modbus TCP) or **`ERR`** (the connection is dead — a client
+  that cannot prove the key never sees a frame, and a client of a wrongly
+  configured peer fails its connect exactly like a down device).
+
+The two legs are configured separately, with separate keys:
+
+- **`--auth` / `--auth-key`** — the auth the cache's *own clients* must
+  speak on the listen port (the server side): with `--auth suite`, every
+  connecting client handshakes first; a failed proof is logged
+  (`suite auth failed for …, closing`) and dropped. `none`/empty (the
+  default) = no auth at all.
+- **`--auth-upstream` / `--auth-upstream-key`** — the auth the cache
+  *presents* to the upstream inverter (the client side): with
+  `--auth-upstream suite`, every (re)connect handshakes first; an `ERR`
+  fails the poll cycle like any other upstream failure and the poller
+  retries.
+
+Both keys are secrets (min 16 characters — enforced at start and on the
+live `set`; they never render back, and `file:<path>` references load from
+an owner-only `0600` file). Both knobs are live-settable: `set modbus auth
+suite` gates the next connection (standing sessions keep theirs), and `set
+modbus auth-upstream …` drops the upstream session so the next exchange
+re-proves under the new material. The peer must speak the same scheme with
+the same key — the fake inverter serves the server side (`--auth
+suite --auth-key …`) and the scraper speaks the client side (`--auth
+suite --auth-key …`), so a chain scraper → cache → inverter can run suite
+auth on either hop independently.
 
 ## Write-through invalidation
 
@@ -732,6 +784,9 @@ bundled `sun2000` profile), `cacheTtl` (unset = 3× `interval`),
 START:COUNT allow-list, `any` or `none`; null = the proxy default
 `none`), `connectAcl` (`any`/`none`/prefixes; null = `any`),
 `writeAcl` (`any`/`none`/prefixes; null = the proxy default `none`),
+`auth`/`authKey` (the suite scheme + key the cache's clients must speak;
+null = no auth), `authUpstream`/`authUpstreamKey` (the suite scheme + key
+toward the inverter; null = no auth),
 `maxClients`, `clientTimeout`, `logLevel`, `localTime`,
 `logAccess`, `openFirewall`, `auditLog` (null = the trail goes to
 **stdout**, which journald captures — the hardened service cannot write

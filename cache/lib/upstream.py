@@ -5,17 +5,19 @@ import struct
 import threading
 import time
 
-from common.protocol import ModbusError, recv_exact
+from common.protocol import ModbusError, auth_handshake_client, recv_exact
 from .protocol import DeviceError
 from .statics import MAX_PDU
 
 
 class Upstream:
-    def __init__(self, host, port, unit, timeout):
+    def __init__(self, host, port, unit, timeout, auth=None, auth_key=None):
         self.host = host
         self.port = port
         self.unit = unit
         self.timeout = timeout
+        self.auth = auth          # None = no auth | 'suite' = the crypt handshake after every connect
+        self.auth_key = auth_key  # the shared key the handshake proves
         self.lock = threading.Lock()
         self.sock = None
         self.txn = 0
@@ -40,6 +42,8 @@ class Upstream:
         self.close()
         self.sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
         self.sock.settimeout(self.timeout)
+        if self.auth == 'suite' and self.auth_key:
+            auth_handshake_client(self.sock, self.auth_key)
         self.connects += 1
         self.connected_since = time.monotonic()
 

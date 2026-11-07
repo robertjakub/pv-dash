@@ -85,12 +85,13 @@ def describe(cfg, args, control_desc):
              (['client-timeout %gs' % cfg['client_timeout']] if cfg['client_timeout'] else []) + \
              (['max-conn-per-ip %d' % cfg['max_conn_per_ip']] if cfg['max_conn_per_ip'] else [])
     listen_host, listen_port = parse_listen(cfg['listen'])
-    return ('polling %s:%d unit %d (profile %s, %d registers, positive=%s%s) every %gs; '
+    return ('polling %s:%d unit %d (profile %s, %d registers, positive=%s%s, modbus auth %s) every %gs; '
             '%s /metrics on %s:%d (config: %s, log level: %s, log time: %s, log access: %s, auth: %s, '
             'limits: %s, caps: %s, control server: %s, version: %s)' % (
                 cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['profile'], len(cfg['sources']),
                 'import' if cfg['grid_positive_import'] else 'export',
                 ', battery on' if cfg['battery'] else '',
+                cfg['auth'] or 'none',
                 cfg['interval'],
                 'would serve' if args.dry_run else 'serving',
                 listen_host, listen_port, args.config, cfg['level'],
@@ -169,7 +170,8 @@ def main():
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target) \
         + (', read-only ops token accepted' if control_ops_token else '')
-    client = ModbusTCP(cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['timeout'], cfg['modbus_offset'])
+    client = ModbusTCP(cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['timeout'], cfg['modbus_offset'],
+                       auth=cfg['auth'], auth_key=cfg['auth_key'])
     scraper = Scraper(cfg, client, spec)
     Handler.scraper = scraper
     Handler.log_access = cfg['log_access']
@@ -200,7 +202,8 @@ def main():
         defaults = {'log-access': 'on' if cfg['log_access'] else 'off',
                     'log-level': cfg['level'],
                     'dump/path': cfg['dump_path'] or 'off',
-                    'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off'}
+                    'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
+                    'modbus/auth': cfg['auth'] or 'none'}
         for o in OPTIONS:
             if o.live and o.conv in (int, float, str) and not o.secret:
                 key = o.name.replace('-', '_')
@@ -222,7 +225,7 @@ def main():
                 else:
                     defaults[o.name] = str(v) if v not in (None, '') else 'off'
         # the secret rows (control/token, control/token-file, control/ops/token,
-        # control/ops/token-file, auth/token, auth/token-file, dump-key) carry NO
+        # control/ops/token-file, auth/token, auth/token-file, auth-key, dump-key) carry NO
         # defaults entry: `unset` refuses them (the metrics/token treatment) — a
         # secret never renders, never re-applies
         control = ControlServer(scraper, httpd, int(control_target) if control_target.isdigit() else control_target,
@@ -254,7 +257,8 @@ def main():
         return 'upstream %s:%d unit %d, interval %gs' % (new_cfg['host'], new_cfg['modbus_port'],
                                                          new_cfg['modbus_unit'], new_cfg['interval'])
 
-    control.reloader = apply_reload   # the control server's `request reload` runs the same path
+    if control:
+        control.reloader = apply_reload   # the control server's `request reload` runs the same path
 
     def graceful_stop(reason):
         logger.info('shutdown: %s received after %ds (%d poll errors), stopping the web server',

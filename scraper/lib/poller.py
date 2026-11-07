@@ -35,7 +35,8 @@ class Scraper:
             old = self.cfg
             self.cfg = cfg
         self.client.apply(host=cfg['host'], port=cfg['modbus_port'],
-                          unit=cfg['modbus_unit'], timeout=cfg['timeout'])
+                          unit=cfg['modbus_unit'], timeout=cfg['timeout'],
+                          auth=cfg.get('auth'), auth_key=cfg.get('auth_key'))
         if (old['host'], old['modbus_port'], old['modbus_unit']) != (cfg['host'], cfg['modbus_port'], cfg['modbus_unit']):
             self.client.close()
 

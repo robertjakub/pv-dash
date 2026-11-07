@@ -31,9 +31,11 @@ from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, describe_node, grouped_rows, match_setting_path
-from common.config import default_profile_path, is_loopback_host, load_token_file, parse_listen, parse_secret, parse_upstream, resolve_profile_file
+from common.config import default_profile_path, is_loopback_host, load_token_file, parse_auth_type, parse_listen, \
+    parse_secret, parse_upstream, resolve_profile_file
 from common.dump import SECRET_REMOVED, dump_filter
 from common import dump as state
+from common.protocol import AUTH_MIN_KEY
 from .config import build_sources, load_device_profile
 from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, KNOWN_VERBS
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
@@ -534,6 +536,31 @@ class ControlServer:
             v = self._typed(key, val)
             s.client.apply(unit=v)
             return '%d' % v
+        if key == 'modbus/auth':
+            try:
+                v = parse_auth_type(val, 'modbus/auth')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if v and not s.client.auth_key:
+                raise ValueError('the suite auth needs a key: set modbus auth key <value> first '
+                                 '(min %d characters)' % AUTH_MIN_KEY)
+            with s.lock:
+                s.cfg['auth'] = v
+            s.client.auth = v
+            s.client.close()   # the next poll reconnects — and handshakes when suite is on
+            return v or 'none'
+        if key == 'modbus/auth/key':
+            try:
+                v = parse_secret(val, 'modbus/auth/key')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if v is not None and len(v) < AUTH_MIN_KEY:
+                raise ValueError('modbus/auth/key must be at least %d characters, got %d' % (AUTH_MIN_KEY, len(v)))
+            with s.lock:
+                s.cfg['auth_key'] = v
+            s.client.auth_key = v
+            s.client.close()   # the session re-proves the new key on the next connect
+            return '<set>'
         if key == 'max-clients':
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
@@ -738,6 +765,10 @@ class ControlServer:
             return '<set>' if self.ops_token else 'off'   # the secret never renders
         if key in ('auth/token', 'auth/token-file'):
             return '<set>' if cfg['auth_token'] else 'off'   # the secret never renders
+        if key == 'modbus/auth':
+            return cfg.get('auth') or 'none'
+        if key == 'modbus/auth/key':
+            return '<set>' if cfg.get('auth_key') else 'none'   # the secret never renders
         if key == 'dump/path':
             return self.dump_path or 'off'
         if key == 'dump/restore-on-start':
@@ -770,6 +801,7 @@ class ControlServer:
             'modbus/upstream': cfg['upstream'],
             'modbus/unit': cfg['modbus_unit'],
             'modbus/offset': cfg['modbus_offset'],
+            'modbus/auth': cfg.get('auth') or 'none',
             'interval': cfg['interval'],
             'timeout': cfg['timeout'],
             'profile': cfg['profile'],
@@ -963,6 +995,7 @@ class ControlServer:
             'upstream=%s:%d' % (cfg['host'], cfg['modbus_port']),
             'unit=%d' % cfg['modbus_unit'],
             'offset=%d' % cfg['modbus_offset'],
+            'modbus_auth=%s' % (cfg.get('auth') or 'none'),
             'timeout=%s' % secs(cfg['timeout']),
             'listen=%s' % cfg['listen'],
             'control=%s' % self.describe(),
@@ -994,8 +1027,9 @@ class ControlServer:
         gate = self.httpd.gate if self.httpd else None
         rows = [
             'version   modbus-scraper %s' % version_string(),
-            'upstream  %s:%d unit %d (offset %d), timeout %s, last poll %s%s'
+            'upstream  %s:%d unit %d (offset %d), timeout %s, modbus auth %s, last poll %s%s'
             % (cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['modbus_offset'], secs(cfg['timeout']),
+               cfg.get('auth') or 'none',
                'never' if not last_poll else '%s ago' % secs(now - last_poll),
                '' if s.up else ' (FAILING)'),
             'listen    %s, control %s' % (cfg['listen'], self.describe()),

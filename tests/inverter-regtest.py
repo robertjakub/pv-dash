@@ -153,7 +153,7 @@ def main():
         check('show status carries clients=', st.get('clients') == '1', str(st.get('clients')))
         check('show status carries metrics=off (no endpoint)', st.get('metrics') == 'off', str(st.get('metrics')))
         ins = ctl(A_CTL, 'inspect')
-        check('inspect carries the modbus row', 'modbus    127.0.0.1:%d, clients 1 (limit 1, timeout 5.00m, per-ip none, connect-acl any)' % A_MODBUS in ins,
+        check('inspect carries the modbus row', 'modbus    127.0.0.1:%d, clients 1 (limit 1, timeout 5.00m, per-ip none, connect-acl any, auth none)' % A_MODBUS in ins,
               [l for l in ins.splitlines() if l.startswith('modbus')])
         check('inspect carries the metrics row', 'metrics   off' in ins,
               [l for l in ins.splitlines() if l.startswith('metrics')])
@@ -725,6 +725,93 @@ def main():
             r = subprocess.run([sys.executable, tool, '--man'], capture_output=True, text=True, timeout=30)
             check('--man: %s prints the page' % os.path.basename(tool),
                   r.returncode == 0 and r.stdout.startswith('.TH %s 1' % title), r.stdout[:40] or r.stderr[-80:])
+
+        # ---- the suite auth (instance L): the fake demands the crypt
+        #      handshake before any frame — a good key speaks plain Modbus,
+        #      a wrong key gets ERR, a plain client is dropped, the knobs
+        #      are live, the key is a secret
+        sys.path.insert(0, REPO)
+        from common.protocol import AUTH_MAGIC, auth_handshake_client
+
+        L_MODBUS, L_CTL = 15991, 15992
+        L_KEY = 'inv-suite-key-16chars!'
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(L_MODBUS),
+                                       '--control-port', str(L_CTL), '--auth', 'suite',
+                                       '--auth-key', L_KEY],
+                                      stdout=open(LOG + '.l', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(1.1)
+        c = connect(L_MODBUS)
+        auth_handshake_client(c, L_KEY)
+        txn, unit, body = exchange(c, read_req(1, 3, 32064, 2), 1)
+        check('suite auth: the proved client speaks plain Modbus', txn == 1 and body[0] == 3, body.hex())
+        c.close()
+        c = connect(L_MODBUS)
+        check('suite auth: a silent plain client lingers (the client-timeout story, not the auth)', eof_soon(c, 1.5) is False)
+        c.close()
+        c = connect(L_MODBUS)
+        c.sendall(b'\x00' * 52)   # 52 bytes that are not the handshake: the magic fails
+        c.settimeout(3.0)
+        verdict = c.recv(3)
+        after = c.recv(4096)      # the refusal closes the connection
+        c.close()
+        check('suite auth: a non-handshake peer gets ERR then EOF', verdict == b'ERR' and after == b'',
+              (verdict + after).hex())
+        c = connect(L_MODBUS)
+        try:
+            auth_handshake_client(c, 'wrong-key-16chars00')
+            check('suite auth: the wrong key is rejected', False, 'no error raised')
+        except Exception as e:
+            check('suite auth: the wrong key is rejected (ERR)',
+                  'rejected' in str(e) or 'handshake' in str(e), str(e))
+        c.close()
+        # the raw wire: a bad magic gets the ERR verdict verbatim
+        c = connect(L_MODBUS)
+        c.sendall(b'XXXX' + b'\x00' * 48)
+        verdict = b''
+        try:
+            c.settimeout(3.0)
+            verdict = c.recv(3)
+        except OSError:
+            pass
+        c.close()
+        check('suite auth: a bad magic answers ERR verbatim', verdict == b'ERR', verdict.hex())
+        tx = ctl(L_CTL, 'show modbus auth')
+        check('suite auth: show modbus auth reads suite', tx == 'ok modbus/auth=suite', tx)
+        tx = ctl(L_CTL, 'show modbus auth key')
+        check('suite auth: the key never shows', tx.startswith('err modbus/auth/key is a secret'), tx[:80])
+        tx = ctl(L_CTL, 'unset modbus auth key')
+        check('suite auth: unset refuses the key (no defaults entry)', tx.startswith('err unknown setting'), tx[:80])
+        tx = ctl(L_CTL, 'set modbus auth key short')
+        check('suite auth: a short key refuses on the wire', tx.startswith('err modbus/auth/key must be at least 16'), tx[:100])
+        tx = ctl(L_CTL, 'set modbus auth key %s' % ('x' * 16))
+        check('suite auth: the key rotates live', tx.startswith('ok modbus/auth/key=<set>'), tx[:80])
+        c = connect(L_MODBUS)
+        try:
+            auth_handshake_client(c, L_KEY)
+            check('suite auth: the old key no longer proves', False, 'accepted')
+        except Exception:
+            check('suite auth: the old key no longer proves (ERR)', True)
+        c.close()
+        c = connect(L_MODBUS)
+        auth_handshake_client(c, 'x' * 16)
+        txn, unit, body = exchange(c, read_req(2, 3, 32064, 2), 2)
+        check('suite auth: the rotated key speaks', txn == 2 and body[0] == 3, body.hex())
+        c.close()
+        tx = ctl(L_CTL, 'set modbus auth none')
+        check('suite auth: the scheme disables live', tx.startswith('ok modbus/auth=none'), tx[:80])
+        c = connect(L_MODBUS)
+        txn, unit, body = exchange(c, read_req(3, 3, 32064, 2), 3)
+        check('suite auth: none serves a plain client again', txn == 3 and body[0] == 3, body.hex())
+        c.close()
+        tx = ctl(L_CTL, 'set modbus auth suite')
+        check('suite auth: re-enabling without a key change works (the key persists)',
+              tx.startswith('ok modbus/auth=suite'), tx[:80])
+        c = connect(L_MODBUS)
+        auth_handshake_client(c, 'x' * 16)
+        c.close()
+        logl = open(LOG + '.l').read()
+        check('suite auth: the failed proofs are logged', 'suite auth failed for' in logl)
+        check('suite auth: the listening line names the scheme', 'modbus auth suite' in logl)
 
         # ---- the listening line documents the policy
         log = open(LOG).read()

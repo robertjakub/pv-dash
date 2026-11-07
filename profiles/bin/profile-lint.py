@@ -2,8 +2,9 @@
 """The profile linter: validate every profiles/profiles/*.json against the
 family schema and the shared vocabulary — the shapes the cache/fake/scraper
 all trust. Checks: the required keys and their order, the register bounds,
-the type width, the fc, the per-entry ttl, the mappings, the duplicate names,
-the same-fc overlaps, the terse-ASCII style. Exits 1 when anything is off.
+the type width, the fc, the per-entry ttl, the mappings, the write acl
+tree, the duplicate names, the same-fc overlaps, the terse-ASCII style.
+Exits 1 when anything is off.
 
   python3 profiles/bin/profile-lint.py            # lint profiles/profiles/*.json
   python3 profiles/bin/profile-lint.py my.json    # lint specific files
@@ -20,6 +21,100 @@ from lib.statics import MAX_REGISTERS, REGISTER_TYPES   # noqa: E402
 
 KEY_ORDER = ['name', 'register', 'type', 'scale', 'desc']
 WIDTHS = {'i16': 1, 'u16': 1, 'i32': 2, 'u32': 2}
+
+
+def lint_matcher(v, where):
+    """One rule matcher: 'any'/'none', START:COUNT (a string, a list or a
+    {"START:COUNT": "desc"} map)."""
+    issues = []
+    if isinstance(v, str):
+        t = v.strip().lower()
+        if t in ('any', 'none'):
+            return issues
+        items = [t]
+    elif isinstance(v, dict):
+        for k, d in v.items():
+            t = str(k).strip().lower()
+            if t in ('any', 'none'):
+                continue
+            try:
+                start, count = (int(x) for x in t.split(':'))
+            except ValueError:
+                issues.append('%s: %r must be START:COUNT' % (where, k))
+                continue
+            if start < 0 or count < 1 or start + count > MAX_REGISTERS:
+                issues.append('%s: range %d:%d out of bounds (0..%d)'
+                              % (where, start, count, MAX_REGISTERS - 1))
+            if not isinstance(d, str) or not d.strip() or not d.isascii():
+                issues.append("%s entry %r: the description must be terse ASCII" % (where, k))
+        return issues
+    elif isinstance(v, list):
+        items = v
+    else:
+        return ['%s must be a range, a list of ranges, a {"START:COUNT": "desc"} map, '
+                '"any" or "none"' % where]
+    for x in items:
+        if not isinstance(x, str) or x.strip().lower() in ('any', 'none'):
+            issues.append('%s: %r must be START:COUNT (the words any/none stand alone)'
+                          % (where, x))
+            continue
+        try:
+            start, count = (int(t) for t in x.strip().lower().split(':'))
+        except ValueError:
+            issues.append('%s: %r must be START:COUNT' % (where, x))
+            continue
+        if start < 0 or count < 1 or start + count > MAX_REGISTERS:
+            issues.append('%s: range %d:%d out of bounds (0..%d)'
+                          % (where, start, count, MAX_REGISTERS - 1))
+    return issues
+
+
+def lint_desc(d, where):
+    if d is not None and (not isinstance(d, str) or not d.strip() or not d.isascii()):
+        return ['%s: "desc" must be terse ASCII' % where]
+    return []
+
+
+def lint_acl(data, path):
+    """The optional "acl" tree: keyed by access kind ("write" is the one
+    the cache speaks). The gate is an object with optional "allow"/"deny"
+    (+ "desc"), or an ordered rule list — one {"allow"|"deny"|"defer":
+    matcher} object per rule (+ an optional "desc" each). Returns the
+    issue list."""
+    issues = []
+    acl = data.get('acl')
+    if not isinstance(acl, dict) or not acl:
+        return ['"acl" must be a non-empty object keyed by the access kind']
+    for kind, gate in acl.items():
+        if kind != 'write':
+            issues.append('"acl" kind %r is not known (the cache speaks "write")' % kind)
+            continue
+        base = '%s acl/write' % os.path.basename(path)
+        if isinstance(gate, dict):
+            for k in gate:
+                if k not in ('allow', 'deny', 'desc'):
+                    issues.append('%s: unknown key %r (allow/deny/desc, or the rule-list form)' % (base, k))
+            issues.extend(lint_desc(gate.get('desc'), base))
+            for side in ('allow', 'deny'):
+                if side in gate:
+                    issues.extend(lint_matcher(gate[side], '%s/%s' % (base, side)))
+        elif isinstance(gate, list):
+            if not gate:
+                issues.append('%s: the rule list is empty' % base)
+            for i, rule in enumerate(gate):
+                where = '%s rule %d' % (base, i + 1)
+                if not isinstance(rule, dict) or not rule:
+                    issues.append('%s must be an object with one verb (allow/deny/defer)' % where)
+                    continue
+                verbs = [k for k in rule if k != 'desc']
+                if len(verbs) != 1 or verbs[0] not in ('allow', 'deny', 'defer'):
+                    issues.append('%s: exactly one verb (allow/deny/defer)' % where)
+                    continue
+                issues.extend(lint_desc(rule.get('desc'), where))
+                issues.extend(lint_matcher(rule[verbs[0]], where))
+        else:
+            issues.append('%s must be an object (allow/deny) or a rule list' % base)
+    return issues
 
 
 def lint(path):
@@ -107,6 +202,8 @@ def lint(path):
             if ofc == fc and start < oend and ostart < end:
                 issues.append('%s (%s): the range overlaps %s (%d:%d)'
                               % (label, name, oname, ostart, oend - ostart))
+    if 'acl' in data:
+        issues.extend(lint_acl(data, path))
     return len(entries), issues
 
 

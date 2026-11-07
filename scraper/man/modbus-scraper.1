@@ -21,6 +21,13 @@ the poller) and names the register in the log. A modbus-cache in front of
 the device is detected automatically (its synthesized diagnostics block)
 and adds the device-up / cache-age / cache-uptime gauges.
 .PP
+Modbus auth (\fB--auth\fR): with \fBsuite\fR the session proves the
+shared key (\fB--auth-key\fR, min 16 characters) with a crypt handshake
+right after every connect \(em 52 bytes: magic, fresh nonce,
+HMAC\-SHA256 proof; the peer answers \fBOK\fR and plain Modbus follows,
+or \fBERR\fR and the connection fails (the poller keeps retrying).
+Empty auth (the default) = no auth at all.
+.PP
 The exposition endpoint is the tool's serving surface: the connection caps
 (\fB--max-clients\fR total, \fB--max-conn-per-ip\fR per peer, extras
 get an immediate 503), the idle keep-alive kick (\fB--client-timeout\fR)
@@ -50,6 +57,18 @@ Modbus unit id (default: config, $MODBUS_UNIT or 1)
 .TP
 .BI \-\-modbus\-offset " N"
 added to register addresses (default: config, $MODBUS_OFFSET or 0)
+.TP
+.B \-\-auth
+the inverter's Modbus auth scheme: `suite` proves the shared auth\-key
+with a crypt handshake right after every connect (the peer answers OK,
+or ERR and the connection fails — the poller keeps retrying); none/empty
+= no auth at all (default: config, $AUTH or none)
+.TP
+.B \-\-auth\-key
+the shared key the suite handshake proves (min 16 characters); the value
+may be `file:<path>` — the first line of an owner\-only 0600 file (a
+systemd LoadCredential rides as file:/run/credentials/...) (default:
+config, $AUTH_KEY)
 .TP
 .BI \-\-timeout " N"
 Modbus timeout in seconds (default: config, $TIMEOUT or 3)

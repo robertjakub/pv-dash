@@ -21,6 +21,8 @@ let
     (setLine "upstream" cfg.upstream)
     (setLine "modbus-unit" (toString cfg.modbusUnit))
     (setLine "modbus-offset" (toString cfg.modbusOffset))
+    (lib.optionals (cfg.auth != null) [ (setLine "auth" cfg.auth) ])
+    (lib.optionals (cfg.authKey != null) [ (setLine "auth-key" cfg.authKey) ])
     (setLine "timeout" (toString cfg.timeout))
     (setLine "max-kwp" (toString cfg.maxKwp))
     (setLine "max-grid-kw" (toString cfg.maxGridKw))
@@ -103,6 +105,26 @@ in
       type = lib.types.int;
       default = 0;
       description = "Offset added to register addresses (set -1 for gateways that need 0-based addressing).";
+    };
+
+    auth = lib.mkOption {
+      type = lib.types.nullOr (lib.types.enum [ "suite" ]);
+      default = null;
+      description = ''
+        The inverter's Modbus auth scheme the session must speak: "suite"
+        proves the shared authKey with a crypt handshake right after every
+        connect (the peer answers OK, or ERR and the connection fails —
+        the poller keeps retrying). null = no auth at all.
+      '';
+    };
+
+    authKey = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The shared key the suite handshake proves (min 16 characters).
+        Needs auth = "suite".
+      '';
     };
 
     battery = lib.mkOption {

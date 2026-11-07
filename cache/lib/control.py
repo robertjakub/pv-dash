@@ -22,8 +22,10 @@ import threading
 import time
 
 from common.version import version_string
-from common.config import default_profile_path, parse_upstream, resolve_profile_file, load_token_file, parse_secret
+from common.config import default_profile_path, parse_auth_type, parse_upstream, resolve_profile_file, \
+    load_token_file, parse_secret
 from common.dump import SECRET_REMOVED, dump_filter
+from common.protocol import AUTH_MIN_KEY
 from common.cred import peer_uid, parse_trust_uids
 from common.human import secs
 from common.logutil import UtcFormatter
@@ -565,13 +567,56 @@ class ControlServer:
             p.upstream.close()   # the in-flight session spoke the old unit
             p.config['unit'] = v
             return '%d' % v
+        if key == 'modbus/auth':
+            try:
+                v = parse_auth_type(val, 'modbus/auth')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if v and not p.config.get('auth_key'):
+                raise ValueError('the suite auth needs a key: set modbus auth key <value> first '
+                                 '(min %d characters)' % AUTH_MIN_KEY)
+            p.config['auth'] = v   # the next connection handshakes; the standing ones keep their session
+            return v or 'none'
+        if key == 'modbus/auth/key':
+            try:
+                v = parse_secret(val, 'modbus/auth/key')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if v is not None and len(v) < AUTH_MIN_KEY:
+                raise ValueError('modbus/auth/key must be at least %d characters, got %d' % (AUTH_MIN_KEY, len(v)))
+            p.config['auth_key'] = v
+            return '<set>'
+        if key == 'modbus/auth-upstream':
+            try:
+                v = parse_auth_type(val, 'modbus/auth-upstream')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if v and not p.config.get('auth_upstream_key'):
+                raise ValueError('the suite auth needs a key: set modbus auth-upstream-key <value> first '
+                                 '(min %d characters)' % AUTH_MIN_KEY)
+            p.config['auth_upstream'] = v
+            p.upstream.auth = v
+            p.upstream.close()   # the session re-proves the new scheme on the next exchange
+            return v or 'none'
+        if key == 'modbus/auth-upstream-key':
+            try:
+                v = parse_secret(val, 'modbus/auth-upstream-key')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if v is not None and len(v) < AUTH_MIN_KEY:
+                raise ValueError('modbus/auth-upstream-key must be at least %d characters, got %d'
+                                 % (AUTH_MIN_KEY, len(v)))
+            p.config['auth_upstream_key'] = v
+            p.upstream.auth_key = v
+            p.upstream.close()   # the session re-proves the new key on the next exchange
+            return '<set>'
         if key == 'write/allow':
             if val not in ('on', 'off'):
                 raise ValueError('allow-write must be on|off')
             p.allow_write = val == 'on'
             return val
         if key == 'write/registers':
-            p.write_ranges = parse_write_registers(val, 'write-registers')
+            p.set_write_registers(parse_write_registers(val, 'write-registers'))
             return p.describe_write_ranges()
         if key == 'limits/max-clients':
             v = numi(val, 'max-clients', 'clients')
@@ -896,11 +941,15 @@ class ControlServer:
             else:
                 cfg['selection'] = parse_selection(val)
             saved = p.config
+            saved_gate = (p.write_registers, p.write_ranges)
             p.config = cfg
             try:
+                if p.write_registers == 'profile':
+                    p.write_ranges = p._resolve_write_ranges(p.write_registers)   # the new profile's gate
                 p.apply_map()      # ValueError on a bad file: swap and config roll back
             except Exception:
                 p.config = saved
+                p.write_registers, p.write_ranges = saved_gate
                 raise
             return cfg['profile'] if key == 'modbus/profile' else (cfg['selection'] or 'all')
         raise ValueError('unknown setting %s' % key)
@@ -912,7 +961,7 @@ class ControlServer:
         cfg = dict(p.config)
         cfg.update(interval=p.interval, read_delay=p.read_delay, merge_gap=p.merge_gap,
                    cache_ttl=p.cache.cache_ttl, allow_write=p.allow_write,
-                   write_registers=p.write_ranges, max_clients=p.max_clients,
+                   write_registers=p.write_registers, max_clients=p.max_clients,
                    client_timeout=p.client_timeout, requests_audit_s=p.requests_audit_s,
                    connect_acl=p.connect_acl, write_acl=p.write_acl, timeout=p.upstream.timeout,
                    upstream='%s:%d' % (p.upstream.host, p.upstream.port),
@@ -1008,6 +1057,14 @@ class ControlServer:
             return '%s:%d' % (p.upstream.host, p.upstream.port)
         if key == 'modbus/unit':
             return '%d' % p.upstream.unit
+        if key == 'modbus/auth':
+            return p.config.get('auth') or 'none'
+        if key == 'modbus/auth/key':
+            return '<set>' if p.config.get('auth_key') else 'none'   # the secret never renders
+        if key == 'modbus/auth-upstream':
+            return p.config.get('auth_upstream') or 'none'
+        if key == 'modbus/auth-upstream-key':
+            return '<set>' if p.config.get('auth_upstream_key') else 'none'   # the secret never renders
         if key == 'write/allow':
             return 'on' if p.allow_write else 'off'
         if key == 'write/registers':
@@ -1117,9 +1174,11 @@ class ControlServer:
             'client_timeout=%s' % (secs(p.client_timeout) if p.client_timeout else 'none'),
             'max_conn_per_ip=%s' % (p.conn_gate.max_per_ip or 'none'),
             'connect_acl=%s' % acl_summary(p.connect_acl),
+            'auth=%s' % (p.config.get('auth') or 'none'),
+            'upstream_auth=%s' % (p.config.get('auth_upstream') or 'none'),
             'writes=%s' % ('enabled' if p.allow_write else 'disabled'),
             'write_acl=%s' % acl_summary(p.write_acl),
-            'write_allow_list=%s' % p.describe_write_ranges(),
+            'write_allow_list=%s' % p.describe_write_gate(),
             'requests_audit=%s' % ('off' if not p.requests_audit_s else secs(p.requests_audit_s)),
             'dump=%s' % ('off' if not p.dump_path else '%s every %s%s' % (
                 p.dump_path, 'off' if not p.dump_interval else secs(p.dump_interval),
@@ -1163,12 +1222,14 @@ class ControlServer:
         cfg = p.config or {}
         rows = [
             'version   modbus-cache %s' % version_string(),
-            'upstream  %s:%d unit %d, timeout %s, last poll %s%s' % (p.upstream.host, p.upstream.port,
-                                                                     p.upstream.unit, secs(p.upstream.timeout), age,
-                                                                     '' if p.poll_ok else ' (FAILING)'),
-            'listen    %s:%d, control %s, connect-acl %s'
+            'upstream  %s:%d unit %d, timeout %s, upstream auth %s, last poll %s%s' % (p.upstream.host, p.upstream.port,
+                                                                                       p.upstream.unit, secs(p.upstream.timeout),
+                                                                                       p.config.get('auth_upstream') or 'none',
+                                                                                       age,
+                                                                                       '' if p.poll_ok else ' (FAILING)'),
+            'listen    %s:%d, control %s, connect-acl %s, client auth %s'
             % (p.listen_addr[0], p.listen_addr[1], self.describe(),
-               acl_summary(p.connect_acl)),
+               acl_summary(p.connect_acl), p.config.get('auth') or 'none'),
             'profile   %s, map v%d' % (cfg.get('profile') or p.profile,
                                        p.cache.map_version),
             'selection %s' % (cfg.get('selection') or 'all'),
@@ -1191,7 +1252,7 @@ class ControlServer:
             'writes    %s, write-acl %s, write-registers %s'
             % ('ENABLED' if p.allow_write else 'disabled',
                acl_summary(p.write_acl),
-               p.describe_write_ranges()),
+               p.describe_write_gate()),
             'audit     %s%s' % ('off' if p.audit is None else (p.audit.path if p.audit.path != '-' else 'stdout'),
                                 ', requests accounting every %s' % secs(p.requests_audit_s) if p.audit and p.requests_audit_s else ''),
             'dump      %s' % ('off' if not p.dump_path else '%s, every %s (plus the dump command and the shutdown)'
@@ -1281,6 +1342,8 @@ class ControlServer:
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'modbus/profile': p.config.get('profile'), 'modbus/selection': p.config.get('selection') or 'all',
             'acl/connect': self._acl_text(p.connect_acl), 'acl/write': self._acl_text(p.write_acl),
+            'modbus/auth': p.config.get('auth') or 'none',
+            'modbus/auth-upstream': p.config.get('auth_upstream') or 'none',
             'modbus/upstream': '%s:%d' % (p.upstream.host, p.upstream.port),
             'modbus/unit': p.upstream.unit,
             'modbus/timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,

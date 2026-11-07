@@ -28,8 +28,12 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** | **✓** | **✓** |
 | k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** | **✓** | **✓** |
 | k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** | **✓** | **✓** |
+| k | `auth` | `modbus` | `set modbus auth` | ✓ live | ✓ live | ✓ live |  |
+| k | `auth-key` | `modbus` | `set modbus auth key` | ✓ live+secret | ✓ live+secret | ✓ live+secret |  |
 | k | `auth-token` |  | `set auth token` |  | ✓ live+secret |  |  |
 | k | `auth-token-file` |  | `set auth token-file` |  | ✓ live+secret |  |  |
+| k | `auth-upstream` |  | `set modbus auth-upstream` | ✓ live |  |  |  |
+| k | `auth-upstream-key` |  | `set modbus auth-upstream-key` | ✓ live+secret |  |  |  |
 | c | `batt` |  | `set batt` |  |  | ✓ live |  |
 | k | `battery` |  | `set battery` |  | ✓ | ✓ live | ✓ live |
 | k | `battery-kwh` |  | `set battery-kwh` |  |  | ✓ live |  |
@@ -89,7 +93,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `metrics-spec` |  | *(startup-only)* |  | ✓ |  |  |
 | k | `metrics-token` |  | `set metrics token` | ✓ live+secret |  | ✓ live+secret | ✓ live+secret |
 | k | `metrics-token-file` |  | `set metrics token-file` | ✓ live+secret |  | ✓ live+secret | ✓ live+secret |
-| c | `modbus` |  | *(startup-only)* | ✓ | ✓ |  |  |
+| c | `modbus` |  | *(startup-only)* | ✓ | ✓ | ✓ |  |
 | k | `modbus-offset` |  | `set modbus offset` |  | ✓ live |  |  |
 | k | `modbus-unit` | `modbus` | `set modbus unit` |  | ✓ live |  |  |
 | c | `mppt` |  | `set mppt` |  |  | ✓ live |  |

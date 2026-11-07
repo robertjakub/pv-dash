@@ -54,6 +54,7 @@ pv-suite/
 ├── docker/       # one alpine image per Modbus tool + the compose demo stack ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
 ├── docs/         # the family-level docs: the [security audit](docs/AUDIT.md), the
+│                 #   [Modbus protocol reference](docs/MODBUS.md), the
 │                 #   [family-wide TODO](docs/TODO.md) (every open item, one file — the
 │                 #   per-tool TODOs keep the Done history), the [SBOM](docs/sbom/SBOM.md)
 ├── CHANGELOG.md  # the release history (the suite versions as one, from common/version.py)

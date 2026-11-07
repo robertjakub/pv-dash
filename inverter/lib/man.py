@@ -32,7 +32,15 @@ outage machine (random blackouts). All machines integrate with a simulated
 clock \\(em UTC by default, freezable (\\fB--time\\fR) and scalable
 (\\fB--time-scale\\fR for time-lapse). \\fB--static\\fR replaces the day with
 constant demo values. Writes (FC06/FC16) land in an overlay the scrapers
-read; \\fB--chaos\\fR answers a fraction of requests hostile."""
+read; \\fB--chaos\\fR answers a fraction of requests hostile.
+.PP
+Modbus auth (\\fB--auth\\fR): with \\fBsuite\\fR the fake's clients prove
+a shared key (\\fB--auth-key\\fR, min 16 characters) with a crypt
+handshake right after every connect \\(em 52 bytes: magic, fresh nonce,
+HMAC\\-SHA256 proof; the fake answers \\fBOK\\fR (plain Modbus follows) or
+\\fBERR\\fR (the client is dropped before it ever sees a register).
+Empty auth (the default) = no auth at all \\(em the trusted-LAN posture
+stands."""
     signals = """.SH SIGNALS
 .TP
 .B SIGHUP
@@ -52,9 +60,11 @@ TCP requires the token when configured). Commands: \\fBset\\fR/\\fBunset\\fR/
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
 scenario, chaos, seed, battery, battery-state, strict, static, max-kwp,
 battery-kwh, max-clients, client-timeout, max-conn-per-ip, metrics-server,
-register, profile, log-level \\(em and the token lives: control token,
-the ops token, metrics token, each rotating live, the value never
-rendering \\(em \\fBshow <secret>\\fR refuses),
+register, profile, log-level, modbus auth (the suite scheme; the key
+\\(em modbus auth key \\(em is a secret: \\fBshow\\fR refuses it) \\(em
+and the token lives: control token, the ops token, metrics token, each
+rotating live, the value never rendering \\(em \\fBshow <secret>\\fR
+refuses),
 \\fBshow status\\fR, \\fBshow connections\\fR (the live Modbus clients: peer,
 age, requests), \\fBshow registers\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
@@ -76,7 +86,9 @@ and
     security = """.SH SECURITY
 The fake is a development/test instrument, not a security-first design
 (the audit's F11): the Modbus surface speaks to any peer that can reach
-the port \\(em no TLS, no auth, no ACL \\(em and the metrics endpoint
+the port \\(em no TLS, no ACL; the optional \\fB--auth suite\\fR
+shared-key handshake authenticates clients when a demo wants it \\(em and
+the metrics endpoint
 serves without a token unless one is configured. Run it on a trusted,
 LAN-isolated network, next to the tools it is meant to serve.
 \\fB--max-clients\\fR/\\fB--client-timeout\\fR cap runaway connections and

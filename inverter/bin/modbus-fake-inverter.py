@@ -38,7 +38,7 @@ import os
 import threading
 
 from common.audit import AuditLog
-from common.config import acl_text, load_token_file, parse_acl, parse_listen, parse_secret
+from common.config import acl_text, check_auth_key, load_token_file, parse_acl, parse_auth_type, parse_listen, parse_secret
 from common.cred import parse_trust_uids
 from common.options import build_parser
 from common.version import version_string
@@ -100,9 +100,10 @@ def configured_defaults(args, frozen, profile_text):
     """Every setting's configured startup value — what `unset <setting>`
     restores. The secret rows (control/token, control/token-file,
     control/ops/token, control/ops/token-file, metrics/token,
-    metrics-token-file) carry NO entry: `unset` refuses them (the
+    metrics-token-file, auth-key) carry NO entry: `unset` refuses them (the
     metrics/token treatment) — a secret never renders, never re-applies."""
     connect_acl = parse_acl(args.connect_acl or os.environ.get('CONNECT_ACL'), 'connect-acl')
+    modbus_auth = parse_auth_type(args.auth or os.environ.get('AUTH'), 'auth')
     return {
         'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'grid': 'auto', 'soc': 'auto', 'cloud': 'clear',
         'time': '%02d:%02d' % (int(frozen), round((frozen % 1.0) * 60)) if frozen is not None else 'auto',
@@ -125,6 +126,7 @@ def configured_defaults(args, frozen, profile_text):
         'client-timeout': '%g' % args.client_timeout,
         'max-conn-per-ip': str(args.max_conn_per_ip),
         'connect-acl': acl_text(connect_acl),
+        'modbus/auth': modbus_auth or 'none',
         'metrics-server': 'on' if args.metrics_server else 'off',
         'profile': profile_text,
         'log-level': args.log_level,
@@ -211,6 +213,12 @@ def main():
                           profile=load_profile(profile_path), seed=args.seed)
     simulator.set_time_scale(args.time_scale)   # validated above; before any machine reads the clock
     connect_acl = parse_acl(args.connect_acl or os.environ.get('CONNECT_ACL'), 'connect-acl')
+    modbus_auth = parse_auth_type(args.auth or os.environ.get('AUTH'), 'auth')
+    modbus_auth_key = check_auth_key(
+        parse_secret((args.auth_key or os.environ.get('AUTH_KEY') or '').strip() or None, 'auth-key'), 'auth-key')
+    if modbus_auth and not modbus_auth_key:
+        logger.error('the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)')
+        raise SystemExit(1)
     chaos = Chaos(args.chaos, seed=args.seed)
     target = resolve_control_target(args.control_port, args.port)
     dump_key = parse_secret((args.dump_key or os.environ.get('DUMP_KEY') or '').strip() or None, 'dump/key')
@@ -266,7 +274,7 @@ def main():
     if args.dry_run:
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')
-        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, per-ip limit %s, profile %s: %s, %d register(s), metrics server %s, control server %s)',
+        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, per-ip limit %s, modbus auth %s, profile %s: %s, %d register(s), metrics server %s, control server %s)',
                     args.host, args.port, args.unit, PEAK_RATIO * args.max_kwp * 1000.0,
                     mode,
                     'on' if args.battery else 'off',
@@ -276,6 +284,7 @@ def main():
                     args.max_clients or 'none',
                     '%gs' % args.client_timeout if args.client_timeout else 'never',
                     args.max_conn_per_ip or 'none',
+                    modbus_auth or 'none',
                     simulator.profile.description, profile_label(profile_path), len(simulator.profile.entries),
                     '%s:%d%s' % (metrics_listen[0], metrics_listen[1],
                                  ' (bearer token)' if metrics_token else '') if args.metrics_server else 'off',
@@ -287,7 +296,8 @@ def main():
                                                     daily=args.audit_daily, files=args.audit_files)
     fake = FakeInverter(args.unit, simulator, strict=args.strict, chaos=chaos,
                         max_clients=args.max_clients, client_timeout=args.client_timeout,
-                        max_conn_per_ip=args.max_conn_per_ip, connect_acl=connect_acl)
+                        max_conn_per_ip=args.max_conn_per_ip, connect_acl=connect_acl,
+                        auth=modbus_auth, auth_key=modbus_auth_key)
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,
@@ -303,6 +313,7 @@ def main():
                                     'control-ops-token-file': bool(control_ops_token_file),
                                     'metrics-token': bool(metrics_token),
                                     'metrics-token-file': bool(metrics_token_file),
+                                    'auth-key': bool(modbus_auth_key),
                                     'dump-key': bool(dump_key)}),
                                 dump_path=args.dump_path, restore_on_start=args.restore_on_start,
                                 dump_key=dump_key)

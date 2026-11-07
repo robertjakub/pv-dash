@@ -4,19 +4,24 @@ The limits come from lib/static.json (see statics.py)."""
 import socket
 import struct
 
-from common.protocol import ModbusError, recv_exact
+from common.protocol import ModbusError, auth_handshake_client, recv_exact
 from .statics import MAX_PDU, MAX_COUNT
 
 
 class ModbusTCP:
-    """FC3/FC4 register client; connects lazily, reconnects on any error."""
+    """FC3/FC4 register client; connects lazily, reconnects on any error.
+    The suite auth (auth='suite' + a >=16-char key) handshakes right after
+    every connect: the peer answers OK and the session speaks plain Modbus,
+    or ERR and the connection fails like any other."""
 
-    def __init__(self, host, port, unit, timeout, offset=0):
+    def __init__(self, host, port, unit, timeout, offset=0, auth=None, auth_key=None):
         self.host = host
         self.port = port
         self.unit = unit
         self.timeout = timeout
         self.offset = offset
+        self.auth = auth          # None = no auth | 'suite' = the crypt handshake
+        self.auth_key = auth_key  # the shared key the handshake proves
         self.sock = None
         self.txn = 0
 
@@ -28,8 +33,13 @@ class ModbusTCP:
                 pass
             self.sock = None
 
-    def apply(self, host=None, port=None, unit=None, timeout=None):
-        """Update the endpoint; the socket reconnects on the next read."""
+    _UNSET = object()
+
+    def apply(self, host=None, port=None, unit=None, timeout=None, auth=_UNSET, auth_key=_UNSET):
+        """Update the endpoint (and the auth material); the socket
+        reconnects on the next read. The auth kwargs are positional-aware:
+        pass them explicitly (None included — a reload that disables the
+        suite auth must reach the client)."""
         if host is not None:
             self.host = host
         if port is not None:
@@ -38,6 +48,10 @@ class ModbusTCP:
             self.unit = unit
         if timeout is not None:
             self.timeout = timeout
+        if auth is not self._UNSET:
+            self.auth = auth
+        if auth_key is not self._UNSET:
+            self.auth_key = auth_key
 
     def _recv_exact(self, n):
         try:
@@ -49,6 +63,8 @@ class ModbusTCP:
         self.close()
         self.sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
         self.sock.settimeout(self.timeout)
+        if self.auth == 'suite' and self.auth_key:
+            auth_handshake_client(self.sock, self.auth_key)
 
     def read_registers(self, addr, count, fc=3):
         if not 1 <= count <= MAX_COUNT:

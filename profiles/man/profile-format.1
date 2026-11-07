@@ -7,10 +7,10 @@ profile-format \- rewrite pv-suite device profiles into the canonical layout
 .SH DESCRIPTION
 Rewrites the given pv-suite device-profile JSON files in place into the
 canonical layout (the \fBsun2000.json\fR shape): the description first,
-then the mappings, then the registers \(em one mappings entry per line,
-one register per line, the keys in the family order. Content-preserving
-and idempotent: a profile already in shape comes back byte-for-byte
-unchanged.
+then the acl tree, then the mappings, then the registers \(em one
+mappings entry per line, one register per line, the keys in the family
+order. Content-preserving and idempotent: a profile already in shape
+comes back byte-for-byte unchanged.
 .PP
 Validate before/after with
 .BR profile-lint (1).

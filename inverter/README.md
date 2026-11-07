@@ -279,6 +279,7 @@ read-only ops token the same way):
 | `client-timeout` | seconds (`0` = never) | disconnect Modbus clients silent for this long — sheds connections from clients that died without closing (`--client-timeout` startup value, tunable live) |
 | `max-conn-per-ip` | `N` (`0` = no limit) | the per-peer-IP Modbus connection limit (`--max-conn-per-ip` startup value, tunable live) |
 | `connect-acl` | `any` \| `none` \| IP/CIDR list | the Modbus connect ACL (`--connect-acl` startup value, tunable live): who may connect to the Modbus surface at all |
+| `modbus auth` / `modbus auth key` | `suite` \| `none` / key | the auth scheme the fake's Modbus clients must speak (`--auth` startup value, tunable live): `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect and drops the client on `ERR`/anything else; `none`/empty = no auth at all — the key is a secret: **`show` refuses it**, `unset` refuses it |
 | `metrics-server` | `on`/`off` | the fake's own `/metrics` endpoint (default off; the address is `--metrics-listen`, tunable live); a token-less listen beyond loopback logs a warning |
 | `control token` / `control token-file` | `<token>` \| `off` | rotate the **admin control token** live (the sessions re-auth); `off` drops the token entirely (the trusted-LAN posture, F11). A secret: **`show` refuses it**, `unset` refuses it — pass it by flag/env/token-file |
 | `control ops token` / `control ops token-file` | `<token>` \| `off` | rotate the **read-only ops token** live (must differ from the admin token); `off` signs the ops shift out |
@@ -404,6 +405,8 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 | `--client-timeout` | `300` | disconnect Modbus clients silent for this many seconds (`0` = never) — sheds connections from clients that died without closing |
 | `--max-conn-per-ip` | `0` | refuse further Modbus connections from one peer IP past this many simultaneous connections (`0` = no per-IP limit) |
 | `--connect-acl` | any | the Modbus clients allowed to connect (the cache's `connect-acl`, mirrored): `"any"` (the default — the trusted-LAN posture), `"none"`, or a comma-separated list of IPs and CIDR prefixes, e.g. `127.0.0.1,10.48.0.0/16` (env `CONNECT_ACL`; live-settable, `show status` carries `connect_acl=`) |
+| `--auth` | `none` | the auth scheme the fake's Modbus clients must speak: `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect — the fake answers `OK` and the session speaks plain Modbus, or `ERR` and the client is dropped before it ever sees a register; `none`/empty = no auth at all (env `AUTH`; live-settable, `set modbus auth`) — see the fake's settings table |
+| `--auth-key` | none | the shared key the fake's clients prove with the suite handshake, **min 16 characters**; the value may be `file:<path>` — the first line of an owner-only `0600` file (env `AUTH_KEY`); the scraper takes the matching `--auth suite --auth-key …` |
 | `--timezone` | `utc` | clock the state machines integrate over (`utc` or `local`) |
 | `--time` | real clock | freeze simulated time `HH:MM` (zone-independent) |
 | `--time-scale` | `1` | the simulated clock speed: N× real time — a full simulated day takes 24/N real hours (`set time-scale` tunes it live) |
@@ -499,8 +502,10 @@ Honest scope of a demo device:
 
 > **The fake is a development tool — run it on a trusted, LAN-isolated
 > network.** It is deliberately *not* security-first design: the Modbus
-> surface speaks to any peer that can reach the port (no TLS, no auth, no
-> ACL — that is what the real device's network isolation is for), and its
+> surface speaks to any peer that can reach the port (no TLS, no ACL — that
+> is what the real device's network isolation is for; the optional
+> `--auth suite` shared-key handshake authenticates clients when a demo
+> wants it), and its
 > Prometheus `/metrics` serves without a token unless `--metrics-token` is
 > set. The audit (F11) accepts exactly this for a test instrument and asks
 > for the blunt mitigations only: **`--max-clients` / `--client-timeout`**

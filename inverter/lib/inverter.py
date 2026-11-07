@@ -9,7 +9,7 @@ import struct
 import threading
 import time
 
-from common.protocol import describe_fc, recv_exact
+from common.protocol import auth_handshake_server, describe_fc, recv_exact
 from common.connlimit import ConnGate
 from .statics import MAX_COUNT, MAX_PDU
 from common.version import version_string
@@ -19,7 +19,7 @@ logger = logging.getLogger('fake-inverter')
 
 class FakeInverter:
     def __init__(self, unit, simulator, strict=False, chaos=None, max_clients=64, client_timeout=300.0,
-                 max_conn_per_ip=0, connect_acl=None):
+                 max_conn_per_ip=0, connect_acl=None, auth=None, auth_key=None):
         self.unit = unit
         self.simulator = simulator
         self.strict = strict
@@ -34,6 +34,8 @@ class FakeInverter:
         self.client_timeout = max(0.0, float(client_timeout))   # 0 = never
         self.conn_gate = ConnGate(0, max(0, int(max_conn_per_ip)))   # 0 = no per-IP limit
         self.connect_acl = connect_acl    # None = any (the default); () = none; networks = the allow list
+        self.auth = auth                  # None = no auth | 'suite' = the crypt handshake before any frame
+        self.auth_key = auth_key          # the shared key the handshake demands
         self.client_lock = threading.Lock()
         self.client_count = 0
         self.clients = {}        # 'ip:port' -> {'since': monotonic, 'requests': n} (show connections)
@@ -57,12 +59,13 @@ class FakeInverter:
         srv.listen(16)
         self.srv = srv
         self.listen_addr = (host, port)
-        logger.info('fake inverter %s listening on %s:%d (unit %d, peak PV %gW, client limit %s, client timeout %s, per-ip limit %s, connect-acl %s)%s',
+        logger.info('fake inverter %s listening on %s:%d (unit %d, peak PV %gW, client limit %s, client timeout %s, per-ip limit %s, connect-acl %s, modbus auth %s)%s',
                     version_string(), host, port, self.unit, self.simulator.peak_w,
                     self.max_clients or 'none',
                     '%gs' % self.client_timeout if self.client_timeout else 'none',
                     self.conn_gate.max_per_ip or 'none',
                     'any' if self.connect_acl is None else ('none' if not self.connect_acl else '%d network(s)' % len(self.connect_acl)),
+                    self.auth or 'none',
                     ', chaos p=%.2f' % self.chaos.p if self.chaos and self.chaos.p else '')
         while True:
             try:
@@ -134,6 +137,19 @@ class FakeInverter:
         with self.client_lock:
             self.clients[key] = {'since': time.monotonic(), 'requests': 0}
         try:
+            # the suite auth (when enabled) gates the Modbus loop: the
+            # client speaks the handshake first, and one that cannot prove
+            # the key is dropped before it ever sees a register
+            if self.auth == 'suite' and self.auth_key:
+                try:
+                    proved = auth_handshake_server(client, self.auth_key)
+                except (ConnectionError, OSError) as e:
+                    logger.info('suite auth with %s:%d died mid-handshake (%s)', addr[0], addr[1], e)
+                    return
+                if not proved:
+                    logger.info('suite auth failed for %s:%d, closing', *addr[:2])
+                    return
+                logger.debug('client %s:%d passed the suite handshake', *addr[:2])
             while True:
                 self.requests += 1
                 txn, proto, length, unit = struct.unpack('>HHHB', recv_exact(client, 7))

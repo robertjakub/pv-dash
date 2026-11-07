@@ -8,6 +8,8 @@ failure policy (the cache logs and continues, the scraper dies)."""
 import ipaddress
 import os
 
+from common.protocol import AUTH_MIN_KEY
+
 
 def check_token_file_mode(path, label='token-file'):
     """The token-file discipline (F12 in docs/AUDIT.md): a token file must
@@ -138,6 +140,28 @@ def load_token_file(path, label='control-token-file'):
     if not token:
         raise SystemExit('%s %s: the file is empty' % (label, path))
     return token
+
+
+def parse_auth_type(text, label='auth'):
+    """The Modbus auth scheme: '' / none / off -> None (no auth at all —
+    the default); 'suite' -> 'suite' (the crypt handshake after every
+    connect); anything else fails fast with a clean one-liner."""
+    t = (text or '').strip().lower()
+    if t in ('', 'none', 'off'):
+        return None
+    if t == 'suite':
+        return 'suite'
+    raise SystemExit("invalid %s = %r: use 'suite', or none/empty for no auth" % (label, text))
+
+
+def check_auth_key(key, label='auth-key'):
+    """The suite handshake key's floor: at least 16 characters when set
+    (an empty/None key is the no-auth state, fine)."""
+    if key is None:
+        return None
+    if len(key) < AUTH_MIN_KEY:
+        raise SystemExit('invalid %s: at least %d characters, got %d' % (label, AUTH_MIN_KEY, len(key)))
+    return key
 
 
 def parse_secret(raw, label='secret'):

@@ -10,6 +10,63 @@ before the repo restructured into one suite.
 
 ## Unreleased
 
+### Added
+
+- **profiles** — **the write allow-list speaks the device profile**:
+  the cache's `write-registers` knob takes the new value **`profile`** —
+  the register gate compiles out of the device profile's `"acl"` tree
+  instead of a hand-spelled range list. The profile schema gains the
+  optional top-level `"acl"` object keyed by access kind, `"write"` is the
+  one the cache speaks: the gate is either an object with optional
+  `allow`/`deny` (+ a terse-ASCII `desc`), or an ordered rule list — one
+  `{"allow"|"deny"|"defer": matcher}` object per rule (+ an optional
+  `desc` each); a matcher is a `START:COUNT` range, a list of them, a
+  `{ "START:COUNT": "desc" }` map describing each entry, or the bare word
+  `any` (all registers) / `none`. The chain reads top to
+  bottom and **the last matching rule decides**; `defer` matches but
+  resets the decision back to refused, and an undecided register refuses
+  (the default deny) — the object form is the sugar for the chain
+  "allow, deny" (the deny wins; an absent allow is `any`, so a deny-only
+  gate carves its ranges out of everything). The shipped `deye-sg05lp3`
+  profile carries the first gate — `{"allow": ["127:2", "148:30"]}`: the
+  TOU schedule slots (148–177) and the grid-start registers (127–128) —
+  `set write-registers profile` with that profile refuses every write
+  outside those two spans. The gate re-resolves when the profile swaps
+  live (`set modbus profile ...`), refusing a profile without an
+  `acl`/`write` section (a gate that is not there would be silent);
+  `show write registers` answers `profile`, the status/inspect/start-log
+  render `profile (127:2,148:30)`, the dumps and `unset` keep the
+  re-appliable `profile` spelling. The profile linter validates the tree,
+  the formatter carries it canonically (description → acl → mappings →
+  registers), the profiles and cache READMEs, the man prose and the
+  OPTIONS table follow.
+
+- **everywhere** — **Modbus auth: the `suite` scheme**: the Modbus TCP
+  peers can now demand (and present) a proof-of-key handshake — one round
+  trip after the TCP connect and before any Modbus frame. The client sends
+  52 bytes: the 4-byte magic `PVA1`, a fresh 16-byte nonce and the
+  HMAC-SHA256 of the domain-tagged magic+nonce keyed by the shared key
+  (stdlib only); the server recomputes the proof and answers `OK` (plain
+  Modbus follows) or `ERR` (the connection is dead — the poller/upstream
+  treats it like any failed connect and retries). Empty auth (the default)
+  = no auth at all. Two knob pairs (`suite` or `none`; the keys min 16
+  characters, secret-marked — they never render back — and `file:<path>`
+  referenceable, live-settable): the **scraper** speaks the client side to
+  the inverter (`modbus/auth` + `modbus/auth/key` — `--auth`, `AUTH`,
+  `--auth-key`, `AUTH_KEY`); the **fake inverter** demands it from its
+  clients (the same `modbus/auth` pair); the **cache** runs both legs —
+  `modbus/auth` + `modbus/auth/key` gate its own clients (a failed proof
+  is dropped before it ever sees a frame) and
+  `modbus/auth-upstream` + `modbus/auth-upstream-key` (`--auth-upstream`,
+  `AUTH_UPSTREAM`, `--auth-upstream-key`, `AUTH_UPSTREAM_KEY`) authenticate
+  it toward the inverter. The handshake lives in `common/protocol.py`
+  (one implementation for the family); `show status` carries
+  `auth=`/`upstream_auth=` (cache) and `modbus_auth=` (scraper); the
+  NixOS modules gain `auth`/`authKey` (scraper) and
+  `auth`/`authKey`/`authUpstream`/`authUpstreamKey` (cache); the regtests
+  pin the good-key round trip, the wrong-key `ERR`, the plain-client drop
+  and the live `set` on all three shapes.
+
 ### Security
 
 - **everywhere** — **the state dumps seal under a key (`dump/key`)**: the

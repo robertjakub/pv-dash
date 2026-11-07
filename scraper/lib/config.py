@@ -12,8 +12,8 @@ import re
 
 from common.options import parse_config_script
 from .options import OPTIONS
-from common.config import check_token_file_mode, default_profile_path, is_loopback_host, load_token_file, \
-    parse_listen, parse_secret, parse_upstream, resolve_profile_file
+from common.config import check_auth_key, check_token_file_mode, default_profile_path, is_loopback_host, \
+    load_token_file, parse_auth_type, parse_listen, parse_secret, parse_upstream, resolve_profile_file
 from .metrics import Metrics
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
@@ -120,6 +120,8 @@ def validate_config(cfg):
         logger.warning('timeout (%gs) > interval (%gs): one poll can take longer than the poll '
                        'interval; the loop simply runs back-to-back', cfg['timeout'], cfg['interval'])
     check_hostname(cfg['host'], 'upstream host')
+    if cfg['auth'] and not cfg['auth_key']:
+        fail('auth', "the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)")
     listen_host, _listen_port = parse_listen(cfg['listen'])
     check_hostname(listen_host, 'listen')
     if not is_loopback_host(listen_host) and not cfg['auth_token']:
@@ -267,6 +269,10 @@ def resolve_config(args, script_dir=None):
         'modbus_unit': resolve(getattr(args, 'modbus_unit', None), 'MODBUS_UNIT',
                                'modbus_unit', DEFAULTS['modbus_unit'], int),
         'modbus_offset': resolve(args.modbus_offset, 'MODBUS_OFFSET', 'modbus_offset', 0, int),
+        'auth': parse_auth_type(resolve(getattr(args, 'auth', None), 'AUTH', 'auth', '', str), 'auth'),
+        'auth_key': check_auth_key(
+            parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
+                          or '').strip() or None, 'auth-key'), 'auth-key'),
         'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
         'max_kwp': resolve(args.max_kwp, 'MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float),
         'max_grid_kw': resolve(args.max_grid_kw, 'MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float),

@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The Modbus auth wave: the scraper **speaks the `suite` scheme to the
+inverter** — `modbus/auth` + `modbus/auth/key` (`--auth`/`AUTH`,
+`--auth-key`/`AUTH_KEY`): with `suite` every (re)connect handshakes first
+(52 bytes — the `PVA1` magic, a fresh nonce, the HMAC-SHA256 proof of the
+shared key, min 16 characters, secret-marked, `file:` referenceable) and
+the peer's `OK` opens the session, its `ERR` fails the poll like any down
+device. The knobs are live (`set modbus auth suite` drops the session —
+the next poll reconnects and handshakes), `show status` carries
+`modbus_auth=`.
+
 The file-reference wave: every secret value takes the **`file:` form** —
 `--dump-key file:/path` (env, config, the live `set` too) reads the first
 line of an owner-only `0600` file by the same loader the `-file` sibling

@@ -11,8 +11,8 @@ import os
 
 from common.options import parse_config_script
 from .options import OPTIONS
-from common.config import acl_summary, acl_text, default_profile_path, parse_acl, parse_listen, parse_secret, \
-    parse_upstream, resolve_profile_file
+from common.config import acl_summary, acl_text, check_auth_key, default_profile_path, parse_acl, parse_auth_type, \
+    parse_listen, parse_secret, parse_upstream, resolve_profile_file
 from common.cred import parse_trust_uids
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_COUNT, MAX_REGISTERS, \
     REGISTER_TYPES, UNIT_ID_RANGE
@@ -49,9 +49,11 @@ def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
 
 def parse_write_registers(text, label='write-registers'):
     """'any'/'*'/empty/None -> None (any register writable); 'none' -> ()
-    (no register writable); 'START:COUNT,...' (comma-separated) -> tuple of
-    (start, count) ranges. A write is allowed only when every register it
-    touches lands inside one of the ranges."""
+    (no register writable); 'profile' -> 'profile' (the device profile's
+    write acl — the proxy resolves it against the configured profile);
+    'START:COUNT,...' (comma-separated) -> tuple of (start, count) ranges.
+    A write is allowed only when every register it touches lands inside one
+    of the ranges."""
     if text is None:
         return None
     t = str(text).strip()
@@ -59,6 +61,8 @@ def parse_write_registers(text, label='write-registers'):
         return None
     if t.lower() == 'none':
         return ()
+    if t.lower() == 'profile':
+        return 'profile'
     ranges = []
     for part in t.split(','):
         part = part.strip()
@@ -75,6 +79,145 @@ def parse_write_registers(text, label='write-registers'):
     if not ranges:
         return None
     return tuple(ranges)
+
+
+def _acl_range(text, where):
+    """One acl range "START:COUNT" -> (start, count) — the profile bounds
+    (the register space; no per-frame cap, the gate is coverage)."""
+    try:
+        start, count = (int(x) for x in str(text).split(':'))
+    except ValueError:
+        raise SystemExit('%s: %r must be START:COUNT' % (where, text))
+    if start < 0 or count < 1 or start + count > MAX_REGISTERS:
+        raise SystemExit('%s: range %d:%d out of bounds (0..%d)'
+                         % (where, start, count, MAX_REGISTERS - 1))
+    return start, count
+
+
+def _acl_matcher(v, where):
+    """A rule matcher: 'any' (all registers) / 'none' (matches nothing) /
+    'START:COUNT' / a list of those / a {"START:COUNT": "desc"} map (the
+    desc documents the entry, terse ASCII) -> ('any' | 'none' | 'ranges',
+    ranges)."""
+    if isinstance(v, str):
+        t = v.strip().lower()
+        if t == 'any':
+            return 'any', None
+        if t == 'none':
+            return 'none', None
+        return 'ranges', [_acl_range(t, where)]
+    if isinstance(v, dict):
+        ranges = []
+        for k, d in v.items():
+            _acl_desc(d, '%s entry %r' % (where, k))
+            t = str(k).strip().lower()
+            if t == 'any':
+                ranges.append((0, MAX_REGISTERS))
+            elif t != 'none':
+                ranges.append(_acl_range(t, where))
+        return 'ranges', ranges
+    if isinstance(v, list):
+        ranges = []
+        for x in v:
+            t = str(x).strip().lower()
+            if t in ('any', 'none'):
+                raise SystemExit('%s: the word %r stands alone, not in a list' % (where, t))
+            ranges.append(_acl_range(t, where))
+        return 'ranges', ranges
+    raise SystemExit('%s must be a range, a list of ranges, a {"START:COUNT": "desc"} map, '
+                     '"any" or "none"' % where)
+
+
+def _acl_desc(d, where):
+    if d is not None and (not isinstance(d, str) or not d.strip() or not d.isascii()):
+        raise SystemExit('%s: "desc" must be terse ASCII' % where)
+
+
+def _ranges_from_bits(bits):
+    """The set bytes -> disjoint (start, count) ranges (touching bits merge)."""
+    out = []
+    i, n = 0, len(bits)
+    while i < n:
+        if bits[i]:
+            j = i
+            while j < n and bits[j]:
+                j += 1
+            out.append((i, j - i))
+            i = j
+        else:
+            i += 1
+    return out
+
+
+def load_profile_write_acl(path, label=None):
+    """The device profile's write acl: the optional top-level "acl" object
+    keyed by access kind — "write" is the one the cache speaks. The gate is
+    either an object with optional "allow"/"deny" (+ "desc"), or an ordered
+    rule list — one {"allow"|"deny"|"defer": matcher} object per rule (+ an
+    optional "desc" each). A matcher is a "START:COUNT" range or a list of
+    them, or the bare word "any" (all registers) / "none". The chain reads
+    top to bottom and the LAST matching rule decides; "defer" matches but
+    resets the decision back to refused, and an undecided register refuses
+    (the default deny) — so the object form is the sugar for the chain
+    "allow, deny" (the deny wins), and a deny-only object carves its ranges
+    out of everything (an absent allow is "any"). Compiles to the
+    write-registers shapes: None (any register writable), () (none), else
+    the (start, count) tuple — the chain never needs a second check at
+    write time. A profile without acl/write refuses: the caller asked for
+    the profile's gating, silence would look like a gate that is not
+    there."""
+    label = label or 'device profile %s' % path
+    try:
+        with open(path, encoding='utf-8') as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as e:
+        raise SystemExit('cannot read device profile %s: %s' % (path, e))
+    acl = data.get('acl') if isinstance(data, dict) else None
+    gate = acl.get('write') if isinstance(acl, dict) else None
+    if not isinstance(gate, (dict, list)):
+        raise SystemExit('%s carries no "acl"/"write" gate for write-registers profile '
+                         '(add "acl": {"write": {"allow": ["START:COUNT", ...]}})' % label)
+
+    rules = []   # (verb, matcher-value, where) in chain order
+    if isinstance(gate, dict):
+        unknown = sorted(k for k in gate if k not in ('allow', 'deny', 'desc'))
+        if unknown:
+            raise SystemExit('%s: unknown acl/write key(s) %s (allow/deny/desc, or the rule-list form)'
+                             % (label, ', '.join(unknown)))
+        _acl_desc(gate.get('desc'), '%s acl/write' % label)
+        rules.append(('allow', gate.get('allow', 'any'), '%s acl/write/allow' % label))
+        if 'deny' in gate:
+            rules.append(('deny', gate['deny'], '%s acl/write/deny' % label))
+    else:
+        if not gate:
+            raise SystemExit('%s: the acl/write rule list is empty (an empty gate would be '
+                             'indistinguishable from a whole-space deny)' % label)
+        for i, rule in enumerate(gate):
+            where = '%s acl/write rule %d' % (label, i + 1)
+            if not isinstance(rule, dict) or not rule:
+                raise SystemExit('%s must be an object with one verb (allow/deny/defer)' % where)
+            verbs = [k for k in rule if k != 'desc']
+            if len(verbs) != 1 or verbs[0] not in ('allow', 'deny', 'defer'):
+                raise SystemExit('%s: exactly one verb (allow/deny/defer), got %s'
+                                 % (where, ', '.join(verbs) or 'none'))
+            _acl_desc(rule.get('desc'), where)
+            rules.append((verbs[0], rule[verbs[0]], where))
+
+    bits = bytearray(MAX_REGISTERS)   # 0 = refused (the default), 1 = writable
+    for verb, matcher, where in rules:
+        kind, ranges = _acl_matcher(matcher, where)
+        byte = b'\x01' if verb == 'allow' else b'\x00'   # deny and defer both reset to refused
+        if kind == 'any':
+            bits[:] = byte * MAX_REGISTERS
+        elif kind == 'ranges':
+            for s, c in ranges:
+                bits[s:s + c] = byte * c
+        # 'none' matches nothing: the rule is a no-op
+    if not any(bits):
+        return ()
+    if all(bits):
+        return None
+    return tuple(_ranges_from_bits(bits))
 
 
 def check_range(start, count, label):
@@ -207,6 +350,11 @@ def validate_config(cfg):
     if cfg['metrics_max_conn_per_ip'] < 0:
         fail('metrics_max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
     parse_listen(cfg['metrics_listen'])
+    if cfg['auth'] and not cfg['auth_key']:
+        fail('auth', "the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)")
+    if cfg['auth_upstream'] and not cfg['auth_upstream_key']:
+        fail('auth-upstream', "the suite auth needs a key: set --auth-upstream-key/$AUTH_UPSTREAM_KEY too "
+                              "(min 16 characters)")
     if cfg['level'] not in LOG_LEVELS:
         fail('log-level', 'must be one of %s' % ', '.join(LOG_LEVELS))
     if cfg['audit_max_mb'] < 0:
@@ -299,6 +447,16 @@ def resolve_config(args, script_dir=None):
         'port': port,
         'unit': resolve(args.unit, 'UNIT', 'unit', DEFAULTS['unit'], int),
         'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
+        'auth': parse_auth_type(resolve(args.auth, 'AUTH', 'auth', '', str), 'auth'),
+        'auth_key': check_auth_key(
+            parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
+                          or '').strip() or None, 'auth-key'), 'auth-key'),
+        'auth_upstream': parse_auth_type(resolve(getattr(args, 'auth_upstream', None), 'AUTH_UPSTREAM',
+                                                 'auth_upstream', '', str), 'auth-upstream'),
+        'auth_upstream_key': check_auth_key(
+            parse_secret((resolve(getattr(args, 'auth_upstream_key', None), 'AUTH_UPSTREAM_KEY',
+                                  'auth_upstream_key', '', str) or '').strip() or None, 'auth-upstream-key'),
+            'auth-upstream-key'),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
         'interval': interval,
         'read_delay': resolve(args.read_delay, 'READ_DELAY', 'read_delay', DEFAULTS['read_delay_s'], float),

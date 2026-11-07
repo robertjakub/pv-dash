@@ -21,13 +21,13 @@ dependencies — `python3 profiles/bin/<tool>.py` from the repo root):
   family order (`name` → `register` → `type` → `scale` → `desc`), the
   register bounds (0…65536 − width), the type width, `fc` ∈ {3, 4}, a
   numeric `ttl ≥ 0`, terse-ASCII `desc`s, the mappings vs a register word,
-  duplicate names and same-fc register overlaps. Runs on
+  the write acl tree, duplicate names and same-fc register overlaps. Runs on
   `profiles/profiles/*.json` by default, or the files named on the command
   line; exits non-zero on the first issue found.
 - **`profile-format.py`** — rewrites any profile in place into the
   canonical layout (the `sun2000.json` shape): description first, then the
-  mappings, then the registers — one entry per line, keys in the family
-  order. Content-preserving and idempotent.
+  acl tree, then the mappings, then the registers — one entry per line,
+  keys in the family order. Content-preserving and idempotent.
 
 ```bash
 python3 profiles/bin/profile-lint.py                    # lint all shipped profiles
@@ -42,6 +42,7 @@ One JSON object per device:
 ```json
 {
   "description": "Huawei SUN2000 with meter and optional battery",
+  "acl": {"write": {"allow": {"32089:1": "the inverter on/off switch"}}},
   "mappings": [
     {"register": "device-status", "values": {"512": "on-grid", "40960": "standby"}}
   ],
@@ -53,6 +54,21 @@ One JSON object per device:
 ```
 
 - **`description`** — one line, what device this profile emulates.
+- **`acl`** — the optional access-control tree, keyed by access kind.
+  **`write`** is the one the cache speaks: the gate is either an object
+  with optional `allow`/`deny` (+ a terse-ASCII `desc`), or an ordered
+  rule list — one `{"allow"|"deny"|"defer": matcher}` object per rule,
+  each with an optional `desc`. A matcher is a `START:COUNT` range or a
+  list of them, or a `{ "START:COUNT": "desc" }` map describing each
+  entry, or the bare word `any` (all registers) / `none`. The
+  chain reads top to bottom and **the last matching rule decides**;
+  `defer` matches but resets the decision back to refused, and an
+  undecided register refuses (the default deny). The object form is the
+  sugar for the chain `allow, deny` (the deny wins; an absent allow is
+  `any`, so a deny-only gate carves its ranges out of everything). The
+  cache's `write-registers profile` value compiles the chain into the
+  register ranges a forwarded write may touch (see the cache README); a
+  profile without the `acl` section simply offers no profile gate.
 - **`mappings`** — optional list for coded registers: one
   `{"register": <name>, "values": {code: word}}` object per coded register.
   The values are the **real device's** codes (the sun2000:
@@ -83,6 +99,14 @@ One JSON object per device:
 - **A name left out does not exist on this device**: reads as 0 (exception 02
   in strict mode). A device without, say, per-string data simply omits
   `string-1-voltage`.
+- **The write acl chain reads top to bottom, the last matching rule
+  decides**; `defer` resets the decision for its span, an undecided
+  register refuses. Two worked examples:
+  - `[{"defer": "any"}, {"allow": "148:30"}]` — only 148–177 writable:
+    everything else matches no deciding rule and refuses.
+  - `[{"allow": "any"}, {"deny": "148:30"}, {"allow": "148:1"}]` —
+    everything writable except 149–177: the deny carves the span out of
+    the opening `any`, the last rule re-opens 148.
 - Every fact lives in the JSON — no hardcoded tables anywhere in the suite.
 - A profile is addressed by bare name (this directory) or by path.
 
@@ -93,7 +117,7 @@ One JSON object per device:
 | `sun2000` | Huawei SUN2000 with meter and optional battery | 49 |
 | `deye-sg03lp1` | Deye SUN single-phase hybrid (SG01/03LP1) | 14 |
 | `deye-sg04lp3` | Deye SUN three-phase hybrid (SG04LP3) | 19 |
-| `deye-sg05lp3` | Deye SUN three-phase hybrid (SUN-12K-SG05LP3-EU, full map) | 82 |
+| `deye-sg05lp3` | Deye SUN three-phase hybrid (SUN-12K-SG05LP3-EU) | 88 |
 
 All shipped entries read on FC3 (holding registers) — the `fc: 4` input
 space is supported end to end (the schema, the linter, the cache and the

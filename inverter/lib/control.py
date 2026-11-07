@@ -23,10 +23,11 @@ import threading
 import time
 
 from common.audit import AuditLog
-from common.config import acl_summary, acl_text, load_token_file, parse_acl, parse_secret
+from common.config import acl_summary, acl_text, load_token_file, parse_acl, parse_auth_type, parse_secret
 from common.cred import peer_uid
 from common.human import secs
 from common import dump as state
+from common.protocol import AUTH_MIN_KEY
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
 from .metrics import MetricsServer, describe_metrics
@@ -480,6 +481,29 @@ class ControlServer:
             except SystemExit as e:
                 raise ValueError(str(e))
             return acl_text(fake.connect_acl)
+        if key == 'modbus/auth':
+            if not fake:
+                raise ValueError('no modbus device attached')
+            try:
+                v = parse_auth_type(val, 'modbus/auth')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if v and not fake.auth_key:
+                raise ValueError('the suite auth needs a key: set modbus auth key <value> first '
+                                 '(min %d characters)' % AUTH_MIN_KEY)
+            fake.auth = v   # the next connection handshakes; the standing ones keep their session
+            return v or 'none'
+        if key == 'modbus/auth/key':
+            if not fake:
+                raise ValueError('no modbus device attached')
+            try:
+                v = parse_secret(val, 'modbus/auth/key')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if v is not None and len(v) < AUTH_MIN_KEY:
+                raise ValueError('modbus/auth/key must be at least %d characters, got %d' % (AUTH_MIN_KEY, len(v)))
+            fake.auth_key = v
+            return '<set>'
         if key == 'metrics-server':
             if not fake:
                 raise ValueError('no modbus device attached')
@@ -684,6 +708,10 @@ class ControlServer:
             return str(fake.conn_gate.max_per_ip) if fake else '?'
         if key == 'connect-acl':
             return acl_text(fake.connect_acl) if fake else '?'
+        if key == 'modbus/auth':
+            return (fake.auth or 'none') if fake else '?'
+        if key == 'modbus/auth/key':
+            return ('<set>' if fake.auth_key else 'none') if fake else '?'   # the secret never renders
         if key == 'metrics-server':
             return ('on' if fake.metrics_srv else 'off') if fake else '?'
         if key == 'client-timeout':
@@ -909,12 +937,13 @@ class ControlServer:
         ]
         if self.fake:
             la = self.fake.listen_addr or ('?', '?')
-            rows.append('modbus    %s:%d, clients %d (limit %s, timeout %s, per-ip %s, connect-acl %s)'
+            rows.append('modbus    %s:%d, clients %d (limit %s, timeout %s, per-ip %s, connect-acl %s, auth %s)'
                         % (la[0], la[1], self.fake.client_count, self.fake.max_clients or 'none',
                            secs(self.fake.client_timeout) if self.fake.client_timeout else 'none',
                            self.fake.conn_gate.max_per_ip or 'none',
                            'any' if self.fake.connect_acl is None
-                           else ('none' if not self.fake.connect_acl else '%d network(s)' % len(self.fake.connect_acl))))
+                           else ('none' if not self.fake.connect_acl else '%d network(s)' % len(self.fake.connect_acl)),
+                           self.fake.auth or 'none'))
         return 'ok inspect\n' + '\n'.join(rows)
 
     def status_report(self):
@@ -1000,6 +1029,7 @@ class ControlServer:
             'client-timeout': fake.client_timeout,
             'max-conn-per-ip': fake.conn_gate.max_per_ip,
             'connect-acl': acl_text(fake.connect_acl),
+            'modbus/auth': fake.auth or 'none',
             'metrics-server': 'on' if fake.metrics_srv else 'off',
             'log-level': logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel()),
             'scenario': self.scenario or 'custom',

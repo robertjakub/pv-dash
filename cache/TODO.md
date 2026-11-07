@@ -5,6 +5,35 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The profile write-acl wave: **`write-registers` speaks the device
+profile** — the new `profile` value compiles the register gate out of the
+profile's `"acl"`/`"write"` tree: an allow/deny object (the deny wins, an
+absent allow is `any`) or an ordered rule chain (`allow`/`deny`/`defer`
+rules — a `START:COUNT` matcher, a list of them, a
+`{ "START:COUNT": "desc" }` map describing each entry, or the bare word
+`any`/`none`; an optional terse-ASCII `desc` per gate and rule) — the
+chain reads top to bottom, the LAST matching rule decides, `defer` resets
+the decision for its span and an undecided register refuses (the default
+deny). The shipped `deye-sg05lp3` profile allows exactly the TOU schedule
+slots (148–177) and the grid-start registers (127–128), each entry
+described. The gate re-resolves when the profile swaps live and refuses a
+profile without the section; `show write registers` answers `profile`
+(the re-appliable spelling for the dumps and `unset`), the status, the
+inspect and the start log render `profile (127:2,148:30)`.
+
+The Modbus auth wave: the cache **speaks the `suite` scheme on both
+legs** — `modbus/auth` + `modbus/auth/key` demand the crypt handshake from
+its own clients (a failed proof is dropped before it ever sees a frame,
+logged `suite auth failed for …, closing`) and
+`modbus/auth-upstream` + `modbus/auth-upstream-key` present it to the
+inverter (an `ERR` fails the exchange like any other upstream fault). The
+handshake is one round trip after every connect: 52 bytes — the `PVA1`
+magic, a fresh nonce, the HMAC-SHA256 proof of the shared key (min 16
+characters, secret-marked, `file:` referenceable) — and the peer's `OK`
+or `ERR` decides. The knobs are live (`set modbus auth …` gates the next
+connection; `set modbus auth-upstream …` drops the session so the next
+exchange re-proves), `show status` carries `auth=`/`upstream_auth=`.
+
 The file-reference wave: every secret value takes the **`file:` form** —
 `--dump-key file:/path` (env, config, the live `set` too) reads the first
 line of an owner-only `0600` file by the same loader the `-file` sibling

@@ -1954,6 +1954,98 @@ try:
     check('scraper control: a TCP control port without a token refuses to start (F5)',
           r.returncode == 1 and 'TCP control port' in r.stderr and 'Traceback' not in r.stderr,
           r.stderr[-160:])
+    # 7b. the suite auth: an authed fake + an authed scraper — the good key
+    #     polls, the wrong key fails the connector (ERR), the live `set`
+    #     drops the session; then a plain fake under an authed scraper
+    #     fails the same way (the peer must speak the scheme)
+    sys.path.insert(0, REPO)
+    from common.protocol import auth_handshake_client
+
+    SKEY = 'scr-suite-key-16chars!'
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15910',
+                                   '--control-port', '0', '--auth', 'suite', '--auth-key', SKEY],
+                                  stdout=open('/tmp/scr_auth_fake.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(0.7)
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15910',
+                                   '--listen', '127.0.0.1:19461', '--interval', '1',
+                                   '--control-port', '0', '--auth', 'suite', '--auth-key', SKEY],
+                                  stdout=open('/tmp/scr_auth.log', 'w'), stderr=subprocess.STDOUT))
+    for _ in range(30):
+        try:
+            status, m = wait_metrics(19461, want='scraper_up')
+            if m.get('scraper_up') == 1:
+                break
+        except Exception:
+            pass
+        time.sleep(0.3)
+    status, m = wait_metrics(19461)
+    check('suite auth: the matching key polls (scraper_up 1)', m.get('scraper_up') == 1,
+          str({k: m.get(k) for k in ('scraper_up', 'scraper_modbus_errors_total')}))
+    check('suite auth: the start log names the scheme', 'modbus auth suite' in open('/tmp/scr_auth.log').read())
+    # the wrong key: the handshake is refused — the connector fails, the poll stays down
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15910',
+                                   '--listen', '127.0.0.1:19462', '--interval', '1',
+                                   '--control-port', '0', '--auth', 'suite',
+                                   '--auth-key', 'wrong-key-16chars00'],
+                                  stdout=open('/tmp/scr_auth_wrong.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(3.0)
+    status, m = wait_metrics(19462, want='scraper_up')
+    check('suite auth: the wrong key keeps the connector failed (scraper_up 0)',
+          m.get('scraper_up') == 0, str({k: m.get(k) for k in ('scraper_up', 'scraper_modbus_errors_total')}))
+    check('suite auth: the refusals pile up as poll errors', m.get('scraper_modbus_errors_total', 0) > 0,
+          str(m.get('scraper_modbus_errors_total')))
+    # the live key rotation: the failing wrong-key scraper with a control
+    # port — `set modbus auth key` to the right one and the poll comes up
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15910',
+                                   '--listen', '127.0.0.1:19468', '--interval', '1',
+                                   '--control-port', '19469', '--control-token', 'ctok-a',
+                                   '--auth', 'suite', '--auth-key', 'wrong-key-16chars00'],
+                                  stdout=open('/tmp/scr_auth_rot.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(2.0)
+    status, m = wait_metrics(19468, want='scraper_up')
+    check('suite auth: the wrong-key scraper starts down', m.get('scraper_up') == 0, str(m.get('scraper_up')))
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '19469', '--control-token', 'ctok-a',
+                        'set', 'modbus', 'auth', 'key', SKEY], capture_output=True, text=True, timeout=15)
+    check('suite auth: the key rotates live', r.stdout.startswith('ok modbus/auth/key=<set>'), r.stdout[:120])
+    for _ in range(30):
+        try:
+            status, m = wait_metrics(19468, want='scraper_up')
+            if m.get('scraper_up') == 1:
+                break
+        except Exception:
+            pass
+        time.sleep(0.3)
+    status, m = wait_metrics(19468, want='scraper_up')
+    check('suite auth: the rotated key polls (no restart)', m.get('scraper_up') == 1, str(m.get('scraper_up')))
+    r = subprocess.run([sys.executable, P, '--dry-run', '--auth', 'bogus'], capture_output=True,
+                       text=True, timeout=15)
+    check('suite auth: a bogus scheme fails the config fast',
+          r.returncode == 1 and "use 'suite'" in r.stderr, r.stderr[-160:])
+    r = subprocess.run([sys.executable, P, '--dry-run', '--auth', 'suite'], capture_output=True,
+                       text=True, timeout=15)
+    check('suite auth: suite without a key fails the config fast',
+          r.returncode == 1 and 'needs a key' in r.stderr, r.stderr[-160:])
+    r = subprocess.run([sys.executable, P, '--dry-run', '--auth', 'suite', '--auth-key', 'short'],
+                       capture_output=True, text=True, timeout=15)
+    check('suite auth: a short key fails the config fast',
+          r.returncode == 1 and 'at least 16 characters' in r.stderr, r.stderr[-160:])
+    # an authed scraper against a PLAIN fake: the handshake gets a Modbus
+    # exception frame back — the connector fails there too
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15911',
+                                   '--control-port', '0'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(0.7)
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15911',
+                                   '--listen', '127.0.0.1:19464', '--interval', '1',
+                                   '--control-port', '0', '--auth', 'suite', '--auth-key', SKEY],
+                                  stdout=open('/tmp/scr_auth_plain.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(3.0)
+    status, m = wait_metrics(19464, want='scraper_up')
+    check('suite auth: an authed client of a plain server fails (scraper_up 0)',
+          m.get('scraper_up') == 0, str(m.get('scraper_up')))
+    check('suite auth: the plain-server failures pile up too', m.get('scraper_modbus_errors_total', 0) > 0,
+          str(m.get('scraper_modbus_errors_total')))
+
     for tool, title in ((P, 'MODBUS-SCRAPER'), (CTLB, 'MODBUS-SCRAPER-CTL'), (CLIB, 'MODBUS-SCRAPER-CLI')):
         r = subprocess.run([sys.executable, tool, '--man'], capture_output=True, text=True, timeout=30)
         check('--man: %s prints the page' % os.path.basename(tool),

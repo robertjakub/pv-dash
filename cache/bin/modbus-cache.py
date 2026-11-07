@@ -240,7 +240,8 @@ def main():
         audit_display = 'stdout'
     else:
         audit_display = cfg['audit_log'] or default_audit_path('modbus-cache')
-    upstream = Upstream(cfg['host'], cfg['port'], cfg['unit'], cfg['timeout'])
+    upstream = Upstream(cfg['host'], cfg['port'], cfg['unit'], cfg['timeout'],
+                        auth=cfg['auth_upstream'], auth_key=cfg['auth_upstream_key'])
     cache = Cache(ranges, cfg['cache_ttl'], range_names, range_ttls)
     proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
                   cfg['profile'], cfg)
@@ -262,7 +263,7 @@ def main():
     proxy.audit_params = {'path': cfg['audit_log'] or None, 'max_mb': cfg['audit_max_mb'],
                           'daily': cfg['audit_daily'], 'files': cfg['audit_files'],
                           'disabled': bool(cfg['no_audit_log'])}   # the audit lives rebuild from here
-    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, control token: %s, ops token: %s, audit trail: %s, requests audit: %s, metrics: %s)',
+    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, client auth: %s, upstream auth: %s, control token: %s, ops token: %s, audit trail: %s, requests audit: %s, metrics: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if cfg['allow_write'] else 'disabled (write requests are refused)',
@@ -274,7 +275,8 @@ def main():
                 cfg['max_conn_per_ip'] or 'none',
                 acl_summary(cfg['connect_acl']),
                 acl_summary(cfg['write_acl']),
-                proxy.describe_write_ranges(),
+                proxy.describe_write_gate(),
+                cfg['auth'] or 'none', cfg['auth_upstream'] or 'none',
                 'required on TCP' if control_token else 'none',
                 'read-only ops token set' if control_ops_token else 'no ops token',
                 audit_display,
@@ -332,6 +334,8 @@ def main():
                     'acl/connect': acl_text(cfg['connect_acl']),
                     'acl/write': acl_text(cfg['write_acl']),
                     'modbus/timeout': '%g' % cfg['timeout'],
+                    'modbus/auth': cfg['auth'] or 'none',
+                    'modbus/auth-upstream': cfg['auth_upstream'] or 'none',
                     'control/port': control_target,
                     'control/ops-verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
                     'control/trust-uids': ','.join(str(u) for u in sorted(cfg['control_trust_uids'] or [])) or 'off',

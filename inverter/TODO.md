@@ -5,6 +5,17 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The Modbus auth wave: the fake **demands the `suite` handshake from its
+Modbus clients when told** — `modbus/auth` + `modbus/auth/key`
+(`--auth`/`AUTH`, `--auth-key`/`AUTH_KEY`): with `suite` every connecting
+client speaks the crypt handshake first (52 bytes — the `PVA1` magic, a
+fresh nonce, the HMAC-SHA256 proof of the shared key, min 16 characters,
+secret-marked, `file:` referenceable) and the fake answers `OK` (plain
+Modbus follows) or `ERR` and drops the client before it ever sees a
+register (logged `suite auth failed for …, closing`). `none`/empty (the
+default) = no auth at all — the trusted-LAN posture stands; the knobs are
+live (`set modbus auth suite` gates the next connection).
+
 The file-reference wave: every secret value takes the **`file:` form** —
 `--dump-key file:/path` (env, config, the live `set` too) reads the first
 line of an owner-only `0600` file by the same loader the `-file` sibling

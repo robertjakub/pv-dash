@@ -1576,6 +1576,105 @@ print('mode 0600 ok')
           r.startswith('ok write - ') and 'acl - clients allowed to write' in r
           and '(the alias of acl/write)' in r, r[:120])
 
+    # the profile write acl: --write-registers profile compiles the device
+    # profile's acl/write tree (allow minus deny) — the deye profile allows
+    # the TOU schedule slots (148-177) and the grid-start registers (127-128)
+    deye = os.path.join(REPO, 'profiles', 'profiles', 'deye-sg05lp3.json')
+    start([sys.executable, F, '--static', '--port', '15584', '--profile', deye,
+           '--control-port', '0'], log='/tmp/reg_deye_fake.log')
+    start([sys.executable, P, '--upstream', '127.0.0.1:15584',
+           '--listen', '127.0.0.1:15585', '--interval', '1', '--profile', 'deye-sg05lp3',
+           '--allow-write', '--write-acl', 'any', '--write-registers', 'profile',
+           '--control-port', '15586', '--control-token', 'sekrit'],
+          log='/tmp/reg_profile_acl.log')
+    time.sleep(2)
+    b = wr6(127, 55, port=15585)
+    check('profile acl: grid-start register 127 passes', b == bytes.fromhex('06007f0037'), b.hex())
+    b = wr6(130, 1, port=15585)
+    check('profile acl: register 130 refused', b[0] == 0x86 and b[1] == 1, b.hex())
+    b = wr16(148, [600, 1300] + [0] * 28, port=15585)
+    check('profile acl: the TOU span 148:30 passes', b[:3] == bytes.fromhex('100094'), b.hex())
+    b = wr16(148, [0] * 31, port=15585)
+    check('profile acl: a write spanning past 177 refused', b[0] == 0x90 and b[1] == 1, b.hex())
+    pal_log = open('/tmp/reg_profile_acl.log').read()
+    check('profile acl: the refusal names the profile gate',
+          'outside the write allow-list profile (127:2,148:30)' in pal_log, pal_log[-200:])
+    r = ctl_cmd('show write registers', 15586)
+    check('profile acl: show answers the profile spelling', r == 'ok write/registers=profile', r[:80])
+    r = ctl_cmd('show status', 15586)
+    check('profile acl: status renders the effective gate',
+          'write_allow_list=profile (127:2,148:30)' in r, r[:200])
+    r = ctl_cmd('set write registers 100:1', 15586)
+    check('profile acl: explicit ranges still set', r.startswith('ok write/registers=100:1'), r[:80])
+    b = wr6(130, 1, port=15585)
+    check('profile acl: the explicit range gates instead', b[0] == 0x86 and b[1] == 1, b.hex())
+    r = ctl_cmd('unset write registers', 15586)
+    check('profile acl: unset restores the configured profile mode',
+          r.startswith('ok write/registers=profile'), r[:80])
+    r = ctl_cmd('set write registers profile', 15586)
+    check('profile acl: the wire set answers the profile spelling',
+          r.startswith('ok write/registers=profile'), r[:80])
+
+    # the deny side: a profile copy with allow any + the deye spans denied —
+    # everything EXCEPT 127-128/148-177 becomes writable
+    deny_prof = '/tmp/reg_deye_deny.json'
+    with open(deye) as fh:
+        dj = _json.load(fh)
+    dj['acl'] = {'write': {'allow': 'any', 'deny': ['127:2', '148:30']}}
+    with open(deny_prof, 'w') as fh:
+        _json.dump(dj, fh)
+    start([sys.executable, P, '--upstream', '127.0.0.1:15584',
+           '--listen', '127.0.0.1:15587', '--interval', '1', '--profile', deny_prof,
+           '--allow-write', '--write-acl', 'any', '--write-registers', 'profile'],
+          log='/tmp/reg_profile_deny.log')
+    time.sleep(2)
+    b = wr6(200, 1, port=15587)
+    check('profile acl deny: register 200 passes (allow any)',
+          b == bytes.fromhex('0600c80001'), b.hex())
+    b = wr6(127, 1, port=15587)
+    check('profile acl deny: the denied 127:2 refused', b[0] == 0x86 and b[1] == 1, b.hex())
+    b = wr6(148, 1, port=15587)
+    check('profile acl deny: the denied 148:30 refused', b[0] == 0x86 and b[1] == 1, b.hex())
+    pdl_log = open('/tmp/reg_profile_deny.log').read()
+    check('profile acl deny: the refusal names the carved gate',
+          'outside the write allow-list profile (0:127,129:19,178:65358)' in pdl_log, pdl_log[-200:])
+
+    # the rule-chain form: the last matching rule decides, defer resets the
+    # decision for its span, an undecided register refuses (default deny)
+    for name, gate in [('defer', [{'defer': 'any'}, {'allow': '148:30'}]),
+                       ('reopen', [{'allow': 'any'}, {'deny': '148:30'}, {'allow': '148:1'}])]:
+        cp = '/tmp/reg_deye_%s.json' % name
+        with open(deye) as fh:
+            dj = _json.load(fh)
+        dj['acl'] = {'write': gate}
+        with open(cp, 'w') as fh:
+            _json.dump(dj, fh)
+        start([sys.executable, P, '--upstream', '127.0.0.1:15584',
+               '--listen', '127.0.0.1:%d' % (15590 if name == 'defer' else 15591),
+               '--interval', '1', '--profile', cp,
+               '--allow-write', '--write-acl', 'any', '--write-registers', 'profile'],
+              log='/tmp/reg_profile_%s.log' % name)
+    time.sleep(2)
+    b = wr6(148, 1, port=15590)
+    check('profile acl chain (defer): the allowed span passes', b[0] == 6, b.hex())
+    b = wr6(130, 1, port=15590)
+    check('profile acl chain (defer): an undecided register refuses', b[0] == 0x86 and b[1] == 1, b.hex())
+    b = wr6(148, 1, port=15591)
+    check('profile acl chain (re-open): 148 re-allowed by the last rule', b[0] == 6, b.hex())
+    b = wr6(160, 1, port=15591)
+    check('profile acl chain (re-open): the denied span refuses', b[0] == 0x86 and b[1] == 1, b.hex())
+    b = wr6(200, 1, port=15591)
+    check('profile acl chain (re-open): outside the deny passes', b[0] == 6, b.hex())
+
+    # a profile without the acl section refuses the profile value, at start
+    p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15584',
+                        '--listen', '127.0.0.1:15589', '--profile', R,
+                        '--write-registers', 'profile', '--dry-run'],
+                       capture_output=True, text=True, timeout=60)
+    check('profile acl: a profile without the section fails the start',
+          p.returncode == 1 and 'carries no "acl"/"write" gate' in p.stderr, '%s %r' % (p.returncode, p.stderr[-120:]))
+
+
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
            '--listen', '127.0.0.1:15539', '--interval', '1', '--profile', R,
            '--connect-acl', 'none', '--control-port', '15540', '--control-token', 'sekrit'],
@@ -1705,6 +1804,124 @@ print('mode 0600 ok')
     check('config: a *** SECRET REMOVED *** line refuses to parse (pass the secret by flag/env/token-file)',
           r.returncode != 0 and 'not a value' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
+
+    # 6b-9. the suite auth, both legs: the cache demands the handshake from
+    #       its own clients (--auth/--auth-key) and presents it upstream
+    #       (--auth-upstream/--auth-upstream-key) — one round trip after
+    #       every connect, OK opens the session, ERR kills it
+    sys.path.insert(0, REPO)
+    from common.protocol import auth_handshake_client
+
+    AUTH_FAKE, AUTH_PORT, AUTH_CTL = 15561, 15562, 15563
+    CL_KEY, UP_KEY = 'cl-suite-key-16chars!', 'up-suite-key-16chars!'
+    start([sys.executable, F, '--static', '--port', str(AUTH_FAKE), '--control-port', '0',
+           '--auth', 'suite', '--auth-key', UP_KEY])
+    time.sleep(0.7)
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
+           '--listen', '127.0.0.1:%d' % AUTH_PORT, '--profile', R,
+           '--timeout', '1', '--interval', '2',
+           '--control-port', str(AUTH_CTL), '--control-token', 'ctok-a',
+           '--auth', 'suite', '--auth-key', CL_KEY,
+           '--auth-upstream', 'suite', '--auth-upstream-key', UP_KEY],
+          log='/tmp/reg_auth_cache.log')
+    time.sleep(1.2)
+
+    def ctl_auth(*cmds):
+        r = subprocess.run([sys.executable, os.path.join(CACHE_DIR, 'bin', 'modbus-cache-ctl.py'),
+                            '--control-port', str(AUTH_CTL), '--control-token', 'ctok-a'] + list(cmds),
+                           capture_output=True, text=True, timeout=15)
+        return r.stdout.strip()
+
+    c = socket.create_connection(('127.0.0.1', AUTH_PORT), timeout=5)
+    c.settimeout(5)
+    auth_handshake_client(c, CL_KEY)
+    c.sendall(struct.pack('>HHHB', 9, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 2))
+    head = _recvn(c, 7)
+    body = _recvn(c, struct.unpack('>HHH', head[:6])[2] - 1)
+    check('suite auth: the proved client reads through the cache',
+          body[0] == 3 and body[1] == 4, body.hex())
+    c.close()
+    r = ctl_auth('show', 'status')
+    check('suite auth: show status carries auth= + upstream_auth=',
+          'auth=suite' in r and 'upstream_auth=suite' in r and 'poll=ok' in r, r[:200])
+    c = socket.create_connection(('127.0.0.1', AUTH_PORT), timeout=5)
+    c.sendall(b'\x00' * 52)     # 52 bytes that are not the handshake
+    c.settimeout(5)
+    verdict = c.recv(3)
+    after = c.recv(4096)
+    c.close()
+    check('suite auth: a non-handshake client gets ERR then EOF (no frame ever served)',
+          verdict == b'ERR' and after == b'', (verdict + after).hex())
+    c = socket.create_connection(('127.0.0.1', AUTH_PORT), timeout=5)
+    try:
+        auth_handshake_client(c, 'wrong-key-16chars00')
+        check('suite auth: the wrong key is rejected', False, 'accepted')
+    except Exception:
+        check('suite auth: the wrong key is rejected (ERR)', True)
+    c.close()
+    loga = open('/tmp/reg_auth_cache.log').read()
+    check('suite auth: the failed proofs are logged',
+          'suite auth failed for' in loga)
+    check('suite auth: the start log names both schemes',
+          'client auth: suite, upstream auth: suite' in loga)
+    # the wire: the four lives speak, the keys are secrets
+    r = ctl_auth('show', 'modbus', 'auth')
+    check('suite auth: show modbus auth reads suite', r == 'ok modbus/auth=suite', r[:80])
+    r = ctl_auth('show', 'modbus', 'auth-upstream')
+    check('suite auth: show modbus auth-upstream reads suite', r == 'ok modbus/auth-upstream=suite', r[:80])
+    r = ctl_auth('show', 'modbus', 'auth', 'key')
+    check('suite auth: the client key never shows', r.startswith('err modbus/auth/key is a secret'), r[:80])
+    r = ctl_auth('unset', 'modbus', 'auth-upstream-key')
+    check('suite auth: unset refuses the upstream key', r.startswith('err unknown setting'), r[:80])
+    r = ctl_auth('set', 'modbus', 'auth', 'key', 'short')
+    check('suite auth: a short key refuses on the wire',
+          r.startswith('err modbus/auth/key must be at least 16'), r[:100])
+    # the live legs: disabling the client auth serves plain clients again,
+    # disabling the upstream auth drops the poll (the fake still demands
+    # the handshake), re-enabling restores it
+    r = ctl_auth('set', 'modbus', 'auth', 'none')
+    check('suite auth: the client auth disables live', r.startswith('ok modbus/auth=none'), r[:100])
+    c = socket.create_connection(('127.0.0.1', AUTH_PORT), timeout=5)
+    c.settimeout(5)
+    c.sendall(struct.pack('>HHHB', 10, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 2))
+    head = _recvn(c, 7)
+    body = _recvn(c, struct.unpack('>HHH', head[:6])[2] - 1)
+    c.close()
+    check('suite auth: a plain client reads after the disable', body[0] == 3, body.hex())
+    r = ctl_auth('set', 'modbus', 'auth-upstream', 'none')
+    check('suite auth: the upstream auth disables live', r.startswith('ok modbus/auth-upstream=none'), r[:100])
+    r = ctl_auth('show', 'status')
+    for _ in range(200):
+        r = ctl_auth('show', 'status')
+        if 'poll=down' in r:
+            break
+        time.sleep(0.5)
+    check('suite auth: the plain upstream session fails against the authed fake (poll=down)',
+          'poll=down' in r, r[-200:])
+    r = ctl_auth('set', 'modbus', 'auth-upstream', 'suite')
+    check('suite auth: the upstream auth re-enables live (the key persisted)',
+          r.startswith('ok modbus/auth-upstream=suite'), r[:100])
+    for _ in range(90):
+        r = ctl_auth('show', 'status')
+        if 'poll=ok' in r:
+            break
+        time.sleep(0.5)
+    check('suite auth: the upstream poll recovers under the re-enabled scheme', 'poll=ok' in r, r[-200:])
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
+                        '--listen', '127.0.0.1:%d' % AUTH_PORT, '--dry-run',
+                        '--auth', 'bogus'], capture_output=True, text=True, timeout=15)
+    check('suite auth: a bogus scheme fails the config fast',
+          r.returncode != 0 and "use 'suite'" in r.stderr, r.stderr[-160:])
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
+                        '--listen', '127.0.0.1:%d' % AUTH_PORT, '--dry-run',
+                        '--auth', 'suite'], capture_output=True, text=True, timeout=15)
+    check('suite auth: suite without a key fails the config fast',
+          r.returncode != 0 and 'needs a key' in r.stderr, r.stderr[-160:])
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
+                        '--listen', '127.0.0.1:%d' % AUTH_PORT, '--dry-run',
+                        '--auth', 'suite', '--auth-key', 'short'], capture_output=True, text=True, timeout=15)
+    check('suite auth: a short key fails the config fast',
+          r.returncode != 0 and 'at least 16 characters' in r.stderr, r.stderr[-160:])
 
     # 7. clean shutdowns
     r = cli('shutdown\n\n', 15514)

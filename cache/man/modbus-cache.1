@@ -15,10 +15,23 @@ exactly one) and multiplexes it: a background loop polls the configured
 register ranges into an in-memory cache, any number of clients are served
 FC3/FC4 reads from the cache, reads outside the map and other function
 codes are forwarded live, and writes (FC05/06/15/16/22/23) are forwarded
-when explicitly enabled and audited. Every function code crossing the
+when explicitly enabled and audited \(em gated by a register allow-list
+(\fB--write-registers\fR) that spells its ranges directly or takes the
+device profile's \fBacl\fR/\fBwrite\fR tree (an allow/deny object or
+an ordered rule chain \(em the last matching rule decides, \fBdefer\fR
+resets, the word \fBany\fR = all registers). Every function code crossing the
 wire is named in the log and the audit trail (all standard FCs, FC1
 through FC43). A synthesized diagnostics block at registers
 65000\(en65003 lets clients tell cached data from live data.
+.PP
+Modbus auth (\fB--auth\fR): with \fBsuite\fR the cache's own clients
+prove a shared key (\fB--auth-key\fR, min 16 characters) with a crypt
+handshake right after every connect \(em 52 bytes: magic, fresh nonce,
+HMAC\-SHA256 proof; the cache answers \fBOK\fR (plain Modbus follows)
+or \fBERR\fR (the client is dropped before it ever sees a frame).
+\fB--auth-upstream\fR/\fB--auth-upstream-key\fR do the same toward
+the inverter: an \fBERR\fR fails the exchange like any other upstream
+fault and the poller retries. Empty auth (the default) = no auth at all.
 .PP
 Resilience: when the device dies, cached reads keep serving last-known
 values and forwarded reads get exception 0x0B; when the device rejects a
@@ -38,6 +51,31 @@ Modbus unit id (default: config, $UNIT or 1)
 .TP
 .BI \-\-timeout " N"
 Modbus connect/read timeout in seconds (default: config, $TIMEOUT or 3)
+.TP
+.B \-\-auth
+the auth scheme the cache's own Modbus clients must speak: `suite`
+demands the crypt handshake (magic + nonce + HMAC proof of the shared
+key) right after every connect and drops the client on ERR/anything
+else; none/empty = no auth at all (default: config, $AUTH or none)
+.TP
+.B \-\-auth\-key
+the shared key the cache's clients prove with the suite handshake (min
+16 characters); the value may be `file:<path>` — the first line of an
+owner\-only 0600 file (a systemd LoadCredential rides as
+file:/run/credentials/...) (default: config, $AUTH_KEY)
+.TP
+.B \-\-auth\-upstream
+the auth scheme toward the upstream inverter: `suite` proves the shared
+auth\-upstream\-key with a crypt handshake right after every connect
+(the peer answers OK, or ERR and the connection fails — the poller keeps
+retrying); none/empty = no auth at all (default: config, $AUTH_UPSTREAM
+or none)
+.TP
+.B \-\-auth\-upstream\-key
+the shared key the cache proves to the upstream inverter with the suite
+handshake (min 16 characters); the value may be `file:<path>` — the
+first line of an owner\-only 0600 file (a systemd LoadCredential rides
+as file:/run/credentials/...) (default: config, $AUTH_UPSTREAM_KEY)
 .TP
 .BI \-\-interval " N"
 seconds between cache polls (default: config, $INTERVAL or 10)
@@ -62,7 +100,9 @@ them with a Modbus illegal\-function exception (default: off)
 .B \-\-write\-registers
 register ranges a (forwarded) write may touch: comma\-separated
 START:COUNT, e.g. 47400:100,47600:100; "any" = unrestricted; "none" = no
-register writable (default: config, $WRITE_REGISTERS or none)
+register writable; "profile" = the device profile's write acl ("acl":
+{"write": {"allow": [...], "deny": [...]}} — allow minus deny, "any" =
+all registers) (default: config, $WRITE_REGISTERS or none)
 .TP
 .B \-\-profile
 device profile JSON (the shared profiles/ schema) (default: config,
@@ -293,7 +333,8 @@ modbus merge-gap, write allow, write registers, limits max-clients,
 limits client-timeout, modbus upstream, modbus unit, metrics enable,
 metrics listen, the metrics limits caps, metrics token, requests-audit,
 dump-interval, log-level, local-time, modbus profile, modbus selection,
-acl connect, acl write, modbus timeout, control port, control token,
+acl connect, acl write, modbus timeout, modbus auth, modbus auth key,
+modbus auth-upstream, modbus auth-upstream-key, control port, control token,
 control ops-token, control ops-verbs, control trust-uids, control
 socket-group, audit log-file, audit rotate max-size, audit disable,
 dump path, dump with-cache); a SIGHUP re-applies the config

@@ -6,33 +6,16 @@ Prometheus text format: the hit/miss counters, the poll health and age, the
 poll-cycle durations, the client count, the uplink session counters and the
 per-block poll latency/errors — without depending on the scraper's
 `scraper_cache_*` export path. Requests need
-`Authorization: Bearer <token>` (the same scheme the scraper speaks)."""
-import hmac
-import http.server
-import logging
-import threading
+`Authorization: Bearer <token>` (the same scheme the scraper speaks).
+The gated endpoint skeleton (the 401/404/503, the caps, the thread
+start/stop) is the family's common/metrics_server."""
 import time
 
-from common.connlimit import GatedHTTPServer
-
-logger = logging.getLogger('modbus-cache')
-
-METRICS_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
-               b'Content-Type: text/plain; charset=utf-8\r\n'
-               b'Cache-Control: no-store\r\n'
-               b'Connection: close\r\n\r\n'
-               b'# rate limited: too many concurrent clients\n')
+from common.metrics_server import MetricsServer as _MetricsServer
+from common.metrics_server import describe_metrics
 
 
-def describe_metrics(listen, token, max_clients=0, max_per_ip=0):
-    """The status/inspect one-liner for the endpoint state."""
-    host, port = listen
-    return '%s:%d%s, clients %s, per-ip %s' % (
-        host, port, ' (bearer token)' if token else '',
-        max_clients or 'none', max_per_ip or 'none')
-
-
-class MetricsServer:
+class MetricsServer(_MetricsServer):
     """A tiny Prometheus text-endpoint for the cache itself. The master
     switch is the live `metrics-server` setting (default off); the bind
     address is --metrics-listen HOST:PORT. Caps (F13 round):
@@ -40,16 +23,14 @@ class MetricsServer:
     (0 = the built-in 5 s slowloris cap), --metrics-max-conn-per-ip; 0 = no
     per-IP limit."""
 
+    REALM = 'modbus-cache'
+    LOG_NAME = 'modbus-cache'
+
     def __init__(self, proxy, listen, token=None, started=0.0, max_clients=64,
                  client_timeout=5.0, max_per_ip=0):
+        super().__init__(listen, token=token, started=started, max_clients=max_clients,
+                         client_timeout=client_timeout, max_per_ip=max_per_ip)
         self.proxy = proxy
-        self.listen = listen            # (host, port)
-        self.token = token
-        self.started = started
-        self.max_clients = max(0, int(max_clients or 0))
-        self.client_timeout = max(0.0, float(client_timeout or 0.0))
-        self.max_per_ip = max(0, int(max_per_ip or 0))
-        self._http = None
 
     def snapshot(self):
         p = self.proxy
@@ -179,63 +160,3 @@ class MetricsServer:
                 rows.append('modbus_cache_uplink_block_latency_mean_seconds%s %g' % (label, mean_b))
                 rows.append('modbus_cache_uplink_block_latency_max_seconds%s %g' % (label, max_b))
         return '\n'.join(rows) + '\n'
-
-    class _Handler(http.server.BaseHTTPRequestHandler):
-        timeout = 5   # a silent peer cannot pin a handler thread (slowloris)
-
-        def log_message(self, *a):
-            pass   # the access logging = the scraper's job; the cache stays quiet
-        def do_GET(self):
-            srv = self.server.metrics_server
-            if srv.token:
-                auth = self.headers.get('Authorization', '')
-                want = 'Bearer ' + srv.token
-                if not hmac.compare_digest(auth, want):
-                    self.send_response(401)
-                    self.send_header('WWW-Authenticate', 'Bearer realm="modbus-cache"')
-                    self.end_headers()
-                    self.wfile.write(b'401 unauthorized\n')
-                    return
-            if self.path.split('?')[0] != '/metrics':
-                self.send_response(404)
-                self.end_headers()
-                self.wfile.write(b'404 not found (try /metrics)\n')
-                return
-            body = srv.render().encode()
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
-            self.send_header('Content-Length', str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-    def serve(self):
-        self.started = self.started or time.monotonic()
-        self._Handler.timeout = self.client_timeout or 5   # 0 = the built-in slowloris cap
-
-        class Server(GatedHTTPServer):
-            def gate_refused(httpd, request, client_address, why):
-                logger.info('metrics: rejected %s: too many concurrent clients (%s, max %d/%d)',
-                            client_address, why, httpd.gate.max_total, httpd.gate.max_per_ip)
-                try:
-                    request.sendall(METRICS_503)
-                except OSError:
-                    pass
-                httpd.shutdown_request(request)
-
-        httpd = Server(self.listen, self._Handler)
-        httpd.setup_gate(self.max_clients, self.max_per_ip)
-        httpd.metrics_server = self
-        self._http = httpd
-        httpd.serve_forever()
-
-    def stop(self):
-        """Stop the serving loop and close the socket (the live
-        `set metrics-server off`); a second stop is a no-op."""
-        httpd, self._http = self._http, None
-        if not httpd:
-            return
-        httpd.shutdown()
-        httpd.server_close()
-
-    def start(self):
-        threading.Thread(target=self.serve, daemon=True).start()

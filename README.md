@@ -23,7 +23,7 @@ JSON-lines control server, a settings registry, an append-only audit trail,
 a reconnecting console session — TAB/`?` complete and describe every word,
 the registry's display groups file the listings, the non-value reply lines
 ride the `% ` prefix). Every knob of the four daemons, side by
-side — name, group, the live `set` command, who has it: [options.md](options.md)
+side — name, group, the live `set` command, who has it: [OPTIONS.md](docs/OPTIONS.md)
 (generated from the option registries).
 
 ## The flake
@@ -50,7 +50,7 @@ pv-suite/
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))
 ├── common/       # the shared Python package (version, audit, config, wire core; [docs](common/README.md))
 ├── tests/        # the test suites, one or more per Modbus tool
-├── scripts/      # the registry gates + editors (check/lint/gen/edit_options, set_group/set_live), gen_man.py, release.py, audit_verify.py
+├── scripts/      # the registry gates + editors (check/lint/gen/edit_options, set_group/set_live), gen_man.py, gen_sbom.py, release.py, audit_verify.py
 ├── docker/       # one alpine image per Modbus tool + the compose demo stack ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
 ├── docs/         # the family-level docs: the [security audit](docs/AUDIT.md), the

@@ -23,6 +23,23 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **common** — **the SBOM is generated, not asserted**: `scripts/gen_sbom.py`
+  renders both `docs/sbom/SBOM.md` and `docs/sbom/sbom.cdx.json` from the
+  tree, and the release workflow gains the `sbom` job running
+  `gen_sbom.py --check` (regenerate + diff), so the stdlib-only claim
+  stays audited — the generation runs the import scan first (an `ast`
+  walk over the six shipped subprojects, the lazy imports included) and
+  any root outside the reviewed stdlib allowlist or first-party
+  `common`/`lib` fails the run, the vendored ECharts version is read out
+  of `dashboard/static/vendor/echarts.min.js`'s own export string (its
+  bundled zrender 5.6.0 is now a CycloneDX component too — the recorded
+  version cannot drift from the shipped file; the stale-doc diff is what
+  the check reports), and the suite version, the nixpkgs pin, the alpine
+  base, the apk set and the per-tool module counts all come off the tree
+  (the CycloneDX copy drops its hand-written timestamp — deterministic
+  output, git dates it — and the docs/sbom links point at the real
+  paths now).
+
 - **cache / inverter / common** — **all FC codes awareness**: the family
   names every Modbus function code it sees. The one table lives in
   common/protocol.py (`FC_NAMES` + `describe_fc()` — every standard FC,

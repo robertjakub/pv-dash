@@ -58,13 +58,13 @@ the **Done/history** records for their tool.
   (`cache-fuzz 10000`, `scrape-fuzz 10000`, `control-fuzz`, the stress
   suite) plus `docker compose up` (the Prometheus answers, no tracebacks
   in the logs).
-- **the SBOM / supply-chain note** `[common]` —
-  [sbom/SBOM.md](sbom/SBOM.md) + `sbom/sbom.cdx.json` state the
-  stdlib-only claim per subproject (the machine-readable CycloneDX copy
-  rides along); what remains is the automation: generate and check both in
-  the release workflow, so the claim stays audited, not asserted. Also: a
-  check that the vendored ECharts copy (the dashboard's one vendor)
-  matches its recorded version.
+- **the SBOM / supply-chain note** `[common]` — **done**: `scripts/gen_sbom.py`
+  generates both [sbom/SBOM.md](sbom/SBOM.md) + `sbom/sbom.cdx.json` from
+  the tree (the import scan gates the render — a foreign dependency fails
+  the generation; the vendored ECharts version and its bundled zrender are
+  read out of the shipped bundle itself), and the release workflow's `sbom`
+  job runs `gen_sbom.py --check` (regenerate + diff), so the pair cannot go
+  stale silently.
 - **the release discipline** `[common]` — **done**: `scripts/release.py`
   (the orchestrator: the version sweep, the changelog rename, the
   flake.lock refresh, the verification, the commit, the annotated tag —

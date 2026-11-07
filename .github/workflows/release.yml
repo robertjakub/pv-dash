@@ -33,9 +33,16 @@ jobs:
           nix flake check --no-build || true
           nix build .#modbus-cache .#modbus-scraper .#modbus-fake-inverter .#dashboard --no-link
 
+  sbom:
+    name: the SBOM, checked
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/gen_sbom.py --check
+
   release:
     name: the GitHub release
-    needs: [test, build]
+    needs: [test, build, sbom]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

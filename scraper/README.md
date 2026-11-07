@@ -136,7 +136,13 @@ file is keyed by the exported metric name directly — no separate key layer.
 Entries without a `profile` field are derived by the poller (home,
 export/import split, ...). Each bound entry's `type`/`scale` drive the
 decode — a `scale: 1` SoC is read as plain percent, a `scale: 10` one as
-percent×10. A `profile` field pointing at a register the device profile
+percent×10. The types: `i16`/`u16` (one word), `i32`/`u32` and the
+lo-word-first `i32swap`/`u32swap`, the IEEE 754 `f32`/`f32swap` (two words
+each), `bit` (one address read over FC1 coils / FC2 discrete inputs — the
+metric is 0 or 1). Beyond the four power-math sources, every other
+profile-bound metric (the phase rows, a bit flag, a float) is read once per
+poll, softly: a rejected read keeps its metric absent instead of failing
+the poll. A `profile` field pointing at a register the device profile
 does not define leaves the metric absent (logged at startup). Profile resolution: `--profile`
 flag, env `PROFILE`, config script `set profile`, then the bundled copy;
 re-read on `SIGHUP`. The register map itself — addresses, types, gains,

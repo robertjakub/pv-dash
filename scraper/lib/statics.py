@@ -14,6 +14,7 @@ with open(os.path.join(_here, 'static.json'), encoding='utf-8') as _f:
 PROTOCOL = STATIC['protocol']
 MAX_PDU = PROTOCOL['max_pdu']                  # the largest Modbus PDU
 MAX_COUNT = PROTOCOL['max_count']              # max registers per FC3/FC4 read
+MAX_BITS = PROTOCOL['max_bits']                # max bits per FC1/FC2 read (the Modbus spec's 0x7D0)
 MAX_REGISTERS = PROTOCOL['max_registers']      # the 16-bit register space
 UNIT_ID_RANGE = tuple(PROTOCOL['unit_id_range'])
 

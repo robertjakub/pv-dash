@@ -5,11 +5,12 @@ import socket
 import struct
 
 from common.protocol import ModbusError, auth_handshake_client, recv_exact
-from .statics import MAX_PDU, MAX_COUNT
+from .statics import MAX_BITS, MAX_PDU, MAX_COUNT
 
 
 class ModbusTCP:
-    """FC3/FC4 register client; connects lazily, reconnects on any error.
+    """FC1-FC4 read client (word and bit spaces); connects lazily,
+    reconnects on any error.
     The suite auth (auth='suite' + a >=16-char key) handshakes right after
     every connect: the peer answers OK and the session speaks plain Modbus,
     or ERR and the connection fails like any other."""
@@ -69,6 +70,20 @@ class ModbusTCP:
     def read_registers(self, addr, count, fc=3):
         if not 1 <= count <= MAX_COUNT:
             raise ModbusError('register count %d out of range' % count)
+        words = self._read(fc, addr, count, expect=lambda c: c * 2)
+        return struct.unpack('>%dH' % count, words)
+
+    def read_bits(self, addr, count, fc=1):
+        """One FC1 (coils) / FC2 (discrete inputs) read: count bits, packed
+        8 per byte, LSB first — returned as 0/1 per address."""
+        if not 1 <= count <= MAX_BITS:
+            raise ModbusError('bit count %d out of range' % count)
+        raw = self._read(fc, addr, count, expect=lambda c: (c + 7) // 8)
+        return tuple((raw[i >> 3] >> (i & 7)) & 1 for i in range(count))
+
+    def _read(self, fc, addr, count, expect):
+        """The shared read exchange: pack, send, validate the MBAP and the
+        reply shape, return the raw data bytes (the caller decodes)."""
         if not self.sock:
             self._connect()
         self.txn = (self.txn + 1) & 0xFFFF
@@ -92,9 +107,10 @@ class ModbusTCP:
         if len(body) < 2:
             raise ModbusError('short response: function byte only')
         got = body[1]
-        if got != count * 2:
-            raise ModbusError('expected %d register bytes, got %d' % (count * 2, got))
-        return struct.unpack('>%dH' % count, body[2:2 + got])
+        want = expect(count)
+        if got != want:
+            raise ModbusError('expected %d data bytes, got %d' % (want, got))
+        return body[2:2 + got]
 
     def read_i32(self, addr, fc=3):
         hi, lo = self.read_registers(addr, 2, fc=fc)

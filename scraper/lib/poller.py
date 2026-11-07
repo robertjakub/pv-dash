@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """The poller: reads the inverter, sanity-checks and stores metric values (stdlib only)."""
 import logging
+import struct
 import threading
 import time
 
@@ -57,18 +58,28 @@ class Scraper:
 
     def _read(self, profile_name):
         """Read one source: the profile-declared type and function code on
-        the wire (fc 3 = holding, 4 = input), decoded by the profile's gain
-        (wire value = physical x gain)."""
+        the wire (fc 3 = holding, 4 = input, 1 = coils, 2 = discrete
+        inputs), decoded by the profile's gain (wire value = physical x
+        gain)."""
         src = self.cfg['sources'][profile_name]
         reg, typ, fc = src['register'], src['type'], src.get('fc', 3)
-        if typ in ('i32', 'u32'):
-            raw = self.client.read_i32(reg, fc=fc)
-            if typ == 'u32' and raw < 0:
-                raw += 0x100000000
-        else:
+        if typ == 'bit':
+            raw = self.client.read_bits(reg, 1, fc=fc)[0]
+        elif typ in ('i16', 'u16'):
             raw = self.client.read_registers(reg, 1, fc=fc)[0]
             if typ == 'i16' and raw >= 0x8000:
                 raw -= 0x10000
+        elif typ in ('f32', 'f32swap'):
+            w0, w1 = self.client.read_registers(reg, 2, fc=fc)
+            order = (w1, w0) if typ == 'f32swap' else (w0, w1)   # swap = the lo word first
+            raw = struct.unpack('>f', struct.pack('>HH', *order))[0]
+        else:                       # i32/u32 and the swapped word orders
+            w0, w1 = self.client.read_registers(reg, 2, fc=fc)
+            if typ in ('i32swap', 'u32swap'):
+                w0, w1 = w1, w0
+            raw = struct.unpack('>i', struct.pack('>HH', w0, w1))[0]
+            if typ in ('u32', 'u32swap') and raw < 0:
+                raw += 0x100000000
         return raw / src['gain']
 
     def poll_once(self):
@@ -87,6 +98,19 @@ class Scraper:
             logger.debug('poll failed: %s', e)
             self._account_cycle(started)
             return
+        # the remaining profile-bound sources (the phase rows, a bit flag, a
+        # float — whatever the spec binds beyond the power math): one read
+        # each, soft — a rejected read keeps its metric absent instead of
+        # failing the whole poll (the four power sources above stay hard)
+        extras = {}
+        for pn, src in cfg['sources'].items():
+            if pn in ('pv-power', 'grid-power', 'battery-power', 'battery-soc'):
+                continue
+            try:
+                extras[src['metric']] = self._read(pn)
+            except Exception as e:
+                logger.warning('read of %s (%s) failed, the metric stays absent (%s)',
+                               pn, src['metric'], e)
         self._account_cycle(started)
         pv, grid = pv_raw, grid_raw
         if cfg['grid_positive_import']:
@@ -136,6 +160,7 @@ class Scraper:
                     self.values['%s_battery_charge_watts' % prefix] = max(batt, 0.0)
                     self.values['%s_battery_discharge_watts' % prefix] = max(-batt, 0.0)
                     self.values[metric['battery-soc']] = soc
+                self.values.update(extras)
                 if diag is not None:
                     self.values['scraper_cache_device_up'] = diag[1]
                     self.values['scraper_cache_age_seconds'] = min(diag[2], DIAG_MAX)

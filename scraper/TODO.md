@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The bit-space + float wave: the scraper's client gained **`read_bits`**
+(FC1 coils / FC2 discrete inputs — the reply's packed bits decoded
+LSB-first) and the decode table gained the **lo-word-first
+`i32swap`/`u32swap`** orders and the **IEEE 754 `f32`/`f32swap`** pairs —
+a profile entry's `type` picks the decode, its `fc` the space (`bit`
+defaults to FC1, the word types to FC3). The poller now also reads **every
+profile-bound metric source beyond the four power-math rows** (the spec's
+phase rows were declared but silently never read) — softly: a rejected
+extra read keeps its metric absent instead of failing the poll.
+
 The Modbus auth wave: the scraper **speaks the `suite` scheme to the
 inverter** — `modbus/auth` + `modbus/auth/key` (`--auth`/`AUTH`,
 `--auth-key`/`AUTH_KEY`): with `suite` every (re)connect handshakes first

@@ -136,7 +136,10 @@ def validate_config(cfg):
 
 def load_device_profile(path):
     """Device profile (the shared profiles/ schema) -> {name: (register, type, scale, fc)}.
-    The fc field is optional (the default 3 = holding registers); 4 = input registers."""
+    The fc field is optional; the type picks its legal range and default:
+    word types (i16/u16/i32/u32/i32swap/u32swap/f32/f32swap) read on FC3
+    (holding) or FC4 (input), the bit type reads on FC1 (coils, the
+    default) or FC2 (discrete inputs)."""
     try:
         with open(path, encoding='utf-8') as fh:
             data = json.load(fh)
@@ -155,15 +158,18 @@ def load_device_profile(path):
         except (KeyError, TypeError, ValueError):
             raise SystemExit('%s (%s) needs an integer "register"' % (label, entry['name']))
         typ = str(entry.get('type', 'i32'))
-        if typ not in ('i16', 'u16', 'i32', 'u32'):
-            raise SystemExit('%s (%s): unknown "type" %r (i16/u16/i32/u32)' % (label, entry['name'], typ))
+        if typ not in ('i16', 'u16', 'i32', 'u32', 'i32swap', 'u32swap', 'f32', 'f32swap', 'bit'):
+            raise SystemExit('%s (%s): unknown "type" %r (i16/u16/i32/u32/i32swap/u32swap/f32/f32swap/bit)'
+                             % (label, entry['name'], typ))
         try:
-            fc = int(entry.get('fc', 3))
+            fc = int(entry.get('fc', 1 if typ == 'bit' else 3))
         except (TypeError, ValueError):
             raise SystemExit('%s (%s): bad "fc" %r' % (label, entry['name'], entry.get('fc')))
-        if fc not in (3, 4):
-            raise SystemExit('%s (%s): "fc" must be 3 (holding) or 4 (input), got %d'
-                             % (label, entry['name'], fc))
+        if fc not in ((1, 2) if typ == 'bit' else (3, 4)):
+            raise SystemExit('%s (%s): "fc" must be %s, got %d'
+                             % (label, entry['name'],
+                                '1 (coils) or 2 (discrete inputs)' if typ == 'bit'
+                                else '3 (holding) or 4 (input)', fc))
         scale = entry.get('scale', 1.0)
         try:
             scale = float(scale)

@@ -271,6 +271,70 @@ try:
           str({k: m.get(k) for k in ('huawei_up', 'huawei_modbus_errors_total')}))
     evil4.stop()
 
+    # 1a-ter. the bit and float types: a bit source reads over FC1, an f32
+    # source decodes IEEE 754, an f32swap source the lo-hi word order — and
+    # the profile-bound extras (beyond the power math) export soft.
+    profx = '/tmp/scr_bits_profile.json'
+    _json.dump({'description': 'bit + float sources',
+                'registers': [
+                    {'name': 'pv-power', 'register': 40001, 'type': 'i32', 'scale': 1},
+                    {'name': 'grid-power', 'register': 40003, 'type': 'i32', 'scale': 1},
+                    {'name': 'device-insulation', 'register': 40010, 'type': 'f32', 'scale': 1},
+                    {'name': 'meter-status', 'register': 40020, 'type': 'bit', 'scale': 1},
+                ]}, open(profx, 'w'))
+    specx = '/tmp/scr_bits_spec.json'
+    _json.dump({'profile': {
+        'pv_generation_watts': {'profile': 'pv-power', 'help': 'pv watts'},
+        'grid_net_watts': {'profile': 'grid-power', 'help': 'grid watts'},
+        'float_value': {'profile': 'device-insulation', 'help': 'an f32 row'},
+        'coil_flag': {'profile': 'meter-status', 'help': 'an FC1 bit row'},
+    }}, open(specx, 'w'))
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15548',
+                                   '--control-port', '0', '--profile', profx],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(0.7)
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
+                                    '--upstream', '127.0.0.1:15548', '--profile', profx,
+                                   '--listen', '127.0.0.1:9366', '--metrics-spec', specx],
+                                  stdout=open('/tmp/scr_bits.log', 'w'), stderr=subprocess.STDOUT))
+    for _ in range(30):
+        status, m = wait_metrics(9366)
+        if 'huawei_coil_flag' in m:
+            break
+        time.sleep(0.3)
+    check('profile types: the bit source reads over FC1 (meter-status -> 1)',
+          m.get('huawei_coil_flag') == 1, str(m.get('huawei_coil_flag')))
+    check('profile types: the f32 source decodes IEEE 754 (device-insulation 970.0)',
+          m.get('huawei_float_value') == 970.0, str(m.get('huawei_float_value')))
+    check('profile types: the power math still holds on the i32 sources',
+          m.get('huawei_pv_generation_watts') == 4000 and m.get('huawei_grid_net_watts') == -1500,
+          str({k: m.get(k) for k in ('huawei_pv_generation_watts', 'huawei_grid_net_watts')}))
+    # the swapped word orders: pv on f32swap (lo word first), grid on plain f32
+    profs = '/tmp/scr_swap_profile.json'
+    _json.dump({'description': 'swapped word order',
+                'registers': [
+                    {'name': 'pv-power', 'register': 40001, 'type': 'f32swap', 'scale': 1},
+                    {'name': 'grid-power', 'register': 40003, 'type': 'f32', 'scale': 1},
+                ]}, open(profs, 'w'))
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15549',
+                                   '--control-port', '0', '--profile', profs],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(0.7)
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
+                                    '--upstream', '127.0.0.1:15549', '--profile', profs,
+                                   '--listen', '127.0.0.1:9367', '--metrics-spec', specx],
+                                  stdout=open('/tmp/scr_swap.log', 'w'), stderr=subprocess.STDOUT))
+    for _ in range(30):
+        status, m = wait_metrics(9367)
+        if 'huawei_pv_generation_watts' in m:
+            break
+        time.sleep(0.3)
+    check('profile types: the f32swap source decodes the lo-hi word order (pv 4000)',
+          m.get('huawei_pv_generation_watts') == 4000, str(m.get('huawei_pv_generation_watts')))
+    check('profile types: the plain f32 grid decodes (-1500, the math holds)',
+          m.get('huawei_grid_net_watts') == -1500 and m.get('huawei_home_consumption_watts') == 5500,
+          str({k: m.get(k) for k in ('huawei_grid_net_watts', 'huawei_home_consumption_watts')}))
+
     # 1b. the shipped Deye profile end-to-end: real Deye addresses (SG03LP1
     # family), SoC reported as plain percent (gain 1), omitted registers = 0
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', '15596',
@@ -422,7 +486,8 @@ try:
     ctl_log = open('/tmp/scr_ctl_fake.log').read()
     check('fake audit: write + rejected FC + malformed frame logged one-line',
           'write: register 47415 = 99 (single register, unit 1)' in ctl_log
-          and 'rejected FC5 (write single coil) from' in ctl_log
+          and 'write: coil 1 = 0x00ff from' in ctl_log
+          and '-> exception 03 (illegal data value)' in ctl_log
           and 'malformed frame from' in ctl_log)
     subprocess.run([sys.executable, C, '--control-port', '15571', 'pv', '1234'], capture_output=True)
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'reset'], capture_output=True, text=True)

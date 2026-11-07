@@ -15,8 +15,10 @@ exactly one) and multiplexes it: a background loop polls the configured
 register ranges into an in-memory cache, any number of clients are served
 FC3/FC4 reads from the cache, reads outside the map and other function
 codes are forwarded live, and writes (FC05/06/15/16/22/23) are forwarded
-when explicitly enabled and audited. A synthesized diagnostics block at
-registers 65000\(en65003 lets clients tell cached data from live data.
+when explicitly enabled and audited. Every function code crossing the
+wire is named in the log and the audit trail (all standard FCs, FC1
+through FC43). A synthesized diagnostics block at registers
+65000\(en65003 lets clients tell cached data from live data.
 .PP
 Resilience: when the device dies, cached reads keep serving last-known
 values and forwarded reads get exception 0x0B; when the device rejects a

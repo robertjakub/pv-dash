@@ -8,7 +8,7 @@ import threading
 import time
 from collections import deque
 
-from common.protocol import ModbusError, exception_frame, recv_exact
+from common.protocol import ModbusError, describe_fc, exception_frame, recv_exact
 from common.connlimit import ConnGate
 from .protocol import DeviceError, describe_write
 from .config import load_registers_file, load_selection
@@ -27,14 +27,21 @@ logger = logging.getLogger('modbus-cache')
 
 def _write_target(pdu):
     """The register span a write request touches: (addr, count) for the
-    known write function codes, None when the frame is too short to tell."""
+    known write function codes, None when the frame is too short to tell.
+    FC23's write span is the SECOND address pair — the request reads first,
+    writes second; the gate vets what is written."""
     if len(pdu) < 5:
         return None
     func = pdu[0]
     if func in (5, 6, 22):          # single register (coil / register / mask-write)
         addr = struct.unpack('>H', pdu[1:3])[0]
         return addr, 1
-    if func in (15, 16, 23):        # multiple registers/coils
+    if func == 23:                  # read/write multiple: read addr/count, write addr/count
+        if len(pdu) < 10:
+            return None
+        addr, count = struct.unpack('>HH', pdu[5:9])
+        return addr, count
+    if func in (15, 16):            # multiple registers/coils
         addr, count = struct.unpack('>HH', pdu[1:5])
         return addr, count
     return None
@@ -380,25 +387,25 @@ class Proxy:
         if func in WRITE_FUNCS:
             target = _write_target(pdu)
             if target is None:
-                desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
+                desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
                 logger.info('write: refused %s (the frame is too short to carry a register address)', desc)
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (the frame is too short to carry a register address)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
             if not self.allow_write:
-                desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
+                desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
                 logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (write support disabled)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
             if not self._allowed(self.write_acl, addr[0]):
-                desc = describe_write(pdu, unit) or 'FC%d, %d byte(s) (unit %d)' % (func, len(pdu) - 1, unit)
+                desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
                 logger.info('write: refused %s (client %s not on the write ACL)', desc, addr[0])
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (client %s not on the write ACL)' % (desc, addr[0]))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
             if not self._write_allowed(target):
-                desc = describe_write(pdu, unit) or 'FC%d (unit %d)' % (func, unit)
+                desc = describe_write(pdu, unit) or '%s (unit %d)' % (describe_fc(func), unit)
                 logger.info('write: refused %s (registers outside the write allow-list %s)',
                             desc, self.describe_write_ranges())
                 if self.audit:
@@ -465,6 +472,10 @@ class Proxy:
             fc = pdu[0]
             addr, count = struct.unpack('>HH', pdu[1:5])
             logger.info('read: fc%d registers %d:%d not cached, polling the device', fc, addr, count)
+        else:
+            # the frame carries no cache semantics (FC1/2/7/8/17/…, vendor
+            # codes) — forward it untouched, named in the log
+            logger.info('forwarded %s, %d byte(s) (unit %d)', describe_fc(pdu[0]), len(pdu) - 1, unit)
         frame = struct.pack('>HHHB', txn, proto, len(pdu) + 1, unit) + pdu
         try:
             with self.upstream.lock:
@@ -479,7 +490,8 @@ class Proxy:
                     if self.audit:
                         self.audit.event('WRITE-REJECTED', '%s (modbus exception %d)' % (desc, code))
                 elif not is_read:
-                    logger.info('forwarded FC%d rejected by the device (modbus exception %d)', pdu[0], code)
+                    logger.info('forwarded %s rejected by the device (modbus exception %d)',
+                                describe_fc(pdu[0]), code)
             if is_read:
                 if body and body[0] == fc and len(body) >= 2 and body[1] == count * 2:
                     if not self.no_cache:

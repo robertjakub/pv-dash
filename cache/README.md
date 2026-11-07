@@ -446,7 +446,9 @@ on the write ACL **and** every touched register inside the allow-list
 (and the frame parse gate first) — with `write-acl` and `write-registers`
 defaulting to `none`, enabling `--allow-write` alone still refuses every
 write until the operator opens those two deliberately (in the config or
-live with `set`).
+live with `set`). For FC23 (read/write multiple registers) the touched
+registers are the written span — the request's second address pair; the
+read span riding first is not vetted.
 
 ACLs re-resolve on `SIGHUP` like every other setting; a malformed list keeps
 the previous one.
@@ -556,7 +558,8 @@ is set).
 | Write refused (support disabled) | `write: refused register … (write support disabled …)` |
 | Write refused (ACL) | `write: refused register … (client 10.0.0.5 not on the write ACL)` |
 | Device rejects a forwarded write | `write rejected by the device: … (modbus exception N)` |
-| Device rejects a forwarded non-FC3 request | `forwarded FC22 rejected by the device (modbus exception N)` |
+| Forwarded frame with no cache semantics (FC01/02/07/08/17/…) | `forwarded FC17 (report slave id), 0 byte(s) (unit 1)` |
+| Device rejects a forwarded frame with no cache semantics | `forwarded FC17 (report slave id) rejected by the device (modbus exception N)` |
 | Uncached read forwarded + cached | `read: registers … not cached, polling the device` / `… ok, cached …` |
 | Device rejects a forwarded read | `read: registers … rejected by the device (modbus exception N)` |
 | Connection rejected (ACL) | `connection rejected: 10.0.0.5:51234 not on the connect ACL` |

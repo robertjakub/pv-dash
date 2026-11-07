@@ -422,7 +422,7 @@ try:
     ctl_log = open('/tmp/scr_ctl_fake.log').read()
     check('fake audit: write + rejected FC + malformed frame logged one-line',
           'write: register 47415 = 99 (single register, unit 1)' in ctl_log
-          and 'rejected FC5 from' in ctl_log
+          and 'rejected FC5 (write single coil) from' in ctl_log
           and 'malformed frame from' in ctl_log)
     subprocess.run([sys.executable, C, '--control-port', '15571', 'pv', '1234'], capture_output=True)
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'reset'], capture_output=True, text=True)

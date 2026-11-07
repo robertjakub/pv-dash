@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """The fake inverter's Modbus TCP server: FC3 reads from the simulator
-(strict mode, write overlay), FC06/16 writes, chaos injection."""
+(strict mode, write overlay), FC06/16 writes, every other function code
+named and refused, chaos injection."""
 import ipaddress
 import logging
 import socket
@@ -8,7 +9,7 @@ import struct
 import threading
 import time
 
-from common.protocol import recv_exact
+from common.protocol import describe_fc, recv_exact
 from common.connlimit import ConnGate
 from .statics import MAX_COUNT, MAX_PDU
 from common.version import version_string
@@ -184,9 +185,14 @@ class FakeInverter:
                     logger.info('write: registers %d:%d = %s (multiple registers, unit %d)',
                                 addr_, count, list(values), unit)
                 else:
-                    body = struct.pack('>BB', func + 0x80, 1 if func not in (6, 16) else 3)
+                    # every other function code is named and refused: a
+                    # malformed shape on an implemented write is exception 03
+                    # (illegal data value), an unimplemented FC is 01
+                    malformed = func in (6, 16)
+                    body = struct.pack('>BB', func + 0x80, 3 if malformed else 1)
                     client.sendall(struct.pack('>HHHB', txn, 0, len(body) + 1, unit) + body)
-                    logger.info('rejected FC%d from %s:%d (illegal function)', func, addr[0], addr[1])
+                    logger.info('rejected %s from %s:%d (%s)', describe_fc(func), addr[0], addr[1],
+                                'malformed frame' if malformed else 'illegal function')
         except (ConnectionError, OSError) as e:
             logger.info('client %s:%d disconnected (%s)', *addr[:2], e)
         except struct.error as e:

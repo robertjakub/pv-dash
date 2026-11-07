@@ -5,6 +5,19 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The FC-awareness wave: **every function code is named** — the shared
+`FC_NAMES`/`describe_fc()` table in common/protocol.py, the cache's
+`describe_write()` covering all six write FCs (FC05/15/22/23 joined
+FC06/16 — the coil bits, the mask write's and/or masks, FC23's write
+span + read-back, the malformed shapes named per-FC), the named
+`forwarded FC17 (report slave id), …` line for a frame with no cache
+semantics (was silent), the named refusals and device rejects, and the
+fake's rejects carrying the FC's name (a malformed FC06/16 answers
+exception 03 with a malformed-frame note — the log said illegal
+function for both). The fix riding along: **the write allow-list vets
+FC23's WRITE span** — the second address pair; the read span riding
+first was vetted instead, letting a frame write outside the list.
+
 The show-refusal wave: **`show <secret>` refuses** — `show control/token`
 (the ops token, the metrics token, the `-file` spellings) answers
 `err <name> is a secret — it never shows` instead of the `<set>` guard's

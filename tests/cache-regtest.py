@@ -1272,6 +1272,27 @@ try:
     b = wr16(47498, [1, 2, 3, 4], port=15521)
     check('write allow-list: fc16 spanning the edge refused', b[0] == 0x90 and b[1] == 1, b.hex())
 
+    # FC23 awareness: the gate vets the WRITE span (the second address
+    # pair) — the read span riding first does not smuggle the write through
+    b = txn(struct.pack('>BHHHH', 23, 47415, 2, 47999, 1) + struct.pack('>BH', 2, 5), port=15521)
+    check('write allow-list: fc23 write span outside refused (0x97/01)',
+          b[0] == 0x97 and b[1] == 1, b.hex())
+    check('write allow-list: the refused fc23 write is a WRITE-REFUSED naming the span',
+          'registers 47999:1 = [5], read back 47415:2 (read/write multiple registers, unit 1) '
+          '(registers outside the write allow-list)' in open('/tmp/reg_audit_fc4.log').read())
+    b = txn(struct.pack('>BHHHH', 23, 47415, 2, 47498, 1) + struct.pack('>BH', 2, 5), port=15521)
+    fc4_log = open('/tmp/reg_fc4.log').read()
+    check('write allow-list: fc23 spans inside pass the gate (the device answers)',
+          b[0] == 0x97 and b[1] == 1
+          and 'write: registers 47498:1 = [5], read back 47415:2 (read/write multiple registers, unit 1)' in fc4_log
+          and 'write rejected by the device' in fc4_log, b.hex())
+
+    # the named forward: a frame with no cache semantics is forwarded and
+    # its function code named in the log
+    b = txn(struct.pack('>B', 17), port=15521)   # FC17 report slave id
+    check('unknown-FC forward: the frame is named in the log',
+          'forwarded FC17 (report slave id)' in open('/tmp/reg_fc4.log').read(), b.hex())
+
     # inspect: the pretty multi-line dump
     r = ctl_cmd('inspect', 15522)
     check('control: inspect dumps state, map, write gate',

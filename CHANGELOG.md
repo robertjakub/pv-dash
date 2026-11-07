@@ -12,6 +12,33 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **cache / inverter / common** — **all FC codes awareness**: the family
+  names every Modbus function code it sees. The one table lives in
+  common/protocol.py (`FC_NAMES` + `describe_fc()` — every standard FC,
+  1–24 and 43; the vendor blocks stay bare `FC<n>`), the cache's
+  `describe_write()` learns FC05/15/22/23 (the coil values as 0/1 bits,
+  the mask write's and/or masks, FC23's write span + read-back — a
+  malformed shape names the FC and says so), a forwarded frame with no
+  cache semantics logs `forwarded FC17 (report slave id), 0 byte(s)
+  (unit 1)` instead of passing silently, the device-reject and refusal
+  lines carry the named form, and the fake's rejects name the FC too
+  (`rejected FC5 (write single coil) from … (illegal function)`; a
+  malformed FC06/16 answers exception 03 with a malformed-frame note —
+  the log used to say illegal function for both).
+
+### Fixed
+
+- **cache** — **the write allow-list vets FC23's WRITE span**: the
+  request's second address pair (read addr/count rides first, write
+  second) — `_write_target()` took the read span, so a read/write
+  multiple-registers frame with the read span inside the allow-list and
+  the written span outside was forwarded, and the write-through
+  invalidation dropped the same wrong span. The gate refuses it 0x97/01
+  now and the invalidation drops exactly the written words; the regtest
+  pins both halves.
+
+### Added
+
 - **scraper / inverter / dashboard** — **the state machinery is
   family-wide**: `dump_settings`/`apply_dump_settings` on all three
   control servers (the overrides serialize to raw, re-appliable wire

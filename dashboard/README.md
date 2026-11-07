@@ -208,9 +208,9 @@ token). Over the unix socket a trusted peer (root, the daemon's own user or
 `--control-trust-uids`) skips the token handshake (SO_PEERCRED). A second,
 **read-only ops token** (`--control-ops-token`/`--control-ops-token-file`)
 authenticates into the `show` verbs only — no `set`/`unset`, no `request
-reload`, no `shutdown`: the ops shift against the admin key, both audited
-(the DSH trail's COMMAND entries carry `role=ops`/`role=admin`, the
-denials included; each session's frames are mac'd with the key it
+reload`, no `reload`, no `shutdown`: the ops shift against the admin key,
+both audited (the DSH trail's COMMAND entries carry `role=ops`/`role=admin`,
+the denials included; each session's frames are mac'd with the key it
 authenticated with).
 
 ```bash
@@ -223,14 +223,27 @@ python3 bin/dashboard-cli.py                      # the console: TAB completion,
 
 Commands: `set <setting> <value>` / `unset <setting>` (the live settings:
 `max-clients`, `client-timeout`, `max-conn-per-ip`, `log-access`,
-`log-queries`, `battery`, `log-level`), `show <setting>` / `show status` /
+`log-queries`, `battery`, `log-level` — and the **token lives**:
+`control token`/`control token-file` and `control ops token`/`control ops
+token-file` rotate the control tokens live (the sessions re-auth),
+`metrics token`/`metrics token-file` rotate the /metrics bearer live; a
+token value never renders back — **`show <secret>` refuses** (it is a
+secret: pass it by flag/env/token-file)), `show <setting>` / `show status` /
 `show connections` (the live HTTP clients per peer IP) /
 `show version` / `show knobs` (the dictionary of every registry knob: its
 flag, its env twin, how it changes — under its display group, ungrouped
 rows bare), `inspect` (the one-page
 dump for a bug report), `request
 reload` (re-read `server.conf` — the SIGHUP path; the listen address and
-port are bound and stay), `shutdown`, `quit`; `help <setting>` describes a
+port are bound and stay), `reload` (**the whole-daemon restart that keeps
+the sets**: the live overrides save to a state file beside the config
+(``<config>.reload``), the process re-execs, the fresh daemon re-resolves
+the config file and re-applies the saved overrides once, then consumes the
+state file — overridden secrets never save (the dump rule), the reply
+names them), the state dump (`--dump-path`): `request dump` /
+`request restore` (the live overrides as one `0600` JSON with an integrity
+hash; `--restore-on-start` loads it at start), `shutdown`, `quit`;
+`help <setting>` describes a
 setting. A SIGHUP or `request reload` also clears the live overrides
 (`show status`'s `overridden=` row lists them).
 

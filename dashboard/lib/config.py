@@ -193,6 +193,9 @@ def resolve_config(args, script_dir=None):
     cfg['metrics_max_conn_per_ip'] = resolve(getattr(args, 'metrics_max_conn_per_ip', None),
                                              'METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
                                              DEFAULTS['metrics_max_conn_per_ip'], int)
+    cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', None, str)
+    cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
+                                      'restore_on_start', False, str_to_bool)
     control_port = str(cfg['control_port'] or '').strip()
     if control_port.isdigit() and control_port != '0' and not cfg['control_token']:
         raise SystemExit('the TCP control port %s without a token is open to every local process; '

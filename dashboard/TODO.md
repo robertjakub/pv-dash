@@ -4,6 +4,21 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[dashboard]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+
+The state-machinery wave: `dump_settings`/`apply_dump_settings` land on
+the control server — the **state dump** (`dump/path`,
+`dump/restore-on-start` lives + the `--dump-path`/`--restore-on-start`
+flags/env/NixOS options; `request dump`/`request restore` write and
+re-apply the live overrides as one 0600 integrity-hashed JSON,
+common/dump.py; the graceful shutdown dumps too), the **whole-daemon
+`reload`** (the overrides save to `<config>.reload`, the process re-execs,
+the fresh daemon re-applies them once and consumes the file — the ops
+role may not reload), and the **secret lives**: `control/token`(-file),
+`control/ops/token`(-file) and `metrics/token`(-file) rotate live (the
+sessions re-auth; the F6 rule stands — the endpoint's token is mandatory
+while it serves), the secret defaults placeholders are gone (unset
+refuses) and **`show <secret>` refuses** — the value renders nowhere.
+
 The show-settings retirement: `show settings` is gone — the per-setting
 `show <setting>` and `show status`'s `overridden=` row carry the same
 truth, the command answers `err unknown setting` (the registry row, the

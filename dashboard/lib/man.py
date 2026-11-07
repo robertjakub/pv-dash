@@ -54,10 +54,18 @@ The control server speaks JSON lines ({"cmd": "..."} ->
 configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: max-clients,
 client-timeout, max-conn-per-ip, log-access, log-queries, battery,
-log-level), \\fBshow status\\fR, \\fBshow connections\\fR (the live HTTP
-clients), \\fBshow version\\fR, \\fBshow knobs\\fR
+log-level \\(em and the token lives: control token, the ops token,
+metrics token, each rotating live, the value never rendering \\(em
+\\fBshow <secret>\\fR refuses), \\fBshow status\\fR, \\fBshow connections\\fR
+(the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
 (the dictionary of the registry), \\fBinspect\\fR,
-\\fBrequest reload\\fR, \\fBshutdown\\fR, \\fBquit\\fR. See
+\\fBrequest reload\\fR (the SIGHUP path), \\fBreload\\fR (the
+whole-daemon restart that keeps the sets: the live overrides save to a
+state file beside the config, the process re-execs, the fresh daemon
+re-applies them once), with a dump path configured (\\fB--dump-path\\fR):
+\\fBrequest dump\\fR / \\fBrequest restore\\fR (the overrides as one 0600
+integrity-hashed JSON; \\fB--restore-on-start\\fR loads it at start),
+\\fBshutdown\\fR, \\fBquit\\fR. See
 .BR dashboard-ctl (1)
 and
 .BR dashboard-cli (1)."""

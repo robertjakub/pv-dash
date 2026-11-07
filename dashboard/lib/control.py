@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import socket
+import sys
 import threading
 import time
 
@@ -29,7 +30,9 @@ from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
-from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME
+from common.config import load_token_file
+from common import dump as state
+from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, KNOWN_VERBS, NODE_BY_NAME
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
@@ -49,13 +52,14 @@ class ControlServer:
     the token first when one is configured; the unix socket relies on
     filesystem permissions. A second, read-only token (ops_token) may be
     configured beside the admin token: it authenticates into the show/clear
-    verbs only — no set/unset, no request reload, no shutdown
+    verbs only — no set/unset, no request reload, no reload, no shutdown
     (common/wiresec.py's roles). `stopper` is the graceful-stop callback
     shared with the signal handlers; it runs after the shutdown reply left
     the wire."""
 
     def __init__(self, httpd, target, reloader=None, stopper=None, audit=None, token=None,
-                 defaults=None, trust_uids=None, ops_token=None, ops_verbs=None, startup_values=None):
+                 defaults=None, trust_uids=None, ops_token=None, ops_verbs=None, startup_values=None,
+                 config_path=None, dump_path=None, restore_on_start=False):
         self.httpd = httpd
         self.reloader = reloader         # request reload: re-resolve the config, apply, returns the summary
         self.audit = audit               # the SCR audit trail (common.audit), None = off
@@ -63,6 +67,10 @@ class ControlServer:
         self.ops_token = ops_token       # the read-only ops token (the ops role); None = off
         self.ops_verbs = frozenset(v.lower() for v in (ops_verbs or OPS_VERBS))   # the ops role's RBAC policy
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
+        self.config_path = config_path   # the config script the daemon started from — the reload state lives beside it
+        self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
+        self.dump_path = dump_path or None   # the state dump file (the dump family)
+        self.dump_restore = bool(restore_on_start)   # prospective-only: the START already chose
         self.metrics_srv = None          # set by the entry (the live metrics-server toggle)
         self.metrics_token = None        # the /metrics bearer token (the entry passes it)
         self.metrics_listen = None       # the /metrics bind address (the entry passes it)
@@ -80,6 +88,7 @@ class ControlServer:
         self.started = time.monotonic()
 
     def start(self):
+        self._restore_reload_state()   # a reload exec: the saved overrides re-apply once, the state file is consumed
         threading.Thread(target=self.serve, daemon=True).start()
 
     def describe(self):
@@ -209,12 +218,13 @@ class ControlServer:
             reply_obj['mac'] = sign_reply(key, reply)
         return cmd, reply_obj, reply, role
 
-    def announce_exit(self, reason):
+    def announce_exit(self, reason, text=None):
         """The daemon is going down: send every connected control client a
         bye frame (the consoles print the notice and exit instead of trying
-        to reconnect to a dead server) and close their sockets."""
+        to reconnect to a dead server) and close their sockets. `text`
+        replaces the shutdown wording (the reload speaks of restarting)."""
         frame = (json.dumps({'status': 'bye',
-                             'text': 'daemon-exit: the dashboard is shutting down (%s)' % reason},
+                             'text': text or 'daemon-exit: the dashboard is shutting down (%s)' % reason},
                             ensure_ascii=False)   # the frame is utf-8 like every other reply
                  + '\n').encode()
         with self.clients_lock:
@@ -265,8 +275,12 @@ class ControlServer:
                     client.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())
                 if reply.startswith('bye'):
                     break
+                if self.reload_pending:
+                    break   # the reply is out — the post-loop hook re-execs
             if self.shutdown_pending and self.stopper:
                 self.stopper('control command')   # reply is out, now really stop
+            if self.reload_pending:
+                self._exec_reload()               # reply is out, now really re-exec
         except (ConnectionError, OSError):
             pass
         except Exception as e:
@@ -349,6 +363,9 @@ class ControlServer:
             args = cmd.split()[1:]
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
+                opt = OPTION_BY_LIVE.get(key)
+                if opt is not None and opt.secret:
+                    return 'err %s is a secret — it never shows (pass it by flag/env/token-file)' % key
                 word = SHOW_BY_LIVE.get(key)
                 if word:
                     return self.command('show ' + word)   # a show command's report, by its word
@@ -368,6 +385,12 @@ class ControlServer:
                 return 'ok reloaded (%s)' % self.reloader()
             except Exception as e:
                 return 'err reload failed: %s' % e
+        if low == 'request dump':
+            return self.dump_state()
+        if low == 'request restore':
+            return self.restore_state()
+        if low == 'reload':
+            return self.reload_daemon()
         if low == 'shutdown':
             self.shutdown_pending = True
             logger.info('control: shutdown requested')
@@ -375,11 +398,17 @@ class ControlServer:
         return 'err unknown command %r (try help)' % cmd
 
     def command_help(self):
-        """The one-line command reference."""
-        return ('commands: set <setting> <value>, unset <setting>, inspect, '
-                'show <setting|status|connections|version|config|knobs>, request reload, shutdown, quit; '
-                'help <setting> describes it, help config maps every knob to its control command, '
-                'show knobs prints the full dictionary')
+        """The one-line command reference: the state-dump commands appear
+        only when a dump path is configured (there is nothing to dump
+        into otherwise)."""
+        cmds = ('commands: set <setting> <value>, unset <setting>, inspect, '
+                'show <setting|status|connections|version|config|knobs>, request reload')
+        if self.dump_path:
+            cmds += ', request dump, request restore'
+        cmds += ', reload, shutdown, quit; '
+        cmds += 'help <setting> describes it, help config maps every knob to its control command, '
+        cmds += 'show knobs prints the full dictionary'
+        return cmds
 
     def config_mapping(self):
         """The knob -> control-command mapper (help config): every option of
@@ -511,7 +540,90 @@ class ControlServer:
                 raise ValueError('log-level must be one of %s' % ', '.join(LOG_LEVELS))
             logging.getLogger().setLevel(getattr(logging, lvl))
             return lvl
+        if key == 'control/token':
+            if val in ('off', 'none', ''):
+                if not self.is_unix:
+                    raise ValueError('the TCP control port needs its token (F5 in docs/AUDIT.md) — '
+                                     'only the unix socket (the filesystem is the auth) may run tokenless')
+                self.token = None
+                return 'off'
+            if self.ops_token and hmac.compare_digest(val, self.ops_token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.token = val   # the rotation is live: the sessions re-auth, the macs verify against the new key
+            return '<set>'
+        if key == 'control/token-file':
+            try:
+                tok = load_token_file(val, 'control-token-file')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if self.ops_token and hmac.compare_digest(tok, self.ops_token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.token = tok
+            return '<set>'
+        if key == 'control/ops/token':
+            if val in ('off', 'none', ''):
+                self.ops_token = None   # the ops shift signs off; the admin role is untouched
+                return 'off'
+            if self.token and hmac.compare_digest(val, self.token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.ops_token = val
+            return '<set>'
+        if key == 'control/ops/token-file':
+            try:
+                tok = load_token_file(val, 'control-ops-token-file')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if self.token and hmac.compare_digest(tok, self.token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.ops_token = tok
+            return '<set>'
+        if key == 'metrics/token':
+            if not val or val in ('off', 'none', '0'):
+                raise ValueError('metrics/token is mandatory while the endpoint serves (F6 in docs/AUDIT.md) '
+                                 '— set the new token')
+            self.metrics_token = val
+            if self.metrics_srv:
+                self.metrics_srv.token = val   # the handler reads it per request — the swap is live
+            from .metrics import describe_metrics
+            caps = self._metrics_caps()
+            self.metrics_desc = describe_metrics(self.metrics_listen, val, caps[0], caps[2])
+            return '<set>'
+        if key == 'metrics/token-file':
+            tok = load_token_file(val, 'metrics-token-file')
+            self.metrics_token = tok
+            if self.metrics_srv:
+                self.metrics_srv.token = tok
+            from .metrics import describe_metrics
+            caps = self._metrics_caps()
+            self.metrics_desc = describe_metrics(self.metrics_listen, tok, caps[0], caps[2])
+            return '<set>'
+        if key == 'dump/path':
+            if val in ('off', 'none', ''):
+                self.dump_path = None
+                return 'off'
+            self.dump_path = val   # request dump and the graceful shutdown write it from here on
+            return val
+        if key == 'dump/restore-on-start':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('dump/restore-on-start must be on or off')
+            self.dump_restore = on   # prospective: the START behaviour this session already chose stands
+            return 'on' if on else 'off'
         raise ValueError('unknown setting %s' % key)
+
+    def _metrics_caps(self):
+        """The caps the describe line renders: the running server's when it
+        is up, the defaults otherwise."""
+        from .statics import DEFAULT_METRICS_CAPS
+        return ((self.metrics_srv.max_clients, self.metrics_srv.client_timeout, self.metrics_srv.max_per_ip)
+                if self.metrics_srv else DEFAULT_METRICS_CAPS)
 
     def _get(self, key):
         h = self.httpd.RequestHandlerClass
@@ -530,6 +642,16 @@ class ControlServer:
             return 'on' if h.battery else 'off'
         if key == 'metrics-server':
             return 'on' if self.metrics_srv else 'off'
+        if key in ('control/token', 'control/token-file'):
+            return '<set>' if self.token else 'off'   # the secret never renders
+        if key in ('control/ops/token', 'control/ops/token-file'):
+            return '<set>' if self.ops_token else 'off'   # the secret never renders
+        if key in ('metrics/token', 'metrics/token-file'):
+            return '<set>' if self.metrics_token else 'off'   # the secret never renders
+        if key == 'dump/path':
+            return self.dump_path or 'off'
+        if key == 'dump/restore-on-start':
+            return 'on' if self.dump_restore else 'off'
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         s = SETTING_BY_NAME.get(key)
@@ -541,6 +663,170 @@ class ControlServer:
         """The config was re-applied (SIGHUP/request reload): nothing is
         live-overridden anymore."""
         self.overridden.clear()
+
+    def dump_settings(self):
+        """The live-overridden settings as raw, re-appliable values. The
+        secrets (control/token, the ops token, metrics/token) are absent: a
+        dump is a plain JSON file, the secrets never land in it — the
+        restore keeps their current value."""
+        h = self.httpd.RequestHandlerClass
+        raw = {
+            'battery': 'on' if h.battery else 'off',
+            'max-clients': self.httpd.gate.max_total,
+            'client-timeout': h.timeout or 0,
+            'max-conn-per-ip': self.httpd.gate.max_per_ip,
+            'log-access': 'on' if h.log_access else 'off',
+            'log-queries': 'on' if h.log_queries else 'off',
+            'metrics-server': 'on' if self.metrics_srv else 'off',
+            'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
+            'dump/path': self.dump_path or 'off',
+            'dump/restore-on-start': 'on' if self.dump_restore else 'off',
+        }
+        return {k: raw[k] for k in sorted(self.overridden) if k in raw}
+
+    def apply_dump_settings(self, settings):
+        """Re-apply the dumped overrides; returns (applied, failed-name-list).
+        An unknown setting or a value the current config rejects is skipped,
+        never fatal."""
+        applied, failed = 0, []
+        for name, value in (settings or {}).items():
+            if name not in SETTING_BY_NAME:
+                failed.append(name)
+                continue
+            try:
+                self._apply(name, str(value))
+                self.overridden.add(name)
+                applied += 1
+            except ValueError as e:
+                failed.append('%s (%s)' % (name, e))
+        return applied, failed
+
+    # --- the whole-daemon reload (`reload`): the live overrides serialize to
+    # a state file beside the config, the reply leaves the wire, the process
+    # re-execs. The fresh daemon re-resolves the config file (the
+    # startup-only knobs take their configured values) and re-applies the
+    # saved overrides once (start) — the file and the flags stay the owners
+    # of the base, the state file is consumed, nothing lingers. ---
+
+    def _reload_state_path(self):
+        return self.config_path + '.reload' if self.config_path else None
+
+    def _save_reload_state(self):
+        """The overrides in their wire-parsable form (dump_settings) to the
+        state file — the secrets are absent by construction. Returns
+        (settings, lost-secret-names); raises OSError on an unwritable home."""
+        settings = self.dump_settings()
+        lost = sorted(k for k in self.overridden if k not in settings)
+        path = self._reload_state_path()
+        tmp = path + '.tmp'
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)   # config-equivalent trust: 0600, never the umask's
+        with os.fdopen(fd, 'w') as f:
+            json.dump({'when': time.time(), 'settings': settings}, f, indent=1, sort_keys=True)
+            f.write('\n')
+        os.replace(tmp, path)
+        return settings, lost
+
+    def _restore_reload_state(self):
+        """One-shot, at start: a reload exec re-applies the saved overrides
+        and consumes the state file — a later manual start stays pure (the
+        config file and the flags alone). A state older than two minutes is
+        stale (a failed start in between): discarded, never applied."""
+        path = self._reload_state_path()
+        if not path or not os.path.exists(path):
+            return
+        try:
+            with open(path) as f:
+                state_obj = json.load(f)
+            if time.time() - state_obj.get('when', 0) > 120:
+                logger.warning('reload: the state file %s is stale, discarding it', path)
+                os.unlink(path)
+                return
+            applied, failed = self.apply_dump_settings(state_obj.get('settings'))
+            os.unlink(path)
+            logger.info('reload: %d override(s) re-applied from %s%s', applied, path,
+                        (' (%d skipped: %s)' % (len(failed), ', '.join(failed))) if failed else '')
+            if self.audit:
+                self.audit.event('RELOAD', 'restored %d override(s) from %s' % (applied, path))
+        except (OSError, ValueError) as e:
+            logger.error('reload: the state file %s is unreadable (%s) — starting without it', path, e)
+
+    def reload_daemon(self):
+        """The `reload` verb: save the overrides, then restart the whole
+        daemon. The fresh process re-resolves the config file — the
+        startup-only knobs take their configured values — and start()
+        re-applies the saved overrides once. The secrets never save (the
+        dump rule): an overridden secret is named in the reply, to re-pass
+        by flag/env/token-file."""
+        if not self.config_path:
+            return 'err reload needs a config path (start with --config)'
+        try:
+            settings, lost = self._save_reload_state()
+        except OSError as e:
+            logger.error('control: reload could not save the overrides: %s', e)
+            return 'err reload failed: %s' % e
+        self.reload_pending = True
+        logger.info('control: reload — %d override(s) saved to %s, re-execing',
+                    len(settings), self._reload_state_path())
+        msg = 'ok reload: %s, the daemon restarts now' % (
+            '%d override(s) saved' % len(settings) if settings else 'no overrides to save')
+        if lost:
+            msg += ' (%s: secret, not saved — re-pass by flag/env/token-file)' % ', '.join(lost)
+        return msg
+
+    def _exec_reload(self):
+        """The reply is out (the session loop calls this after it): announce
+        to the consoles and re-exec in place — the same argv re-resolves the
+        config, the fresh daemon rebinds the control target (stale sockets
+        are replaced) and restores the saved overrides."""
+        if self.audit:
+            self.audit.event('RELOAD', 'exec: the daemon re-execs (pid %d)' % os.getpid())
+        self.announce_exit('reload', text='daemon-exit: the dashboard is reloading — '
+                                          'the daemon restarts with the saved configuration')
+        sys.stdout.flush()
+        sys.stderr.flush()
+        time.sleep(0.2)   # let the bye frames drain
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    def dump_state(self):
+        """The write-behind: the live setting overrides to the configured
+        dump path (the `request dump` command and the graceful shutdown)."""
+        if not self.dump_path:
+            return 'err no dump path configured (set dump/path or --dump-path)'
+        settings = self.dump_settings()
+        try:
+            n = state.write_dump(self.dump_path, settings)
+        except (OSError, ValueError) as e:
+            logger.error('control: the dump to %s failed: %s', self.dump_path, e)
+            return 'err dump failed: %s' % e
+        logger.info('control: state dumped to %s (%d setting(s))', self.dump_path, n)
+        return 'ok dumped %d setting(s) to %s' % (n, self.dump_path)
+
+    def restore_state(self):
+        """Load a dump back: the setting overrides re-apply."""
+        if not self.dump_path:
+            return 'err no dump path configured (set dump/path or --dump-path)'
+        if not os.path.exists(self.dump_path):
+            return 'err no dump at %s yet (run dump first)' % self.dump_path
+        try:
+            settings = state.read_dump(self.dump_path)
+            applied, failed = self.apply_dump_settings(settings)
+        except ValueError as e:
+            return 'err restore failed: %s' % e
+        logger.info('control: state restored from %s (%d setting(s))', self.dump_path, applied)
+        return 'ok restored %d setting(s) from %s%s' % (
+            applied, self.dump_path,
+            ' (%d skipped: %s)' % (len(failed), ', '.join(failed)) if failed else '')
+
+    def shutdown_dump(self):
+        """The graceful stop's write-behind: the overrides to the dump path
+        (no reply — the log carries it)."""
+        if not self.dump_path:
+            return
+        try:
+            n = state.write_dump(self.dump_path, self.dump_settings())
+            logger.info('state dumped to %s (%d setting(s))', self.dump_path, n)
+        except (OSError, ValueError) as e:
+            logger.error('the shutdown dump to %s failed: %s', self.dump_path, e)
 
     def summary(self):
         """The compact state summary appended to the set/unset replies."""

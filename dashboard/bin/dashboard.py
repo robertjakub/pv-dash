@@ -356,6 +356,10 @@ def main():
     Handler.timeout = cfg['client_timeout'] or None
     args.metrics_desc = metrics_desc
     logger.info('%s', describe(cfg, args, control_desc))
+    logger.info('state dumps: %s',
+                'off' if not cfg['dump_path']
+                else '%s (request dump, the graceful shutdown%s)'
+                % (cfg['dump_path'], ', restore on start' if cfg['restore_on_start'] else ''))
     if args.dry_run:
         logger.info('dry-run: configuration is valid, nothing was bound')
         return
@@ -385,18 +389,14 @@ def main():
             'static-dir': cfg['static_dir'] or 'off',
             'config-js': cfg['config_js'] or 'off',
             'control-port': cfg['control_port'] or 'off',
-            'control-token': '<set>' if control_token else 'off',
-            'control-token-file': '<set>' if cfg.get('control_token_file') else 'off',
-            'control-ops-token': '<set>' if control_ops_token else 'off',
-            'control-ops-token-file': '<set>' if cfg.get('control_ops_token_file') else 'off',
             'control-ops-verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
             'control-trust-uids': ','.join(str(u) for u in sorted(trust_uids or [])) if trust_uids else 'off',
             'metrics-listen': cfg['metrics_listen'],
-            'metrics-token': '<set>' if metrics_token else 'off',
-            'metrics-token-file': '<set>' if cfg.get('metrics_token_file') else 'off',
             'metrics-max-clients': str(cfg['metrics_max_clients']),
             'metrics-client-timeout': '%g' % cfg['metrics_client_timeout'],
             'metrics-max-conn-per-ip': str(cfg['metrics_max_conn_per_ip']),
+            'dump/path': cfg['dump_path'] or 'off',
+            'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
             'audit-log': 'off' if args.no_audit_log else ('stdout' if args.audit_log == '-'
                                                           else (args.audit_log or 'the XDG state home')),
             'audit-max-mb': '%g' % args.audit_max_mb,
@@ -404,10 +404,17 @@ def main():
             'no-audit-log': 'on' if args.no_audit_log else 'off',
             'local-time': 'on' if cfg['local_time'] else 'off',
         }
+        # the secret rows (control/token, control/token-file, control/ops/token,
+        # control/ops/token-file, metrics/token, metrics/token-file) carry NO
+        # defaults entry: `unset` refuses them (the metrics/token treatment) —
+        # a secret never renders, never re-applies
         control = ControlServer(httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
-                                ops_token=control_ops_token, ops_verbs=ops_verbs)
+                                ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
+                                dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'])
         control.start()
+        if control.dump_path and cfg['restore_on_start']:
+            logger.info('restore-on-start: %s', control.restore_state())
     metrics_srv = None
     if cfg['metrics_server']:
         metrics_srv = MetricsServer(httpd, metrics_listen, token=metrics_token, started=started,
@@ -416,11 +423,13 @@ def main():
                                     max_per_ip=cfg.get('metrics_max_conn_per_ip', 0))
         metrics_srv.start()
         httpd.metrics_srv = metrics_srv
-        if control:
-            control.metrics_srv = metrics_srv
-            control.metrics_token = metrics_token
-            control.metrics_listen = metrics_listen
-            control.metrics_desc = metrics_desc
+    if control:
+        # the control always knows the metrics state: the live token
+        # rotation and the metrics-server toggle re-describe from here
+        control.metrics_srv = metrics_srv
+        control.metrics_token = metrics_token
+        control.metrics_listen = metrics_listen
+        control.metrics_desc = metrics_desc
 
     def apply_reload():
         """The SIGHUP and the `request reload` command share this: re-resolve
@@ -455,6 +464,7 @@ def main():
         if audit:
             audit.event('SHUTDOWN', '%s: uptime=%ds' % (reason, int(time.monotonic() - started)))
         if control:
+            control.shutdown_dump()   # the write-behind: the overrides ride the next start
             control.announce_exit(reason)   # the consoles print the notice and exit
             control.cleanup()
         httpd.shutdown()

@@ -65,6 +65,8 @@ let
       "--metrics-max-conn-per-ip ${toString cfg.metricsMaxConnPerIp}"
     ]
     ++ lib.optionals (cfg.metricsToken != null) [ "--metrics-token ${cfg.metricsToken}" ]
+    ++ lib.optionals (cfg.dumpPath != null) [ "--dump-path ${cfg.dumpPath}" ]
+    ++ lib.optional cfg.restoreOnStart "--restore-on-start"
   );
 in
 {
@@ -293,6 +295,23 @@ in
         token), mounted via systemd LoadCredential. Mandatory when
         metricsServer is on.
       '';
+    };
+
+    dumpPath = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The state dump file: the live setting overrides (set through the
+        control surface) as one JSON, written 0600 with an integrity hash on
+        `request dump` and the graceful shutdown, and re-applied on start
+        when restoreOnStart is set. null = the dumps are off.
+      '';
+    };
+
+    restoreOnStart = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Load the state dump when the service starts (needs dumpPath) — the live overrides ride again instead of a cold start.";
     };
 
     controlTrustUids = lib.mkOption {

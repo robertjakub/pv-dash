@@ -154,7 +154,7 @@ def candidates(buf):
             pool, hint = segs, None                        # description lives on the full live name
             desc = lambda w, base=base: describe_word((base + '/' if base else '') + w)
     elif head == 'request' and len(done) == 1:
-        pool, hint, desc = ('reload',), None, describe_word
+        pool, hint, desc = ('dump', 'reload', 'restore'), None, describe_word
     elif head == 'show':
         s, segs = setting_path_pool(done[1:], POOL_NAMES, SETTING_BY_NAME)
         base = '/'.join(w.lower() for w in done[1:])   # a segment's description lives on the full live name

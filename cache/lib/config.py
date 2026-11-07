@@ -7,12 +7,10 @@ file speaks the control grammar (common/options.py): every line a
 import ipaddress
 import json
 import logging
-import os
 
-from common.options import parse_config_script
 from .options import OPTIONS
-from common.config import acl_summary, acl_text, check_auth_key, default_profile_path, parse_acl, parse_auth_type, \
-    parse_listen, parse_secret, parse_upstream, resolve_profile_file
+from common.config import acl_summary, acl_text, check_auth_key, default_profile_path, load_config_script, parse_acl, parse_auth_type, \
+    parse_listen, parse_secret, parse_upstream, resolve_profile_file, resolve_target, Resolver
 from common.cred import parse_trust_uids
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_COUNT, MAX_REGISTERS, \
     REGISTER_TYPES, UNIT_ID_RANGE
@@ -39,12 +37,7 @@ def parse_control_target(text, listen_port=DEFAULT_LISTEN_PORT):
 
 def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
     """--control-port flag > CTL environment > default socket."""
-    if explicit is not None and str(explicit).strip():
-        return str(explicit).strip()
-    env = os.environ.get('CTL')
-    if env and env.strip():
-        return env.strip()
-    return '/tmp/modbus-cache-%d.socket' % listen_port
+    return resolve_target(explicit, '/tmp/modbus-cache-%d.socket' % listen_port)
 
 
 def parse_write_registers(text, label='write-registers'):
@@ -399,54 +392,15 @@ def load_config(path):
     with the dash names underscore-normalized (the resolver's keys). A
     missing file is no config at all; an unreadable one or a legacy ini
     file fails fast with the pointer to the new grammar."""
-    if not path or not os.path.isfile(path):
-        return {}
-    try:
-        with open(path, encoding='utf-8') as fh:
-            text = fh.read()
-    except OSError as e:
-        raise SystemExit('cannot read config file %s: %s' % (path, e))
-    try:
-        rows = parse_config_script(text, path, OPTIONS)   # the registry: the CLI spelling + the unknown-setting fail fast
-    except ValueError as e:
-        raise SystemExit(str(e))
-    out = {}
-    for name, value in rows:
-        key = name.replace('-', '_')
-        if key in out:
-            raise SystemExit('%s: %s is set twice (the file applies top to bottom — say it once)'
-                             % (path, name))
-        out[key] = value
-    return out
+    return load_config_script(path, OPTIONS)
 
 
 def resolve_config(args, script_dir=None):
     """Effective settings: CLI flags > env > config script > defaults."""
     cfg = load_config(args.config)
-
-    def resolve(cli_value, env_name, cfg_key, default, conv):
-        raw = cli_value
-        if raw is None or raw == '':
-            raw = os.environ.get(env_name)
-        if raw is None or raw == '':
-            raw = cfg.get(cfg_key)
-        if raw is None or raw == '':
-            return default
-        try:
-            return conv(raw)
-        except (TypeError, ValueError) as e:
-            logger.error('invalid %s = %r: %s (using %r)', cfg_key, raw, e, default)
-            return default
-
-    def resolve_bool(cli_value, env_name, cfg_key, default):
-        def parse_bool(raw):
-            s = str(raw).strip().lower()
-            if s in ('1', 'true', 'yes', 'on'):
-                return True
-            if s in ('0', 'false', 'no', 'off', ''):
-                return False
-            raise ValueError('expected true/false, got %r' % raw)
-        return resolve(cli_value, env_name, cfg_key, default, parse_bool)
+    r = Resolver(cfg, logger)
+    resolve = r.resolve
+    resolve_bool = r.resolve_bool
 
     interval = resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval_s'], float)
     upstream = resolve(getattr(args, 'upstream', None), 'UPSTREAM', 'upstream',

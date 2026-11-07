@@ -12,9 +12,9 @@ import struct
 import threading
 import time
 
-from common.modbus import (auth_handshake_server, describe_fc, describe_write,
-                           exception_frame, frame, pack_bits, read_frame,
-                           unpack_bits)
+from common.modbus import (ModbusError, auth_handshake_server, describe_fc,
+                           describe_write, exception_frame, frame, pack_bits,
+                           read_frame, unpack_bits)
 from common.connlimit import ConnGate
 from .statics import MAX_BITS, MAX_COUNT, MAX_PDU
 from common.version import version_string

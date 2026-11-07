@@ -359,7 +359,7 @@ def settings_of(options):
                                o.group, o.alias, restart=o.restart, secret=o.secret))
         elif o.restart:
             out.append(Setting(o.name, o.setting_help or o.help, o.values, o.hint, o.value_help,
-                               o.group, restart=True))
+                               o.group, restart=True, secret=o.secret))
     return tuple(out)
 
 

@@ -465,6 +465,134 @@ def main():
         check('reload: the re-execed fake shuts down clean', tx.startswith('bye shutdown'), tx)
         time.sleep(0.4)
 
+        # ---- the sealed dumps (dump/key): the state rides encrypted (an
+        #      HMAC-SHA256 counter-mode box), the restore fails closed on a
+        #      wrong or missing key — and on an unsealed dump under a
+        #      configured key — and the keyed reload re-reads the sealed
+        #      state file on the other side of the exec (instance J)
+        J_MODBUS, J_CTL = 15987, 15988
+        kstate = '/tmp/inv_regtest_state_sealed.json'
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
+                                       '--control-port', str(J_CTL), '--dump-path', kstate,
+                                       '--dump-key', 'inv-seal-key', '--restore-on-start'],
+                                      stdout=open(LOG + '.j', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        time.sleep(1.5)
+        tx = ctl(J_CTL, 'show dump key')
+        check('sealed dump: show dump/key is a secret — it never shows',
+              tx.startswith('err dump/key is a secret'), tx[:100])
+        tx = ctl(J_CTL, 'set dump key other')
+        check('sealed dump: set dump/key answers the restart note (the key cannot drift mid-life)',
+              tx.startswith('err restart required (startup-only knob)'), tx[:100])
+        tx = ctl(J_CTL, 'set pv 120')
+        check('sealed dump: the pin lands', 'ok pv=120' in tx, tx)
+        tx = ctl(J_CTL, 'request dump')
+        check('sealed dump: request dump reports sealed',
+              tx.startswith('ok dumped 1 setting(s)') and '(sealed)' in tx, tx[:100])
+        raw = open(kstate).read()
+        kd = json.loads(raw)
+        check('sealed dump: the envelope is the sealed version-2 shape',
+              kd.get('format') == 'pv-suite-state-dump' and kd.get('version') == 2
+              and kd.get('cipher') == 'sha256-ctr' and len(kd.get('nonce', '')) == 32
+              and len(kd.get('mac', '')) == 64 and len(kd.get('box', '')) > 64, raw[:120])
+        check('sealed dump: no plaintext rides the file',
+              '"settings"' not in raw and '"pv"' not in raw and '"saved"' not in raw, raw[:120])
+        check('sealed dump: the sealed dump is 0600 too', os.stat(kstate).st_mode & 0o777 == 0o600,
+              oct(os.stat(kstate).st_mode & 0o777))
+        tx = ctl(J_CTL, 'reset')
+        tx = ctl(J_CTL, 'request restore')
+        check('sealed dump: the restore re-applies under the configured key',
+              tx.startswith('ok restored 1 setting(s)'), tx[:100])
+        tx = ctl(J_CTL, 'show pv')
+        check('sealed dump: the restored pin reads back', tx == 'ok pv=120', tx)
+        procs[-1].kill()
+        time.sleep(0.3)
+        # the wrong key: the sealed dump refuses at start (the mac reads it as tampered content)
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
+                                       '--control-port', str(J_CTL), '--dump-path', kstate,
+                                       '--dump-key', 'inv-seal-key-WRONG', '--restore-on-start'],
+                                      stdout=open(LOG + '.j2', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        line = ''
+        for _ in range(80):
+            line = open(LOG + '.j2').read()
+            if 'fails its seal' in line:
+                break
+            time.sleep(0.1)
+        check('sealed dump: a wrong key refuses the dump at start (fails closed)',
+              'fails its seal' in line, line[-220:])
+        tx = ctl(J_CTL, 'show pv')
+        check('sealed dump: the daemon is up despite the refused dump', tx == 'ok pv=auto', repr(tx))
+        procs[-1].kill()
+        time.sleep(0.3)
+        # no key at all: a sealed dump refuses with the pointer to dump/key
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
+                                       '--control-port', str(J_CTL), '--dump-path', kstate,
+                                       '--restore-on-start'],
+                                      stdout=open(LOG + '.j3', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        line = ''
+        for _ in range(80):
+            line = open(LOG + '.j3').read()
+            if 'is sealed' in line:
+                break
+            time.sleep(0.1)
+        check('sealed dump: a sealed dump without any key refuses at start',
+              'is sealed' in line and 'dump/key' in line, line[-220:])
+        procs[-1].kill()
+        time.sleep(0.3)
+        # a configured key refuses an UNSEALED dump (plaintext stopped being trust at rest)
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
+                                       '--control-port', str(J_CTL), '--dump-path', '/tmp/inv_regtest_state.json',
+                                       '--dump-key', 'inv-seal-key', '--restore-on-start'],
+                                      stdout=open(LOG + '.j4', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        line = ''
+        for _ in range(80):
+            line = open(LOG + '.j4').read()
+            if 'is not sealed' in line:
+                break
+            time.sleep(0.1)
+        check('sealed dump: a configured key refuses an unsealed dump',
+              'is not sealed' in line and 'dump/key is configured' in line, line[-220:])
+        procs[-1].kill()
+        time.sleep(0.3)
+        # the right key: the sealed dump restores at start, and the keyed
+        # reload's state file re-reads on the other side of the exec
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
+                                       '--control-port', str(J_CTL), '--dump-path', kstate,
+                                       '--dump-key', 'inv-seal-key', '--restore-on-start'],
+                                      stdout=open(LOG + '.j5', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        back = None
+        for _ in range(100):
+            try:
+                back = ctl(J_CTL, 'show pv')
+                if back == 'ok pv=120':
+                    break
+            except Exception:
+                pass
+            time.sleep(0.1)
+        check('sealed dump: the right key restores the sealed dump at start', back == 'ok pv=120', repr(back))
+        tx = ctl(J_CTL, 'set batt 50')
+        check('sealed reload: the pin lands before the reload', 'ok batt=50' in tx, tx)
+        tx = ctl(J_CTL, 'reload')
+        check('sealed reload: the reply reports the saved overrides',
+              tx.startswith('ok reload: 2 override(s) saved'), tx[:100])
+        back = None
+        for _ in range(100):
+            try:
+                back = ctl(J_CTL, 'show batt')
+                if back.startswith('ok batt=50'):
+                    break
+            except Exception:
+                time.sleep(0.1)
+        check('sealed reload: the fresh fake re-applied the sealed state file',
+              back is not None and 'ok batt=50' in back, repr(back))
+        tx = ctl(J_CTL, 'shutdown')
+        check('sealed reload: the re-execed fake shuts down clean', tx.startswith('bye shutdown'), tx)
+        time.sleep(0.4)
+
         # ---- --man: every tool prints its generated roff page
         for tool, title in ((F, 'MODBUS-FAKE-INVERTER'), (CTL, 'MODBUS-FAKE-CTL'),
                             (os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'), 'MODBUS-FAKE-CLI')):

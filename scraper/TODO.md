@@ -5,6 +5,14 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The seal wave: the state dumps and the reload state file **encrypt under
+`dump/key`** when it is set (`--dump-key`/`DUMP_KEY`/`set dump-key` —
+startup-only, restart-marked, hidden: the key cannot drift between the
+writer and the re-exec'd reader): the whole state rides a version-2
+envelope's `box` (an HMAC-SHA256 counter-mode keystream + the mac — the
+shared seal in common/dump.py, stdlib only), a restore fails closed on a
+wrong or missing key — and on an unsealed dump under a configured key.
+
 The secret-placeholder wave: the state dump and the reload state file
 carry an overridden secret's key as `*** SECRET REMOVED ***` (the value
 never lands in a file — the restore skips the placeholder and names it),

@@ -194,6 +194,7 @@ def resolve_config(args, script_dir=None):
                                              'METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
                                              DEFAULTS['metrics_max_conn_per_ip'], int)
     cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', None, str)
+    cfg['dump_key'] = (resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key', None, str) or '').strip() or None
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
                                       'restore_on_start', False, str_to_bool)
     control_port = str(cfg['control_port'] or '').strip()

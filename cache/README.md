@@ -187,6 +187,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (config `set control trust-uids`, env `CONTROL_TRUST_UIDS`) |
 | **Persistence** | | |
 | `--dump-path` | off | the state dump (write-behind): the live setting overrides and — with `--dump-with-cache` — the cached words + their stamps, as one JSON, created `0600` with an integrity hash — written on shutdown, by the `request dump` command and every `--dump-interval` seconds; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (config `set dump path`, env `DUMP_PATH`) |
+| `--dump-key` | off | the key that **seals** the state dumps and the reload's state file: the state rides encrypted (an HMAC-SHA256 counter-mode keystream, authenticated — a restore refuses a wrong or missing key, and a configured key refuses an unsealed dump); startup-only — the reload re-exec re-resolves the same key (config `set dump key`, env `DUMP_KEY`) |
 | `--dump-with-cache` | off | dump the cached words too: the `request dump` command and the `--dump-interval` loop write the words + the settings (the default off = settings only; `request dump with-cache` always includes them; the restore takes either shape) (config `set dump with-cache`, env `DUMP_WITH_CACHE`) |
 | `--dump-interval` | `0` | seconds between the automatic state dumps, `0` = on request (the `request dump` command and the shutdown); needs `--dump-path`; live-settable (config `set dump-interval`, env `DUMP_INTERVAL`) |
 | **Audit trail** | | |
@@ -507,6 +508,21 @@ outright — whoever can write the dump holds config trust, so own the file
 like the ini (`chmod 0600`). The honest boundary, same as the audit
 trail's: the hash catches corruption and casual tampering, not a local
 admin who rechashes.
+
+With **`--dump-key`** set, the dump is **sealed**: the whole state — words
+included — rides encrypted under an HMAC-SHA256 counter-mode keystream
+derived from the key and authenticated by an HMAC-SHA256 mac (stdlib only
+— no AES in the stdlib; the nonce is fresh per dump, so the same state
+never seals to the same box twice). The mac is checked first: a wrong key
+reads as tampered content and fails closed (`fails its seal`), never as
+garbage. The gate is symmetric — a restore without the key refuses a
+sealed dump, and a restore **with** a key refuses an unsealed one (the
+plain hash is unkeyed; the moment the operator declares a key, plaintext
+stops being trust at rest). The reload's state file seals under the same
+key — the re-exec re-resolves the same flag/env/config key, so the fresh
+daemon reads what the dying one wrote. That is also why the knob is
+startup-only: `set dump key` answers the restart note — the key cannot
+drift between the writer and the reader of a sealed file.
 
 ## Metrics
 

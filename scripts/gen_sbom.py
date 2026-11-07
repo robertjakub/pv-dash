@@ -39,8 +39,8 @@ SCAN_DIRS = ('common', 'profiles', 'cache', 'inverter', 'scraper', 'dashboard')
 STDLIB = (
     'argparse', 'collections', 'getpass', 'glob', 'hashlib', 'hmac', 'http',
     'ipaddress', 'json', 'logging', 'math', 'mimetypes', 'os', 'random',
-    'readline', 're', 'signal', 'socket', 'struct', 'subprocess', 'sys',
-    'textwrap', 'threading', 'time', 'urllib',
+    'readline', 're', 'secrets', 'signal', 'socket', 'struct', 'subprocess',
+    'sys', 'textwrap', 'threading', 'time', 'urllib',
 )
 FIRST_PARTY = ('common', 'lib')
 

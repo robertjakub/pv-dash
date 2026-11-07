@@ -216,6 +216,15 @@ and every \-\-dump\-interval seconds; loaded on start only with
 \-\-restore\-on\-start, on demand with the request restore command
 (default: config, $DUMP_PATH or none)
 .TP
+.B \-\-dump\-key
+the key that seals the state dumps and the reload's state file: the
+words and the settings ride encrypted (an HMAC\-SHA256 counter\-mode
+keystream, authenticated — a restore refuses a wrong or missing key, and
+a configured key refuses an unsealed dump); the reload re\-exec
+re\-resolves the same key, so the state file reads on the other side; no
+key = the dumps stay 0600 plaintext with the integrity hash (default:
+config, $DUMP_KEY or none)
+.TP
 .B \-\-dump\-with\-cache
 dump the cached words too: `request dump` and the \-\-dump\-interval
 loop write the words + the settings (the default off = settings only;
@@ -302,7 +311,9 @@ the live setting overrides) to/from the \fB--dump-path\fR file; the startup
 restore and the shutdown dump run the same path automatically. An overridden
 secret rides as \fB*** SECRET REMOVED ***\fR \(em the knob renders, the
 value never lands in the file, the restore skips the placeholder and names
-it. The dump
+it. With \fB--dump-key\fR the dump is sealed: the state rides encrypted
+(an HMAC\\-SHA256 counter\\-mode keystream, authenticated \(em a restore
+refuses a wrong or missing key). The dump
 commands \(em and the \fBdump-interval\fR setting \(em show up in the
 listings only when a dump path is configured.
 .IP \(bu 2

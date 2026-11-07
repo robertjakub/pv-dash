@@ -183,6 +183,15 @@ graceful shutdown; loaded on start only with \-\-restore\-on\-start, on
 demand with the request restore command (default: config file,
 $DUMP_PATH or none)
 .TP
+.B \-\-dump\-key
+the key that seals the state dumps and the reload's state file: the
+state rides encrypted (an HMAC\-SHA256 counter\-mode keystream,
+authenticated — a restore refuses a wrong or missing key, and a
+configured key refuses an unsealed dump); the reload re\-exec
+re\-resolves the same key, so the state file reads on the other side; no
+key = the dumps stay 0600 plaintext with the integrity hash (default:
+config file, $DUMP_KEY or none)
+.TP
 .B \-\-restore\-on\-start
 load the state dump when the server starts (needs \-\-dump\-path) — the
 live overrides ride again instead of a cold start; default: start cold,
@@ -226,7 +235,9 @@ whole-daemon restart that keeps the sets: the live overrides save to a
 state file beside the config, the process re-execs, the fresh daemon
 re-applies them once), with a dump path configured (\fB--dump-path\fR):
 \fBrequest dump\fR / \fBrequest restore\fR (the overrides as one 0600
-integrity-hashed JSON; \fB--restore-on-start\fR loads it at start),
+integrity-hashed JSON; \fB--dump-key\fR seals it \(em the state rides
+encrypted, a restore refuses a wrong or missing key;
+\fB--restore-on-start\fR loads it at start),
 \fBshutdown\fR, \fBquit\fR. See
 .BR dashboard-ctl (1)
 and

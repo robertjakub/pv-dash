@@ -14,7 +14,7 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (19): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-token-file`, `control-ops-verbs`, `control-port`, `control-token`, `control-token-file`, `control-trust-uids`, `dump`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `no-audit-log`, `restore-on-start`. The control-plane block is
+Common to **all four** tools (20): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-token-file`, `control-ops-verbs`, `control-port`, `control-token`, `control-token-file`, `control-trust-uids`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `no-audit-log`, `restore-on-start`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `status`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
@@ -57,6 +57,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `control-trust-uids` |  | `set control trust-uids` | **✓** live | **✓** | **✓** | **✓** |
 | c | `dump` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `dump-interval` |  | `set dump-interval` | ✓ live |  |  |  |
+| k | `dump-key` |  | `set dump key` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
 | k | `dump-path` |  | `set dump path` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `dump-with-cache` |  | `set dump with-cache` | ✓ live |  |  |  |
 | c | `grid` |  | `set grid` |  |  | ✓ live |  |

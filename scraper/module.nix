@@ -61,6 +61,7 @@ let
     ""
     "# --- the state dump (the live overrides' write-behind) ---"
     (lib.optionals (cfg.dumpPath != null) [ (setLine "dump-path" cfg.dumpPath) ])
+    (lib.optionals (cfg.dumpPath != null && cfg.dumpKey != null) [ (setLine "dump-key" cfg.dumpKey) ])
     (setLine "restore-on-start" (lib.boolToString cfg.restoreOnStart))
     ""
     "# --- the audit trail ---"
@@ -370,6 +371,18 @@ in
       type = lib.types.bool;
       default = false;
       description = "Load the state dump when the service starts (needs dumpPath) — the live overrides ride again instead of a cold start.";
+    };
+
+    dumpKey = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The key that seals the state dumps and the reload's state file: the
+        state rides encrypted (an HMAC-SHA256 counter-mode keystream,
+        authenticated — a restore refuses a wrong or missing key, and a
+        configured key refuses an unsealed dump). Needs dumpPath. null =
+        the dumps stay 0600 plaintext with the integrity hash.
+      '';
     };
   };
 

@@ -85,7 +85,7 @@ class ControlServer:
 
     def __init__(self, scraper, httpd, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, ops_token=None, ops_verbs=None, config_path=None,
-                 dump_path=None, restore_on_start=False):
+                 dump_path=None, restore_on_start=False, dump_key=None):
         self.scraper = scraper
         self.httpd = httpd
         self.reloader = reloader         # request reload: re-resolve the config, apply, returns the summary
@@ -97,6 +97,7 @@ class ControlServer:
         self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
         self.dump_path = dump_path or None   # the state dump file (the dump family)
         self.dump_restore = bool(restore_on_start)   # prospective-only: the START already chose
+        self.dump_key = dump_key or None   # the dump seal key (startup-only: the reload re-exec re-resolves the same)
         self.is_unix = not isinstance(target, int)
         self.port = None if self.is_unix else int(target)
         self.sockpath = str(target) if self.is_unix else None
@@ -803,32 +804,28 @@ class ControlServer:
 
     def _save_reload_state(self):
         """The overrides in their wire-parsable form (dump_settings) to the
-        state file — the secrets ride as *** SECRET REMOVED *** (the value
+        state file — the shared dump writer (sealed when dump/key is
+        configured); the secrets ride as *** SECRET REMOVED *** (the value
         never lands in the file). Returns (settings, lost-secret-names);
         raises OSError on an unwritable home."""
         settings = self.dump_settings()
         lost = sorted(k for k in self.overridden if settings.get(k) == SECRET_REMOVED)
-        path = self._reload_state_path()
-        tmp = path + '.tmp'
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)   # config-equivalent trust: 0600, never the umask's
-        with os.fdopen(fd, 'w') as f:
-            json.dump({'when': time.time(), 'settings': settings}, f, indent=1, sort_keys=True)
-            f.write('\n')
-        os.replace(tmp, path)
+        state.write_dump(self._reload_state_path(), settings, key=self.dump_key)
         return settings, lost
 
     def _restore_reload_state(self):
         """One-shot, at start: a reload exec re-applies the saved overrides
         and consumes the state file — a later manual start stays pure (the
         config file and the flags alone). A state older than two minutes is
-        stale (a failed start in between): discarded, never applied."""
+        stale (a failed start in between): discarded, never applied. The
+        file is the shared dump shape — sealed when dump/key is configured
+        (the re-exec re-resolves the same key)."""
         path = self._reload_state_path()
         if not path or not os.path.exists(path):
             return
         try:
-            with open(path) as f:
-                state_obj = json.load(f)
-            if time.time() - state_obj.get('when', 0) > 120:
+            state_obj = state.read_dump_state(path, key=self.dump_key)
+            if time.time() - state_obj.get('saved', 0) > 120:
                 logger.warning('reload: the state file %s is stale, discarding it', path)
                 os.unlink(path)
                 return
@@ -880,26 +877,29 @@ class ControlServer:
 
     def dump_state(self):
         """The write-behind: the live setting overrides to the configured
-        dump path (the `request dump` command and the graceful shutdown)."""
+        dump path (the `request dump` command and the graceful shutdown) —
+        sealed when dump/key is configured."""
         if not self.dump_path:
             return 'err no dump path configured (set dump/path or --dump-path)'
         settings = self.dump_settings()
         try:
-            n = state.write_dump(self.dump_path, settings)
+            n = state.write_dump(self.dump_path, settings, key=self.dump_key)
         except (OSError, ValueError) as e:
             logger.error('control: the dump to %s failed: %s', self.dump_path, e)
             return 'err dump failed: %s' % e
-        logger.info('control: state dumped to %s (%d setting(s))', self.dump_path, n)
-        return 'ok dumped %d setting(s) to %s' % (n, self.dump_path)
+        logger.info('control: state dumped to %s (%d setting(s)%s)', self.dump_path, n,
+                    ', sealed' if self.dump_key else '')
+        return 'ok dumped %d setting(s) to %s%s' % (n, self.dump_path, ' (sealed)' if self.dump_key else '')
 
     def restore_state(self):
-        """Load a dump back: the setting overrides re-apply."""
+        """Load a dump back: the setting overrides re-apply (a sealed dump
+        restores only under the configured dump/key)."""
         if not self.dump_path:
             return 'err no dump path configured (set dump/path or --dump-path)'
         if not os.path.exists(self.dump_path):
             return 'err no dump at %s yet (run dump first)' % self.dump_path
         try:
-            settings = state.read_dump(self.dump_path)
+            settings = state.read_dump(self.dump_path, key=self.dump_key)
             applied, failed = self.apply_dump_settings(settings)
         except ValueError as e:
             return 'err restore failed: %s' % e
@@ -911,12 +911,13 @@ class ControlServer:
 
     def shutdown_dump(self):
         """The graceful stop's write-behind: the overrides to the dump path
-        (no reply — the log carries it)."""
+        (no reply — the log carries it; sealed when dump/key is set)."""
         if not self.dump_path:
             return
         try:
-            n = state.write_dump(self.dump_path, self.dump_settings())
-            logger.info('state dumped to %s (%d setting(s))', self.dump_path, n)
+            n = state.write_dump(self.dump_path, self.dump_settings(), key=self.dump_key)
+            logger.info('state dumped to %s (%d setting(s)%s)', self.dump_path, n,
+                        ', sealed' if self.dump_key else '')
         except (OSError, ValueError) as e:
             logger.error('the shutdown dump to %s failed: %s', self.dump_path, e)
 

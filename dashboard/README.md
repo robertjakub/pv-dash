@@ -245,7 +245,8 @@ value never lands in the file), the reply names them), the state dump
 `request restore` (the live overrides as one `0600` JSON with an integrity
 hash — an overridden secret rides as `*** SECRET REMOVED ***`, the restore
 skips the placeholder and names it; `--restore-on-start` loads it at
-start), `shutdown`, `quit`;
+start; `--dump-key` seals the dump — the state rides encrypted, a restore
+refuses a wrong or missing key), `shutdown`, `quit`;
 `help <setting>` describes a
 setting. A SIGHUP or `request reload` also clears the live overrides
 (`show status`'s `overridden=` row lists them).

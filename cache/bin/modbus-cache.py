@@ -94,9 +94,10 @@ def install_signal_handlers(proxy, cache, args):
             try:
                 n = persist.write_dump(proxy.dump_path, proxy.cache,
                                        proxy.control.dump_settings() if getattr(proxy, 'control', None) else None,
-                                       with_cache=proxy.dump_with_cache)
-                logger.info('state dumped to %s (%d word(s), %s)', proxy.dump_path, n,
-                            'with cache' if proxy.dump_with_cache else 'settings only')
+                                       with_cache=proxy.dump_with_cache, key=proxy.dump_key)
+                logger.info('state dumped to %s (%d word(s), %s%s)', proxy.dump_path, n,
+                            'with cache' if proxy.dump_with_cache else 'settings only',
+                            ', sealed' if proxy.dump_key else '')
             except OSError as e:
                 logger.error('the shutdown dump to %s failed: %s', proxy.dump_path, e)
         if proxy.audit:
@@ -254,6 +255,7 @@ def main():
     proxy.metrics_caps = (cfg['metrics_max_clients'], cfg['metrics_client_timeout'],
                           cfg['metrics_max_conn_per_ip'])
     proxy.dump_path = cfg['dump_path'] or None
+    proxy.dump_key = cfg['dump_key']   # the dump seal key (startup-only: the reload re-exec re-resolves the same)
     proxy.dump_interval = cfg['dump_interval']
     proxy.dump_with_cache = cfg['dump_with_cache']
     proxy.restore_on_start = cfg['restore_on_start']
@@ -280,8 +282,9 @@ def main():
                 metrics_desc)
     logger.info('state dumps: %s',
                 'off' if not proxy.dump_path
-                else '%s every %s (plus request dump and the shutdown), restore on start'
-                % (proxy.dump_path, 'off' if not proxy.dump_interval else '%gs' % proxy.dump_interval))
+                else '%s every %s (plus request dump and the shutdown)%s, restore on start'
+                % (proxy.dump_path, 'off' if not proxy.dump_interval else '%gs' % proxy.dump_interval,
+                   ', sealed' if proxy.dump_key else ''))
     proxy.log_map()
     if args.dry_run:
         logger.info('dry-run: configuration and register map are valid, nothing was bound or connected (control server would listen on %s)',
@@ -356,7 +359,7 @@ def main():
                             proxy.dump_path)
         elif os.path.exists(proxy.dump_path):
             try:
-                words, stamps, settings = persist.read_dump(proxy.dump_path)
+                words, stamps, settings = persist.read_dump(proxy.dump_path, key=proxy.dump_key)
                 n = 0 if proxy.no_cache else cache.restore(words, stamps)
                 applied, failed = (proxy.control.apply_dump_settings(settings)
                                    if getattr(proxy, 'control', None) else (0, ['no control server']))
@@ -384,7 +387,7 @@ def main():
                 try:
                     n = persist.write_dump(proxy.dump_path, proxy.cache,
                                            proxy.control.dump_settings() if getattr(proxy, 'control', None) else None,
-                                           with_cache=proxy.dump_with_cache)
+                                           with_cache=proxy.dump_with_cache, key=proxy.dump_key)
                     logger.debug('state dumped to %s (%d word(s), %s)', proxy.dump_path, n,
                                  'with cache' if proxy.dump_with_cache else 'settings only')
                 except (OSError, ValueError) as e:

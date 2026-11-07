@@ -864,6 +864,85 @@ try:
     r = ctl_cmd('request restore', 15537)
     check('dump: the restored dump still loads after the refused attempts',
           r.startswith('ok restored 91 word(s)'), r[:120])
+
+    # ---- the sealed dumps (dump/key): the words and the settings ride
+    #      encrypted; a restore fails closed on a wrong or missing key
+    kdumpfile = '/tmp/reg_dump_sealed.json'
+    p_kdump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
+                                '--listen', '127.0.0.1:15538', '--interval', '1', '--cache-ttl', '30',
+                                '--profile', R, '--control-port', '15539',
+                                '--dump-path', kdumpfile, '--dump-key', 'seal-key-1'],
+                               stdout=open('/tmp/reg_cache_kdump.log', 'w'), stderr=subprocess.STDOUT,
+                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
+    procs.append(p_kdump)
+    time.sleep(1.5)
+    r = ctl_cmd('show dump key', 15539)
+    check('sealed dump: show dump/key is a secret — it never shows',
+          r.startswith('err dump/key is a secret'), r[:100])
+    r = ctl_cmd('set dump key other', 15539)
+    check('sealed dump: set dump/key answers the restart note (the key cannot drift mid-life)',
+          r.startswith('err restart required (startup-only knob)'), r[:100])
+    time.sleep(1.6)   # the poller fills the cache (interval 1 s)
+    r = ctl_cmd('request dump with-cache', 15539)
+    check('sealed dump: the with-cache dump reports sealed',
+          r.startswith('ok dumped 91 word(s)') and '(sealed)' in r, r[:120])
+    raw = open(kdumpfile).read()
+    d = _json.loads(raw)
+    check('sealed dump: the envelope is the sealed version-2 shape — the words and the settings encrypted away',
+          d.get('format') == 'modbus-cache-dump' and d.get('version') == 2
+          and d.get('cipher') == 'sha256-ctr' and 'registers' not in d and 'settings' not in d
+          and d.get('box') and d.get('mac') and 'modbus/interval' not in raw, raw[:120])
+    r = ctl_cmd('request restore', 15539)
+    check('sealed dump: the restore re-applies under the configured key',
+          r.startswith('ok restored 91 word(s)'), r[:120])
+    p_kdump.kill()
+    time.sleep(0.4)
+    # the wrong key: the sealed dump refuses at start (the mac reads it as tampered content)
+    p_wrong = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
+                                '--listen', '127.0.0.1:15538', '--interval', '1', '--cache-ttl', '30',
+                                '--profile', R, '--control-port', '15539',
+                                '--dump-path', kdumpfile, '--dump-key', 'seal-key-WRONG',
+                                '--restore-on-start'],
+                               stdout=open('/tmp/reg_cache_kwrong.log', 'w'), stderr=subprocess.STDOUT,
+                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
+    procs.append(p_wrong)
+    line = ''
+    for _ in range(80):
+        line = open('/tmp/reg_cache_kwrong.log').read()
+        if 'fails its seal' in line:
+            break
+        time.sleep(0.1)
+    check('sealed dump: a wrong key refuses the dump at start (fails closed)',
+          'fails its seal' in line, line[-220:])
+    r = ctl_cmd('show version', 15539)
+    check('sealed dump: the daemon is up despite the refused dump', r.startswith('ok modbus-cache'), r[:80])
+    p_wrong.kill()
+    time.sleep(0.4)
+    # the right key: the sealed dump restores (the words are back without the device)
+    p_right = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
+                                '--listen', '127.0.0.1:15538', '--interval', '1', '--cache-ttl', '30',
+                                '--profile', R, '--control-port', '15539',
+                                '--dump-path', kdumpfile, '--dump-key', 'seal-key-1',
+                                '--restore-on-start'],
+                               stdout=open('/tmp/reg_cache_kright.log', 'w'), stderr=subprocess.STDOUT,
+                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
+    procs.append(p_right)
+    line = ''
+    for _ in range(80):
+        line = open('/tmp/reg_cache_kright.log').read()
+        if 'restored the state dump' in line:
+            break
+        time.sleep(0.1)
+    check('sealed dump: the right key restores the words at start',
+          'restored the state dump' in line and '91 word(s)' in line, line[-220:])
+    r = ctl_cmd('show cache', 15539)
+    check('sealed dump: the restored words serve', '91 word(s) cached' in r, r[:80])
+    r = ctl_cmd('show status', 15539)
+    check('sealed dump: the status dump row marks the seal',
+          'dump=%s every off, sealed' % kdumpfile in r, r[-160:])
+    p_right.kill()
+    time.sleep(0.4)
+
     r = ctl_cmd('set dump-interval 1', 15537)
     check('dump-interval: the live setting accepted', r.startswith('ok dump-interval=1.00s'), r[:120])
     r = ctl_cmd('show status', 15537)
@@ -1356,6 +1435,9 @@ class Stub(C.ControlServer):
     def __init__(self):
         self.config_path = '/tmp/reg_reload_mode.conf'
         self.overridden = {'modbus/interval'}
+        class _Proxy:
+            dump_key = None   # the reload state file seals only under dump/key
+        self.proxy = _Proxy()
     def dump_settings(self):
         return {'modbus/interval': '7'}
 Stub()._save_reload_state()

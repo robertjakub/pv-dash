@@ -28,9 +28,9 @@ grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashb
 
 Every name in that list is stdlib (`argparse`, `collections`, `getpass`,
 `glob`, `hashlib`, `hmac`, `http`, `ipaddress`, `json`, `logging`, `math`,
-`mimetypes`, `os`, `random`, `re`, `readline`, `signal`, `socket`, `struct`,
-`subprocess`, `sys`, `textwrap`, `threading`, `time`, `urllib`) or
-`common`/`lib`. Nothing else. No `requests`, no `pyserial`, no
+`mimetypes`, `os`, `random`, `re`, `readline`, `secrets`, `signal`,
+`socket`, `struct`, `subprocess`, `sys`, `textwrap`, `threading`, `time`,
+`urllib`) or `common`/`lib`. Nothing else. No `requests`, no `pyserial`, no
 `prometheus_client`.
 
 ## Per subproject

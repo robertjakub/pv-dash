@@ -1,4 +1,4 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 9)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 11)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
@@ -697,7 +697,7 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   fails the gate); `scripts/lint_options.py --check` clean; the man pages
   regenerate (`mandoc -Tlint` clean).
 
-### Rev. 10 (this revision)
+### Rev. 10
 
 - **The state machinery walked to the other three control servers** —
   `dump_settings`/`apply_dump_settings` on the scraper, the fake and the
@@ -732,6 +732,35 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   on the revised tree; `scripts/check_options.py` +
   `scripts/lint_options.py --check` clean; the man pages regenerate
   (`mandoc -Tlint` clean).
+
+### Rev. 11 (this revision)
+
+- **The state dumps seal under a key** — the F18/F23 posture's optional
+  upgrade: with the startup-only secret knob `dump/key` set
+  (`--dump-key`/`DUMP_KEY`/the config file — restart-marked, so the key
+  cannot drift between the writer and the re-exec'd reader of a sealed
+  file), every state file — the dumps AND the reload state files, the
+  cache's cached words included — rides a version-2 envelope: the state
+  encrypted under an HMAC-SHA256 counter-mode keystream derived from the
+  key, authenticated by an HMAC-SHA256 over nonce+box (stdlib only — no
+  AES in the stdlib; the nonce is fresh per dump from `secrets`). The mac
+  is checked first: a wrong key fails closed as tampered content, never
+  as garbage. The gate is symmetric — a restore without the key refuses
+  a sealed dump; a restore WITH a key refuses an unsealed one (the plain
+  hash is unkeyed: once the operator declares a key, plaintext stops
+  being trust at rest). The reload state files migrate onto the shared
+  `common/dump.py` writer/reader (the `when` key is `saved` now) — the
+  0600-explicit, atomic-replace posture unchanged. Without a key the old
+  posture stands (0600 plaintext + the integrity hash).
+- **The verified evidence**: the regtests pin the sealed round-trip and
+  the no-plaintext-at-rest check on all three shapes (the fake's pins,
+  the cache's words, the scraper's `DUMP_KEY` env twin), the wrong-key /
+  missing-key / unsealed-under-key refusals at start, and the keyed
+  reload exec (`tests/inverter-regtest.py`,
+  `tests/cache-regtest.py`, `tests/scrape-regtest.py` §6b-4b).
+  `scripts/check_options.py` + `scripts/lint_options.py --check` clean;
+  the man pages regenerate (`mandoc -Tlint` clean); the SBOM's import
+  scan re-reviewed `secrets` into the stdlib allowlist.
 
 ## 5. NIS2 / DORA mapping (all modules; cache is the production-relevant one)
 | Requirement | Status | Where |

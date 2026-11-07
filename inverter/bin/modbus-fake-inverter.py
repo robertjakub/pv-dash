@@ -213,6 +213,7 @@ def main():
     connect_acl = parse_acl(args.connect_acl or os.environ.get('CONNECT_ACL'), 'connect-acl')
     chaos = Chaos(args.chaos, seed=args.seed)
     target = resolve_control_target(args.control_port, args.port)
+    dump_key = (args.dump_key or os.environ.get('DUMP_KEY') or '').strip() or None
     control_token_file = args.control_token_file or os.environ.get('CONTROL_TOKEN_FILE')
     if args.control_token and control_token_file:
         logger.error('--control-token and --control-token-file are mutually exclusive')
@@ -296,8 +297,10 @@ def main():
                                     'control-ops-token': bool(control_ops_token),
                                     'control-ops-token-file': bool(control_ops_token_file),
                                     'metrics-token': bool(metrics_token),
-                                    'metrics-token-file': bool(metrics_token_file)}),
-                                dump_path=args.dump_path, restore_on_start=args.restore_on_start)
+                                    'metrics-token-file': bool(metrics_token_file),
+                                    'dump-key': bool(dump_key)}),
+                                dump_path=args.dump_path, restore_on_start=args.restore_on_start,
+                                dump_key=dump_key)
     fake.metrics_listen = metrics_listen
     fake.metrics_token = metrics_token
     fake.metrics_caps = (args.metrics_max_clients, args.metrics_client_timeout, args.metrics_max_conn_per_ip)

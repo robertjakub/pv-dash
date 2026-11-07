@@ -266,7 +266,9 @@ value never lands in the file), the reply names them), the state dump
 `request restore` (the live overrides as one `0600` JSON with an
 integrity hash — an overridden secret rides as `*** SECRET REMOVED ***`,
 the restore skips the placeholder and names it;
-`--restore-on-start` loads it at start), `inspect`,
+`--restore-on-start` loads it at start; `--dump-key` seals the dump —
+the state rides encrypted, a restore refuses a wrong or missing key),
+`inspect`,
 `show version`, `show knobs` (the dictionary of
 the registry: every knob with its flag, its env twin, how it changes,
 under its display group — ungrouped rows bare), `shutdown`.
@@ -351,6 +353,7 @@ journald adds one.
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (`CONTROL_OPS_VERBS`) |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `CONTROL_TRUST_UIDS`) |
 | `--dump-path` | off | the state dump (write-behind): the live setting overrides — the tokens apart — as one JSON, created `0600` with an integrity hash, written on the `request dump` command and the graceful shutdown; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (config `set dump path`, env `DUMP_PATH`) |
+| `--dump-key` | off | the key that **seals** the state dumps and the reload's state file: the state rides encrypted (an HMAC-SHA256 counter-mode keystream, authenticated — a restore refuses a wrong or missing key, and a configured key refuses an unsealed dump); startup-only — the reload re-exec re-resolves the same key (config `set dump key`, env `DUMP_KEY`) |
 | `--restore-on-start` | off | load the state dump when the daemon starts (needs `--dump-path`) — the live overrides ride again instead of a cold start (config `set restore-on-start`, env `RESTORE_ON_START`) |
 | `--audit-log` | the XDG state home | the SCR audit trail: a file path or `-` for stdout (the docker/journald way) |
 | `--audit-max-mb` / `--audit-files` / `--no-audit-log` | `10` / `3` / off | the audit trail's rotation and the off switch |

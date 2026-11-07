@@ -91,7 +91,9 @@ the live setting overrides) to/from the \\fB--dump-path\\fR file; the startup
 restore and the shutdown dump run the same path automatically. An overridden
 secret rides as \\fB*** SECRET REMOVED ***\\fR \\(em the knob renders, the
 value never lands in the file, the restore skips the placeholder and names
-it. The dump
+it. With \\fB--dump-key\\fR the dump is sealed: the state rides encrypted
+(an HMAC\\\-SHA256 counter\\\-mode keystream, authenticated \\(em a restore
+refuses a wrong or missing key). The dump
 commands \\(em and the \\fBdump-interval\\fR setting \\(em show up in the
 listings only when a dump path is configured.
 .IP \\(bu 2

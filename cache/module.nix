@@ -90,6 +90,9 @@ let
       (setLine "dump-with-cache" (lib.boolToString cfg.dumpWithCache))
       (setLine "restore-on-start" (lib.boolToString cfg.restoreOnStart))
     ])
+    (lib.optionals (cfg.dumpPath != null && cfg.dumpKey != null) [
+      (setLine "dump-key" cfg.dumpKey)
+    ])
     (lib.optionals (cfg.dumpPath != null && cfg.dumpInterval != null) [
       (setLine "dump-interval" (toString cfg.dumpInterval))
     ])
@@ -466,6 +469,18 @@ in
         dumpInterval loop write the words + the settings (the default off =
         settings only; request dump with-cache always includes them; the
         restore takes either shape).
+      '';
+    };
+
+    dumpKey = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The key that seals the state dumps and the reload's state file: the
+        state rides encrypted (an HMAC-SHA256 counter-mode keystream,
+        authenticated — a restore refuses a wrong or missing key, and a
+        configured key refuses an unsealed dump). Needs dumpPath. null =
+        the dumps stay 0600 plaintext with the integrity hash.
       '';
     };
 

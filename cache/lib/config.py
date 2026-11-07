@@ -361,6 +361,8 @@ def resolve_config(args, script_dir=None):
                                     'requests_audit_s', DEFAULTS['requests_audit_s'], float),
         'dump_path': resolve(getattr(args, 'dump_path', None), 'DUMP_PATH',
                              'dump_path', '', str),
+        'dump_key': (resolve(getattr(args, 'dump_key', None), 'DUMP_KEY',
+                             'dump_key', None, str) or '').strip() or None,
         'dump_interval': resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
                                  'dump_interval', 0.0, float),
         'dump_with_cache': resolve_bool(getattr(args, 'dump_with_cache', False) or None,

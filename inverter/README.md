@@ -244,7 +244,7 @@ read-only ops token the same way):
 | `set scenario <name>` | apply a scenario preset (below) |
 | `reset` | clear **all** pinned settings and the Modbus write overlay at once (like SIGUSR1, per-connection) |
 | `reload` | **restart the whole fake with the pins kept**: the live overrides save to a state file (the XDG state home — the fake has no config file), the process re-execs with the same argv, the fresh fake re-applies the saved overrides once, then consumes the state file. Overridden secrets save as `*** SECRET REMOVED ***` (the value never lands in the file) — the reply names them |
-| `request dump` / `request restore` | with `--dump-path` configured: write the live overrides to the state file (`0600`, integrity-hashed) / load them back (the pins re-apply) — an overridden secret rides as `*** SECRET REMOVED ***`, the restore skips the placeholder and names it; `--restore-on-start` does the restore automatically at start |
+| `request dump` / `request restore` | with `--dump-path` configured: write the live overrides to the state file (`0600`, integrity-hashed) / load them back (the pins re-apply) — an overridden secret rides as `*** SECRET REMOVED ***`, the restore skips the placeholder and names it; `--dump-key` seals the dump (the state rides encrypted, a restore refuses a wrong or missing key); `--restore-on-start` does the restore automatically at start |
 | `shutdown` | gracefully stop the fake inverter (same as SIGTERM: session summary, control socket unlinked) |
 | `help` / `help <setting>` | the command reference / one setting's description |
 | `quit` | close the connection |
@@ -423,6 +423,7 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user |
 | `--control-log-replies` | off | DEBUG-log the full output of every control command, not just the command |
 | `--dump-path` | off | the state dump (write-behind): the live setting overrides — the pins, the machines, the tokens apart — as one JSON, created `0600` with an integrity hash, written on the `request dump` command and the graceful shutdown; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (env `DUMP_PATH`) |
+| `--dump-key` | off | the key that **seals** the state dumps and the reload's state file: the state rides encrypted (an HMAC-SHA256 counter-mode keystream, authenticated — a restore refuses a wrong or missing key, and a configured key refuses an unsealed dump); startup-only — the reload re-exec re-resolves the same key (env `DUMP_KEY`) |
 | `--restore-on-start` | off | load the state dump when the fake starts (needs `--dump-path`) — the live overrides ride again instead of a cold start (env `RESTORE_ON_START`) |
 | `--chaos` | `0` | probability 0..1 that a request is answered hostile and dropped |
 | `--seed` | random | chaos/cloud RNG seed for reproducible runs |

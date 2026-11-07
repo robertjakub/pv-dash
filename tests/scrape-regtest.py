@@ -1714,6 +1714,35 @@ try:
           and 'integrity' in r, r[:120])
     r = sctl('unset dump/path', 15597, token='ctok9')
     check('scraper control: the dump path unset back to off', r.startswith('ok dump/path=off'), r[:80])
+    # 6b-4b. the sealed dump (the DUMP_KEY env twin): the state rides encrypted,
+    #        the restore fails closed without the key (the restart matrix lives
+    #        in the inverter and cache regtests — the same open_dump gate)
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
+                                   '--listen', '127.0.0.1:19466', '--interval', '1',
+                                   '--control-port', '15601', '--control-token', STOK,
+                                   '--dump-path', '/tmp/scr_regtest_state_sealed.json'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                  env={**os.environ, 'DUMP_KEY': 'scr-seal-key'}))
+    time.sleep(1.5)
+    r = sctl('show dump key', 15601, token=STOK)
+    check('scraper sealed dump: show dump/key is a secret — it never shows',
+          r.startswith('err dump/key is a secret'), r[:100])
+    r = sctl('set dump key other', 15601, token=STOK)
+    check('scraper sealed dump: set dump/key answers the restart note',
+          r.startswith('err restart required (startup-only knob)'), r[:100])
+    r = sctl('set interval 7', 15601, token=STOK)
+    r = sctl('request dump', 15601, token=STOK)
+    check('scraper sealed dump: request dump reports sealed (the DUMP_KEY env twin)',
+          r.startswith('ok dumped 1 setting(s)') and '(sealed)' in r, r[:120])
+    raw = open('/tmp/scr_regtest_state_sealed.json').read()
+    d = _json.loads(raw)
+    check('scraper sealed dump: the envelope is sealed — the settings encrypted away',
+          d.get('version') == 2 and d.get('cipher') == 'sha256-ctr' and 'settings' not in d
+          and '"interval"' not in raw and d.get('box'), raw[:120])
+    r = sctl('set interval 1', 15601, token=STOK)
+    r = sctl('request restore', 15601, token=STOK)
+    check('scraper sealed dump: the restore re-applies under the configured key',
+          r.startswith('ok restored 1 setting(s)'), r[:120])
     r = sctl('restart', 15597, token='ctok9')
     check('scraper control: the modbus session restart', r.startswith('ok modbus session dropped'), r[:80])
     r = sctl('inspect', 15597, token='ctok9')

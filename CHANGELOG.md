@@ -10,6 +10,34 @@ before the repo restructured into one suite.
 
 ## Unreleased
 
+### Security
+
+- **everywhere** — **the state dumps seal under a key (`dump/key`)**: the
+  dump/restore data — the live setting overrides, and on the cache the
+  cached words — can ride encrypted at rest. A new startup-only secret
+  knob `dump/key` (`--dump-key`, env `DUMP_KEY`, config `set dump-key`;
+  restart-marked — the wire answers the restart note, so the key cannot
+  drift between the writer and the reader of a sealed file) seals every
+  state file as a version-2 envelope (`cipher: sha256-ctr`): the whole
+  state rides as the `box`, encrypted under an HMAC-SHA256 counter-mode
+  keystream derived from the key and authenticated by an HMAC-SHA256 over
+  nonce+box (stdlib only — no AES in the stdlib; the nonce is fresh per
+  dump, and the mac is checked first: a wrong key reads as tampered
+  content and fails closed, never as garbage). The gate is symmetric: a
+  restore without the key refuses a sealed dump, and a restore WITH a key
+  refuses an unsealed one (the plain hash is unkeyed — the moment the
+  operator declares a key, plaintext stops being trust at rest). The
+  reload's state files (`<config>.reload`, the fake's XDG home) migrate
+  onto the shared dump writer/reader (the `when` key is `saved` now) and
+  seal under the same key — the re-exec re-resolves the same argv, so the
+  fresh daemon reads what the dying one wrote. No key = the old posture
+  stands (0600 plaintext + the integrity hash). The registries carry the
+  row (hidden, secret — `show dump key` refuses, `show config` marks it),
+  the NixOS modules gain `dumpKey`, the SBOM allowlist gains `secrets`,
+  and the regtests pin the sealed round-trip, the wrong-key/missing-key/
+  unsealed refusals and the keyed reload on all three shapes (the fake's
+  pins, the cache's words, the scraper's env twin).
+
 ### Docs
 
 - **OPTIONS.md** — **the registries' `show` section rides the table**: the

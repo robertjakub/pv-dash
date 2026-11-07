@@ -63,7 +63,9 @@ that keeps the pins: the overrides save to a state file in the XDG state
 home \\(em the fake has no config file \\(em, the process re-execs, the
 fresh fake re-applies them once), with a dump path configured
 (\\fB--dump-path\\fR): \\fBrequest dump\\fR / \\fBrequest restore\\fR (the
-overrides as one 0600 integrity-hashed JSON; \\fB--restore-on-start\\fR
+overrides as one 0600 integrity-hashed JSON; \\fB--dump-key\\fR seals it
+\\(em the state rides encrypted, a restore refuses a wrong or missing key;
+\\fB--restore-on-start\\fR
 loads it at start), \\fBshutdown\\fR,
 \\fBquit\\fR. A second, read-only token (\\fB--control-ops-token\\fR)
 authenticates into the show verbs only \\(em the ops shift against the

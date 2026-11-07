@@ -70,7 +70,9 @@ auth token, each rotating live, the value never rendering \\(em
 overrides save to a state file beside the config, the process re-execs,
 the fresh daemon re-applies them once), with a dump path configured
 (\\fB--dump-path\\fR): \\fBrequest dump\\fR / \\fBrequest restore\\fR
-(the overrides as one 0600 integrity-hashed JSON; \\fB--restore-on-start\\fR
+(the overrides as one 0600 integrity-hashed JSON; \\fB--dump-key\\fR
+seals it \\(em the state rides encrypted, a restore refuses a wrong or
+missing key; \\fB--restore-on-start\\fR
 loads it at start), \\fBrestart\\fR, \\fBshutdown\\fR,
 \\fBquit\\fR. See
 .BR modbus-scraper-ctl (1)

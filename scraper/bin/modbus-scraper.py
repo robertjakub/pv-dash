@@ -178,8 +178,9 @@ def main():
     logger.info('%s', describe(cfg, args, control_desc))
     logger.info('state dumps: %s',
                 'off' if not cfg['dump_path']
-                else '%s (request dump, the graceful shutdown%s)'
-                % (cfg['dump_path'], ', restore on start' if cfg['restore_on_start'] else ''))
+                else '%s (request dump, the graceful shutdown%s%s)'
+                % (cfg['dump_path'], ', sealed' if cfg['dump_key'] else '',
+                   ', restore on start' if cfg['restore_on_start'] else ''))
     if args.dry_run:
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
@@ -201,7 +202,7 @@ def main():
                 key = o.name.replace('-', '_')
                 if key in cfg and cfg[key] is not None:
                     defaults[o.live] = str(cfg[key])
-            if o.restart:   # the startup-only knobs: what `show <knob>` answers
+            if o.restart and not o.secret:   # the startup-only knobs: what `show <knob>` answers
                 key = o.name.replace('-', '_')
                 v = cfg.get(key, getattr(args, key, None))
                 if o.name == 'audit-log':
@@ -217,13 +218,14 @@ def main():
                 else:
                     defaults[o.name] = str(v) if v not in (None, '') else 'off'
         # the secret rows (control/token, control/token-file, control/ops/token,
-        # control/ops/token-file, auth/token, auth/token-file) carry NO defaults
-        # entry: `unset` refuses them (the metrics/token treatment) — a secret
-        # never renders, never re-applies
+        # control/ops/token-file, auth/token, auth/token-file, dump-key) carry NO
+        # defaults entry: `unset` refuses them (the metrics/token treatment) — a
+        # secret never renders, never re-applies
         control = ControlServer(scraper, httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
                                 ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
-                                dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'])
+                                dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'],
+                                dump_key=cfg['dump_key'])
         control.start()
         if control.dump_path and cfg['restore_on_start']:
             logger.info('restore-on-start: %s', control.restore_state())

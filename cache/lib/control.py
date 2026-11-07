@@ -1108,8 +1108,9 @@ class ControlServer:
             'write_acl=%s' % acl_summary(p.write_acl),
             'write_allow_list=%s' % p.describe_write_ranges(),
             'requests_audit=%s' % ('off' if not p.requests_audit_s else secs(p.requests_audit_s)),
-            'dump=%s' % ('off' if not p.dump_path else '%s every %s' % (
-                p.dump_path, 'off' if not p.dump_interval else secs(p.dump_interval))),
+            'dump=%s' % ('off' if not p.dump_path else '%s every %s%s' % (
+                p.dump_path, 'off' if not p.dump_interval else secs(p.dump_interval),
+                ', sealed' if p.dump_key else '')),
             'profile=%s' % (cfg.get('profile') or p.profile),
             'selection=%s' % (cfg.get('selection') or 'all'),
             'metrics=%s' % getattr(p, 'metrics_desc', 'off'),
@@ -1320,36 +1321,32 @@ class ControlServer:
 
     def _save_reload_state(self):
         """The overrides in their wire-parsable form (dump_settings) to the
-        state file — the secrets ride as *** SECRET REMOVED *** (the value
+        state file — the shared dump writer (sealed when dump/key is
+        configured); the secrets ride as *** SECRET REMOVED *** (the value
         never lands in the file). Returns (settings, lost-secret-names);
         raises OSError on an unwritable home."""
         settings = self.dump_settings()
         lost = sorted(k for k in self.overridden if settings.get(k) == SECRET_REMOVED)
-        path = self._reload_state_path()
-        tmp = path + '.tmp'
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)   # config-equivalent trust: 0600, never the umask's
-        with os.fdopen(fd, 'w') as f:
-            json.dump({'when': time.time(), 'settings': settings}, f, indent=1, sort_keys=True)
-            f.write('\n')
-        os.replace(tmp, path)
+        persist.write_state_dump(self._reload_state_path(), settings, key=self.proxy.dump_key)
         return settings, lost
 
     def _restore_reload_state(self):
         """One-shot, at start: a reload exec re-applies the saved overrides
         and consumes the state file — a later manual start stays pure (the
         config file and the flags alone). A state older than two minutes is
-        stale (a failed start in between): discarded, never applied."""
+        stale (a failed start in between): discarded, never applied. The
+        file is the shared dump shape — sealed when dump/key is configured
+        (the re-exec re-resolves the same key)."""
         path = self._reload_state_path()
         if not path or not os.path.exists(path):
             return
         try:
-            with open(path) as f:
-                state = json.load(f)
-            if time.time() - state.get('when', 0) > 120:
+            state_obj = persist.read_state_dump(path, key=self.proxy.dump_key)
+            if time.time() - state_obj.get('saved', 0) > 120:
                 logger.warning('reload: the state file %s is stale, discarding it', path)
                 os.unlink(path)
                 return
-            applied, failed = self.apply_dump_settings(state.get('settings'))
+            applied, failed = self.apply_dump_settings(state_obj.get('settings'))
             os.unlink(path)
             logger.info('reload: %d override(s) re-applied from %s%s', applied, path,
                         (' (%d skipped: %s)' % (len(failed), ', '.join(failed))) if failed else '')
@@ -1400,31 +1397,36 @@ class ControlServer:
         """The write-behind: the live setting overrides and — when
         with_cache (the `request dump with-cache` command, the
         `--dump-with-cache` default or the dump-interval loop) — the cached
-        words (+ stamps), to the configured dump path."""
+        words (+ stamps), to the configured dump path — sealed when
+        dump/key is configured."""
         path = self.proxy.dump_path
         if not path:
             return 'err no dump path configured (set dump/path or --dump-path)'
         settings = self.dump_settings()
         try:
-            n = persist.write_dump(path, self.proxy.cache, settings, with_cache=with_cache)
+            n = persist.write_dump(path, self.proxy.cache, settings, with_cache=with_cache,
+                                   key=self.proxy.dump_key)
         except (OSError, ValueError) as e:
             logger.error('control: the dump to %s failed: %s', path, e)
             return 'err dump failed: %s' % e
-        logger.info('control: state dumped to %s (%d word(s), %d setting(s), %s)', path, n,
-                    len(settings), 'with cache' if with_cache else 'settings only')
-        return 'ok dumped %d word(s), %d setting(s) to %s' % (n, len(settings), path)
+        logger.info('control: state dumped to %s (%d word(s), %d setting(s), %s%s)', path, n,
+                    len(settings), 'with cache' if with_cache else 'settings only',
+                    ', sealed' if self.proxy.dump_key else '')
+        return 'ok dumped %d word(s), %d setting(s) to %s%s' % (
+            n, len(settings), path, ' (sealed)' if self.proxy.dump_key else '')
 
     def restore_state(self):
         """Load a dump back: the words (+ their original stamps, so the
         freshness carries over) land in the cache — only what the current
-        register map still covers — and the setting overrides re-apply."""
+        register map still covers — and the setting overrides re-apply (a
+        sealed dump restores only under the configured dump/key)."""
         path = self.proxy.dump_path
         if not path:
             return 'err no dump path configured (set dump/path or --dump-path)'
         if not os.path.exists(path):
             return 'err no dump at %s yet (run dump first)' % path
         try:
-            words, stamps, settings = persist.read_dump(path)
+            words, stamps, settings = persist.read_dump(path, key=self.proxy.dump_key)
             n = 0 if self.proxy.no_cache else self.proxy.cache.restore(words, stamps)
             applied, failed = self.apply_dump_settings(settings)
         except ValueError as e:

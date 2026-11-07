@@ -155,29 +155,29 @@ NODE_BY_NAME = {o.name: o for o in OPTIONS if o.node}   # the hierarchy nodes (h
 describe_setting, describe_value = make_describe(SETTING_BY_NAME)
 
 
-def config_value(name, cfg):
-    """The set-grammar form of one option's effective startup value (the
-    resolved config dict), or None when it should not render (unset secrets
-    hide; empty strings drop). Secrets never render inline — the file/flag/
-    env form is the documented way, and `show config` output must be safe
-    to paste."""
-    opt = OPTION_BY_NAME[name]
-    key = CFG_KEYS.get(name, name.replace('-', '_'))
-    v = cfg.get(key)
-    if opt.secret:
-        return None
-    if v is None or v == '':
-        return None
-    if isinstance(v, bool):
-        return 'true' if v else 'false'
-    if key in ('connect_acl', 'write_acl'):
-        from .config import acl_text
-        return acl_text(v)
-    if key == 'write_registers':
-        from .config import parse_write_registers
-        return 'any' if v is None else ('none' if not v else ','.join('%d:%d' % r for r in v))
-    if key == 'control_trust_uids':
-        return ','.join(str(u) for u in v) if v else None
-    if key == 'selection':
-        return v or 'all'
-    return str(v)
+def cfg_acl_text(v):
+    """The connect/write ACL as its set-grammar text (any, none, or the
+    ip[/mask] list)."""
+    from .config import acl_text
+    return acl_text(v)
+
+
+def cfg_write_registers(v):
+    """The write-register map as its set-grammar text (any, none, or the
+    addr:count list)."""
+    return 'any' if v is None else ('none' if not v else ','.join('%d:%d' % r for r in v))
+
+
+def cfg_trust_uids(v):
+    """The trusted-peer uid list as its csv text (empty = nothing renders)."""
+    return ','.join(str(u) for u in v) if v else None
+
+
+def cfg_selection(v):
+    """The register-selection spec ('all' when empty)."""
+    return v or 'all'
+
+
+CFG_FORMATTERS = {'connect_acl': cfg_acl_text, 'write_acl': cfg_acl_text,
+                  'write_registers': cfg_write_registers, 'control_trust_uids': cfg_trust_uids,
+                  'selection': cfg_selection}

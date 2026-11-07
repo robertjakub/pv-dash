@@ -8,9 +8,11 @@ import threading
 import time
 from collections import deque
 
-from common.modbus import ModbusError, auth_handshake_server, describe_fc, exception_frame, recv_exact
+from common.modbus import (DeviceError, ModbusError, auth_handshake_server,
+                           describe_fc, describe_write, exception_frame,
+                           frame, pack_bits, read_frame, unpack_bits,
+                           write_shape_error, write_target)
 from common.connlimit import ConnGate
-from .protocol import DeviceError, describe_write
 from .config import load_profile_write_acl, load_registers_file, load_selection
 from .cache import build_blocks, span
 from .statics import (MAX_COUNT, MAX_PDU, MAX_BITS, READ_FUNCS, BIT_READ_FUNCS, WRITE_FUNCS,
@@ -43,51 +45,6 @@ def _read_shape(fc, count):
     if fc in BIT_READ_FUNCS:
         return (count + 7) // 8
     return count * 2
-
-
-def _write_shape_error(pdu):
-    """None when an FC15/FC16 frame's declared counts are consistent (the
-    byte-count byte matches the data actually present, the register count
-    is at least 1); the reason otherwise. FC5/6/22 carry no byte-count
-    byte and FC23's is the device's call — None for them (the too-short
-    check already answered what it could)."""
-    func = pdu[0]
-    if func not in (15, 16):
-        return None
-    if len(pdu) < 6:
-        return 'the byte-count byte is missing'
-    count = struct.unpack('>H', pdu[3:5])[0]
-    n = pdu[5]
-    want = count * 2 if func == 16 else (count + 7) // 8
-    if count < 1:
-        return 'register count %d is zero' % count
-    if n != want:
-        return 'the byte count is %d, the register count needs %d' % (n, want)
-    if len(pdu) != 6 + n:
-        return 'the frame carries %d data byte(s), the byte count says %d' % (len(pdu) - 6, n)
-    return None
-
-
-def _write_target(pdu):
-    """The register span a write request touches: (addr, count) for the
-    known write function codes, None when the frame is too short to tell.
-    FC23's write span is the SECOND address pair — the request reads first,
-    writes second; the gate vets what is written."""
-    if len(pdu) < 5:
-        return None
-    func = pdu[0]
-    if func in (5, 6, 22):          # single register (coil / register / mask-write)
-        addr = struct.unpack('>H', pdu[1:3])[0]
-        return addr, 1
-    if func == 23:                  # read/write multiple: read addr/count, write addr/count
-        if len(pdu) < 10:
-            return None
-        addr, count = struct.unpack('>HH', pdu[5:9])
-        return addr, count
-    if func in (15, 16):            # multiple registers/coils
-        addr, count = struct.unpack('>HH', pdu[1:5])
-        return addr, count
-    return None
 
 
 class Proxy:
@@ -460,11 +417,10 @@ class Proxy:
                     return
                 access('client %s:%d passed the suite handshake', *addr[:2])
             while True:
-                head = recv_exact(client, 7)
-                txn, proto, length, unit = struct.unpack('>HHHB', head)
-                if not 2 <= length <= MAX_PDU + 2:
-                    break
-                pdu = recv_exact(client, length - 1)
+                try:
+                    txn, proto, length, unit, pdu = read_frame(client, MAX_PDU)
+                except ModbusError:
+                    break   # a bad MBAP length: the frame is not parseable enough to answer
                 with self.client_lock:
                     entry = self.clients.get(key)
                     if entry:
@@ -489,7 +445,7 @@ class Proxy:
             return exception_frame(txn, proto, unit, pdu[0] if pdu else 3, ILLEGAL_VALUE)
         func = pdu[0]
         if func in WRITE_FUNCS:
-            target = _write_target(pdu)
+            target = write_target(pdu)
             if target is None:
                 desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
                 logger.info('write: refused %s (the frame is too short to carry a register address)', desc)
@@ -515,7 +471,7 @@ class Proxy:
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (registers outside the write allow-list)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
-            shape_err = _write_shape_error(pdu)
+            shape_err = write_shape_error(pdu)
             if shape_err:
                 desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
                 logger.info('write: refused %s (malformed frame: %s)', desc, shape_err)
@@ -545,14 +501,11 @@ class Proxy:
                 logger.debug('read: fc%d %s %d:%d served from cache', func, _space_name(func), addr_, count)
                 words = self.cache.words(func, addr_, count)
                 if func in BIT_READ_FUNCS:
-                    packed = bytearray(_read_shape(func, count))
-                    for i, w in enumerate(words):
-                        if w & 1:
-                            packed[i >> 3] |= 1 << (i & 7)
-                    body = struct.pack('>BB', func, len(packed)) + bytes(packed)
+                    packed = pack_bits(w & 1 for w in words)
+                    body = struct.pack('>BB', func, len(packed)) + packed
                 else:
                     body = struct.pack('>BB', func, count * 2) + struct.pack('>%dH' % count, *words)
-                return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
+                return frame(txn, unit, body, proto=proto)
             self.cache_misses += 1
         return self.forward(txn, proto, unit, pdu)
 
@@ -569,7 +522,7 @@ class Proxy:
                      addr, count, 'up' if words[1] else 'DOWN',
                      'n/a' if age == DIAG_MAX else age)
         body = struct.pack('>BB', 3, count * 2) + struct.pack('>%dH' % count, *vals)
-        return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
+        return frame(txn, unit, body, proto=proto)
 
     def forward(self, txn, proto, unit, pdu):
         desc = describe_write(pdu, unit)
@@ -588,10 +541,10 @@ class Proxy:
             # the frame carries no cache semantics (FC7/8/17/…, vendor
             # codes) — forward it untouched, named in the log
             logger.info('forwarded %s, %d byte(s) (unit %d)', describe_fc(pdu[0]), len(pdu) - 1, unit)
-        frame = struct.pack('>HHHB', txn, proto, len(pdu) + 1, unit) + pdu
+        frame_out = frame(txn, unit, pdu, proto=proto)
         try:
             with self.upstream.lock:
-                resp = self.upstream.forward(frame)
+                resp = self.upstream.forward(frame_out)
             if resp[6:7] != bytes([unit & 0xFF]):
                 raise ModbusError('reply from unit id %d, expected %d' % (resp[6], unit))
             body = resp[7:]
@@ -609,7 +562,7 @@ class Proxy:
                 if body and body[0] == fc and len(body) >= 2 and body[1] == expect:
                     if not self.no_cache:
                         if fc in BIT_READ_FUNCS:
-                            vals = [(body[2 + (i >> 3)] >> (i & 7)) & 1 for i in range(count)]
+                            vals = unpack_bits(body[2:2 + expect], count)
                         else:
                             vals = struct.unpack('>%dH' % count, body[2:2 + count * 2])
                         self.cache.store(fc, addr, vals)
@@ -628,7 +581,7 @@ class Proxy:
                 # register writes (FC6/16/22/23) invalidate both register
                 # spaces (a device is free to mirror), the coil writes
                 # (FC5/15) the coil space.
-                target = _write_target(pdu)
+                target = write_target(pdu)
                 if target:
                     waddr, wcount = target
                     spaces = (1,) if pdu[0] in (5, 15) else (3, 4)

@@ -862,7 +862,6 @@ cache/
 └── lib/
     ├── static.json      # the static constants: protocol limits, diagnostics block, defaults
     ├── statics.py       # its loader (the STATIC dict + the named aliases)
-    ├── protocol.py      # wire format, errors, frame helpers
     ├── config.py        # settings resolution + device-profile loading
     ├── upstream.py      # the shared inverter connection
     ├── cache.py         # register cache + block planner

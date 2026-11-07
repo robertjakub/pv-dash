@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """The single Modbus TCP upstream connection to the inverter, shared by all threads (stdlib only)."""
-import socket
 import struct
 import threading
 import time
 
-from common.modbus import ModbusError, auth_handshake_client, recv_exact, waveshare_handshake_client
-from .protocol import DeviceError
+from common.modbus import (ModbusError, check_data_bytes, check_head,
+                           check_reply, frame, open_socket, recv_exact,
+                           unpack_bits)
 from .statics import BIT_READ_FUNCS, MAX_PDU
 
 
@@ -41,12 +41,7 @@ class Upstream:
 
     def _connect(self):
         self.close()
-        self.sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
-        self.sock.settimeout(self.timeout)
-        if self.auth == 'suite' and self.auth_key:
-            auth_handshake_client(self.sock, self.auth_key)
-        elif self.auth == 'waveshare' and self.auth_key:
-            waveshare_handshake_client(self.sock, self.auth_key)
+        self.sock = open_socket(self.host, self.port, self.timeout, self.auth, self.auth_key)
         self.connects += 1
         self.connected_since = time.monotonic()
 
@@ -56,17 +51,15 @@ class Upstream:
         except OSError as e:
             raise ModbusError(str(e))
 
-    def _exchange(self, frame, want_txn):
+    def _exchange(self, out, want_txn):
         try:
             if not self.sock:
                 self._connect()
-            self.sock.sendall(frame)
-            self.bytes_out += len(frame)
+            self.sock.sendall(out)
+            self.bytes_out += len(out)
             head = self._recv_exact(7)
             self.bytes_in += len(head)
-            txn, proto, length, unit = struct.unpack('>HHHB', head)
-            if not 2 <= length <= MAX_PDU + 2:
-                raise ModbusError('bad response length %d' % length)
+            txn, proto, length, unit = check_head(head, MAX_PDU)
             body = self._recv_exact(length - 1)
             self.bytes_in += len(body)
             if txn != want_txn:
@@ -86,30 +79,17 @@ class Upstream:
         the caller serializes on .lock."""
         self.txn = (self.txn + 1) & 0xFFFF
         pdu = struct.pack('>BHH', fc, addr, count)
-        _, _, _, unit, body = self._exchange(struct.pack('>HHHB', self.txn, 0, len(pdu) + 1, self.unit) + pdu, self.txn)
-        if unit != self.unit:
-            raise ModbusError('reply from unit id %d, expected %d' % (unit, self.unit))
-        func = body[0]
-        if func == fc + 0x80:
-            code = body[1] if len(body) > 1 else -1
-            raise DeviceError('FC%d modbus exception, code %d' % (fc, code), code)
-        if func != fc:
-            raise ModbusError('unexpected function byte 0x%02x' % func)
-        if len(body) < 2:
-            raise ModbusError('short response: function byte only')
+        txn, proto, _, unit, body = self._exchange(frame(self.txn, self.unit, pdu), self.txn)
+        check_reply(txn, proto, unit, body, self.txn, self.unit, fc)
         got = body[1]
         if fc in BIT_READ_FUNCS:
-            want = (count + 7) // 8
-            if got != want:
-                raise ModbusError('expected %d data bytes, got %d' % (want, got))
-            return tuple((body[2 + (i >> 3)] >> (i & 7)) & 1 for i in range(count))
-        want = count * 2
-        if got != want:
-            raise ModbusError('expected %d register bytes, got %d' % (want, got))
+            check_data_bytes(got, (count + 7) // 8)
+            return unpack_bits(body[2:2 + got], count)
+        check_data_bytes(got, count * 2, 'register')
         return struct.unpack('>%dH' % count, body[2:2 + got])
 
-    def forward(self, frame):
+    def forward(self, out):
         """Send a client frame verbatim and return the response frame."""
-        want = struct.unpack('>H', frame[0:2])[0]
-        txn, proto, length, unit, body = self._exchange(frame, want)
-        return struct.pack('>HHHB', txn, proto, length, unit) + body
+        want = struct.unpack('>H', out[0:2])[0]
+        txn, proto, length, unit, body = self._exchange(out, want)
+        return frame(txn, unit, body, proto=proto)

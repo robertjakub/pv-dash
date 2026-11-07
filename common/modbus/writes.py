@@ -1,17 +1,9 @@
-#!/usr/bin/env python3
-"""Modbus TCP wire format: the cache's frame layer on the common core
-(stdlib only). The limits and codes come from lib/static.json (see statics.py)."""
+"""The shared write shapes (stdlib only): the human description, the
+touched span and the consistency check for every write function code —
+the cache's gate vets with them, the fake inverter parses its own writes
+with them. The FC23 note: the request reads first and writes second, so
+the WRITE span is the second address pair — the gate vets what is written."""
 import struct
-
-from common.modbus import ModbusError, describe_fc
-
-
-class DeviceError(ModbusError):
-    """The device answered with a Modbus exception; .code carries it."""
-
-    def __init__(self, msg, code):
-        super().__init__(msg)
-        self.code = code
 
 
 def describe_write(pdu, unit):
@@ -62,4 +54,47 @@ def describe_write(pdu, unit):
                 return 'registers %d:%d = %s, read back %d:%d (read/write multiple registers, unit %d)' % (
                     waddr, wcount, values, raddr, rcount, unit)
         return 'read/write multiple registers, malformed frame (unit %d)' % unit
+    return None
+
+
+def write_target(pdu):
+    """The register span a write request touches: (addr, count) for the
+    known write function codes, None when the frame is too short to tell."""
+    if len(pdu) < 5:
+        return None
+    func = pdu[0]
+    if func in (5, 6, 22):          # single register (coil / register / mask-write)
+        addr = struct.unpack('>H', pdu[1:3])[0]
+        return addr, 1
+    if func == 23:                  # read/write multiple: read addr/count, write addr/count
+        if len(pdu) < 10:
+            return None
+        addr, count = struct.unpack('>HH', pdu[5:9])
+        return addr, count
+    if func in (15, 16):            # multiple registers/coils
+        addr, count = struct.unpack('>HH', pdu[1:5])
+        return addr, count
+    return None
+
+
+def write_shape_error(pdu):
+    """None when an FC15/FC16 frame's declared counts are consistent (the
+    byte-count byte matches the data actually present, the register count
+    is at least 1); the reason otherwise. FC5/6/22 carry no byte-count
+    byte and FC23's is the device's call — None for them (the too-short
+    check already answered what it could)."""
+    func = pdu[0]
+    if func not in (15, 16):
+        return None
+    if len(pdu) < 6:
+        return 'the byte-count byte is missing'
+    count = struct.unpack('>H', pdu[3:5])[0]
+    n = pdu[5]
+    want = count * 2 if func == 16 else (count + 7) // 8
+    if count < 1:
+        return 'register count %d is zero' % count
+    if n != want:
+        return 'the byte count is %d, the register count needs %d' % (n, want)
+    if len(pdu) != 6 + n:
+        return 'the frame carries %d data byte(s), the byte count says %d' % (len(pdu) - 6, n)
     return None

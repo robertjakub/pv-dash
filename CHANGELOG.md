@@ -6,8 +6,6 @@ tagged commits'. The early tags (before 0.1.0) carried per-tool versions —
 the dashboard, the scraper and the cache each numbered their own releases
 before the repo restructured into one suite.
 
-# Changelog
-
 ## Unreleased
 
 ### Changed
@@ -107,6 +105,292 @@ before the repo restructured into one suite.
   unchanged and stay documented in each tool's README (the flag/default
   tables are the reference now); the resolution order
   (flag > env > config > default) is untouched.
+
+- **inverter** — the fake's MBAP-length refusal log renders the shared
+  check's text (`malformed frame from … (bad response length N)`) and a
+  zero-count FC15/FC16 write is now refused with exception 03 (the
+  cache's shape rule — `write_shape_error`) instead of echoing a no-op
+  write; everything else on the wire is byte-identical.
+
+- **everywhere** — **the secret knobs render as `*** SECRET REMOVED ***`
+  in the dump/restore and `show config`**: an overridden secret rides in
+  the state dump (and the reload's state file) as the placeholder — the
+  knob is public, the value never lands in a file (the dump stays 0600 +
+  integrity-hashed; the restore and the reload's fresh start SKIP the
+  placeholder — the secret keeps its current value — and name it
+  `(secret, not restored — re-pass by flag/env, or as file:<path>)` in the
+  skipped list, the reload reply keeps naming the lost secrets),
+  `show config` renders every configured secret row as
+  `set <name> *** SECRET REMOVED ***` (the trailing hidden-note line is
+  gone — the placeholder line IS the marker), and the paste-back is
+  gated: the config parser refuses the placeholder as a value
+  (`*** SECRET REMOVED *** is not a value — pass the secret by
+  flag/env, or as file:<path>`) and so does the wire `set` — a rendered script
+  piped back cannot poison a secret with a known constant. The dashboard's
+  entry passes the control server the secret rows' configured-ness (its
+  `show config` marks the placeholders too), the fake's `startup_values`
+  marks them from the resolved argv, the shared
+  `SECRET_REMOVED`/`dump_filter` live in common/dump.py, and the
+  registries' show-config rows, the READMEs, the book's config chapter,
+  options.md's legend and the man prose follow.
+
+- **scraper / cache** — **the client-side modbus errors name the
+  function code that failed**: `FC4 modbus exception, code 1` (was
+  `modbus exception, code 1`) — the scraper's `inverter … unreachable`
+  warnings and the cache's `poll of … failed` lines carry the failing
+  read's FC (an fc4-marked source on an FC3-only device reads as such
+  now).
+
+- **everywhere** — **the show verb refuses the secrets**: `show
+  control/token` (the ops token, `metrics/token`, `auth/token`, the
+  `-file` spellings) answers `err <name> is a secret — it never shows
+  (pass it by flag/env, or as file:<path>)` instead of the `<set>` guard's
+  placeholder — a secret's value renders nowhere, on any tool (the set
+  reply keeps `<set>` as the rotation's confirmation; the `?`/help still
+  describes the knob — the vocabulary is public, the value is not).
+
+- **everywhere** — **the consoles prefix every non-value line with `% `**:
+  the ok/err verdicts, the bye notices and the local echoes (`% ok pong`,
+  the clear/restart/reload confirms, the shutdown's `% bye shutdown`) all
+  carry the prefix now — the show reports, the tables and the bare values
+  are the values and print bare (the fake's console already spoke this
+  rule; the other three follow, and its `help <setting>` no longer prints
+  the verdict twice). The README transcripts and the man prose follow.
+
+- **cache** — **the wire vocabulary aligns with the scraper's namespaces**:
+  the live names are paths now — `modbus/interval`, `modbus/read-delay`,
+  `modbus/merge-gap`, `modbus/profile`, `modbus/selection`,
+  `modbus/upstream`, `modbus/unit`, `cache/ttl`,
+  `limits/client-timeout` (`set modbus interval 2`, `show cache ttl`;
+  the new `modbus` node describes the namespace) — beside the landed
+  `write/*`, `limits/max-*` and `acl/*` paths. **The upstream endpoint and
+  the unit id are live-settable**: `set modbus upstream HOST:PORT`
+  re-targets the inverter and drops the session (the next exchange dials
+  the new endpoint), `set modbus unit N` likewise. The replies render the
+  paths (`ok modbus/interval=2.00s`), the dump's override keys and the
+  unset defaults rekey, the config scripts and the flags keep the flat
+  registry names; the regtest and the control fuzz speak the path forms.
+
+- **everywhere** — **`show settings` is gone**: the one-line-per-setting
+  listing retires (no longer in use) — a per-setting `show <setting>`
+  and `show status`'s `overridden=` row carry the same truth, and the
+  command answers `err unknown setting` now. The registry rows drop the
+  word (the ?/TAB pools follow), the daemon help lines lose the
+  `settings` view, and the man pages, the READMEs and the suites
+  follow; the `overridden` tracking and the dump's settings section
+  stay (the SIGHUP/reload marker clearing rides `show status`).
+
+- **cache** — **the write knobs spell as paths**: `allow-write` is
+  `write/allow` and `write-registers` is `write/registers` on the wire —
+  `set|unset|show|help write allow <on|off>`, `write registers
+  <START:COUNT,...|any|none>` (the new `write` node carries the namespace
+  — `show write ?` lists the two children, `help write` describes it);
+  the replies render the path (`ok write/allow=on`), the dispatch, the
+  dump's override keys and the unset defaults rekey (a pre-rename dump's
+  write overrides restore as skipped — re-set them), the config scripts
+  keep the flat registry names, and cache-regtest speaks the path forms.
+
+- **everywhere** — **a `/`-path live name dispatches now**: the wire resolves
+  the path (`set limits max-conn-per-ip <value>` — the registry's `live`
+  spells as its words) and the daemon dispatches it — the control.py
+  `_apply`/`_get` branches and the bin's `defaults` dict key the **live
+  name** (the family rule all along: the cache's `cache-ttl` knob already
+  dispatched as `ttl`). Until now a path resolved on the wire and then
+  fell through the dispatch (`show` answered the `_get` fallback `?`).
+  The first rename rides in: the scraper's `max-conn-per-ip` is
+  `limits/max-conn-per-ip` — the set/unset/show replies render the path
+  (`ok limits/max-conn-per-ip=2`), `show settings` lists it under the
+  same live name. And the dispatch drives itself now: a registry row
+  with a typed conv (`int`/`float`/`str`) needs no `_apply`/`_get`
+  branch at all — the conv parses the value, the row's config key takes
+  it, and the bin's `unset` defaults generate from the same rows; the
+  row's `min`/`max` (inclusive bounds) gate the value in the same
+  breath, so validation lives in the registry too (the branches stay
+  for the runtime plumbing a bare config write cannot reach — the
+  client, the gate, the logger — and shrink to a `_typed` call plus the
+  plumbing; the bool/choice knobs keep theirs). The scraper's
+  `modbus-unit` rides it live as `modbus/unit` (`set modbus unit 5`
+  applies through the client's `apply(unit=...)` branch, the 0..255
+  gate reads off the row; a future typed row dispatches with the JSON
+  row alone). A row may also name a `check` — the tool's validator for
+  the value's shape: it validates (the clean one-liner becomes the err
+  reply), normalizes (`set modbus upstream :5502` stores
+  `127.0.0.1:5502`) and hands back the config keys derived from the
+  knob (the scraper's upstream updates `host`/`modbus_port` with it —
+  the status line stays truthful). The bounds are family-wide now: the
+  four registries carry `min`/`max` on every ranged live row (19 rows)
+  and all four control servers gate through the same `_gate_range`
+  helper (NaN included — a `nan` value is rejected like any other
+  out-of-bounds one); the branch keeps the parse, the plumbing and the
+  message's unit, the row owns the numbers.
+
+- **everywhere** — **the console listings group by the `group` field
+  alone**: the cli `?`/TAB listings bucket a setting under its registry
+  `group`, and a row that carries none renders under `[ungrouped]`
+  (until now the section filled in — `[device]/[serving]/...`;
+  `Setting.display_group` holds the rule, `setting_groups()` the
+  grouping). The `[values]`/`[system]` groups stay the callers'; the
+  daemon-side surfaces (`show config`, `show knobs`, `help config`)
+  keep the section fallback for their groupless rows. (The Added entry
+  "the registry learns to group" above said the console listings group
+  "the same way" as the daemon surfaces — they split here.)
+
+- **everywhere** — **the sections render as their registry names**: the
+  console `?`/TAB listings group the settings under the registry's own
+  section heads — `[device]`, `[serving]`, `[control]`, `[metrics]`,
+  `[limits]`, `[audit]`, `[persistence]`, `[logging]` (until now one flat
+  `[settings]` group; `[values]`/`[system]` unchanged) — instead of the
+  translated titles; the knob table (options.md) renders the same raw
+  section keys in its function column. `Setting` carries its section and
+  `common/options.py` `section_groups()` does the grouping; the long
+  titles stay where they were already at home (`show config`, `show
+  knobs`, `help config`).
+
+- **everywhere** — **the control grammar's vocabulary folds into the option
+  registry (one place to have all knobs)**: `lib/settings.py` is gone —
+  its `SETTINGS` (the live settings' short descriptions, the completable
+  value words, the value-shape hints and the per-value notes) now rides the
+  same `lib/options.json` rows as the flags/envs/sections
+  (`setting-help`/`values`/`hint`/`value-help` beside `live`), and
+  `lib/options.py` derives the wire vocabulary from them
+  (`SETTINGS`/`SETTING_BY_NAME`/`SETTING_NAMES` +
+  `describe_setting`/`describe_value`, the shared
+  `common/options.py` `Setting`/`settings_of()`/`make_describe()`); the
+  ctl/cli clients and the control servers import the same names from
+  `lib/options.py` now. The fake's **control-only settings** (the pins and
+  the machines — `pv`, `load`, `batt`, `grid`, `soc`, `mppt`, `cloud`,
+  `scenario`, `battery-state`, `grid-outage`) ride the registry as flagless
+  rows (a live name, no flag/env) — until now they existed only in the
+  hand-listed settings module; `show knobs` renders them with a
+  `(control-only)` marker. The wire grammar, the completions and the word
+  help are unchanged (the fake's device section lists the pins first, so
+  its help output keeps its shape); check_options.py grows the drift gate
+  (the live names unique, every live row carries its description, the
+  control-only rows flag/env/secret-free) and options.md renders the
+  control-only rows (89 knobs now).
+- **scraper** — **breaking: the subproject directory is `scraper/`** (was
+  `scrape/`): the flake's package/module paths, the docker build context
+  and the image layout, the mdBook include, the SBOM, the cross-README
+  links and the man pages' rendered paths follow; the test-suite
+  filenames keep their historical `tests/scrape-*.py` names and the
+  binary stays `modbus-scraper`.
+- **cache, scraper** — **breaking: the inverter endpoint is one
+  `--upstream HOST:PORT` knob** (the shared `common/config.py`
+  `parse_upstream()`): `--host` and `--port` retire on the cache,
+  `--host`/`--modbus-port` on the scraper, flags, env twins and config
+  keys alike — `HOST`/`PORT`/`MODBUS_PORT` give way to `UPSTREAM`
+  (a config `set upstream 127.0.0.1:5502`, the NixOS option
+  `upstream`, the docker CMDs), and **`:PORT` = 127.0.0.1:PORT** (the
+  loopback shorthand; `[v6]:PORT` parses like `--listen`). The resolved
+  config keeps its derived `host`/`port` keys — `show status`, the start
+  log and the audit trails report the same fields as before. Anything
+  scripting the retired flags/envs must follow.
+- **scraper** — **breaking: `--unit` is `--modbus-unit`** (env `UNIT` →
+  `MODBUS_UNIT`, config `set modbus-unit`, the NixOS option `modbusUnit`):
+  the Modbus unit id wears the modbus- prefix its siblings on the flag
+  line already carry (`--modbus-port`'s place is taken by `--upstream`,
+  so the family stays grep-able). Anything scripting `--unit` must
+  follow.
+- **everywhere** — **breaking: every environment twin carries the tool's
+  prefix now** — `MCH_*` (the cache), `SCR_*` (the scraper), `INV_*` (the
+  fake inverter), `DSH_*` (the dashboard) — and each control-port answers
+  to the one short form (`MCH_CTL`/`SCR_CTL`/`INV_CTL`/`DSH_CTL`, the
+  daemons and the ctl/cli clients agree; no more long/short duplicates).
+  The dashboard retires the generic docker envs (`PORT`, `BIND`, `PROM_URL`,
+  `PROM_PREFIX`, `STATIC_DIR`, `CONFIG_JS`, `BATTERY`) for
+  `DSH_PORT`/`DSH_BIND`/`DSH_PROM_URL`/`DSH_PROM_PREFIX`/
+  `DSH_STATIC_DIR`/`DSH_CONFIG_JS`/`DSH_BATTERY` — the compose stack, the
+  docker docs and the compose's Prometheus wiring follow. Anything
+  scripting the old names must follow.
+  (Reversed later in this same unreleased cycle — the prefix retirement
+  above ships the twins as the bare names; this entry is kept for the
+  wave's own story.)
+- **cache** — **retagged: "Modbus TCP caching proxy for single-client
+  devices"** (the man page's NAME has said so; the sources follow): the
+  module docstring and the `--help`/man DESCRIPTION lead with the
+  device-first story (any single-client Modbus TCP device — an inverter or
+  its SDongle/EMMA radio — the bundled sun2000 profile stays the shipped
+  example), not the Huawei-specific one.
+- **everywhere** — the bins are renamed to match their man pages (the
+  family's dash names): `cache/bin/modbus_cache.py` → **`modbus-cache.py`**,
+  the `*_ctl.py`/`*_cli.py` clients likewise (`modbus-cache-ctl.py`,
+  `modbus-cache-cli.py`, `modbus-scraper*.py`, `modbus-fake-*.py`,
+  `dashboard-*.py`) — the man page, the bin and the installed entrypoint
+  share one name now; the nix packages, the docker images and the docs
+  follow.
+- **scrape** — **breaking: the register-map config is gone** —
+  `--pv-register`/`--grid-register`/`--battery-register`/
+  `--battery-soc-register`/`--scale`/`--grid-scale` (flags, envs, config
+  keys, NixOS options) existed because the spec predates the device
+  profile; the device profile is the register map's single source now
+  (addresses, types, gains, function codes — its per-entry `scale` is the
+  decode divisor, validated finite > 0 at load). The live control surface
+  gained **`set profile <file-or-name>`** (`default` = the bundled sun2000
+  profile, `unset` restores the configured one): the new register map
+  loads, the metric sources rebuild and a profile without the registers
+  the power math needs rolls back with a clean error.
+- **everywhere** — the log levels are a static constant: every tool's
+  `lib/static.json` carries **`log_levels`** (`DEBUG`/`INFO`/`WARNING`/
+  `ERROR`) and every consumer reads it from there (the argparse choices,
+  the config validation, the live `set log-level` completion and check)
+  — nothing hardcodes the ladder anymore.
+- **dashboard** — the bin+lib layout like the rest of the family: `src/`
+  splits into `bin/` (`server.py` → **`bin/dashboard.py`**) and `lib/`
+  (the statics loader), with `config.js`, `server.ini` and `man/` promoted
+  to the subproject root (the dev checkout resolves them from the script's
+  parent; the installed package stays flattened); `package.nix` builds from
+  the subproject root now. No behavior change beyond the paths.
+- **cache** — **breaking**: the state dump splits by content — by default
+  it dumps **settings only**; **`request dump with-cache`** includes the
+  cached words, and the new **`--dump-with-cache`** flag flips the plain
+  `request dump`, the `--dump-interval` loop **and the shutdown dump** to
+  the full shape (the default off = settings only — the words are
+  production data, keep them out of the file unless the
+  write-behind/restart story needs them). The restore takes either shape
+  and loads whatever the file carries. Pair `--restore-on-start` with
+  `--dump-with-cache` for the words to survive the restart.
+- **cache, inverter** — **breaking**: the metrics endpoint renames — the
+  master switch is **`--metrics-server`** (off by default, **live-settable**
+  `set metrics-server on/off`), and **`--metrics-port`** becomes
+  **`--metrics-listen HOST:PORT`** (default `127.0.0.1:9252` on the cache,
+  `127.0.0.1:9452` on the fake) — `0.0.0.0:PORT` serves every interface
+  (the cache's token is mandatory regardless; the fake warns when bound
+  beyond loopback without one). Anything scripting `--metrics-port N`
+  follows.
+- **scrape** — the metrics surface is the tool by design (always on); the
+  connection limits are `--max-clients` (64), `--client-timeout` (300 s)
+  and `--max-conn-per-ip` (0 = no per-IP limit) — no master switch.
+- **cache** — **breaking**: the write path defaults fully closed —
+  `write-acl` and `write-registers` now default to **`none`** (was `any`):
+  enabling `--allow-write` alone refuses every write until the operator
+  opens the write ACL and the register allow-list (in the config or live
+  with `set`). Both settings (and `connect-acl`, whose default stays
+  `any`) grew the **`none`** mode — restrict all: `write-acl none` refuses
+  every client's writes, `write-registers none` refuses every write
+  regardless of the client, `connect-acl none` rejects every connection at
+  accept.
+- **scrape** — the default poll interval is **10 s** (was 5) — matching
+  the cache's poll default, the demo Prometheus's scrape interval and the
+  dashboard's `scrapeSec`; the cache already polled at 10 s.
+- **common** — `human.secs`: one human time formatter for every command
+  surface in the suite (ms/s/m/h/d, one unit, always two decimals) — the
+  control reports, the set/unset confirmations, the `show cache all` /
+  `show uplink` tables and the console banners all speak it now (the logs,
+  the audit trail and the Prometheus endpoints keep raw seconds).
+- **cache** — `show cache all` carries the cached words' values too: a
+  `values` column between `words` and `age` (`-` = the register is not
+  cached yet).
+- **cache** — **breaking**: the per-client audit tally renamed — the event
+  is `REQUESTS` (it counts reads and writes alike, so `READS` lied), the
+  flag `--requests-audit`, the ini key `requests_audit_s`, the env
+  `MODBUS_CACHE_REQUESTS_AUDIT`, the live setting `requests-audit` (was
+  `reads-audit`), the `show status` field `requests_audit` and the NixOS
+  option `requestsAudit`. Anything grepping the trail for
+  `AUDIT CACHE READS` must follow.
+- **scrape** — the profile `fc` awareness: a spec-bound source is read
+  with its profile entry's function code (`fc: 4` = input registers, the
+  default 3 unchanged) — the schema field now flows profile → source →
+  wire (packed, and validated in the reply).
 
 ### Removed
 
@@ -289,13 +573,12 @@ before the repo restructured into one suite.
   optional top-level `"acl"` object keyed by access kind, `"write"` is the
   one the cache speaks: the gate is either an object with optional
   `allow`/`deny` (+ a terse-ASCII `desc`), or an ordered rule list — one
-  `{"allow"|"deny"|"defer": matcher}` object per rule (+ an optional
+  `{"allow"|"deny": matcher}` object per rule (+ an optional
   `desc` each); a matcher is a `START:COUNT` range, a list of them, a
   `{ "START:COUNT": "desc" }` map describing each entry, or the bare word
   `any` (all registers) / `none`. The chain reads top to
-  bottom and **the last matching rule decides**; `defer` matches but
-  resets the decision back to refused, and an undecided register refuses
-  (the default deny) — the object form is the sugar for the chain
+  bottom and **the last matching rule decides**, and an undecided register
+  refuses (the default deny) — the object form is the sugar for the chain
   "allow, deny" (the deny wins; an absent allow is `any`, so a deny-only
   gate carves its ranges out of everything). The shipped `deye-sg05lp3`
   profile carries the first gate — `{"allow": ["127:2", "148:30"]}`: the
@@ -337,71 +620,6 @@ before the repo restructured into one suite.
   pin the good-key round trip, the wrong-key `ERR`, the plain-client drop
   and the live `set` on all three shapes.
 
-### Changed
-
-- **inverter** — the fake's MBAP-length refusal log renders the shared
-  check's text (`malformed frame from … (bad response length N)`) and a
-  zero-count FC15/FC16 write is now refused with exception 03 (the
-  cache's shape rule — `write_shape_error`) instead of echoing a no-op
-  write; everything else on the wire is byte-identical.
-
-### Security
-
-- **everywhere** — **the state dumps seal under a key (`dump/key`)**: the
-  dump/restore data — the live setting overrides, and on the cache the
-  cached words — can ride encrypted at rest. A new startup-only secret
-  knob `dump/key` (`--dump-key`, env `DUMP_KEY`, config `set dump-key`;
-  restart-marked — the wire answers the restart note, so the key cannot
-  drift between the writer and the reader of a sealed file) seals every
-  state file as a version-2 envelope (`cipher: sha256-ctr`): the whole
-  state rides as the `box`, encrypted under an HMAC-SHA256 counter-mode
-  keystream derived from the key and authenticated by an HMAC-SHA256 over
-  nonce+box (stdlib only — no AES in the stdlib; the nonce is fresh per
-  dump, and the mac is checked first: a wrong key reads as tampered
-  content and fails closed, never as garbage). The gate is symmetric: a
-  restore without the key refuses a sealed dump, and a restore WITH a key
-  refuses an unsealed one (the plain hash is unkeyed — the moment the
-  operator declares a key, plaintext stops being trust at rest). The
-  reload's state files (`<config>.reload`, the fake's XDG home) migrate
-  onto the shared dump writer/reader (the `when` key is `saved` now) and
-  seal under the same key — the re-exec re-resolves the same argv, so the
-  fresh daemon reads what the dying one wrote. No key = the old posture
-  stands (0600 plaintext + the integrity hash). The registries carry the
-  row (hidden, secret — `show dump key` refuses, `show config` marks it),
-  the NixOS modules gain `dumpKey`, the SBOM allowlist gains `secrets`,
-  and the regtests pin the sealed round-trip, the wrong-key/missing-key/
-  unsealed refusals and the keyed reload on all three shapes (the fake's
-  pins, the cache's words, the scraper's env twin).
-- **everywhere** — **one secret knob, two forms: the `file:` reference**:
-  every secret value now takes either the inline string or
-  `file:<path>` — the first line of an owner-only `0600` file, loaded by
-  the shared `load_token_file` discipline (F12; a systemd
-  LoadCredential rides as `file:/run/credentials/...`). `--dump-key
-  file:/path` (env `DUMP_KEY=file:...`, config `set dump key file:...`)
-  is the headline, and the same acceptance lands on `--control-token`,
-  `--control-ops-token`, `--auth-token` and `--metrics-token` (flag, env,
-  config and the live `set` — a `file:` token re-reads on reload, so
-  rotating the file rotates the token). The config file carries the
-  reference, never the material; a reference that cannot be read fails
-  fast (a secret that silently vanishes is a misconfiguration, not a
-  fallback to plaintext). Plaintext dumps stay the
-  no-key posture **by design**, and now say so: a `WARNING` at start and
-  a `(not sealed — set dump/key to encrypt at rest)` note on the
-  `set dump path` reply wherever a dump path is live without a key.
-
-### Docs
-
-- **OPTIONS.md** — **the registries' `show` section rides the table**: the
-  nine show commands render as `s` rows beside the knobs (status/
-  connections/version/config/knobs on all four, the cache's
-  `cache`/`cache-all`/`uplink`, the fake's `registers`), the live column
-  spells `show <name>` (not a knob — nothing to set), the hidden rows
-  (`config`/`knobs`/`cache-all`/the cache's `status`) carry the `hidden`
-  mark, and the legend explains the new kind; `gen_options.py` merges the
-  show rows into the one alphabetical run (the name spaces don't collide).
-
-### Added
-
 - **common** — **the SBOM is generated, not asserted**: `scripts/gen_sbom.py`
   renders both `docs/sbom/SBOM.md` and `docs/sbom/sbom.cdx.json` from the
   tree, and the release workflow gains the `sbom` job running
@@ -433,55 +651,6 @@ before the repo restructured into one suite.
   malformed FC06/16 answers exception 03 with a malformed-frame note —
   the log used to say illegal function for both).
 
-### Fixed
-
-- **everywhere** — **the ctl/cli clients and the control servers converge
-  on one behavior** (the drift the four-way copies carried): the fake's
-  cli passes `--audit-max-mb`/`--audit-files` to its audit trail (they
-  parsed but never reached it), its TAB completion inserts a single match
-  with the trailing space (the family shape — without it tab-tab
-  re-completes the same word and never lists) and its shutdown confirm
-  survives a connection lost right after the confirm (the reply's
-  ConnectionLost no longer aborts the goodbye); the dashboard's state
-  summary renders `upstream_ok=` (it spelled `upstream=` twice, the
-  second carrying the health state); the cache's cli/ctl read the audit
-  and timeout defaults from `lib/static.json` (the other three already
-  did — the hardcoded `10.0`/`3`/`5.0` die) and the cache cli's `?` help
-  lists the `help <setting>` pin beside `?` like the family; the dead
-  `describe_setting` local (cache cli) and the unused imports (the
-  cache/inverter/dashboard control servers, the scraper/dashboard clis)
-  die; the fake's SIGHUP env layer loses its doubled `LOG_LEVEL` read and
-  the control plane's `_parse_hour` rides the same `parse_time` the
-  signals layer speaks (a malformed HH:MM now answers the clean
-  `time out of range` text, not a Python unpack message); the fake's
-  startup parses the connect ACL and the auth type once (it computed the
-  same pair twice — once for the defaults, once for the device).
-
-- **everywhere** — **the Modbus shape/consistency round**: the cache's
-  `--allow-write` help (and the generated man/OPTIONS rows) claimed
-  FC05/06/15/16 while the write gate has covered FC22/23 since the
-  write-acl wave — the text now names all six; the cache validates a
-  forwarded FC15/FC16 frame's byte count against its declared register
-  count and answers exception 03 itself (audited) instead of forwarding
-  garbage to the device; the cache's write-through invalidation drops the
-  written span in **both** register spaces (FC4 copies stayed stale until
-  the TTL); the **fake inverter** answers a frame too short to carry its
-  address with a Modbus exception (03 on an implemented code) instead of
-  silently closing the connection; and the exported `READ_FUNCS` static
-  is actually the cache's read dispatch now (the `func == 3 or func == 4`
-  hardcode is gone — FC1/FC2 ride the same table).
-
-- **cache** — **the write allow-list vets FC23's WRITE span**: the
-  request's second address pair (read addr/count rides first, write
-  second) — `_write_target()` took the read span, so a read/write
-  multiple-registers frame with the read span inside the allow-list and
-  the written span outside was forwarded, and the write-through
-  invalidation dropped the same wrong span. The gate refuses it 0x97/01
-  now and the invalidation drops exactly the written words; the regtest
-  pins both halves.
-
-### Added
-
 - **scraper / inverter / dashboard** — **the state machinery is
   family-wide**: `dump_settings`/`apply_dump_settings` on all three
   control servers (the overrides serialize to raw, re-appliable wire
@@ -509,47 +678,6 @@ before the repo restructured into one suite.
   the bins (unset refuses — the metrics/token treatment), and the
   regtests pin the rotations, the refusals, the dump/restore and the
   reload exec.
-
-### Changed
-
-- **everywhere** — **the secret knobs render as `*** SECRET REMOVED ***`
-  in the dump/restore and `show config`**: an overridden secret rides in
-  the state dump (and the reload's state file) as the placeholder — the
-  knob is public, the value never lands in a file (the dump stays 0600 +
-  integrity-hashed; the restore and the reload's fresh start SKIP the
-  placeholder — the secret keeps its current value — and name it
-  `(secret, not restored — re-pass by flag/env, or as file:<path>)` in the
-  skipped list, the reload reply keeps naming the lost secrets),
-  `show config` renders every configured secret row as
-  `set <name> *** SECRET REMOVED ***` (the trailing hidden-note line is
-  gone — the placeholder line IS the marker), and the paste-back is
-  gated: the config parser refuses the placeholder as a value
-  (`*** SECRET REMOVED *** is not a value — pass the secret by
-  flag/env, or as file:<path>`) and so does the wire `set` — a rendered script
-  piped back cannot poison a secret with a known constant. The dashboard's
-  entry passes the control server the secret rows' configured-ness (its
-  `show config` marks the placeholders too), the fake's `startup_values`
-  marks them from the resolved argv, the shared
-  `SECRET_REMOVED`/`dump_filter` live in common/dump.py, and the
-  registries' show-config rows, the READMEs, the book's config chapter,
-  options.md's legend and the man prose follow.
-
-- **scraper / cache** — **the client-side modbus errors name the
-  function code that failed**: `FC4 modbus exception, code 1` (was
-  `modbus exception, code 1`) — the scraper's `inverter … unreachable`
-  warnings and the cache's `poll of … failed` lines carry the failing
-  read's FC (an fc4-marked source on an FC3-only device reads as such
-  now).
-
-- **everywhere** — **the show verb refuses the secrets**: `show
-  control/token` (the ops token, `metrics/token`, `auth/token`, the
-  `-file` spellings) answers `err <name> is a secret — it never shows
-  (pass it by flag/env, or as file:<path>)` instead of the `<set>` guard's
-  placeholder — a secret's value renders nowhere, on any tool (the set
-  reply keeps `<set>` as the rotation's confirmation; the `?`/help still
-  describes the knob — the vocabulary is public, the value is not).
-
-### Added
 
 - **everywhere** — **the registries drop the `section` field; the display
   `group` is the one grouping**: a row's `group` files it in show config,
@@ -1034,252 +1162,226 @@ before the repo restructured into one suite.
   fix is a defaults flip (the workflow cuts the release, the local gate
   runs the full suite, sign the tags).
 
-### Changed
+### Security
 
-- **everywhere** — **the consoles prefix every non-value line with `% `**:
-  the ok/err verdicts, the bye notices and the local echoes (`% ok pong`,
-  the clear/restart/reload confirms, the shutdown's `% bye shutdown`) all
-  carry the prefix now — the show reports, the tables and the bare values
-  are the values and print bare (the fake's console already spoke this
-  rule; the other three follow, and its `help <setting>` no longer prints
-  the verdict twice). The README transcripts and the man prose follow.
+- **everywhere** — **the state dumps seal under a key (`dump/key`)**: the
+  dump/restore data — the live setting overrides, and on the cache the
+  cached words — can ride encrypted at rest. A new startup-only secret
+  knob `dump/key` (`--dump-key`, env `DUMP_KEY`, config `set dump-key`;
+  restart-marked — the wire answers the restart note, so the key cannot
+  drift between the writer and the reader of a sealed file) seals every
+  state file as a version-2 envelope (`cipher: sha256-ctr`): the whole
+  state rides as the `box`, encrypted under an HMAC-SHA256 counter-mode
+  keystream derived from the key and authenticated by an HMAC-SHA256 over
+  nonce+box (stdlib only — no AES in the stdlib; the nonce is fresh per
+  dump, and the mac is checked first: a wrong key reads as tampered
+  content and fails closed, never as garbage). The gate is symmetric: a
+  restore without the key refuses a sealed dump, and a restore WITH a key
+  refuses an unsealed one (the plain hash is unkeyed — the moment the
+  operator declares a key, plaintext stops being trust at rest). The
+  reload's state files (`<config>.reload`, the fake's XDG home) migrate
+  onto the shared dump writer/reader (the `when` key is `saved` now) and
+  seal under the same key — the re-exec re-resolves the same argv, so the
+  fresh daemon reads what the dying one wrote. No key = the old posture
+  stands (0600 plaintext + the integrity hash). The registries carry the
+  row (hidden, secret — `show dump key` refuses, `show config` marks it),
+  the NixOS modules gain `dumpKey`, the SBOM allowlist gains `secrets`,
+  and the regtests pin the sealed round-trip, the wrong-key/missing-key/
+  unsealed refusals and the keyed reload on all three shapes (the fake's
+  pins, the cache's words, the scraper's env twin).
+- **everywhere** — **one secret knob, two forms: the `file:` reference**:
+  every secret value now takes either the inline string or
+  `file:<path>` — the first line of an owner-only `0600` file, loaded by
+  the shared `load_token_file` discipline (F12; a systemd
+  LoadCredential rides as `file:/run/credentials/...`). `--dump-key
+  file:/path` (env `DUMP_KEY=file:...`, config `set dump key file:...`)
+  is the headline, and the same acceptance lands on `--control-token`,
+  `--control-ops-token`, `--auth-token` and `--metrics-token` (flag, env,
+  config and the live `set` — a `file:` token re-reads on reload, so
+  rotating the file rotates the token). The config file carries the
+  reference, never the material; a reference that cannot be read fails
+  fast (a secret that silently vanishes is a misconfiguration, not a
+  fallback to plaintext). Plaintext dumps stay the
+  no-key posture **by design**, and now say so: a `WARNING` at start and
+  a `(not sealed — set dump/key to encrypt at rest)` note on the
+  `set dump path` reply wherever a dump path is live without a key.
 
-- **cache** — **the wire vocabulary aligns with the scraper's namespaces**:
-  the live names are paths now — `modbus/interval`, `modbus/read-delay`,
-  `modbus/merge-gap`, `modbus/profile`, `modbus/selection`,
-  `modbus/upstream`, `modbus/unit`, `cache/ttl`,
-  `limits/client-timeout` (`set modbus interval 2`, `show cache ttl`;
-  the new `modbus` node describes the namespace) — beside the landed
-  `write/*`, `limits/max-*` and `acl/*` paths. **The upstream endpoint and
-  the unit id are live-settable**: `set modbus upstream HOST:PORT`
-  re-targets the inverter and drops the session (the next exchange dials
-  the new endpoint), `set modbus unit N` likewise. The replies render the
-  paths (`ok modbus/interval=2.00s`), the dump's override keys and the
-  unset defaults rekey, the config scripts and the flags keep the flat
-  registry names; the regtest and the control fuzz speak the path forms.
+- **scripts** — the audit finding F19 (docs/AUDIT.md, rev. 5) closed: the
+  release no longer lands before the CI gate reports. The GitHub release
+  is the tag-triggered workflow's job (`needs: [test, build]` — the suites
+  + the nix build — then the cut from the changelog section); the
+  orchestrator's local cut becomes the explicit opt-in (**`--release`**,
+  printed with the bypass reminder; `--no-release` is gone). The local
+  gate defaults to **`--tests full`** (was `quick`), and the tag is
+  **signed** (`git tag -s`) whenever a signing key exists — the unsigned
+  annotated tag is the fallback, with the reason printed. Flight-tested on
+  the way: a fresh bump no longer dies on `git grep`'s no-matches exit
+  code, and a dry-run prints the plan without pretending the suites ran.
+- **cache** — the audit finding F18 (docs/AUDIT.md) closed: the state
+  dump is owned trust at rest — created **`0600` explicitly** (never the
+  umask) and carrying a **sha256 integrity hash** of its canonical
+  content; a restore **fails closed**: an edited, truncated or unsigned
+  dump refuses with a one-liner, and a group/world-writable dump refuses
+  outright (whoever can write the dump holds config trust — own the file
+  like the ini, `chmod 0600`). The hash catches corruption and casual
+  tampering, not a local admin who rechashes (the same boundary as the
+  audit trail's chains). The regtest asserts the mode, the hash and all
+  three refusals.
+- **cache, inverter** — the audit findings F2–F8 (docs/AUDIT.md) closed:
+  the shared audit writer folds control characters, so an embedded `\n` in
+  a control command can no longer forge a trail line (F2); an unparseable
+  write frame (too short to carry an address) is refused with an
+  illegal-value exception instead of being forwarded past the allow-list —
+  fail closed (F3, cache); the pre-auth control line buffer drops the
+  connection past 1 MB instead of growing for the idle timeout (F4, both
+  control servers); a TCP control port without a token refuses to start —
+  the unix socket needs none (F5, cache); the metrics endpoint refuses to
+  start without a bearer token and its handler socket times out after 5 s
+  (F6, cache); the unix control socket is `chmod 0600` after bind (not the
+  umask), with `--control-socket-group` opting into `0660` (F8, the cache's
+  option; the inverter takes the default).
+- **docker** — the audit finding F7 (docs/AUDIT.md) closed: the compose
+  stack publishes nothing on the host — the services talk over one
+  `internal: true` network (`pv-modbus`, no outbound route), so the Modbus
+  listeners, the exporter's `/metrics` and the Prometheus UI are reachable
+  only from inside the network (`docker compose exec`, or a collector
+  container attached to the network by name); the plain `docker run`
+  examples bind their published ports to `127.0.0.1` now. The demo
+  exporter serves with a bearer token — the entrypoint generates
+  `/config/metrics.token` into the volume on the first seed (0600; bundled
+  `*.token` defaults are placeholders, never copied) and Prometheus scrapes
+  with the same value.
+- **cache, inverter, scrape** — the audit findings F9 and F12
+  (docs/AUDIT.md) closed: a token passed as `--control-token` /
+  `--metrics-token` / `--auth-token` lands in `ps` / `/proc/*/cmdline` —
+  the READMEs and the token-flag man pages now say prefer the `-file`
+  variants (LoadCredential) or the env vars, the flag form is for quick
+  tests (F9). Token files must be owner-only (`0600`): a group- or
+  world-accessible token file refuses to start with a one-line
+  `chmod 0600` error — the shared loader (`check_token_file_mode` in
+  `common/config.py`) covers the cache, the fake and the ctl/cli clients,
+  the scraper's SIGHUP-reread loader re-checks on every reload (F12); the
+  docker entrypoint seeds generated token files 0600. The regtests assert
+  the refusal.
+- **inverter** — the audit finding F11 (docs/AUDIT.md) closed as
+  recommended — capped and documented, not redesigned: the fake's Modbus
+  listener grew **`--max-clients`** (refuse past the limit at accept,
+  default 64, `0` = no limit) and **`--client-timeout`** (shed silent
+  clients, default 300 s, `0` = never) mirroring the cache — both tunable
+  live (`set max-clients` / `set client-timeout`, `unset` restores the
+  configured value) and watched via the new **`show connections`** control
+  command (peer, connection age, requests served; `clients=` joined the
+  `show status` fields and `inspect` carries the modbus row). A declared
+  read count past the 125-register cap (`0`, `0xFFFF`, a span past the
+  16-bit space) now answers exception 03 — the cache's gate — instead of
+  assembling an oversized reply. The README's Security section and the man
+  page's SECURITY block document the posture: the fake is a development
+  tool, not security-first design — run it on a trusted, LAN-isolated
+  network. Verified by the new `tests/inverter-regtest.py`. The two suites
+  that predate the earlier fixes caught up in the same sweep: the
+  cache-control fuzzer authenticates now (its token-less TCP control port
+  predates the F5 startup refusal) and the cache stress proxy opens its
+  write path explicitly (`--write-acl any --write-registers any` — the
+  write defaults are none).
+- **scrape** — the audit finding F13 (docs/AUDIT.md) closed: a non-loopback
+  `/metrics` listen without `--auth-token` **refuses to
+  start** with a one-liner (`refusing to expose /metrics beyond loopback
+  without a token`) — the SIGHUP reload runs the same check and keeps the
+  previous settings; the loopback default needs no token (localhost dev
+  stays friction-free) and the docker demo has carried the token since F7.
+  The README documents the refusal and the Prometheus scrape job with
+  `authorization.credentials_file`. (The cache's metrics endpoint already
+  refused to start without a token and binds loopback only — F6; the
+  fake's is loopback-only by construction with the optional token.)
 
-- **everywhere** — **`show settings` is gone**: the one-line-per-setting
-  listing retires (no longer in use) — a per-setting `show <setting>`
-  and `show status`'s `overridden=` row carry the same truth, and the
-  command answers `err unknown setting` now. The registry rows drop the
-  word (the ?/TAB pools follow), the daemon help lines lose the
-  `settings` view, and the man pages, the READMEs and the suites
-  follow; the `overridden` tracking and the dump's settings section
-  stay (the SIGHUP/reload marker clearing rides `show status`).
+### Docs
 
-- **cache** — **the write knobs spell as paths**: `allow-write` is
-  `write/allow` and `write-registers` is `write/registers` on the wire —
-  `set|unset|show|help write allow <on|off>`, `write registers
-  <START:COUNT,...|any|none>` (the new `write` node carries the namespace
-  — `show write ?` lists the two children, `help write` describes it);
-  the replies render the path (`ok write/allow=on`), the dispatch, the
-  dump's override keys and the unset defaults rekey (a pre-rename dump's
-  write overrides restore as skipped — re-set them), the config scripts
-  keep the flat registry names, and cache-regtest speaks the path forms.
+- **OPTIONS.md** — **the registries' `show` section rides the table**: the
+  nine show commands render as `s` rows beside the knobs (status/
+  connections/version/config/knobs on all four, the cache's
+  `cache`/`cache-all`/`uplink`, the fake's `registers`), the live column
+  spells `show <name>` (not a knob — nothing to set), the hidden rows
+  (`config`/`knobs`/`cache-all`/the cache's `status`) carry the `hidden`
+  mark, and the legend explains the new kind; `gen_options.py` merges the
+  show rows into the one alphabetical run (the name spaces don't collide).
 
-- **everywhere** — **a `/`-path live name dispatches now**: the wire resolves
-  the path (`set limits max-conn-per-ip <value>` — the registry's `live`
-  spells as its words) and the daemon dispatches it — the control.py
-  `_apply`/`_get` branches and the bin's `defaults` dict key the **live
-  name** (the family rule all along: the cache's `cache-ttl` knob already
-  dispatched as `ttl`). Until now a path resolved on the wire and then
-  fell through the dispatch (`show` answered the `_get` fallback `?`).
-  The first rename rides in: the scraper's `max-conn-per-ip` is
-  `limits/max-conn-per-ip` — the set/unset/show replies render the path
-  (`ok limits/max-conn-per-ip=2`), `show settings` lists it under the
-  same live name. And the dispatch drives itself now: a registry row
-  with a typed conv (`int`/`float`/`str`) needs no `_apply`/`_get`
-  branch at all — the conv parses the value, the row's config key takes
-  it, and the bin's `unset` defaults generate from the same rows; the
-  row's `min`/`max` (inclusive bounds) gate the value in the same
-  breath, so validation lives in the registry too (the branches stay
-  for the runtime plumbing a bare config write cannot reach — the
-  client, the gate, the logger — and shrink to a `_typed` call plus the
-  plumbing; the bool/choice knobs keep theirs). The scraper's
-  `modbus-unit` rides it live as `modbus/unit` (`set modbus unit 5`
-  applies through the client's `apply(unit=...)` branch, the 0..255
-  gate reads off the row; a future typed row dispatches with the JSON
-  row alone). A row may also name a `check` — the tool's validator for
-  the value's shape: it validates (the clean one-liner becomes the err
-  reply), normalizes (`set modbus upstream :5502` stores
-  `127.0.0.1:5502`) and hands back the config keys derived from the
-  knob (the scraper's upstream updates `host`/`modbus_port` with it —
-  the status line stays truthful). The bounds are family-wide now: the
-  four registries carry `min`/`max` on every ranged live row (19 rows)
-  and all four control servers gate through the same `_gate_range`
-  helper (NaN included — a `nan` value is rejected like any other
-  out-of-bounds one); the branch keeps the parse, the plumbing and the
-  message's unit, the row owns the numbers.
+- **everywhere** — **options.md, the knob comparison table**: every knob of
+  the four daemons in one table — the name, the function it files under
+  (device/serving/control plane/own /metrics/limits/audit trail/
+  persistence/logging), the registry description and a ✓ mark per tool
+  (**bold** = common to all four, `live`/`secret` marked) — generated from
+  the per-tool `lib/options.json` registries by the new
+  `scripts/gen_options.py` (edit the registries, re-run, never the
+  markdown). The table's first render flushed two registry helps: the
+  cache's `--restore-on-start` still cited the dead ini key
+  (`ini restore_on_start`) and the dashboard's `--no-audit-log` said
+  "SCR audit trail" — both reworded to the family's default style (the
+  `--help`/man pages follow the registry).
+- this wave's docs: the READMEs updated family-wide (the config grammar —
+  the ini is gone —, `show config`/`help config`, the RBAC verbs flag, the
+  dashboard's metrics/audit rows, the scrape privacy note), the man pages
+  regenerated (mandoc -Tlint clean), the TODOs follow, the mdBook scaffold
+  (`docs/book/`); **docs/AUDIT.md rev. 8** records the wave (no new
+  findings). **docs/AUDIT.md rev. 6** — the audit covers the whole pv-suite (the
+  dashboard's deferral closed): the scraper's and the dashboard's control
+  planes walked (no new findings beyond F20), the dashboard's HTTP surface
+  audited for the first time — **F21** raised (no auth on page/proxy, the
+  `0.0.0.0` default bind; the family TODO's auth-story item is the same
+  work) — the assets/surfaces inventory and the NIS2/DORA mapping extended
+  to the dashboard, and the release-gate drift recorded (fixed above).
 
-- **everywhere** — **the console listings group by the `group` field
-  alone**: the cli `?`/TAB listings bucket a setting under its registry
-  `group`, and a row that carries none renders under `[ungrouped]`
-  (until now the section filled in — `[device]/[serving]/...`;
-  `Setting.display_group` holds the rule, `setting_groups()` the
-  grouping). The `[values]`/`[system]` groups stay the callers'; the
-  daemon-side surfaces (`show config`, `show knobs`, `help config`)
-  keep the section fallback for their groupless rows. (The Added entry
-  "the registry learns to group" above said the console listings group
-  "the same way" as the daemon surfaces — they split here.)
-
-- **everywhere** — **the sections render as their registry names**: the
-  console `?`/TAB listings group the settings under the registry's own
-  section heads — `[device]`, `[serving]`, `[control]`, `[metrics]`,
-  `[limits]`, `[audit]`, `[persistence]`, `[logging]` (until now one flat
-  `[settings]` group; `[values]`/`[system]` unchanged) — instead of the
-  translated titles; the knob table (options.md) renders the same raw
-  section keys in its function column. `Setting` carries its section and
-  `common/options.py` `section_groups()` does the grouping; the long
-  titles stay where they were already at home (`show config`, `show
-  knobs`, `help config`).
-
-- **everywhere** — **the control grammar's vocabulary folds into the option
-  registry (one place to have all knobs)**: `lib/settings.py` is gone —
-  its `SETTINGS` (the live settings' short descriptions, the completable
-  value words, the value-shape hints and the per-value notes) now rides the
-  same `lib/options.json` rows as the flags/envs/sections
-  (`setting-help`/`values`/`hint`/`value-help` beside `live`), and
-  `lib/options.py` derives the wire vocabulary from them
-  (`SETTINGS`/`SETTING_BY_NAME`/`SETTING_NAMES` +
-  `describe_setting`/`describe_value`, the shared
-  `common/options.py` `Setting`/`settings_of()`/`make_describe()`); the
-  ctl/cli clients and the control servers import the same names from
-  `lib/options.py` now. The fake's **control-only settings** (the pins and
-  the machines — `pv`, `load`, `batt`, `grid`, `soc`, `mppt`, `cloud`,
-  `scenario`, `battery-state`, `grid-outage`) ride the registry as flagless
-  rows (a live name, no flag/env) — until now they existed only in the
-  hand-listed settings module; `show knobs` renders them with a
-  `(control-only)` marker. The wire grammar, the completions and the word
-  help are unchanged (the fake's device section lists the pins first, so
-  its help output keeps its shape); check_options.py grows the drift gate
-  (the live names unique, every live row carries its description, the
-  control-only rows flag/env/secret-free) and options.md renders the
-  control-only rows (89 knobs now).
-- **scraper** — **breaking: the subproject directory is `scraper/`** (was
-  `scrape/`): the flake's package/module paths, the docker build context
-  and the image layout, the mdBook include, the SBOM, the cross-README
-  links and the man pages' rendered paths follow; the test-suite
-  filenames keep their historical `tests/scrape-*.py` names and the
-  binary stays `modbus-scraper`.
-- **cache, scraper** — **breaking: the inverter endpoint is one
-  `--upstream HOST:PORT` knob** (the shared `common/config.py`
-  `parse_upstream()`): `--host` and `--port` retire on the cache,
-  `--host`/`--modbus-port` on the scraper, flags, env twins and config
-  keys alike — `HOST`/`PORT`/`MODBUS_PORT` give way to `UPSTREAM`
-  (a config `set upstream 127.0.0.1:5502`, the NixOS option
-  `upstream`, the docker CMDs), and **`:PORT` = 127.0.0.1:PORT** (the
-  loopback shorthand; `[v6]:PORT` parses like `--listen`). The resolved
-  config keeps its derived `host`/`port` keys — `show status`, the start
-  log and the audit trails report the same fields as before. Anything
-  scripting the retired flags/envs must follow.
-- **scraper** — **breaking: `--unit` is `--modbus-unit`** (env `UNIT` →
-  `MODBUS_UNIT`, config `set modbus-unit`, the NixOS option `modbusUnit`):
-  the Modbus unit id wears the modbus- prefix its siblings on the flag
-  line already carry (`--modbus-port`'s place is taken by `--upstream`,
-  so the family stays grep-able). Anything scripting `--unit` must
-  follow.
-- **everywhere** — **breaking: every environment twin carries the tool's
-  prefix now** — `MCH_*` (the cache), `SCR_*` (the scraper), `INV_*` (the
-  fake inverter), `DSH_*` (the dashboard) — and each control-port answers
-  to the one short form (`MCH_CTL`/`SCR_CTL`/`INV_CTL`/`DSH_CTL`, the
-  daemons and the ctl/cli clients agree; no more long/short duplicates).
-  The dashboard retires the generic docker envs (`PORT`, `BIND`, `PROM_URL`,
-  `PROM_PREFIX`, `STATIC_DIR`, `CONFIG_JS`, `BATTERY`) for
-  `DSH_PORT`/`DSH_BIND`/`DSH_PROM_URL`/`DSH_PROM_PREFIX`/
-  `DSH_STATIC_DIR`/`DSH_CONFIG_JS`/`DSH_BATTERY` — the compose stack, the
-  docker docs and the compose's Prometheus wiring follow. Anything
-  scripting the old names must follow.
-  (Reversed later in this same unreleased cycle — the prefix retirement
-  above ships the twins as the bare names; this entry is kept for the
-  wave's own story.)
-- **cache** — **retagged: "Modbus TCP caching proxy for single-client
-  devices"** (the man page's NAME has said so; the sources follow): the
-  module docstring and the `--help`/man DESCRIPTION lead with the
-  device-first story (any single-client Modbus TCP device — an inverter or
-  its SDongle/EMMA radio — the bundled sun2000 profile stays the shipped
-  example), not the Huawei-specific one.
-- **everywhere** — the bins are renamed to match their man pages (the
-  family's dash names): `cache/bin/modbus_cache.py` → **`modbus-cache.py`**,
-  the `*_ctl.py`/`*_cli.py` clients likewise (`modbus-cache-ctl.py`,
-  `modbus-cache-cli.py`, `modbus-scraper*.py`, `modbus-fake-*.py`,
-  `dashboard-*.py`) — the man page, the bin and the installed entrypoint
-  share one name now; the nix packages, the docker images and the docs
-  follow.
-- **scrape** — **breaking: the register-map config is gone** —
-  `--pv-register`/`--grid-register`/`--battery-register`/
-  `--battery-soc-register`/`--scale`/`--grid-scale` (flags, envs, config
-  keys, NixOS options) existed because the spec predates the device
-  profile; the device profile is the register map's single source now
-  (addresses, types, gains, function codes — its per-entry `scale` is the
-  decode divisor, validated finite > 0 at load). The live control surface
-  gained **`set profile <file-or-name>`** (`default` = the bundled sun2000
-  profile, `unset` restores the configured one): the new register map
-  loads, the metric sources rebuild and a profile without the registers
-  the power math needs rolls back with a clean error.
-- **everywhere** — the log levels are a static constant: every tool's
-  `lib/static.json` carries **`log_levels`** (`DEBUG`/`INFO`/`WARNING`/
-  `ERROR`) and every consumer reads it from there (the argparse choices,
-  the config validation, the live `set log-level` completion and check)
-  — nothing hardcodes the ladder anymore.
-- **dashboard** — the bin+lib layout like the rest of the family: `src/`
-  splits into `bin/` (`server.py` → **`bin/dashboard.py`**) and `lib/`
-  (the statics loader), with `config.js`, `server.ini` and `man/` promoted
-  to the subproject root (the dev checkout resolves them from the script's
-  parent; the installed package stays flattened); `package.nix` builds from
-  the subproject root now. No behavior change beyond the paths.
-- **cache** — **breaking**: the state dump splits by content — by default
-  it dumps **settings only**; **`request dump with-cache`** includes the
-  cached words, and the new **`--dump-with-cache`** flag flips the plain
-  `request dump`, the `--dump-interval` loop **and the shutdown dump** to
-  the full shape (the default off = settings only — the words are
-  production data, keep them out of the file unless the
-  write-behind/restart story needs them). The restore takes either shape
-  and loads whatever the file carries. Pair `--restore-on-start` with
-  `--dump-with-cache` for the words to survive the restart.
-- **cache, inverter** — **breaking**: the metrics endpoint renames — the
-  master switch is **`--metrics-server`** (off by default, **live-settable**
-  `set metrics-server on/off`), and **`--metrics-port`** becomes
-  **`--metrics-listen HOST:PORT`** (default `127.0.0.1:9252` on the cache,
-  `127.0.0.1:9452` on the fake) — `0.0.0.0:PORT` serves every interface
-  (the cache's token is mandatory regardless; the fake warns when bound
-  beyond loopback without one). Anything scripting `--metrics-port N`
-  follows.
-- **scrape** — the metrics surface is the tool by design (always on); the
-  connection limits are `--max-clients` (64), `--client-timeout` (300 s)
-  and `--max-conn-per-ip` (0 = no per-IP limit) — no master switch.
-- **cache** — **breaking**: the write path defaults fully closed —
-  `write-acl` and `write-registers` now default to **`none`** (was `any`):
-  enabling `--allow-write` alone refuses every write until the operator
-  opens the write ACL and the register allow-list (in the config or live
-  with `set`). Both settings (and `connect-acl`, whose default stays
-  `any`) grew the **`none`** mode — restrict all: `write-acl none` refuses
-  every client's writes, `write-registers none` refuses every write
-  regardless of the client, `connect-acl none` rejects every connection at
-  accept.
-- **scrape** — the default poll interval is **10 s** (was 5) — matching
-  the cache's poll default, the demo Prometheus's scrape interval and the
-  dashboard's `scrapeSec`; the cache already polled at 10 s.
-- **common** — `human.secs`: one human time formatter for every command
-  surface in the suite (ms/s/m/h/d, one unit, always two decimals) — the
-  control reports, the set/unset confirmations, the `show cache all` /
-  `show uplink` tables and the console banners all speak it now (the logs,
-  the audit trail and the Prometheus endpoints keep raw seconds).
-- **cache** — `show cache all` carries the cached words' values too: a
-  `values` column between `words` and `age` (`-` = the register is not
-  cached yet).
-- **cache** — **breaking**: the per-client audit tally renamed — the event
-  is `REQUESTS` (it counts reads and writes alike, so `READS` lied), the
-  flag `--requests-audit`, the ini key `requests_audit_s`, the env
-  `MODBUS_CACHE_REQUESTS_AUDIT`, the live setting `requests-audit` (was
-  `reads-audit`), the `show status` field `requests_audit` and the NixOS
-  option `requestsAudit`. Anything grepping the trail for
-  `AUDIT CACHE READS` must follow.
-- **scrape** — the profile `fc` awareness: a spec-bound source is read
-  with its profile entry's function code (`fc: 4` = input registers, the
-  default 3 unchanged) — the schema field now flows profile → source →
-  wire (packed, and validated in the reply).
+- **everywhere** — **options.md is docs/OPTIONS.md now**: the generated
+  knob comparison table sits beside the other family-level docs, name
+  upper-cased to match its siblings (AUDIT.md, SBOM.md) — `gen_options.py`
+  writes the new path and the README's link follows; no content change
+  beyond the regeneration.
 
 ### Fixed
+
+- **everywhere** — **the ctl/cli clients and the control servers converge
+  on one behavior** (the drift the four-way copies carried): the fake's
+  cli passes `--audit-max-mb`/`--audit-files` to its audit trail (they
+  parsed but never reached it), its TAB completion inserts a single match
+  with the trailing space (the family shape — without it tab-tab
+  re-completes the same word and never lists) and its shutdown confirm
+  survives a connection lost right after the confirm (the reply's
+  ConnectionLost no longer aborts the goodbye); the dashboard's state
+  summary renders `upstream_ok=` (it spelled `upstream=` twice, the
+  second carrying the health state); the cache's cli/ctl read the audit
+  and timeout defaults from `lib/static.json` (the other three already
+  did — the hardcoded `10.0`/`3`/`5.0` die) and the cache cli's `?` help
+  lists the `help <setting>` pin beside `?` like the family; the dead
+  `describe_setting` local (cache cli) and the unused imports (the
+  cache/inverter/dashboard control servers, the scraper/dashboard clis)
+  die; the fake's SIGHUP env layer loses its doubled `LOG_LEVEL` read and
+  the control plane's `_parse_hour` rides the same `parse_time` the
+  signals layer speaks (a malformed HH:MM now answers the clean
+  `time out of range` text, not a Python unpack message); the fake's
+  startup parses the connect ACL and the auth type once (it computed the
+  same pair twice — once for the defaults, once for the device).
+
+- **everywhere** — **the Modbus shape/consistency round**: the cache's
+  `--allow-write` help (and the generated man/OPTIONS rows) claimed
+  FC05/06/15/16 while the write gate has covered FC22/23 since the
+  write-acl wave — the text now names all six; the cache validates a
+  forwarded FC15/FC16 frame's byte count against its declared register
+  count and answers exception 03 itself (audited) instead of forwarding
+  garbage to the device; the cache's write-through invalidation drops the
+  written span in **both** register spaces (FC4 copies stayed stale until
+  the TTL); the **fake inverter** answers a frame too short to carry its
+  address with a Modbus exception (03 on an implemented code) instead of
+  silently closing the connection; and the exported `READ_FUNCS` static
+  is actually the cache's read dispatch now (the `func == 3 or func == 4`
+  hardcode is gone — FC1/FC2 ride the same table).
+
+- **cache** — **the write allow-list vets FC23's WRITE span**: the
+  request's second address pair (read addr/count rides first, write
+  second) — `_write_target()` took the read span, so a read/write
+  multiple-registers frame with the read span inside the allow-list and
+  the written span outside was forwarded, and the write-through
+  invalidation dropped the same wrong span. The gate refuses it 0x97/01
+  now and the invalidation drops exactly the written words; the regtest
+  pins both halves.
 
 - **cache** — **the reload state file saves `0600` explicitly (F23,
   docs/AUDIT.md rev. 9)**: the whole-daemon `reload`'s
@@ -1390,131 +1492,6 @@ before the repo restructured into one suite.
   audit-chain suite were missing) — the gate lists all ten now.
 - **dashboard** — the `--audit-log` help said SCR (the scraper's trail
   prefix); the trail is DSH.
-
-### Docs
-
-- **everywhere** — **options.md, the knob comparison table**: every knob of
-  the four daemons in one table — the name, the function it files under
-  (device/serving/control plane/own /metrics/limits/audit trail/
-  persistence/logging), the registry description and a ✓ mark per tool
-  (**bold** = common to all four, `live`/`secret` marked) — generated from
-  the per-tool `lib/options.json` registries by the new
-  `scripts/gen_options.py` (edit the registries, re-run, never the
-  markdown). The table's first render flushed two registry helps: the
-  cache's `--restore-on-start` still cited the dead ini key
-  (`ini restore_on_start`) and the dashboard's `--no-audit-log` said
-  "SCR audit trail" — both reworded to the family's default style (the
-  `--help`/man pages follow the registry).
-- this wave's docs: the READMEs updated family-wide (the config grammar —
-  the ini is gone —, `show config`/`help config`, the RBAC verbs flag, the
-  dashboard's metrics/audit rows, the scrape privacy note), the man pages
-  regenerated (mandoc -Tlint clean), the TODOs follow, the mdBook scaffold
-  (`docs/book/`); **docs/AUDIT.md rev. 8** records the wave (no new
-  findings). **docs/AUDIT.md rev. 6** — the audit covers the whole pv-suite (the
-  dashboard's deferral closed): the scraper's and the dashboard's control
-  planes walked (no new findings beyond F20), the dashboard's HTTP surface
-  audited for the first time — **F21** raised (no auth on page/proxy, the
-  `0.0.0.0` default bind; the family TODO's auth-story item is the same
-  work) — the assets/surfaces inventory and the NIS2/DORA mapping extended
-  to the dashboard, and the release-gate drift recorded (fixed above).
-
-### Security
-
-- **scripts** — the audit finding F19 (docs/AUDIT.md, rev. 5) closed: the
-  release no longer lands before the CI gate reports. The GitHub release
-  is the tag-triggered workflow's job (`needs: [test, build]` — the suites
-  + the nix build — then the cut from the changelog section); the
-  orchestrator's local cut becomes the explicit opt-in (**`--release`**,
-  printed with the bypass reminder; `--no-release` is gone). The local
-  gate defaults to **`--tests full`** (was `quick`), and the tag is
-  **signed** (`git tag -s`) whenever a signing key exists — the unsigned
-  annotated tag is the fallback, with the reason printed. Flight-tested on
-  the way: a fresh bump no longer dies on `git grep`'s no-matches exit
-  code, and a dry-run prints the plan without pretending the suites ran.
-- **cache** — the audit finding F18 (docs/AUDIT.md) closed: the state
-  dump is owned trust at rest — created **`0600` explicitly** (never the
-  umask) and carrying a **sha256 integrity hash** of its canonical
-  content; a restore **fails closed**: an edited, truncated or unsigned
-  dump refuses with a one-liner, and a group/world-writable dump refuses
-  outright (whoever can write the dump holds config trust — own the file
-  like the ini, `chmod 0600`). The hash catches corruption and casual
-  tampering, not a local admin who rechashes (the same boundary as the
-  audit trail's chains). The regtest asserts the mode, the hash and all
-  three refusals.
-- **cache, inverter** — the audit findings F2–F8 (docs/AUDIT.md) closed:
-  the shared audit writer folds control characters, so an embedded `\n` in
-  a control command can no longer forge a trail line (F2); an unparseable
-  write frame (too short to carry an address) is refused with an
-  illegal-value exception instead of being forwarded past the allow-list —
-  fail closed (F3, cache); the pre-auth control line buffer drops the
-  connection past 1 MB instead of growing for the idle timeout (F4, both
-  control servers); a TCP control port without a token refuses to start —
-  the unix socket needs none (F5, cache); the metrics endpoint refuses to
-  start without a bearer token and its handler socket times out after 5 s
-  (F6, cache); the unix control socket is `chmod 0600` after bind (not the
-  umask), with `--control-socket-group` opting into `0660` (F8, the cache's
-  option; the inverter takes the default).
-- **docker** — the audit finding F7 (docs/AUDIT.md) closed: the compose
-  stack publishes nothing on the host — the services talk over one
-  `internal: true` network (`pv-modbus`, no outbound route), so the Modbus
-  listeners, the exporter's `/metrics` and the Prometheus UI are reachable
-  only from inside the network (`docker compose exec`, or a collector
-  container attached to the network by name); the plain `docker run`
-  examples bind their published ports to `127.0.0.1` now. The demo
-  exporter serves with a bearer token — the entrypoint generates
-  `/config/metrics.token` into the volume on the first seed (0600; bundled
-  `*.token` defaults are placeholders, never copied) and Prometheus scrapes
-  with the same value.
-- **cache, inverter, scrape** — the audit findings F9 and F12
-  (docs/AUDIT.md) closed: a token passed as `--control-token` /
-  `--metrics-token` / `--auth-token` lands in `ps` / `/proc/*/cmdline` —
-  the READMEs and the token-flag man pages now say prefer the `-file`
-  variants (LoadCredential) or the env vars, the flag form is for quick
-  tests (F9). Token files must be owner-only (`0600`): a group- or
-  world-accessible token file refuses to start with a one-line
-  `chmod 0600` error — the shared loader (`check_token_file_mode` in
-  `common/config.py`) covers the cache, the fake and the ctl/cli clients,
-  the scraper's SIGHUP-reread loader re-checks on every reload (F12); the
-  docker entrypoint seeds generated token files 0600. The regtests assert
-  the refusal.
-- **inverter** — the audit finding F11 (docs/AUDIT.md) closed as
-  recommended — capped and documented, not redesigned: the fake's Modbus
-  listener grew **`--max-clients`** (refuse past the limit at accept,
-  default 64, `0` = no limit) and **`--client-timeout`** (shed silent
-  clients, default 300 s, `0` = never) mirroring the cache — both tunable
-  live (`set max-clients` / `set client-timeout`, `unset` restores the
-  configured value) and watched via the new **`show connections`** control
-  command (peer, connection age, requests served; `clients=` joined the
-  `show status` fields and `inspect` carries the modbus row). A declared
-  read count past the 125-register cap (`0`, `0xFFFF`, a span past the
-  16-bit space) now answers exception 03 — the cache's gate — instead of
-  assembling an oversized reply. The README's Security section and the man
-  page's SECURITY block document the posture: the fake is a development
-  tool, not security-first design — run it on a trusted, LAN-isolated
-  network. Verified by the new `tests/inverter-regtest.py`. The two suites
-  that predate the earlier fixes caught up in the same sweep: the
-  cache-control fuzzer authenticates now (its token-less TCP control port
-  predates the F5 startup refusal) and the cache stress proxy opens its
-  write path explicitly (`--write-acl any --write-registers any` — the
-  write defaults are none).
-- **scrape** — the audit finding F13 (docs/AUDIT.md) closed: a non-loopback
-  `/metrics` listen without `--auth-token` **refuses to
-  start** with a one-liner (`refusing to expose /metrics beyond loopback
-  without a token`) — the SIGHUP reload runs the same check and keeps the
-  previous settings; the loopback default needs no token (localhost dev
-  stays friction-free) and the docker demo has carried the token since F7.
-  The README documents the refusal and the Prometheus scrape job with
-  `authorization.credentials_file`. (The cache's metrics endpoint already
-  refused to start without a token and binds loopback only — F6; the
-  fake's is loopback-only by construction with the optional token.)
-
-### Docs
-
-- **everywhere** — **options.md is docs/OPTIONS.md now**: the generated
-  knob comparison table sits beside the other family-level docs, name
-  upper-cased to match its siblings (AUDIT.md, SBOM.md) — `gen_options.py`
-  writes the new path and the README's link follows; no content change
-  beyond the regeneration.
 
 ## 0.3.0 — 2026-11-05
 

@@ -422,7 +422,7 @@ Device register maps live in `profiles/profiles/*.json`
 `fc` — word types `3` (default) or `4`, `bit` entries `1` (default) or
 `2` — optional per-entry `ttl`, `scale`, `desc`. A
 profile may carry a top-level `acl.write` tree — an allow/deny object
-(sugar) or an ordered rule chain (`allow`/`deny`/`defer`, last matching
+(sugar) or an ordered rule chain (`allow`/`deny`, last matching
 rule decides) — which the cache's write gate compiles to register ranges.
 
 The cache merges adjacent ranges up to `merge-gap` addresses and 125

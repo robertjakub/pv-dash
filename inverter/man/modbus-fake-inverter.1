@@ -122,6 +122,13 @@ mirrored): "any" (the default — the trusted\-LAN posture), "none", or a
 comma\-separated list of IPs and CIDR prefixes, e.g.
 127.0.0.1,10.48.0.0/16 (env CONNECT_ACL)
 .TP
+.B \-\-allow\-write
+accept Modbus writes (FC05/06/15/16) from the fake's clients: a write
+lands in the write overlay, logged and audited WRITE like the cache's
+forwarded ones; off (the default) = every write is refused with
+exception 01 and audited WRITE\-REFUSED — the cache's \-\-allow\-write
+gate, mirrored (env ALLOW_WRITE) (default: off)
+.TP
 .BI \-\-max\-clients " N"
 refuse further Modbus connections past this many simultaneous clients, 0
 = no limit (default 64)

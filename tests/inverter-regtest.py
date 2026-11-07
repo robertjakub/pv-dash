@@ -96,7 +96,7 @@ def main():
     procs = []
     try:
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(A_MODBUS),
-                                       '--control-port', str(A_CTL), '--max-clients', '1'],
+                                       '--control-port', str(A_CTL), '--max-clients', '1', '--allow-write'],
                                       stdout=open(LOG, 'w'), stderr=subprocess.STDOUT))
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(B_MODBUS),
                                        '--control-port', str(B_CTL), '--client-timeout', '1',

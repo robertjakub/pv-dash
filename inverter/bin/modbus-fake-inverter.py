@@ -125,6 +125,7 @@ def configured_defaults(args, frozen, profile_text):
         'client-timeout': '%g' % args.client_timeout,
         'max-conn-per-ip': str(args.max_conn_per_ip),
         'connect-acl': acl_text(connect_acl),
+        'write/allow': 'on' if args.allow_write else 'off',
         'modbus/auth': modbus_auth or 'none',
         'metrics-server': 'on' if args.metrics_server else 'off',
         'profile': profile_text,
@@ -278,7 +279,8 @@ def main():
     fake = FakeInverter(args.unit, simulator, strict=args.strict, chaos=chaos,
                         max_clients=args.max_clients, client_timeout=args.client_timeout,
                         max_conn_per_ip=args.max_conn_per_ip, connect_acl=connect_acl,
-                        auth=modbus_auth, auth_key=modbus_auth_key)
+                        auth=modbus_auth, auth_key=modbus_auth_key,
+                        allow_write=args.allow_write, audit=audit)
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,

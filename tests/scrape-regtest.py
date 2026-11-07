@@ -178,7 +178,8 @@ def write_ini(path, extra=''):
 procs = []
 try:
     # 1. baseline: fake with battery + scraper with battery enabled
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(PORT),
+                                   '--allow-write'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     write_ini('/tmp/scr_base.ini')
@@ -1152,7 +1153,7 @@ try:
     # SIGUSR1 = scenario reset (pins + write overlay), SIGTERM = summary + exit 0
     SIG_SOCK = '/tmp/scr_sig_ctl.sock'
     fake_ctl = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15574',
-                                 '--control-port', SIG_SOCK],
+                                 '--control-port', SIG_SOCK, '--allow-write'],
                                 stdout=open('/tmp/scr_sig.log', 'w'), stderr=subprocess.STDOUT,
                                 env={**os.environ, 'CHAOS': '0.9', 'LOG_LEVEL': 'DEBUG'})
     procs.append(fake_ctl)

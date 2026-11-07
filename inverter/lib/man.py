@@ -44,7 +44,10 @@ handshake right after every connect \\(em 52 bytes: magic, fresh nonce,
 HMAC\\-SHA256 proof; the fake answers \\fBOK\\fR (plain Modbus follows) or
 \\fBERR\\fR (the client is dropped before it ever sees a register).
 Empty auth (the default) = no auth at all \\(em the trusted-LAN posture
-stands."""
+stands. The writes are gated like the cache's (\\fB--allow-write\\fR):
+off (the default) = every Modbus write (FC05/06/15/16) is refused with
+exception 01 and audited WRITE\\-REFUSED; on = a write lands in the
+overlay, audited WRITE.\"""
     signals = """.SH SIGNALS
 .TP
 .B SIGHUP

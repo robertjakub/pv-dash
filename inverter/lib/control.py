@@ -481,6 +481,16 @@ class ControlServer:
             except SystemExit as e:
                 raise ValueError(str(e))
             return acl_text(fake.connect_acl)
+        if key == 'write/allow':
+            if not fake:
+                raise ValueError('no modbus device attached')
+            if val in ('on', 'true', '1', 'yes'):
+                fake.allow_write = True
+                return 'on'
+            if val in ('off', 'false', '0', 'no'):
+                fake.allow_write = False
+                return 'off'
+            raise ValueError('write/allow must be on or off')
         if key == 'modbus/auth':
             if not fake:
                 raise ValueError('no modbus device attached')
@@ -675,6 +685,8 @@ class ControlServer:
             return str(fake.conn_gate.max_per_ip) if fake else '?'
         if key == 'connect-acl':
             return acl_text(fake.connect_acl) if fake else '?'
+        if key == 'write/allow':
+            return ('on' if fake.allow_write else 'off') if fake else '?'
         if key == 'modbus/auth':
             return (fake.auth or 'none') if fake else '?'
         if key == 'modbus/auth/key':
@@ -965,6 +977,7 @@ class ControlServer:
         if self.fake:
             rows.append('clients=%d' % self.fake.client_count)
             rows.append('connect_acl=%s' % acl_summary(self.fake.connect_acl))
+            rows.append('write=%s' % ('on' if self.fake.allow_write else 'off'))
         return 'ok status\n' + '\n'.join(rows)
 
     def status(self):

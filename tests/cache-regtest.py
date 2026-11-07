@@ -164,7 +164,8 @@ class EvilUpstream:
 
 try:
     # 1. baseline: strict fake (undefined regs rejected with 02) + cache
-    start([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(PORT)])
+    start([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(PORT),
+           '--allow-write'])
     time.sleep(0.7)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT, '--listen', '127.0.0.1:%d' % CACHE_PORT,
            '--interval', '1', '--cache-ttl', '3', '--allow-write', '--profile', R,
@@ -1615,7 +1616,7 @@ print('mode 0600 ok')
     # the TOU schedule slots (148-177) and the grid-start registers (127-128)
     deye = os.path.join(REPO, 'profiles', 'profiles', 'deye-sg05lp3.json')
     start([sys.executable, F, '--static', '--port', '15584', '--profile', deye,
-           '--control-port', '0'], log='/tmp/reg_deye_fake.log')
+           '--control-port', '0', '--allow-write'], log='/tmp/reg_deye_fake.log')
     start([sys.executable, P, '--upstream', '127.0.0.1:15584',
            '--listen', '127.0.0.1:15585', '--interval', '1', '--profile', 'deye-sg05lp3',
            '--allow-write', '--write-acl', 'any', '--write-registers', 'profile',

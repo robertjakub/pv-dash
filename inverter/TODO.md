@@ -5,6 +5,18 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The modbus-common wave: the fake's wire rides **`common/modbus`** with the
+rest of the family — the MBAP framing (`read_frame`/`frame`/`check_head`),
+the LSB-first bit packing (`pack_bits`/`unpack_bits` — the fake's hand
+rolls were three of the family's four copies) and the write shapes
+(`describe_write`) are the one implementation. **Its writes are gated like
+the cache's now**: `--allow-write` (env `ALLOW_WRITE`, live `write/allow`,
+off by default) accepts FC05/06/15/16 into the overlays — logged via the
+shared `describe_write` and audited `WRITE`; off (the default) refuses
+every write with exception 01 and audits `WRITE-REFUSED`. The control
+verbs (`set register`/`set coil`/`set discrete`) are the control plane —
+RBAC-gated, not Modbus writes, unchanged.
+
 The `-file` sibling removal: **`file:` is the one spelling** — the fake's
 `--control-token-file`/`--control-ops-token-file`/`--metrics-token-file`
 flags, their env twins and the ctl/cli's `--control-token-file` are GONE

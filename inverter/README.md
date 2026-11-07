@@ -290,6 +290,7 @@ read-only ops token the same way):
 | `client-timeout` | seconds (`0` = never) | disconnect Modbus clients silent for this long — sheds connections from clients that died without closing (`--client-timeout` startup value, tunable live) |
 | `max-conn-per-ip` | `N` (`0` = no limit) | the per-peer-IP Modbus connection limit (`--max-conn-per-ip` startup value, tunable live) |
 | `connect-acl` | `any` \| `none` \| IP/CIDR list | the Modbus connect ACL (`--connect-acl` startup value, tunable live): who may connect to the Modbus surface at all |
+| `write/allow` | `on` \| `off` | the write gate (`--allow-write` startup value, tunable live): whether the fake accepts Modbus writes (FC05/06/15/16) from its clients — off refuses every write with exception 01 |
 | `modbus auth` / `modbus auth key` | `suite` \| `none` / key | the auth scheme the fake's Modbus clients must speak (`--auth` startup value, tunable live): `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect and drops the client on `ERR`/anything else; `none`/empty = no auth at all — the key is a secret: **`show` refuses it**, `unset` refuses it |
 | `metrics-server` | `on`/`off` | the fake's own `/metrics` endpoint (default off; the address is `--metrics-listen`, tunable live); a token-less listen beyond loopback logs a warning |
 | `control token` | `<token>` \| `off` | rotate the **admin control token** live (the sessions re-auth); `off` drops the token entirely (the trusted-LAN posture, F11). A secret: **`show` refuses it**, `unset` refuses it — pass it by flag/env, or as `file:<path>` |
@@ -417,6 +418,7 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 | `--client-timeout` | `300` | disconnect Modbus clients silent for this many seconds (`0` = never) — sheds connections from clients that died without closing |
 | `--max-conn-per-ip` | `0` | refuse further Modbus connections from one peer IP past this many simultaneous connections (`0` = no per-IP limit) |
 | `--connect-acl` | any | the Modbus clients allowed to connect (the cache's `connect-acl`, mirrored): `"any"` (the default — the trusted-LAN posture), `"none"`, or a comma-separated list of IPs and CIDR prefixes, e.g. `127.0.0.1,10.48.0.0/16` (env `CONNECT_ACL`; live-settable, `show status` carries `connect_acl=`) |
+| `--allow-write` | off | accept Modbus writes (FC05/06/15/16) from the fake's clients: a write lands in the write overlay, logged and audited `WRITE` like the cache's forwarded ones; off (the default) = every write is refused with exception 01 and audited `WRITE-REFUSED` — the cache's write gate, mirrored (env `ALLOW_WRITE`; live-settable, `set write allow`) |
 | `--auth` | `none` | the auth scheme the fake's Modbus clients must speak: `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect — the fake answers `OK` and the session speaks plain Modbus, or `ERR` and the client is dropped before it ever sees a register; `none`/empty = no auth at all (env `AUTH`; live-settable, `set modbus auth`) — see the fake's settings table |
 | `--auth-key` | none | the shared key the fake's clients prove with the suite handshake, **min 16 characters**; the value may be `file:<path>` — the first line of an owner-only `0600` file (env `AUTH_KEY`); the scraper takes the matching `--auth suite --auth-key …` |
 | `--timezone` | `utc` | clock the state machines integrate over (`utc` or `local`) |
@@ -569,11 +571,10 @@ inverter/bin/
     ├── profile.py      # register-map profiles: name registry, encoding, loading
     ├── simulator.py    # day curves, runtime overrides, named values, cloud machines
     ├── battery.py      # the battery state machine (SoC state, decision, integration)
-    ├── inverter.py     # Modbus TCP server: FC1-FC4 reads, FC05/06/15/16 writes, strict mode, chaos
+    ├── inverter.py     # Modbus TCP server: FC1-FC4 reads, FC05/06/15/16 writes behind the write gate, strict mode, chaos
     ├── control.py      # JSON-lines control server (set/unset/show, scenarios)
     ├── metrics.py      # the fake's own Prometheus /metrics endpoint
     ├── audit.py        # the append-only audit trail (AUDIT INV/CLI/CTL lines)
-    ├── protocol.py     # wire helpers (recv_exact)
     ├── chaos.py        # seeded hostile-reply dice layer
     ├── signals.py      # SIGHUP/SIGUSR1/SIGTERM handling
     ├── statics.py      # static configuration loader (lib/static.json)

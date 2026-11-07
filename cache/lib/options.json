@@ -242,26 +242,26 @@
       "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes" }
   ],
   "commands": [
-    { "name": "set", "help": "configure a setting live: set <setting> <value>" },
-    { "name": "unset", "help": "restore a setting to its configured value: unset <setting>" },
+    { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true },
     { "name": "inspect", "help": "one pretty dump of everything (the status, the map, the counters, the write gate)" },
-    { "name": "show", "help": "runtime state: show <setting|status|connections|cache|uplink|version|knobs>" },
+    { "name": "ping", "help": "keep-alive: answers pong", "internal": true },
+    { "name": "quit", "help": "close the session" },
+    { "name": "request-clear-cache", "live": "request/clear/cache",
+      "help": "drop the cached registers, repoll now (request clear cache)" },
     { "name": "request-dump", "live": "request/dump",
       "help": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)",
       "hidden": true },
     { "name": "request-dump-with-cache", "live": "request/dump/with-cache",
       "help": "the dump carries the cached register words too", "hidden": true },
-    { "name": "request-restore", "live": "request/restore",
-      "help": "re-apply a state dump's overrides (when the daemon has a dump path)", "hidden": true },
-    { "name": "request-clear-cache", "live": "request/clear/cache",
-      "help": "drop the cached registers, repoll now (request clear cache)" },
-    { "name": "request-restart", "live": "request/restart",
-      "help": "restart the upstream session: connection + cache dropped, repoll", "hidden": true },
     { "name": "request-reload", "live": "request/reload",
       "help": "save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)" },
+    { "name": "request-restart", "live": "request/restart",
+      "help": "restart the upstream session: connection + cache dropped, repoll", "hidden": true },
+    { "name": "request-restore", "live": "request/restore",
+      "help": "re-apply a state dump's overrides (when the daemon has a dump path)", "hidden": true },
+    { "name": "set", "help": "configure a setting live: set <setting> <value>" },
+    { "name": "show", "help": "runtime state: show <setting|status|connections|cache|uplink|version|knobs>" },
     { "name": "shutdown", "help": "stop the proxy gracefully (asks to confirm)" },
-    { "name": "quit", "help": "close the session" },
-    { "name": "ping", "help": "keep-alive: answers pong", "internal": true },
-    { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true }
+    { "name": "unset", "help": "restore a setting to its configured value: unset <setting>" }
   ]
 }

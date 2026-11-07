@@ -240,23 +240,23 @@
       "hidden": true }
   ],
   "commands": [
-    { "name": "set", "help": "configure a setting (set soc auto, set scenario noon)" },
-    { "name": "unset", "help": "restore a setting to its configured value (unset pv, unset seed)" },
-    { "name": "show", "help": "print a setting, the status line, or all of them" },
-    { "name": "reset", "help": "clear all pins + the write overlay" },
+    { "name": "exit", "help": "close the session", "hidden": true },
+    { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true },
+    { "name": "inspect", "help": "one pretty dump of everything: the status, the machines, the overlay" },
+    { "name": "logout", "help": "close the session", "hidden": true },
+    { "name": "ping", "help": "keep-alive: answers pong", "internal": true },
+    { "name": "quit", "help": "close the session" },
     { "name": "request-dump", "live": "request/dump",
       "help": "write the state dump: the live setting overrides, sealed (when the fake has a dump path)",
       "hidden": true },
-    { "name": "request-restore", "live": "request/restore",
-      "help": "re-apply a state dump's overrides (when the fake has a dump path)", "hidden": true },
     { "name": "request-reload", "live": "request/reload",
       "help": "save the live overrides and restart the whole daemon (the flags and the env are re-resolved)" },
+    { "name": "request-restore", "live": "request/restore",
+      "help": "re-apply a state dump's overrides (when the fake has a dump path)", "hidden": true },
+    { "name": "reset", "help": "clear all pins + the write overlay" },
+    { "name": "set", "help": "configure a setting (set soc auto, set scenario noon)" },
+    { "name": "show", "help": "print a setting, the status line, or all of them" },
     { "name": "shutdown", "help": "stop the fake inverter (asks to confirm)" },
-    { "name": "quit", "help": "close the session" },
-    { "name": "exit", "help": "close the session", "hidden": true },
-    { "name": "logout", "help": "close the session", "hidden": true },
-    { "name": "inspect", "help": "one pretty dump of everything: the status, the machines, the overlay" },
-    { "name": "ping", "help": "keep-alive: answers pong", "internal": true },
-    { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true }
+    { "name": "unset", "help": "restore a setting to its configured value (unset pv, unset seed)" }
   ]
 }

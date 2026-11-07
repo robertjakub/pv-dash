@@ -135,21 +135,21 @@
       "hidden": true }
   ],
   "commands": [
-    { "name": "set", "help": "configure a setting (set battery on, set log-queries on)" },
-    { "name": "unset", "help": "restore a setting to its configured value (unset battery, unset log-level)" },
+    { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true },
     { "name": "inspect", "help": "one pretty dump of everything (the state, the counters, the caps)" },
-    { "name": "show", "help": "print a setting, the status report, or all of them" },
-    { "name": "request-reload-config", "live": "request/reload-config",
-      "help": "re-read the config file (the SIGHUP path)" },
+    { "name": "ping", "help": "keep-alive: answers pong", "internal": true },
+    { "name": "quit", "help": "close the session" },
     { "name": "request-dump", "live": "request/dump",
       "help": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)" },
-    { "name": "request-restore", "live": "request/restore",
-      "help": "re-apply a state dump's overrides (when the daemon has a dump path)" },
     { "name": "request-reload", "live": "request/reload",
       "help": "save the live overrides and restart the whole daemon (the config file and the flags are re-resolved)" },
+    { "name": "request-reload-config", "live": "request/reload-config",
+      "help": "re-read the config file (the SIGHUP path)" },
+    { "name": "request-restore", "live": "request/restore",
+      "help": "re-apply a state dump's overrides (when the daemon has a dump path)" },
+    { "name": "set", "help": "configure a setting (set battery on, set log-queries on)" },
+    { "name": "show", "help": "print a setting, the status report, or all of them" },
     { "name": "shutdown", "help": "stop the dashboard server (asks to confirm)" },
-    { "name": "quit", "help": "close the session" },
-    { "name": "ping", "help": "keep-alive: answers pong", "internal": true },
-    { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true }
+    { "name": "unset", "help": "restore a setting to its configured value (unset battery, unset log-level)" }
   ]
 }

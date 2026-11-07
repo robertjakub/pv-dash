@@ -145,24 +145,24 @@
       "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes" }
   ],
   "commands": [
-    { "name": "set", "help": "configure a setting (set interval 5, set log-access on)" },
-    { "name": "unset", "help": "restore a setting to its configured value (unset interval, unset log-level)" },
+    { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true },
     { "name": "inspect", "help": "one pretty dump of everything (the state, the counters, the caps)" },
-    { "name": "show", "help": "print a setting, the status report, or all of them" },
+    { "name": "ping", "help": "keep-alive: answers pong", "internal": true },
     { "name": "poll-now", "live": "poll/now", "help": "wake the poll loop immediately" },
+    { "name": "quit", "help": "close the session" },
+    { "name": "request-dump", "live": "request/dump",
+      "help": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)" },
     { "name": "request-reload", "live": "request/reload",
       "help": "save the live overrides and restart the whole daemon (the config file and the flags are re-resolved)" },
     { "name": "request-reload-config", "live": "request/reload-config",
       "help": "re-read the config file (the SIGHUP path)" },
-    { "name": "request-dump", "live": "request/dump",
-      "help": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)" },
-    { "name": "request-restore", "live": "request/restore",
-      "help": "re-apply a state dump's overrides (when the daemon has a dump path)" },
     { "name": "request-restart", "live": "request/restart",
       "help": "drop the Modbus session (reconnects on the next poll)" },
+    { "name": "request-restore", "live": "request/restore",
+      "help": "re-apply a state dump's overrides (when the daemon has a dump path)" },
+    { "name": "set", "help": "configure a setting (set interval 5, set log-access on)" },
+    { "name": "show", "help": "print a setting, the status report, or all of them" },
     { "name": "shutdown", "help": "stop the scraper (asks to confirm)" },
-    { "name": "quit", "help": "close the session" },
-    { "name": "ping", "help": "keep-alive: answers pong", "internal": true },
-    { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true }
+    { "name": "unset", "help": "restore a setting to its configured value (unset interval, unset log-level)" }
   ]
 }

@@ -1338,6 +1338,11 @@ before the repo restructured into one suite.
 
 ### Fixed
 
+- **scraper** — the nix package ships the bundled config's current name
+  again: the install line still reached for `scraper.ini` (the name the
+  config-format wave retired) and the build died on it — the first
+  `nix build` since the rename caught it; `scraper.conf` installs.
+
 - **everywhere** — **the ctl/cli clients and the control servers converge
   on one behavior** (the drift the four-way copies carried): the fake's
   cli passes `--audit-max-mb`/`--audit-files` to its audit trail (they

@@ -434,6 +434,30 @@ def setting_path_pool(typed, names, by_name):
     return None, tuple(segs)
 
 
+def command_path_pool(typed, names):
+    """The completion pool for a command word list — the settings'
+    setting_path_pool's sibling: the command rows are '/'-paths spelled as
+    words on the wire (`request/clear/cache` is `request clear cache`),
+    and the pool is the distinct next path segment of `names` under the
+    '/'-joined prefix so far (the pool's order kept) — the first position
+    offers the verbs (`request` completes its children: dump, reload,
+    restart, restore, clear), the leaf's own children follow (`request
+    clear` offers `cache`), a whole childless command completes nothing.
+    A trailing empty word asks for the children of the named path."""
+    words = [w.lower() for w in typed if w]
+    path = '/'.join(words)
+    prefix = path + '/' if path else ''
+    segs, seen = [], set()
+    for n in names:
+        if path and not n.startswith(prefix):
+            continue
+        seg = n[len(prefix):].split('/')[0]
+        if seg and seg not in seen:
+            seen.add(seg)
+            segs.append(seg)
+    return tuple(segs)
+
+
 def make_describe(by_name):
     """The describe pair bound to one tool's SETTING_BY_NAME: describe_setting
     (the `help set <name>` answer) and describe_value (the per-value note the

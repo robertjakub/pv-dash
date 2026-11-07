@@ -29,7 +29,7 @@ from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S
 
 if __name__ == '__main__':
     run_ctl(daemon='fake inverter', bin_name='modbus-fake-ctl', app='fake-inverter',
-            self_note='the fake itself', default_socket='/tmp/fake-inverter-5502.socket',
+            self_note='the fake itself',
             command_help='e.g. set pv 2500, set scenario noon, show status, reset, shutdown',
             resolve=resolve_control_target, timeout_s=CLI_TIMEOUT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES, ctl_page=ctl_page)

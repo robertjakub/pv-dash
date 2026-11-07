@@ -845,9 +845,10 @@ try:
           and not any(l.startswith('% ok status') for l in lines), repr(r.stdout))
     r = cli('help soc\nshow registers\ninspect\nquit\n')
     lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
-    check('fake_cli: the help is bare, the tables ride under % ok, inspect dumps', r.returncode == 0
-          and any(l == 'soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' for l in lines)
-          and any(l == '% ok registers (49)' for l in lines) and 'pv-power' in ''.join(lines)
+    check('fake_cli: the help rides under % ok, the registers table prints bare, inspect dumps',
+          r.returncode == 0
+          and any(l == '% ok soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' for l in lines)
+          and any(l == 'registers (49)' for l in lines) and 'pv-power' in ''.join(lines)
           and any('0.3.0' in l and 'version' in l for l in lines)
           and not any(l.startswith('% ok inspect') for l in lines), repr(r.stdout[:120]))
 
@@ -1126,7 +1127,8 @@ try:
     check('fake_inverter: --version reports 0.3.0-<short git>', r.returncode == 0
           and r.stdout.strip().startswith('0.3.0-') and len(r.stdout.strip()) > 10
           and r.stdout.strip() == '0.3.0-' + r.stdout.strip().split('-', 1)[1], r.stdout.strip())
-    check('fake_ctl/fake_cli are executable', os.access(FCTL, os.X_OK) if 'FCTL' in dir() else True)
+    check('fake_ctl/fake_cli carry no exec bit (python runs the family)',
+          not (os.stat(C).st_mode & 0o111) and not (os.stat(K).st_mode & 0o111))
 
     # the battery is on by default (no flag): the status shows a real SoC, and
     # the state force refuses while the battery is off

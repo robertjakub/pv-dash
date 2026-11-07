@@ -7,7 +7,6 @@ sections are roff text kept next to the tool, and `--man` prints the page
 to stdout (`modbus-cache --man | man -l -` works in a container with no man
 pages installed). scripts/gen_man.py regenerates the shipped man/*.1 files
 from the same builders. Stdlib only."""
-import argparse
 import textwrap
 
 
@@ -21,18 +20,6 @@ def wrap(text, width=72):
     """The roff body re-flows, so a hard wrap is pure formatting: keep the
     generated pages under the 80-column lint the hand-written pages hold."""
     return '\n'.join(textwrap.wrap(text, width=width, break_long_words=False, break_on_hyphens=False))
-
-
-def _fmt_default(action):
-    """The rendered default of an argparse action for the help text."""
-    d = action.default
-    if d is argparse.SUPPRESS or d is None:
-        return None
-    if d is True:
-        return 'on'
-    if d is False:
-        return 'off'
-    return str(d)
 
 
 def _flag_str(action):
@@ -53,8 +40,8 @@ def _flag_str(action):
 
 def options_section(parser, skip=('-h', '--help', '--man')):
     """The .SH OPTIONS blocks from the argparse parser: one .TP per action,
-    the help text with the %(default)s interpolations applied (the repo's
-    help strings carry them), the default named where set. Returns the roff
+    the help text as-is (the help strings carry no defaults — the READMEs
+    are the defaults reference). Returns the roff
     text (the caller embeds it after .SH OPTIONS — usually straight from
     this function, which emits the heading itself)."""
     lines = ['.SH OPTIONS']
@@ -62,14 +49,6 @@ def options_section(parser, skip=('-h', '--help', '--man')):
         if any(o in skip for o in a.option_strings) or a.dest in ('help', 'man'):
             continue
         help_text = a.help or ''
-        if '%(default)' in help_text:
-            d = _fmt_default(a)
-            help_text = help_text.replace('%(default)s', d if d is not None else 'none') \
-                                  .replace('%(default)r', repr(a.default))
-        else:
-            d = _fmt_default(a)
-            if d is not None:
-                help_text = '%s (default: %s)' % (help_text, d)
         lines.append('.TP')
         lines.append(_flag_str(a))
         if help_text:

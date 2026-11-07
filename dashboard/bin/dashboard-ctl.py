@@ -30,7 +30,7 @@ from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S
 
 if __name__ == '__main__':
     run_ctl(daemon='dashboard', bin_name='dashboard-ctl', app='dashboard',
-            self_note='the server itself', default_socket='/tmp/dashboard-8080.socket',
+            self_note='the server itself',
             command_help='e.g. inspect, show status, set battery on, request reload, shutdown',
             resolve=resolve_control_target, timeout_s=CLI_TIMEOUT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES, ctl_page=ctl_page)

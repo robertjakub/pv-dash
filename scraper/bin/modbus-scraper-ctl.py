@@ -30,7 +30,7 @@ from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S
 
 if __name__ == '__main__':
     run_ctl(daemon='modbus-scraper', bin_name='modbus-scraper-ctl', app='modbus-scraper',
-            self_note='the scraper itself', default_socket='/tmp/modbus-scraper-9350.socket',
+            self_note='the scraper itself',
             command_help='e.g. inspect, show status, set interval 5, poll now, request reload, restart, shutdown',
             resolve=resolve_control_target, timeout_s=CLI_TIMEOUT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES, ctl_page=ctl_page)

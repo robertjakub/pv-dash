@@ -51,8 +51,13 @@ ROLE_POLICIES = {
 
 def command_verb(cmd):
     """The head verb of one command line (lowercased), '' when empty —
-    the thing the role gate decides on."""
+    the thing the role gate decides on. The `request` namespace is
+    grammar, not authority: the verb is the first word PAST a leading
+    `request` (`request clear cache` decides on `clear`, `request reload`
+    on `reload`) — the ops policy keeps its per-action granularity."""
     parts = cmd.strip().split()
+    if parts and parts[0].lower() == 'request':
+        parts = parts[1:]
     return parts[0].lower() if parts else ''
 
 

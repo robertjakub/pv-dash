@@ -16,7 +16,7 @@ from common.config import parse_secret
 from common.wiresec import sign_request, verify_reply
 
 
-def run_ctl(daemon, bin_name, app, self_note, default_socket, command_help,
+def run_ctl(daemon, bin_name, app, self_note, command_help,
             resolve, timeout_s, audit_max_mb, audit_files, ctl_page):
     """The whole ctl ladder: the parser (the tool's name, socket, examples),
     the batch stdin strip (comments and blanks stay comments), the token
@@ -24,13 +24,13 @@ def run_ctl(daemon, bin_name, app, self_note, default_socket, command_help,
     auth handshake and the command loop (the daemon-exit bye short-circuits
     it)."""
     p = argparse.ArgumentParser(description='Send commands to the %s control server (TCP or unix socket).' % daemon)
-    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: %s; env CTL when unset) — same flag as %s' % (default_socket, self_note))
+    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (env CTL when unset) — same flag as %s' % self_note)
     p.add_argument('command', nargs='*', help='control command, %s' % command_help)
-    p.add_argument('--timeout', type=float, default=timeout_s, help='socket timeout in seconds (default %(default)s)')
+    p.add_argument('--timeout', type=float, default=timeout_s, help='socket timeout in seconds')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN); a file:<path> value reads the first line of an owner-only 0600 file')
-    p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
+    p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; the XDG state home when unset")
     p.add_argument('--audit-max-mb', type=float, default=audit_max_mb, help='rotate the audit log at this size, 0 = off')
-    p.add_argument('--audit-files', type=int, default=audit_files, help='rotated audit backups to keep (default %(default)s)')
+    p.add_argument('--audit-files', type=int, default=audit_files, help='rotated audit backups to keep')
     p.add_argument('--no-audit-log', action='store_true', help='disable the audit trail')
     p.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (%s --man | man -l -)' % bin_name)
     args = p.parse_args()

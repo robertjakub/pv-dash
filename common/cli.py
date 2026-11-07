@@ -23,10 +23,15 @@ except ImportError:
 from common.audit import AuditLog
 from common.config import parse_secret
 from common.human import secs
-from common.options import word_groups
+from common.options import command_path_pool, setting_path_pool, word_groups
 from common.wiresec import sign_request, verify_reply
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
+
+HELP_PINS = (
+    ('help <setting>', "the setting's description"),
+    ('?', 'this help'),
+)
 
 _SPEC = None   # the tool's specifics — set by run_cli() before anything reads it
 
@@ -39,6 +44,42 @@ class ConnectionLost(Exception):
 class DaemonExit(Exception):
     """The daemon sent its bye daemon-exit frame: print the notice and leave —
     there is nothing on the other end to reconnect to."""
+
+
+def status_map(reply):
+    """The key=value report rows of a `show status` reply as one dict
+    (the welcome greetings read their fields here)."""
+    st = {}
+    for line in reply.splitlines()[1:]:
+        if '=' in line:
+            k, v = line.split('=', 1)
+            st[k] = v
+    return st
+
+
+def make_describe_word(nodes, commands_help, settings, extra=None):
+    """The describer bound to one tool's registries — the golden order:
+    a hierarchy node describes its namespace, a command row its help, a
+    setting its own, the tool's extra words (the fake's `register`
+    pseudo-word) theirs, then the walk-ons: a word both a settings
+    namespace and a command one describes by the settings' first child
+    (the alias-first-segment rule), a pure command namespace (`request`)
+    by its first command child's help."""
+    def describe_word(w):
+        if w in nodes:
+            return nodes[w].setting_help or nodes[w].help
+        if w in commands_help:
+            return commands_help[w]
+        s = settings.get(w)
+        if s:
+            return s.help
+        if extra and w in extra:
+            return extra[w]
+        walk = next((s for k, s in settings.items() if k.startswith(w + '/')), None)
+        if walk is not None:
+            return walk.help
+        return next((h for k, h in commands_help.items() if k.startswith(w + '/')), None)
+    return describe_word
 
 
 def daemon_exit_notice(text):
@@ -198,6 +239,72 @@ def keepalive(sock, interval, audit=None):
             return   # unannounced: the main loop notices on the next command
 
 
+def candidates(buf):
+    """Valid next words for the buffer being completed or questioned — the
+    golden ladder, one shape for the family: (matches, hint about the
+    following word, describer of each word, the listing groups — the
+    settings under their registry groups (ungrouped rows bare, no header),
+    the values of one setting ([values]), the commands bare). The branches:
+    the first position offers the commands (the spec's command_pool — the
+    '/'-path rows walk segment-wise: `request` completes its children,
+    `request clear` the leaf's own), set/unset walk the setting paths (the
+    spec's setting_pool minus the show reports; the spec's set_extra words
+    — the fake's `register` — join the set side only), show walks the
+    setting paths including the reports. A live setting's name may be a
+    '/'-path (`inverter/profile`): set/unset/show spell it as words — the
+    completion offers the next segment until the path is whole, then the
+    values."""
+    end_space = buf.endswith(' ')
+    parts = buf.split()
+    text = '' if end_space else (parts[-1] if parts else '')
+    done = parts if end_space else parts[:-1]
+    head = done[0].lower() if done else ''
+    values_mode = False
+    base = ''
+    if not done:
+        pool, hint, desc = _SPEC['command_pool'](), None, _SPEC['describe']
+    elif head in ('set', 'unset'):
+        names = tuple(n for n in _SPEC['setting_pool']() if n not in _SPEC['show_lives'])
+        if head == 'set' and _SPEC['set_extra']:
+            names = names + _SPEC['set_extra']
+        by = {n: _SPEC['settings'][n] for n in names if n in _SPEC['settings']}   # the exact match obeys the pool:
+        s, segs = setting_path_pool(done[1:], names, by)                          # a show report never offers a value
+        if s is None:   # the hidden knobs (the secrets) never walk, but the typed whole path still describes
+            s = _SPEC['settings'].get('/'.join(w.lower() for w in done[1:]))
+            if s is not None and s.name not in _SPEC['live_settings'] - _SPEC['show_lives']:
+                s = None   # a show report never offers a value
+        if s is not None:
+            if head == 'unset':
+                return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole; unset takes no value — ? describes it
+            values_mode = True
+            pool, hint = tuple(s.values), s.value_shape
+            desc = lambda w, s=s: s.value_help.get(w, s.value_help.get(w.lower(), '')) or None
+        else:
+            base = '/'.join(w.lower() for w in done[1:])   # the path spelled so far — a segment's
+            pool, hint = segs, None                        # description lives on the full live name
+            desc = lambda w, base=base: _SPEC['describe']((base + '/' if base else '') + w)
+    elif head == 'show':
+        s, segs = setting_path_pool(done[1:], _SPEC['setting_pool'](), _SPEC['settings'])
+        base = '/'.join(w.lower() for w in done[1:])   # a segment's description lives on the full live name
+        if s is None:   # the hidden knobs never walk, but the typed whole path still describes (the wire's help answers it)
+            s = _SPEC['settings'].get('/'.join(w.lower() for w in done[1:]))
+        if s is not None:
+            _, cont = setting_path_pool(done[1:] + [''], _SPEC['setting_pool'](), _SPEC['settings'])
+            if not cont:
+                return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole and childless; ? describes the report
+            pool, hint = cont, None   # a namespace too: the report answers on Enter, TAB walks on
+        else:
+            pool, hint = segs, None
+        desc = lambda w, base=base: _SPEC['describe']((base + '/' if base else '') + w)
+    else:
+        base = '/'.join(w.lower() for w in done)   # the command path spelled so far — a segment's
+        pool, hint = command_path_pool(done, _SPEC['command_pool']()), None
+        desc = lambda w, base=base: _SPEC['describe']((base + '/' if base else '') + w)
+    if pool is None:                      # a value shape with no completable words
+        return [], hint, desc, [('values', [])]
+    matches = [w for w in pool if w.startswith(text.lower())]
+    return matches, hint, desc, _sections(head, len(done), matches, values_mode, base)
+
 def complete(text, state):
     """TAB completer, console-style: extend the word silently while the common
     prefix grows (a single-match return inserts it — verified libedit adds no
@@ -206,7 +313,7 @@ def complete(text, state):
     column-packs or skips its own listings) — and yield no match so the
     editor just redraws the line."""
     global _last_listed
-    matches, hint, desc, sections = _SPEC['candidates'](readline.get_line_buffer())
+    matches, hint, desc, sections = candidates(readline.get_line_buffer())
     if state >= len(matches):
         return None
     if len(matches) > 1:
@@ -234,7 +341,7 @@ def print_options(buf):
     display groups (`# --- group ---` headers; the ungrouped words bare on
     top) plus [values]; a value shape with no completable words still shows
     its hint."""
-    matches, hint, desc, sections = _SPEC['candidates'](buf)
+    matches, hint, desc, sections = candidates(buf)
     rows = sectioned_rows(sections, desc, hint)
     if not rows:
         print('% Invalid input.')
@@ -482,14 +589,14 @@ def run_cli(spec):
     global _SPEC
     _SPEC = spec
     p = argparse.ArgumentParser(description='console-style CLI for the %s (TCP or unix socket).' % spec['daemon_label'])
-    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: %s; env CTL when unset) — same flag as %s' % (spec['socket_default'], spec['self_note']))
-    p.add_argument('--timeout', type=float, default=spec['timeout_s'], help='socket timeout in seconds (default %(default)s)')
-    p.add_argument('--reconnect', type=int, default=spec['reconnect'], help='when the connection dies (an unanswered ping, a reset, a timeout), retry this many times before giving up; 0 = off (default %(default)s)')
-    p.add_argument('--reconnect-wait', type=float, default=spec['reconnect_wait'], help='seconds between the reconnect attempts (default %(default)s)')
+    p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (env CTL when unset) — same flag as %s' % spec['self_note'])
+    p.add_argument('--timeout', type=float, default=spec['timeout_s'], help='socket timeout in seconds')
+    p.add_argument('--reconnect', type=int, default=spec['reconnect'], help='when the connection dies (an unanswered ping, a reset, a timeout), retry this many times before giving up; 0 = off')
+    p.add_argument('--reconnect-wait', type=float, default=spec['reconnect_wait'], help='seconds between the reconnect attempts')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN); a file:<path> value reads the first line of an owner-only 0600 file')
-    p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
-    p.add_argument('--audit-max-mb', type=float, default=spec['audit_max_mb'], help='rotate the audit log at this size in MB, keeping 3 backups; 0 = off (default %(default)s)')
-    p.add_argument('--audit-files', type=int, default=spec['audit_files'], help='rotated audit backups to keep (default %(default)s)')
+    p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; the XDG state home when unset")
+    p.add_argument('--audit-max-mb', type=float, default=spec['audit_max_mb'], help='rotate the audit log at this size, 0 = off')
+    p.add_argument('--audit-files', type=int, default=spec['audit_files'], help='rotated audit backups to keep')
     p.add_argument('--no-audit-log', action='store_true', help='disable the audit trail')
     p.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (%s --man | man -l -)' % spec['cli_name'])
     args = p.parse_args()

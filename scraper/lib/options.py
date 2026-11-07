@@ -27,8 +27,8 @@ _CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 # set must name verbs this server knows). 'clear' rides along: the family's
 # default ops policy names it, and on the scraper it just answers
 # "unknown command" (there is nothing to flush).
-KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'request', 'poll', 'clear', 'reload', 'restart', 'shutdown',
-               'help', 'ping', 'quit')
+KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'poll', 'dump', 'restore', 'reload', 'reload-config', 'restart',
+               'shutdown', 'help', 'ping', 'quit')
 
 
 def _load_options():

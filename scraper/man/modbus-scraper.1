@@ -26,7 +26,7 @@ shared key (\fB--auth-key\fR, min 16 characters) with a crypt handshake
 right after every connect \(em 52 bytes: magic, fresh nonce,
 HMAC\-SHA256 proof; the peer answers \fBOK\fR and plain Modbus follows,
 or \fBERR\fR and the connection fails (the poller keeps retrying).
-Empty auth (the default) = no auth at all.
+Empty auth = no auth at all.
 .PP
 The exposition endpoint is the tool's serving surface: the connection caps
 (\fB--max-clients\fR total, \fB--max-conn-per-ip\fR per peer, extras
@@ -51,91 +51,80 @@ and over TCP the signed commands are mandatory. A second, read-only token
 .TP
 .B \-\-upstream
 the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502)
-(default: config, $UPSTREAM or 127.0.0.1:5502)
 .TP
 .BI \-\-modbus\-unit " N"
-Modbus unit id (default: config, $MODBUS_UNIT or 1)
+Modbus unit id
 .TP
 .BI \-\-modbus\-offset " N"
-added to register addresses (default: config, $MODBUS_OFFSET or 0)
+added to register addresses
 .TP
 .B \-\-auth
 the inverter's Modbus auth scheme: `suite` proves the shared auth\-key
 with a crypt handshake right after every connect (the peer answers OK,
 or ERR and the connection fails — the poller keeps retrying); none/empty
-= no auth at all (default: config, $AUTH or none)
+= no auth at all
 .TP
 .B \-\-auth\-key
 the shared key the suite handshake proves (min 16 characters); the value
 may be `file:<path>` — the first line of an owner\-only 0600 file (a
-systemd LoadCredential rides as file:/run/credentials/...) (default:
-config, $AUTH_KEY)
+systemd LoadCredential rides as file:/run/credentials/...)
 .TP
 .BI \-\-timeout " N"
-Modbus timeout in seconds (default: config, $TIMEOUT or 3)
+Modbus timeout in seconds
 .TP
 .B \-\-profile
 device profile JSON (the shared profiles/ schema; scrape\-marked entries
-feed the metric registers) (default: config, $PROFILE or the bundled
-sun2000 profile)
+feed the metric registers)
 .TP
 .B \-\-metrics\-spec
 metrics spec JSON, sectioned: {profile: {key: {help, profile?}},
-compute: ..., scraper: ...} — merged in memory over the built\-in
-lib/metrics.json scraper_* block (default: config, $METRICS_SPEC or the
-bundled metrics.json)
+compute:..., scraper:...} — merged in memory over the built\-in
+lib/metrics.json scraper_* block
 .TP
 .B \-\-metric\-prefix
-the prefix on the profile\- and compute\-fed metric names (default:
-config, $METRIC_PREFIX or 'huawei'); the bundled scraper_* names are
-fixed
+the prefix on the profile\- and compute\-fed metric names; the bundled
+scraper_* names are fixed
 .TP
 .BI \-\-max\-kwp " N"
-maximum PV array kWp (default: config, $MAX_KWP or 6; 0 = no checking)
+maximum PV array kWp
 .TP
 .BI \-\-max\-grid\-kw " N"
-maximum grid kW, either direction (default: config, $MAX_GRID_KW or 12;
-0 = no checking)
+maximum grid kW, either direction
 .TP
 .B \-\-battery
-enable battery support (default: config, $BATTERY or off)
+enable battery support
 .TP
 .B \-\-grid\-positive\-import
-grid register positive when importing (default: config,
-$GRID_POSITIVE_IMPORT or positive = export)
+grid register positive when importing
 .TP
 .B \-\-listen
-listen address HOST:PORT (default: config, $LISTEN or 127.0.0.1:9350)
+listen address HOST:PORT
 .TP
 .B \-\-local\-time
-log timestamps in the system time zone instead of UTC (default: off)
+log timestamps in the system time zone instead of UTC
 .TP
 .BI \-\-max\-clients " N"
-maximum concurrent HTTP clients; extras get an immediate 503 (default:
-config, $MAX_CLIENTS or 64; 0 = unlimited)
+maximum concurrent HTTP clients; extras get an immediate 503
 .TP
 .BI \-\-client\-timeout " N"
 seconds an idle keep\-alive HTTP client is kept before being kicked
-(default: config, $CLIENT_TIMEOUT or 300; 0 = off)
 .TP
 .BI \-\-max\-conn\-per\-ip " N"
 maximum concurrent HTTP connections from one peer IP; extras get an
-immediate 503 (default: config, $MAX_CONN_PER_IP or 0 = no per\-IP
-limit)
+immediate 503
 .TP
 .B \-\-control\-port
-JSON\-lines control server target: unix socket path (default:
-/tmp/modbus\-scraper\-<listen\-port>.socket) or TCP port number on
-127.0.0.1 (e.g. 15599); 0 = off. Talk to it with modbus\-scraper\-ctl.py
-(default: config, $CTL)
+JSON\-lines control server target: unix socket path or TCP port number
+on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with
+modbus\-scraper\-ctl.py
 .TP
 .B \-\-control\-token
 require a token on control connections: the client authenticates with
-{"cmd": "auth", "token": ...}; over the unix socket a trusted peer
-(root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
-skips the token; the value may be `file:<path>` — the first line of an
+{"cmd": "auth", "token":...}; over the unix socket a trusted peer (root,
+the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED) skips
+the token; the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
-file:/run/credentials/...) (default: config, $CONTROL_TOKEN or none)
+file:/run/credentials/...)
 .TP
 .B \-\-control\-ops\-token
 a second, read\-only control token: sessions authenticating with it may
@@ -143,47 +132,44 @@ run the show/clear verbs only (no set/unset, no poll now, no request
 reload, no restart, no shutdown) — the ops shift against the admin key,
 both audited; the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
-file:/run/credentials/...) (default: config, $CONTROL_OPS_TOKEN or none)
+file:/run/credentials/...)
 .TP
 .B \-\-control\-ops\-verbs
 the read\-only ops role's RBAC policy: the verbs its sessions may run,
-comma\-separated (default: show,clear; validated against the control
-grammar at start)
+comma\-separated
 .TP
 .B \-\-control\-trust\-uids
 extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
-the daemon's own user are always trusted (default: config,
-$CONTROL_TRUST_UIDS or none)
+the daemon's own user are always trusted
 .TP
 .B \-\-auth\-token
 require Authorization: Bearer <token> on all requests; the value may be
 `file:<path>` — the first line of an owner\-only 0600 file (a systemd
-LoadCredential rides as file:/run/credentials/...) (default: config,
-$AUTH_TOKEN or disabled)
+LoadCredential rides as file:/run/credentials/...)
 .TP
 .B \-\-audit\-log
 SCR audit trail: a file path or \- for stdout (the docker/journald way);
-default: the XDG state home (~/.local/state/modbus\-scraper/audit.log)
+the XDG state home (~/.local/state/modbus\-scraper/audit.log) when unset
 .TP
 .BI \-\-audit\-max\-mb " N"
 rotate the audit log at this size in MB, keeping 3 backups; 0 = no size
-rotation (default 10.0)
+rotations)
 .TP
 .BI \-\-audit\-files " N"
-rotated audit backups to keep (default 3)
+rotated audit backups to keeps)
 .TP
 .B \-\-no\-audit\-log
-disable the SCR audit trail (default: off)
+disable the SCR audit trail
 .TP
 .BI \-\-interval " N"
-seconds between polls (default: config, $INTERVAL or 10)
+seconds between polls
 .TP
 .B \-\-log\-access
-log every HTTP request at INFO (default: config, $LOG_ACCESS or quiet)
+log every HTTP request at INFO
 .TP
 .B \-\-log\-level
-log level (default: config, $LOG_LEVEL or INFO)
+log level
 .TP
 .B \-\-dump\-path
 the state dump: the live setting overrides (the poll plan, the caps, the
@@ -191,8 +177,7 @@ log surface — the tokens apart) as one JSON, written 0600 with an
 integrity hash (a restore refuses a tampered, unsigned or
 group\-writable dump); dumped on the request dump command and the
 graceful shutdown; loaded on start only with \-\-restore\-on\-start, on
-demand with the request restore command (default: config, $DUMP_PATH or
-none)
+demand with the request restore command
 .TP
 .B \-\-dump\-key
 the key that seals the state dumps and the reload's state file: the
@@ -203,30 +188,29 @@ re\-resolves the same key, so the state file reads on the other side; no
 key = the dumps stay 0600 plaintext with the integrity hash a dump path
 without a key warns at start and on set; the value may be `file:<path>`
 — the first line of an owner\-only 0600 file (a systemd LoadCredential
-rides as file:/run/credentials/...) (default: config, $DUMP_KEY or none)
+rides as file:/run/credentials/...)
 .TP
 .B \-\-restore\-on\-start
 load the state dump when the daemon starts (needs \-\-dump\-path) — the
-live overrides ride again instead of a cold start; default: start cold,
-load only on demand (default: config, $RESTORE_ON_START) (default: off)
+live overrides ride again instead of a cold start; without it the dump
+loads on demand
 .TP
 .B \-\-config
 config file — the set grammar: every line a `set <name> <value>`,
-comments start with # (default: $CONFIG, then scraper.conf next to this
-script, then the subproject root) (default:
-/Users/oom/GensparkCode/pv\-dash/scraper/scraper.conf)
+comments start with # ($CONFIG, then scraper.conf next to this script,
+then the subproject root)
 .TP
 .B \-\-dry\-run
 validate the configuration, print the effective settings and exit
-(nothing is bound or connected) (default: off)
+(nothing is bound or connected)
 
 
 .SH SIGNALS
 .TP
 .B SIGHUP
 re-read the config file (and the auth token file) and apply what is live
-(the same path as the control server's request reload); a broken config
-keeps the previous settings.
+(the same path as the control server's request reload-config); a broken
+config keeps the previous settings.
 .TP
 .BR SIGTERM ", " SIGINT
 graceful shutdown.
@@ -242,15 +226,15 @@ auth token, each rotating live, the value never rendering \(em
 \fBshow <secret>\fR refuses), \fBshow status\fR, \fBshow connections\fR
 (the live HTTP clients), \fBshow version\fR, \fBshow knobs\fR
 (the dictionary of the registry), \fBpoll now\fR,
-\fBinspect\fR, \fBrequest reload\fR (the SIGHUP path),
-\fBreload\fR (the whole-daemon restart that keeps the sets: the live
-overrides save to a state file beside the config, the process re-execs,
-the fresh daemon re-applies them once), with a dump path configured
-(\fB--dump-path\fR): \fBrequest dump\fR / \fBrequest restore\fR
-(the overrides as one 0600 integrity-hashed JSON; \fB--dump-key\fR
-seals it \(em the state rides encrypted, a restore refuses a wrong or
-missing key; \fB--restore-on-start\fR
-loads it at start), \fBrestart\fR, \fBshutdown\fR,
+\fBinspect\fR, \fBrequest reload-config\fR (the SIGHUP path),
+\fBrequest reload\fR (the whole-daemon restart that keeps the sets: the
+live overrides save to a state file beside the config, the process
+re-execs, the fresh daemon re-applies them once), with a dump path
+configured (\fB--dump-path\fR): \fBrequest dump\fR / \fBrequest
+restore\fR (the overrides as one 0600 integrity-hashed JSON;
+\fB--dump-key\fR seals it \(em the state rides encrypted, a restore
+refuses a wrong or missing key; \fB--restore-on-start\fR loads it at
+start), \fBrequest restart\fR, \fBshutdown\fR,
 \fBquit\fR. See
 .BR modbus-scraper-ctl (1)
 and
@@ -258,24 +242,24 @@ and
 
 .SH SECURITY
 The scraper reads an open Modbus device (no auth, no TLS — the inverter's
-network isolation is the boundary) and serves /metrics: bind loopback by
-default, set the bearer token when it must serve beyond loopback (a
+network isolation is the boundary) and serves /metrics: bind loopback,
+set the bearer token when it must serve beyond loopback (a
 non-loopback token-less start is refused, F13), and keep the connection
 caps on. The control surface is loopback-only (TCP) or a 0600 unix socket;
 a TCP control port without a token refuses to start (F5); with a token the
 wire is signed and the commands/replies verify end to end; a second,
 read-only ops token (\fB--control-ops-token\fR) scopes its sessions to
-the show/clear verbs. The audit trail (default in the XDG state home,
-prefix SCR) records the control commands with their roles, the auth
-failures, the reloads and the shutdowns.
+the show/clear verbs. The audit trail (in the XDG state home when
+\fB--audit-log\fR is unset, prefix SCR) records the control commands
+with their roles, the auth failures, the reloads and the shutdowns.
 
 .SH FILES
 .TP
 .I /tmp/modbus-scraper-<listen-port>.socket
-the default control socket.
+the control socket used when \fB--control-port\fR is unset.
 .TP
 .I ~/.local/state/modbus-scraper/audit.log
-the default audit trail.
+the audit trail when \fB--audit-log\fR is unset.
 
 .SH SEE ALSO
 .BR modbus-scraper-ctl (1),

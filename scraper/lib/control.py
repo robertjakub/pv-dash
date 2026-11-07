@@ -111,10 +111,10 @@ class ControlServer(_ControlServer):
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|'
-                'version|config|knobs>, poll now, request reload')
+                'version|config|knobs>, poll now, request reload-config')
         if self.dump_path:
             cmds += ', request dump, request restore'
-        cmds += ', reload, restart, shutdown, quit; '
+        cmds += ', request reload, request restart, shutdown, quit; '
         cmds += 'help <setting> describes it, help config maps every knob to its control command, '
         cmds += 'show knobs prints the full dictionary'
         return cmds
@@ -235,7 +235,7 @@ class ControlServer(_ControlServer):
             self.scraper.wake.set()
             logger.info('control: poll now (the loop wakes immediately)')
             return 'ok poll now (the loop wakes immediately, %s)' % self.summary()
-        if low == 'request reload':
+        if low == 'request reload-config':
             if not self.reloader:
                 return 'err no reloader configured'
             try:
@@ -246,9 +246,9 @@ class ControlServer(_ControlServer):
             return self.dump_state()
         if low == 'request restore':
             return self.restore_state()
-        if low == 'reload':
+        if low == 'request reload':
             return self.reload_daemon()
-        if low == 'restart':
+        if low == 'request restart':
             self.scraper.client.close()
             logger.info('control: the modbus session dropped (reconnects on the next poll)')
             return 'ok modbus session dropped (reconnects on the next poll)'

@@ -1613,7 +1613,8 @@ try:
 
     # 6. the scraper's control plane (the cache's shape, mirrored): the
     # signed wire (the full sha256 HMAC keyed by the token), the live
-    # settings, poll now, the reload, the Modbus restart, the shutdown
+    # settings, poll now, the config re-read, the request reload, the Modbus
+    # request restart, the shutdown
     import hashlib
     import hmac as _hmac
 
@@ -1717,8 +1718,8 @@ try:
           and 'set interval <value>' in r and ', secret' in r and '# ---' in r, r[:200])
     r = sctl('poll now', 15597)
     check('scraper control: poll now', r.startswith('ok poll now'), r[:80])
-    r = sctl('request reload', 15597)
-    check('scraper control: request reload', r.startswith('ok reloaded'), r[:80])
+    r = sctl('request reload-config', 15597)
+    check('scraper control: request reload-config', r.startswith('ok reloaded'), r[:80])
     # 6b-3. the secrets on the wire: the token lives rotate (the cache's
     #       treatment) and the show verb refuses them — a secret never renders
     r = sctl('show auth token', 15597)
@@ -1863,7 +1864,7 @@ try:
           'is not sealed' in line and 'set dump/key' in line, line[-220:])
     procs[-1].kill()
     time.sleep(0.4)
-    r = sctl('restart', 15597, token='ctok9')
+    r = sctl('request restart', 15597, token='ctok9')
     check('scraper control: the modbus session restart', r.startswith('ok modbus session dropped'), r[:80])
     r = sctl('inspect', 15597, token='ctok9')
     check('scraper control: inspect', r.startswith('ok inspect\n') and 'version   modbus-scraper' in r, r[:120])
@@ -1891,12 +1892,12 @@ try:
     check('scraper control: the ops token cannot set', r.startswith('err forbidden:') and 'admin' in r, r[:80])
     r = sctl('poll now', 15598, token='opssecret')
     check('scraper control: the ops token cannot poll now', r.startswith('err forbidden:'), r[:80])
-    r = sctl('restart', 15598, token='opssecret')
-    check('scraper control: the ops token cannot restart', r.startswith('err forbidden:'), r[:80])
+    r = sctl('request restart', 15598, token='opssecret')
+    check('scraper control: the ops token cannot request restart', r.startswith('err forbidden:'), r[:80])
     r = sctl('shutdown', 15598, token='opssecret')
     check('scraper control: the ops token cannot shutdown', r.startswith('err forbidden:'), r[:80])
-    r = sctl('reload', 15598, token='opssecret')
-    check('scraper control: the ops token cannot reload', r.startswith('err forbidden:'), r[:80])
+    r = sctl('request reload', 15598, token='opssecret')
+    check('scraper control: the ops token cannot request reload', r.startswith('err forbidden:'), r[:80])
     r = sctl('show version', 15598, token=STOK)
     check('scraper control: the admin token still steers the same server', r.startswith('ok modbus-scraper'),
           r[:80])
@@ -1931,7 +1932,7 @@ try:
     time.sleep(1.5)
     r = sctl('set interval 7', 15600)
     check('scraper reload: the override lands before the reload', r.startswith('ok interval=7.00s'), r[:90])
-    r = sctl('reload', 15600)
+    r = sctl('request reload', 15600)
     check('scraper reload: the reply reports the saved override', r.startswith('ok reload: 1 override(s) saved'),
           r[:100])
     back = None

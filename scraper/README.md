@@ -264,9 +264,10 @@ control tokens live (the sessions re-auth), `auth token` rotates the
 refuses** (it is a secret: pass it by flag/env, or as `file:<path>`)),
 `show status` (the key=value report), `show connections` (the live HTTP
 clients of /metrics), `poll now` (the loop wakes immediately), `request
-reload` (the SIGHUP path — the token file re-reads, so the bearer token
-rotates too), `restart` (the Modbus session drops; the next poll
-reconnects), `reload` (**the whole-daemon restart that keeps the sets**:
+reload-config` (the SIGHUP path — the token file re-reads, so the bearer
+token rotates too), `request restart` (the Modbus session drops; the next
+poll reconnects), `request reload` (**the whole-daemon restart that keeps
+the sets**:
 the live overrides save to a state file beside the config
 (``<config>.reload``), the process re-execs, the fresh daemon re-resolves
 the config file and re-applies the saved overrides once, then consumes the

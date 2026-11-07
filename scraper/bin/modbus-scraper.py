@@ -57,7 +57,7 @@ logger = logging.getLogger('scraper')
 def parse_args():
     ap = build_parser(OPTIONS, description='Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP).')
     ap.add_argument('--config', default=default_config_path(),
-                    help='config file — the set grammar: every line a `set <name> <value>`, comments start with # (default: $CONFIG, then scraper.conf next to this script, then the subproject root)')
+                    help='config file — the set grammar: every line a `set <name> <value>`, comments start with # ($CONFIG, then scraper.conf next to this script, then the subproject root)')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
     ap.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-scraper --man | man -l -)')
     args = ap.parse_args()

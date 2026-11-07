@@ -67,7 +67,7 @@ def welcome(sock):
 
 SPEC = dict(label='the scraper', daemon_label='modbus-scraper control server',
             cli_name='modbus-scraper-cli', app='modbus-scraper', self_note='the scraper itself',
-            command_help='e.g. inspect, show status, set interval 5, poll now, request reload, restart, shutdown',
+            command_help='e.g. inspect, show status, set interval 5, poll now, request reload, request restart, shutdown',
             prompt_word='scraper', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,
@@ -76,7 +76,7 @@ SPEC = dict(label='the scraper', daemon_label='modbus-scraper control server',
             command_pool=command_pool, setting_pool=setting_pool, set_extra=(),
             describe=describe_word,
             help=HELP, welcome=welcome, loop=cli.typed_loop,
-            silent_ok=lambda low: low.startswith(('restart', 'poll now')),
+            silent_ok=lambda low: low.startswith(('request restart', 'poll now')),
             render=None, cli_page=cli_page)
 
 if __name__ == '__main__':

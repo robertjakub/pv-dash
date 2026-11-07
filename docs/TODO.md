@@ -28,6 +28,17 @@ the **Done/history** records for their tool.
   verified (§3.1/§4); re-run the audit after the scraper control surface,
   the TLS story or the dashboard service (the dashboard is the next audit
   wave).
+- **the RBAC rewrite** `[common]` — the role gate decides on the head
+  verb (`command_verb` = the first word, `common/wiresec.py`) with the
+  flat verb-set policies (`ROLE_POLICIES`); the request-namespace grammar
+  (`request clear cache` — the ctl/cli drift wave's rename) already needs
+  the "skip the prefix" rule patched into the extraction, and the
+  per-child authority (the ops shift may `request clear`, never
+  `request reload`) is policy-shaped, not extraction-shaped: rewrite the
+  gate to decide on the command PATH — the leaf units with per-child
+  policies (`request/clear` in the ops set, `request/reload` out) —
+  instead of patching the head-word verb; the audit `role=` entries and
+  the `--control-ops-verbs` validation follow the same units.
 - **native TLS on the HTTP surfaces** `[scraper]` `[cache]` `[inverter]` —
   F14 says "terminate at a proxy"; an opt-in native path
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a
@@ -132,6 +143,18 @@ the **Done/history** records for their tool.
 - **the user-defined scenarios** `[inverter]` — scene files (the time +
   the pins + the machines) loadable with `set scenario <file>`; the audit
   trail of a manual session could *record* one.
+- **set/show the registers (F1/2/3/4)** `[inverter]` — the fake's control
+  plane goes fc-aware: the pin verbs take a space qualifier
+  (`set register [fc3|fc4] <addr> <value>`, `set coil [fc1|fc2] <addr>
+  <0|1>` — the bare form keeps today's space; `discrete`/`input-register`
+  the sugar spellings, one store per space) and a first-class
+  `input-register` row (the flat name; the live `input/register` path
+  under an `input` node) pins the input space — no wire write exists
+  there, so its pins ride the dump/restore as a live override while
+  register/coil/discrete stay undumped; `show registers` gains the fc
+  column + per-space pin markers (today the overlay `*` misfires on fc4
+  rows); reset/SIGUSR1/inspect count the fourth map; the suite drives
+  `profiles/profiles/demo-fc4.json` for it.
 - **the dongle latency profile** `[inverter]` — a persistent slow-reply
   mode (the laggy-modem character: every response delayed, not dropped) to
   exercise read-delay and poll pacing against a realistic SDongle — the

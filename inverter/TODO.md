@@ -5,6 +5,19 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The request-namespace wave: the control grammar's commands are `/`-paths
+spelled as words on the wire — `reload` renamed to `request reload` (the
+bare spelling answers `err unknown command`; the dump/restore requests
+keep their names as the hidden `request/dump`/`request/restore` rows),
+the registry's command rows drive the console completion segment-wise,
+and the RBAC verb is the word past the `request` prefix. The console cli
+joined the family's golden ladder — the hand-rolled loop is gone (the
+shared typed-command loop: the help verdict rides under `% ok`, the
+listings keep the registry order, the values gain the shape hint) — and
+every help surface — `--help`, the man pages, the registry helps —
+stopped stating default values (the README's flag/default tables are the
+reference).
+
 The modbus-common wave: the fake's wire rides **`common/modbus`** with the
 rest of the family — the MBAP framing (`read_frame`/`frame`/`check_head`),
 the LSB-first bit packing (`pack_bits`/`unpack_bits` — the fake's hand

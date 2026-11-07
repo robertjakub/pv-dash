@@ -10,6 +10,31 @@ before the repo restructured into one suite.
 
 ## Unreleased
 
+### Changed
+
+- **everywhere** — **the wire's reload/restart/clear commands join the
+  request namespace**: `reload` → `request reload`, `restart` →
+  `request restart`, `clear cache` → `request clear cache` — the old
+  spellings answer `err unknown command` (the project is experimental —
+  behaviour may change). The registries' command rows are `/`-paths
+  spelled as words on the wire (`request/clear/cache`,
+  `request/dump/with-cache`, `poll/now`) — the console completion walks
+  them segment-wise and the RBAC verb is the word past the `request`
+  prefix (`request clear cache` decides on `clear`, so the ops shift
+  keeps the flush and never gains the reload dance). The scraper's and
+  the dashboard's config re-read — the SIGHUP path, a different action
+  from the exec dance — rides on as `request reload-config`. A
+  deployment pinning `--control-ops-verbs reload`/`restart`/`request`
+  fails the start validation (fail-closed).
+- **everywhere** — **no help surface states a default**: the eight
+  ctl/cli clients' `--help` and the four daemons' `--help`/`--man` lose
+  every `(default …)` mention (the parentheticals and the prose — the
+  registry helps included); `common/manpage.py` stops manufacturing
+  `(default: …)` from the argparse defaults. The defaults themselves are
+  unchanged and stay documented in each tool's README (the flag/default
+  tables are the reference now); the resolution order
+  (flag > env > config > default) is untouched.
+
 ### Removed
 
 - **everywhere** — **the `-file` secret siblings are gone; `file:` is the

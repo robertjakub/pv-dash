@@ -215,7 +215,8 @@ in
       default = null;
       description = ''
         A second, read-only control token: sessions authenticating with it
-        run the show/clear verbs only (no set/unset, no request reload, no
+        run the show/clear verbs only (no set/unset, no request
+        reload-config, no request reload, no request dump/restore, no
         shutdown) — the ops shift against the admin key. Needs
         controlToken/controlTokenFile. WARNING: it is rendered into the
         world-readable systemd unit in the nix store — prefer

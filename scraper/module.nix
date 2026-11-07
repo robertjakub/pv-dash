@@ -290,7 +290,8 @@ in
       description = ''
         A second, read-only control token: sessions authenticating with it
         run the show/clear verbs only (no set/unset, no poll now, no
-        request reload, no restart, no shutdown) — the ops shift against
+        request reload-config, no request reload, no request restart, no
+        shutdown) — the ops shift against
         the admin key. Needs controlToken/controlTokenFile. WARNING: it is
         rendered into the world-readable config script in the nix store —
         prefer controlOpsTokenFile.

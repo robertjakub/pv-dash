@@ -5,6 +5,19 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The request-namespace wave: the control grammar's commands are `/`-paths
+spelled as words on the wire — `clear cache`/`reload`/`restart` renamed to
+`request clear cache`/`request reload`/`request restart` (the bare
+spellings answer `err unknown command`), the registry's command rows
+(`request/dump`, `request/dump/with-cache`, `request/restore`,
+`request/clear/cache`, `request/reload`, `request/restart`) drive the
+console completion segment-wise, and the RBAC verb is the word past the
+`request` prefix (the ops shift keeps the flush, never gains the dance).
+The console cli joined the family's golden ladder (the shared candidates
+walk, the pools, the describe order) and every help surface — `--help`,
+the man pages, the registry helps — stopped stating default values (the
+README's flag/default tables are the reference).
+
 The `-file` sibling removal: **`file:` is the one spelling** — the
 `--control-token-file`/`--control-ops-token-file`/`--metrics-token-file`
 flags, their env twins and the `control/token-file`-style live keys are

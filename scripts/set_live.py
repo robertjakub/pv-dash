@@ -24,28 +24,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
-def row_span(text, name):
-    """The (start, end) char span of the option object with this name."""
-    for m in re.finditer(r'"name"\s*:\s*"(.*?)"', text):
-        if m.group(1) != name:
-            continue
-        brace = text.rfind('{', 0, m.start())
-        while brace != -1:
-            try:
-                obj, end = json.JSONDecoder().raw_decode(text[brace:])
-            except ValueError:
-                obj, end = None, -1
-            if isinstance(obj, dict) and obj.get('name') == name:
-                return brace, brace + end
-            brace = text.rfind('{', 0, brace)
-    return None
-
-
-def clean_path(live):
-    """A live name is one clean word-path: every '/' segment a word."""
-    segs = live.split('/')
-    return all(seg and not any(c.isspace() for c in seg) for seg in segs)
+from scriptlib import clean_path, row_span   # the shared registry-editing helpers
 
 
 def main():

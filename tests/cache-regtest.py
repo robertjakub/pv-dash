@@ -370,7 +370,8 @@ try:
           'Traceback' not in evil_log and 'poll of' in evil_log)
     evil.stop()
 
-    # 5. control server: show status/connections/cache, clear cache, restart,
+    # 5. control server: show status/connections/cache, request clear cache,
+    #    request restart,
     #    cache_cli, shutdown (+ the default unix socket / CTL)
     K = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py')
 
@@ -555,8 +556,8 @@ try:
     r = cli('show status\nquit\n')
     check('cache_cli: show status prints the report', r.returncode == 0
           and '\ncache:15514 > upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-160:]))
-    r = cli('clear cache\nquit\n')
-    check('cache_cli: clear cache confirms silently', r.returncode == 0
+    r = cli('request clear cache\nquit\n')
+    check('cache_cli: request clear cache confirms silently', r.returncode == 0
           and '\ncache:15514 > % ok\n' in r.stdout, repr(r.stdout[-120:]))
     r = cli('show control token ?\nshow control ops ?\nset connections ?\nquit\n')
     check("cache_cli: ? at a hidden leaf describes it (the wire's help answer)",
@@ -624,7 +625,7 @@ try:
     check('cache_ctl: one-shot show status', r.returncode == 0
           and r.stdout.startswith('ok status\nupstream=127.0.0.1:15512'), repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15520'],
-                       input='show cache\nclear cache\n', capture_output=True, text=True,
+                       input='show cache\nrequest clear cache\n', capture_output=True, text=True,
                        timeout=30, env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     check('cache_ctl: piped batch with the token env', r.returncode == 0
           and r.stdout.startswith('ok cache ') and 'ok cache cleared' in r.stdout, repr(r.stdout[:160]))
@@ -1548,7 +1549,7 @@ print('mode 0600 ok')
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                          env={**os.environ, 'CLI_KEEPALIVE': '0.2', 'CONTROL_TOKEN': 'sekrit'})
     time.sleep(1.0)
-    p.stdin.write('reload\n')
+    p.stdin.write('request reload\n')
     p.stdin.flush()
     time.sleep(3.0)          # stdin stays open: the console lives at the prompt until the bye notice exits it
     out, _ = p.communicate(timeout=25)

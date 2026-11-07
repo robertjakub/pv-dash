@@ -514,7 +514,7 @@ def main():
         check('dump: the restored machine reads back', tx.startswith('ok cloud=autumn'), tx)
         tx = ctl(I_CTL, 'show time')
         check('dump: the restored freeze reads back', tx == 'ok time=09:30', tx)
-        tx = ctl(I_CTL, 'request reload'
+        tx = ctl(I_CTL, 'request reload')
         check('reload: the reply reports the saved overrides', tx.startswith('ok reload: 3 override(s) saved'), tx)
         back = None
         for _ in range(100):     # the exec is fast; a connect on the dying fake retries
@@ -651,7 +651,7 @@ def main():
         check('sealed dump: the right key restores the sealed dump at start', back == 'ok pv=120', repr(back))
         tx = ctl(J_CTL, 'set batt 50')
         check('sealed reload: the pin lands before the reload', 'ok batt=50' in tx, tx)
-        tx = ctl(J_CTL, 'request reload'
+        tx = ctl(J_CTL, 'request reload')
         check('sealed reload: the reply reports the saved overrides',
               tx.startswith('ok reload: 2 override(s) saved'), tx[:100])
         back = None

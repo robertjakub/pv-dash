@@ -27,8 +27,9 @@ _CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 # set must name verbs this server knows). 'clear' rides along: the family's
 # default ops policy names it, and on the dashboard it just answers
 # "unknown command" (there is nothing to flush).
-KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'dump', 'restore', 'reload', 'reload-config', 'shutdown',
-               'help', 'ping', 'quit')
+KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'dump', 'restore', 'reload', 'reload-config', 'clear', 'shutdown',
+               'help', 'ping', 'quit')   # 'clear': the default ops policy names it;
+                                          # the wire answers unknown command (nothing to flush)
 
 
 def _load_options():

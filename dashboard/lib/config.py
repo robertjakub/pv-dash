@@ -11,6 +11,7 @@ every line a `set <name> <value>`, every comment a `#` comment — the ini
 format is gone (the breaking wave in docs/TODO.md).
 """
 import logging
+import os
 
 from .options import OPTIONS
 from common.config import check_control_tokens, check_token_chars, load_config_script, parse_secret, \

@@ -7,13 +7,12 @@ docs/TODO.md)."""
 import json
 import logging
 import math
-import os
 import re
 
-from common.options import parse_config_script
 from .options import OPTIONS
-from common.config import check_auth_key, default_profile_path, is_loopback_host, \
-    parse_auth_type, parse_listen, parse_secret, parse_upstream, resolve_profile_file
+from common.config import check_auth_key, check_token_chars, check_control_tokens, default_profile_path, \
+    is_loopback_host, load_config_script, parse_auth_type, parse_listen, parse_secret, parse_upstream, \
+    resolve_profile_file, resolve_target, Resolver, str_to_bool
 from .metrics import Metrics
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
@@ -26,12 +25,7 @@ def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
     """The control server target for the daemon and the clients: the flag
     wins, then CTL, then the default unix socket named after the
     listen port (/tmp/modbus-scraper-9350.socket)."""
-    if explicit is not None and str(explicit).strip():
-        return str(explicit).strip()
-    env = os.environ.get('CTL')
-    if env and env.strip():
-        return env.strip()
-    return '/tmp/modbus-scraper-%d.socket' % int(listen_port)
+    return resolve_target(explicit, '/tmp/modbus-scraper-%d.socket' % int(listen_port))
 
 
 def check_register(value, label):
@@ -40,40 +34,11 @@ def check_register(value, label):
     return value
 
 
-def str_to_bool(value):
-    if isinstance(value, bool):
-        return value
-    text = str(value).strip().lower()
-    if text in ('true', 'yes', 'on', '1'):
-        return True
-    if text in ('false', 'no', 'off', '0'):
-        return False
-    raise ValueError('not a boolean')
-
-
 def load_config(path):
     """Parse the set-grammar config script (missing file is fine); a
     malformed file — or the legacy ini format — is fatal. Returns {key:
     raw-string value} with the dash names underscore-normalized."""
-    if not path or not os.path.isfile(path):
-        return {}
-    try:
-        with open(path, encoding='utf-8') as fh:
-            text = fh.read()
-    except OSError as e:
-        raise SystemExit('cannot read config file %s: %s' % (path, e))
-    try:
-        rows = parse_config_script(text, path, OPTIONS)   # the registry: the CLI spelling + the unknown-setting fail fast
-    except ValueError as e:
-        raise SystemExit(str(e))
-    out = {}
-    for name, value in rows:
-        key = name.replace('-', '_')
-        if key in out:
-            raise SystemExit('%s: %s is set twice (the file applies top to bottom — say it once)'
-                             % (path, name))
-        out[key] = value
-    return out
+    return load_config_script(path, OPTIONS)
 
 
 def check_hostname(host, label):
@@ -232,20 +197,8 @@ def resolve_config(args, script_dir=None):
     map itself — addresses, types, gains, function codes — comes from the
     device profile alone: there are no register override knobs."""
     cfg = load_config(args.config)
-
-    def resolve(cli_value, env_name, cfg_key, default, conv):
-        raw = cli_value
-        if raw is None or raw == '':
-            raw = os.environ.get(env_name)
-        if raw is None or raw == '':
-            raw = cfg.get(cfg_key)
-        if raw is None or raw == '':
-            return default
-        try:
-            return conv(raw)
-        except (TypeError, ValueError) as e:
-            logger.error('invalid %s = %r: %s (using %r)', cfg_key, raw, e, default)
-            return default
+    r = Resolver(cfg, logger)
+    resolve = r.resolve
 
     profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'PROFILE',
                                                 'profile', default_profile_path(), str))
@@ -312,17 +265,9 @@ def resolve_config(args, script_dir=None):
                                         'control_ops_verbs', 'show,clear', str) or 'show,clear').strip() or 'show,clear'
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'CONTROL_TRUST_UIDS',
                                         'control_trust_uids', None, str)
-    if cfg['control_ops_token']:
-        if not cfg['control_token']:
-            raise SystemExit('the read-only ops token supplements the admin token: '
-                             'set --control-token too')
-        if cfg['control_ops_token'] == cfg['control_token']:
-            raise SystemExit('the ops token must differ from the admin token (the same secret would '
-                             'hand every holder the role the server picks first)')
-    if cfg['control_token'] and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in cfg['control_token']):
-        raise SystemExit('invalid control_token: must not contain whitespace or control characters')
-    if cfg['auth_token'] and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in cfg['auth_token']):
-        raise SystemExit('invalid auth_token: must not contain whitespace or control characters')
+    check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
+    check_token_chars(cfg['control_token'], 'control_token')
+    check_token_chars(cfg['auth_token'], 'auth_token')
     if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', cfg['metric_prefix']):
         raise SystemExit('invalid metric_prefix = %r: must be a valid metric-name start '
                          '(letters/digits/underscore, not starting with a digit)' % cfg['metric_prefix'])

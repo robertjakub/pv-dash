@@ -175,7 +175,7 @@ generated into that volume gating the exporter. The arrows are the traffic;
 every listener binds inside the network only:
 
 ```text
-        HOST — 127.0.0.1:8080 published (the dashboard's UI), nothing else
+        HOST - 127.0.0.1:8080 published (the dashboard's UI), nothing else
    ┌─────────────────────────────────────────────────────────────────────┐
    │                                                                     │
    │   internal network "pv-modbus"                                      │
@@ -208,11 +208,11 @@ every listener binds inside the network only:
    │   │      └──────────────┘        (127.0.0.1 only)            │      │
    │   └──────────────────────────────────────────────────────────┘      │
    │                                                                     │
-   │   shared "config" volume (/config): metrics.token, the JSON specs  │
-   │   — mounted by the Modbus services + the dashboard; prometheus     │
-   │   reads it read-only                                               │
+   │   shared "config" volume (/config): metrics.token, the JSON         │
+   │   specs, config.js - mounted by the Modbus services + the           │
+   │   dashboard; prometheus reads it read-only                          │
    │                                                                     │
-   │   docker compose exec <service> …  — the way in                     │
+   │   docker compose exec <service> ... - the way in                    │
    └─────────────────────────────────────────────────────────────────────┘
 ```
 

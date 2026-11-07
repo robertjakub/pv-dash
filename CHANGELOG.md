@@ -12,6 +12,17 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **the lint files the namespaces**: a knob's
+  `/`-prefix with live children and no node row gains one in the
+  canonical render — the path-named, no-live spelling (no Setting, so
+  `set` never reaches it; a TODO setting-help the prose fills): the
+  cache's `metrics`, `metrics/limits`, `audit/rotate` and
+  `control/ops`, the scraper's/inverter's/dashboard's `metrics` and
+  `control/ops`. A node row with no live children at all (even hidden
+  count) is asked to be removed. And a knob may carry the **double
+  meaning** — the scraper's `auth` knob is now the node of its `auth/`
+  namespace too (the bearer-token child; the prose covers both) — when
+  the name is taken the lint asks and the human marks.
 - **everywhere** — **the row bools read tolerant, write canonical**: the
   registries' bool fields (`secret`, `internal`, `hidden`, `restart`,
   `node`) load the JSON booleans and the wire's `on`/`off` spelling alike

@@ -213,6 +213,42 @@ def lint(path):
                 nits.append('%s: %s: unknown key(s) %s' % (path, key, ', '.join(unknown)))
             if key == 'show' and not r.get('setting-help'):
                 nits.append('%s: show: %r carries no description' % (path, r.get('name')))
+
+    # the namespace discipline: a knob's '/'-prefix with no node row is an
+    # implicit namespace the wire's show cannot describe — the canonical
+    # text gains the node row (the path-named, no-live spelling: no
+    # Setting, so set never reaches it; a TODO setting-help the prose
+    # fills); a node row with no live children at all — even hidden count
+    # — is an orphan: the nit asks to remove it
+    rows = meta.get('options') or []
+    lives = [r['live'] for r in rows if isinstance(r, dict) and r.get('live')]
+    node_paths = {r['name'] for r in rows if isinstance(r, dict) and r.get('node')}
+    show_lives = {(r.get('live') or r['name']) for r in meta.get('show') or []
+                  if isinstance(r, dict)}
+    prefixes = set()
+    for lv in lives:
+        segs = lv.split('/')
+        for i in range(1, len(segs)):
+            prefixes.add('/'.join(segs[:i]))
+    missing = sorted(p for p in prefixes
+                     if p not in node_paths and p not in lives and p not in show_lives)
+    all_names = {r['name'] for r in rows if isinstance(r, dict)}
+    orphans = sorted(n for n in node_paths
+                     if not any(lv.startswith(n + '/') for lv in lives))
+    for n in orphans:
+        nits.append('%s: the node %r has no live children (even hidden count) — remove it' % (path, n))
+    for p in missing:
+        if p in all_names:
+            # the node's name must be its path (the prefix tests key on it) —
+            # a knob squatting the name blocks the file: the human calls it
+            nits.append('%s: the namespace %r has no node row and the name is taken by a knob — '
+                        'rename the knob or file the node by hand' % (path, p))
+            continue
+        i = next(i for i, r in enumerate(rows)
+                 if isinstance(r, dict) and r.get('live') and r['live'].startswith(p + '/'))
+        rows.insert(i, {'name': p, 'setting-help': 'TODO: describe %s for the control help' % p,
+                        'node': True})
+
     if nits:
         return nits, None
     canon = render_registry(meta)

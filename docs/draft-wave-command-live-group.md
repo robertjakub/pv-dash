@@ -18,7 +18,11 @@ docs/TODO.md's control-plane section). FOLLOW-UP, same day: the cli
 faces spell the '/'-paths as words — the ? listing renders `request
 clear cache` (the options' dictionary rule) and the first TAB position
 walks the command paths segment-wise (a slash never renders or
-inserts).
+inserts). SECOND FOLLOW-UP: the lint files the namespaces — the missing
+node rows auto-add (the path-named, no-live spelling, a TODO
+setting-help), the childless nodes are asked to be removed, and a knob
+may carry the double meaning (the scraper's `auth` knob is now its
+`auth/` namespace's node).
 
 ---
 

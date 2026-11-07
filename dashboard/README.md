@@ -152,11 +152,11 @@ DEBUG level only (or at INFO when `--log-queries` is passed / set in
 1. CLI: `--port`, `--bind`, `--upstream`, `--static-dir`, `--prom-prefix`,
    `--log-level DEBUG|INFO|WARNING|ERROR`, `--log-queries`, `--log-access`,
    `--max-clients`, `--client-timeout`, `--max-conn-per-ip`, `--local-time`,
-   `--control-port`, `--control-token`, `--control-token-file`,
-   `--control-ops-token`, `--control-ops-token-file`, `--control-ops-verbs`,
+   `--control-port`, `--control-token`,
+   `--control-ops-token`, `--control-ops-verbs`,
    `--control-trust-uids`, `--audit-log`, `--audit-max-mb`, `--audit-files`,
    `--no-audit-log`, `--metrics-server`, `--metrics-listen`, `--metrics-token`,
-   `--metrics-token-file`, `--metrics-max-clients`, `--metrics-client-timeout`,
+   `--metrics-max-clients`, `--metrics-client-timeout`,
    `--metrics-max-conn-per-ip`, `--dry-run`, `--man`
 2. Environment: every env twin is the knob's bare upper-snake name (no
    tool prefix) —
@@ -164,11 +164,10 @@ DEBUG level only (or at INFO when `--log-queries` is passed / set in
    docker-documented set), `STATIC_DIR`, `CONFIG_JS`, `BATTERY`,
    `MAX_CLIENTS`, `CLIENT_TIMEOUT`,
    `MAX_CONN_PER_IP`, `LOG_ACCESS`, `CTL`,
-   `CONTROL_TOKEN`, `CONTROL_TOKEN_FILE`,
-   `CONTROL_OPS_TOKEN`, `CONTROL_OPS_TOKEN_FILE`,
+   `CONTROL_TOKEN`,
+   `CONTROL_OPS_TOKEN`,
    `CONTROL_OPS_VERBS`, `METRICS_SERVER`,
    `METRICS_LISTEN`, `METRICS_TOKEN`,
-   `METRICS_TOKEN_FILE`, `METRICS_MAX_CLIENTS`,
    `METRICS_CLIENT_TIMEOUT`, `METRICS_MAX_CONN_PER_IP`,
    `CONTROL_TRUST_UIDS`
 3. `server.conf` — the set grammar, every line a `set <name> <value>`:
@@ -206,7 +205,7 @@ port refuses to start; with a token configured the wire is HMAC-signed:
 every command and reply carries the full sha256 of its frame, keyed by the
 token). Over the unix socket a trusted peer (root, the daemon's own user or
 `--control-trust-uids`) skips the token handshake (SO_PEERCRED). A second,
-**read-only ops token** (`--control-ops-token`/`--control-ops-token-file`)
+**read-only ops token** (`--control-ops-token`)
 authenticates into the `show` verbs only — no `set`/`unset`, no `request
 reload`, no `reload`, no `shutdown`: the ops shift against the admin key,
 both audited (the DSH trail's COMMAND entries carry `role=ops`/`role=admin`,
@@ -224,11 +223,11 @@ python3 bin/dashboard-cli.py                      # the console: TAB completion,
 Commands: `set <setting> <value>` / `unset <setting>` (the live settings:
 `max-clients`, `client-timeout`, `max-conn-per-ip`, `log-access`,
 `log-queries`, `battery`, `log-level` — and the **token lives**:
-`control token`/`control token-file` and `control ops token`/`control ops
-token-file` rotate the control tokens live (the sessions re-auth),
-`metrics token`/`metrics token-file` rotate the /metrics bearer live; a
+`control token` and `control ops token` rotate the control tokens live
+(the sessions re-auth),
+`metrics token` rotates the /metrics bearer live; a
 token value never renders back — **`show <secret>` refuses** (it is a
-secret: pass it by flag/env/token-file)), `show <setting>` / `show status` /
+secret: pass it by flag/env, or as `file:<path>`)), `show <setting>` / `show status` /
 `show connections` (the live HTTP clients per peer IP) /
 `show version` / `show knobs` (the dictionary of every registry knob: its
 flag, its env twin, how it changes — under its display group, ungrouped

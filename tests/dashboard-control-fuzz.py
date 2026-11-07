@@ -244,23 +244,15 @@ def main():
         except (OSError, ValueError) as e:
             check('fuzz: the right token authenticates', False, str(e))
 
-        # 6b. the token-file env var the help promises: honored like the flags
+        # 6b. the token as a file: reference on the env: honored like the flag
         open('/tmp/dash_ctl_fuzz_token', 'w').write(TOKEN + '\n')
         os.chmod('/tmp/dash_ctl_fuzz_token', 0o600)
         r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
                             '--control-port', str(CTRL_PORT), 'show', 'version'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'CONTROL_TOKEN_FILE': '/tmp/dash_ctl_fuzz_token'})
-        check('fuzz: dashboard_ctl honors CONTROL_TOKEN_FILE', r.returncode == 0
+                           env={**os.environ, 'CONTROL_TOKEN': 'file:/tmp/dash_ctl_fuzz_token'})
+        check('fuzz: dashboard_ctl honors CONTROL_TOKEN=file:...', r.returncode == 0
               and 'dashboard' in r.stdout, repr(r.stdout[:80]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
-                            '--control-port', str(CTRL_PORT), 'status'],
-                           capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'CONTROL_TOKEN': 'x',
-                                'CONTROL_TOKEN_FILE': '/tmp/dash_ctl_fuzz_token'})
-        check('fuzz: the token env + the token-file env is a clean error', r.returncode != 0
-              and 'mutually exclusive' in (r.stderr + r.stdout)
-              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
 
         # 6c. the read-only ops token: show allowed, steering forbidden; both audited
         OPS_AUDIT = '/tmp/dash_ctl_fuzz_ops_audit.log'

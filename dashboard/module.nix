@@ -47,19 +47,19 @@ let
     ++ lib.optionals (cfg.controlToken != null) [ "--control-token ${cfg.controlToken}" ]
     ++ lib.optionals (cfg.controlTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      "--control-token-file /run/credentials/dashboard/control-token"
+      "--control-token file:/run/credentials/dashboard/control-token"
     ]
     ++ lib.optionals (cfg.controlOpsToken != null) [ "--control-ops-token ${cfg.controlOpsToken}" ]
     ++ lib.optionals (cfg.controlOpsTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      "--control-ops-token-file /run/credentials/dashboard/control-ops-token"
+      "--control-ops-token file:/run/credentials/dashboard/control-ops-token"
     ]
     ++ lib.optionals (cfg.controlOpsVerbs != null) [ "--control-ops-verbs ${cfg.controlOpsVerbs}" ]
     ++ lib.optionals (cfg.controlTrustUids != null) [ "--control-trust-uids ${cfg.controlTrustUids}" ]
     ++ lib.optionals (cfg.metricsServer != null) [ "--metrics-server" ]
     ++ lib.optionals (cfg.metricsServer != null) [
       "--metrics-listen ${cfg.metricsListen}"
-      "--metrics-token-file /run/credentials/dashboard/metrics-token"
+      "--metrics-token file:/run/credentials/dashboard/metrics-token"
       "--metrics-max-clients ${toString cfg.metricsMaxClients}"
       "--metrics-client-timeout ${toString cfg.metricsClientTimeout}"
       "--metrics-max-conn-per-ip ${toString cfg.metricsMaxConnPerIp}"

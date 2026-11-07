@@ -15,7 +15,7 @@ import os
 
 from common.options import parse_config_script
 from .options import OPTIONS
-from common.config import load_token_file, parse_secret
+from common.config import parse_secret
 from .statics import DEFAULTS, DEFAULT_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
@@ -140,27 +140,15 @@ def resolve_config(args, script_dir=None):
                                   'control_port', None, str)
     cfg['control_token'] = parse_secret((resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
                                                  'control_token', None, str) or '').strip() or None, 'control/token')
-    control_token_file = resolve(getattr(args, 'control_token_file', None), 'CONTROL_TOKEN_FILE',
-                                 'control_token_file', None, str)
     cfg['control_ops_token'] = parse_secret((resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
                                                      'control_ops_token', None, str) or '').strip() or None,
                                             'control-ops-token')
-    control_ops_token_file = resolve(getattr(args, 'control_ops_token_file', None), 'CONTROL_OPS_TOKEN_FILE',
-                                     'control_ops_token_file', None, str)
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None),
                                         'CONTROL_TRUST_UIDS', 'control_trust_uids', None, str)
-    if cfg['control_token'] and control_token_file:
-        raise SystemExit('--control-token and --control-token-file are mutually exclusive')
-    if control_token_file:
-        cfg['control_token'] = load_token_file(control_token_file, 'control-token-file')
-    if cfg['control_ops_token'] and control_ops_token_file:
-        raise SystemExit('--control-ops-token and --control-ops-token-file are mutually exclusive')
-    if control_ops_token_file:
-        cfg['control_ops_token'] = load_token_file(control_ops_token_file, 'control-ops-token-file')
     if cfg['control_ops_token']:
         if not cfg['control_token']:
             raise SystemExit('the read-only ops token supplements the admin token: '
-                             'set --control-token/--control-token-file too')
+                             'set --control-token too')
         if cfg['control_ops_token'] == cfg['control_token']:
             raise SystemExit('the ops token must differ from the admin token (the same secret would '
                              'hand every holder the role the server picks first)')
@@ -184,8 +172,6 @@ def resolve_config(args, script_dir=None):
                                     'metrics_listen', DEFAULTS['metrics_listen'], str)
     cfg['metrics_token'] = parse_secret((resolve(getattr(args, 'metrics_token', None), 'METRICS_TOKEN',
                                                  'metrics_token', None, str) or '').strip() or None, 'metrics/token')
-    cfg['metrics_token_file'] = resolve(getattr(args, 'metrics_token_file', None), 'METRICS_TOKEN_FILE',
-                                        'metrics_token_file', None, str)
     cfg['metrics_max_clients'] = resolve(getattr(args, 'metrics_max_clients', None), 'METRICS_MAX_CLIENTS',
                                          'metrics_max_clients', DEFAULTS['metrics_max_clients'], int)
     cfg['metrics_client_timeout'] = resolve(getattr(args, 'metrics_client_timeout', None),
@@ -202,6 +188,6 @@ def resolve_config(args, script_dir=None):
     control_port = str(cfg['control_port'] or '').strip()
     if control_port.isdigit() and control_port != '0' and not cfg['control_token']:
         raise SystemExit('the TCP control port %s without a token is open to every local process; '
-                         'set --control-token or --control-token-file (the default unix socket needs none), '
+                         'set --control-token (the default unix socket needs none), '
                          'or disable it with --control-port 0' % control_port)
     return cfg

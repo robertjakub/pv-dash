@@ -32,7 +32,7 @@ from common.connlimit import GatedHTTPServer
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.version import version_string
-from common.config import load_token_file, parse_listen, parse_secret
+from common.config import parse_listen, parse_secret
 from lib.config import resolve_config, resolve_control_target
 from lib.control import ControlServer
 from lib.man import daemon_page
@@ -329,14 +329,10 @@ def main():
         raise SystemExit(2)
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
     metrics_token = parse_secret(args.metrics_token or cfg.get('metrics_token'), 'metrics/token')
-    if args.metrics_token_file:
-        metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
-    elif cfg.get('metrics_token_file'):
-        metrics_token = load_token_file(cfg['metrics_token_file'], 'metrics-token-file')
     metrics_listen = parse_listen(cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9452'))
     if cfg['metrics_server'] and not metrics_token:
-        logger.error('the metrics endpoint serves the request counters: set --metrics-token or '
-                     '--metrics-token-file when --metrics-server is on (or drop --metrics-server)')
+        logger.error('the metrics endpoint serves the request counters: set --metrics-token '
+                     '(or file:<path>) when --metrics-server is on (or drop --metrics-server)')
         raise SystemExit(2)
     metrics_desc = 'off'
     if cfg['metrics_server']:
@@ -409,10 +405,9 @@ def main():
             'no-audit-log': 'on' if args.no_audit_log else 'off',
             'local-time': 'on' if cfg['local_time'] else 'off',
         }
-        # the secret rows (control/token, control/token-file, control/ops/token,
-        # control/ops/token-file, metrics/token, metrics/token-file) carry NO
-        # defaults entry: `unset` refuses them (the metrics/token treatment) —
-        # a secret never renders, never re-applies
+        # the secret rows (control/token, control/ops/token, metrics/token)
+        # carry NO defaults entry: `unset` refuses them (the metrics/token
+        # treatment) — a secret never renders, never re-applies
         control = ControlServer(httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
                                 ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
@@ -423,7 +418,6 @@ def main():
                                 startup_values={'control_token': control_token,
                                                 'control_ops_token': control_ops_token,
                                                 'metrics_token': metrics_token,
-                                                'metrics_token_file': cfg.get('metrics_token_file'),
                                                 'dump_key': cfg.get('dump_key')})
         control.start()
         if control.dump_path and cfg['restore_on_start']:

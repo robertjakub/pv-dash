@@ -5,6 +5,15 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The `-file` sibling removal: **`file:` is the one spelling** — the
+dashboard's `--control-token-file`/`--control-ops-token-file`
+`/--metrics-token-file` flags, their env twins and the live `-file` keys
+are GONE (still experimental — behaviour may change). Every token knob
+takes the inline string or a `file:<path>` reference (the same loader and
+0600 discipline the siblings enforced, F12), the secret-error strings say
+"by flag/env, or as `file:<path>`", and the NixOS module renders
+`--control-token file:/run/credentials/...` (the option names stay).
+
 The file-reference wave: every secret value takes the **`file:` form** —
 `--dump-key file:/path` (env, config, the live `set` too) reads the first
 line of an owner-only `0600` file by the same loader the `-file` sibling

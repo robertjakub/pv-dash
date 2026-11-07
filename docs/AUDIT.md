@@ -697,6 +697,42 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   fails the gate); `scripts/lint_options.py --check` clean; the man pages
   regenerate (`mandoc -Tlint` clean).
 
+### Rev. 10 (this revision)
+
+- **The state machinery walked to the other three control servers** —
+  `dump_settings`/`apply_dump_settings` on the scraper, the fake and the
+  dashboard (the secrets absent by construction, every restored value
+  re-validates through the live dispatch), the settings state dump
+  (`common/dump.py`: the F18 posture — 0600 explicit, atomic replace,
+  the integrity hash, the group/world-writable refusal, fail closed) and
+  the whole-daemon `reload` beside the cache's: the state file 0600
+  explicit (the F23 posture, now the family's shape), the 120 s
+  staleness discard, the ops role denied (the F22 gate, free). The fake
+  has no config file (F11): its reload state home is the XDG state home
+  beside its audit trail, the flags stay the owners of the base.
+- **The secret lives + the show refusal** — the token pairs are live on
+  all four control servers now (the rotation semantics re-read: the old
+  sessions' macs fail and re-auth, the ops≠admin `compare_digest` on the
+  wire; the scraper's bearer refuses to go tokenless beyond loopback —
+  F13's posture on the live path; the F6 rule stands on the metrics
+  endpoints). **`show <secret>` refuses family-wide** (rev. 9's `<set>`
+  guard retires): a secret's value renders nowhere — the show verb
+  answers `err <name> is a secret — it never shows`, the dump and the
+  reload state carry no secret keys (by construction), the bins' secret
+  defaults placeholders are deleted (unset refuses; a placeholder could
+  never re-apply a literal `<set>`), and the `?`/help still describe the
+  knob — the vocabulary is public, the value is not.
+- **The verified evidence**: the regtests pin the rotations (the old
+  token refuses, the new one speaks), the refusals (`show`/`unset` on
+  every secret), the dump/restore round-trips (0600 + the tamper check)
+  and the reload exec on the scraper and the fake
+  (`tests/scrape-regtest.py` §6b-3/6d, `tests/inverter-regtest.py` §7);
+  the fuzzes deny the ops role the reload
+  (`tests/dashboard-control-fuzz.py` §6c). All ten suites print ALL PASS
+  on the revised tree; `scripts/check_options.py` +
+  `scripts/lint_options.py --check` clean; the man pages regenerate
+  (`mandoc -Tlint` clean).
+
 ## 5. NIS2 / DORA mapping (all modules; cache is the production-relevant one)
 | Requirement | Status | Where |
 |---|---|---|

@@ -7,13 +7,6 @@ the **Done/history** records for their tool.
 
 ## The control plane (the grammar follow-through)
 
-- **the reload family-wide** `[scraper]` `[inverter]` `[dashboard]` — the
-  cache's whole-daemon `reload` (the live overrides serialize to
-  `<config>.reload` 0600, the daemon re-execs, the fresh start re-applies
-  once and consumes the file) waits for `dump_settings`/
-  `apply_dump_settings` on the other three control servers — the state
-  dump machinery is the prerequisite; the verb row + `KNOWN_VERBS` land
-  with it (the ops denial comes free).
 - **file the display groups** `[common]` `[cache]` `[inverter]`
   `[dashboard]` `[scraper]` — the registries lost their `section` field
   (the `group` is the one grouping now; ungrouped rows render bare, no
@@ -22,12 +15,6 @@ the **Done/history** records for their tool.
   dictionaries and the cli ?/TAB listings render mostly bare. File the
   groups row by row (`scripts/set_group.py <project> <name> <group>`) so
   the dictionaries read filed again.
-- **the secret lives for the other three consoles** `[scraper]`
-  `[inverter]` `[dashboard]` — the console-? rule (a hidden leaf
-  describes instead of lying Invalid input) is wired in all four clis,
-  but only the cache's registry carries hidden+live rows (the six
-  secrets): the other three patches stay inert until their TUI grants
-  secret lives.
 
 ## The security wave (the audit follow-ups)
 
@@ -203,6 +190,16 @@ the **Done/history** records for their tool.
 
 ## Done (the highlights; the git history has the details)
 
+- **the state machinery, family-wide** — the three remaining control
+  servers gained `dump_settings`/`apply_dump_settings`, the settings
+  state dump (common/dump.py: 0600, integrity-hashed, fail-closed
+  restore) with the `dump` node (`dump/path`, `dump/restore-on-start`,
+  `request dump`/`request restore`, the shutdown dump), the whole-daemon
+  `reload` (the cache's exec dance; the fake's state home is the XDG
+  state home — no config file, F11), and the **secret lives**: the token
+  pairs rotate on the wire everywhere now, the `show` verb refuses the
+  secrets (the value renders nowhere), the secret defaults placeholders
+  are gone (unset refuses).
 - **the hierarchical control grammar** — the live names are `/`-paths
   spelled as words on the wire (`set modbus upstream <value>`, however
   deep; the alias rows answer a second spelling, the canonical renders);

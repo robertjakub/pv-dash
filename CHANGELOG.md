@@ -12,6 +12,45 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **scraper / inverter / dashboard** — **the state machinery is
+  family-wide**: `dump_settings`/`apply_dump_settings` on all three
+  control servers (the overrides serialize to raw, re-appliable wire
+  values; the secrets are absent by construction), the **state dump**
+  (the `dump` node with the `dump/path` and `dump/restore-on-start`
+  lives, `--dump-path`/`--restore-on-start` flags, env twins, NixOS
+  options; `request dump` writes the overrides as one 0600
+  integrity-hashed JSON — common/dump.py, the F18 posture — and the
+  graceful shutdown dumps too; `request restore` re-applies,
+  `--restore-on-start` does it at start), and the **whole-daemon
+  `reload`** (the cache's verb, landed beside it: the overrides save to
+  `<config>.reload` — the fake has no config file, its state home is the
+  XDG state home beside its audit trail — the process re-execs, the fresh
+  daemon re-applies the saved overrides once and consumes the file; the
+  ops role may not reload). The **secret lives land too** (the registries
+  carry the six hidden rows each): `control/token`/`control/token-file`
+  and `control/ops/token`/`control/ops/token-file` rotate the control
+  tokens live (the sessions re-auth, the ops token must differ from the
+  admin token on the wire), the scraper's `auth/token`(-file) rotates the
+  /metrics bearer live (a non-loopback listen refuses to go tokenless —
+  F13), the metrics/token pair on the fake and the dashboard (F6: the
+  endpoint's token is mandatory while it serves); the `control` node rows
+  file the namespace, the secret defaults placeholders are deleted from
+  the bins (unset refuses — the metrics/token treatment), and the
+  regtests pin the rotations, the refusals, the dump/restore and the
+  reload exec.
+
+### Changed
+
+- **everywhere** — **the show verb refuses the secrets**: `show
+  control/token` (the ops token, `metrics/token`, `auth/token`, the
+  `-file` spellings) answers `err <name> is a secret — it never shows
+  (pass it by flag/env/token-file)` instead of the `<set>` guard's
+  placeholder — a secret's value renders nowhere, on any tool (the set
+  reply keeps `<set>` as the rotation's confirmation; the `?`/help still
+  describes the knob — the vocabulary is public, the value is not).
+
+### Added
+
 - **everywhere** — **the registries drop the `section` field; the display
   `group` is the one grouping**: a row's `group` files it in show config,
   show knobs, help config and the cli ?/TAB listings; a row without one

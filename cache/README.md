@@ -214,7 +214,10 @@ with a clean one-line error instead of failing later at runtime.
 `cache/modbus_cache.conf` is a sample in the set grammar (every line a
 `set <name> <value>` in the CLI spelling, `#` comments stay comments — the
 config file pipes through `modbus-cache-ctl` unchanged, and `show config`
-regenerates it from the running daemon; `show knobs` prints the whole
+regenerates it from the running daemon — the secret knobs render as
+`set <name> *** SECRET REMOVED ***`, the value never does, and the parser
+refuses the placeholder (pass the secret by flag/env/token-file);
+`show knobs` prints the whole
 registry — every knob with its flag, its env twin and how it changes,
 `help config` maps them to their control commands). Boolean config/env
 values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
@@ -321,7 +324,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 | `show knobs` | the dictionary of all knobs: every registry knob under its display group (ungrouped rows bare) — its flag, its env twin(s), the command that changes it live (or the restart note), a `secret` marker on the tokens |
 | `clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
 | `restart` | drop the upstream connection **and** the cache, repoll now — for recovering from a wedged inverter session |
-| `reload` | **restart the whole daemon with the configuration kept**: the live overrides save to a state file beside the config (`<config>.reload`), the process re-execs with the same argv, the fresh daemon re-resolves the config file (so the `restart: true` knobs take their configured values) and re-applies the saved overrides once, then consumes the state file. The cache starts empty; overridden secrets never save (the dump rule) — the reply names them, to re-pass by flag/env/token-file. The ops role may not reload |
+| `reload` | **restart the whole daemon with the configuration kept**: the live overrides save to a state file beside the config (`<config>.reload`), the process re-execs with the same argv, the fresh daemon re-resolves the config file (so the `restart: true` knobs take their configured values) and re-applies the saved overrides once, then consumes the state file. The cache starts empty; overridden secrets save as `*** SECRET REMOVED ***` (the value never lands in the file) — the reply names them, to re-pass by flag/env/token-file. The ops role may not reload |
 | `shutdown` | gracefully stop the proxy (same as SIGTERM: listener closed, control socket unlinked) |
 | `help` / `?` | one-line command reference |
 | `quit` | close the connection |
@@ -472,7 +475,10 @@ production data, the settings are config): by default **settings only**;
 **`request dump with-cache`** includes the words, and **`--dump-with-cache`**
 flips the plain `request dump` and the `--dump-interval` loop to the full
 shape (the shutdown dump follows the flag too). The restore takes either
-shape — it loads whatever the file carries. The dumps land in three ways:
+shape — it loads whatever the file carries. An overridden **secret** rides
+as `*** SECRET REMOVED ***` — the knob renders, the value never lands in
+the file; the restore skips the placeholder (the secret keeps its current
+value) and names it. The dumps land in three ways:
 every `--dump-interval` seconds (live-settable
 `set dump-interval`, `0` = off — the default: on request), on the
 **`request dump`** command, and on every

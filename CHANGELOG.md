@@ -42,7 +42,8 @@ before the repo restructured into one suite.
 - **scraper / inverter / dashboard** — **the state machinery is
   family-wide**: `dump_settings`/`apply_dump_settings` on all three
   control servers (the overrides serialize to raw, re-appliable wire
-  values; the secrets are absent by construction), the **state dump**
+  values; the secrets ride as `*** SECRET REMOVED ***` — the value never
+  lands), the **state dump**
   (the `dump` node with the `dump/path` and `dump/restore-on-start`
   lives, `--dump-path`/`--restore-on-start` flags, env twins, NixOS
   options; `request dump` writes the overrides as one 0600
@@ -67,6 +68,28 @@ before the repo restructured into one suite.
   reload exec.
 
 ### Changed
+
+- **everywhere** — **the secret knobs render as `*** SECRET REMOVED ***`
+  in the dump/restore and `show config`**: an overridden secret rides in
+  the state dump (and the reload's state file) as the placeholder — the
+  knob is public, the value never lands in a file (the dump stays 0600 +
+  integrity-hashed; the restore and the reload's fresh start SKIP the
+  placeholder — the secret keeps its current value — and name it
+  `(secret, not restored — re-pass by flag/env/token-file)` in the
+  skipped list, the reload reply keeps naming the lost secrets),
+  `show config` renders every configured secret row as
+  `set <name> *** SECRET REMOVED ***` (the trailing hidden-note line is
+  gone — the placeholder line IS the marker), and the paste-back is
+  gated: the config parser refuses the placeholder as a value
+  (`*** SECRET REMOVED *** is not a value — pass the secret by
+  flag/env/token-file`) and so does the wire `set` — a rendered script
+  piped back cannot poison a secret with a known constant. The dashboard's
+  entry passes the control server the secret rows' configured-ness (its
+  `show config` marks the placeholders too), the fake's `startup_values`
+  marks them from the resolved argv, the shared
+  `SECRET_REMOVED`/`dump_filter` live in common/dump.py, and the
+  registries' show-config rows, the READMEs, the book's config chapter,
+  options.md's legend and the man prose follow.
 
 - **scraper / cache** — **the client-side modbus errors name the
   function code that failed**: `FC4 modbus exception, code 1` (was
@@ -1041,6 +1064,14 @@ before the repo restructured into one suite.
   `authorization.credentials_file`. (The cache's metrics endpoint already
   refused to start without a token and binds loopback only — F6; the
   fake's is loopback-only by construction with the optional token.)
+
+### Docs
+
+- **everywhere** — **options.md is docs/OPTIONS.md now**: the generated
+  knob comparison table sits beside the other family-level docs, name
+  upper-cased to match its siblings (AUDIT.md, SBOM.md) — `gen_options.py`
+  writes the new path and the README's link follows; no content change
+  beyond the regeneration.
 
 ## 0.3.0 — 2026-11-05
 

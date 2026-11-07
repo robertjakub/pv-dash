@@ -151,15 +151,22 @@ def configured_defaults(args, frozen, profile_text):
     }
 
 
-def startup_values(args):
+def startup_values(args, secrets):
     """The startup options as display strings by registry name — what
     `show config` renders (the argv that would restart this fake; the
-    secrets and the unset flags drop)."""
+    unset flags drop). A configured secret renders as *** SECRET REMOVED
+    *** (the knob is public, the value never is): `secrets` is the resolved
+    {registry name: set-or-not} of the secret rows."""
     from lib.options import OPTION_BY_NAME
+    from common.dump import SECRET_REMOVED
     out = {}
     for name, opt in OPTION_BY_NAME.items():
         v = getattr(args, name.replace('-', '_'), None)
-        if opt.secret or v is None or v == '' or v is False:
+        if opt.secret:
+            if secrets.get(name) or secrets.get(opt.live):   # either key spelling
+                out[name] = SECRET_REMOVED
+            continue
+        if v is None or v == '' or v is False:
             continue
         if v is True:
             out[name] = 'true'
@@ -283,7 +290,13 @@ def main():
                                 token=control_token, trust_uids=trust_uids,
                                 socket_group=args.control_socket_group,
                                 ops_token=control_ops_token, ops_verbs=ops_verbs,
-                                startup_values=startup_values(args),
+                                startup_values=startup_values(args, {
+                                    'control-token': bool(control_token),
+                                    'control-token-file': bool(control_token_file),
+                                    'control-ops-token': bool(control_ops_token),
+                                    'control-ops-token-file': bool(control_ops_token_file),
+                                    'metrics-token': bool(metrics_token),
+                                    'metrics-token-file': bool(metrics_token_file)}),
                                 dump_path=args.dump_path, restore_on_start=args.restore_on_start)
     fake.metrics_listen = metrics_listen
     fake.metrics_token = metrics_token

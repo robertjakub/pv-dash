@@ -239,10 +239,13 @@ port are bound and stay), `reload` (**the whole-daemon restart that keeps
 the sets**: the live overrides save to a state file beside the config
 (``<config>.reload``), the process re-execs, the fresh daemon re-resolves
 the config file and re-applies the saved overrides once, then consumes the
-state file — overridden secrets never save (the dump rule), the reply
-names them), the state dump (`--dump-path`): `request dump` /
+state file — overridden secrets save as `*** SECRET REMOVED ***` (the
+value never lands in the file), the reply names them), the state dump
+(`--dump-path`): `request dump` /
 `request restore` (the live overrides as one `0600` JSON with an integrity
-hash; `--restore-on-start` loads it at start), `shutdown`, `quit`;
+hash — an overridden secret rides as `*** SECRET REMOVED ***`, the restore
+skips the placeholder and names it; `--restore-on-start` loads it at
+start), `shutdown`, `quit`;
 `help <setting>` describes a
 setting. A SIGHUP or `request reload` also clears the live overrides
 (`show status`'s `overridden=` row lists them).

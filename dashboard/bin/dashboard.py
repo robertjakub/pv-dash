@@ -411,7 +411,13 @@ def main():
         control = ControlServer(httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
                                 ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
-                                dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'])
+                                dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'],
+                                # the secret rows' configured-ness for `show config`
+                                # (the values never render — config_value refuses them)
+                                startup_values={'control_token': control_token,
+                                                'control_ops_token': control_ops_token,
+                                                'metrics_token': metrics_token,
+                                                'metrics_token_file': cfg.get('metrics_token_file')})
         control.start()
         if control.dump_path and cfg['restore_on_start']:
             logger.info('restore-on-start: %s', control.restore_state())

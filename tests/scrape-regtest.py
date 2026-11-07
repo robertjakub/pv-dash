@@ -1690,16 +1690,20 @@ try:
     r = sctl('set interval 9', 15597, token='ctok9')
     check('scraper control: the override before the dump', r.startswith('ok interval=9.00s'), r[:80])
     r = sctl('request dump', 15597, token='ctok9')
-    check('scraper control: request dump writes the live path', r.startswith('ok dumped 2 setting(s)'), r[:80])
+    check('scraper control: request dump writes the live path', r.startswith('ok dumped 4 setting(s)'), r[:80])
     dumpst = os.stat('/tmp/scr_regtest_state.json')
     check('scraper control: the state dump is 0600 (the F18 posture)', dumpst.st_mode & 0o777 == 0o600,
           oct(dumpst.st_mode & 0o777))
     raw = open('/tmp/scr_regtest_state.json').read()
     check('scraper control: the dump carries the settings, never the secrets',
-          '"interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw, raw[:160])
+          '"interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw
+          and '"auth/token": "*** SECRET REMOVED ***"' in raw
+          and '"control/token": "*** SECRET REMOVED ***"' in raw, raw[:240])
     r = sctl('set interval 1', 15597, token='ctok9')
     r = sctl('request restore', 15597, token='ctok9')
-    check('scraper control: the restore re-applies the dump', r.startswith('ok restored 2 setting(s)'), r[:80])
+    check('scraper control: the restore re-applies the dump, the secret placeholders skip',
+          r.startswith('ok restored 2 setting(s)') and 'secret, not restored' in r
+          and 'auth/token' in r and 'control/token' in r, r[:160])
     r = sctl('show interval', 15597, token='ctok9')
     check('scraper control: the restored override reads back', r == 'ok interval=9.00s', r[:80])
     r = sctl('request dump', 15597, token='ctok9')   # a tamper check: edit the dump, the restore refuses

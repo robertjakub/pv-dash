@@ -299,7 +299,10 @@ and last error.
 .B request dump
 / \fBrequest restore\fR: the write-behind state (the cached words + stamps,
 the live setting overrides) to/from the \fB--dump-path\fR file; the startup
-restore and the shutdown dump run the same path automatically. The dump
+restore and the shutdown dump run the same path automatically. An overridden
+secret rides as \fB*** SECRET REMOVED ***\fR \(em the knob renders, the
+value never lands in the file, the restore skips the placeholder and names
+it. The dump
 commands \(em and the \fBdump-interval\fR setting \(em show up in the
 listings only when a dump path is configured.
 .IP \(bu 2
@@ -316,9 +319,12 @@ A second, read-only token (\fB--control-ops-token\fR) authenticates
 sessions into the show/clear verbs only \(em no set/unset, no request
 dump/restore, no reload, no restart, no shutdown \(em the ops shift against the
 admin key, both roles audited. A secret knob (control token, the ops
-token, the metrics token \(em either spelling) never renders: \fBshow\fR
+token, the metrics token \(em either spelling) never shows its value:
+\fBshow\fR
 answers \fBerr <name> is a secret \(em it never shows\fR, \fBunset\fR
-refuses \(em pass the secret by flag/env/token-file.
+refuses \(em pass the secret by flag/env/token-file; \fBshow config\fR
+and the dumps render the knob as \fB*** SECRET REMOVED ***\fR (the
+config parser refuses the placeholder \(em it is never a value).
 .PP
 See
 .BR modbus-cache-ctl (1)

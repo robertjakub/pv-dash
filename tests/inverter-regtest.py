@@ -399,6 +399,10 @@ def main():
         check('secrets: the metrics token never shows', tx.startswith('err metrics/token is a secret'), tx)
         tx = ctl(H_CTL, 'unset metrics token', token='tok2')
         check('secrets: unset refuses the metrics token too', tx.startswith('err unknown setting'), tx)
+        tx = ctl(H_CTL, 'show config', token='tok2')
+        check('secrets: show config renders the secret knob as the placeholder',
+              'set control token *** SECRET REMOVED ***' in tx
+              and 'set control token tok' not in tx and 'tok2' not in tx, tx[:200])
 
         # ---- the whole-daemon reload (the fake has no config file — its
         #      reload state lives in the XDG state home) and the settings

@@ -231,7 +231,7 @@
     { "name": "uplink", "setting-help": "the inverter link: session counters, per-block latency and errors" },
     { "name": "version", "setting-help": "the modbus-cache version" },
     { "name": "config", "live": "config",
-      "setting-help": "the effective configuration as a set-grammar script (the secrets are hidden)" },
+      "setting-help": "the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***)" },
     { "name": "knobs", "live": "knobs",
       "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes" }
   ],

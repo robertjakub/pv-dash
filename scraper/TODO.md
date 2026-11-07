@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The secret-placeholder wave: the state dump and the reload state file
+carry an overridden secret's key as `*** SECRET REMOVED ***` (the value
+never lands in a file — the restore skips the placeholder and names it),
+`show config` renders the configured secret rows the same way, and the
+placeholder refuses to parse (the config parser and the wire `set` both
+point at flag/env/token-file).
+
 The FC-awareness wave: the client's modbus errors **name the function
 code that failed** — an fc4-marked source on an FC3-only device now logs
 `inverter … unreachable: FC4 modbus exception, code 1` instead of a bare

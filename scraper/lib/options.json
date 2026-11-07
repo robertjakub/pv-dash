@@ -153,7 +153,7 @@
       "setting-help": "the live HTTP clients of /metrics: the gate counters, one row per peer IP" },
     { "name": "version", "setting-help": "the modbus-scraper version" },
     { "name": "config",
-      "setting-help": "the effective configuration as a set-grammar script (the secrets are hidden)" },
+      "setting-help": "the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***)" },
     { "name": "knobs",
       "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes" }
   ],

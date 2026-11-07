@@ -519,6 +519,12 @@ try:
           and 'peer=127.0.0.1:' in tok_audit and "'show status' wire=h" in tok_audit
           and ' -> ok' in tok_audit, tok_audit[-240:])
 
+    # show config: the secret knobs render as the placeholder — the knob is
+    # public, the value never is
+    r = ctl_cmd('show config', 15520)
+    check('show config: the secret knob renders as *** SECRET REMOVED ***',
+          'set control token *** SECRET REMOVED ***' in r and 'sekrit' not in r, r[:160])
+
     # the pre-auth line buffer is capped: a newline-less stream is dropped, not buffered
     s = socket.create_connection(('127.0.0.1', 15520), timeout=10)
     try:
@@ -1556,6 +1562,18 @@ print('mode 0600 ok')
                        capture_output=True, text=True, timeout=15)
     check('metrics: the metrics endpoint without a token refuses to start',
           r.returncode != 0 and 'serves register values' in (r.stderr + r.stdout)
+          and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
+
+    # the paste-back gate: a rendered `set <secret> *** SECRET REMOVED ***`
+    # line refuses to parse — the placeholder is never a value
+    ph = '/tmp/reg_placeholder.conf'
+    open(ph, 'w').write('# the rendered script pasted back\n'
+                        'set control token *** SECRET REMOVED ***\n')
+    r = subprocess.run([sys.executable, P, '--config', ph, '--upstream', '127.0.0.1:15512',
+                        '--listen', '127.0.0.1:15599', '--dry-run'],
+                       capture_output=True, text=True, timeout=15)
+    check('config: a *** SECRET REMOVED *** line refuses to parse (pass the secret by flag/env/token-file)',
+          r.returncode != 0 and 'not a value' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
 
     # 7. clean shutdowns

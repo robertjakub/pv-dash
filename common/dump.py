@@ -14,7 +14,9 @@ closed — F18 in docs/AUDIT.md), and a group/world-writable dump is refused
 outright: whoever can write the dump holds config trust, so the write bits
 stay owner-only. The boundary is the F10 one: the hash catches corruption
 and casual tampering, not a local admin who rechashes — own the dump file
-like the config."""
+like the config. An overridden secret rides as SECRET_REMOVED — the knob
+renders, the value never lands in the file; the restore skips the
+placeholder and names it."""
 
 import hashlib
 import hmac
@@ -24,6 +26,29 @@ import time
 
 FORMAT = 'pv-suite-state-dump'
 VERSION = 1
+
+# the placeholder a dump/restore and `show config` render for a secret
+# knob: the key is public (the knob exists, the vocabulary describes it),
+# the value never lands in a file or a report — the restore skips the
+# placeholder (never applies it), the config parser refuses it (a rendered
+# script pasted back must not poison the secret with a known constant).
+SECRET_REMOVED = '*** SECRET REMOVED ***'
+
+
+def dump_filter(overridden, raw, by_name):
+    """The family-wide dump shape: the overridden settings sorted, as raw
+    re-appliable values. An overridden secret has no raw value (the raw
+    dict carries none by construction) — it rides as SECRET_REMOVED, so
+    the dump renders the knob without the value."""
+    out = {}
+    for k in sorted(overridden):
+        if k in raw:
+            out[k] = raw[k]
+        else:
+            opt = by_name.get(k)
+            if opt is not None and getattr(opt, 'secret', False):
+                out[k] = SECRET_REMOVED
+    return out
 
 
 def _payload_hash(state):

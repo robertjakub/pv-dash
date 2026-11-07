@@ -32,6 +32,8 @@ one renders ungrouped — bare, no header. Stdlib only."""
 import argparse
 import os
 
+from common.dump import SECRET_REMOVED
+
 
 class Option:
     """One knob: `name` (the config/set-grammar key), `flag` ('--interval';
@@ -191,6 +193,9 @@ def parse_config_script(text, label, options=None):
         if '_' in name or value.startswith('='):
             raise ValueError(('%s:%d: the ini format is gone (key = value) — the config is the control grammar: '
                               '`set %s <value>`') % (label, no, name.replace('_', '-')))
+        if SECRET_REMOVED in value:
+            raise ValueError(('%s:%d: *** SECRET REMOVED *** is not a value — a rendered script hides the '
+                              "secret's value; pass the secret by flag/env/token-file") % (label, no))
         out.append((name, value))
     return out
 
@@ -309,7 +314,7 @@ class Setting:
     Derived from the Option rows (settings_of) — the
     registry is the one place a knob's vocabulary lives."""
 
-    def __init__(self, name, help, values=(), hint=None, value_help=None, group=None, alias=None, restart=False):
+    def __init__(self, name, help, values=(), hint=None, value_help=None, group=None, alias=None, restart=False, secret=False):
         self.name = name
         self.help = help
         self.values = values              # completable words
@@ -318,6 +323,7 @@ class Setting:
         self.group = group                # the display bucket; None = ungrouped (bare)
         self.alias = alias                # the row's second wire spelling (the canonical renders)
         self.restart = restart            # startup-only: set/unset answers the restart note
+        self.secret = secret              # a token: the dump/show-config placeholder rule, the paste-back gate
 
     @property
     def display_group(self):
@@ -350,7 +356,7 @@ def settings_of(options):
                 continue
             seen.add(o.live)
             out.append(Setting(o.live, o.setting_help or o.help, o.values, o.hint, o.value_help,
-                               o.group, o.alias, restart=o.restart))
+                               o.group, o.alias, restart=o.restart, secret=o.secret))
         elif o.restart:
             out.append(Setting(o.name, o.setting_help or o.help, o.values, o.hint, o.value_help,
                                o.group, restart=True))

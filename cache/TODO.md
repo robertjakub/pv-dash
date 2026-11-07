@@ -5,6 +5,17 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The secret-placeholder wave: **the secret knobs render as
+`*** SECRET REMOVED ***`** — the state dump (and the reload's state
+file) carries an overridden secret's key with the placeholder value (the
+value never lands in a file; the restore and the reload's fresh start
+skip it and name it in the skipped list), `show config` renders every
+configured secret row as `set <name> *** SECRET REMOVED ***` (the
+trailing hidden-note line is gone — the placeholder line is the marker),
+and the paste-back is gated both ways: the config parser refuses the
+placeholder as a value and so does the wire `set` — a rendered script
+piped back cannot poison a secret with a known constant.
+
 The FC-awareness wave: **every function code is named** — the shared
 `FC_NAMES`/`describe_fc()` table in common/protocol.py, the cache's
 `describe_write()` covering all six write FCs (FC05/15/22/23 joined

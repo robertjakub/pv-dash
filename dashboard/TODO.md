@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The secret-placeholder wave: an overridden secret rides the state dump /
+the reload state file as `*** SECRET REMOVED ***` (the value never lands
+in a file — the restore skips the placeholder and names it),
+`show config` marks the configured secret rows the same way (the entry
+passes the control server the secret rows' configured-ness), and the
+placeholder refuses to parse as a value.
+
 The state-machinery wave: `dump_settings`/`apply_dump_settings` land on
 the control server — the **state dump** (`dump/path`,
 `dump/restore-on-start` lives + the `--dump-path`/`--restore-on-start`

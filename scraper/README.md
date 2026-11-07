@@ -196,7 +196,8 @@ of failing.
 `scraper/scraper.conf` is a sample in the set grammar (every line a
 `set <name> <value>`, `#` comments stay comments — the file pipes through
 `modbus-scraper-ctl` unchanged, and `show config` regenerates it from the running
-scraper):
+scraper — the secret knobs render as `set <name> *** SECRET REMOVED ***`,
+the value never does, and the parser refuses the placeholder):
 
 ```conf
 # modbus-scraper configuration — every line is a set command (the CLI spelling)
@@ -259,10 +260,13 @@ reconnects), `reload` (**the whole-daemon restart that keeps the sets**:
 the live overrides save to a state file beside the config
 (``<config>.reload``), the process re-execs, the fresh daemon re-resolves
 the config file and re-applies the saved overrides once, then consumes the
-state file — overridden secrets never save (the dump rule), the reply
-names them), the state dump (`--dump-path`): `request dump` /
+state file — overridden secrets save as `*** SECRET REMOVED ***` (the
+value never lands in the file), the reply names them), the state dump
+(`--dump-path`): `request dump` /
 `request restore` (the live overrides as one `0600` JSON with an
-integrity hash; `--restore-on-start` loads it at start), `inspect`,
+integrity hash — an overridden secret rides as `*** SECRET REMOVED ***`,
+the restore skips the placeholder and names it;
+`--restore-on-start` loads it at start), `inspect`,
 `show version`, `show knobs` (the dictionary of
 the registry: every knob with its flag, its env twin, how it changes,
 under its display group — ungrouped rows bare), `shutdown`.

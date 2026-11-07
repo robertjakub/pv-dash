@@ -124,7 +124,7 @@ def acl_summary(acl):
     return '%d network(s)' % len(acl)
 
 
-def load_token_file(path, label='control-token-file'):
+def load_token_file(path, label='token-file'):
     """The token from a file: the first line, whitespace-stripped (a systemd
     LoadCredential or a plain key file — anything but the rendered ini,
     which lands world-readable in the store). The file must be owner-only
@@ -193,8 +193,8 @@ def check_auth_key(key, label='auth-key', kind='suite'):
 
 def parse_secret(raw, label='secret'):
     """One secret knob, two forms: the inline string, or ``file:<path>`` —
-    the first line of an owner-only (0600) file, loaded by the same
-    load_token_file discipline the -file siblings enforce (F12). The
+    the first line of an owner-only (0600) file, loaded by the shared
+    load_token_file discipline (F12). The
     reference form is what a config file or an env var wants to carry: the
     material stays in the file, the config renders the reference (and the
     knob is secret-marked, so even the reference never renders back). A

@@ -195,7 +195,7 @@ def parse_config_script(text, label, options=None):
                               '`set %s <value>`') % (label, no, name.replace('_', '-')))
         if SECRET_REMOVED in value:
             raise ValueError(('%s:%d: *** SECRET REMOVED *** is not a value — a rendered script hides the '
-                              "secret's value; pass the secret by flag/env/token-file") % (label, no))
+                              "secret's value; pass the secret by flag/env, or as file:<path>") % (label, no))
         out.append((name, value))
     return out
 

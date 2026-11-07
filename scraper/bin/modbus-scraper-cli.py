@@ -51,7 +51,7 @@ from common.options import setting_path_pool
 from common.wiresec import sign_request, verify_reply
 from common.options import word_groups
 from lib.config import resolve_control_target
-from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, HIDDEN_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES, LIVE_SETTINGS, describe_value
+from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, HIDDEN_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES, LIVE_SETTINGS
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off

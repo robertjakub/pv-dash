@@ -79,7 +79,7 @@ def lint_desc(d, where):
 def lint_acl(data, path):
     """The optional "acl" tree: keyed by access kind ("write" is the one
     the cache speaks). The gate is an object with optional "allow"/"deny"
-    (+ "desc"), or an ordered rule list — one {"allow"|"deny"|"defer":
+    (+ "desc"), or an ordered rule list — one {"allow"|"deny":
     matcher} object per rule (+ an optional "desc" each). Returns the
     issue list."""
     issues = []
@@ -105,11 +105,11 @@ def lint_acl(data, path):
             for i, rule in enumerate(gate):
                 where = '%s rule %d' % (base, i + 1)
                 if not isinstance(rule, dict) or not rule:
-                    issues.append('%s must be an object with one verb (allow/deny/defer)' % where)
+                    issues.append('%s must be an object with one verb (allow/deny)' % where)
                     continue
                 verbs = [k for k in rule if k != 'desc']
-                if len(verbs) != 1 or verbs[0] not in ('allow', 'deny', 'defer'):
-                    issues.append('%s: exactly one verb (allow/deny/defer)' % where)
+                if len(verbs) != 1 or verbs[0] not in ('allow', 'deny'):
+                    issues.append('%s: exactly one verb (allow/deny)' % where)
                     continue
                 issues.extend(lint_desc(rule.get('desc'), where))
                 issues.extend(lint_matcher(rule[verbs[0]], where))

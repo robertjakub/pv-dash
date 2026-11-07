@@ -46,7 +46,7 @@ def fmt_gate(gate, depth):
     rule per line; depth = the indent level of the gate itself."""
     pad, inner = '  ' * depth, '  ' * (depth + 1)
     if isinstance(gate, list):
-        rows = ',\n'.join(inner + fmt_entry(r, ['allow', 'deny', 'defer', 'desc']) for r in gate)
+        rows = ',\n'.join(inner + fmt_entry(r, ['allow', 'deny', 'desc']) for r in gate)
         return '[\n%s\n%s]' % (rows, pad)
     keys = [k for k in ('allow', 'deny', 'desc') if k in gate] \
         + [k for k in gate if k not in ('allow', 'deny', 'desc')]

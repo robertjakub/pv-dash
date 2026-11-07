@@ -23,7 +23,7 @@
 # attached to the same network by name (see README.md).
 #
 # The scraper/token story ships in the stack: the exporter serves with a
-# bearer token (AUTH_TOKEN_FILE -> /config/metrics.token — a random
+# bearer token (AUTH_TOKEN=file:/config/metrics.token — a random
 # value the entrypoint generates on the first seed, 0600, owner pvsuite) and
 # the Prometheus service reads its copy of the same file from the config
 # volume. Read the token: docker compose exec modbus-scraper cat /config/metrics.token
@@ -83,8 +83,9 @@ services:
     environment:
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the demo exporter never serves unauthenticated (the audit's F13) —
-      # environment beats env_file, so scraper.env cannot override this
-      AUTH_TOKEN_FILE: /config/metrics.token
+      # environment beats env_file, so scraper.env cannot override this;
+      # the value is a file: reference (the first line of the 0600 file)
+      AUTH_TOKEN: file:/config/metrics.token
     env_file:
       - path: env/scraper.env
         required: false

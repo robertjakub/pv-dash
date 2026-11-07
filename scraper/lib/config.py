@@ -12,8 +12,8 @@ import re
 
 from common.options import parse_config_script
 from .options import OPTIONS
-from common.config import check_auth_key, check_token_file_mode, default_profile_path, is_loopback_host, \
-    load_token_file, parse_auth_type, parse_listen, parse_secret, parse_upstream, resolve_profile_file
+from common.config import check_auth_key, default_profile_path, is_loopback_host, \
+    parse_auth_type, parse_listen, parse_secret, parse_upstream, resolve_profile_file
 from .metrics import Metrics
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
@@ -126,11 +126,11 @@ def validate_config(cfg):
     check_hostname(listen_host, 'listen')
     if not is_loopback_host(listen_host) and not cfg['auth_token']:
         raise SystemExit('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
-                         'listen = %r — set --auth-token/--auth-token-file or bind 127.0.0.1:PORT' % cfg['listen'])
+                         'listen = %r — set --auth-token (or file:<path>) or bind 127.0.0.1:PORT' % cfg['listen'])
     control_port = str(cfg.get('control_port') or '').strip()
     if control_port.isdigit() and control_port != '0' and not cfg.get('control_token'):
         raise SystemExit('the TCP control port %s without a token is open to every local process; '
-                         'set --control-token or --control-token-file (the default unix socket needs none), '
+                         'set --control-token (the default unix socket needs none), '
                          'or disable it with --control-port 0' % control_port)
 
 
@@ -298,8 +298,6 @@ def resolve_config(args, script_dir=None):
         'metric_prefix': metric_prefix,
         'auth_token': parse_secret((resolve(args.auth_token, 'AUTH_TOKEN', 'auth_token', None, str)
                                     or '').strip() or None, 'auth/token'),
-        'auth_token_file': resolve(args.auth_token_file, 'AUTH_TOKEN_FILE', 'auth_token_file',
-                                   None, str),
         'level': resolve(args.log_level, 'LOG_LEVEL', 'log_level',
                          DEFAULTS['log_level'], str).strip().upper(),
     }
@@ -307,29 +305,17 @@ def resolve_config(args, script_dir=None):
                                   'control_port', None, str)
     cfg['control_token'] = parse_secret((resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
                                                  'control_token', None, str) or '').strip() or None, 'control/token')
-    control_token_file = resolve(getattr(args, 'control_token_file', None), 'CONTROL_TOKEN_FILE',
-                                 'control_token_file', None, str)
     cfg['control_ops_token'] = parse_secret((resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
                                                      'control_ops_token', None, str) or '').strip() or None,
                                             'control-ops-token')
-    control_ops_token_file = resolve(getattr(args, 'control_ops_token_file', None), 'CONTROL_OPS_TOKEN_FILE',
-                                     'control_ops_token_file', None, str)
     cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
                                         'control_ops_verbs', 'show,clear', str) or 'show,clear').strip() or 'show,clear'
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'CONTROL_TRUST_UIDS',
                                         'control_trust_uids', None, str)
-    if cfg['control_token'] and control_token_file:
-        raise SystemExit('--control-token and --control-token-file are mutually exclusive')
-    if control_token_file:
-        cfg['control_token'] = load_token_file(control_token_file, 'control-token-file')
-    if cfg['control_ops_token'] and control_ops_token_file:
-        raise SystemExit('--control-ops-token and --control-ops-token-file are mutually exclusive')
-    if control_ops_token_file:
-        cfg['control_ops_token'] = load_token_file(control_ops_token_file, 'control-ops-token-file')
     if cfg['control_ops_token']:
         if not cfg['control_token']:
             raise SystemExit('the read-only ops token supplements the admin token: '
-                             'set --control-token/--control-token-file too')
+                             'set --control-token too')
         if cfg['control_ops_token'] == cfg['control_token']:
             raise SystemExit('the ops token must differ from the admin token (the same secret would '
                              'hand every holder the role the server picks first)')
@@ -337,25 +323,9 @@ def resolve_config(args, script_dir=None):
         raise SystemExit('invalid control_token: must not contain whitespace or control characters')
     if cfg['auth_token'] and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in cfg['auth_token']):
         raise SystemExit('invalid auth_token: must not contain whitespace or control characters')
-    if cfg['auth_token_file'] and any(ord(c) < 32 or ord(c) == 127 for c in cfg['auth_token_file']):
-        raise SystemExit('invalid auth_token_file: must not contain control characters')
-    if cfg['auth_token'] and cfg['auth_token_file']:
-        raise SystemExit('--auth-token and --auth-token-file are mutually exclusive')
     if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', cfg['metric_prefix']):
         raise SystemExit('invalid metric_prefix = %r: must be a valid metric-name start '
                          '(letters/digits/underscore, not starting with a digit)' % cfg['metric_prefix'])
-    if cfg['auth_token_file']:
-        check_token_file_mode(cfg['auth_token_file'], 'auth_token_file')
-        try:
-            with open(cfg['auth_token_file']) as fh:
-                token = fh.read(8192).strip()
-        except OSError as e:
-            raise SystemExit('cannot read auth_token_file %s: %s' % (cfg['auth_token_file'], e))
-        if len(token) >= 8192:
-            raise SystemExit('auth_token_file %s: token longer than 8191 characters' % cfg['auth_token_file'])
-        if not token:
-            raise SystemExit('auth_token_file %s is empty' % cfg['auth_token_file'])
-        cfg['auth_token'] = token
     cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', None, str)
     cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
                                             None, str) or '').strip() or None, 'dump/key')

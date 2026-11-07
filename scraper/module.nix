@@ -41,19 +41,19 @@ let
     ""
     "# --- the /metrics bearer token ---"
     (lib.optionals (cfg.authToken != null) [ (setLine "auth-token" cfg.authToken) ])
-    (lib.optionals (cfg.authTokenFile != null) [ (setLine "auth-token-file" cfg.authTokenFile) ])
+    (lib.optionals (cfg.authTokenFile != null) [ (setLine "auth-token" "file:${toString cfg.authTokenFile}") ])
     ""
     "# --- the control plane ---"
     (lib.optionals (cfg.controlPort != null) [ (setLine "control-port" (toString cfg.controlPort)) ])
     (lib.optionals (cfg.controlToken != null) [ (setLine "control-token" cfg.controlToken) ])
     (lib.optionals (cfg.controlTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      (setLine "control-token-file" "/run/credentials/modbus-scraper/control-token")
+      (setLine "control-token" "file:/run/credentials/modbus-scraper/control-token")
     ])
     (lib.optionals (cfg.controlOpsToken != null) [ (setLine "control-ops-token" cfg.controlOpsToken) ])
     (lib.optionals (cfg.controlOpsTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      (setLine "control-ops-token-file" "/run/credentials/modbus-scraper/control-ops-token")
+      (setLine "control-ops-token" "file:/run/credentials/modbus-scraper/control-ops-token")
     ])
     (lib.optionals (cfg.controlOpsVerbs != null) [ (setLine "control-ops-verbs" cfg.controlOpsVerbs) ])
     (lib.optionals (cfg.controlTrustUids != null) [ (setLine "control-trust-uids" cfg.controlTrustUids) ])

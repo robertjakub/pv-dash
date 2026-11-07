@@ -26,7 +26,7 @@
 # the per-tool env file env/scraper.env overrides its knobs (see
 # ../docker/README.md; a flag beats the env: `docker run ... modbus-scraper
 # --upstream 10.0.0.2:15502` on top). The compose stack adds
-# AUTH_TOKEN_FILE=/config/metrics.token: a random token the entrypoint
+# AUTH_TOKEN=file:/config/metrics.token: a random token the entrypoint
 # generates on the first seed (0600, pvsuite — bundled metrics.token is a
 # placeholder that is never copied), shared with the demo Prometheus
 # (see README.md).

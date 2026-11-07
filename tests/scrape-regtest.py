@@ -1278,12 +1278,12 @@ try:
           auth_log.count('unauthorized 127.0.0.1 request for /metrics') >= 2
           and '"GET /metrics" 200' not in auth_log)
 
-    # 3d. token from file: enforced, rotates on SIGHUP, error paths fail dry-run
+    # 3d. token from a file: reference: enforced, rotates on SIGHUP, error paths fail dry-run
     #     (the file must be owner-only 0600 — F12 in docs/AUDIT.md)
     with open('/tmp/scr_token.txt', 'w') as fh:
         fh.write('first-token\n')
     os.chmod('/tmp/scr_token.txt', 0o600)
-    write_ini('/tmp/scr_tokfile.ini', 'set auth-token-file /tmp/scr_token.txt')
+    write_ini('/tmp/scr_tokfile.ini', 'set auth-token file:/tmp/scr_token.txt')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_tokfile.ini',
                                    '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19447'],
@@ -1300,16 +1300,12 @@ try:
     status, _ = get('/metrics', 19447, headers={'Authorization': 'Bearer first-token'})
     status2, _ = get('/metrics', 19447, headers={'Authorization': 'Bearer second-token'})
     check('token file: SIGHUP rotates the token', status == 401 and status2 == 200)
-    r = subprocess.run([sys.executable, P, '--dry-run', '--auth-token', 'a', '--auth-token-file',
-                        '/tmp/scr_token.txt'], capture_output=True)
-    check('token file: mutually exclusive with --auth-token', r.returncode == 1
-          and b'mutually exclusive' in r.stderr)
-    r = subprocess.run([sys.executable, P, '--dry-run', '--auth-token-file', '/nonexistent/file'],
+    r = subprocess.run([sys.executable, P, '--dry-run', '--auth-token', 'file:/nonexistent/file'],
                        capture_output=True)
-    check('token file: missing file -> clean rc=1', r.returncode == 1 and b'cannot read' in r.stderr)
+    check('token file: missing reference -> clean rc=1', r.returncode == 1 and b'cannot read' in r.stderr)
     lax = '/tmp/scr_token_lax.txt'
     open(lax, 'w').write('laxsecret\n')                                 # the umask default (0644)
-    r = subprocess.run([sys.executable, P, '--dry-run', '--auth-token-file', lax],
+    r = subprocess.run([sys.executable, P, '--dry-run', '--auth-token', 'file:' + lax],
                        capture_output=True)
     check('token file: group/world-readable file refused (F12)',
           r.returncode == 1 and b'0600' in r.stderr and b'Traceback' not in r.stderr,
@@ -1726,8 +1722,6 @@ try:
     r = sctl('show auth token', 15597)
     check('scraper control: the auth token is a secret that never shows',
           r.startswith('err auth/token is a secret'), r[:90])
-    r = sctl('show auth token-file', 15597)
-    check('scraper control: the file spelling refuses too', r.startswith('err auth/token-file is a secret'), r[:90])
     r = sctl('unset auth token', 15597)
     check('scraper control: unset refuses a secret (no defaults entry)', r.startswith('err unknown setting'), r[:80])
     r = sctl('show control token', 15597)
@@ -1999,21 +1993,14 @@ try:
     os.chmod(stok_file, 0o600)
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', 'show', 'version'],
                        capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'CONTROL_TOKEN_FILE': stok_file})
-    check('scraper_ctl: honors CONTROL_TOKEN_FILE', r.returncode == 0
+                       env={**os.environ, 'CONTROL_TOKEN': 'file:' + stok_file})
+    check('scraper_ctl: honors CONTROL_TOKEN=file:...', r.returncode == 0
           and 'ok modbus-scraper' in r.stdout, repr(r.stdout[:80]) + repr(r.stderr[-80:]))
     r = subprocess.run([sys.executable, CLIB, '--control-port', '15597'],
                        input='show interval\nquit\n', capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'CONTROL_TOKEN_FILE': stok_file})
-    check('scraper_cli: honors CONTROL_TOKEN_FILE', r.returncode == 0 and '5' in r.stdout,
+                       env={**os.environ, 'CONTROL_TOKEN': 'file:' + stok_file})
+    check('scraper_cli: honors CONTROL_TOKEN=file:...', r.returncode == 0 and '5' in r.stdout,
           repr(r.stdout[:120]))
-    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', 'status'],
-                       capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'CONTROL_TOKEN': 'x',
-                            'CONTROL_TOKEN_FILE': stok_file})
-    check('scraper_ctl: the token env + the token-file env is a clean error', r.returncode != 0
-          and 'mutually exclusive' in (r.stderr + r.stdout)
-          and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
     r = subprocess.run([sys.executable, P, '--dry-run', '--control-port', '15596'], capture_output=True,
                        text=True, timeout=15)
     check('scraper control: a TCP control port without a token refuses to start (F5)',

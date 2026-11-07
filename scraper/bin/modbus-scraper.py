@@ -224,8 +224,8 @@ def main():
                     defaults[o.name] = ','.join(str(u) for u in sorted(trust_uids or [])) or 'off'
                 else:
                     defaults[o.name] = str(v) if v not in (None, '') else 'off'
-        # the secret rows (control/token, control/token-file, control/ops/token,
-        # control/ops/token-file, auth/token, auth/token-file, auth-key, dump-key) carry NO
+        # the secret rows (control/token, control/ops/token, auth/token,
+        # auth-key, dump-key) carry NO
         # defaults entry: `unset` refuses them (the metrics/token treatment) — a
         # secret never renders, never re-applies
         control = ControlServer(scraper, httpd, int(control_target) if control_target.isdigit() else control_target,

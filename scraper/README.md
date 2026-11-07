@@ -26,7 +26,7 @@ curl http://localhost:9350/metrics
 By default the exporter **binds to 127.0.0.1:9350** (loopback only) — pass
 `--listen 0.0.0.0:9350` when Prometheus scrapes from another host.
 **Beyond loopback a token is mandatory**: a non-loopback listen without
-`--auth-token`/`--auth-token-file` **refuses to start** (the audit's F13 —
+`--auth-token` **refuses to start** (the audit's F13 —
 one clean line, no traceback); the loopback default needs no token.
 
 Add **`--dry-run`** to validate the configuration and print the effective
@@ -51,17 +51,19 @@ with the generated token file — see [docker/README.md](../docker/README.md).)
 **Authentication is disabled by default.** Set **`--auth-token <secret>`**
 (config script `set auth-token`, env `AUTH_TOKEN`) to require
 `Authorization: Bearer <token>` on every request — anything else gets `401`
-with a `WWW-Authenticate: Bearer` challenge. Keep the token out of the
-world-readable Nix store with **`--auth-token-file`** (NixOS: `authTokenFile`) —
-the file is re-read on every SIGHUP, so rotation is `rewrite file` +
-`systemctl reload`.
+with a `WWW-Authenticate: Bearer` challenge. The value may be a
+**`file:<path>` reference** — the first line of an owner-only `0600` file
+(NixOS: `authTokenFile`, mounted via `LoadCredential` and passed as
+`file:/run/credentials/...`) — so the config carries the reference, never
+the material; the file is re-read on every SIGHUP, so rotation is
+`rewrite file` + `systemctl reload`.
 
 > **The flag lands in `ps`.** A token passed as `--auth-token <secret>` is
 > visible on the process command line — every local user can read it in
-> `ps` output or `/proc/*/cmdline` (the audit's F9). Prefer
-> **`--auth-token-file`** — the file must be **owner-only (`0600`)**;
+> `ps` output or `/proc/*/cmdline` (the audit's F9). Prefer the
+> **`file:<path>` reference** — the file must be **owner-only (`0600`)**;
 > group/world-accessible token files refuse to start (F12) — or the
-> `AUTH_TOKEN` env var. The flag form is for quick tests.
+> `AUTH_TOKEN` env var carrying the same `file:` reference. The flag form is for quick tests.
 
 Pass the token to Prometheus with — the file form is the shipped way (one
 secret per line, `0600`; `credentials:` with the literal secret works too):
@@ -177,7 +179,7 @@ Settings are resolved in this order (first hit wins), mirroring
    `BATTERY`,
    `GRID_POSITIVE_IMPORT`, `LISTEN`,
    `INTERVAL`, `LOCAL_TIME`, `LOG_ACCESS`,
-   `LOG_LEVEL`, `AUTH_TOKEN`, `AUTH_TOKEN_FILE`,
+   `LOG_LEVEL`, `AUTH_TOKEN`,
    `MAX_CLIENTS`, `CLIENT_TIMEOUT`
 3. Config file — the set-grammar script (`set <name> <value>` lines) —
    `--config` picks the
@@ -256,11 +258,10 @@ sun2000 profile), **`interval`**,
 auth`**/`modbus auth key` (the suite scheme + key toward the inverter; a
 change drops the Modbus session — the next poll reconnects and handshakes)
 — and the
-**token lives**: `control token`/`control token-file` and `control ops
-token`/`control ops token-file` rotate the control tokens live (the
-sessions re-auth), `auth token`/`auth token-file` rotate the /metrics
-bearer live; a token value never renders back — **`show <secret>` refuses**
-(it is a secret: pass it by flag/env/token-file)),
+**token lives**: `control token` and `control ops token` rotate the
+control tokens live (the sessions re-auth), `auth token` rotates the
+/metrics bearer live; a token value never renders back — **`show <secret>`
+refuses** (it is a secret: pass it by flag/env, or as `file:<path>`)),
 `show status` (the key=value report), `show connections` (the live HTTP
 clients of /metrics), `poll now` (the loop wakes immediately), `request
 reload` (the SIGHUP path — the token file re-reads, so the bearer token
@@ -284,20 +285,20 @@ the registry: every knob with its flag, its env twin, how it changes,
 under its display group — ungrouped rows bare), `shutdown`.
 
 A **TCP control port refuses to start without a token** (the audit's F5 —
-the same rule as the cache): `--control-token`/`--control-token-file`
-require the token handshake (`{"cmd": "auth", "token": ...}`) on the first
+the same rule as the cache): `--control-token`
+requires the token handshake (`{"cmd": "auth", "token": ...}`) on the first
 frame; over the unix socket a kernel-vouched peer (root, the daemon's own
 user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake.
-Every secret value also takes a `file:` reference — `--control-token
+Every token value also takes a `file:` reference — `--control-token
 file:/path` reads the first line of an owner-only `0600` file (the same
-loader behind the `-file` siblings; a systemd LoadCredential rides as
+loader disciplines every secret; a systemd LoadCredential rides as
 `file:/run/credentials/...`).
 **With a token configured the wire is signed**: every command and reply
 carries the **full sha256 HMAC of its payload, keyed by the token** —
 a token-holding client verifies nothing was injected or altered in flight,
 and over TCP the signed commands are mandatory (the same wire the cache
 and the fake speak). A **second, read-only token**
-(`--control-ops-token`/`--control-ops-token-file`) authenticates into the
+(`--control-ops-token`) authenticates into the
 **`show`/`clear` verbs only** — no `set`/`unset`, no `poll now`, no
 `request reload`, no `reload`, no `restart`, no `shutdown`: the ops shift
 against the admin key. Denied commands answer `err forbidden: the ops token
@@ -359,13 +360,10 @@ journald adds one.
 | `--interval` | `10` | seconds between Modbus polls |
 | `--log-level` | `INFO` | `DEBUG` logs every poll |
 | `--log-access` | off | audit log: every HTTP request at INFO (client, path, status, size) |
-| `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; token compared timing-safe) |
-| `--auth-token-file` | disabled | read the bearer token from a file instead (single line, trimmed; **re-read on every SIGHUP** — rotate by rewriting the file and reloading; **owner-only `0600`** — a group/world-accessible token file refuses to start, F12); mutually exclusive with `--auth-token` |
+| `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; token compared timing-safe); the value may be `file:<path>` — the first line of an owner-only `0600` file (**re-read on every SIGHUP** — rotate by rewriting the file and reloading), F12 |
 | `--control-port` | `/tmp/modbus-scraper-<listen-port>.socket` | the JSON-lines control server target (unix socket path or TCP port on 127.0.0.1), `0` = off |
-| `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `CONTROL_TOKEN`); a TCP control port refuses to start without one (F5) |
-| `--control-token-file` | off | the control token from a file (the first line; a key file or a systemd `LoadCredential`, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12), instead of `--control-token`; giving both is an error |
-| `--control-ops-token` | off | a second, **read-only** control token: its sessions run the `show`/`clear` verbs only (no `set`/`unset`, no `poll now`, no `request reload`, no `restart`, no `shutdown`) — needs `--control-token`/`--control-token-file`, must differ from it; both roles audited (`CONTROL_OPS_TOKEN`) |
-| `--control-ops-token-file` | off | the read-only ops token from a file (the first line; **owner-only `0600`**, F12), instead of `--control-ops-token`; giving both is an error |
+| `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `CONTROL_TOKEN`); a TCP control port refuses to start without one (F5); the value may be `file:<path>` — the first line of an owner-only `0600` file, F12 |
+| `--control-ops-token` | off | a second, **read-only** control token: its sessions run the `show`/`clear` verbs only (no `set`/`unset`, no `poll now`, no `request reload`, no `restart`, no `shutdown`) — needs `--control-token`, must differ from it; both roles audited (`CONTROL_OPS_TOKEN`) |
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (`CONTROL_OPS_VERBS`) |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `CONTROL_TRUST_UIDS`) |
 | `--dump-path` | off | the state dump (write-behind): the live setting overrides — the tokens apart — as one JSON, created `0600` with an integrity hash, written on the `request dump` command and the graceful shutdown; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (config `set dump path`, env `DUMP_PATH`) |

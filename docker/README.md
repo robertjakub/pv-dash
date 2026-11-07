@@ -116,9 +116,9 @@ checkout has. Compose recreates a service when its env file changes. Two
 knobs are compose-level by nature and stay in the compose file: the
 dashboard's published port and its `PROM_URL` (the stack's
 `environment:` block — environment beats env_file, so `scraper.env`'s
-`AUTH_TOKEN_FILE` cannot override the stack's generated-token file
+`AUTH_TOKEN` cannot override the stack's generated-token file
 either; the token story stays the volume file, a plain-docker
-`AUTH_TOKEN_FILE` in `scraper.env` is fine). The fake's simulation envs
+`AUTH_TOKEN=file:...` in `scraper.env` is fine). The fake's simulation envs
 (`CHAOS`, `MAX_KWP`, `BATTERY`, `STRICT`, `TIME`, `TIME_SCALE`) are its
 SIGHUP layer, not startup: they reach a container when it is created with
 them (compose recreates on the file change) or via
@@ -153,7 +153,7 @@ carrying a legacy seeded conf (`modbus_cache.conf`, `scraper.conf`,
 
 **The scraper/token story ships in the stack** (the audit's F13 closed for
 the demo): the exporter never serves unauthenticated — the compose sets
-`AUTH_TOKEN_FILE=/config/metrics.token`, and the entrypoint
+`AUTH_TOKEN=file:/config/metrics.token` (the `file:` reference form), and the entrypoint
 generates that file into the volume on the first seed: a random value,
 **0600, owner pvsuite** (bundled `*.token` defaults are placeholders that
 are never copied — the generation is in `entrypoint.sh`; the token survives
@@ -332,8 +332,8 @@ docker run --rm -p 127.0.0.1:9350:9350 \
 ```
 
 Standalone runs stay token-less by default — the compose stack is what
-wires the token (`AUTH_TOKEN_FILE`); pass
-`-e AUTH_TOKEN_FILE=/config/metrics.token` by hand to mirror it.
+wires the token (`AUTH_TOKEN=file:...`); pass
+`-e AUTH_TOKEN=file:/config/metrics.token` by hand to mirror it.
 
 ### prometheus (`Dockerfile.prometheus`)
 

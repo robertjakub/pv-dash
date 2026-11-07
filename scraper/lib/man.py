@@ -38,7 +38,8 @@ Empty auth (the default) = no auth at all.
 The exposition endpoint is the tool's serving surface: the connection caps
 (\\fB--max-clients\\fR total, \\fB--max-conn-per-ip\\fR per peer, extras
 get an immediate 503), the idle keep-alive kick (\\fB--client-timeout\\fR)
-and the bearer token (\\fB--auth-token\\fR/\\fB--auth-token-file\\fR). A
+and the bearer token (\\fB--auth-token\\fR, the value a token or a
+\\fBfile:<path>\\fR reference). A
 non-loopback listen without a token refuses to start (F13 in
 docs/AUDIT.md).
 .PP

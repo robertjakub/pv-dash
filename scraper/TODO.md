@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The `-file` sibling removal: **`file:` is the one spelling** —
+`--control-token-file`/`--control-ops-token-file`/`--auth-token-file`,
+their env twins and the `auth/token-file`-style live keys are GONE (still
+experimental — behaviour may change). Every token knob takes the inline
+string or a `file:<path>` reference (the same loader and 0600 discipline
+the siblings enforced, F12 — the auth token's SIGHUP re-read included),
+the secret-error strings say "by flag/env, or as `file:<path>`", the
+NixOS module renders `set auth-token file:...` (the option names stay),
+and the compose stack passes `AUTH_TOKEN=file:/config/metrics.token`.
+
 The bit-space + float wave: the scraper's client gained **`read_bits`**
 (FC1 coils / FC2 discrete inputs — the reply's packed bits decoded
 LSB-first) and the decode table gained the **lo-word-first

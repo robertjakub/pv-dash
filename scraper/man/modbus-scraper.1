@@ -31,7 +31,8 @@ Empty auth (the default) = no auth at all.
 The exposition endpoint is the tool's serving surface: the connection caps
 (\fB--max-clients\fR total, \fB--max-conn-per-ip\fR per peer, extras
 get an immediate 503), the idle keep-alive kick (\fB--client-timeout\fR)
-and the bearer token (\fB--auth-token\fR/\fB--auth-token-file\fR). A
+and the bearer token (\fB--auth-token\fR, the value a token or a
+\fBfile:<path>\fR reference). A
 non-loopback listen without a token refuses to start (F13 in
 docs/AUDIT.md).
 .PP
@@ -136,12 +137,6 @@ skips the token; the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
 file:/run/credentials/...) (default: config, $CONTROL_TOKEN or none)
 .TP
-.B \-\-control\-token\-file
-the control token from a file (the first line; e.g. a systemd
-LoadCredential or a key file; must be owner\-only 0600) — takes the
-place of \-\-control\-token; giving both is an error (env
-CONTROL_TOKEN_FILE)
-.TP
 .B \-\-control\-ops\-token
 a second, read\-only control token: sessions authenticating with it may
 run the show/clear verbs only (no set/unset, no poll now, no request
@@ -149,11 +144,6 @@ reload, no restart, no shutdown) — the ops shift against the admin key,
 both audited; the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
 file:/run/credentials/...) (default: config, $CONTROL_OPS_TOKEN or none)
-.TP
-.B \-\-control\-ops\-token\-file
-the read\-only ops token from a file (the first line; must be
-owner\-only 0600) — takes the place of \-\-control\-ops\-token; giving
-both is an error (default: config, $CONTROL_OPS_TOKEN_FILE)
 .TP
 .B \-\-control\-ops\-verbs
 the read\-only ops role's RBAC policy: the verbs its sessions may run,
@@ -171,11 +161,6 @@ require Authorization: Bearer <token> on all requests; the value may be
 `file:<path>` — the first line of an owner\-only 0600 file (a systemd
 LoadCredential rides as file:/run/credentials/...) (default: config,
 $AUTH_TOKEN or disabled)
-.TP
-.B \-\-auth\-token\-file
-read the bearer token from this file instead (single line, trimmed;
-re\-read on every SIGHUP — rotate by rewriting the file and reloading;
-must be owner\-only 0600); mutually exclusive with \-\-auth\-token
 .TP
 .B \-\-audit\-log
 SCR audit trail: a file path or \- for stdout (the docker/journald way);

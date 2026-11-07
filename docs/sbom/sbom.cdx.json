@@ -211,7 +211,7 @@
       "properties": [
         {
           "name": "pv-suite:dockerfile",
-          "value": "docker/Dockerfile.inverter"
+          "value": "docker/Dockerfile.fake-inverter"
         }
       ]
     },
@@ -223,7 +223,7 @@
       "properties": [
         {
           "name": "pv-suite:dockerfile",
-          "value": "docker/Dockerfile.cache"
+          "value": "docker/Dockerfile.modbus-cache"
         }
       ]
     },
@@ -235,7 +235,7 @@
       "properties": [
         {
           "name": "pv-suite:dockerfile",
-          "value": "docker/Dockerfile.scraper"
+          "value": "docker/Dockerfile.modbus-scraper"
         }
       ]
     }

@@ -25,6 +25,22 @@ umask 077
 cp "$TOKEN_SRC" "$TOKEN_DST"
 chown prometheus:prometheus "$TOKEN_DST" /prometheus
 
-exec su-exec prometheus:prometheus prometheus \
-    --config.file=/etc/prometheus/prometheus.yml \
-    --storage.tsdb.path=/prometheus
+# The knobs the env file (env/prometheus.env) or a docker -e can set —
+# PROM_RETENTION (the TSDB retention, a prometheus duration: 15d, 90d,
+# 1y, ...; default 90d), PROM_LIFECYCLE=on (the lifecycle API: POST
+# /-/reload after editing prometheus.yml, POST /-/quit) and
+# PROM_ADMIN_API=on (the admin API: snapshots, delete_series — powerful
+# and destructive, keep off unless a runbook needs it). The endpoints
+# sit on the internal network only, and the lifecycle API can stop the
+# collector: enable deliberately. An empty value means unset.
+PROM_ARGS="--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
+PROM_RETENTION="${PROM_RETENTION:-90d}"
+PROM_ARGS="$PROM_ARGS --storage.tsdb.retention.time=$PROM_RETENTION"
+if [ "${PROM_LIFECYCLE:-}" = "on" ]; then
+    PROM_ARGS="$PROM_ARGS --web.enable-lifecycle"
+fi
+if [ "${PROM_ADMIN_API:-}" = "on" ]; then
+    PROM_ARGS="$PROM_ARGS --web.enable-admin-api"
+fi
+
+exec su-exec prometheus:prometheus prometheus $PROM_ARGS

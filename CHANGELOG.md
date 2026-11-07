@@ -12,6 +12,36 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **docker** — **the Dockerfiles and the image tags speak the daemon
+  names** (`Dockerfile.inverter` → `Dockerfile.fake-inverter`,
+  `Dockerfile.cache` → `Dockerfile.modbus-cache`, `Dockerfile.scraper` →
+  `Dockerfile.modbus-scraper`; the compose images `pv-prometheus` →
+  `prometheus`, `pv-dashboard` → `dashboard` — the service names already
+  did), and the compose build blocks gain the `dockerfile:` keys they
+  were missing (the per-subproject contexts carry no Dockerfile of their
+  own — the builds resolve `dockerfile: ../docker/Dockerfile.<daemon>`,
+  the plain-docker README commands take the matching `-f`; the scraper
+  build doc drops the stale `../scrape` spelling). The healthchecks
+  check every **5 minutes** (`--interval=5m`).
+- **docker** — **a HEALTHCHECK on every image, and the demo Prometheus's
+  retention/lifecycle knobs ride an env file**: the four Modbus images
+  probe their unix control socket with the ctl (`modbus-cache-ctl show
+  version`, `fake-ctl show version`, `modbus-scraper-ctl ping`,
+  `dashboard-ctl ping` — the check runs as root, a trusted peer over
+  SO_PEERCRED, so it needs no token; disabling the control plane with
+  `CTL=0` fails it), the Prometheus image probes `/-/ready` with busybox
+  wget; the scraper image gains the missing `modbus-scraper-ctl`/
+  `modbus-scraper-cli` symlinks (parity with the other images). The
+  Prometheus entrypoint takes `PROM_RETENTION` (the TSDB retention, a
+  prometheus duration — the default is now an explicit **90d**, was
+  prometheus's own 15d), `PROM_LIFECYCLE=on` (the `/-/reload`,
+  `/-/quit` API) and `PROM_ADMIN_API=on` (snapshots, delete-series —
+  powerful and destructive) — shipped as
+  `docker/env/prometheus.env.example`, read by the compose service's
+  `env_file:` (`required: false`) or a plain `docker run --env-file`.
+  The docker README states the files' role: an example stack for the
+  **demo** — a starting point to adapt (the real `UPSTREAM`, the
+  published ports, the retention), not a production recipe.
 - **docker** — **each image gets its own env file, and the config volume
   shrinks to the required file artifacts**: the env examples ship as
   `docker/env/cache.env.example`, `env/scraper.env.example`,

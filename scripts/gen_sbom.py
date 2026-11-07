@@ -146,7 +146,8 @@ def docker_facts():
     """The alpine tag and the apk set, identical across all three
     Dockerfiles (a disagreement fails)."""
     tag, apks = None, None
-    for df in ('Dockerfile.cache', 'Dockerfile.scraper', 'Dockerfile.inverter'):
+    for df in ('Dockerfile.modbus-cache', 'Dockerfile.modbus-scraper',
+               'Dockerfile.fake-inverter'):
         text = read(os.path.join(REPO, 'docker', df))
         m = re.search(r'^FROM alpine:(\S+)', text, re.M)
         a = re.search(r'^RUN apk add --no-cache (.+?)(?:\s*\\)?$', text, re.M)
@@ -241,9 +242,9 @@ def render_cdx(f):
             comp['properties'] = [{'name': 'pv-suite:note',
                                    'value': 'drops the entrypoint from root to the unprivileged pvsuite user'}]
         comps.append(comp)
-    for image, dockerfile in (('fake-inverter', 'docker/Dockerfile.inverter'),
-                              ('modbus-cache', 'docker/Dockerfile.cache'),
-                              ('modbus-scraper', 'docker/Dockerfile.scraper')):
+    for image, dockerfile in (('fake-inverter', 'docker/Dockerfile.fake-inverter'),
+                              ('modbus-cache', 'docker/Dockerfile.modbus-cache'),
+                              ('modbus-scraper', 'docker/Dockerfile.modbus-scraper')):
         comps.append({'bom-ref': 'image:%s' % image, 'type': 'container', 'name': image, 'version': v,
                       'properties': [{'name': 'pv-suite:dockerfile', 'value': dockerfile}]})
 

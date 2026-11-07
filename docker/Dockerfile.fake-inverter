@@ -5,7 +5,8 @@
 # Build (the context = ../inverter, the profiles = ../profiles, the entrypoint
 # = ../docker, the shared code = ../common):
 #   cd docker
-#   docker build -t fake-inverter --build-context profiles=../profiles \
+#   docker build -f ../docker/Dockerfile.fake-inverter -t fake-inverter \
+#       --build-context profiles=../profiles \
 #       --build-context scripts=../docker --build-context common=../common ../inverter
 #   # or: docker compose up -d
 #
@@ -40,3 +41,9 @@ ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 5502
 CMD ["fake-inverter", "--host", "0.0.0.0", "--port", "5502", "--audit-log", "-"]
+
+# Liveness: the ctl answers over the fake's unix control socket (the
+# default socket follows the CMD's port; the check runs as root — a
+# trusted peer over SO_PEERCRED, so no token is needed).
+HEALTHCHECK --interval=5m --timeout=5s --start-period=15s --retries=3 \
+    CMD ["fake-ctl", "show", "version"]

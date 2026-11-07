@@ -5,14 +5,15 @@
 #
 # Build (the context = ../dashboard, the entrypoint + common = the named contexts):
 #   cd docker
-#   docker build -t pv-dashboard --build-context scripts=../docker --build-context common=../common ../dashboard
+#   docker build -f ../docker/Dockerfile.dashboard -t dashboard \
+#       --build-context scripts=../docker --build-context common=../common ../dashboard
 #   # or: docker compose up -d dashboard
 #
 # Run:
-#   docker run --rm -p 127.0.0.1:8080:8080 pv-dashboard   # loopback-published
-#   docker run --rm -it pv-dashboard bash                 # poke around as pvsuite
+#   docker run --rm -p 127.0.0.1:8080:8080 dashboard   # loopback-published
+#   docker run --rm -it dashboard bash                 # poke around as pvsuite
 #   docker run --rm -p 127.0.0.1:8080:8080 -e PROM_URL=http://prometheus:9090 \
-#       pv-dashboard                                      # the upstream via env
+#       dashboard                                      # the upstream via env
 #
 # The config volume: the entrypoint seeds /config with the REQUIRED file
 # artifacts on start (files the volume lacks are copied in, existing ones
@@ -52,3 +53,9 @@ ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 8080
 CMD ["dashboard"]
+
+# Liveness: the ctl answers over the server's unix control socket (the
+# default socket follows the bundled conf's port; the check runs as root —
+# a trusted peer over SO_PEERCRED, so no token is needed).
+HEALTHCHECK --interval=5m --timeout=5s --start-period=15s --retries=3 \
+    CMD ["dashboard-ctl", "ping"]

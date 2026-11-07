@@ -5,7 +5,8 @@
 # Build (the context = ../cache, the profiles = ../profiles, the entrypoint
 # = ../docker, the shared code = ../common):
 #   cd docker
-#   docker build -t modbus-cache --build-context profiles=../profiles \
+#   docker build -f ../docker/Dockerfile.modbus-cache -t modbus-cache \
+#       --build-context profiles=../profiles \
 #       --build-context scripts=../docker --build-context common=../common ../cache
 #   # or: docker compose up -d modbus-cache
 #
@@ -54,3 +55,10 @@ ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 15502
 CMD ["modbus-cache", "--listen", "0.0.0.0:15502", "--audit-log", "-"]
+
+# Liveness: the ctl answers over the daemon's unix control socket (the
+# default socket follows the CMD's listen port; the check runs as root —
+# a trusted peer over SO_PEERCRED, so no token is needed). Disabling the
+# control plane (CTL=0) fails the check.
+HEALTHCHECK --interval=5m --timeout=5s --start-period=15s --retries=3 \
+    CMD ["modbus-cache-ctl", "show", "version"]

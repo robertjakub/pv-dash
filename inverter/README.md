@@ -438,7 +438,7 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 
 The fake ships as an alpine container — stdlib-only, no pip, running as
 the unprivileged `pvsuite` user with the tools on `PATH`. Build + run
-(`Dockerfile.inverter` + `compose.yaml`; the shared
+(`Dockerfile.fake-inverter` + `compose.yaml`; the shared
 [`profiles/`](../profiles/README.md) directory is copied in):
 [`docker/README.md`](../docker/README.md).
 

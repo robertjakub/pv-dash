@@ -4,9 +4,18 @@
 > active development: interfaces, file formats and behavior can still change
 > at any time.
 
+> **These are example files for the DEMO.** The compose stack below wires
+> the fake inverter end to end on one internal network — a self-contained
+> demo, not a production recipe. Before running it against real hardware,
+> adapt it: point the cache's `UPSTREAM` at the device
+> (`env/cache.env`), publish only the ports your clients actually need
+> (loopback first — see the F7 notes below), and size the collector's
+> retention (`env/prometheus.env`).
+
 The suite is stdlib-only, so the containers are trivial: `alpine` + `apk add
-python3`, no pip, no venv, ~50 MB images. One Dockerfile per tool —
-`Dockerfile.inverter`, `Dockerfile.cache`, `Dockerfile.scraper`,
+python3`, no pip, no venv, ~50 MB images. One Dockerfile per tool, named
+after the tool's daemon — `Dockerfile.fake-inverter`,
+`Dockerfile.modbus-cache`, `Dockerfile.modbus-scraper`,
 `Dockerfile.dashboard` — plus `Dockerfile.prometheus` for the demo stack's
 collector, and a `compose.yaml` wiring the demo stack. The pattern:
 
@@ -15,8 +24,15 @@ collector, and a `compose.yaml` wiring the demo stack. The pattern:
   `pvsuite` via `su-exec` — the tool never runs as root
 - the tools symlinked onto `PATH` (the inverter image: `fake-inverter`,
   `fake-ctl`, `fake-cli`; the cache image: `modbus-cache`, `modbus-cache-ctl`,
-  `modbus-cache-cli`; the scraper image: `modbus-scraper`), `bash` for
-  interactive runs
+  `modbus-cache-cli`; the scraper image: `modbus-scraper`,
+  `modbus-scraper-ctl`, `modbus-scraper-cli`; the dashboard image:
+  `dashboard`, `dashboard-ctl`, `dashboard-cli`), `bash` for interactive
+  runs
+- a **HEALTHCHECK** on every image: the Modbus tools answer over their
+  unix control socket (`<tool>-ctl ping` / `show version` — the check
+  runs as root, a trusted peer over SO_PEERCRED, so no token is needed;
+  disabling the control plane with `CTL=0` fails the check), the
+  Prometheus image probes `/-/ready` with busybox wget
 - the shared [`profiles/`](../profiles/README.md) JSON files copied flat to
   `/pv-suite/profiles/` (the subproject's `bin/` tools stay out of the
   image) — the profile resolution finds them relative to the checkout layout
@@ -70,11 +86,13 @@ Prometheus UI directly from the host as well, add
 
 Each image has its own env file, shipped as an example:
 `env/cache.env.example`, `env/scraper.env.example`, `env/fake.env.example`,
-`env/dashboard.env.example` — `cp env/<tool>.env.example env/<tool>.env`
-and edit. The names are the **bare env twins** the tool's own docs speak
-(`UPSTREAM`, `INTERVAL`, `TTL`, `PROFILE`, `METRIC_PREFIX`, `LOG_LEVEL`,
-…) — one file per tool, so no namespacing is needed. Every line starts
-commented; the defaults live in the image.
+`env/dashboard.env.example`, `env/prometheus.env.example` — `cp
+env/<tool>.env.example env/<tool>.env` and edit. The names are the
+**bare env twins** the tool's own docs speak (`UPSTREAM`, `INTERVAL`,
+`TTL`, `PROFILE`, `METRIC_PREFIX`, `LOG_LEVEL`, …) — one file per tool,
+so no namespacing is needed (the Prometheus file is the exception: its
+`PROM_*` knobs belong to `entrypoint-prometheus.sh`, not a pv-suite
+tool). Every line starts commented; the defaults live in the image.
 
 The same file is consumed two ways:
 
@@ -246,14 +264,15 @@ edit).
 
 ## The images, one by one
 
-### fake-inverter (`Dockerfile.inverter`)
+### fake-inverter (`Dockerfile.fake-inverter`)
 
 The demo device for development and testing — see the
 [fake inverter](../inverter/README.md):
 
 ```bash
 cd docker
-docker build -t fake-inverter --build-context profiles=../profiles \
+docker build -f ../docker/Dockerfile.fake-inverter -t fake-inverter \
+    --build-context profiles=../profiles \
     --build-context scripts=../docker --build-context common=../common ../inverter
 docker run --rm -p 127.0.0.1:5502:5502 fake-inverter      # loopback-published, serves on 0.0.0.0:5502 in the container
 docker run --rm -it fake-inverter bash                    # poke around as pvsuite
@@ -264,7 +283,7 @@ docker run --rm -p 127.0.0.1:5502:5502 fake-inverter \
 The fake has no file configs yet — its `/config` volume is there for
 symmetry with the other two images and for future use.
 
-### modbus-cache (`Dockerfile.cache`)
+### modbus-cache (`Dockerfile.modbus-cache`)
 
 The caching proxy multiplexing the inverter's single Modbus client — see the
 [cache](../cache/README.md). The bundled conf
@@ -275,7 +294,8 @@ from the image; the volume carries `/config/selection.json` (`SELECTION`)
 
 ```bash
 cd docker
-docker build -t modbus-cache --build-context profiles=../profiles \
+docker build -f ../docker/Dockerfile.modbus-cache -t modbus-cache \
+    --build-context profiles=../profiles \
     --build-context scripts=../docker --build-context common=../common ../cache
 docker run --rm -p 127.0.0.1:15502:15502 modbus-cache    # upstream defaults to fake-inverter:5502 (the image's UPSTREAM env)
 docker run --rm -it modbus-cache bash          # poke around as pvsuite
@@ -289,7 +309,7 @@ Without `-v` the volume is anonymous (thrown away with `--rm`); name it to
 keep the configs: `docker run -v pv-suite-config:/config ...` — the same
 named volume under all three tools keeps every config in one place.
 
-### modbus-scraper (`Dockerfile.scraper`)
+### modbus-scraper (`Dockerfile.modbus-scraper`)
 
 The Prometheus exporter — see the [scraper](../scraper/README.md). The
 bundled conf (`/pv-suite/scraper/scraper.conf`, the default `--config`
@@ -300,7 +320,8 @@ there, it survives recreation; override the conf's knobs with
 
 ```bash
 cd docker
-docker build -t modbus-scraper --build-context profiles=../profiles \
+docker build -f ../docker/Dockerfile.modbus-scraper -t modbus-scraper \
+    --build-context profiles=../profiles \
     --build-context scripts=../docker --build-context common=../common ../scraper
 docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper    # upstream defaults to modbus-cache:15502 (the image's UPSTREAM env)
 docker run --rm -it modbus-scraper bash        # poke around as pvsuite
@@ -321,7 +342,7 @@ The context is the `docker/` directory itself:
 
 ```bash
 cd docker
-docker build -t pv-prometheus -f Dockerfile.prometheus .
+docker build -t prometheus -f Dockerfile.prometheus .
 ```
 
 Compose-only by design: it mounts the shared `config` volume (read-only)
@@ -329,6 +350,20 @@ for the token, needs `modbus-scraper` on the internal network, and its
 entrypoint (`entrypoint-prometheus.sh`) drops root before the exec — see
 [The demo stack](#the-demo-stack-compose). The UI serves on the internal
 network only — the dashboard's proxy is the way in from the host.
+
+The entrypoint takes three `PROM_*` knobs (ship them in
+`env/prometheus.env` — see [the env files](#the-env-files-one-per-tool) —
+or `-e` on a plain `docker run`):
+
+- `PROM_RETENTION` — the TSDB retention, a prometheus duration
+  (`15d`, `90d`, `1y`, …); the default keeps **90 days** of scrapes on
+  the `prometheus-data` volume (prometheus's own default would be 15 days)
+- `PROM_LIFECYCLE=on` — the lifecycle API: `POST /-/reload` after editing
+  the config, `POST /-/quit` to stop the collector (it sits on the
+  internal network only, and it can stop the collector — enable
+  deliberately)
+- `PROM_ADMIN_API=on` — the admin API (snapshots, delete_series):
+  powerful and destructive; keep off unless a runbook needs it
 
 ### dashboard (`Dockerfile.dashboard`)
 
@@ -340,11 +375,12 @@ The static single-page app with its stdlib Prometheus proxy — see the
 
 ```bash
 cd docker
-docker build -t pv-dashboard --build-context scripts=../docker ../dashboard
-docker run --rm -p 127.0.0.1:8080:8080 pv-dashboard    # loopback-published, serves 0.0.0.0:8080 in the container
-docker run --rm -it pv-dashboard bash                  # poke around as pvsuite
+docker build -f ../docker/Dockerfile.dashboard -t dashboard \
+    --build-context scripts=../docker --build-context common=../common ../dashboard
+docker run --rm -p 127.0.0.1:8080:8080 dashboard    # loopback-published, serves 0.0.0.0:8080 in the container
+docker run --rm -it dashboard bash                  # poke around as pvsuite
 docker run --rm -p 127.0.0.1:8080:8080 -e PROM_URL=http://prometheus:9090 \
-    pv-dashboard                                       # the upstream via env (env beats server.conf)
+    dashboard                                       # the upstream via env (env beats server.conf)
 ```
 
 The upstream defaults to `http://localhost:9090` (the bundled

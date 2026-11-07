@@ -5,7 +5,7 @@
 #
 # Build (the context = the docker/ directory itself):
 #   cd docker
-#   docker build -t pv-prometheus -f Dockerfile.prometheus .
+#   docker build -t prometheus -f Dockerfile.prometheus .
 #   # or: docker compose up -d prometheus
 #
 # The entrypoint waits for /config/metrics.token (the modbus-scraper's
@@ -29,3 +29,8 @@ RUN chmod +x /usr/local/bin/pv-prometheus-entrypoint \
 VOLUME /prometheus
 EXPOSE 9090
 ENTRYPOINT ["/usr/local/bin/pv-prometheus-entrypoint"]
+
+# Liveness: busybox wget against the /-/ready probe (the UI serves on the
+# internal network only — the loopback target works inside the container).
+HEALTHCHECK --interval=5m --timeout=5s --start-period=30s --retries=3 \
+    CMD ["wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]

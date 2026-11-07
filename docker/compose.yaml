@@ -1,7 +1,9 @@
 # The pv-suite Modbus tools as compose services. The build contexts are
-# ../inverter, ../cache, ../scraper and ../dashboard; the shared profiles/
-# directory, the entrypoint and the common/ package ride in as named
-# contexts. Run one service: docker compose up -d fake-inverter
+# ../inverter, ../cache, ../scraper and ../dashboard; the Dockerfiles are
+# this directory's Dockerfile.<daemon> files (dockerfile: ../docker/... —
+# the subproject contexts carry no Dockerfile of their own); the shared
+# profiles/ directory, the entrypoint and the common/ package ride in as
+# named contexts. Run one service: docker compose up -d fake-inverter
 # Run the stack:         docker compose up -d (inverter + cache + scraper + prometheus + dashboard)
 #
 # All three share the external `config` volume mounted at /config: on start
@@ -34,6 +36,7 @@ services:
   fake-inverter:
     build:
       context: ../inverter
+      dockerfile: ../docker/Dockerfile.fake-inverter
       additional_contexts:
         profiles: ../profiles
         scripts: ../docker
@@ -51,6 +54,7 @@ services:
   modbus-cache:
     build:
       context: ../cache
+      dockerfile: ../docker/Dockerfile.modbus-cache
       additional_contexts:
         profiles: ../profiles
         scripts: ../docker
@@ -70,6 +74,7 @@ services:
   modbus-scraper:
     build:
       context: ../scraper
+      dockerfile: ../docker/Dockerfile.modbus-scraper
       additional_contexts:
         profiles: ../profiles
         scripts: ../docker
@@ -93,7 +98,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prometheus
-    image: pv-prometheus
+    image: prometheus
+    env_file:
+      - path: env/prometheus.env
+        required: false
     volumes:
       - config:/config:ro
       - prometheus-data:/prometheus
@@ -106,10 +114,11 @@ services:
   dashboard:
     build:
       context: ../dashboard
+      dockerfile: ../docker/Dockerfile.dashboard
       additional_contexts:
         scripts: ../docker
         common: ../common
-    image: pv-dashboard
+    image: dashboard
     environment:
       # the proxy target: the stack's internal Prometheus service (the
       # dashboard never needs the token — the scrape stays prometheus-side;

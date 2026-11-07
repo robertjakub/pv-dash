@@ -2,11 +2,12 @@
 # Runs as the unprivileged user `pvsuite`; the profiles come from the shared
 # profiles/ directory via a named build context.
 #
-# Build (the context = ../scrape, the profiles = ../profiles, the entrypoint
+# Build (the context = ../scraper, the profiles = ../profiles, the entrypoint
 # = ../docker, the shared code = ../common):
 #   cd docker
-#   docker build -t modbus-scraper --build-context profiles=../profiles \
-#       --build-context scripts=../docker --build-context common=../common ../scrape
+#   docker build -f ../docker/Dockerfile.modbus-scraper -t modbus-scraper \
+#       --build-context profiles=../profiles \
+#       --build-context scripts=../docker --build-context common=../common ../scraper
 #   # or: docker compose up -d modbus-scraper
 #
 # Run:
@@ -43,7 +44,9 @@ COPY --chown=pvsuite lib/ scraper/lib/
 COPY --chown=pvsuite scraper.conf metrics.json scraper/
 COPY --chown=pvsuite metrics.json metrics.token config-defaults/
 RUN chmod +x scraper/bin/*.py /usr/local/bin/pv-entrypoint \
-    && ln -s /pv-suite/scraper/bin/modbus-scraper.py /usr/local/bin/modbus-scraper
+    && ln -s /pv-suite/scraper/bin/modbus-scraper.py /usr/local/bin/modbus-scraper \
+    && ln -s /pv-suite/scraper/bin/modbus-scraper-ctl.py /usr/local/bin/modbus-scraper-ctl \
+    && ln -s /pv-suite/scraper/bin/modbus-scraper-cli.py /usr/local/bin/modbus-scraper-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
 # UPSTREAM is the image's default upstream peer (modbus-cache:15502 — the
@@ -57,3 +60,9 @@ ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 9350
 CMD ["modbus-scraper", "--listen", "0.0.0.0:9350"]
+
+# Liveness: the ctl answers over the daemon's unix control socket (the
+# default socket follows the CMD's listen port; the check runs as root —
+# a trusted peer over SO_PEERCRED, so no token is needed).
+HEALTHCHECK --interval=5m --timeout=5s --start-period=15s --retries=3 \
+    CMD ["modbus-scraper-ctl", "ping"]

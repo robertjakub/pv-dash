@@ -12,6 +12,28 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **the dump/reload family fully rides the common
+  base**: the per-tool control servers lose their stale copies of
+  `apply_dump_settings`, `_save_reload_state`, `_restore_reload_state`,
+  `_reload_state_path` and `reload_daemon` (the base's versions carry
+  them — `self.LOG`/`self.SETTINGS`, not the module globals); the fake's
+  scenario-first restore order and XDG state-home fallback become the
+  base's `APPLY_FIRST`/`XDG_STATE_NAME` hooks, the seal key reads
+  `self.dump_key` (the cache points it at the proxy with a property —
+  the one home `set dump/key` mutates), the reload-state save makes the
+  directory, and the `_apply` branches' `num`/`numi` parsers move to
+  common/control.py.
+- **everywhere** — **`show config` is one renderer, modbus-cache's
+  golden shape**: the base's `show_config` walks the registry with the
+  golden chain (the per-tool `CFG_KEYS` renames and the structured-value
+  `CFG_FORMATTERS` — the cache's ACL/write-map/selection formatters are
+  now the family's wiring pattern in each `lib/options.py`), the
+  per-tool copies and their `config_value` functions die; the subclass
+  points `show_config_cfg()` at its resolved startup dict (the cache's
+  live `proxy.config`, the scraper's `scraper.cfg`, the dashboard's
+  `startup_values` with the metrics-server knob's live state folded
+  in); the fake keeps its own (the argv-restart shape — no config
+  file). No wire, reply or file-shape change — a refactor-only wave.
 - **everywhere** — **the value listing slims**: the `?` listing of a
   setting's values drops the `[values]` header (the branch is always the
   listing's sole section — the words render bare with their per-value

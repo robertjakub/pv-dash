@@ -20,17 +20,38 @@ import time
 from common import dump as state
 from common.cred import peer_uid
 from common.dump import SECRET_REMOVED
-from common.options import control_command, grouped_rows, knob_dictionary
+from common.options import config_value, control_command, grouped_rows, knob_dictionary, \
+    render_config_script
 from common.wiresec import ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, proof_tag, role_allows, \
     role_tag, sign_reply, verify_request_mac
+
+
+def num(text, label, what):
+    """The `_apply` branches' float parser: the err message keeps the knob's
+    label and its unit ('seconds', 'clients', ...)."""
+    try:
+        return float(text)
+    except ValueError:
+        raise ValueError('%s must be %s, got %r' % (label, what, text))
+
+
+def numi(text, label, what):
+    """The `_apply` branches' int parser — num's integer sibling."""
+    try:
+        return int(text)
+    except ValueError:
+        raise ValueError('%s must be %s, got %r' % (label, what, text))
 
 
 class ControlServer:
     """The family's control server. The subclass sets the class attributes:
     LOG (the daemon's logger), OPTIONS/SETTINGS (its registry), WHO (the
     show-knobs voice), EXIT_TEXT/RELOAD_TEXT (the bye-frame wording) and —
-    for the fake, which has no config file — RELOAD_NEEDS_CONFIG = False and
-    the XDG _reload_state_path override."""
+    for the fake, which has no config file — RELOAD_NEEDS_CONFIG = False,
+    XDG_STATE_NAME (the reload state lives under the state home instead of
+    beside a config) and APPLY_FIRST ('scenario' applies before the pins).
+    The dump seal key reads self.dump_key — a subclass may replace it with
+    a property pointing at its one home (the cache: the proxy's key)."""
 
     LOG = logging.getLogger('control')   # the subclass names its daemon's logger
     OPTIONS = ()                          # the registry rows — the subclass sets
@@ -39,8 +60,13 @@ class ControlServer:
     EXIT_TEXT = 'the daemon is shutting down'
     RELOAD_TEXT = 'the daemon is reloading — the daemon restarts with the saved configuration'
     RELOAD_NEEDS_CONFIG = True            # the reload verb needs --config
+    XDG_STATE_NAME = None                 # set = the reload state falls back to the state home
+    APPLY_FIRST = ()                      # the settings that apply first on a restore
     LINE_CAP = 1048576                    # the pre-auth line-buffer cap (drop past it)
     IDLE_TIMEOUT_S = 300                  # the control socket's idle timeout
+    dump_key = None                       # the dump seal key — a subclass may property it
+    CFG_KEYS = {}                         # the knob -> cfg-key renames — the subclass's registry wiring
+    CFG_FORMATTERS = {}                   # the cfg key -> text map for the structured values
 
     def __init__(self, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None,
@@ -55,7 +81,8 @@ class ControlServer:
         self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
         self.dump_path = dump_path or None   # the state dump file (the dump family)
         self.dump_restore = bool(restore_on_start)   # prospective-only: the START already chose
-        self.dump_key = dump_key or None   # the dump seal key (startup-only: the reload re-exec re-resolves the same)
+        if dump_key is not None:
+            self.dump_key = dump_key   # only when given: a subclass may property dump_key
         self.is_unix = not isinstance(target, int) and not str(target).isdigit()
         self.port = None if self.is_unix else int(target)
         self.sockpath = str(target) if self.is_unix else None
@@ -69,6 +96,7 @@ class ControlServer:
         self.clients_lock = threading.Lock()
         self.started = time.monotonic()
         self.option_by_live = {o.live: o for o in self.OPTIONS if o.live}   # the row bounds' one home
+        self.option_by_name = {o.name: o for o in self.OPTIONS}   # the registry rows by knob name (show config)
 
     # --- the wire tier ---
 
@@ -301,6 +329,43 @@ class ControlServer:
         the control command that changes it and the secret marker."""
         return knob_dictionary(self.OPTIONS, who=self.WHO)
 
+    def show_config(self):
+        """The effective configuration as a set-grammar script (modbus-cache's
+        golden shape, family-wide): every line a `set`, sectioned by the
+        shared registry comments — the output pipes straight back into a
+        config file (or through a ctl client). The secret knobs render as
+        `set <name> *** SECRET REMOVED ***` (the value never does — the
+        file/flag/env form is the documented way); the live overrides ride
+        in as their current values. The resolved startup dict rides
+        show_config_cfg(); a knob's special render (the dashboard's
+        metrics-server: the live start/stop state, not the startup flag)
+        overrides show_config_value()."""
+        cfg = dict(self.show_config_cfg() or {})
+        values = {}
+        for o in self.OPTIONS:
+            v = self.show_config_value(o.name, cfg)
+            if v is not None:
+                values[o.name] = v
+            elif o.secret and o.flag and cfg.get(o.flag[2:].replace('-', '_')):
+                values[o.name] = SECRET_REMOVED   # the knob renders, the value never does
+        script = render_config_script(self.OPTIONS, values,
+                                      comment='generated by show config — the secret knobs render as '
+                                              '*** SECRET REMOVED ***, pass them by flag/env, or as file:<path>')
+        return 'ok config\n' + script
+
+    def show_config_cfg(self):
+        """The resolved startup config dict the render reads (the subclass
+        points it at its one home — the cache's proxy.config, the live dict
+        the _apply branches write back into)."""
+        return {}
+
+    def show_config_value(self, name, cfg):
+        """One knob's set-grammar value off the resolved dict — the
+        registry's chain (common.options config_value): the CFG_KEYS
+        renames, the CFG_FORMATTERS structured values, secrets hide,
+        empties drop."""
+        return config_value(name, cfg, self.option_by_name, self.CFG_KEYS, self.CFG_FORMATTERS)
+
     TYPED_CONVS = (int, float, str)       # the typed knobs the row's bounds gate
 
     def _gate_range(self, key, v, what=''):
@@ -319,9 +384,12 @@ class ControlServer:
         An unknown setting or a value the current config rejects is skipped,
         never fatal; a *** SECRET REMOVED *** placeholder (the dump renders
         an overridden secret's knob) is skipped and named — the secret keeps
-        its current value."""
+        its current value. APPLY_FIRST names apply before the rest (the
+        fake's scenario: a preset release is the state the pins were pinned
+        after — the pins must land on top of it, never under it)."""
         applied, failed = 0, []
-        for name, value in (settings or {}).items():
+        for name in sorted(settings or {}, key=lambda k: k not in self.APPLY_FIRST):
+            value = settings[name]
             if name not in self.SETTINGS:
                 failed.append(name)
                 continue
@@ -337,7 +405,15 @@ class ControlServer:
         return applied, failed
 
     def _reload_state_path(self):
-        return self.config_path + '.reload' if self.config_path else None
+        """The one-shot reload state file: beside the config script — or,
+        when the tool has no config (XDG_STATE_NAME set), under the state
+        home."""
+        if self.config_path:
+            return self.config_path + '.reload'
+        if self.XDG_STATE_NAME:
+            base = os.environ.get('XDG_STATE_HOME') or os.path.expanduser('~/.local/state')
+            return os.path.join(base, self.XDG_STATE_NAME, 'reload.json')
+        return None
 
     def _save_reload_state(self):
         """The overrides in their wire-parsable form (dump_settings) to the
@@ -347,7 +423,11 @@ class ControlServer:
         raises OSError on an unwritable home."""
         settings = self.dump_settings()
         lost = sorted(k for k in self.overridden if settings.get(k) == SECRET_REMOVED)
-        state.write_dump(self._reload_state_path(), settings, key=self.dump_key)
+        path = self._reload_state_path()
+        d = os.path.dirname(path)
+        if d and not os.path.isdir(d):
+            os.makedirs(d, exist_ok=True)   # the XDG home may not exist yet
+        state.write_dump(path, settings, key=self.dump_key)
         return settings, lost
 
     def _restore_reload_state(self):

@@ -262,6 +262,31 @@ def render_config_script(options, values, comment=None):
     return '\n'.join(lines).rstrip() + '\n'
 
 
+def config_value(name, cfg, by_name, cfg_keys=None, formatters=None):
+    """The set-grammar form of one option's effective startup value (the
+    resolved config dict), or None when it should not render: secrets never
+    render inline (the file/flag/env form is the documented way — `show
+    config` output must be safe to paste), empty values drop (the defaults
+    apply on re-run), bools render true/false. `cfg_keys` carries the
+    per-tool knob -> cfg-key renames, `formatters` the cfg key -> text
+    map for the structured values (the ACLs, the register map) — the
+    tool's registry wiring passes both; this is modbus-cache's chain made
+    family-wide (the golden show_config)."""
+    opt = by_name[name]
+    key = (cfg_keys or {}).get(name, name.replace('-', '_'))
+    v = cfg.get(key)
+    if opt.secret:
+        return None
+    if v is None or v == '':
+        return None
+    if isinstance(v, bool):
+        return 'true' if v else 'false'
+    f = (formatters or {}).get(key)
+    if f is not None:
+        return f(v)
+    return str(v)
+
+
 def control_command(opt):
     """The knob -> control-command mapper: the command that changes this knob
     on a running daemon (`set interval 10`; a live path spells as its words:

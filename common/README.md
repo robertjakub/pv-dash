@@ -7,10 +7,10 @@ the [fake inverter](../inverter/README.md) and the [dashboard](../dashboard/READ
 | module | what |
 |---|---|
 | `version.py` | the suite version string: `0.3.0`, or `0.3.0-<short git>` in a checkout |
-| `options.py` | the family's option registry — one knob, one source: the `Option` rows (the flag, the env twin, the display group, the live `/`-path name, the control-grammar vocabulary), the argparse parser builder, the set-grammar config parser/renderer (the CLI spelling), the knob dictionary and the `Setting` rows the control grammar speaks |
+| `options.py` | the family's option registry — one knob, one source: the `Option` rows (the flag, the env twin, the display group, the live `/`-path name, the control-grammar vocabulary), the argparse parser builder, the set-grammar config parser/renderer (the CLI spelling), the knob dictionary, the golden `config_value` (the set-grammar form of one knob's effective value over the tool's renames + formatters) and the `Setting` rows the control grammar speaks |
 | `wiresec.py` | the control wire's integrity layer: the full-HMAC frame signing/verification, the token auth, the RBAC roles (admin / the read-only ops shift) |
 | `ctl.py` | the ctl client, one ladder for the family: one command or a stdin batch, the signed exchange, the auth handshake, the daemon-exit bye — the four `*-ctl` bins keep only their prose and constants |
-| `control.py` | the control server's base: the wire tier (the unix/TCP listener with the 0600/0660 mode, the peer-cred trusted peers, the admin/ops roles, the HMAC frame verification), the buffered session handler, the bye-frame announce ladder, the registry surfaces (help config / show knobs) and the dump/reload family (the write-behind dump, the restore, the whole-daemon reload with its re-exec) — the four tools subclass it with their grammar (`command`/`_apply`/`_get`), their registry rows and their reports |
+| `control.py` | the control server's base: the wire tier (the unix/TCP listener with the 0600/0660 mode, the peer-cred trusted peers, the admin/ops roles, the HMAC frame verification), the buffered session handler, the bye-frame announce ladder, the registry surfaces (help config / show knobs / the golden `show config` — the resolved startup dict over the `CFG_KEYS`/`CFG_FORMATTERS` wiring each tool's registry passes) and the dump/reload family (the write-behind dump, the restore, the whole-daemon reload with its re-exec) — the four tools subclass it with their grammar (`command`/`_apply`/`_get`), their registry rows and their reports |
 | `cli.py` | the console-style cli client, one implementation: the signed session with its reconnect cycle, the keepalive thread, the readline TAB completion and the typed-command loop with the confirm guards — the four `*-cli` bins keep their pools, candidates ladder, welcome and (the fake) its verb-first loop, passed as a spec dict |
 | `audit.py` | the append-only audit trail (`AuditLog`): `<stamp> AUDIT <PREFIX> <EVENT>`, the chained per-writer hashes, size/daily rotation, `-` = stdout |
 | `config.py` | `parse_upstream`/`parse_listen`, the token loading (`load_token_file` — the first line of an **owner-only (0600)** file; `check_token_file_mode` refuses group/world-accessible token files, F12 in docs/AUDIT.md) and the device-profile resolution against the shared [profiles/](../profiles/README.md); plus the family's resolver pieces — the set-grammar config-script loader (`load_config_script`), the precedence object (`Resolver`: flags > env > config > defaults), the control-target ladder (`resolve_target`), `str_to_bool` and the control-token pairing/charset rules |
@@ -31,11 +31,13 @@ How `common` is found:
 - **docker image** — the tree is copied to `/pv-suite/common/` (the
   `common` named build context)
 
-Deliberately *not* here (still per-tool): the control-server framework and
-the metrics endpoints (textually diverged, tool-specific wording), the
-static configuration (`static.json` / `statics.py` — different defaults and
-diagnostics per tool) and the config-script loaders (each tool resolves its
-own registry onto the common grammar).
+Deliberately *not* here (still per-tool): the command grammars
+(`command`/`_apply`/`_get` — each tool's verbs and `_apply` branches) and
+the status/inspect reports (tool-specific wording), the metrics endpoints
+(snapshot()/render() over the common skeleton — tool-specific gauge
+wording), the static configuration (`static.json` / `statics.py` —
+different defaults and diagnostics per tool) and the config-script
+loaders (each tool resolves its own registry onto the common grammar).
 
 ## License
 

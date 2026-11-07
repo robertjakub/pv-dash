@@ -52,11 +52,19 @@ TCP requires the token when configured). Commands: \\fBset\\fR/\\fBunset\\fR/
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
 scenario, chaos, seed, battery, battery-state, strict, static, max-kwp,
 battery-kwh, max-clients, client-timeout, max-conn-per-ip, metrics-server,
-register, profile, log-level),
+register, profile, log-level \\(em and the token lives: control token,
+the ops token, metrics token, each rotating live, the value never
+rendering \\(em \\fBshow <secret>\\fR refuses),
 \\fBshow status\\fR, \\fBshow connections\\fR (the live Modbus clients: peer,
 age, requests), \\fBshow registers\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
-\\fBinspect\\fR, \\fBreset\\fR, \\fBshutdown\\fR,
+\\fBinspect\\fR, \\fBreset\\fR, \\fBreload\\fR (the whole-daemon restart
+that keeps the pins: the overrides save to a state file in the XDG state
+home \\(em the fake has no config file \\(em, the process re-execs, the
+fresh fake re-applies them once), with a dump path configured
+(\\fB--dump-path\\fR): \\fBrequest dump\\fR / \\fBrequest restore\\fR (the
+overrides as one 0600 integrity-hashed JSON; \\fB--restore-on-start\\fR
+loads it at start), \\fBshutdown\\fR,
 \\fBquit\\fR. A second, read-only token (\\fB--control-ops-token\\fR)
 authenticates into the show verbs only \\(em the ops shift against the
 admin key, both roles audited. See

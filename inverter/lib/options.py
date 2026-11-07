@@ -29,7 +29,7 @@ _CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 # set must name verbs this server knows). 'clear' rides along: the family's
 # default ops policy names it, and on the fake it just answers
 # "unknown command" (there is nothing to flush).
-KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'reset', 'clear', 'shutdown',
+KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'reset', 'clear', 'reload', 'shutdown',
                'help', 'ping', 'quit')
 
 

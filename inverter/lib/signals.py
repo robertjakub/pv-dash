@@ -145,6 +145,7 @@ class SignalBox:
             self.audit.event('SHUTDOWN', '%s: uptime=%.0fs conns=%d requests=%d chaos_hits=%d'
                              % (name, dur, self.fake.conns, self.fake.requests, self.chaos.hits))
         if self.control:
+            self.control.shutdown_dump()   # the write-behind: the overrides ride the next start
             self.control.announce_exit(name)   # the consoles print the notice and exit
             self.control.cleanup()   # unlink the socket file before anything can exit first
         self.fake.stopping = True

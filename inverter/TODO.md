@@ -4,6 +4,23 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[inverter]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+
+The state-machinery wave: `dump_settings`/`apply_dump_settings` land on
+the control server — the **state dump** (`dump/path`,
+`dump/restore-on-start` lives + the `--dump-path`/`--restore-on-start`
+flags/env; `request dump`/`request restore` write and re-apply the live
+overrides — the pins and the machines, the scenario applied first so the
+pins land on top — as one 0600 integrity-hashed JSON, common/dump.py; the
+graceful shutdown dumps too), the **whole-daemon `reload`** (the fake has
+no config file — its reload state lives in the XDG state home beside the
+audit trail; the overrides save, the process re-execs, the fresh fake
+re-applies them once and consumes the file; the ops role may not reload),
+and the **secret lives**: `control/token`(-file), `control/ops/token`
+(-file) and `metrics/token`(-file) rotate live (the sessions re-auth;
+dropping the control token entirely stays legal — the trusted-LAN
+posture, F11), the secret defaults placeholders are gone (unset refuses)
+and **`show <secret>` refuses** — the value renders nowhere.
+
 The show-settings retirement: `show settings` (and its `show all`
 spelling) is gone — the per-setting `show <setting>` and `show status`'s
 `overridden=` row carry the same truth, the command answers

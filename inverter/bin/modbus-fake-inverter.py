@@ -97,7 +97,11 @@ def validate(args):
 
 
 def configured_defaults(args, frozen, profile_text):
-    """Every setting's configured startup value — what `unset <setting>` restores."""
+    """Every setting's configured startup value — what `unset <setting>`
+    restores. The secret rows (control/token, control/token-file,
+    control/ops/token, control/ops/token-file, metrics/token,
+    metrics-token-file) carry NO entry: `unset` refuses them (the
+    metrics/token treatment) — a secret never renders, never re-applies."""
     connect_acl = parse_acl(args.connect_acl or os.environ.get('CONNECT_ACL'), 'connect-acl')
     return {
         'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'grid': 'auto', 'soc': 'auto', 'cloud': 'clear',
@@ -124,21 +128,17 @@ def configured_defaults(args, frozen, profile_text):
         'metrics-server': 'on' if args.metrics_server else 'off',
         'profile': profile_text,
         'log-level': args.log_level,
+        'dump/path': args.dump_path or 'off',
+        'dump/restore-on-start': 'on' if args.restore_on_start else 'off',
         # the startup-only knobs (restart: true) — what `show <knob>` answers
         'host': args.host, 'port': str(args.port), 'unit': str(args.unit),
         'no-battery': 'on' if not args.battery else 'off',   # the no-battery flag store_falses battery
         'control-port': args.control_port or 'off',
-        'control-token': '<set>' if (args.control_token or args.control_token_file) else 'off',
-        'control-token-file': '<set>' if args.control_token_file else 'off',
-        'control-ops-token': '<set>' if (args.control_ops_token or args.control_ops_token_file) else 'off',
-        'control-ops-token-file': '<set>' if args.control_ops_token_file else 'off',
         'control-ops-verbs': args.control_ops_verbs or 'off',
         'control-trust-uids': args.control_trust_uids or 'off',
         'control-socket-group': 'on' if args.control_socket_group else 'off',
         'control-log-replies': 'on' if args.control_log_replies else 'off',
         'metrics-listen': args.metrics_listen or 'off',
-        'metrics-token': '<set>' if (args.metrics_token or args.metrics_token_file) else 'off',
-        'metrics-token-file': '<set>' if args.metrics_token_file else 'off',
         'metrics-max-clients': str(args.metrics_max_clients),
         'metrics-client-timeout': '%g' % args.metrics_client_timeout,
         'metrics-max-conn-per-ip': str(args.metrics_max_conn_per_ip),
@@ -283,8 +283,8 @@ def main():
                                 token=control_token, trust_uids=trust_uids,
                                 socket_group=args.control_socket_group,
                                 ops_token=control_ops_token, ops_verbs=ops_verbs,
-                                startup_values=startup_values(args))
-        threading.Thread(target=control.serve, daemon=True).start()
+                                startup_values=startup_values(args),
+                                dump_path=args.dump_path, restore_on_start=args.restore_on_start)
     fake.metrics_listen = metrics_listen
     fake.metrics_token = metrics_token
     fake.metrics_caps = (args.metrics_max_clients, args.metrics_client_timeout, args.metrics_max_conn_per_ip)
@@ -299,6 +299,10 @@ def main():
         fake.metrics_srv.start()
     else:
         fake.metrics_srv = None
+    if control:
+        control.start()   # the reload state restores first, then the listener binds
+        if control.dump_path and args.restore_on_start:
+            logger.info('restore-on-start: %s', control.restore_state())
     box = SignalBox(simulator, chaos, fake, control=control, audit=audit)
     if control:
         control.signalbox = box

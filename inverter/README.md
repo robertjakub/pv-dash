@@ -243,6 +243,8 @@ read-only ops token the same way):
 | `show version` | the fake-inverter version (`0.3.0`, or `0.3.0-<short git>` from a checkout) |
 | `set scenario <name>` | apply a scenario preset (below) |
 | `reset` | clear **all** pinned settings and the Modbus write overlay at once (like SIGUSR1, per-connection) |
+| `reload` | **restart the whole fake with the pins kept**: the live overrides save to a state file (the XDG state home — the fake has no config file), the process re-execs with the same argv, the fresh fake re-applies the saved overrides once, then consumes the state file. Overridden secrets never save (the dump rule) — the reply names them |
+| `request dump` / `request restore` | with `--dump-path` configured: write the live overrides to the state file (`0600`, integrity-hashed) / load them back (the pins re-apply) — `--restore-on-start` does the restore automatically at start |
 | `shutdown` | gracefully stop the fake inverter (same as SIGTERM: session summary, control socket unlinked) |
 | `help` / `help <setting>` | the command reference / one setting's description |
 | `quit` | close the connection |
@@ -278,6 +280,10 @@ read-only ops token the same way):
 | `max-conn-per-ip` | `N` (`0` = no limit) | the per-peer-IP Modbus connection limit (`--max-conn-per-ip` startup value, tunable live) |
 | `connect-acl` | `any` \| `none` \| IP/CIDR list | the Modbus connect ACL (`--connect-acl` startup value, tunable live): who may connect to the Modbus surface at all |
 | `metrics-server` | `on`/`off` | the fake's own `/metrics` endpoint (default off; the address is `--metrics-listen`, tunable live); a token-less listen beyond loopback logs a warning |
+| `control token` / `control token-file` | `<token>` \| `off` | rotate the **admin control token** live (the sessions re-auth); `off` drops the token entirely (the trusted-LAN posture, F11). A secret: **`show` refuses it**, `unset` refuses it — pass it by flag/env/token-file |
+| `control ops token` / `control ops token-file` | `<token>` \| `off` | rotate the **read-only ops token** live (must differ from the admin token); `off` signs the ops shift out |
+| `metrics token` / `metrics token-file` | `<token>` \| `off` | rotate the **/metrics bearer token** live; `off` serves tokenless (F11) |
+| `dump path` / `dump restore-on-start` | `<file>` / `on`\|`off` | the state dump's file (the pins, the machines — the tokens apart) and the restore-on-start mark (prospective: the running session's start already chose) |
 | `register` | `addr value` | `set register <addr> <value>` — write a raw register into the **write overlay** (the same store the FC06/FC16 writes use, so the scrapers read it); `reset` clears it, `show registers` marks the rows with `*` |
 | `profile` | `<file>` | swap the register-map profile live |
 | `log-level` | `DEBUG\|INFO\|WARNING\|ERROR` | live log level |
@@ -416,6 +422,8 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `CONTROL_TRUST_UIDS`) |
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user |
 | `--control-log-replies` | off | DEBUG-log the full output of every control command, not just the command |
+| `--dump-path` | off | the state dump (write-behind): the live setting overrides — the pins, the machines, the tokens apart — as one JSON, created `0600` with an integrity hash, written on the `request dump` command and the graceful shutdown; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (env `DUMP_PATH`) |
+| `--restore-on-start` | off | load the state dump when the fake starts (needs `--dump-path`) — the live overrides ride again instead of a cold start (env `RESTORE_ON_START`) |
 | `--chaos` | `0` | probability 0..1 that a request is answered hostile and dropped |
 | `--seed` | random | chaos/cloud RNG seed for reproducible runs |
 | `--dry-run` | off | validate the configuration, print the effective settings and exit (`0` = valid, `1` = invalid, `2` = CLI misuse) |

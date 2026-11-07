@@ -18,13 +18,15 @@ import logging
 import math
 import os
 import socket
+import sys
 import threading
 import time
 
 from common.audit import AuditLog
-from common.config import acl_summary, acl_text, parse_acl
+from common.config import acl_summary, acl_text, load_token_file, parse_acl
 from common.cred import peer_uid
 from common.human import secs
+from common import dump as state
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
 from .metrics import MetricsServer, describe_metrics
@@ -53,7 +55,7 @@ class ControlServer:
     daemon's own user or trust_uids — SO_PEERCRED) skips the handshake. A
     second, read-only token (ops_token) may be configured beside the admin
     token: it authenticates into the show/clear verbs only — no set/unset,
-    no reset, no shutdown (common/wiresec.py's roles)."""
+    no reset, no reload, no shutdown (common/wiresec.py's roles)."""
 
     def describe(self):
         return 'unix:%s' % self.sockpath if self.is_unix else '127.0.0.1:%d' % self.port
@@ -97,6 +99,10 @@ class ControlServer:
             if self.ops_token and hmac.compare_digest(given, self.ops_token):
                 return ROLE_OPS
         return None
+
+    def start(self):
+        self._restore_reload_state()   # a reload exec: the saved overrides re-apply once, the state file is consumed
+        threading.Thread(target=self.serve, daemon=True).start()
 
     def serve(self):
         srv = socket.socket(socket.AF_UNIX if self.is_unix else socket.AF_INET, socket.SOCK_STREAM)
@@ -185,12 +191,13 @@ class ControlServer:
             return '%s:%d' % (addr[0], addr[1])
         return 'unix socket'
 
-    def announce_exit(self, reason):
+    def announce_exit(self, reason, text=None):
         """The daemon is going down: send every connected control client a
         bye frame (the consoles print the notice and exit instead of trying
-        to reconnect to a dead fake) and close their sockets."""
+        to reconnect to a dead fake) and close their sockets. `text`
+        replaces the shutdown wording (the reload speaks of restarting)."""
         frame = (json.dumps({'status': 'bye',
-                             'text': 'daemon-exit: the fake inverter is shutting down (%s)' % reason},
+                             'text': text or 'daemon-exit: the fake inverter is shutting down (%s)' % reason},
                             ensure_ascii=False)   # the frame is utf-8 like every other reply
                  + '\n').encode()
         with self.clients_lock:
@@ -243,8 +250,12 @@ class ControlServer:
                 client.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())
                 if reply.startswith('bye'):
                     break
+                if self.reload_pending:
+                    break   # the reply is out — the post-loop hook re-execs
             if self.shutdown_pending and self.signalbox:
                 self.signalbox.shutdown('control')   # reply is out, now really stop
+            if self.reload_pending:
+                self._exec_reload()               # reply is out, now really re-exec
         except (ConnectionError, OSError):
             pass
         except Exception as e:
@@ -263,13 +274,18 @@ class ControlServer:
     # the day simulation (and the battery machine) take over
 
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
-                 trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None, startup_values=None):
+                 trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None, startup_values=None,
+                 dump_path=None, restore_on_start=False, config_path=None):
         self.log_replies = log_replies   # DEBUG also logs the full command output
         self.audit = audit               # the INV audit trail (common.audit), None = off
         self.token = token               # the control auth token (the admin role); None = no auth (the unix = the perms)
         self.ops_token = ops_token       # the read-only ops token (the ops role); None = off
         self.ops_verbs = frozenset(v.lower() for v in (ops_verbs or OPS_VERBS))   # the ops role's RBAC policy
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
+        self.config_path = config_path  # the fake has none (F11) — the reload state falls to the XDG state home
+        self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
+        self.dump_path = dump_path or None   # the state dump file (the dump family)
+        self.dump_restore = bool(restore_on_start)   # prospective-only: the START already chose
         self.trust_uids = trust_uids or frozenset()   # extra peer uids the unix socket trusts without the token
         self.socket_group = bool(socket_group)   # chmod 0660 instead of 0600 on the unix socket
         self.simulator = simulator
@@ -514,6 +530,91 @@ class ControlServer:
                 sim.override(k, None)
             self.scenario = val
             return val
+        if key == 'control/token':
+            # the rotation is live: the sessions re-auth, the macs verify
+            # against the new key. Dropping it entirely is the fake's
+            # documented trusted-LAN posture (F11) — even on TCP.
+            if val in ('off', 'none', ''):
+                self.token = None
+                return 'off'
+            if self.ops_token and hmac.compare_digest(val, self.ops_token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.token = val
+            return '<set>'
+        if key == 'control/token-file':
+            try:
+                tok = load_token_file(val, 'control-token-file')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if self.ops_token and hmac.compare_digest(tok, self.ops_token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.token = tok
+            return '<set>'
+        if key == 'control/ops/token':
+            if val in ('off', 'none', ''):
+                self.ops_token = None   # the ops shift signs off; the admin role is untouched
+                return 'off'
+            if self.token and hmac.compare_digest(val, self.token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.ops_token = val
+            return '<set>'
+        if key == 'control/ops/token-file':
+            try:
+                tok = load_token_file(val, 'control-ops-token-file')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if self.token and hmac.compare_digest(tok, self.token):
+                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
+                                 'every holder the role the server picks first)')
+            self.ops_token = tok
+            return '<set>'
+        if key == 'metrics/token':
+            if not fake:
+                raise ValueError('no modbus device attached')
+            if not val or val in ('off', 'none', '0'):
+                fake.metrics_token = None
+                if fake.metrics_srv:
+                    fake.metrics_srv.token = None   # the handler reads it per request — the swap is live
+                fake.metrics_desc = describe_metrics(fake.metrics_listen, None,
+                                                     fake.metrics_caps[0], fake.metrics_caps[2])
+                return 'off'   # the trusted-LAN posture (F11): the fake may serve tokenless
+            fake.metrics_token = val
+            if fake.metrics_srv:
+                fake.metrics_srv.token = val
+            fake.metrics_desc = describe_metrics(fake.metrics_listen, val,
+                                                 fake.metrics_caps[0], fake.metrics_caps[2])
+            return '<set>'
+        if key == 'metrics/token-file':
+            if not fake:
+                raise ValueError('no modbus device attached')
+            try:
+                tok = load_token_file(val, 'metrics-token-file')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            fake.metrics_token = tok
+            if fake.metrics_srv:
+                fake.metrics_srv.token = tok
+            fake.metrics_desc = describe_metrics(fake.metrics_listen, tok,
+                                                 fake.metrics_caps[0], fake.metrics_caps[2])
+            return '<set>'
+        if key == 'dump/path':
+            if val in ('off', 'none', ''):
+                self.dump_path = None
+                return 'off'
+            self.dump_path = val   # request dump and the graceful shutdown write it from here on
+            return val
+        if key == 'dump/restore-on-start':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('dump/restore-on-start must be on or off')
+            self.dump_restore = on   # prospective: the START behaviour this session already chose stands
+            return 'on' if on else 'off'
         raise ValueError('unknown setting %s' % key)
 
     def _parse_hour(self, text):
@@ -525,10 +626,12 @@ class ControlServer:
 
     def _get(self, key):
         sim, ov, fake, chaos = self.simulator, self.simulator.overrides(), self.fake, self.chaos
-        if key in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud'):
+        if key in ('pv', 'load', 'batt', 'grid', 'soc'):
             if ov[key] is None:
-                return 'clear' if key == 'cloud' else 'auto'
+                return 'auto'
             return '%g' % ov[key]
+        if key == 'cloud':
+            return sim.cloud_display()   # the pin, the machine with its factor, or clear — the summary's wording
         if key == 'timezone':
             return 'utc' if sim.utc else 'local'
         if key == 'time':
@@ -573,6 +676,16 @@ class ControlServer:
             return '%s (%s)' % (sim.profile.description, profile_label(sim.profile.path))
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel())
+        if key in ('control/token', 'control/token-file'):
+            return '<set>' if self.token else 'off'   # the secret never renders
+        if key in ('control/ops/token', 'control/ops/token-file'):
+            return '<set>' if self.ops_token else 'off'   # the secret never renders
+        if key in ('metrics/token', 'metrics/token-file'):
+            return '<set>' if (fake and fake.metrics_token) else 'off'   # the secret never renders
+        if key == 'dump/path':
+            return self.dump_path or 'off'
+        if key == 'dump/restore-on-start':
+            return 'on' if self.dump_restore else 'off'
         if key == 'scenario':
             return self.scenario or 'custom'
         s = SETTING_BY_NAME.get(key)
@@ -597,10 +710,13 @@ class ControlServer:
                 if key is not None and not rest:
                     return 'ok %s' % describe_setting(key)
                 return 'err unknown setting %s (try help)' % ' '.join(args)
-            return ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|connections|config|knobs>, '
-                    'reset, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
-                    'show knobs prints the full dictionary'
-                    % '|'.join(self.SETTING_KEYS))
+            cmds = ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|connections|config|knobs>, '
+                    'reset' % '|'.join(self.SETTING_KEYS))
+            if self.dump_path:
+                cmds += ', request dump, request restore'
+            cmds += ', reload, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
+            cmds += 'show knobs prints the full dictionary'
+            return cmds
         if cmd == 'show' and args and args[0].lower() == 'config' \
                 and len(args) in (1, 2) and (len(args) == 1 or args[1].lower() == 'all'):
             # 'all' rides along: the script IS the full config
@@ -632,6 +748,12 @@ class ControlServer:
             return 'ok reset (%d pin(s), %d overlay register(s) cleared) %s' % (pins, overlay, self.status())
         if cmd == 'inspect':
             return self.inspect()
+        if cmd == 'request' and args and args[0].lower() == 'dump':
+            return self.dump_state()
+        if cmd == 'request' and args and args[0].lower() == 'restore':
+            return self.restore_state()
+        if cmd == 'reload':
+            return self.reload_daemon()
         if cmd == 'shutdown':
             self.shutdown_pending = True
             logger.info('control: shutdown requested')
@@ -676,6 +798,9 @@ class ControlServer:
                 return 'ok registers (%d)\n%s' % (len(rows), table)
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
+                opt = OPTION_BY_LIVE.get(key)
+                if opt is not None and opt.secret:
+                    return 'err %s is a secret — it never shows (pass it by flag/env/token-file)' % key
                 word = SHOW_BY_LIVE.get(key)
                 if word:
                     return self.command('show ' + word)   # a show command's report, by its word
@@ -817,3 +942,201 @@ class ControlServer:
                    sim.cloud_display(), sim.mppt,
                    format_clock(t), scale, self.chaos.p, self.chaos.hits, outage, extra,
                    (' pinned: ' + pinned) if pinned else ''))
+
+    def dump_settings(self):
+        """The live-overridden settings as raw, re-appliable values. The
+        secrets (control/token, the ops token, metrics/token) are absent: a
+        dump is a plain JSON file, the secrets never land in it — the
+        restore keeps their current value. The scenario rides as its truth
+        ('custom' when the pins took over — the restore applies it first and
+        re-pins on top)."""
+        sim, chaos, fake = self.simulator, self.chaos, self.fake
+        ov = sim.overrides()
+        raw = {
+            'pv': 'auto' if ov['pv'] is None else '%g' % ov['pv'],
+            'load': 'auto' if ov['load'] is None else '%g' % ov['load'],
+            'batt': 'auto' if ov['batt'] is None else '%g' % ov['batt'],
+            'grid': 'auto' if ov['grid'] is None else '%g' % ov['grid'],
+            'soc': 'auto' if ov['soc'] is None else '%g' % ov['soc'],
+            'cloud': ('clear' if not sim.cloud_mode else sim.cloud_mode) if ov['cloud'] is None
+                     else '%g' % ov['cloud'],
+            'mppt': sim.mppt,
+            'timezone': 'utc' if sim.utc else 'local',
+            'time': 'auto' if sim.frozen_time is None
+                    else '%02d:%02d' % (int(sim.frozen_time), round((sim.frozen_time % 1.0) * 60)),
+            'time-scale': '%g' % sim.time_scale,
+            'static': 'on' if sim.static else 'off',
+            'battery': 'on' if sim.battery else 'off',
+            'battery-state': sim.batt_state or 'auto',
+            'battery-kwh': '%g' % sim.battery_kwh,
+            'strict': 'on' if fake.strict else 'off',
+            'chaos': '%.2f' % chaos.p,
+            'seed': 'random' if chaos.seed is None else str(chaos.seed),
+            'grid-voltage': '%g' % sim.grid_voltage,
+            'grid-frequency': '%g' % sim.grid_frequency,
+            'grid-outage': sim.grid_outage,
+            'max-kwp': '%g' % (sim.peak_w / (1000.0 * PEAK_RATIO)),
+            'profile': sim.profile.path,
+            'max-clients': fake.max_clients,
+            'client-timeout': fake.client_timeout,
+            'max-conn-per-ip': fake.conn_gate.max_per_ip,
+            'connect-acl': acl_text(fake.connect_acl),
+            'metrics-server': 'on' if fake.metrics_srv else 'off',
+            'log-level': logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel()),
+            'scenario': self.scenario or 'custom',
+            'dump/path': self.dump_path or 'off',
+            'dump/restore-on-start': 'on' if self.dump_restore else 'off',
+        }
+        return {k: raw[k] for k in sorted(self.overridden) if k in raw}
+
+    def apply_dump_settings(self, settings):
+        """Re-apply the dumped overrides; returns (applied, failed-name-list).
+        An unknown setting or a value the current config rejects is skipped,
+        never fatal. `scenario` applies first: a preset release is the state
+        the pins were pinned after — the pins must land on top of it, never
+        under it."""
+        applied, failed = 0, []
+        for name in sorted(settings or {}, key=lambda k: k != 'scenario'):
+            value = settings[name]
+            if name not in SETTING_BY_NAME:
+                failed.append(name)
+                continue
+            try:
+                self._apply(name, str(value))
+                self.overridden.add(name)
+                applied += 1
+            except ValueError as e:
+                failed.append('%s (%s)' % (name, e))
+        return applied, failed
+
+    # --- the whole-daemon reload (`reload`): the live overrides serialize to
+    # a state file, the reply leaves the wire, the process re-execs. The
+    # fresh daemon re-resolves the flags and the env (the fake has no config
+    # file — F11) and re-applies the saved overrides once (start) — the
+    # flags stay the owners of the base, the state file is consumed, nothing
+    # lingers. The state lives beside the config when the daemon has one;
+    # the fake's home is the XDG state home, beside its audit trail. ---
+
+    def _reload_state_path(self):
+        if self.config_path:
+            return self.config_path + '.reload'
+        base = os.environ.get('XDG_STATE_HOME') or os.path.expanduser('~/.local/state')
+        return os.path.join(base, 'fake-inverter', 'reload.json')
+
+    def _save_reload_state(self):
+        """The overrides in their wire-parsable form (dump_settings) to the
+        state file — the secrets are absent by construction. Returns
+        (settings, lost-secret-names); raises OSError on an unwritable home."""
+        settings = self.dump_settings()
+        lost = sorted(k for k in self.overridden if k not in settings)
+        path = self._reload_state_path()
+        d = os.path.dirname(path)
+        if d and not os.path.isdir(d):
+            os.makedirs(d, exist_ok=True)
+        tmp = path + '.tmp'
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)   # config-equivalent trust: 0600, never the umask's
+        with os.fdopen(fd, 'w') as f:
+            json.dump({'when': time.time(), 'settings': settings}, f, indent=1, sort_keys=True)
+            f.write('\n')
+        os.replace(tmp, path)
+        return settings, lost
+
+    def _restore_reload_state(self):
+        """One-shot, at start: a reload exec re-applies the saved overrides
+        and consumes the state file — a later manual start stays pure (the
+        flags alone). A state older than two minutes is stale (a failed
+        start in between): discarded, never applied."""
+        path = self._reload_state_path()
+        if not os.path.exists(path):
+            return
+        try:
+            with open(path) as f:
+                state_obj = json.load(f)
+            if time.time() - state_obj.get('when', 0) > 120:
+                logger.warning('reload: the state file %s is stale, discarding it', path)
+                os.unlink(path)
+                return
+            applied, failed = self.apply_dump_settings(state_obj.get('settings'))
+            os.unlink(path)
+            logger.info('reload: %d override(s) re-applied from %s%s', applied, path,
+                        (' (%d skipped: %s)' % (len(failed), ', '.join(failed))) if failed else '')
+            if self.audit:
+                self.audit.event('RELOAD', 'restored %d override(s) from %s' % (applied, path))
+        except (OSError, ValueError) as e:
+            logger.error('reload: the state file %s is unreadable (%s) — starting without it', path, e)
+
+    def reload_daemon(self):
+        """The `reload` verb: save the overrides, then restart the whole
+        daemon. The fresh process re-resolves the flags and the env — the
+        fake has no config file (F11) — and start() re-applies the saved
+        overrides once. The secrets never save (the dump rule): an
+        overridden secret is named in the reply, to re-pass by flag/env/
+        token-file."""
+        try:
+            settings, lost = self._save_reload_state()
+        except OSError as e:
+            logger.error('control: reload could not save the overrides: %s', e)
+            return 'err reload failed: %s' % e
+        self.reload_pending = True
+        logger.info('control: reload — %d override(s) saved to %s, re-execing',
+                    len(settings), self._reload_state_path())
+        msg = 'ok reload: %s, the daemon restarts now' % (
+            '%d override(s) saved' % len(settings) if settings else 'no overrides to save')
+        if lost:
+            msg += ' (%s: secret, not saved — re-pass by flag/env/token-file)' % ', '.join(lost)
+        return msg
+
+    def _exec_reload(self):
+        """The reply is out (the session loop calls this after it): announce
+        to the consoles and re-exec in place — the same argv re-resolves the
+        flags, the fresh daemon rebinds the control target (stale sockets
+        are replaced) and restores the saved overrides."""
+        if self.audit:
+            self.audit.event('RELOAD', 'exec: the daemon re-execs (pid %d)' % os.getpid())
+        self.announce_exit('reload', text='daemon-exit: the fake inverter is reloading — '
+                                          'the daemon restarts with the saved configuration')
+        sys.stdout.flush()
+        sys.stderr.flush()
+        time.sleep(0.2)   # let the bye frames drain
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    def dump_state(self):
+        """The write-behind: the live setting overrides to the configured
+        dump path (the `request dump` command and the graceful shutdown)."""
+        if not self.dump_path:
+            return 'err no dump path configured (set dump/path or --dump-path)'
+        settings = self.dump_settings()
+        try:
+            n = state.write_dump(self.dump_path, settings)
+        except (OSError, ValueError) as e:
+            logger.error('control: the dump to %s failed: %s', self.dump_path, e)
+            return 'err dump failed: %s' % e
+        logger.info('control: state dumped to %s (%d setting(s))', self.dump_path, n)
+        return 'ok dumped %d setting(s) to %s' % (n, self.dump_path)
+
+    def restore_state(self):
+        """Load a dump back: the setting overrides re-apply."""
+        if not self.dump_path:
+            return 'err no dump path configured (set dump/path or --dump-path)'
+        if not os.path.exists(self.dump_path):
+            return 'err no dump at %s yet (run dump first)' % self.dump_path
+        try:
+            settings = state.read_dump(self.dump_path)
+            applied, failed = self.apply_dump_settings(settings)
+        except ValueError as e:
+            return 'err restore failed: %s' % e
+        logger.info('control: state restored from %s (%d setting(s))', self.dump_path, applied)
+        return 'ok restored %d setting(s) from %s%s' % (
+            applied, self.dump_path,
+            ' (%d skipped: %s)' % (len(failed), ', '.join(failed)) if failed else '')
+
+    def shutdown_dump(self):
+        """The graceful stop's write-behind: the overrides to the dump path
+        (no reply — the log carries it)."""
+        if not self.dump_path:
+            return
+        try:
+            n = state.write_dump(self.dump_path, self.dump_settings())
+            logger.info('state dumped to %s (%d setting(s))', self.dump_path, n)
+        except (OSError, ValueError) as e:
+            logger.error('the shutdown dump to %s failed: %s', self.dump_path, e)

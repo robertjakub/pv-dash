@@ -4,3 +4,6 @@ result*
 .DS_Store
 .env
 docker/env/*.env
+
+# the wave drafts — invented against the tree, deleted at landing
+/docs/draft-*.md

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fake Inverter Simulator: a Modbus TCP server with demo values. Through
 inverter profiles it can emulate different inverter/battery/meter devices —
-the shipped default profile is the Huawei SUN2000 map, a Deye hybrid map is
+the shipped profile is the Huawei SUN2000 map, a Deye hybrid map is
 included as well.
 
 Simulates a sunny day (bell-curve PV between 06:00 and 18:00, home load
@@ -183,7 +183,7 @@ def main():
     if '--version' in sys.argv:
         print(version_string())
         raise SystemExit(0)
-    p = build_parser(OPTIONS, description='Fake Inverter Simulator: a Modbus TCP server with demo values. Simulates different inverter/battery/meter devices through inverter profiles — the shipped default is the Huawei SUN2000 map, a Deye hybrid map is included as well.')
+    p = build_parser(OPTIONS, description='Fake Inverter Simulator: a Modbus TCP server with demo values. Simulates different inverter/battery/meter devices through inverter profiles — the shipped profile is the Huawei SUN2000 map, a Deye hybrid map is included as well.')
     p.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
     p.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-fake-inverter --man | man -l -)')
     args = p.parse_args()

@@ -6,13 +6,12 @@ require the token first ({"cmd": "auth", "token": ...}) — pass it with
 --control-token or the CONTROL_TOKEN environment variable.
 
   python3 modbus-fake-ctl.py --control-port 15599 set pv 2500
-  python3 modbus-fake-ctl.py --control-port 15599 status
-  printf 'set pv 2500\\nset soc 30\\nstatus\\n' | python3 modbus-fake-ctl.py --control-port 15599
+  python3 modbus-fake-ctl.py --control-port 15599 show status
+  printf 'set pv 2500\\nset soc 30\\nshow status\\n' | python3 modbus-fake-ctl.py --control-port 15599
 
-Commands (see the server's help): set <pv|load|batt|soc|cloud|time|scenario|
-chaos|seed|battery|strict|static|max-kwp|battery-kwh|max-clients|
-client-timeout|log-level> <value>, show <setting|status|connections|settings>,
-status, reset, shutdown, quit.
+Commands (see the server's help): set <setting> <value>, show
+<setting|status|connections|registers|version|config|knobs>, reset,
+request reload, shutdown, quit.
 
 Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.
 """

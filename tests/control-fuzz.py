@@ -287,8 +287,8 @@ def main():
         r = authed_roundtrip(15982, 'opstok', 'reset')
         check('ops: reset is forbidden (no set, no shutdown)', r.get('status') == 'err'
               and 'forbidden' in r.get('text', ''), str(r))
-        r = authed_roundtrip(15982, 'opstok', 'reload')
-        check('ops: the whole-daemon reload is forbidden', r.get('status') == 'err'
+        r = authed_roundtrip(15982, 'opstok', 'request reload')
+        check('ops: the whole-daemon request reload is forbidden', r.get('status') == 'err'
               and 'forbidden' in r.get('text', ''), str(r))
         r = authed_roundtrip(15982, 'admintok', 'show control token')
         check('secrets: the show verb refuses the control token (the admin sees the refusal too)',

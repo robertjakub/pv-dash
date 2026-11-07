@@ -19,17 +19,17 @@ def daemon_page(parser):
 A stdlib-only Modbus TCP server that plays an inverter \\(em with a
 battery, a smart meter, the modbus-cache diagnostics block and the
 pv-suite's register-map profiles \\(em so the scraper, the cache and the
-whole stack can be exercised without hardware. The default profile is the
+whole stack can be exercised without hardware. The shipped profile is the
 Huawei SUN2000 map; Deye hybrids are included. This is a test instrument:
 synthetic data only, no state worth protecting beyond its LAN segment.
 .PP
-By default it simulates a sunny day: a double-shouldered PV curve over
+It simulates a sunny day: a double-shouldered PV curve over
 two MPPT strings (east/west), a home load with morning/evening peaks, a
 battery state machine (95 % charge efficiency, self-discharge, an 80 %
 discharge cap, temperature derating), per-phase grid voltages and load
 shares (mean-reverting wanderers), a grid-frequency machine, and a grid
 outage machine (random blackouts). All machines integrate with a simulated
-clock \\(em UTC by default, freezable (\\fB--time\\fR) and scalable
+clock \\(em UTC unless told otherwise, freezable (\\fB--time\\fR) and scalable
 (\\fB--time-scale\\fR for time-lapse). \\fB--static\\fR replaces the day with
 constant demo values. The profile's per-entry \\fBfc\\fR picks each
 entry's address space (FC3 holding / FC4 input registers, FC1 coils /
@@ -43,9 +43,9 @@ a shared key (\\fB--auth-key\\fR, min 16 characters) with a crypt
 handshake right after every connect \\(em 52 bytes: magic, fresh nonce,
 HMAC\\-SHA256 proof; the fake answers \\fBOK\\fR (plain Modbus follows) or
 \\fBERR\\fR (the client is dropped before it ever sees a register).
-Empty auth (the default) = no auth at all \\(em the trusted-LAN posture
+Empty auth = no auth at all \\(em the trusted-LAN posture
 stands. The writes are gated like the cache's (\\fB--allow-write\\fR):
-off (the default) = every Modbus write (FC05/06/15/16) is refused with
+off = every Modbus write (FC05/06/15/16) is refused with
 exception 01 and audited WRITE\\-REFUSED; on = a write lands in the
 overlay, audited WRITE."""
     signals = """.SH SIGNALS
@@ -77,7 +77,7 @@ refuses),
 \\fBshow status\\fR, \\fBshow connections\\fR (the live Modbus clients: peer,
 age, requests), \\fBshow registers\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
-\\fBinspect\\fR, \\fBreset\\fR, \\fBreload\\fR (the whole-daemon restart
+\\fBinspect\\fR, \\fBreset\\fR, \\fBrequest reload\\fR (the whole-daemon restart
 that keeps the pins: the overrides save to a state file in the XDG state
 home \\(em the fake has no config file \\(em, the process re-execs, the
 fresh fake re-applies them once), with a dump path configured
@@ -111,7 +111,7 @@ token (\\fB--control-ops-token\\fR) when the ops shift only ever watches."""
 the SIGHUP-reloadable layer.
 .TP
 .B CTL
-the default control target for the clients.
+the control target when \\fB--control-port\\fR is unset.
 .TP
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the clients' TCP token and idle-ping interval.
@@ -121,10 +121,10 @@ the daemon's read-only ops token (the flagless start; the OPTIONS above)."""
     files = """.SH FILES
 .TP
 .I /tmp/fake-inverter-<port>.socket
-the default control socket.
+the control socket used when \\fB--control-port\\fR is unset.
 .TP
 .I ~/.local/state/fake-inverter/audit.log
-the default audit trail."""
+the audit trail when \\fB--audit-log\\fR is unset."""
     return page(
         'simulated PV inverter for testing the pv-suite stack',
         'modbus-fake-inverter', 1, DATE, VERSION, MANUAL,
@@ -143,11 +143,12 @@ replies on stdout, one per line. Every invocation lands in the audit trail
 (prefix \\fBCTL\\fR).
 .PP
 The command grammar is the fake's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
-\\fBhelp\\fR (the 26-setting registry), \\fBshow status\\fR,
+\\fBhelp\\fR (the settings registry), \\fBshow status\\fR,
 \\fBshow connections\\fR (the live Modbus clients: peer, age, requests),
 \\fBshow registers\\fR, \\fBshow version\\fR,
 \\fBshow knobs\\fR (the dictionary of the registry),
-\\fBinspect\\fR, \\fBreset\\fR, \\fBshutdown\\fR, \\fBquit\\fR. See
+\\fBinspect\\fR, \\fBreset\\fR, \\fBrequest reload\\fR, \\fBshutdown\\fR,
+\\fBquit\\fR. See
 .BR modbus-fake-inverter (1)
 CONTROL."""
     examples = """.SH EXAMPLES
@@ -189,17 +190,18 @@ registry's own groups \\(em ungrouped rows render bare, no header \\(em, with
 the same in any position; \\fBhelp <setting>\\fR explains one; \\fBshutdown\\fR
 asks \\fBProceed with shutdown? [confirm]\\fR first.
 .PP
-While idle the session sends wire pings every 55 s; when the connection
-dies, the console retries (default 3 times, 10 s apart) and resumes on the
+While idle the session sends wire pings; when the connection
+dies, the console retries (\\fB--reconnect\\fR attempts,
+\\fB--reconnect-wait\\fR seconds apart) and resumes on the
 first success. The session is audited with the \\fBCLI\\fR prefix; the wire
 commands are audited once, by the server."""
     environment = """.SH ENVIRONMENT
 .TP
 .B CLI_KEEPALIVE
-idle ping interval, seconds (default \\fB55\\fR); \\fB0\\fR = off.
+idle ping interval, seconds; \\fB0\\fR = off.
 .TP
 .B CTL ", " CONTROL_TOKEN
-the default control target and TCP token."""
+the control target and TCP token when the flags are unset."""
     exit_status = """.SH EXIT STATUS
 .TP
 .B 0

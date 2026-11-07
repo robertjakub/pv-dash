@@ -574,7 +574,7 @@ class ControlServer(_ControlServer):
                     'reset' % '|'.join(self.SETTING_KEYS))
             if self.dump_path:
                 cmds += ', request dump, request restore'
-            cmds += ', reload, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
+            cmds += ', request reload, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
             cmds += 'show knobs prints the full dictionary'
             return cmds
         if cmd == 'show' and args and args[0].lower() == 'config' \
@@ -618,7 +618,7 @@ class ControlServer(_ControlServer):
             return self.dump_state()
         if cmd == 'request' and args and args[0].lower() == 'restore':
             return self.restore_state()
-        if cmd == 'reload':
+        if cmd == 'request' and len(args) == 1 and args[0].lower() == 'reload':
             return self.reload_daemon()
         if cmd == 'shutdown':
             self.shutdown_pending = True

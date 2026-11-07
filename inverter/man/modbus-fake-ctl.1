@@ -17,11 +17,12 @@ replies on stdout, one per line. Every invocation lands in the audit trail
 (prefix \fBCTL\fR).
 .PP
 The command grammar is the fake's: \fBset\fR/\fBunset\fR/\fBshow\fR/
-\fBhelp\fR (the 26-setting registry), \fBshow status\fR,
+\fBhelp\fR (the settings registry), \fBshow status\fR,
 \fBshow connections\fR (the live Modbus clients: peer, age, requests),
 \fBshow registers\fR, \fBshow version\fR,
 \fBshow knobs\fR (the dictionary of the registry),
-\fBinspect\fR, \fBreset\fR, \fBshutdown\fR, \fBquit\fR. See
+\fBinspect\fR, \fBreset\fR, \fBrequest reload\fR, \fBshutdown\fR,
+\fBquit\fR. See
 .BR modbus-fake-inverter (1)
 CONTROL.
 
@@ -29,31 +30,30 @@ CONTROL.
 .TP
 .B \-\-control\-port
 control server target: unix socket path or TCP port on 127.0.0.1,
-auto\-detected (default: /tmp/fake\-inverter\-5502.socket; env CTL when
-unset) — same flag as the fake itself
+auto\-detected (env CTL when unset) — same flag as the fake itself
 .TP
 .B command
 control command, e.g. set pv 2500, set scenario noon, show status,
 reset, shutdown
 .TP
 .BI \-\-timeout " N"
-socket timeout in seconds (default 5.0)
+socket timeout in seconds
 .TP
 .B \-\-control\-token
 control auth token for TCP (env CONTROL_TOKEN); a file:<path> value
 reads the first line of an owner\-only 0600 file
 .TP
 .B \-\-audit\-log
-audit trail: a file path or \- for stdout; default: the XDG state home
+audit trail: a file path or \- for stdout; the XDG state home when unset
 .TP
 .BI \-\-audit\-max\-mb " N"
-rotate the audit log at this size, 0 = off (default: 10.0)
+rotate the audit log at this size, 0 = off
 .TP
 .BI \-\-audit\-files " N"
-rotated audit backups to keep (default 3)
+rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
-disable the audit trail (default: off)
+disable the audit trail
 
 
 .SH EXAMPLES

@@ -13,17 +13,17 @@ stack
 A stdlib-only Modbus TCP server that plays an inverter \(em with a
 battery, a smart meter, the modbus-cache diagnostics block and the
 pv-suite's register-map profiles \(em so the scraper, the cache and the
-whole stack can be exercised without hardware. The default profile is the
+whole stack can be exercised without hardware. The shipped profile is the
 Huawei SUN2000 map; Deye hybrids are included. This is a test instrument:
 synthetic data only, no state worth protecting beyond its LAN segment.
 .PP
-By default it simulates a sunny day: a double-shouldered PV curve over
+It simulates a sunny day: a double-shouldered PV curve over
 two MPPT strings (east/west), a home load with morning/evening peaks, a
 battery state machine (95 % charge efficiency, self-discharge, an 80 %
 discharge cap, temperature derating), per-phase grid voltages and load
 shares (mean-reverting wanderers), a grid-frequency machine, and a grid
 outage machine (random blackouts). All machines integrate with a simulated
-clock \(em UTC by default, freezable (\fB--time\fR) and scalable
+clock \(em UTC unless told otherwise, freezable (\fB--time\fR) and scalable
 (\fB--time-scale\fR for time-lapse). \fB--static\fR replaces the day with
 constant demo values. The profile's per-entry \fBfc\fR picks each
 entry's address space (FC3 holding / FC4 input registers, FC1 coils /
@@ -37,126 +37,121 @@ a shared key (\fB--auth-key\fR, min 16 characters) with a crypt
 handshake right after every connect \(em 52 bytes: magic, fresh nonce,
 HMAC\-SHA256 proof; the fake answers \fBOK\fR (plain Modbus follows) or
 \fBERR\fR (the client is dropped before it ever sees a register).
-Empty auth (the default) = no auth at all \(em the trusted-LAN posture
+Empty auth = no auth at all \(em the trusted-LAN posture
 stands. The writes are gated like the cache's (\fB--allow-write\fR):
-off (the default) = every Modbus write (FC05/06/15/16) is refused with
+off = every Modbus write (FC05/06/15/16) is refused with
 exception 01 and audited WRITE\-REFUSED; on = a write lands in the
 overlay, audited WRITE.
 
 .SH OPTIONS
 .TP
 .B \-\-host
-bind address (default 127.0.0.1)
+bind addresss)
 .TP
 .BI \-\-port " N"
-Modbus TCP port (default 5502)
+Modbus TCP ports)
 .TP
 .BI \-\-unit " N"
-Modbus unit id served (default 1)
+Modbus unit id serveds)
 .TP
 .B \-\-profile
 inverter profile JSON: name \-> register (+ optional type/scale), e.g.
-profiles/profiles/sun2000.json (the default); PROFILE when unset
+profiles/profiles/sun2000.json; PROFILE when unset
 .TP
 .BI \-\-max\-kwp " N"
-PV array size in kWp, peak = 75%% of it (default 6.0)
+PV array size in kWp, peak = 75%% of its)
 .TP
 .B \-\-timezone
 clock the state machines integrate over (the PV bell, the home load, the
-clouds, the battery, the grid voltage): UTC (the default) or the local
-wall clock (default: utc)
+clouds, the battery, the grid voltage): UTC or the local wall clock
 .TP
 .B \-\-time
-freeze simulated time HH:MM (default: real clock)
+freeze simulated time HH:MM
 .TP
 .BI \-\-time\-scale " N"
 the simulated clock speed: N times real time \- every machine (the
 battery, the clouds, the voltages, the day counters) integrates over it,
-so a full simulated day takes 24/N real hours (default: 1 = real time)
-(default: 1.0)
+so a full simulated day takes 24/N real hours
 .TP
 .B \-\-static
-constant demo values instead of the day simulation (default: off)
+constant demo values instead of the day simulation
 .TP
 .B \-\-battery
-simulate a battery (the default) (default: on)
+simulate a battery (the real capacity story: the SoC machine, the
+\-\-battery\-kwh pack)
 .TP
 .B \-\-no\-battery
-no battery values (default: on)
+no battery values
 .TP
 .BI \-\-battery\-kwh " N"
-usable battery capacity in kWh (default 6.9)
+usable battery capacity in kWhs)
 .TP
 .B \-\-strict
 reject reads of undefined registers with exception 02 (like the real
-device) (default: off)
+device)
 .TP
 .BI \-\-chaos " N"
-probability 0..1 that a request is answered hostile and dropped
-(default: off); seed with \-\-seed for reproducibility (default: 0.0)
+probability 0..1 that a request is answered hostile and dropped; seed
+with \-\-seed for reproducibility
 .TP
 .BI \-\-grid\-voltage " N"
 nominal grid phase voltage in V (120 or 230; the per\-phase machine
-wanders ±10 %% around it, default 230.0)
+wanders ±10 %% around it, the grid\-voltage setpoint overrides)
 .TP
 .BI \-\-grid\-frequency " N"
-nominal grid frequency in Hz (the machine wanders ±0.2 Hz around it,
-default 50.0)
+nominal grid frequency in Hz (the machine wanders ±0.2 Hz around it, the
+grid\-frequency setpoint overrides)
 .TP
 .BI \-\-seed " N"
-chaos RNG seed (default: random)
+chaos RNG seed
 .TP
 .B \-\-auth
 the auth scheme the fake's Modbus clients must speak: `suite` demands
 the crypt handshake (magic + nonce + HMAC proof of the shared key) right
 after every connect and drops the client on ERR/anything else;
-none/empty = no auth at all — the trusted\-LAN posture (default: $AUTH
-or none)
+none/empty = no auth at all — the trusted\-LAN posture
 .TP
 .B \-\-auth\-key
 the shared key the fake's clients prove with the suite handshake (min 16
 characters); the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
-file:/run/credentials/...) (default: $AUTH_KEY)
+file:/run/credentials/...)
 .TP
 .B \-\-connect\-acl
 the Modbus clients allowed to connect (the cache's connect\-acl,
-mirrored): "any" (the default — the trusted\-LAN posture), "none", or a
-comma\-separated list of IPs and CIDR prefixes, e.g.
-127.0.0.1,10.48.0.0/16 (env CONNECT_ACL)
+mirrored): "any" (the trusted\-LAN posture), "none", or a
+comma\-separated IP/CIDR list
 .TP
 .B \-\-allow\-write
 accept Modbus writes (FC05/06/15/16) from the fake's clients: a write
 lands in the write overlay, logged and audited WRITE like the cache's
-forwarded ones; off (the default) = every write is refused with
-exception 01 and audited WRITE\-REFUSED — the cache's \-\-allow\-write
-gate, mirrored (env ALLOW_WRITE) (default: off)
+forwarded ones; off = every write is refused with exception 01 and
+audited WRITE\-REFUSED — the cache's \-\-allow\-write gate, mirrored
+(env ALLOW_WRITE)
 .TP
 .BI \-\-max\-clients " N"
 refuse further Modbus connections past this many simultaneous clients, 0
-= no limit (default 64)
+= no limits)
 .TP
 .BI \-\-client\-timeout " N"
-disconnect Modbus clients silent for this many seconds, 0 = never
-(default 300.0) — sheds connections from clients that died without
-closing
+disconnect Modbus clients silent for this many seconds, 0 = nevers) —
+sheds connections from clients that died without closing
 .TP
 .BI \-\-max\-conn\-per\-ip " N"
 refuse further Modbus connections from one peer IP past this many
-simultaneous connections, 0 = no per\-IP limit (default 0)
+simultaneous connections, 0 = no per\-IP limits)
 .TP
 .B \-\-control\-port
-control server target: unix socket path (default:
-/tmp/fake\-inverter\-<modbus\-port>.socket) or TCP port number on
-127.0.0.1 (e.g. 15599); 0 = off. Talk to it with modbus\-fake\-ctl.py
+control server target: unix socket path or TCP port number on 127.0.0.1
+(e.g. 15599); 0 = off. Talk to it with modbus\-fake\-ctl.py
 .TP
 .B \-\-control\-token
 require a token on control connections: the client authenticates with
-{"cmd": "auth", "token": ...}; over the unix socket a trusted peer
-(root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
-skips the token; the value may be `file:<path>` — the first line of an
+{"cmd": "auth", "token":...}; over the unix socket a trusted peer (root,
+the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED) skips
+the token; the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
-file:/run/credentials/...) (default: $CONTROL_TOKEN or none)
+file:/run/credentials/...)
 .TP
 .B \-\-control\-ops\-token
 a second, read\-only control token: sessions authenticating with it may
@@ -168,8 +163,7 @@ CONTROL_OPS_TOKEN)
 .TP
 .B \-\-control\-ops\-verbs
 the read\-only ops role's RBAC policy: the verbs its sessions may run,
-comma\-separated (default: show,clear; validated against the control
-grammar at start; env CONTROL_OPS_VERBS)
+comma\-separated
 .TP
 .B \-\-control\-trust\-uids
 extra peer uids the unix control socket trusts without the token
@@ -178,19 +172,19 @@ the daemon's own user are always trusted (env CONTROL_TRUST_UIDS)
 .TP
 .B \-\-control\-socket\-group
 leave the unix control socket group\-accessible (chmod 0660 instead of
-the default 0600): a local group may speak to the control without being
-the service user (default: off)
+the plain 0600): a local group may speak to the control wire without the
+token
 .TP
 .B \-\-control\-log\-replies
-DEBUG\-log the full output of every control command (the default logs
-the command only) (default: off)
+DEBUG\-log the full output of every control command (plainly: only the
+command logs)
 .TP
 .B \-\-metrics\-server
 serve the fake's own Prometheus /metrics endpoint (the live `set
-metrics\-server` toggle exists too); off by default (default: off)
+metrics\-server` toggle exists too)
 .TP
 .B \-\-metrics\-listen
-the metrics bind address HOST:PORT (default 127.0.0.1:9452)
+the metrics bind address HOST:PORTs)
 .TP
 .B \-\-metrics\-token
 require Authorization: Bearer <token> on the /metrics endpoint (the same
@@ -200,35 +194,34 @@ file:/run/credentials/...)
 .TP
 .BI \-\-metrics\-max\-clients " N"
 maximum concurrent HTTP clients on the /metrics endpoint; extras get an
-immediate 503, 0 = unlimited (default 64)
+immediate 503, 0 = unlimiteds)
 .TP
 .BI \-\-metrics\-client\-timeout " N"
 seconds an idle /metrics client is kept before the socket times out, 0 =
-the built\-in 5 s cap (default 5.0)
+the built\-in 5 s caps)
 .TP
 .BI \-\-metrics\-max\-conn\-per\-ip " N"
 maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
-limit (default 0)
+limits)
 .TP
 .B \-\-audit\-log
 INV audit trail: a file path or \- for stdout (the docker/journald way);
-default: ~/.local/state/fake\-inverter/audit.log — the XDG state home
+~/.local/state/fake\-inverter/audit.log — the XDG state home when unset
 .TP
 .BI \-\-audit\-max\-mb " N"
 rotate the audit log at this size in MB, keeping 3 backups; 0 = no size
-rotation (default 10.0)
+rotations)
 .TP
 .B \-\-audit\-daily
-also rotate the audit log at UTC midnight (default: off)
+also rotate the audit log at UTC midnight
 .TP
 .BI \-\-audit\-files " N"
-rotated audit backups to keep (default 3)
+rotated audit backups to keeps)
 .TP
 .B \-\-no\-audit\-log
-disable the INV audit trail (default: off)
+disable the INV audit trail
 .TP
 .B \-\-log\-level
- (default: INFO)
 .TP
 .B \-\-dump\-path
 the state dump: the live setting overrides (the pins, the machines, the
@@ -236,7 +229,6 @@ tokens apart) as one JSON, written 0600 with an integrity hash (a
 restore refuses a tampered, unsigned or group\-writable dump); dumped on
 the request dump command and the graceful shutdown; loaded on start only
 with \-\-restore\-on\-start, on demand with the request restore command
-(default: $DUMP_PATH or none)
 .TP
 .B \-\-dump\-key
 the key that seals the state dumps and the reload's state file: the
@@ -247,16 +239,16 @@ re\-resolves the same key, so the state file reads on the other side; no
 key = the dumps stay 0600 plaintext with the integrity hash; a dump path
 without a key warns at start and on set; the value may be `file:<path>`
 — the first line of an owner\-only 0600 file (a systemd LoadCredential
-rides as file:/run/credentials/...) (default: $DUMP_KEY or none)
+rides as file:/run/credentials/...)
 .TP
 .B \-\-restore\-on\-start
 load the state dump when the fake starts (needs \-\-dump\-path) — the
-live overrides ride again instead of a cold start; default: start cold,
-load only on demand (default: $RESTORE_ON_START) (default: off)
+live overrides ride again instead of a cold start; without it the dump
+loads on demand
 .TP
 .B \-\-dry\-run
 validate the configuration, print the effective settings and exit
-(nothing is bound or connected) (default: off)
+(nothing is bound or connected)
 
 
 .SH SIGNALS
@@ -289,7 +281,7 @@ refuses),
 \fBshow status\fR, \fBshow connections\fR (the live Modbus clients: peer,
 age, requests), \fBshow registers\fR,
 \fBshow version\fR, \fBshow knobs\fR (the dictionary of the registry),
-\fBinspect\fR, \fBreset\fR, \fBreload\fR (the whole-daemon restart
+\fBinspect\fR, \fBreset\fR, \fBrequest reload\fR (the whole-daemon restart
 that keeps the pins: the overrides save to a state file in the XDG state
 home \(em the fake has no config file \(em, the process re-execs, the
 fresh fake re-applies them once), with a dump path configured
@@ -325,7 +317,7 @@ token (\fB--control-ops-token\fR) when the ops shift only ever watches.
 the SIGHUP-reloadable layer.
 .TP
 .B CTL
-the default control target for the clients.
+the control target when \fB--control-port\fR is unset.
 .TP
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the clients' TCP token and idle-ping interval.
@@ -336,10 +328,10 @@ the daemon's read-only ops token (the flagless start; the OPTIONS above).
 .SH FILES
 .TP
 .I /tmp/fake-inverter-<port>.socket
-the default control socket.
+the control socket used when \fB--control-port\fR is unset.
 .TP
 .I ~/.local/state/fake-inverter/audit.log
-the default audit trail.
+the audit trail when \fB--audit-log\fR is unset.
 
 .SH SEE ALSO
 .BR modbus-fake-ctl (1),

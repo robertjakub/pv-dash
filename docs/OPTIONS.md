@@ -1,8 +1,9 @@
-# The knobs of the family (options.md)
+# The knobs of the family (OPTIONS.md)
 
-One alphabetical table of every knob of the four daemons — the kind,
+One alphabetical table of every knob and every show command of the
+four daemons — the kind,
 the name, the group it renders under, and the control command that
-changes it on a running daemon — with a mark per
+changes it (or answers with the report) on a running daemon — with a mark per
 tool. **Generated** from the per-tool `lib/options.json` registries (the
 one-knob-one-source rows) by `scripts/gen_options.py` — edit the
 registries and re-run `python3 scripts/gen_options.py`, never this file.
@@ -15,7 +16,8 @@ here. The ctl/cli clients speak the control plane only
 
 Common to **all four** tools (19): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-token-file`, `control-ops-verbs`, `control-port`, `control-token`, `control-token-file`, `control-trust-uids`, `dump`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `no-audit-log`, `restore-on-start`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
-family shape with per-tool defaults.
+family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `status`, `version` ride
+on all four too (the per-tool extras carry their own rows below).
 
 | kind | name | group | live | cache | scraper | inverter | dashboard |
 |---|---|---|---|---|---|---|---|
@@ -33,12 +35,16 @@ family shape with per-tool defaults.
 | k | `battery-kwh` |  | `set battery-kwh` |  |  | ✓ live |  |
 | c | `battery-state` |  | `set battery-state` |  |  | ✓ live |  |
 | k | `bind` |  | *(startup-only)* |  |  |  | ✓ |
+| s | `cache` |  | `show cache` | ✓ |  |  |  |
+| s | `cache-all` |  | `show cache-all` | ✓ hidden |  |  |  |
 | k | `cache-ttl` |  | `set cache ttl` | ✓ live |  |  |  |
 | k | `chaos` |  | `set chaos` |  |  | ✓ live |  |
 | k | `client-timeout` |  | `set client-timeout`, `set limits client-timeout` | **✓** live | **✓** live | **✓** live | **✓** live |
 | c | `cloud` |  | `set cloud` |  |  | ✓ live |  |
+| s | `config` |  | `show config` | **✓** | **✓** | **✓** hidden | **✓** hidden |
 | k | `config-js` |  | *(startup-only)* |  |  |  | ✓ |
 | k | `connect-acl` |  | `set acl connect`, `set connect-acl` | ✓ live |  | ✓ live |  |
+| s | `connections` |  | `show connections` | **✓** | **✓** | **✓** | **✓** |
 | c | `control` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `control-log-replies` |  | *(startup-only)* |  |  | ✓ |  |
 | k | `control-ops-token` |  | `set control ops token` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
@@ -60,6 +66,7 @@ family shape with per-tool defaults.
 | k | `grid-voltage` |  | `set grid-voltage` |  |  | ✓ live |  |
 | k | `host` |  | *(startup-only)* |  |  | ✓ |  |
 | k | `interval` |  | `set interval`, `set modbus interval` | ✓ live | ✓ live |  |  |
+| s | `knobs` |  | `show knobs` | **✓** | **✓** | **✓** hidden | **✓** hidden |
 | c | `limits` |  | *(startup-only)* | ✓ | ✓ |  |  |
 | k | `listen` |  | *(startup-only)* | ✓ | ✓ |  |  |
 | c | `load` |  | `set load` |  |  | ✓ live |  |
@@ -92,6 +99,7 @@ family shape with per-tool defaults.
 | k | `prom-prefix` |  | *(startup-only)* |  |  |  | ✓ |
 | c | `pv` |  | `set pv` |  |  | ✓ live |  |
 | k | `read-delay` |  | `set modbus read-delay` | ✓ live |  |  |  |
+| s | `registers` |  | `show registers` |  |  | ✓ |  |
 | k | `requests-audit` |  | `set audit requests` | ✓ live |  |  |  |
 | k | `restore-on-start` |  | `set dump restore-on-start` | **✓** live | **✓** live | **✓** live | **✓** live |
 | c | `scenario` |  | `set scenario` |  |  | ✓ live |  |
@@ -100,15 +108,18 @@ family shape with per-tool defaults.
 | c | `soc` |  | `set soc` |  |  | ✓ live |  |
 | k | `static` |  | `set static` |  |  | ✓ live |  |
 | k | `static-dir` |  | *(startup-only)* |  |  |  | ✓ |
+| s | `status` |  | `show status` | **✓** hidden | **✓** | **✓** | **✓** |
 | k | `strict` |  | `set strict` |  |  | ✓ live |  |
 | k | `time` |  | `set time` |  |  | ✓ live |  |
 | k | `time-scale` |  | `set time-scale` |  |  | ✓ live |  |
 | k | `timeout` |  | `set modbus timeout`, `set timeout` | ✓ live | ✓ live |  |  |
 | k | `timezone` |  | `set timezone` |  |  | ✓ live |  |
 | k | `unit` |  | `set modbus unit` | ✓ live |  | ✓ |  |
+| s | `uplink` |  | `show uplink` | ✓ |  |  |  |
 | k | `upstream` | `upstream` | `set modbus upstream` | ✓ live | ✓ live |  | ✓ |
+| s | `version` |  | `show version` | **✓** | **✓** | **✓** | **✓** |
 | c | `write` |  | *(startup-only)* | ✓ |  |  |  |
 | k | `write-acl` |  | `set acl write` | ✓ live |  |  |  |
 | k | `write-registers` |  | `set write registers` | ✓ live |  |  |  |
 
-Legend: `k` = a knob — the flag/env/config-file rows; `c` = control-only — a setting that lives on the control wire alone (the fake's pins and machines — no flag, no env, no config-file row); ✓ = the tool has the knob (**bold** = all four do); the `live` column is the control command itself — `set <name>` over the control plane, the wire name the registry gives the knob (it can differ from the flag: the cache's `cache-ttl` sets `ttl`); *(startup-only)* = no live form, a restart applies the knob; a cell's `live` mark says the tool takes the knob live (a cell without one = that tool applies the knob at startup only); `group` = the row's display bucket — the tool's surfaces file the knob under it (blank = ungrouped, rendered bare); `secret` = a token — never rendered inline by `show config` (the `-file` form is). The knob descriptions stay in the registries — `--help`, the man pages, `show knobs` and `help config` render them per tool.
+Legend: `k` = a knob — the flag/env/config-file rows; `c` = control-only — a setting that lives on the control wire alone (the fake's pins and machines — no flag, no env, no config-file row); `s` = a show command — a report the wire answers with (`show <name>`; not a knob, nothing to set, the registry's `show` section); ✓ = the tool has the row (**bold** = all four do); the `live` column is the control command itself — `set <name>` over the control plane, the wire name the registry gives the knob (it can differ from the flag: the cache's `cache-ttl` sets `ttl`) — a show row spells `show <name>`; *(startup-only)* = no live form, a restart applies the knob; a cell's `live` mark says the tool takes the knob live (a cell without one = that tool applies the knob at startup only); `group` = the row's display bucket — the tool's surfaces file the knob under it (blank = ungrouped, rendered bare); `hidden` = the command stays out of the wire's listings (it still answers); `secret` = a token — `show config` and the dumps render the knob as `*** SECRET REMOVED ***` (the value never does; the `-file` form renders the same placeholder when the row is set). The knob descriptions stay in the registries — `--help`, the man pages, `show knobs` and `help config` render them per tool.

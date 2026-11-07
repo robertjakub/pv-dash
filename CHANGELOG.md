@@ -10,6 +10,17 @@ before the repo restructured into one suite.
 
 ## Unreleased
 
+### Docs
+
+- **OPTIONS.md** — **the registries' `show` section rides the table**: the
+  nine show commands render as `s` rows beside the knobs (status/
+  connections/version/config/knobs on all four, the cache's
+  `cache`/`cache-all`/`uplink`, the fake's `registers`), the live column
+  spells `show <name>` (not a knob — nothing to set), the hidden rows
+  (`config`/`knobs`/`cache-all`/the cache's `status`) carry the `hidden`
+  mark, and the legend explains the new kind; `gen_options.py` merges the
+  show rows into the one alphabetical run (the name spaces don't collide).
+
 ### Added
 
 - **cache / inverter / common** — **all FC codes awareness**: the family

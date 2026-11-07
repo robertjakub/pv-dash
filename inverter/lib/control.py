@@ -28,6 +28,7 @@ from common.human import secs
 from common import dump as state
 from common.modbus import AUTH_MIN_KEY
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.control import ControlServer as _ControlServer
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
@@ -48,7 +49,7 @@ TYPED_CONVS = (int, float, str)
 MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
 
 
-class ControlServer:
+class ControlServer(_ControlServer):
     """JSON-lines control socket: pin values, freeze time, tune chaos — see
     the README for the command list. The target is either a TCP port (bound to
     127.0.0.1) or a unix socket path (stale files are replaced, unlinked on
@@ -61,50 +62,6 @@ class ControlServer:
 
     def describe(self):
         return 'unix:%s' % self.sockpath if self.is_unix else '127.0.0.1:%d' % self.port
-
-    def cleanup(self):
-        if self.is_unix and self.sockpath and os.path.exists(self.sockpath):
-            try:
-                os.unlink(self.sockpath)
-            except OSError:
-                pass
-
-    def trusted_peer(self, client, who):
-        """The peer-cred auth on the unix control socket: with a token
-        configured, a peer the kernel vouches for — root, the daemon's own
-        user or one of trust_uids — is authenticated without the token (a
-        local systemd unit speaks without sharing the secret) and holds the
-        admin role. TCP peers always need a token (admin or ops)."""
-        if not (self.token and self.is_unix):
-            return None
-        uid = peer_uid(client)
-        if uid is None:
-            return None
-        if uid == 0 or uid == os.getuid() or uid in self.trust_uids:
-            logger.debug('control client from %s: trusted peer uid %d, no token required', who, uid)
-            return ROLE_ADMIN
-        logger.info('control client from %s: peer uid %d is not trusted, the token is required', who, uid)
-        return None
-
-    def session_key(self, role):
-        """The hmac key of one session's role: the ops sessions sign and
-        verify with the ops token, everything else (admin, trusted peer,
-        pre-auth) with the admin token."""
-        return self.ops_token if role == ROLE_OPS else self.token
-
-    def auth_role(self, given):
-        """Which role a presented token authenticates into (hmac.compare_digest
-        against both keys): the admin token, the ops token, or None."""
-        if isinstance(given, str):
-            if self.token and hmac.compare_digest(given, self.token):
-                return ROLE_ADMIN
-            if self.ops_token and hmac.compare_digest(given, self.ops_token):
-                return ROLE_OPS
-        return None
-
-    def start(self):
-        self._restore_reload_state()   # a reload exec: the saved overrides re-apply once, the state file is consumed
-        threading.Thread(target=self.serve, daemon=True).start()
 
     def serve(self):
         srv = socket.socket(socket.AF_UNIX if self.is_unix else socket.AF_INET, socket.SOCK_STREAM)
@@ -134,85 +91,6 @@ class ControlServer:
             except (OSError, RuntimeError) as e:
                 logger.error('control accept failed (%s), retrying', e)
                 time.sleep(0.1)
-
-    def framed(self, line, who, role):
-        """One wire frame in, one out: parse {"cmd": ...}, gate the TCP auth,
-        gate the ops role (show/clear only), verify the frame mac keyed by
-        the session's token, run the command. Returns (cmd, reply-obj,
-        internal-reply, role) — the role so the auth reply can promote the
-        session. The text of a multi-line reply keeps its embedded newlines;
-        the '.' terminator of the internal form is stripped (the JSON frame
-        needs no framing)."""
-        try:
-            obj = json.loads(line) if line else {}
-        except ValueError:
-            obj = None
-        if not isinstance(obj, dict) or not isinstance(obj.get('cmd'), str):
-            return '', {'status': 'err',
-                        'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request', role
-        cmd = obj['cmd']
-        if self.token and cmd.lower() != 'auth' and role is None:
-            return cmd, {'status': 'err', 'text': 'authenticate first: {"cmd": "auth", "token": "..."}'}, \
-                'err authenticate first', role
-        if cmd.lower() == 'auth':
-            granted = self.auth_role(obj.get('token'))
-            if granted:
-                key = self.session_key(granted)
-                reply = 'ok authenticated'
-                return 'auth', {'status': 'ok', 'text': 'authenticated', 'mac': sign_reply(key, reply)}, reply, granted
-            return 'auth', {'status': 'err', 'text': 'bad token'}, 'err bad token', role
-        key = self.session_key(role)
-        if key and obj.get('mac') is None and not self.is_unix:
-            return cmd, {'status': 'err',
-                         'text': 'unsigned command rejected: TCP commands carry the hmac-sha256 of the command, keyed by the token'}, \
-                'err unsigned command', role
-        if key and obj.get('mac') is not None and not verify_request_mac(key, cmd, obj.get('mac')):
-            return cmd, {'status': 'err',
-                         'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac', role
-        if not role_allows(role, cmd, self.ops_verbs):
-            verb = command_verb(cmd) or cmd
-            text = ('forbidden: the ops token runs the %s verbs only (%s needs the admin token)'
-                    % ('/'.join(sorted(self.ops_verbs)), verb))
-            reply = 'err ' + text
-            reply_obj = {'status': 'err', 'text': text}
-            if key:
-                reply_obj['mac'] = sign_reply(key, reply)
-            logger.warning('control: ops session from %s denied %r (read-only role)', who, cmd)
-            return cmd, reply_obj, reply, role
-        reply = self.command(cmd)
-        status, _, text = reply.partition(' ')
-        reply_obj = {'status': status, 'text': text}
-        if key:
-            reply_obj['mac'] = sign_reply(key, reply)
-        return cmd, reply_obj, reply, role
-
-    @staticmethod
-    def peer(addr):
-        """Where the client sits: an IP:port for TCP, the socket for unix."""
-        if isinstance(addr, (tuple, list)) and len(addr) >= 2:
-            return '%s:%d' % (addr[0], addr[1])
-        return 'unix socket'
-
-    def announce_exit(self, reason, text=None):
-        """The daemon is going down: send every connected control client a
-        bye frame (the consoles print the notice and exit instead of trying
-        to reconnect to a dead fake) and close their sockets. `text`
-        replaces the shutdown wording (the reload speaks of restarting)."""
-        frame = (json.dumps({'status': 'bye',
-                             'text': text or 'daemon-exit: the fake inverter is shutting down (%s)' % reason},
-                            ensure_ascii=False)   # the frame is utf-8 like every other reply
-                 + '\n').encode()
-        with self.clients_lock:
-            clients, self.clients = list(self.clients), set()
-        for client in clients:
-            try:
-                client.sendall(frame)
-            except OSError:
-                pass
-            try:
-                client.close()
-            except OSError:
-                pass
 
     def handle(self, client, addr):
         who = self.peer(addr)
@@ -275,60 +153,29 @@ class ControlServer:
     # freeze the clock at a typical moment and release the value pins, so
     # the day simulation (and the battery machine) take over
 
+    LOG = logger
+    OPTIONS = OPTIONS
+    SETTINGS = SETTING_BY_NAME
+    WHO = 'the fake inverter'
+    EXIT_TEXT = 'the fake inverter is shutting down'
+    RELOAD_TEXT = 'the fake inverter is reloading — the daemon restarts with the saved configuration'
+    RELOAD_NEEDS_CONFIG = False   # the fake has no config file (F11) — the reload state falls to the XDG state home
+
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
                  trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None, startup_values=None,
                  dump_path=None, restore_on_start=False, config_path=None, dump_key=None):
+        super().__init__(target, audit=audit, token=token, defaults=defaults, trust_uids=trust_uids,
+                         socket_group=socket_group, ops_token=ops_token, ops_verbs=ops_verbs,
+                         config_path=config_path, dump_path=dump_path,
+                         restore_on_start=restore_on_start, dump_key=dump_key)
         self.log_replies = log_replies   # DEBUG also logs the full command output
-        self.audit = audit               # the INV audit trail (common.audit), None = off
-        self.token = token               # the control auth token (the admin role); None = no auth (the unix = the perms)
-        self.ops_token = ops_token       # the read-only ops token (the ops role); None = off
-        self.ops_verbs = frozenset(v.lower() for v in (ops_verbs or OPS_VERBS))   # the ops role's RBAC policy
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
-        self.config_path = config_path  # the fake has none (F11) — the reload state falls to the XDG state home
-        self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
-        self.dump_path = dump_path or None   # the state dump file (the dump family)
-        self.dump_restore = bool(restore_on_start)   # prospective-only: the START already chose
-        self.dump_key = dump_key or None   # the dump seal key (startup-only: the reload re-exec re-resolves the same)
-        self.trust_uids = trust_uids or frozenset()   # extra peer uids the unix socket trusts without the token
-        self.socket_group = bool(socket_group)   # chmod 0660 instead of 0600 on the unix socket
         self.simulator = simulator
         self.chaos = chaos
         self.fake = fake
         self.signalbox = None       # set by the entry; 'shutdown' hands over to it
-        self.shutdown_pending = False
         self.scenario = None        # last applied preset, or None = 'custom'
-        self.defaults = defaults or {}   # setting -> configured startup value ('unset')
-        self.overridden = set()          # settings changed live (`show status` carries the overridden= row)
-        self.clients = set()             # the live control sockets (announce_exit)
-        self.clients_lock = threading.Lock()
         self.target = str(target)
-        self.started = time.monotonic()
-        self.is_unix = not self.target.isdigit()
-        self.port = int(self.target) if not self.is_unix else None
-        self.sockpath = self.target if self.is_unix else None
-
-    def config_mapping(self):
-        """The knob -> control-command mapper (help config): every option of
-        the registry under its display group (the row's `group`, ungrouped
-        rows headerless), with the command that changes it on a running fake — or
-        the restart note when the knob is startup-only."""
-        from .options import OPTIONS
-        lines = ['ok config mapping']
-        for key, rows in grouped_rows(OPTIONS):
-            if key:
-                lines.append('# --- %s ---' % key)
-            for o in rows:
-                lines.append('%-24s %s' % (o.name, control_command(o)))
-        return '\n'.join(lines)
-
-    def knobs_dictionary(self):
-        """The dictionary of all knobs (show knobs): every option of the
-        registry under its display group, with its flag, its env twin(s) when
-        it has one, the control command that changes it and
-        the secret marker."""
-        from .options import OPTIONS
-        from common.options import knob_dictionary
-        return knob_dictionary(OPTIONS, who='the fake inverter')
 
     def show_config(self):
         """The startup options as a set-grammar script — the argv that would
@@ -340,15 +187,6 @@ class ControlServer:
                                       comment='generated by show config — the argv that would restart this fake '
                                               '(the secret knobs render as *** SECRET REMOVED ***)')
         return 'ok config\n' + script
-
-    def _gate_range(self, key, v, what=''):
-        """The row's min/max (inclusive) — the registry is the one home for
-        a knob's bounds; the branch parses and plumbs, the row gates."""
-        opt = OPTION_BY_LIVE.get(key)
-        if opt is None or opt.conv not in TYPED_CONVS:
-            return
-        if (opt.min is not None and not v >= opt.min) or (opt.max is not None and not v <= opt.max):
-            raise ValueError('%s must be %s..%s%s' % (key, opt.min, opt.max, (' ' + what) if what else ''))
 
     def _apply(self, key, value):
         sim, chaos, fake = self.simulator, self.chaos, self.fake
@@ -1120,83 +958,3 @@ class ControlServer:
                 self.audit.event('RELOAD', 'restored %d override(s) from %s' % (applied, path))
         except (OSError, ValueError) as e:
             logger.error('reload: the state file %s is unreadable (%s) — starting without it', path, e)
-
-    def reload_daemon(self):
-        """The `reload` verb: save the overrides, then restart the whole
-        daemon. The fresh process re-resolves the flags and the env — the
-        fake has no config file (F11) — and start() re-applies the saved
-        overrides once. The secrets never save (the dump rule): an
-        overridden secret is named in the reply, to re-pass by flag/env,
-        or as file:<path>."""
-        try:
-            settings, lost = self._save_reload_state()
-        except OSError as e:
-            logger.error('control: reload could not save the overrides: %s', e)
-            return 'err reload failed: %s' % e
-        self.reload_pending = True
-        logger.info('control: reload — %d override(s) saved to %s, re-execing',
-                    len(settings), self._reload_state_path())
-        msg = 'ok reload: %s, the daemon restarts now' % (
-            '%d override(s) saved' % len(settings) if settings else 'no overrides to save')
-        if lost:
-            msg += ' (%s: secret, not saved — re-pass by flag/env, or as file:<path>)' % ', '.join(lost)
-        return msg
-
-    def _exec_reload(self):
-        """The reply is out (the session loop calls this after it): announce
-        to the consoles and re-exec in place — the same argv re-resolves the
-        flags, the fresh daemon rebinds the control target (stale sockets
-        are replaced) and restores the saved overrides."""
-        if self.audit:
-            self.audit.event('RELOAD', 'exec: the daemon re-execs (pid %d)' % os.getpid())
-        self.announce_exit('reload', text='daemon-exit: the fake inverter is reloading — '
-                                          'the daemon restarts with the saved configuration')
-        sys.stdout.flush()
-        sys.stderr.flush()
-        time.sleep(0.2)   # let the bye frames drain
-        os.execv(sys.executable, [sys.executable] + sys.argv)
-
-    def dump_state(self):
-        """The write-behind: the live setting overrides to the configured
-        dump path (the `request dump` command and the graceful shutdown) —
-        sealed when dump/key is configured."""
-        if not self.dump_path:
-            return 'err no dump path configured (set dump/path or --dump-path)'
-        settings = self.dump_settings()
-        try:
-            n = state.write_dump(self.dump_path, settings, key=self.dump_key)
-        except (OSError, ValueError) as e:
-            logger.error('control: the dump to %s failed: %s', self.dump_path, e)
-            return 'err dump failed: %s' % e
-        logger.info('control: state dumped to %s (%d setting(s)%s)', self.dump_path, n,
-                    ', sealed' if self.dump_key else '')
-        return 'ok dumped %d setting(s) to %s%s' % (n, self.dump_path, ' (sealed)' if self.dump_key else '')
-
-    def restore_state(self):
-        """Load a dump back: the setting overrides re-apply (a sealed dump
-        restores only under the configured dump/key)."""
-        if not self.dump_path:
-            return 'err no dump path configured (set dump/path or --dump-path)'
-        if not os.path.exists(self.dump_path):
-            return 'err no dump at %s yet (run dump first)' % self.dump_path
-        try:
-            settings = state.read_dump(self.dump_path, key=self.dump_key)
-            applied, failed = self.apply_dump_settings(settings)
-        except ValueError as e:
-            return 'err restore failed: %s' % e
-        logger.info('control: state restored from %s (%d setting(s))', self.dump_path, applied)
-        return 'ok restored %d setting(s) from %s%s' % (
-            applied, self.dump_path,
-            ' (%d skipped: %s)' % (len(failed), ', '.join(failed)) if failed else '')
-
-    def shutdown_dump(self):
-        """The graceful stop's write-behind: the overrides to the dump path
-        (no reply — the log carries it; sealed when dump/key is set)."""
-        if not self.dump_path:
-            return
-        try:
-            n = state.write_dump(self.dump_path, self.dump_settings(), key=self.dump_key)
-            logger.info('state dumped to %s (%d setting(s)%s)', self.dump_path, n,
-                        ', sealed' if self.dump_key else '')
-        except (OSError, ValueError) as e:
-            logger.error('the shutdown dump to %s failed: %s', self.dump_path, e)

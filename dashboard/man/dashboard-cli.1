@@ -21,41 +21,39 @@ console signs every command and verifies every reply.
 .TP
 .B \-\-control\-port
 control server target: unix socket path or TCP port on 127.0.0.1,
-auto\-detected (default: /tmp/dashboard\-8080.socket; env CTL when
-unset) — same flag as the server itself
+auto\-detected (env CTL when unset) — same flag as the server itself
 .TP
 .BI \-\-timeout " N"
-socket timeout in seconds (default 5.0)
+socket timeout in seconds
 .TP
 .BI \-\-reconnect " N"
 when the connection dies (an unanswered ping, a reset, a timeout), retry
-this many times before giving up; 0 = off (default 3)
+this many times before giving up; 0 = off
 .TP
 .BI \-\-reconnect\-wait " N"
-seconds between the reconnect attempts (default 10.0)
+seconds between the reconnect attempts
 .TP
 .B \-\-control\-token
 control auth token for TCP (env CONTROL_TOKEN); a file:<path> value
 reads the first line of an owner\-only 0600 file
 .TP
 .B \-\-audit\-log
-audit trail: a file path or \- for stdout; default: the XDG state home
+audit trail: a file path or \- for stdout; the XDG state home when unset
 .TP
 .BI \-\-audit\-max\-mb " N"
-rotate the audit log at this size in MB, keeping 3 backups; 0 = off
-(default 10.0)
+rotate the audit log at this size, 0 = off
 .TP
 .BI \-\-audit\-files " N"
-rotated audit backups to keep (default 3)
+rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
-disable the audit trail (default: off)
+disable the audit trail
 
 
 .SH ENVIRONMENT
 .TP
 .B CTL
-the default control target for the clients.
+the control target when \fB--control-port\fR is unset.
 .TP
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off).

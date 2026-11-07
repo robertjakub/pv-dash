@@ -36,134 +36,116 @@ signed commands are mandatory. A second, read-only token
 .SH OPTIONS
 .TP
 .BI \-\-port " N"
-listen port (default: config file, $PORT or 8080)
+listen port
 .TP
 .B \-\-bind
-address to bind (default: config file, $BIND or 0.0.0.0)
+address to bind
 .TP
 .B \-\-upstream
-upstream Prometheus URL (default: config file, $PROM_URL or
-http://localhost:9090)
+upstream Prometheus URL
 .TP
 .B \-\-prom\-prefix
-path under which Prometheus is proxied (default: config file,
-$PROM_PREFIX or /prom); empty string proxies everything
+path under which Prometheus is proxied; empty string proxies everything
 .TP
 .B \-\-static\-dir
-directory to serve (default: config file, $STATIC_DIR or static next to
-the script)
+directory to serve
 .TP
 .B \-\-config\-js
-config.js to serve at /config.js (default: config file, $CONFIG_JS or
-config.js next to the script)
+config.js to serve at /config.js
 .TP
 .B \-\-battery
-enable battery support in the served config.js (default: config file,
-$BATTERY or off)
+enable battery support in the served config.js
 .TP
 .BI \-\-max\-clients " N"
 maximum concurrent HTTP clients (pages + proxy); extras get an immediate
-503 (default: config file, $MAX_CLIENTS or 64; 0 = unlimited)
+503
 .TP
 .BI \-\-client\-timeout " N"
 seconds an idle keep\-alive HTTP client is kept before being kicked
-(default: config file, $CLIENT_TIMEOUT or 300; 0 = off)
 .TP
 .BI \-\-max\-conn\-per\-ip " N"
 maximum concurrent HTTP connections from one peer IP; extras get an
-immediate 503 (default: config file, $MAX_CONN_PER_IP or 0 = no per\-IP
-limit)
+immediate 503
 .TP
 .B \-\-control\-port
-JSON\-lines control server target: unix socket path (default:
-/tmp/dashboard\-<port>.socket) or TCP port number on 127.0.0.1 (e.g.
-15598); 0 = off. Talk to it with dashboard\-ctl.py (default: config
-file, $CTL)
+JSON\-lines control server target: unix socket path or TCP port number
+on 127.0.0.1 (e.g. 15598); 0 = off. Talk to it with dashboard\-ctl.py
 .TP
 .B \-\-control\-token
 require a token on control connections: the client authenticates with
-{"cmd": "auth", "token": ...}; over the unix socket a trusted peer
-(root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
-skips the token; the value may be `file:<path>` — the first line of an
+{"cmd": "auth", "token":...}; over the unix socket a trusted peer (root,
+the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED) skips
+the token; the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
-file:/run/credentials/...) (default: config file, $CONTROL_TOKEN or
-none)
+file:/run/credentials/...)
 .TP
 .B \-\-control\-ops\-token
 a second, read\-only control token: sessions authenticating with it may
 run the show/clear verbs only (no set/unset, no request reload, no
 shutdown) — the ops shift against the admin key, both audited; the value
 may be `file:<path>` — the first line of an owner\-only 0600 file (a
-systemd LoadCredential rides as file:/run/credentials/...) (default:
-config file, $CONTROL_OPS_TOKEN or none)
+systemd LoadCredential rides as file:/run/credentials/...)
 .TP
 .B \-\-control\-trust\-uids
 extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
-the daemon's own user are always trusted (default: config file,
-$CONTROL_TRUST_UIDS or none)
+the daemon's own user are always trusted
 .TP
 .B \-\-control\-ops\-verbs
 the read\-only ops role's RBAC policy: the verbs its sessions may run,
-comma\-separated (default: show,clear; validated against the control
-grammar at start)
+comma\-separated
 .TP
 .B \-\-metrics\-server
 serve the dashboard's own Prometheus /metrics endpoint (the uptime, the
-request counters, the proxied query total, the client gate) — off by
-default and a token is mandatory when on (default: config file,
-$METRICS_SERVER or off)
+request counters, the proxied query total, the client gate) — off unless
+toggled, and a token is mandatory when on
 .TP
 .B \-\-metrics\-listen
-the metrics bind address HOST:PORT (default: config file,
-$METRICS_LISTEN or 127.0.0.1:9452)
+the metrics bind address HOST:PORT
 .TP
 .B \-\-metrics\-token
 require Authorization: Bearer <token> on the /metrics endpoint —
 mandatory when \-\-metrics\-server is on; the value may be `file:<path>`
 — the first line of an owner\-only 0600 file (a systemd LoadCredential
-rides as file:/run/credentials/...) (default: config file,
-$METRICS_TOKEN)
+rides as file:/run/credentials/...)
 .TP
 .BI \-\-metrics\-max\-clients " N"
 maximum concurrent /metrics clients; extras get an immediate 503, 0 =
-unlimited (default: config file, $METRICS_MAX_CLIENTS or 16)
+unlimited
 .TP
 .BI \-\-metrics\-client\-timeout " N"
 seconds an idle /metrics client is kept before the socket times out, 0 =
-the built\-in 5 s cap (default: config file, $METRICS_CLIENT_TIMEOUT or
-5)
+the built\-in 5 s cap
 .TP
 .BI \-\-metrics\-max\-conn\-per\-ip " N"
 maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
-limit (default: config file, $METRICS_MAX_CONN_PER_IP or 0)
+limit
 .TP
 .B \-\-audit\-log
 DSH audit trail: a file path or \- for stdout (the docker/journald way);
-default: the XDG state home (~/.local/state/dashboard/audit.log)
+the XDG state home (~/.local/state/dashboard/audit.log) when unset
 .TP
 .BI \-\-audit\-max\-mb " N"
 rotate the audit log at this size in MB, keeping 3 backups; 0 = no size
-rotation (default 10.0)
+rotations)
 .TP
 .BI \-\-audit\-files " N"
-rotated audit backups to keep (default 3)
+rotated audit backups to keeps)
 .TP
 .B \-\-no\-audit\-log
-disable the DSH audit trail (default: off)
+disable the DSH audit trail
 .TP
 .B \-\-log\-level
-log level (default: config file or INFO); DEBUG logs every request
+log level; DEBUG logs every request
 .TP
 .B \-\-log\-queries
 log proxied Prometheus queries at INFO level
 .TP
 .B \-\-log\-access
-log every HTTP request at INFO (default: config file, $LOG_ACCESS or
-quiet)
+log every HTTP request at INFO
 .TP
 .B \-\-local\-time
-log timestamps in the system time zone instead of UTC (default: off)
+log timestamps in the system time zone instead of UTC
 .TP
 .B \-\-dump\-path
 the state dump: the live setting overrides (the toggles, the caps, the
@@ -171,8 +153,7 @@ log surface — the tokens apart) as one JSON, written 0600 with an
 integrity hash (a restore refuses a tampered, unsigned or
 group\-writable dump); dumped on the request dump command and the
 graceful shutdown; loaded on start only with \-\-restore\-on\-start, on
-demand with the request restore command (default: config file,
-$DUMP_PATH or none)
+demand with the request restore command
 .TP
 .B \-\-dump\-key
 the key that seals the state dumps and the reload's state file: the
@@ -183,24 +164,21 @@ re\-resolves the same key, so the state file reads on the other side; no
 key = the dumps stay 0600 plaintext with the integrity hash; a dump path
 without a key warns at start and on set; the value may be `file:<path>`
 — the first line of an owner\-only 0600 file (a systemd LoadCredential
-rides as file:/run/credentials/...) (default: config file, $DUMP_KEY or
-none)
+rides as file:/run/credentials/...)
 .TP
 .B \-\-restore\-on\-start
 load the state dump when the server starts (needs \-\-dump\-path) — the
-live overrides ride again instead of a cold start; default: start cold,
-load only on demand (default: config file, $RESTORE_ON_START) (default:
-off)
+live overrides ride again instead of a cold start; without it the dump
+loads on demand
 .TP
 .B \-\-config
 config file — the set grammar: every line a `set <name> <value>`,
-comments start with # (default: $CONFIG, then server.conf next to this
-script, then the subproject root) (default:
-/Users/oom/GensparkCode/pv\-dash/dashboard/server.conf)
+comments start with # ($CONFIG, then server.conf next to this script,
+then the subproject root)
 .TP
 .B \-\-dry\-run
 validate the configuration, print the effective settings and exit
-(nothing is bound) (default: off)
+(nothing is bound)
 
 
 .SH SIGNALS
@@ -224,7 +202,7 @@ metrics token, each rotating live, the value never rendering \(em
 \fBshow <secret>\fR refuses), \fBshow status\fR, \fBshow connections\fR
 (the live HTTP clients), \fBshow version\fR, \fBshow knobs\fR
 (the dictionary of the registry), \fBinspect\fR,
-\fBrequest reload\fR (the SIGHUP path), \fBreload\fR (the
+\fBrequest reload-config\fR (the SIGHUP path), \fBrequest reload\fR (the
 whole-daemon restart that keeps the sets: the live overrides save to a
 state file beside the config, the process re-execs, the fresh daemon
 re-applies them once), with a dump path configured (\fB--dump-path\fR):
@@ -240,23 +218,23 @@ and
 .SH SECURITY
 The server speaks plain HTTP and has no authentication on the page or the
 proxy yet (the auth story in docs/TODO.md): bind the loopback (the NixOS
-module's default) or publish the port loopback-only and put an
+module ships that bind) or publish the port loopback-only and put an
 authenticating reverse proxy in front for anything beyond localhost. The
 control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
 control port without a token refuses to start (F5); with a token the wire
 is signed and the commands/replies verify end to end; a second, read-only
 ops token (\fB--control-ops-token\fR) scopes its sessions to the
-show/clear verbs. The audit trail (default in the XDG state home, prefix
-DSH) records the control commands with their roles, the auth failures, the
-reloads and the shutdowns.
+show/clear verbs. The audit trail (in the XDG state home when
+\fB--audit-log\fR is unset, prefix DSH) records the control commands with
+their roles, the auth failures, the reloads and the shutdowns.
 
 .SH FILES
 .TP
 .I /tmp/dashboard-<port>.socket
-the default control socket.
+the control socket used when \fB--control-port\fR is unset.
 .TP
 .I ~/.local/state/dashboard/audit.log
-the default audit trail.
+the audit trail when \fB--audit-log\fR is unset.
 
 .SH SEE ALSO
 .BR dashboard-ctl (1),

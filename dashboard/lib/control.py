@@ -54,7 +54,8 @@ class ControlServer(_ControlServer):
     the token first when one is configured; the unix socket relies on
     filesystem permissions. A second, read-only token (ops_token) may be
     configured beside the admin token: it authenticates into the show/clear
-    verbs only — no set/unset, no request reload, no reload, no shutdown
+    verbs only — no set/unset, no request reload-config, no request reload,
+    no request dump/restore, no shutdown
     (common/wiresec.py's roles). `stopper` is the graceful-stop callback
     shared with the signal handlers; it runs after the shutdown reply left
     the wire."""
@@ -169,7 +170,7 @@ class ControlServer(_ControlServer):
                 return 'err unknown setting %s (try help)' % args[0].lower()
         if low == 'inspect':
             return self.inspect()
-        if low == 'request reload':
+        if low == 'request reload-config':
             if not self.reloader:
                 return 'err no reloader configured'
             try:
@@ -180,7 +181,7 @@ class ControlServer(_ControlServer):
             return self.dump_state()
         if low == 'request restore':
             return self.restore_state()
-        if low == 'reload':
+        if low == 'request reload':
             return self.reload_daemon()
         if low == 'shutdown':
             self.shutdown_pending = True
@@ -193,10 +194,10 @@ class ControlServer(_ControlServer):
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, unset <setting>, inspect, '
-                'show <setting|status|connections|version|config|knobs>, request reload')
+                'show <setting|status|connections|version|config|knobs>, request reload-config')
         if self.dump_path:
             cmds += ', request dump, request restore'
-        cmds += ', reload, shutdown, quit; '
+        cmds += ', request reload, shutdown, quit; '
         cmds += 'help <setting> describes it, help config maps every knob to its control command, '
         cmds += 'show knobs prints the full dictionary'
         return cmds
@@ -409,7 +410,7 @@ class ControlServer(_ControlServer):
         return '?'
 
     def clear_overrides(self):
-        """The config was re-applied (SIGHUP/request reload): nothing is
+        """The config was re-applied (SIGHUP/request reload-config): nothing is
         live-overridden anymore."""
         self.overridden.clear()
 

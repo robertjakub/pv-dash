@@ -59,7 +59,7 @@ metrics token, each rotating live, the value never rendering \\(em
 \\fBshow <secret>\\fR refuses), \\fBshow status\\fR, \\fBshow connections\\fR
 (the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
 (the dictionary of the registry), \\fBinspect\\fR,
-\\fBrequest reload\\fR (the SIGHUP path), \\fBreload\\fR (the
+\\fBrequest reload-config\\fR (the SIGHUP path), \\fBrequest reload\\fR (the
 whole-daemon restart that keeps the sets: the live overrides save to a
 state file beside the config, the process re-execs, the fresh daemon
 re-applies them once), with a dump path configured (\\fB--dump-path\\fR):
@@ -74,22 +74,22 @@ and
     security = """.SH SECURITY
 The server speaks plain HTTP and has no authentication on the page or the
 proxy yet (the auth story in docs/TODO.md): bind the loopback (the NixOS
-module's default) or publish the port loopback-only and put an
+module ships that bind) or publish the port loopback-only and put an
 authenticating reverse proxy in front for anything beyond localhost. The
 control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
 control port without a token refuses to start (F5); with a token the wire
 is signed and the commands/replies verify end to end; a second, read-only
 ops token (\\fB--control-ops-token\\fR) scopes its sessions to the
-show/clear verbs. The audit trail (default in the XDG state home, prefix
-DSH) records the control commands with their roles, the auth failures, the
-reloads and the shutdowns."""
+show/clear verbs. The audit trail (in the XDG state home when
+\\fB--audit-log\\fR is unset, prefix DSH) records the control commands with
+their roles, the auth failures, the reloads and the shutdowns."""
     files = """.SH FILES
 .TP
 .I /tmp/dashboard-<port>.socket
-the default control socket.
+the control socket used when \\fB--control-port\\fR is unset.
 .TP
 .I ~/.local/state/dashboard/audit.log
-the default audit trail."""
+the audit trail when \\fB--audit-log\\fR is unset."""
     return page(
         'Static single-page home PV monitoring dashboard with a Prometheus proxy',
         'dashboard', 1, DATE, VERSION, MANUAL,
@@ -134,7 +134,7 @@ console signs every command and verifies every reply."""
     env = """.SH ENVIRONMENT
 .TP
 .B CTL
-the default control target for the clients.
+the control target when \\fB--control-port\\fR is unset.
 .TP
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off)."""

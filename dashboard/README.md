@@ -207,7 +207,7 @@ token). Over the unix socket a trusted peer (root, the daemon's own user or
 `--control-trust-uids`) skips the token handshake (SO_PEERCRED). A second,
 **read-only ops token** (`--control-ops-token`)
 authenticates into the `show` verbs only — no `set`/`unset`, no `request
-reload`, no `reload`, no `shutdown`: the ops shift against the admin key,
+reload-config`, no `request reload`, no `request dump`/`restore`, no `shutdown`: the ops shift against the admin key,
 both audited (the DSH trail's COMMAND entries carry `role=ops`/`role=admin`,
 the denials included; each session's frames are mac'd with the key it
 authenticated with).
@@ -215,7 +215,7 @@ authenticated with).
 ```bash
 python3 bin/dashboard.py --control-port /tmp/dashboard-8080.socket &
 python3 bin/dashboard-ctl.py show status          # one-shot
-python3 bin/dashboard-ctl.py request reload       # the SIGHUP path
+python3 bin/dashboard-ctl.py request reload-config  # the SIGHUP path
 printf 'set battery on\nshow status\n' | python3 bin/dashboard-ctl.py
 python3 bin/dashboard-cli.py                      # the console: TAB completion, ?, reconnect
 ```
@@ -233,8 +233,9 @@ secret: pass it by flag/env, or as `file:<path>`)), `show <setting>` / `show sta
 flag, its env twin, how it changes — under its display group, ungrouped
 rows bare), `inspect` (the one-page
 dump for a bug report), `request
-reload` (re-read `server.conf` — the SIGHUP path; the listen address and
-port are bound and stay), `reload` (**the whole-daemon restart that keeps
+reload-config` (re-read `server.conf` — the SIGHUP path; the listen address
+and port are bound and stay), `request reload` (**the whole-daemon restart
+that keeps
 the sets**: the live overrides save to a state file beside the config
 (``<config>.reload``), the process re-execs, the fresh daemon re-resolves
 the config file and re-applies the saved overrides once, then consumes the
@@ -251,7 +252,7 @@ at start and on `set`, and every secret value takes a `file:` reference —
 an owner-only `0600` file, so the config carries the reference, never the
 material), `shutdown`, `quit`;
 `help <setting>` describes a
-setting. A SIGHUP or `request reload` also clears the live overrides
+setting. A SIGHUP or `request reload-config` also clears the live overrides
 (`show status`'s `overridden=` row lists them).
 
 Every control command, auth failure, reload and shutdown lands in the audit

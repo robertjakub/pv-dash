@@ -301,7 +301,7 @@ def install_signal_handlers(httpd, apply_reload=None, graceful_stop=None):
 def parse_args():
     ap = build_parser(OPTIONS, description='Static file server with a Prometheus proxy at /prom')
     ap.add_argument('--config', default=default_config_path(),
-                    help='config file — the set grammar: every line a `set <name> <value>`, comments start with # (default: $CONFIG, then server.conf next to this script, then the subproject root)')
+                    help='config file — the set grammar: every line a `set <name> <value>`, comments start with # ($CONFIG, then server.conf next to this script, then the subproject root)')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound)')
     ap.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (dashboard --man | man -l -)')
     args = ap.parse_args()
@@ -439,7 +439,7 @@ def main():
         control.metrics_desc = metrics_desc
 
     def apply_reload():
-        """The SIGHUP and the `request reload` command share this: re-resolve
+        """The SIGHUP and the `request reload-config` command share this: re-resolve
         the config, apply what is live (the handler, the gate, the log
         level), clear the override markers, audit. The listen address and
         the port are bound — they stay."""
@@ -463,7 +463,7 @@ def main():
         return 'upstream %s, battery %s' % (new_cfg['upstream'], 'on' if new_cfg['battery'] else 'off')
 
     if control:
-        control.reloader = apply_reload   # the control server's `request reload` runs the same path
+        control.reloader = apply_reload   # the control server's `request reload-config` runs the same path
 
     def graceful_stop(reason):
         logger.info('shutdown: %s received after %ds, stopping the web server',

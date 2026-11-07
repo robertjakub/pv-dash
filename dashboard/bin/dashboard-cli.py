@@ -67,7 +67,7 @@ def welcome(sock):
 
 SPEC = dict(label='the dashboard', daemon_label='dashboard control server',
             cli_name='dashboard-cli', app='dashboard', self_note='the server itself',
-            command_help='e.g. inspect, show status, set battery on, request reload, shutdown',
+            command_help='e.g. inspect, show status, set battery on, request reload-config, shutdown',
             prompt_word='dashboard', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,
@@ -76,7 +76,7 @@ SPEC = dict(label='the dashboard', daemon_label='dashboard control server',
             command_pool=command_pool, setting_pool=setting_pool, set_extra=(),
             describe=describe_word,
             help=HELP, welcome=welcome, loop=cli.typed_loop,
-            silent_ok=lambda low: low.startswith('request reload'),
+            silent_ok=lambda low: low.startswith('request reload-config'),
             render=None, cli_page=cli_page)
 
 if __name__ == '__main__':

@@ -274,10 +274,10 @@ def main():
         st, tx, macok = ops_roundtrip('set log-level DEBUG')
         check('ops: set is forbidden', st == 'err' and 'forbidden' in tx and 'admin' in tx and macok,
               '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('request reload-config')
+        check('ops: request reload-config is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request reload')
-        check('ops: request reload is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('reload')
-        check('ops: the whole-daemon reload is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        check('ops: the whole-daemon request reload is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show control token', token='admintok2')
         check('secrets: the show verb refuses the control token (the admin sees the refusal too)',
               st == 'err' and 'is a secret' in tx and macok, '%s %s' % (st, tx))

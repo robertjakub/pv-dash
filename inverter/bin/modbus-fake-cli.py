@@ -334,7 +334,10 @@ def complete(text, state):
             sys.stdout.write(_prompt + buf)
             sys.stdout.flush()
         return None
-    return matches[0]
+    # a single match: insert it with the trailing space so the NEXT tab moves
+    # into the following word — editline does not add the space itself, and
+    # without it tab-tab just re-completes the same word and never lists
+    return matches[0] + ' '
 
 
 def print_options(buf):
@@ -370,7 +373,8 @@ def main():
         sys.stdout.write(cli_page(p))
         raise SystemExit(0)
 
-    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CLI', app='fake-inverter')
+    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CLI', app='fake-inverter',
+                                                    max_mb=args.audit_max_mb, files=args.audit_files)
 
     token = args.control_token or os.environ.get('CONTROL_TOKEN')
     token = parse_secret(token, 'control-token')   # the inline form may be file:<path> — the same loader
@@ -622,7 +626,10 @@ def confirm_shutdown(sock):
     if ans.strip().lower() not in ('', 'y', 'yes'):
         print('% Aborted.')
         return False
-    reply = exchange(sock, wire('shutdown'))
+    try:
+        reply = exchange(sock, wire('shutdown'))
+    except ConnectionLost:
+        return True   # the wire died right after the confirm; the fake is stopping either way
     if reply is not None:
         display(reply)
     return True   # 'bye shutdown' is out; the fake is stopping either way

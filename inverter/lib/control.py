@@ -22,7 +22,6 @@ import sys
 import threading
 import time
 
-from common.audit import AuditLog
 from common.config import acl_summary, acl_text, parse_acl, parse_auth_type, parse_secret
 from common.cred import peer_uid
 from common.human import secs
@@ -32,6 +31,7 @@ from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
+from .signals import parse_time
 from common.version import version_string
 from common.dump import SECRET_REMOVED, dump_filter
 from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME
@@ -635,11 +635,10 @@ class ControlServer:
         raise ValueError('unknown setting %s' % key)
 
     def _parse_hour(self, text):
-        h, m = text.split(':')
-        t = int(h) + int(m) / 60.0
-        if not 0 <= t < 24:
-            raise ValueError('time out of range (00:00-23:59)')
-        return t
+        try:
+            return parse_time(text)
+        except ValueError as e:
+            raise ValueError('time out of range (00:00-23:59)') from e
 
     def _get(self, key):
         sim, ov, fake, chaos = self.simulator, self.simulator.overrides(), self.fake, self.chaos

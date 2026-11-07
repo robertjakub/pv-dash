@@ -96,13 +96,12 @@ def validate(args):
     return problems
 
 
-def configured_defaults(args, frozen, profile_text):
+def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth):
     """Every setting's configured startup value — what `unset <setting>`
-    restores. The secret rows (control/token, control/ops/token,
+    restores (the connect ACL and the auth type ride in, parsed once in
+    main). The secret rows (control/token, control/ops/token,
     metrics/token, auth-key) carry NO entry: `unset` refuses them (the
     metrics/token treatment) — a secret never renders, never re-applies."""
-    connect_acl = parse_acl(args.connect_acl or os.environ.get('CONNECT_ACL'), 'connect-acl')
-    modbus_auth = parse_auth_type(args.auth or os.environ.get('AUTH'), 'auth')
     return {
         'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'grid': 'auto', 'soc': 'auto', 'cloud': 'clear',
         'time': '%02d:%02d' % (int(frozen), round((frozen % 1.0) * 60)) if frozen is not None else 'auto',
@@ -284,7 +283,8 @@ def main():
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,
-                                defaults=configured_defaults(args, frozen, profile_text),
+                                defaults=configured_defaults(args, frozen, profile_text,
+                                                             connect_acl, modbus_auth),
                                 log_replies=args.control_log_replies, audit=audit,
                                 token=control_token, trust_uids=trust_uids,
                                 socket_group=args.control_socket_group,

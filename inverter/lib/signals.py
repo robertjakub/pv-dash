@@ -101,7 +101,6 @@ class SignalBox:
                 plan.append(('profile=%s: %s' % (profile_label(new_map.path), new_map.description),
                              lambda m=new_map: self.simulator.set_profile(m)))
             v = env.get('LOG_LEVEL')
-            v = env.get('LOG_LEVEL')
             if v:
                 level = getattr(logging, v.strip().upper())
                 plan.append(('log_level=%s' % v.strip().upper(),

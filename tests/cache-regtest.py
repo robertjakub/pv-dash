@@ -313,7 +313,8 @@ try:
           b[0] == 3 and w[:2] == (0xCAFE, 0) and w[2] >= 3, str(w))
 
     # 3. poll status caching: profile variant with a register the device rejects
-    procs[0] = subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(PORT)],
+    procs[0] = subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(PORT),
+                                 '--allow-write'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(0.7)
     import json as _json

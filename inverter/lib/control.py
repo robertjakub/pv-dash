@@ -23,7 +23,7 @@ import threading
 import time
 
 from common.audit import AuditLog
-from common.config import acl_summary, acl_text, load_token_file, parse_acl
+from common.config import acl_summary, acl_text, load_token_file, parse_acl, parse_secret
 from common.cred import peer_uid
 from common.human import secs
 from common import dump as state
@@ -540,6 +540,10 @@ class ControlServer:
             if val in ('off', 'none', ''):
                 self.token = None
                 return 'off'
+            try:
+                val = parse_secret(val, 'control/token')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
             if self.ops_token and hmac.compare_digest(val, self.ops_token):
                 raise ValueError('the ops token must differ from the admin token (the same secret would hand '
                                  'every holder the role the server picks first)')
@@ -559,6 +563,10 @@ class ControlServer:
             if val in ('off', 'none', ''):
                 self.ops_token = None   # the ops shift signs off; the admin role is untouched
                 return 'off'
+            try:
+                val = parse_secret(val, 'control-ops-token')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
             if self.token and hmac.compare_digest(val, self.token):
                 raise ValueError('the ops token must differ from the admin token (the same secret would hand '
                                  'every holder the role the server picks first)')
@@ -584,6 +592,10 @@ class ControlServer:
                 fake.metrics_desc = describe_metrics(fake.metrics_listen, None,
                                                      fake.metrics_caps[0], fake.metrics_caps[2])
                 return 'off'   # the trusted-LAN posture (F11): the fake may serve tokenless
+            try:
+                val = parse_secret(val, 'metrics/token')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
             fake.metrics_token = val
             if fake.metrics_srv:
                 fake.metrics_srv.token = val
@@ -608,7 +620,8 @@ class ControlServer:
                 self.dump_path = None
                 return 'off'
             self.dump_path = val   # request dump and the graceful shutdown write it from here on
-            return val
+            # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
+            return val if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
         if key == 'dump/restore-on-start':
             if val in ('on', 'true', '1', 'yes'):
                 on = True

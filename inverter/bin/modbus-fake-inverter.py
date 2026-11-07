@@ -38,7 +38,7 @@ import os
 import threading
 
 from common.audit import AuditLog
-from common.config import acl_text, load_token_file, parse_acl, parse_listen
+from common.config import acl_text, load_token_file, parse_acl, parse_listen, parse_secret
 from common.cred import parse_trust_uids
 from common.options import build_parser
 from common.version import version_string
@@ -213,19 +213,20 @@ def main():
     connect_acl = parse_acl(args.connect_acl or os.environ.get('CONNECT_ACL'), 'connect-acl')
     chaos = Chaos(args.chaos, seed=args.seed)
     target = resolve_control_target(args.control_port, args.port)
-    dump_key = (args.dump_key or os.environ.get('DUMP_KEY') or '').strip() or None
+    dump_key = parse_secret((args.dump_key or os.environ.get('DUMP_KEY') or '').strip() or None, 'dump/key')
     control_token_file = args.control_token_file or os.environ.get('CONTROL_TOKEN_FILE')
     if args.control_token and control_token_file:
         logger.error('--control-token and --control-token-file are mutually exclusive')
         raise SystemExit(1)
-    control_token = args.control_token
+    control_token = parse_secret(args.control_token, 'control/token')
     if control_token_file:
         control_token = load_token_file(control_token_file)
     control_ops_token_file = args.control_ops_token_file or os.environ.get('CONTROL_OPS_TOKEN_FILE')
     if args.control_ops_token and control_ops_token_file:
         logger.error('--control-ops-token and --control-ops-token-file are mutually exclusive')
         raise SystemExit(1)
-    control_ops_token = args.control_ops_token or os.environ.get('CONTROL_OPS_TOKEN')
+    control_ops_token = parse_secret(args.control_ops_token or os.environ.get('CONTROL_OPS_TOKEN'),
+                                     'control-ops-token')
     if control_ops_token_file:
         control_ops_token = load_token_file(control_ops_token_file, 'control-ops-token-file')
     if control_ops_token and not control_token:
@@ -249,7 +250,7 @@ def main():
     if args.metrics_token and metrics_token_file:
         logger.error('--metrics-token and --metrics-token-file are mutually exclusive')
         raise SystemExit(1)
-    metrics_token = args.metrics_token
+    metrics_token = parse_secret(args.metrics_token, 'metrics/token')
     if metrics_token_file:
         metrics_token = load_token_file(metrics_token_file, 'metrics-token-file')
     metrics_listen = parse_listen(args.metrics_listen)
@@ -258,6 +259,10 @@ def main():
         if not is_loopback_host(metrics_listen[0]):
             logger.warning('serving /metrics on %s without a token: the values are production-shaped '
                            'even though this is a test tool — set --metrics-token', args.metrics_listen)
+    if args.dump_path and not dump_key:
+        logger.warning('the state dump %s is not sealed (the integrity hash only — plaintext at rest): '
+                       'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '
+                       'to encrypt it', args.dump_path)
     if args.dry_run:
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')

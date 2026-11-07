@@ -30,7 +30,7 @@ from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
-from common.config import load_token_file
+from common.config import load_token_file, parse_secret
 from common.dump import SECRET_REMOVED, dump_filter
 from common import dump as state
 from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, KNOWN_VERBS, NODE_BY_NAME
@@ -556,6 +556,10 @@ class ControlServer:
                                      'only the unix socket (the filesystem is the auth) may run tokenless')
                 self.token = None
                 return 'off'
+            try:
+                val = parse_secret(val, 'control/token')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
             if self.ops_token and hmac.compare_digest(val, self.ops_token):
                 raise ValueError('the ops token must differ from the admin token (the same secret would hand '
                                  'every holder the role the server picks first)')
@@ -575,6 +579,10 @@ class ControlServer:
             if val in ('off', 'none', ''):
                 self.ops_token = None   # the ops shift signs off; the admin role is untouched
                 return 'off'
+            try:
+                val = parse_secret(val, 'control-ops-token')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
             if self.token and hmac.compare_digest(val, self.token):
                 raise ValueError('the ops token must differ from the admin token (the same secret would hand '
                                  'every holder the role the server picks first)')
@@ -594,6 +602,10 @@ class ControlServer:
             if not val or val in ('off', 'none', '0'):
                 raise ValueError('metrics/token is mandatory while the endpoint serves (F6 in docs/AUDIT.md) '
                                  '— set the new token')
+            try:
+                val = parse_secret(val, 'metrics/token')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
             self.metrics_token = val
             if self.metrics_srv:
                 self.metrics_srv.token = val   # the handler reads it per request — the swap is live
@@ -615,7 +627,8 @@ class ControlServer:
                 self.dump_path = None
                 return 'off'
             self.dump_path = val   # request dump and the graceful shutdown write it from here on
-            return val
+            # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
+            return val if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
         if key == 'dump/restore-on-start':
             if val in ('on', 'true', '1', 'yes'):
                 on = True

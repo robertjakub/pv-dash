@@ -15,7 +15,7 @@ import os
 
 from common.options import parse_config_script
 from .options import OPTIONS
-from common.config import load_token_file
+from common.config import load_token_file, parse_secret
 from .statics import DEFAULTS, DEFAULT_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
@@ -138,12 +138,13 @@ def resolve_config(args, script_dir=None):
     }
     cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'CTL',
                                   'control_port', None, str)
-    cfg['control_token'] = (resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
-                                    'control_token', None, str) or '').strip() or None
+    cfg['control_token'] = parse_secret((resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
+                                                 'control_token', None, str) or '').strip() or None, 'control/token')
     control_token_file = resolve(getattr(args, 'control_token_file', None), 'CONTROL_TOKEN_FILE',
                                  'control_token_file', None, str)
-    cfg['control_ops_token'] = (resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
-                                        'control_ops_token', None, str) or '').strip() or None
+    cfg['control_ops_token'] = parse_secret((resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
+                                                     'control_ops_token', None, str) or '').strip() or None,
+                                            'control-ops-token')
     control_ops_token_file = resolve(getattr(args, 'control_ops_token_file', None), 'CONTROL_OPS_TOKEN_FILE',
                                      'control_ops_token_file', None, str)
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None),
@@ -181,8 +182,8 @@ def resolve_config(args, script_dir=None):
                                     'metrics_server', False, str_to_bool)
     cfg['metrics_listen'] = resolve(getattr(args, 'metrics_listen', None), 'METRICS_LISTEN',
                                     'metrics_listen', DEFAULTS['metrics_listen'], str)
-    cfg['metrics_token'] = (resolve(getattr(args, 'metrics_token', None), 'METRICS_TOKEN',
-                                    'metrics_token', None, str) or '').strip() or None
+    cfg['metrics_token'] = parse_secret((resolve(getattr(args, 'metrics_token', None), 'METRICS_TOKEN',
+                                                 'metrics_token', None, str) or '').strip() or None, 'metrics/token')
     cfg['metrics_token_file'] = resolve(getattr(args, 'metrics_token_file', None), 'METRICS_TOKEN_FILE',
                                         'metrics_token_file', None, str)
     cfg['metrics_max_clients'] = resolve(getattr(args, 'metrics_max_clients', None), 'METRICS_MAX_CLIENTS',
@@ -194,7 +195,8 @@ def resolve_config(args, script_dir=None):
                                              'METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
                                              DEFAULTS['metrics_max_conn_per_ip'], int)
     cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', None, str)
-    cfg['dump_key'] = (resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key', None, str) or '').strip() or None
+    cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
+                                            None, str) or '').strip() or None, 'dump/key')
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
                                       'restore_on_start', False, str_to_bool)
     control_port = str(cfg['control_port'] or '').strip()

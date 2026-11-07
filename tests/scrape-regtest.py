@@ -1687,6 +1687,8 @@ try:
     #       re-applies, the whole-daemon reload keeps the sets across the exec
     r = sctl('set dump/path /tmp/scr_regtest_state.json', 15597, token='ctok9')
     check('scraper control: the dump path set live', r.startswith('ok dump/path=/tmp/scr_regtest_state.json'), r[:90])
+    check('scraper control: the set dump path reply notes the unsealed dump (no key configured)',
+          '(not sealed' in r and 'set dump/key' in r, r[:160])
     r = sctl('set interval 9', 15597, token='ctok9')
     check('scraper control: the override before the dump', r.startswith('ok interval=9.00s'), r[:80])
     r = sctl('request dump', 15597, token='ctok9')
@@ -1743,6 +1745,63 @@ try:
     r = sctl('request restore', 15601, token=STOK)
     check('scraper sealed dump: the restore re-applies under the configured key',
           r.startswith('ok restored 1 setting(s)'), r[:120])
+    # the file: reference form: the same material rides an owner-only file
+    # (env DUMP_KEY=file:...), and an unreadable reference fails the start
+    procs[-1].kill()
+    time.sleep(0.4)
+    scrkeyfile = '/tmp/scr_regtest_dump_key_file'
+    with open(scrkeyfile, 'w') as fh:
+        fh.write('scr-seal-key\n')
+    os.chmod(scrkeyfile, 0o600)
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
+                                   '--listen', '127.0.0.1:19466', '--interval', '1',
+                                   '--control-port', '15601', '--control-token', STOK,
+                                   '--dump-path', '/tmp/scr_regtest_state_sealed.json'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                  env={**os.environ, 'DUMP_KEY': 'file:' + scrkeyfile}))
+    time.sleep(1.5)
+    r = sctl('request restore', 15601, token=STOK)
+    check('scraper sealed dump: the file-reference key restores the sealed dump',
+          r.startswith('ok restored 1 setting(s)'), r[:120])
+    procs[-1].kill()
+    time.sleep(0.4)
+    p_nofile = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
+                                 '--listen', '127.0.0.1:19466', '--interval', '1',
+                                 '--control-port', '15601', '--control-token', STOK,
+                                 '--dump-path', '/tmp/scr_regtest_state_sealed.json',
+                                 '--dump-key', 'file:/nonexistent/dump_key'],
+                                stdout=open('/tmp/scr_regtest_keyfile_missing.log', 'w'),
+                                stderr=subprocess.STDOUT)
+    line = ''
+    for _ in range(80):
+        line = open('/tmp/scr_regtest_keyfile_missing.log').read()
+        if 'cannot read dump/key' in line:
+            break
+        time.sleep(0.1)
+    time.sleep(0.3)   # the SystemExit prints, then the process is gone
+    check('scraper sealed dump: an unreadable key reference fails the start (fail fast, never plaintext)',
+          'cannot read dump/key' in line and p_nofile.poll() is not None, line[-220:])
+    p_nofile.poll()
+    time.sleep(0.4)
+    # a dump path without a key warns at start (the plaintext posture is a
+    # choice, and now a visible one)
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
+                                   '--listen', '127.0.0.1:19466', '--interval', '1',
+                                   '--control-port', '15601', '--control-token', STOK,
+                                   '--dump-path', '/tmp/scr_regtest_state_plain.json'],
+                                  stdout=open('/tmp/scr_regtest_unsealed_warn.log', 'w'),
+                                  stderr=subprocess.STDOUT,
+                                  env={**os.environ, 'DUMP_PATH': '/tmp/scr_regtest_state_plain.json'}))
+    line = ''
+    for _ in range(80):
+        line = open('/tmp/scr_regtest_unsealed_warn.log').read()
+        if 'is not sealed' in line:
+            break
+        time.sleep(0.1)
+    check('scraper sealed dump: a dump path without a key warns unsealed at start',
+          'is not sealed' in line and 'set dump/key' in line, line[-220:])
+    procs[-1].kill()
+    time.sleep(0.4)
     r = sctl('restart', 15597, token='ctok9')
     check('scraper control: the modbus session restart', r.startswith('ok modbus session dropped'), r[:80])
     r = sctl('inspect', 15597, token='ctok9')

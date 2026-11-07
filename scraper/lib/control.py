@@ -31,7 +31,7 @@ from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, describe_node, grouped_rows, match_setting_path
-from common.config import default_profile_path, is_loopback_host, load_token_file, parse_listen, parse_upstream, resolve_profile_file
+from common.config import default_profile_path, is_loopback_host, load_token_file, parse_listen, parse_secret, parse_upstream, resolve_profile_file
 from common.dump import SECRET_REMOVED, dump_filter
 from common import dump as state
 from .config import build_sources, load_device_profile
@@ -592,6 +592,10 @@ class ControlServer:
                                      'only the unix socket (the filesystem is the auth) may run tokenless')
                 self.token = None
                 return 'off'
+            try:
+                val = parse_secret(val, 'control/token')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
             if self.ops_token and hmac.compare_digest(val, self.ops_token):
                 raise ValueError('the ops token must differ from the admin token (the same secret would hand '
                                  'every holder the role the server picks first)')
@@ -611,6 +615,10 @@ class ControlServer:
             if val in ('off', 'none', ''):
                 self.ops_token = None   # the ops shift signs off; the admin role is untouched
                 return 'off'
+            try:
+                val = parse_secret(val, 'control-ops-token')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
             if self.token and hmac.compare_digest(val, self.token):
                 raise ValueError('the ops token must differ from the admin token (the same secret would hand '
                                  'every holder the role the server picks first)')
@@ -636,6 +644,10 @@ class ControlServer:
                 with s.lock:
                     s.cfg['auth_token'] = None
                 return 'off'
+            try:
+                val = parse_secret(val, 'auth/token')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
             if any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in val):
                 raise ValueError('auth/token must not contain whitespace or control characters')
             self.httpd.RequestHandlerClass.auth_token = val   # the handler reads it per request — the swap is live
@@ -656,7 +668,8 @@ class ControlServer:
                 self.dump_path = None
                 return 'off'
             self.dump_path = val   # request dump and the graceful shutdown write it from here on
-            return val
+            # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
+            return val if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
         if key == 'dump/restore-on-start':
             if val in ('on', 'true', '1', 'yes'):
                 on = True

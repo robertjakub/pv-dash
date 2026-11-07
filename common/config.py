@@ -140,6 +140,26 @@ def load_token_file(path, label='control-token-file'):
     return token
 
 
+def parse_secret(raw, label='secret'):
+    """One secret knob, two forms: the inline string, or ``file:<path>`` —
+    the first line of an owner-only (0600) file, loaded by the same
+    load_token_file discipline the -file siblings enforce (F12). The
+    reference form is what a config file or an env var wants to carry: the
+    material stays in the file, the config renders the reference (and the
+    knob is secret-marked, so even the reference never renders back). A
+    file: reference that cannot be read fails fast — a secret that
+    silently vanishes is a misconfiguration, not a fallback to plaintext.
+    The inline form passes through untouched (a key may contain any
+    non-whitespace text; 'file:' as a literal KEY prefix is the one
+    reserved spelling)."""
+    if raw is None:
+        return None
+    raw = str(raw).strip()
+    if raw.startswith('file:'):
+        return load_token_file(raw[len('file:'):].strip(), label)
+    return raw
+
+
 def _profile_candidates(name):
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return [os.path.join(here, 'profiles', name),                        # the bundled copy (the packaged share tree)

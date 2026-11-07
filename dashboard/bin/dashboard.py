@@ -32,7 +32,7 @@ from common.connlimit import GatedHTTPServer
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.version import version_string
-from common.config import load_token_file, parse_listen
+from common.config import load_token_file, parse_listen, parse_secret
 from lib.config import resolve_config, resolve_control_target
 from lib.control import ControlServer
 from lib.man import daemon_page
@@ -328,7 +328,7 @@ def main():
                      ', '.join(unknown) if unknown else 'empty', ', '.join(sorted(KNOWN_VERBS)))
         raise SystemExit(2)
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
-    metrics_token = args.metrics_token or cfg.get('metrics_token')
+    metrics_token = parse_secret(args.metrics_token or cfg.get('metrics_token'), 'metrics/token')
     if args.metrics_token_file:
         metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
     elif cfg.get('metrics_token_file'):
@@ -358,8 +358,13 @@ def main():
     logger.info('%s', describe(cfg, args, control_desc))
     logger.info('state dumps: %s',
                 'off' if not cfg['dump_path']
-                else '%s (request dump, the graceful shutdown%s)'
-                % (cfg['dump_path'], ', restore on start' if cfg['restore_on_start'] else ''))
+                else '%s (request dump, the graceful shutdown%s%s)'
+                % (cfg['dump_path'], ', sealed' if cfg['dump_key'] else '',
+                   ', restore on start' if cfg['restore_on_start'] else ''))
+    if cfg['dump_path'] and not cfg['dump_key']:
+        logger.warning('the state dump %s is not sealed (the integrity hash only — plaintext at rest): '
+                       'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '
+                       'to encrypt it', cfg['dump_path'])
     if args.dry_run:
         logger.info('dry-run: configuration is valid, nothing was bound')
         return

@@ -13,7 +13,7 @@ import re
 from common.options import parse_config_script
 from .options import OPTIONS
 from common.config import check_token_file_mode, default_profile_path, is_loopback_host, load_token_file, \
-    parse_listen, parse_upstream, resolve_profile_file
+    parse_listen, parse_secret, parse_upstream, resolve_profile_file
 from .metrics import Metrics
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
@@ -284,7 +284,8 @@ def resolve_config(args, script_dir=None):
         'local_time': resolve(args.local_time, 'LOCAL_TIME', 'local_time', False, str_to_bool),
         'log_access': resolve(args.log_access, 'LOG_ACCESS', 'log_access', False, str_to_bool),
         'metric_prefix': metric_prefix,
-        'auth_token': (resolve(args.auth_token, 'AUTH_TOKEN', 'auth_token', None, str) or '').strip() or None,
+        'auth_token': parse_secret((resolve(args.auth_token, 'AUTH_TOKEN', 'auth_token', None, str)
+                                    or '').strip() or None, 'auth/token'),
         'auth_token_file': resolve(args.auth_token_file, 'AUTH_TOKEN_FILE', 'auth_token_file',
                                    None, str),
         'level': resolve(args.log_level, 'LOG_LEVEL', 'log_level',
@@ -292,12 +293,13 @@ def resolve_config(args, script_dir=None):
     }
     cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'CTL',
                                   'control_port', None, str)
-    cfg['control_token'] = (resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
-                                    'control_token', None, str) or '').strip() or None
+    cfg['control_token'] = parse_secret((resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
+                                                 'control_token', None, str) or '').strip() or None, 'control/token')
     control_token_file = resolve(getattr(args, 'control_token_file', None), 'CONTROL_TOKEN_FILE',
                                  'control_token_file', None, str)
-    cfg['control_ops_token'] = (resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
-                                        'control_ops_token', None, str) or '').strip() or None
+    cfg['control_ops_token'] = parse_secret((resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
+                                                     'control_ops_token', None, str) or '').strip() or None,
+                                            'control-ops-token')
     control_ops_token_file = resolve(getattr(args, 'control_ops_token_file', None), 'CONTROL_OPS_TOKEN_FILE',
                                      'control_ops_token_file', None, str)
     cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
@@ -343,7 +345,8 @@ def resolve_config(args, script_dir=None):
             raise SystemExit('auth_token_file %s is empty' % cfg['auth_token_file'])
         cfg['auth_token'] = token
     cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', None, str)
-    cfg['dump_key'] = (resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key', None, str) or '').strip() or None
+    cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
+                                            None, str) or '').strip() or None, 'dump/key')
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
                                       'restore_on_start', False, str_to_bool)
     cfg['listen'] = cfg['listen'].strip()

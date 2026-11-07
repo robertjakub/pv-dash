@@ -35,7 +35,8 @@ this many times before giving up; 0 = off (default 3)
 seconds between the reconnect attempts (default 10.0)
 .TP
 .B \-\-control\-token
-control auth token for TCP (env CONTROL_TOKEN)
+control auth token for TCP (env CONTROL_TOKEN); a file:<path> value
+reads the first line of an owner\-only 0600 file
 .TP
 .B \-\-control\-token\-file
 the token from a file (the first line; must be owner\-only 0600); not

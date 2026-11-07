@@ -37,6 +37,23 @@ before the repo restructured into one suite.
   and the regtests pin the sealed round-trip, the wrong-key/missing-key/
   unsealed refusals and the keyed reload on all three shapes (the fake's
   pins, the cache's words, the scraper's env twin).
+- **everywhere** — **one secret knob, two forms: the `file:` reference**:
+  every secret value now takes either the inline string or
+  `file:<path>` — the first line of an owner-only `0600` file, loaded by
+  the same discipline the `-file` sibling knobs enforce (F12; a systemd
+  LoadCredential rides as `file:/run/credentials/...`). `--dump-key
+  file:/path` (env `DUMP_KEY=file:...`, config `set dump key file:...`)
+  is the headline, and the same acceptance lands on `--control-token`,
+  `--control-ops-token`, `--auth-token` and `--metrics-token` (flag, env,
+  config and the live `set` — a `file:` token re-reads on reload, so
+  rotating the file rotates the token). The config file carries the
+  reference, never the material; a reference that cannot be read fails
+  fast (a secret that silently vanishes is a misconfiguration, not a
+  fallback to plaintext). The `-file` siblings stay — same loader, same
+  discipline, the explicit-path spelling. Plaintext dumps stay the
+  no-key posture **by design**, and now say so: a `WARNING` at start and
+  a `(not sealed — set dump/key to encrypt at rest)` note on the
+  `set dump path` reply wherever a dump path is live without a key.
 
 ### Docs
 

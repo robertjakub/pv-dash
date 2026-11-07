@@ -29,7 +29,7 @@ import socket
 import sys
 
 from common.audit import AuditLog
-from common.config import load_token_file
+from common.config import load_token_file, parse_secret
 from common.wiresec import sign_request, verify_reply
 from lib.config import resolve_control_target
 
@@ -39,7 +39,7 @@ def main():
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (default: /tmp/modbus-cache-15502.socket; env CTL when unset) — same flag as the proxy itself')
     p.add_argument('command', nargs='*', help='control command, e.g. inspect, show status, show cache, clear cache, restart, shutdown')
     p.add_argument('--timeout', type=float, default=5.0, help='socket timeout in seconds (default %(default)s)')
-    p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN)')
+    p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN); a file:<path> value reads the first line of an owner-only 0600 file')
     p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
     p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size, 0 = off')
@@ -71,6 +71,7 @@ def main():
         p.error('--control-token and --control-token-file are mutually exclusive')
     if token_file:
         token = load_token_file(token_file, 'control-token-file')
+    token = parse_secret(token, 'control-token')   # the inline form may be file:<path> — the same loader
     target = resolve_control_target(args.control_port)
     if target.isdigit():
         if not 1 <= int(target) <= 65535:

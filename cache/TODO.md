@@ -5,6 +5,15 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The file-reference wave: every secret value takes the **`file:` form** —
+`--dump-key file:/path` (env, config, the live `set` too) reads the first
+line of an owner-only `0600` file by the same loader the `-file` sibling
+knobs enforce (a systemd LoadCredential rides as `file:/run/credentials/...`):
+the config carries the reference, never the material, and an unreadable
+reference fails fast. A dump path without a key keeps the plaintext
+posture **by design** — and warns: a `WARNING` at start and a
+`(not sealed)` note on the `set dump path` reply.
+
 The seal wave: the state dumps **encrypt under `dump/key`** when it is set
 (`--dump-key`/`DUMP_KEY`/`set dump-key` — startup-only, restart-marked,
 hidden: the key cannot drift between the writer and the re-exec'd reader):

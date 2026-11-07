@@ -11,8 +11,8 @@ import os
 
 from common.options import parse_config_script
 from .options import OPTIONS
-from common.config import acl_summary, acl_text, default_profile_path, parse_acl, parse_listen, parse_upstream, \
-    resolve_profile_file
+from common.config import acl_summary, acl_text, default_profile_path, parse_acl, parse_listen, parse_secret, \
+    parse_upstream, resolve_profile_file
 from common.cred import parse_trust_uids
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_COUNT, MAX_REGISTERS, \
     REGISTER_TYPES, UNIT_ID_RANGE
@@ -338,12 +338,12 @@ def resolve_config(args, script_dir=None):
                                'write-acl'),
         'level': resolve(args.log_level, 'LOG_LEVEL', 'log_level', DEFAULTS['log_level'], str).upper(),
         'control_port': resolve(getattr(args, 'control_port', None), 'CTL', 'control_port', '', str),
-        'control_token': resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
-                                 'control_token', '', str),
+        'control_token': parse_secret(resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
+                                              'control_token', '', str), 'control/token'),
         'control_token_file': resolve(getattr(args, 'control_token_file', None), 'CONTROL_TOKEN_FILE',
                                       'control_token_file', '', str),
-        'control_ops_token': resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
-                                     'control_ops_token', '', str),
+        'control_ops_token': parse_secret(resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
+                                                  'control_ops_token', '', str), 'control-ops-token'),
         'control_ops_token_file': resolve(getattr(args, 'control_ops_token_file', None),
                                           'CONTROL_OPS_TOKEN_FILE', 'control_ops_token_file', '', str),
         'control_ops_verbs': resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
@@ -361,8 +361,8 @@ def resolve_config(args, script_dir=None):
                                     'requests_audit_s', DEFAULTS['requests_audit_s'], float),
         'dump_path': resolve(getattr(args, 'dump_path', None), 'DUMP_PATH',
                              'dump_path', '', str),
-        'dump_key': (resolve(getattr(args, 'dump_key', None), 'DUMP_KEY',
-                             'dump_key', None, str) or '').strip() or None,
+        'dump_key': parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY',
+                                          'dump_key', None, str) or '').strip() or None, 'dump/key'),
         'dump_interval': resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
                                  'dump_interval', 0.0, float),
         'dump_with_cache': resolve_bool(getattr(args, 'dump_with_cache', False) or None,

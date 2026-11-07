@@ -84,7 +84,10 @@ file, $CTL)
 require a token on control connections: the client authenticates with
 {"cmd": "auth", "token": ...}; over the unix socket a trusted peer
 (root, the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED)
-skips the token (default: config file, $CONTROL_TOKEN or none)
+skips the token; the value may be `file:<path>` — the first line of an
+owner\-only 0600 file (a systemd LoadCredential rides as
+file:/run/credentials/...) (default: config file, $CONTROL_TOKEN or
+none)
 .TP
 .B \-\-control\-token\-file
 the control token from a file (the first line; e.g. a systemd
@@ -95,7 +98,9 @@ CONTROL_TOKEN_FILE)
 .B \-\-control\-ops\-token
 a second, read\-only control token: sessions authenticating with it may
 run the show/clear verbs only (no set/unset, no request reload, no
-shutdown) — the ops shift against the admin key, both audited (default:
+shutdown) — the ops shift against the admin key, both audited; the value
+may be `file:<path>` — the first line of an owner\-only 0600 file (a
+systemd LoadCredential rides as file:/run/credentials/...) (default:
 config file, $CONTROL_OPS_TOKEN or none)
 .TP
 .B \-\-control\-ops\-token\-file
@@ -126,7 +131,9 @@ $METRICS_LISTEN or 127.0.0.1:9452)
 .TP
 .B \-\-metrics\-token
 require Authorization: Bearer <token> on the /metrics endpoint —
-mandatory when \-\-metrics\-server is on (default: config file,
+mandatory when \-\-metrics\-server is on; the value may be `file:<path>`
+— the first line of an owner\-only 0600 file (a systemd LoadCredential
+rides as file:/run/credentials/...) (default: config file,
 $METRICS_TOKEN)
 .TP
 .B \-\-metrics\-token\-file
@@ -189,8 +196,11 @@ state rides encrypted (an HMAC\-SHA256 counter\-mode keystream,
 authenticated — a restore refuses a wrong or missing key, and a
 configured key refuses an unsealed dump); the reload re\-exec
 re\-resolves the same key, so the state file reads on the other side; no
-key = the dumps stay 0600 plaintext with the integrity hash (default:
-config file, $DUMP_KEY or none)
+key = the dumps stay 0600 plaintext with the integrity hash; a dump path
+without a key warns at start and on set; the value may be `file:<path>`
+— the first line of an owner\-only 0600 file (a systemd LoadCredential
+rides as file:/run/credentials/...) (default: config file, $DUMP_KEY or
+none)
 .TP
 .B \-\-restore\-on\-start
 load the state dump when the server starts (needs \-\-dump\-path) — the

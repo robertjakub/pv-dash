@@ -942,6 +942,54 @@ try:
           'dump=%s every off, sealed' % kdumpfile in r, r[-160:])
     p_right.kill()
     time.sleep(0.4)
+    # the file: reference form (one secret knob, two forms): the key
+    # material comes from an owner-only file — and an unreadable reference
+    # fails the start; the keyless dump posture warns at start
+    kkeyfile = '/tmp/reg_cache_dump_key_file'
+    with open(kkeyfile, 'w') as fh:
+        fh.write('seal-key-1\n')
+    os.chmod(kkeyfile, 0o600)
+    log = open('/tmp/reg_cache_dump.log').read()   # the keyless dump instance's start
+    check('file-key: a dump path without a key warns unsealed at start',
+          'is not sealed' in log and 'set dump/key' in log, log[-220:])
+    p_file = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
+                               '--listen', '127.0.0.1:15538', '--interval', '1', '--cache-ttl', '30',
+                               '--profile', R, '--control-port', '15539',
+                               '--dump-path', kdumpfile, '--dump-key', 'file:' + kkeyfile,
+                               '--restore-on-start'],
+                              stdout=open('/tmp/reg_cache_kfile.log', 'w'), stderr=subprocess.STDOUT,
+                              env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
+    procs.append(p_file)
+    line = ''
+    for _ in range(80):
+        line = open('/tmp/reg_cache_kfile.log').read()
+        if 'restored the state dump' in line:
+            break
+        time.sleep(0.1)
+    check('file-key: the file-reference key restores the sealed words at start',
+          'restored the state dump' in line and '91 word(s)' in line, line[-220:])
+    r = ctl_cmd('show cache', 15539)
+    check('file-key: the restored words serve', '91 word(s) cached' in r, r[:80])
+    p_file.kill()
+    time.sleep(0.4)
+    p_missing = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
+                                  '--listen', '127.0.0.1:15538', '--interval', '1', '--cache-ttl', '30',
+                                  '--profile', R, '--control-port', '15539',
+                                  '--dump-path', kdumpfile, '--dump-key', 'file:/nonexistent/dump_key',
+                                  '--restore-on-start'],
+                                 stdout=open('/tmp/reg_cache_kmissing.log', 'w'), stderr=subprocess.STDOUT,
+                                 env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
+    line = ''
+    for _ in range(80):
+        line = open('/tmp/reg_cache_kmissing.log').read()
+        if 'cannot read dump/key' in line:
+            break
+        time.sleep(0.1)
+    time.sleep(0.3)   # the SystemExit prints, then the process is gone
+    check('file-key: an unreadable reference fails the start (fail fast, never plaintext)',
+          'cannot read dump/key' in line and p_missing.poll() is not None, line[-220:])
+    p_missing.poll()
+    time.sleep(0.4)
 
     r = ctl_cmd('set dump-interval 1', 15537)
     check('dump-interval: the live setting accepted', r.startswith('ok dump-interval=1.00s'), r[:120])

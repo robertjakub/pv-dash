@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common.audit import AuditLog, default_path as default_audit_path
-from common.config import default_profile_path, load_token_file, parse_listen
+from common.config import default_profile_path, load_token_file, parse_listen, parse_secret
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.protocol import exception_frame
@@ -222,7 +222,7 @@ def main():
     if args.metrics_token and args.metrics_token_file:
         logger.error('--metrics-token and --metrics-token-file are mutually exclusive')
         raise SystemExit(2)
-    metrics_token = args.metrics_token or os.environ.get('METRICS_TOKEN')
+    metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics/token')
     if args.metrics_token_file:
         metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
     metrics_listen = parse_listen(cfg['metrics_listen'])
@@ -285,6 +285,10 @@ def main():
                 else '%s every %s (plus request dump and the shutdown)%s, restore on start'
                 % (proxy.dump_path, 'off' if not proxy.dump_interval else '%gs' % proxy.dump_interval,
                    ', sealed' if proxy.dump_key else ''))
+    if proxy.dump_path and not proxy.dump_key:
+        logger.warning('the state dump %s is not sealed (the integrity hash only — plaintext at rest): '
+                       'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '
+                       'to encrypt it', proxy.dump_path)
     proxy.log_map()
     if args.dry_run:
         logger.info('dry-run: configuration and register map are valid, nothing was bound or connected (control server would listen on %s)',

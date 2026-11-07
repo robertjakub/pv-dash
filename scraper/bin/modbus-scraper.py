@@ -181,6 +181,10 @@ def main():
                 else '%s (request dump, the graceful shutdown%s%s)'
                 % (cfg['dump_path'], ', sealed' if cfg['dump_key'] else '',
                    ', restore on start' if cfg['restore_on_start'] else ''))
+    if cfg['dump_path'] and not cfg['dump_key']:
+        logger.warning('the state dump %s is not sealed (the integrity hash only — plaintext at rest): '
+                       'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '
+                       'to encrypt it', cfg['dump_path'])
     if args.dry_run:
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return

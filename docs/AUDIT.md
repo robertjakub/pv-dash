@@ -1,4 +1,4 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 11)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 12)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
@@ -733,7 +733,36 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   `scripts/lint_options.py --check` clean; the man pages regenerate
   (`mandoc -Tlint` clean).
 
-### Rev. 11 (this revision)
+### Rev. 12 (this revision)
+
+- **One secret knob, two forms: the `file:` reference** — every secret
+  value (the dump/key, the control and ops tokens, the auth and metrics
+  tokens) accepts the inline string or `file:<path>`: the first line of
+  an owner-only `0600` file, loaded by the same loader and F12 discipline
+  the `-file` sibling knobs enforce (a systemd LoadCredential rides as
+  `file:/run/credentials/...`). The reference is what a config file or an
+  env var wants to carry — the material stays in the file, and even the
+  reference never renders back (the rows are secret-marked). A reference
+  that cannot be read fails fast: at start (a misconfigured key is a
+  dead daemon, not an unsealed one) and on the wire (`err cannot read
+  ...`). A `file:` value re-resolves wherever the config re-resolves —
+  the auth token re-reads on SIGHUP, so rotating the file rotates the
+  token. The `-file` siblings stay (same loader, same discipline, the
+  explicit-path spelling); `common/config.py:parse_secret` is the one
+  implementation.
+- **The unsealed dump warns** — the no-key posture stays (0600 plaintext
+  + the integrity hash, by design), and is now visible: a dump path
+  without a key logs a `WARNING` at start (all four daemons) and the
+  `set dump path` reply carries `(not sealed — set dump/key to encrypt
+  at rest)`.
+- **The verified evidence**: the regtests pin the file-form key
+  round-trip (the fake's instance and the cache's words seal under
+  `file:` keys), the missing-reference start refusal, the start warning,
+  the `set` note, and the live `set control token file:` rotation
+  (`tests/inverter-regtest.py`, `tests/cache-regtest.py`,
+  `tests/scrape-regtest.py`).
+
+### Rev. 11
 
 - **The state dumps seal under a key** — the F18/F23 posture's optional
   upgrade: with the startup-only secret knob `dump/key` set

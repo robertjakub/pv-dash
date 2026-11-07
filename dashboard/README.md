@@ -246,7 +246,11 @@ value never lands in the file), the reply names them), the state dump
 hash — an overridden secret rides as `*** SECRET REMOVED ***`, the restore
 skips the placeholder and names it; `--restore-on-start` loads it at
 start; `--dump-key` seals the dump — the state rides encrypted, a restore
-refuses a wrong or missing key), `shutdown`, `quit`;
+refuses a wrong or missing key; a dump path without a key warns unsealed
+at start and on `set`, and every secret value takes a `file:` reference —
+`--dump-key file:/path`, `--control-token file:/path` — the first line of
+an owner-only `0600` file, so the config carries the reference, never the
+material), `shutdown`, `quit`;
 `help <setting>` describes a
 setting. A SIGHUP or `request reload` also clears the live overrides
 (`show status`'s `overridden=` row lists them).

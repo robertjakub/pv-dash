@@ -472,6 +472,8 @@ def main():
         #      state file on the other side of the exec (instance J)
         J_MODBUS, J_CTL = 15987, 15988
         kstate = '/tmp/inv_regtest_state_sealed.json'
+        if os.path.exists(kstate):
+            os.unlink(kstate)   # the block is idempotent: a previous run's graceful-shutdown dump (2 settings) must not seed this one
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', kstate,
                                        '--dump-key', 'inv-seal-key', '--restore-on-start'],
@@ -550,7 +552,7 @@ def main():
         line = ''
         for _ in range(80):
             line = open(LOG + '.j4').read()
-            if 'is not sealed' in line:
+            if 'dump/key is configured' in line:
                 break
             time.sleep(0.1)
         check('sealed dump: a configured key refuses an unsealed dump',
@@ -592,6 +594,130 @@ def main():
         tx = ctl(J_CTL, 'shutdown')
         check('sealed reload: the re-execed fake shuts down clean', tx.startswith('bye shutdown'), tx)
         time.sleep(0.4)
+
+        # ---- the file: reference form (one secret knob, two forms) and the
+        #      unsealed-dump warning (instance K): the key rides a file
+        #      reference (the first line of an owner-only file), an
+        #      unreadable reference fails the start, a dump path without a
+        #      key warns at start and on set, and the live control token
+        #      takes the same reference form
+        K_MODBUS, K_CTL = 15989, 15990
+        kfile_state = '/tmp/inv_regtest_state_filekey.json'
+        if os.path.exists(kfile_state):
+            os.unlink(kfile_state)
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+                                       '--control-port', str(K_CTL), '--dump-path', kfile_state],
+                                      stdout=open(LOG + '.k', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        line = ''
+        for _ in range(80):
+            line = open(LOG + '.k').read()
+            if 'is not sealed' in line:
+                break
+            time.sleep(0.1)
+        check('file-key: a dump path without a key warns unsealed at start',
+              'is not sealed' in line and 'set dump/key' in line, line[-220:])
+        tx = ctl(K_CTL, 'set dump path %s' % kfile_state)
+        check('file-key: the set dump path reply notes the unsealed dump',
+              tx.startswith('ok dump/path=%s (not sealed' % kfile_state), tx[:120])
+        tx = ctl(K_CTL, 'set pv 77')
+        tx = ctl(K_CTL, 'request dump')
+        check('file-key: the keyless dump stays plaintext (no sealed mark)',
+              tx.startswith('ok dumped 2 setting(s)') and '(sealed)' not in tx, tx[:100])
+        procs[-1].kill()
+        time.sleep(0.3)
+        # the file reference: the key material comes from an owner-only file
+        kkey = '/tmp/inv_regtest_dump_key_file'
+        with open(kkey, 'w') as fh:
+            fh.write('file-key-material-9\n')
+        os.chmod(kkey, 0o600)
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+                                       '--control-port', str(K_CTL), '--dump-path', kfile_state,
+                                       '--dump-key', 'file:' + kkey, '--restore-on-start'],
+                                      stdout=open(LOG + '.k2', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        line = ''
+        for _ in range(80):
+            line = open(LOG + '.k2').read()
+            if 'dump/key is configured' in line:
+                break
+            time.sleep(0.1)
+        check('file-key: the file-reference key refuses the plaintext dump at start (the symmetric gate)',
+              'is not sealed but dump/key is configured' in line, line[-220:])
+        procs[-1].kill()
+        time.sleep(0.3)
+        kfile_state2 = '/tmp/inv_regtest_state_filekey2.json'
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+                                       '--control-port', str(K_CTL), '--dump-path', kfile_state2,
+                                       '--dump-key', 'file:' + kkey],
+                                      stdout=open(LOG + '.k3', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        back = None
+        for _ in range(100):
+            try:
+                back = ctl(K_CTL, 'show version')
+                if back.startswith('ok'):
+                    break
+            except Exception:
+                pass
+            time.sleep(0.1)
+        tx = ctl(K_CTL, 'set pv 78')
+        tx = ctl(K_CTL, 'request dump')
+        check('file-key: the file-reference key seals the dump',
+              tx.startswith('ok dumped 1 setting(s)') and '(sealed)' in tx, tx[:100])
+        raw = open(kfile_state2).read()
+        kd = json.loads(raw)
+        check('file-key: the sealed envelope is the version-2 shape',
+              kd.get('version') == 2 and kd.get('cipher') == 'sha256-ctr'
+              and kd.get('box') and '"pv"' not in raw, raw[:120])
+        procs[-1].kill()
+        time.sleep(0.3)
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+                                       '--control-port', str(K_CTL), '--dump-path', kfile_state2,
+                                       '--dump-key', 'file:' + kkey, '--restore-on-start'],
+                                      stdout=open(LOG + '.k4', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        back = None
+        for _ in range(100):
+            try:
+                back = ctl(K_CTL, 'show pv')
+                if back == 'ok pv=78':
+                    break
+            except Exception:
+                pass
+            time.sleep(0.1)
+        check('file-key: the restarted fake restores the sealed dump through the same reference',
+              back == 'ok pv=78', repr(back))
+        ktok = '/tmp/inv_regtest_ctl_token_file'
+        with open(ktok, 'w') as fh:
+            fh.write('tok-from-file-77\n')
+        os.chmod(ktok, 0o600)
+        tx = ctl(K_CTL, 'set control token file:' + ktok)
+        check('file-key: the live set control token takes the file: reference',
+              'ok control/token=<set>' in tx, tx[:120])
+        tx = ctl(K_CTL, 'show pv')
+        check('file-key: the unauthenticated session is refused after the token set',
+              tx.startswith('err authenticate first'), tx[:100])
+        tx = ctl(K_CTL, 'show pv', token='tok-from-file-77')
+        check('file-key: the file material authenticates', tx == 'ok pv=78', repr(tx))
+        procs[-1].kill()
+        time.sleep(0.3)
+        # an unreadable reference fails the start (a key that silently
+        # vanishes is a misconfiguration, not a fallback to plaintext)
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+                                       '--control-port', str(K_CTL), '--dump-path', kfile_state2,
+                                       '--dump-key', 'file:/nonexistent/dump_key', '--restore-on-start'],
+                                      stdout=open(LOG + '.k5', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        line = ''
+        for _ in range(80):
+            line = open(LOG + '.k5').read()
+            if 'cannot read dump/key' in line:
+                break
+            time.sleep(0.1)
+        time.sleep(0.3)   # the SystemExit prints, then the process is gone
+        check('file-key: an unreadable reference fails the start (fail fast, never plaintext)',
+              'cannot read dump/key' in line and procs[-1].poll() is not None, line[-220:])
 
         # ---- --man: every tool prints its generated roff page
         for tool, title in ((F, 'MODBUS-FAKE-INVERTER'), (CTL, 'MODBUS-FAKE-CTL'),

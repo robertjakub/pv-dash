@@ -187,7 +187,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (config `set control trust-uids`, env `CONTROL_TRUST_UIDS`) |
 | **Persistence** | | |
 | `--dump-path` | off | the state dump (write-behind): the live setting overrides and — with `--dump-with-cache` — the cached words + their stamps, as one JSON, created `0600` with an integrity hash — written on shutdown, by the `request dump` command and every `--dump-interval` seconds; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (config `set dump path`, env `DUMP_PATH`) |
-| `--dump-key` | off | the key that **seals** the state dumps and the reload's state file: the state rides encrypted (an HMAC-SHA256 counter-mode keystream, authenticated — a restore refuses a wrong or missing key, and a configured key refuses an unsealed dump); startup-only — the reload re-exec re-resolves the same key (config `set dump key`, env `DUMP_KEY`) |
+| `--dump-key` | off | the key that **seals** the state dumps and the reload's state file: the state rides encrypted (an HMAC-SHA256 counter-mode keystream, authenticated — a restore refuses a wrong or missing key, and a configured key refuses an unsealed dump); startup-only — the reload re-exec re-resolves the same key (config `set dump key`, env `DUMP_KEY`); the value may be `file:<path>` — the first line of an owner-only 0600 file, so the config carries the reference, never the material; a dump path without a key warns unsealed at start and on `set dump path` |
 | `--dump-with-cache` | off | dump the cached words too: the `request dump` command and the `--dump-interval` loop write the words + the settings (the default off = settings only; `request dump with-cache` always includes them; the restore takes either shape) (config `set dump with-cache`, env `DUMP_WITH_CACHE`) |
 | `--dump-interval` | `0` | seconds between the automatic state dumps, `0` = on request (the `request dump` command and the shutdown); needs `--dump-path`; live-settable (config `set dump-interval`, env `DUMP_INTERVAL`) |
 | **Audit trail** | | |
@@ -523,6 +523,19 @@ key — the re-exec re-resolves the same flag/env/config key, so the fresh
 daemon reads what the dying one wrote. That is also why the knob is
 startup-only: `set dump key` answers the restart note — the key cannot
 drift between the writer and the reader of a sealed file.
+
+The key rides inline or **as a reference**: `--dump-key file:/path` (env
+`DUMP_KEY=file:...`, config `set dump key file:...`) reads the first line
+of an owner-only `0600` file — a systemd LoadCredential rides as
+`file:/run/credentials/...`. One knob, two forms: the config file then
+carries the reference, never the material (and a reference that cannot be
+read fails the start — a key that silently vanishes is a misconfiguration,
+not a fallback to plaintext). The same `file:` reference form works on
+every secret value: `--control-token file:/path`, `set metrics token
+file:/path` (the `-file` sibling knobs stay — same loader, same 0600
+discipline). Without a key a dump path stays plaintext **by design** — and
+says so: a `WARNING` at start and a `(not sealed — set dump/key to encrypt
+at rest)` note on the `set dump path` reply.
 
 ## Metrics
 

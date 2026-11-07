@@ -14,12 +14,15 @@
 #   docker run --rm -p 127.0.0.1:8080:8080 -e PROM_URL=http://prometheus:9090 \
 #       pv-dashboard                                      # the upstream via env
 #
-# The config volume: the entrypoint seeds /config with the bundled defaults
-# on start (files the volume lacks are copied in, existing ones stay) — edit
-# /config/server.conf and /config/config.js there, they survive recreation.
-# The upstream Prometheus: PROM_URL (env) beats server.conf, so the compose
-# stack points the proxy at the internal prometheus service without touching
-# the seeded file.
+# The config volume: the entrypoint seeds /config with the REQUIRED file
+# artifacts on start (files the volume lacks are copied in, existing ones
+# stay) — for the dashboard that is /config/config.js (CONFIG_JS): edit it
+# there, it survives recreation. The bundled server.conf is NOT in the
+# volume — the tool loads the image's /pv-suite/dashboard/server.conf (the
+# default --config target: bind 0.0.0.0, port 8080) and the env overrides
+# its knobs. The upstream Prometheus: the compose stack points the proxy
+# at the internal prometheus service with PROM_URL (environment beats the
+# conf — see ../docker/README.md).
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \
@@ -31,18 +34,21 @@ COPY --from=common *.py common/
 COPY --chown=pvsuite bin/ dashboard/bin/
 COPY --chown=pvsuite lib/ dashboard/lib/
 COPY --chown=pvsuite static/ dashboard/static/
-COPY --chown=pvsuite server.conf config.js config-defaults/
+COPY --chown=pvsuite server.conf dashboard/
+COPY --chown=pvsuite config.js config-defaults/
 RUN chmod +x dashboard/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/dashboard/bin/dashboard.py /usr/local/bin/dashboard \
     && ln -s /pv-suite/dashboard/bin/dashboard-ctl.py /usr/local/bin/dashboard-ctl \
     && ln -s /pv-suite/dashboard/bin/dashboard-cli.py /usr/local/bin/dashboard-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
-# CONFIG_JS points the served config.js at the volume copy; the listen
-# address comes from the seeded server.conf (0.0.0.0:8080).
+# CONFIG_JS points the served config.js at the volume copy; the bundled
+# server.conf loads via the built-in default --config target
+# (/pv-suite/dashboard/server.conf — bind 0.0.0.0, port 8080) — env and
+# flags override it.
 ENV CONFIG_JS=/config/config.js
 VOLUME /config
 ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 8080
-CMD ["dashboard", "--config", "/config/server.conf"]
+CMD ["dashboard"]

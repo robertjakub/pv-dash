@@ -15,10 +15,9 @@
 #   docker run --rm -p 127.0.0.1:5502:5502 fake-inverter \
 #       fake-inverter --profile deye-sg04lp3 --no-battery    # any flags via the CMD override
 #
-# The config volume: the entrypoint seeds /config with the bundled defaults
-# on start (files the volume lacks are copied in, existing ones stay). The
-# fake has no file configs yet — the volume is there for symmetry with the
-# scraper and cache images and for future use.
+# The config volume: the entrypoint seeds /config with the required file
+# artifacts (for the fake: none — no seeding happens). The volume is there
+# for symmetry with the other images and for future use.
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \

@@ -1,12 +1,14 @@
 #!/bin/sh
-# pv-suite docker entrypoint: seed the config volume, then run the tool as
-# the unprivileged pvsuite user.
+# pv-suite docker entrypoint: seed the config volume with the REQUIRED
+# file artifacts, then run the tool as the unprivileged pvsuite user.
 #
-# The image carries its bundled configs in /pv-suite/config-defaults; every
-# file the config volume (/config) does not have yet is copied in on start —
-# the bundled ones are the defaults, the copies in /config are the live ones
-# (edit them there, they survive container recreation). Runs as root only for
-# the seeding and drops to pvsuite via su-exec; the tool never runs as root.
+# The image carries only those artifacts in /pv-suite/config-defaults (the
+# generated bearer token, the JSON specs, the served config.js — never the
+# bundled conf scripts: the tool loads the image's own conf and the
+# per-tool env file overrides it, see docker/README.md); every file the
+# config volume (/config) does not have yet is copied in on start — edit
+# them there, they survive container recreation. Runs as root only for the
+# seeding and drops to pvsuite via su-exec; the tool never runs as root.
 set -eu
 
 mkdir -p /config

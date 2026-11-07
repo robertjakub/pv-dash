@@ -21,12 +21,11 @@ collector, and a `compose.yaml` wiring the demo stack. The pattern:
   `/pv-suite/profiles/` (the subproject's `bin/` tools stay out of the
   image) — the profile resolution finds them relative to the checkout layout
 - the **config volume** (`/config`, `VOLUME` + `ENTRYPOINT
-  pv-entrypoint`): the image carries its bundled configs in
-  `/pv-suite/config-defaults`; every file the volume does not have yet is
-  copied in on start (existing ones stay) — the bundled ones are the
-  defaults, the `/config` copies are the live ones (edit them there, they
-  survive container recreation). The `ENV` vars point each tool at the
-  volume copies (and carry the demo stack's default upstream peers). See
+  pv-entrypoint`): the entrypoint seeds it with the **required file
+  artifacts only** — the generated `metrics.token`, the JSON specs
+  (`selection.json`, `metrics.json`) and the served `config.js`; the
+  bundled conf scripts are NOT copied there (each tool loads the image's
+  own conf as the default layer). See
   [env or the config volume?](#env-or-the-config-volume) for the split:
   the env twins (and the per-tool env files) cover the knobs, the volume
   holds the file-shaped artifacts.
@@ -39,7 +38,8 @@ collector, and a `compose.yaml` wiring the demo stack. The pattern:
 ## The demo stack (compose)
 
 All three Modbus services share the named `config` volume mounted at
-`/config`; each container seeds it with its own bundled defaults on start.
+`/config`; each container seeds it with its own required file artifacts on
+start (the token, its JSON spec).
 `docker compose exec` sessions bypass the entrypoint and run as root — add
 `--user pvsuite` to land as `pvsuite`.
 
@@ -92,24 +92,27 @@ docker compose up -d modbus-cache                # the stack: env_file: (require
 Compose reads the service's file via `env_file:` with `required: false`
 (compose ≥ 2.24) — **no file means the image defaults**, so the stack runs
 out of the box; when a file exists its values ride the tools' resolution
-(flag > env > config script > default), beating the seeded `/config` conf
-files. Compose recreates a service when its env file changes. Two knobs
-are compose-level by nature and stay in the compose file: the dashboard's
-published port and its `PROM_URL` (the stack's `environment:` block —
-environment beats env_file, so `scraper.env`'s `AUTH_TOKEN_FILE` cannot
-override the stack's generated-token file either; the token story stays
-the volume file, a plain-docker `AUTH_TOKEN_FILE` in `scraper.env` is
-fine). The fake's simulation envs (`CHAOS`, `MAX_KWP`, `BATTERY`, `STRICT`,
-`TIME`, `TIME_SCALE`) are its SIGHUP layer, not startup: they reach a
-container when it is created with them (compose recreates on the file
-change) or via `docker compose kill -s HUP fake-inverter`.
+(**flag > env > the bundled conf > built-in defaults**) — an env value
+overrides the image's bundled conf script, the same layering a plain
+checkout has. Compose recreates a service when its env file changes. Two
+knobs are compose-level by nature and stay in the compose file: the
+dashboard's published port and its `PROM_URL` (the stack's
+`environment:` block — environment beats env_file, so `scraper.env`'s
+`AUTH_TOKEN_FILE` cannot override the stack's generated-token file
+either; the token story stays the volume file, a plain-docker
+`AUTH_TOKEN_FILE` in `scraper.env` is fine). The fake's simulation envs
+(`CHAOS`, `MAX_KWP`, `BATTERY`, `STRICT`, `TIME`, `TIME_SCALE`) are its
+SIGHUP layer, not startup: they reach a container when it is created with
+them (compose recreates on the file change) or via
+`docker compose kill -s HUP fake-inverter`.
 
 ### env or the config volume?
 
-Both, on purpose — they split by shape. The env files cover what an env
-twin can carry (every knob has one; the env beats the conf file in the
-resolution). The `/config` volume stays because the things it holds are
-files by nature, not knobs:
+Both, on purpose — they split by shape. The bundled conf scripts are not
+copied to the volume at all: each tool loads the image's own conf (the
+default `--config` target) as the default layer, and the env files
+override it knob by knob — the env file is the edit surface. The
+`/config` volume stays for the things that are files by nature, not knobs:
 
 - **the generated `metrics.token`** — one shared secret, produced once by
   the entrypoint (0600, owner pvsuite), read by the exporter and the
@@ -119,12 +122,16 @@ files by nature, not knobs:
   discipline prefers owner-only files; the knobs accept `file:`
   references for exactly this)
 - **`selection.json` and `metrics.json`** — JSON specs, not knobs: the
-  `SELECTION`/`METRICS_SPEC` env twins only point at the files
+  `SELECTION`/`METRICS_SPEC` env twins only point at the files; edit them
+  in the volume (they seed once, edits survive recreation)
 - **`config.js`** — the dashboard's served front-end file (`CONFIG_JS`
-  points at it)
+  points at it), same story
 
-The three conf scripts stay seeded for the edit-a-file workflow; with an
-env file in play they are simply overridden and inert.
+Prefer the conf file after all? Point the tool at the volume —
+`CONFIG=/config/modbus_cache.conf` (env) or a `--config` flag — and edit
+the file there; the entrypoint keeps whatever is in the volume. A volume
+carrying a legacy seeded conf (`modbus_cache.conf`, `scraper.conf`,
+`server.conf` from an older image) is simply no longer loaded.
 
 **The scraper/token story ships in the stack** (the audit's F13 closed for
 the demo): the exporter never serves unauthenticated — the compose sets
@@ -201,9 +208,9 @@ every listener binds inside the network only:
    │   │      └──────────────┘        (127.0.0.1 only)            │      │
    │   └──────────────────────────────────────────────────────────┘      │
    │                                                                     │
-   │   shared "config" volume (/config): the conf scripts, the JSON     │
-   │   specs, config.js + metrics.token — mounted by the Modbus         │
-   │   services + the dashboard; prometheus reads it read-only          │
+   │   shared "config" volume (/config): metrics.token, the JSON specs  │
+   │   — mounted by the Modbus services + the dashboard; prometheus     │
+   │   reads it read-only                                               │
    │                                                                     │
    │   docker compose exec <service> …  — the way in                     │
    └─────────────────────────────────────────────────────────────────────┘
@@ -225,15 +232,17 @@ every listener binds inside the network only:
   and the served `config.js` come from the image (the `/config` copies for
   the live edits).
 - **the `config` volume** — mounted by the three Modbus services and the
-  dashboard (prometheus reads it read-only): the config files are editable
-  there; `/config/metrics.token` is the generated shared secret.
+  dashboard (prometheus reads it read-only): the required file artifacts
+  live there (the JSON specs, `config.js`); `/config/metrics.token` is the
+  generated shared secret.
 - **the audit trails** — the tools audit to stdout in the demo, so `docker
   compose logs <service>` is the trail.
 
 The volume is a compose-managed named volume: `docker compose down` keeps
-it, `down -v` wipes it (reseeded with the bundled defaults on the next
-`up`). Seeding happens **once per file** — a bundled-default fix only
-reaches an existing volume after `down -v` (or a manual `/config` edit).
+it, `down -v` wipes it (reseeded with the required file artifacts on the
+next `up`). Seeding happens **once per file** — a bundled-artifact fix
+only reaches an existing volume after `down -v` (or a manual `/config`
+edit).
 
 ## The images, one by one
 
@@ -258,9 +267,11 @@ symmetry with the other two images and for future use.
 ### modbus-cache (`Dockerfile.cache`)
 
 The caching proxy multiplexing the inverter's single Modbus client — see the
-[cache](../cache/README.md). The live configs are `/config/modbus_cache.conf`
-and `/config/selection.json` (`CONFIG` /
-`SELECTION`):
+[cache](../cache/README.md). The bundled conf
+(`/pv-suite/cache/modbus_cache.conf`, the default `--config` target) loads
+from the image; the volume carries `/config/selection.json` (`SELECTION`)
+— edit it there, it survives recreation; override the conf's knobs with
+`env/cache.env` (or flags):
 
 ```bash
 cd docker
@@ -280,9 +291,12 @@ named volume under all three tools keeps every config in one place.
 
 ### modbus-scraper (`Dockerfile.scraper`)
 
-The Prometheus exporter — see the [scraper](../scraper/README.md). The live
-configs are `/config/scraper.conf` and `/config/metrics.json`
-(`CONFIG` / `METRICS_SPEC`):
+The Prometheus exporter — see the [scraper](../scraper/README.md). The
+bundled conf (`/pv-suite/scraper/scraper.conf`, the default `--config`
+target) loads from the image; the volume carries `/config/metrics.json`
+(`METRICS_SPEC`) and the generated `/config/metrics.token` — edit the spec
+there, it survives recreation; override the conf's knobs with
+`env/scraper.env` (or flags):
 
 ```bash
 cd docker
@@ -319,9 +333,10 @@ network only — the dashboard's proxy is the way in from the host.
 ### dashboard (`Dockerfile.dashboard`)
 
 The static single-page app with its stdlib Prometheus proxy — see the
-[dashboard](../dashboard/README.md). The live configs are
-`/config/server.conf` and `/config/config.js` (`--config /config/server.conf`,
-`CONFIG_JS`):
+[dashboard](../dashboard/README.md). The bundled `server.conf`
+(`/pv-suite/dashboard/server.conf`, the default `--config` target: bind
+`0.0.0.0`, port 8080) loads from the image; the volume carries
+`/config/config.js` (`CONFIG_JS`) — edit it there, it survives recreation:
 
 ```bash
 cd docker
@@ -332,11 +347,11 @@ docker run --rm -p 127.0.0.1:8080:8080 -e PROM_URL=http://prometheus:9090 \
     pv-dashboard                                       # the upstream via env (env beats server.conf)
 ```
 
-The upstream defaults to the bundled `server.conf`'s
-`upstream = http://localhost:9090`; `PROM_URL` (env) or a `--upstream` flag
-override it. In the compose stack the compose sets `PROM_URL` to the
-internal `prometheus` service — the dashboard is the stack's one published
-surface (`127.0.0.1:8080:8080`).
+The upstream defaults to `http://localhost:9090` (the bundled
+`server.conf` leaves `upstream` commented); `PROM_URL` (env) or a
+`--upstream` flag override it. In the compose stack the compose sets
+`PROM_URL` to the internal `prometheus` service — the dashboard is the
+stack's one published surface (`127.0.0.1:8080:8080`).
 
 ## The version inside the image
 

@@ -12,7 +12,8 @@ before the repo restructured into one suite.
 
 ### Added
 
-- **docker** — **each image gets its own env file**: the examples ship as
+- **docker** — **each image gets its own env file, and the config volume
+  shrinks to the required file artifacts**: the env examples ship as
   `docker/env/cache.env.example`, `env/scraper.env.example`,
   `env/fake.env.example`, `env/dashboard.env.example` — cp one to
   `env/<tool>.env` and edit. The names are the **bare env twins** the
@@ -23,25 +24,28 @@ before the repo restructured into one suite.
   `docker run --env-file env/<tool>.env <image>` for plain docker and the
   compose stack's per-service `env_file:` (`required: false` — compose
   ≥ 2.24; no file = the image defaults, the stack runs out of the box).
-  An env value rides the tools' resolution (flag > env > config script >
-  default — an empty value is treated as unset by every resolver, the
-  fake's SIGHUP layer skips falsy ones), so it beats the seeded `/config`
-  conf file; compose recreates a service when its env file changes. Two
-  knobs stay compose-level by nature: the dashboard's published port and
-  its `PROM_URL` (`environment:` beats `env_file`, so the stack's
-  generated-token `AUTH_TOKEN_FILE` cannot be overridden by
-  `scraper.env` either — the token story stays the volume file). The
-  cache's and scraper's `--upstream` defaults move from the CMD flags to
-  image `ENV` (`UPSTREAM=fake-inverter:5502` /
+  An env value rides the tools' resolution (**flag > env > the bundled
+  conf > built-in defaults** — an empty value is treated as unset by every
+  resolver, the fake's SIGHUP layer skips falsy ones), so it overrides the
+  image's bundled conf script knob by knob; compose recreates a service
+  when its env file changes. The conf scripts leave
+  `/pv-suite/config-defaults` — **never seeded into `/config`**: each tool
+  loads the image's own conf via the built-in default `--config` target
+  (`/pv-suite/<tool>/<conf>`), and the `CONFIG=/config/<conf>` envs (cache,
+  scraper) and the dashboard's `--config /config/server.conf` CMD flag are
+  gone with them; a legacy volume conf from an older image is simply no
+  longer loaded (point `CONFIG` at it to keep the file-editing workflow).
+  `/config` now seeds only what env twins cannot carry: the generated
+  `metrics.token` (one shared secret, two containers, survives
+  recreation), the JSON specs (`selection.json`, `metrics.json`) and the
+  served `config.js`. Two knobs stay compose-level by nature: the
+  dashboard's published port and its `PROM_URL` (`environment:` beats
+  `env_file`). The cache's and scraper's `--upstream` defaults move from
+  the CMD flags to image `ENV` (`UPSTREAM=fake-inverter:5502` /
   `UPSTREAM=modbus-cache:15502`) — a CMD flag would pin the peer past
   every env forever, while the env keeps the plain `docker run` default.
-  The `/config` volume stays: the generated `metrics.token` (one shared
-  secret, two containers, survives recreation), the JSON specs
-  (`selection.json`, `metrics.json`) and the served `config.js` are files
-  by nature, not knobs; the seeded conf scripts become the edit-a-file
-  option under the env layer. The README gains the env-files section and
-  the env-or-volume split, `.gitignore` the `docker/env/*.env` live
-  copies.
+  The README gains the env-files section and the env-or-volume split,
+  `.gitignore` the `docker/env/*.env` live copies.
 
 - **profiles** — **the write allow-list speaks the device profile**:
   the cache's `write-registers` knob takes the new value **`profile`** —

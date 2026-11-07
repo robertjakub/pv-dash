@@ -5,10 +5,12 @@
 # Run the stack:         docker compose up -d (inverter + cache + scraper + prometheus + dashboard)
 #
 # All three share the external `config` volume mounted at /config: on start
-# the entrypoint seeds it with the bundled defaults (every file the volume
-# lacks is copied in, existing ones stay) — edits to /config survive
-# container recreation. `docker compose exec` sessions bypass the entrypoint
-# and run as root; add --user pvsuite to land as pvsuite.
+# the entrypoint seeds it with the REQUIRED file artifacts (the generated
+# metrics token, the JSON specs, the dashboard's config.js — never the
+# bundled conf scripts: each tool loads the image's own conf and the
+# per-tool env file overrides it). Edits to /config survive container
+# recreation. `docker compose exec` sessions bypass the entrypoint and run
+# as root; add --user pvsuite to land as pvsuite.
 #
 # Nothing else is published on the host (the audit's F7): the services talk
 # over one `internal: true` network — no host ports, no outbound route. The

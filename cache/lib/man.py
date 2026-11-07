@@ -72,7 +72,8 @@ dump path, dump with-cache); a SIGHUP re-applies the config
 answers the note
 .B restart required (startup-only knob)
 from set/unset \-\- the config (and a SIGHUP) changes it; show
-renders the configured value (the secrets answer <set>/off).
+renders the configured value (a secret knob refuses to show at all
+\(em the value renders nowhere).
 .IP \\(bu 2
 .B show cache all
 prints every cached entry: name, words, values, age, expiry, poll status.
@@ -101,7 +102,10 @@ overrides re-apply once; the cache starts empty),
 A second, read-only token (\\fB--control-ops-token\\fR) authenticates
 sessions into the show/clear verbs only \\(em no set/unset, no request
 dump/restore, no reload, no restart, no shutdown \\(em the ops shift against the
-admin key, both roles audited.
+admin key, both roles audited. A secret knob (control token, the ops
+token, the metrics token \\(em either spelling) never renders: \\fBshow\\fR
+answers \\fBerr <name> is a secret \\(em it never shows\\fR, \\fBunset\\fR
+refuses \\(em pass the secret by flag/env/token-file.
 .PP
 See
 .BR modbus-cache-ctl (1)

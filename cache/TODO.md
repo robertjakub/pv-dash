@@ -4,6 +4,14 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 `[cache]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
+
+The show-refusal wave: **`show <secret>` refuses** — `show control/token`
+(the ops token, the metrics token, the `-file` spellings) answers
+`err <name> is a secret — it never shows` instead of the `<set>` guard's
+placeholder: the value renders nowhere (the set reply keeps `<set>` as
+the rotation's confirmation; the `?`/help still describes — the
+vocabulary is public, the value is not).
+
 The reload wave: the whole-daemon `reload` verb — the live overrides save
 to `<config>.reload` (created **0600 explicitly**: the file is
 config-equivalent trust at rest, docs/AUDIT.md rev. 9's F23), the process

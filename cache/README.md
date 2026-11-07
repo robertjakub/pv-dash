@@ -306,7 +306,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 |---|---|
 | `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers`, `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token`/`metrics token-file` (rotate live; the value never renders back), `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write`, `modbus timeout`, `control port` (rebinds the listener live), `control token`/`control token-file` and `control ops token`/`control ops token-file` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
-| `set`/`unset` a startup-only knob | the registry's `restart: true` rows answer the note: `% restart required (startup-only knob)` — the config (and a SIGHUP, or a restart) changes them; `show <knob>` renders the configured value (the secrets answer `<set>`/`off`) |
+| `set`/`unset` a startup-only knob | the registry's `restart: true` rows answer the note: `% restart required (startup-only knob)` — the config (and a SIGHUP, or a restart) changes them; `show <knob>` renders the configured value (a **secret knob refuses to show** — the value renders nowhere) |
 | `show <setting>` | the bare live value of one tunable |
 | `help <setting>` | the registry description of one setting |
 | `inspect` | one pretty multi-line dump of everything — version, upstream, listen/control, profile, cache state, poll plan, counters, the write gate, the audit sink: the baton for a bug report |
@@ -512,8 +512,8 @@ closes, the new one serves), the `metrics limits` caps apply to the
 running gate (`max-clients` 503s past the cap, `timeout` kicks the
 idle, `max-conn-per-ip` sheds one peer), and `set metrics token` /
 `metrics token-file` rotate the credential without a restart — the
-token never renders back (`show metrics token` answers `<set>`, and
-`unset` refuses: set the new one). The gauges:
+token never renders back (`show metrics token` **refuses** — it is a
+secret; `unset` refuses too: set the new one). The gauges:
 `modbus_cache_hits_total` /
 `modbus_cache_misses_total`, `modbus_cache_poll_up` +
 `modbus_cache_last_poll_age_seconds`, `modbus_cache_age_seconds` (the

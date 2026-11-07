@@ -446,6 +446,9 @@ class ControlServer:
             args = cmd.split()[1:]
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
+                opt = OPTION_BY_LIVE.get(key)
+                if opt is not None and opt.secret:
+                    return 'err %s is a secret — it never shows (pass it by flag/env/token-file)' % key
                 word = SHOW_BY_LIVE.get(key)
                 if word:
                     return self.command('show ' + word)   # a show command's report, by its word

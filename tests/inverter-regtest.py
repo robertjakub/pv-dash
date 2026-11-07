@@ -378,6 +378,89 @@ def main():
         aud = open('/tmp/inv_regtest_audit.log').read()
         check('signed wire: the audit COMMAND line carries the wire mac', "'show version' wire=h" in aud, aud[-200:])
 
+        # ---- the secret lives: the token lives rotate (the cache's
+        #      treatment) and the show verb refuses them — a secret never renders
+        tx = ctl(H_CTL, 'show control token', token='tok')
+        check('secrets: the control token never shows', tx.startswith('err control/token is a secret'), tx)
+        tx = ctl(H_CTL, 'unset control token', token='tok')
+        check('secrets: unset refuses a secret (no defaults entry)', tx.startswith('err unknown setting'), tx)
+        tx = ctl(H_CTL, 'set control token tok2', token='tok')
+        check('secrets: the control token rotates live', tx.startswith('ok control/token=<set>'), tx)
+        tx = ctl(H_CTL, 'show version', token='tok')
+        check('secrets: the old control token is refused', 'control auth failed' in tx or tx == '', tx or '(empty)')
+        tx = ctl(H_CTL, 'show version', token='tok2')
+        check('secrets: the rotated control token speaks', tx.startswith('ok fake-inverter'), tx)
+        tx = ctl(H_CTL, 'show control token', token='tok2')
+        check('secrets: the rotated control token never renders back',
+              tx.startswith('err control/token is a secret'), tx)
+        tx = ctl(H_CTL, 'set metrics token mtok2', token='tok2')
+        check('secrets: the metrics token rotates live', tx.startswith('ok metrics/token=<set>'), tx)
+        tx = ctl(H_CTL, 'show metrics token', token='tok2')
+        check('secrets: the metrics token never shows', tx.startswith('err metrics/token is a secret'), tx)
+        tx = ctl(H_CTL, 'unset metrics token', token='tok2')
+        check('secrets: unset refuses the metrics token too', tx.startswith('err unknown setting'), tx)
+
+        # ---- the whole-daemon reload (the fake has no config file — its
+        #      reload state lives in the XDG state home) and the settings
+        #      dump/restore (instance I)
+        I_MODBUS, I_CTL = 15985, 15986
+        reload_state = '/tmp/inv_regtest_reload_state'
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(I_MODBUS),
+                                       '--control-port', str(I_CTL),
+                                       '--dump-path', '/tmp/inv_regtest_state.json', '--restore-on-start'],
+                                      stdout=open(LOG + '.i', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        time.sleep(1.5)
+        tx = ctl(I_CTL, 'set pv 100')
+        check('dump: the pin lands', 'ok pv=100' in tx, tx)
+        tx = ctl(I_CTL, 'set cloud autumn')
+        check('dump: the machine pins too', 'ok cloud=autumn' in tx, tx)
+        tx = ctl(I_CTL, 'set time 09:30')
+        check('dump: the freeze pins', 'ok time=09:30' in tx, tx)
+        tx = ctl(I_CTL, 'request dump')
+        check('dump: request dump writes the state', tx.startswith('ok dumped 3 setting(s)'), tx)
+        dumpst = os.stat('/tmp/inv_regtest_state.json')
+        check('dump: the state dump is 0600 (the F18 posture)', dumpst.st_mode & 0o777 == 0o600,
+              oct(dumpst.st_mode & 0o777))
+        raw = open('/tmp/inv_regtest_state.json').read()
+        check('dump: the dump carries the settings, never the secrets',
+              '"pv"' in raw and 'mtok2' not in raw and 'tok2' not in raw, raw[:160])
+        tx = ctl(I_CTL, 'reset')
+        check('dump: reset releases everything', 'ok reset' in tx, tx)
+        tx = ctl(I_CTL, 'show pv')
+        check('dump: the pin is gone', tx == 'ok pv=auto', tx)
+        tx = ctl(I_CTL, 'request restore')
+        check('dump: the restore re-applies the dump', tx.startswith('ok restored 3 setting(s)'), tx)
+        tx = ctl(I_CTL, 'show pv')
+        check('dump: the restored pin reads back', tx == 'ok pv=100', tx)
+        tx = ctl(I_CTL, 'show cloud')
+        check('dump: the restored machine reads back', tx.startswith('ok cloud=autumn'), tx)
+        tx = ctl(I_CTL, 'show time')
+        check('dump: the restored freeze reads back', tx == 'ok time=09:30', tx)
+        tx = ctl(I_CTL, 'reload')
+        check('reload: the reply reports the saved overrides', tx.startswith('ok reload: 3 override(s) saved'), tx)
+        back = None
+        for _ in range(100):     # the exec is fast; a connect on the dying fake retries
+            try:
+                back = ctl(I_CTL, 'show pv')
+                break
+            except Exception:
+                time.sleep(0.1)
+        check('reload: the fake came back with the pin re-applied', back == 'ok pv=100', repr(back))
+        tx = ctl(I_CTL, 'show cloud')
+        check('reload: the machine rode the exec too', back is not None and tx.startswith('ok cloud=autumn'), tx)
+        gone = False
+        for _ in range(100):     # the fresh daemon consumes the state at start — poll for the disappearance
+            if not os.path.exists(os.path.join(reload_state, 'fake-inverter', 'reload.json')):
+                gone = True
+                break
+            time.sleep(0.1)
+        check('reload: the state file is consumed', gone,
+              os.path.join(reload_state, 'fake-inverter', 'reload.json'))
+        tx = ctl(I_CTL, 'shutdown')
+        check('reload: the re-execed fake shuts down clean', tx.startswith('bye shutdown'), tx)
+        time.sleep(0.4)
+
         # ---- --man: every tool prints its generated roff page
         for tool, title in ((F, 'MODBUS-FAKE-INVERTER'), (CTL, 'MODBUS-FAKE-CTL'),
                             (os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'), 'MODBUS-FAKE-CLI')):

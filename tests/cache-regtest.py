@@ -1015,7 +1015,7 @@ try:
     st, _ = get_metrics('sekrit2')
     check('metrics token: the new token serves', st == 200, str(st))
     r = ctl_cmd('show metrics token', 15530)
-    check('metrics token: the secret never renders back', r == 'ok metrics/token=<set>', r)
+    check('metrics token: the secret never renders back', r.startswith('err metrics/token is a secret'), r)
     # the live rebind: the endpoint moves to the new address
     r = ctl_cmd('set metrics listen 127.0.0.1:15535', 15530)
     check('metrics listen: rebound live', r.startswith('ok metrics/listen=127.0.0.1:15535'), r[:90])
@@ -1068,7 +1068,7 @@ try:
           r[:80])
     ctl_cmd('unset control ops-verbs', 15530)
     r = ctl_cmd('show control token', 15530)
-    check('control token: the secret never renders back', r == 'ok control/token=<set>', r)
+    check('control token: the secret never renders back', r.startswith('err control/token is a secret'), r)
     r = ctl_cmd('unset control token', 15530)
     check('control token: unset refuses (a secret has no defaults)', r.startswith('err unknown setting'), r[:80])
     r = ctl_cmd('set control trust-uids 1000, 1001', 15530)
@@ -1158,7 +1158,7 @@ try:
     r = ctl_tok('show version', 15530, 'sekrit2')
     check('control token: the new token speaks', r.startswith('ok modbus-cache'), r[:60])
     r = ctl_tok('show control token', 15530, 'sekrit2')
-    check('control token: the rotated secret never renders back', r == 'ok control/token=<set>', r)
+    check('control token: the rotated secret never renders back', r.startswith('err control/token is a secret'), r)
 
     p_metrics.send_signal(signal.SIGTERM)
     p_metrics.wait(timeout=10)

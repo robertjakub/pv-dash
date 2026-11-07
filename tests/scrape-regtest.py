@@ -1656,9 +1656,63 @@ try:
     check('scraper control: poll now', r.startswith('ok poll now'), r[:80])
     r = sctl('request reload', 15597)
     check('scraper control: request reload', r.startswith('ok reloaded'), r[:80])
-    r = sctl('restart', 15597)
+    # 6b-3. the secrets on the wire: the token lives rotate (the cache's
+    #       treatment) and the show verb refuses them — a secret never renders
+    r = sctl('show auth token', 15597)
+    check('scraper control: the auth token is a secret that never shows',
+          r.startswith('err auth/token is a secret'), r[:90])
+    r = sctl('show auth token-file', 15597)
+    check('scraper control: the file spelling refuses too', r.startswith('err auth/token-file is a secret'), r[:90])
+    r = sctl('unset auth token', 15597)
+    check('scraper control: unset refuses a secret (no defaults entry)', r.startswith('err unknown setting'), r[:80])
+    r = sctl('show control token', 15597)
+    check('scraper control: the control token never shows', r.startswith('err control/token is a secret'), r[:90])
+    r = sctl('set auth token bearer9', 15597)
+    check('scraper control: the auth token rotates live', r.startswith('ok auth/token=<set>'), r[:80])
+    st, _ = get('/metrics', 19457)
+    check('scraper control: the endpoint demands the rotated bearer', st == 401, str(st))
+    st, _ = get('/metrics', 19457, headers={'Authorization': 'Bearer bearer9'})
+    check('scraper control: the rotated bearer serves', st == 200, str(st))
+    r = sctl('set control token ctok9', 15597)
+    check('scraper control: the control token rotates live', r.startswith('ok control/token=<set>'), r[:80])
+    r = sctl('show version', 15597, token=STOK)
+    check('scraper control: the old control token is refused', r.startswith('err authenticate first'), r[:80])
+    r = sctl('show version', 15597, token='ctok9')
+    check('scraper control: the rotated control token speaks', r.startswith('ok modbus-scraper'), r[:80])
+    r = sctl('show control token', 15597, token='ctok9')
+    check('scraper control: the rotated control token never renders back',
+          r.startswith('err control/token is a secret'), r[:90])
+    # 6b-4. the state dump (settings by default — there are no cache words
+    #       here): request dump writes 0600 + the integrity hash, the restore
+    #       re-applies, the whole-daemon reload keeps the sets across the exec
+    r = sctl('set dump/path /tmp/scr_regtest_state.json', 15597, token='ctok9')
+    check('scraper control: the dump path set live', r.startswith('ok dump/path=/tmp/scr_regtest_state.json'), r[:90])
+    r = sctl('set interval 9', 15597, token='ctok9')
+    check('scraper control: the override before the dump', r.startswith('ok interval=9.00s'), r[:80])
+    r = sctl('request dump', 15597, token='ctok9')
+    check('scraper control: request dump writes the live path', r.startswith('ok dumped 2 setting(s)'), r[:80])
+    dumpst = os.stat('/tmp/scr_regtest_state.json')
+    check('scraper control: the state dump is 0600 (the F18 posture)', dumpst.st_mode & 0o777 == 0o600,
+          oct(dumpst.st_mode & 0o777))
+    raw = open('/tmp/scr_regtest_state.json').read()
+    check('scraper control: the dump carries the settings, never the secrets',
+          '"interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw, raw[:160])
+    r = sctl('set interval 1', 15597, token='ctok9')
+    r = sctl('request restore', 15597, token='ctok9')
+    check('scraper control: the restore re-applies the dump', r.startswith('ok restored 2 setting(s)'), r[:80])
+    r = sctl('show interval', 15597, token='ctok9')
+    check('scraper control: the restored override reads back', r == 'ok interval=9.00s', r[:80])
+    r = sctl('request dump', 15597, token='ctok9')   # a tamper check: edit the dump, the restore refuses
+    tampered = open('/tmp/scr_regtest_state.json').read().replace('9.0', '3.0')
+    open('/tmp/scr_regtest_state.json', 'w').write(tampered)
+    r = sctl('request restore', 15597, token='ctok9')
+    check('scraper control: a tampered dump fails closed', r.startswith('err restore failed')
+          and 'integrity' in r, r[:120])
+    r = sctl('unset dump/path', 15597, token='ctok9')
+    check('scraper control: the dump path unset back to off', r.startswith('ok dump/path=off'), r[:80])
+    r = sctl('restart', 15597, token='ctok9')
     check('scraper control: the modbus session restart', r.startswith('ok modbus session dropped'), r[:80])
-    r = sctl('inspect', 15597)
+    r = sctl('inspect', 15597, token='ctok9')
     check('scraper control: inspect', r.startswith('ok inspect\n') and 'version   modbus-scraper' in r, r[:120])
     aud = open('/tmp/scr_regtest_audit.log').read()
     check('scraper control: the SCR audit trail with the wire mac',
@@ -1688,6 +1742,8 @@ try:
     check('scraper control: the ops token cannot restart', r.startswith('err forbidden:'), r[:80])
     r = sctl('shutdown', 15598, token='opssecret')
     check('scraper control: the ops token cannot shutdown', r.startswith('err forbidden:'), r[:80])
+    r = sctl('reload', 15598, token='opssecret')
+    check('scraper control: the ops token cannot reload', r.startswith('err forbidden:'), r[:80])
     r = sctl('show version', 15598, token=STOK)
     check('scraper control: the admin token still steers the same server', r.startswith('ok modbus-scraper'),
           r[:80])
@@ -1709,7 +1765,55 @@ try:
           r.returncode != 0 and 'differ' in (r.stderr + r.stdout) and 'Traceback' not in (r.stderr + r.stdout),
           (r.stderr + r.stdout)[-160:])
 
-    r = sctl('shutdown', 15597)
+    # 6d. the whole-daemon reload (a dedicated daemon — the reload state
+    #     lives beside ITS config): the overrides save, the process re-execs,
+    #     the fresh daemon re-applies them once and consumes the file
+    ini_r = '/tmp/scr_reload.conf'
+    open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset timeout 2\n')
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
+                                   '--listen', '127.0.0.1:19463', '--interval', '1',
+                                   '--config', ini_r, '--control-port', '15600', '--control-token', STOK,
+                                   '--audit-log', '/tmp/scr_regtest_reload_audit.log'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(1.5)
+    r = sctl('set interval 7', 15600)
+    check('scraper reload: the override lands before the reload', r.startswith('ok interval=7.00s'), r[:90])
+    r = sctl('reload', 15600)
+    check('scraper reload: the reply reports the saved override', r.startswith('ok reload: 1 override(s) saved'),
+          r[:100])
+    back = None
+    for _ in range(100):     # the exec is fast: a connect in the drain window rides the dying daemon's
+        try:                 # unsigned bye frame — only the freshly re-resolved status settles it
+            back = sctl('show status', 15600)
+        except Exception:
+            back = None
+        if back is not None and back.startswith('ok status') and 'interval=7.00s' in back \
+                and 'overridden=interval' in back:
+            break
+        time.sleep(0.1)
+    check('scraper reload: the daemon came back with the override re-applied (above the config)',
+          back is not None and 'interval=7.00s' in back and 'overridden=interval' in back,
+          repr((back or '')[-200:]))
+    gone = False
+    for _ in range(100):     # the fresh daemon consumes the state at start — poll for the disappearance
+        if not os.path.exists(ini_r + '.reload'):
+            gone = True
+            break
+        time.sleep(0.1)
+    check('scraper reload: the state file is consumed', gone, ini_r + '.reload')
+    down = None
+    for _ in range(100):
+        try:
+            down = sctl('shutdown', 15600)
+        except Exception:
+            down = None
+        if down is not None and down.startswith('bye shutdown'):
+            break
+        time.sleep(0.1)
+    check('scraper reload: the re-execed daemon still shuts down clean',
+          down is not None and down.startswith('bye shutdown'), repr(down))
+
+    r = sctl('shutdown', 15597, token='ctok9')
     check('scraper control: shutdown', r.startswith('bye shutdown'), r[:80])
     time.sleep(0.6)
 

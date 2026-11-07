@@ -316,6 +316,12 @@ def main():
         r = authed_roundtrip(15982, 'opstok', 'reset')
         check('ops: reset is forbidden (no set, no shutdown)', r.get('status') == 'err'
               and 'forbidden' in r.get('text', ''), str(r))
+        r = authed_roundtrip(15982, 'opstok', 'reload')
+        check('ops: the whole-daemon reload is forbidden', r.get('status') == 'err'
+              and 'forbidden' in r.get('text', ''), str(r))
+        r = authed_roundtrip(15982, 'admintok', 'show control token')
+        check('secrets: the show verb refuses the control token (the admin sees the refusal too)',
+              r.get('status') == 'err' and 'is a secret' in r.get('text', '') and r.get('_mac_ok'), str(r))
         try:
             s = connect(15982)
             s.sendall(_json.dumps({'cmd': 'auth', 'token': 'opstok'}).encode() + b'\n')

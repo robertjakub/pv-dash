@@ -284,6 +284,11 @@ def main():
               '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request reload')
         check('ops: request reload is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('reload')
+        check('ops: the whole-daemon reload is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('show control token', token='admintok2')
+        check('secrets: the show verb refuses the control token (the admin sees the refusal too)',
+              st == 'err' and 'is a secret' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('shutdown')
         check('ops: shutdown is forbidden', st == 'err' and 'forbidden' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show version', unsigned=True)

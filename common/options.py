@@ -216,24 +216,95 @@ def grouped_rows(options):
     return list(buckets.items())
 
 
+def render_word_sections(sections):
+    """The listing render — the console's ? output and the wire's node help
+    (describe_node) share the one shape: the ungrouped words on top (no
+    header), then every labeled section under a blank line and its
+    `  [label]` header, the descriptions in one column across all the
+    sections (`    word  text`; an undescribed word rides bare)."""
+    width = max((len(w) for _, ws in sections for w, d in ws if d), default=0)
+    rows = []
+    for label, ws in sections:
+        if not ws:
+            continue
+        if label:
+            rows.append('')
+            rows.append('  [%s]' % label)
+        rows.extend(('    %-*s %s' % (width, w, d)) if d else ('    %s' % w) for w, d in ws)
+    return rows
+
+
+def _listing(name, options, node=None, hidden_words=()):
+    """The walk listing describe_node and describe_root share — the
+    console's ? render of one position: the next words under `name`'s
+    prefix (the root when empty) one per row, the node-first
+    descriptions, the display groups' sections (the ungrouped on top,
+    soft-alphabetical within), the hidden rows never listing (the pools'
+    rule; `hidden_words` hides more — the runtime-gated words). A node
+    whose every child is hidden falls back to its own `name - help` line;
+    the root never falls back."""
+    prefix = name + '/' if name else ''
+    nodes = {o.name: o for o in options if o.node}
+    by_live = {}
+    for o in options:
+        if o.live and o.live not in by_live:
+            by_live[o.live] = o
+    words = {}
+    for o in options:
+        if o.hidden:
+            continue   # the pools' rule: the hidden rows never list (the typed path still answers)
+        spellings = [(o.live, False)]
+        if o.alias:
+            spellings.append((o.alias, True))
+        for spelling, by_alias in spellings:
+            if spelling and spelling.startswith(prefix):
+                word = spelling[len(prefix):].split('/')[0]
+                if word and word not in hidden_words:
+                    words.setdefault(word, (o, by_alias))
+    if not words:
+        return ('%s - %s' % (name, node.setting_help or node.help)) if node is not None else None
+    buckets = {}
+    for word, (o, by_alias) in words.items():   # registry order = the sections' first-appearance order
+        child = nodes.get(prefix + word)
+        row = by_live.get(prefix + word)
+        if child is not None:   # a namespace child: the word walks on, the node row describes
+            text, via, group = child.setting_help or child.help, None, child.group
+        elif row is not None:   # a setting at the path describes the word (the console's rule)
+            text, via, group = row.setting_help or row.help, None, row.group
+        else:                   # a walk-on: the contributing row describes (the lint keeps nodes on every prefix)
+            text = o.setting_help or o.help
+            via, group = (o.live if by_alias else None), o.group
+        buckets.setdefault(group or '', []).append(
+            (word, '%s%s' % (text, (' (the alias of %s)' % via) if via else '')))
+    bare = buckets.pop('', None)
+    sections = ([('', sorted(bare, key=lambda p: p[0].lower()))] if bare else []) \
+        + [(label, sorted(ws, key=lambda p: p[0].lower())) for label, ws in buckets.items()]
+    return '\n'.join(render_word_sections(sections))
+
+
 def describe_node(options, name):
-    """The hierarchy node's wire help (`help modbus`): the node row's
-    setting-help, then the child settings the node namespaces — one per
-    line, the path suffix as the word (the console completes it); a row
-    that reaches the node through its `alias` lists too, the line marked
-    with the canonical name (one knob, two spellings). None when the name
-    is no node."""
+    """The hierarchy node's wire help (`show audit`, `show audit rotate`;
+    also `help audit`): the node's own children as the console's ?
+    listing renders them — the golden master, byte for byte (the walk
+    carries the depth: `show audit rotate` names the rotation namespace
+    and its own listing answers past it). The alias rows list marked with
+    the canonical name (one knob, two spellings). None when the name is
+    no node."""
     node = next((o for o in options if o.node and o.name == name), None)
     if node is None:
         return None
-    lines = ['%s - %s' % (name, node.setting_help or node.help)]
-    for o in options:
-        if o.live and o.live.startswith(name + '/'):
-            lines.append('  %s - %s' % (o.live[len(name) + 1:], o.setting_help or o.help))
-        elif o.alias and o.alias.startswith(name + '/'):
-            lines.append('  %s - %s (the alias of %s)'
-                         % (o.alias[len(name) + 1:], o.setting_help or o.help, o.live))
-    return '\n'.join(lines)
+    return _listing(name, options, node)
+
+
+def describe_root(options, show_options=(), hidden_words=()):
+    """The bare `show` answer — the walk's first position as the console's
+    ? renders it: every visible top-level word (the namespaces, the
+    knobs, the show reports) one per row, the node-first descriptions,
+    the sectioned render. `show_options` rides the same space (the show
+    reports are rows of it); `hidden_words` carries the runtime-gated
+    words — the dump-gated `dump-interval` lists only while the dump node
+    is on, and the caller knows."""
+    return _listing('', tuple(options) + tuple(show_options), None, hidden_words)
 
 
 def render_config_script(options, values, comment=None):

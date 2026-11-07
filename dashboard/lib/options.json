@@ -145,6 +145,8 @@
     { "name": "inspect", "help": "one pretty dump of everything (the state, the counters, the caps)" },
     { "name": "ping", "help": "keep-alive: answers pong", "internal": true },
     { "name": "quit", "help": "close the session" },
+    { "name": "request", "help": "the state machinery: the dump written and restored, the daemon reloaded",
+      "node": true },
     { "name": "request-dump", "live": "request/dump",
       "help": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)" },
     { "name": "request-reload", "live": "request/reload",

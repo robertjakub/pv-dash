@@ -23,15 +23,10 @@ except ImportError:
 from common.audit import AuditLog
 from common.config import parse_secret
 from common.human import secs
-from common.options import command_path_pool, setting_path_pool, word_groups
+from common.options import command_path_pool, render_word_sections, setting_path_pool, word_groups
 from common.wiresec import sign_request, verify_reply
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
-
-HELP_PINS = (
-    ('help <setting>', "the setting's description"),
-    ('?', 'this help'),
-)
 
 _SPEC = None   # the tool's specifics — set by run_cli() before anything reads it
 
@@ -71,7 +66,8 @@ def make_describe_word(nodes, commands_help, settings):
             return commands_help[w]
         s = settings.get(w)
         if s:
-            return s.help
+            mark = ' (the alias of %s)' % s.name if s.alias and w == s.alias else ''
+            return s.help + mark
         walk = next((s for k, s in settings.items() if k.startswith(w + '/')), None)
         if walk is not None:
             return walk.help
@@ -103,32 +99,6 @@ def prompt_for(target, is_unix):
         m = re.search(r'(\d+)$', base)
         return '%s:%s > ' % (_SPEC['prompt_word'], m.group(1) if m else base)
     return '%s:%s > ' % (_SPEC['prompt_word'], target)
-
-
-def help_text(commands_help, command_groups, command_hidden, pins, command_internal=()):
-    """The `?` listing — the same shape as the setting help: bare words on
-    top, then the filed groups, soft-alphabetical within; the pins ride
-    last (they are syntax, not words), and `quit` rides just before them —
-    the leave-word sits beside the navigation syntax, on every tool. The
-    internal rows (the machinery's own words) never list. The '/'-path
-    rows spell as words — the wire's spelling, the options' dictionary
-    rule."""
-    disp = {n.replace('/', ' '): d for n, d in commands_help.items()
-            if n not in command_hidden and n not in command_internal}
-    quit_help = disp.pop('quit', None)
-    groups = {n.replace('/', ' '): g for n, g in command_groups.items()}
-    width = max([len(n) for n in disp] + [len(n) for n, _ in pins]) + 1
-    out = ['commands (TAB completes, ? lists the options + descriptions in any position):']
-    for g, ws in word_groups(list(disp), groups):
-        if g:
-            out.append('[%s]' % g)
-        for n in sorted(ws, key=str.lower):
-            out.append('    %-*s %s' % (width, n, disp[n]))
-    if quit_help is not None:
-        out.append('    %-*s %s' % (width, 'quit', quit_help))
-    for n, d in pins:
-        out.append('    %-*s %s' % (width, n, d))
-    return '\n'.join(out)
 
 
 def _sections(head, done_len, matches, values=False, base=''):
@@ -173,34 +143,13 @@ def _grouped(matches, base):
 
 def sectioned_rows(sections, desc, hint):
     """The listing: a blank line, then each [section] header, its entries
-    padded two spaces under it — the descriptions aligned to one column across all the sections."""
-    rows = []
-    for label, words in sections:
-        if not words:
-            continue
-        if label:   # the '' bucket = the ungrouped words: bare, at the top, no header
-            rows.append('')
-            rows.append('  [%s]' % label)
-        flat = [w for _, ws in sections for w in ws]
-        width = max((len(w) for w in flat if desc(w)), default=0)
-        rows.extend('  ' + r for r in aligned_rows(words, desc, None, width))
+    padded two spaces under it — the descriptions aligned to one column across all the sections.
+    The render is the wire's describe_node's own (the ? output is the
+    golden master — common/options.py render_word_sections); the console
+    adds the hint line."""
+    rows = render_word_sections([(label, [(w, desc(w)) for w in ws]) for label, ws in sections])
     if hint:
         rows.append('    ' + hint)
-    return rows
-
-
-def aligned_rows(matches, desc, hint, width=None):
-    """One candidate per line with the descriptions aligned to the longest
-    described word — one column for every section of the listing (the
-    caller's width). The hint line keeps its own indent."""
-    if width is None:   # the caller's width: one column for every section of the listing
-        width = max((len(w) for w in matches if desc(w)), default=0)
-    rows = []
-    for w in matches:
-        d = desc(w)
-        rows.append('  %-*s %s' % (width, w, d) if d else '  %s' % w)
-    if hint:
-        rows.append('  ' + hint)
     return rows
 
 
@@ -486,7 +435,7 @@ def typed_loop(sock, prompt, audit=None):
         if low in ('?', 'help'):
             if audit:
                 audit.command(cmd, 'local')
-            print(_SPEC['help'])
+            print_options('')    # the word listing — the same rows TAB lists (the golden master)
             continue
         if low.endswith('?'):
             if audit:
@@ -516,7 +465,7 @@ def typed_loop(sock, prompt, audit=None):
             print('% ok')               # confirm silently
         elif _SPEC['render'] and _SPEC['render'](low, reply):
             pass                        # the tool's special render answered
-        elif low.startswith('show ') and reply.startswith('ok '):
+        elif (low.startswith('show ') or low == 'show') and reply.startswith('ok '):
             body = reply.split(' ', 1)[1]
             head, _, rest = body.partition('\n')
             if rest and ' ' not in head and '=' not in head:

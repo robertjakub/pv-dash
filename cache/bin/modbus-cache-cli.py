@@ -28,12 +28,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 from common import cli
 from lib.config import resolve_control_target
 from lib.man import cli_page
-from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
+from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
 
 SESSION = {'dump': False}
 
-HELP = cli.help_text(COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, cli.HELP_PINS, COMMAND_INTERNAL)
 
 DUMP_GATED = ('request/dump', 'request/dump/with-cache', 'request/restore')
 
@@ -96,7 +95,7 @@ SPEC = dict(label='the cache proxy', daemon_label='modbus-cache control server',
             live_settings=LIVE_SETTINGS, show_lives=SHOW_LIVES,
             command_pool=command_pool, setting_pool=setting_pool,
             describe=describe_word,
-            help=HELP, welcome=welcome, loop=cli.typed_loop,
+            welcome=welcome, loop=cli.typed_loop,
             silent_ok=lambda low: low.startswith(('request clear', 'request restart')),
             render=_render_special, cli_page=cli_page)
 

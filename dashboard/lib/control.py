@@ -24,10 +24,10 @@ from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.control import ControlServer as _ControlServer, num, numi
-from common.options import control_command, grouped_rows, match_setting_path, describe_node
+from common.options import control_command, describe_node, describe_root, grouped_rows, match_setting_path
 from common.config import parse_secret
 from common.dump import SECRET_REMOVED, dump_filter
-from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME, CFG_KEYS
+from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
@@ -89,6 +89,9 @@ class ControlServer(_ControlServer):
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
                 return 'ok %s' % describe_setting(key)
+            node_path = '/'.join(w.lower() for w in args)   # a node path spells as words too — the walk the ? offers
+            if node_path in NODE_BY_NAME:
+                return 'ok %s' % describe_node(OPTIONS, node_path)
             if args:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             return 'ok ' + self.command_help()
@@ -147,6 +150,8 @@ class ControlServer(_ControlServer):
             return self.knobs_dictionary()
         if low.startswith('show'):
             args = cmd.split()[1:]
+            if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
+                return 'ok %s' % describe_root(OPTIONS, SHOW_OPTIONS)
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
                 opt = OPTION_BY_LIVE.get(key)
@@ -158,8 +163,9 @@ class ControlServer(_ControlServer):
                 return 'ok %s=%s' % (key, self._get(key))
             if key is not None and rest:
                 return 'err %s: unexpected %s' % (key, ' '.join(rest))
-            if len(args) == 1 and args[0].lower() in NODE_BY_NAME:
-                return 'ok %s' % describe_node(OPTIONS, args[0].lower())
+            node_path = '/'.join(w.lower() for w in args)   # the walk the ? offers: every word of the path answers
+            if node_path in NODE_BY_NAME:
+                return 'ok %s' % describe_node(OPTIONS, node_path)
             if len(args) == 1:
                 return 'err unknown setting %s (try help)' % args[0].lower()
         if low == 'inspect':

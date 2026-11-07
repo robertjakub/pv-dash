@@ -28,10 +28,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 from common import cli
 from lib.config import resolve_control_target
 from lib.man import cli_page
-from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
+from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
 
-HELP = cli.help_text(COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, cli.HELP_PINS, COMMAND_INTERNAL)
 
 POOL_NAMES = tuple(n for n in SETTING_NAMES + ALIAS_NAMES if n not in HIDDEN_SETTINGS
                    and (n in LIVE_SETTINGS or n in ALIAS_NAMES))   # a not-yet-live knob never lists
@@ -76,7 +75,7 @@ SPEC = dict(label='the dashboard', daemon_label='dashboard control server',
             live_settings=LIVE_SETTINGS, show_lives=SHOW_LIVES,
             command_pool=command_pool, setting_pool=setting_pool,
             describe=describe_word,
-            help=HELP, welcome=welcome, loop=cli.typed_loop,
+            welcome=welcome, loop=cli.typed_loop,
             silent_ok=lambda low: low.startswith('request reload-config'),
             render=None, cli_page=cli_page)
 

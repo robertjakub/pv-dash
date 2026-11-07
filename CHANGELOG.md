@@ -6,6 +6,51 @@ tagged commits'. The early tags (before 0.1.0) carried per-tool versions —
 the dashboard, the scraper and the cache each numbered their own releases
 before the repo restructured into one suite.
 
+## Unreleased
+
+### Changed
+
+- **everywhere** — **the node listing mimics the `?` output byte for
+  byte — the console's listing is the golden master**: a hierarchy
+  node's wire help (`show audit`, `show audit rotate`) renders the
+  node's own children as the next words — the console's sectioned render
+  exactly (the aligned one-column rows, the display groups' `[section]`
+  blocks, no head line of its own; the depth rides the walk — the
+  flattened `rotate/max-size` rows are gone from `show audit`). The
+  wire's node help answers multi-word paths on every tool and on both
+  verbs that describe nodes (`show control ops`, `show metrics limits`,
+  `help audit` — the cache, dashboard and fake help branches gain the
+  node describe the scraper's already had); the bare `show` answers the
+  walk's first position the same way (every visible top-level word — the
+  namespaces, the knobs, the show reports; the cache's dump-gated
+  `dump-interval` lists only while the dump node is on, the console's
+  session gate); a node whose every child is
+  hidden falls back to its own `name - help` line. The hidden rows (the
+  secrets) never list — the pools' rule, the typed path still answers
+  (`show modbus auth key` keeps refusing as a secret). The alias marking
+  (`(the alias of acl/write)`) rides the console's word-help now too —
+  one shape, both surfaces. The console's `?`/`help` at the empty prompt
+  print the word listing itself now — the same rows TAB lists (the
+  internal machinery's words never list; the command tree's descr rides
+  its row) — and the expanded command-reference block (the header line,
+  the full-path rows, the pinned syntax) retires with its renderer. The
+  command tree speaks its own descr: a
+  `commands` row may carry `node` (the name = the tree path —
+  `request`, `request/clear`, `poll`) and its `help` carries the
+  namespace's word-help (the walk-on borrows the row instead of the
+  first child); the lint files the missing command namespaces the same
+  way it files the settings'. The render is one function
+  (`render_word_sections`) shared by the console's `?`/TAB listings and
+  the wire's `describe_node`.
+
+### Fixed
+
+- **fake** — **the wire keeps a path's case**: `set dump path /srv/State/…`
+  stored and echoed the lowercased value (the simulator pins' `_apply`
+  lowers its value words up front and the path knob rode it) — the dump
+  landed wherever the lowercase spelling pointed. The knob keeps the raw
+  spelling now; the keywords still answer case-insensitively.
+
 ## 0.4.0 — 2026-11-07
 ### Changed
 

@@ -1688,8 +1688,10 @@ try:
     check('scraper control: the row bounds gate (min/max off the registry row)',
           r.startswith('err limits/max-conn-per-ip must be 0..4096'), r[:80])
     r = sctl('help modbus', 15597)
-    check('scraper control: the hierarchy node answers its namespace',
-          r.startswith('ok modbus - ') and '\n  unit - ' in r, r[:80])
+    words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
+             if line.strip() and not line.strip().startswith('[')]
+    check('scraper control: the hierarchy node answers its namespace (the ? shape)',
+          words == ['offset', 'upstream', 'auth', 'unit'], r[:160])
     # 6b-2. the register map lives in the device profile: `set profile` swaps
     #        it live, a profile without the power registers rolls back
     r = sctl('show profile', 15597)
@@ -1999,6 +2001,26 @@ try:
                        env={**os.environ, 'CONTROL_TOKEN': 'file:' + stok_file})
     check('scraper_ctl: honors CONTROL_TOKEN=file:...', r.returncode == 0
           and 'ok modbus-scraper' in r.stdout, repr(r.stdout[:80]) + repr(r.stderr[-80:]))
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
+                        'show', 'modbus'], capture_output=True, text=True, timeout=15)
+    words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
+             if line.strip() and not line.strip().startswith('[')]
+    check('scraper_ctl: show modbus mimics the ? walk (the grouped sections, the direct children)',
+          r.returncode == 0 and words == ['offset', 'upstream', 'auth', 'unit'],
+          repr(r.stdout[:240]))
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
+                        'show'], capture_output=True, text=True, timeout=15)
+    words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
+             if line.strip() and not line.strip().startswith('[')]
+    check("scraper_ctl: the bare show mimics the ? output (the walk's first position)",
+          r.returncode == 0 and words == ['client-timeout', 'config', 'connections', 'dump', 'interval',
+                                          'knobs', 'limits', 'log-access', 'log-level', 'modbus', 'profile',
+                                          'status', 'timeout', 'version', 'max-clients'],
+          repr(r.stdout[:240]))
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
+                        'show', 'control', 'ops'], capture_output=True, text=True, timeout=15)
+    check('scraper_ctl: the node walk answers the intermediate node', r.returncode == 0
+          and r.stdout.startswith('ok control/ops - '), repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, CLIB, '--control-port', '15597'],
                        input='show interval\nquit\n', capture_output=True, text=True, timeout=15,
                        env={**os.environ, 'CONTROL_TOKEN': 'file:' + stok_file})

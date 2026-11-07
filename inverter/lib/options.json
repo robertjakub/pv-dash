@@ -252,6 +252,8 @@
     { "name": "logout", "help": "close the session", "hidden": true },
     { "name": "ping", "help": "keep-alive: answers pong", "internal": true },
     { "name": "quit", "help": "close the session" },
+    { "name": "request", "help": "the state machinery: the dump written and restored, the fake restarted",
+      "node": true },
     { "name": "request-dump", "live": "request/dump",
       "help": "write the state dump: the live setting overrides, sealed (when the fake has a dump path)",
       "hidden": true },

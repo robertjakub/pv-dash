@@ -248,6 +248,27 @@ def lint(path):
                  if isinstance(r, dict) and r.get('live') and r['live'].startswith(p + '/'))
         rows.insert(i, {'name': p, 'setting-help': 'TODO: need update', 'node': True})
 
+    # the commands' tree speaks the same discipline: a command live's
+    # '/'-prefix with no node row gains one (the row's `help` carries the
+    # namespace's word-help — the walk-on borrows it; the node itself is no
+    # command word: never in the pools, never in the ? listing), a node
+    # with no live children — even hidden count — is an orphan
+    cmd_rows = meta.get('commands') or []
+    cmd_lives = [r['live'] for r in cmd_rows if isinstance(r, dict) and r.get('live')]
+    cmd_nodes = {r['name'] for r in cmd_rows if isinstance(r, dict) and r.get('node')}
+    cmd_prefixes = set()
+    for lv in cmd_lives:
+        segs = lv.split('/')
+        for i in range(1, len(segs)):
+            cmd_prefixes.add('/'.join(segs[:i]))
+    for n in sorted(n for n in cmd_nodes
+                    if not any(lv.startswith(n + '/') for lv in cmd_lives)):
+        nits.append('%s: the command node %r has no live children (even hidden count) — remove it' % (path, n))
+    for p in sorted(p for p in cmd_prefixes if p not in cmd_nodes):
+        i = next(i for i, r in enumerate(cmd_rows)
+                 if isinstance(r, dict) and r.get('live') and r['live'].startswith(p + '/'))
+        cmd_rows.insert(i, {'name': p, 'help': 'TODO: need update', 'node': True})
+
     if nits:
         return nits, None
     canon = render_registry(meta)

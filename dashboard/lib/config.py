@@ -11,11 +11,10 @@ every line a `set <name> <value>`, every comment a `#` comment — the ini
 format is gone (the breaking wave in docs/TODO.md).
 """
 import logging
-import os
 
-from common.options import parse_config_script
 from .options import OPTIONS
-from common.config import parse_secret
+from common.config import check_control_tokens, check_token_chars, load_config_script, parse_secret, \
+    resolve_target, Resolver, str_to_bool
 from .statics import DEFAULTS, DEFAULT_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
@@ -25,48 +24,14 @@ def resolve_control_target(explicit, listen_port=DEFAULT_PORT):
     """The control server target for the daemon and the clients: the flag
     wins, then CTL, then the default unix socket named after the
     listen port (/tmp/dashboard-8080.socket)."""
-    if explicit is not None and str(explicit).strip():
-        return str(explicit).strip()
-    env = os.environ.get('CTL')
-    if env and env.strip():
-        return env.strip()
-    return '/tmp/dashboard-%d.socket' % int(listen_port)
-
-
-def str_to_bool(value):
-    if isinstance(value, bool):
-        return value
-    text = str(value).strip().lower()
-    if text in ('true', 'yes', 'on', '1'):
-        return True
-    if text in ('false', 'no', 'off', '0'):
-        return False
-    raise ValueError('not a boolean')
+    return resolve_target(explicit, '/tmp/dashboard-%d.socket' % int(listen_port))
 
 
 def load_config(path):
     """Parse the set-grammar config script (missing file is fine); a
     malformed file — or the legacy ini format — is fatal. Returns {key:
     raw-string value} with the dash names underscore-normalized."""
-    if not path or not os.path.isfile(path):
-        return {}
-    try:
-        with open(path, encoding='utf-8') as fh:
-            text = fh.read()
-    except OSError as e:
-        raise SystemExit('cannot read config file %s: %s' % (path, e))
-    try:
-        rows = parse_config_script(text, path, OPTIONS)   # the registry: the CLI spelling + the unknown-setting fail fast
-    except ValueError as e:
-        raise SystemExit(str(e))
-    out = {}
-    for name, value in rows:
-        key = name.replace('-', '_')
-        if key in out:
-            raise SystemExit('%s: %s is set twice (the file applies top to bottom — say it once)'
-                             % (path, name))
-        out[key] = value
-    return out
+    return load_config_script(path, OPTIONS)
 
 
 def next_to_script(name, script_dir=None):
@@ -87,20 +52,8 @@ def resolve_config(args, script_dir=None):
     and the served config.js at the config volume with CONFIG_JS.
     """
     ini = load_config(args.config)
-
-    def resolve(cli_value, env_name, cfg_key, default, conv):
-        raw = cli_value
-        if raw is None or raw == '':
-            raw = os.environ.get(env_name) if env_name else None
-        if raw is None or raw == '':
-            raw = ini.get(cfg_key)
-        if raw is None or raw == '':
-            return default
-        try:
-            return conv(raw)
-        except (TypeError, ValueError) as e:
-            logger.error('invalid %s = %r: %s (using %r)', cfg_key, raw, e, default)
-            return default
+    r = Resolver(ini, logger)
+    resolve = r.resolve
 
     static_dir = resolve(args.static_dir, 'STATIC_DIR', 'static_dir',
                          next_to_script('static', script_dir), str)
@@ -145,15 +98,8 @@ def resolve_config(args, script_dir=None):
                                             'control-ops-token')
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None),
                                         'CONTROL_TRUST_UIDS', 'control_trust_uids', None, str)
-    if cfg['control_ops_token']:
-        if not cfg['control_token']:
-            raise SystemExit('the read-only ops token supplements the admin token: '
-                             'set --control-token too')
-        if cfg['control_ops_token'] == cfg['control_token']:
-            raise SystemExit('the ops token must differ from the admin token (the same secret would '
-                             'hand every holder the role the server picks first)')
-    if cfg['control_token'] and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in cfg['control_token']):
-        raise SystemExit('invalid control_token: must not contain whitespace or control characters')
+    check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
+    check_token_chars(cfg['control_token'], 'control_token')
     if cfg['port'] < 1 or cfg['port'] > 65535:
         raise SystemExit('invalid port = %d: must be 1..65535' % cfg['port'])
     if cfg['max_clients'] < 0:

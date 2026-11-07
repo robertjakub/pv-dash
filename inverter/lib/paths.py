@@ -12,8 +12,7 @@ The control token comes from --control-token / CONTROL_TOKEN — the value
 may be a file:<path> reference (the first line of an owner-only 0600
 file — a key file or a systemd LoadCredential; the loader is the shared
 common.config.load_token_file)."""
-import os
-
+from common.config import resolve_target
 from .statics import DEFAULT_MODBUS_PORT
 
 
@@ -22,9 +21,4 @@ def default_socket(modbus_port=DEFAULT_MODBUS_PORT):
 
 
 def resolve_control_target(explicit, modbus_port=DEFAULT_MODBUS_PORT):
-    if explicit is not None and str(explicit).strip():
-        return str(explicit).strip()
-    env = os.environ.get('CTL')
-    if env and env.strip():
-        return env.strip()
-    return default_socket(modbus_port)
+    return resolve_target(explicit, default_socket(modbus_port))

@@ -47,7 +47,7 @@ Empty auth (the default) = no auth at all \\(em the trusted-LAN posture
 stands. The writes are gated like the cache's (\\fB--allow-write\\fR):
 off (the default) = every Modbus write (FC05/06/15/16) is refused with
 exception 01 and audited WRITE\\-REFUSED; on = a write lands in the
-overlay, audited WRITE.\"""
+overlay, audited WRITE."""
     signals = """.SH SIGNALS
 .TP
 .B SIGHUP

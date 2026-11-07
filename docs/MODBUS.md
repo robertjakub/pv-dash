@@ -212,24 +212,24 @@ for it):
 |---|---|---|---|---|---|
 | FC01 | Read Coils | ✅ per-profile `fc` (`poller.py:65`) | ✅ cached, first-class bit space (`proxy.py:504`) | ✅ coil map + `--allow-write` overlays (`inverter.py:213`) | **Complete** |
 | FC02 | Read Discrete Inputs | ✅ per-profile `fc` (`poller.py:65`) | ✅ cached, own `(fc, addr)` space (`proxy.py:504`) | ✅ discrete map + overlays (`inverter.py:213`) | **Complete** |
-| FC03 | Read Holding Registers | ✅ `read_registers` (`protocol.py:83`) | ✅ cached, first-class (`proxy.py:496`) | ✅ register map + write overlay (`inverter.py:193`) | **Complete** |
-| FC04 | Read Input Registers | ✅ per-profile `fc` (`poller.py:65`) | ✅ cached, separate `(fc, addr)` space (`proxy.py:496`) | ⚠️ serves the *same* map as FC3 — no overlay (`inverter.py:203`) | Complete except fake |
+| FC03 | Read Holding Registers | ✅ `read_registers` (`protocol.py:83`) | ✅ cached, first-class (`proxy.py:493`) | ✅ register map + write overlay (`inverter.py:193`) | **Complete** |
+| FC04 | Read Input Registers | ✅ per-profile `fc` (`poller.py:65`) | ✅ cached, separate `(fc, addr)` space (`proxy.py:493`) | ✅ own per-profile `fc4` space — no overlay (the pins are the open TODO, `inverter.py:202`) | **Complete** |
 | FC05 | Write Single Coil | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, audited (`inverter.py:229`) | **Complete** (cache + fake) |
 | FC06 | Write Single Register | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, audited (`inverter.py:241`) | **Complete** (cache + fake) |
-| FC07 | Read Exception Status | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
-| FC08 | Diagnostics | — | ✅ forwarded, named — the sub-functions are not interpreted (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade (sub-functions by design) |
-| FC11 | Get Comm Event Counter | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
-| FC12 | Get Comm Event Log | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC07 | Read Exception Status | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC08 | Diagnostics | — | ✅ forwarded, named — the sub-functions are not interpreted (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade (sub-functions by design) |
+| FC11 | Get Comm Event Counter | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC12 | Get Comm Event Log | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
 | FC15 | Write Multiple Coils | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, bit overlays (`inverter.py:247`) | **Complete** (cache + fake) |
 | FC16 | Write Multiple Registers | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, register overlays (`inverter.py:260`) | **Complete** (cache + fake) |
-| FC17 | Report Server ID | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
-| FC20/21 | File Record Read/Write | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC17 | Report Server ID | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC20/21 | File Record Read/Write | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
 | FC22 | Mask Write Register | — no write API | ✅ gated forward, shape-checked (`writes.py:80`) | ⚠️ exception 01 — nothing to gate (`inverter.py:273`) | Complete except fake |
 | FC23 | Read/Write Multiple Regs | — no write API | ✅ gated forward, shape-checked (`writes.py:80`) | ⚠️ exception 01 — nothing to gate (`inverter.py:273`) | Complete except fake |
-| FC24 | Read FIFO Queue | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
-| FC43/14 | Read Device Identification | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade (native MEI by design) |
-| FC09/10, 25–42, 44–64 | reserved / legacy | — | ✅ forwarded bare (`FC<n>`, `proxy.py:522`) | ⚠️ exception 01 (`inverter.py:273`) | Forward-grade |
-| FC65–72/73–94/100+ | vendor-specific | — | ✅ forwarded bare (`FC<n>`, `proxy.py:522`) | ⚠️ exception 01 (`inverter.py:273`) | Forward-grade |
+| FC24 | Read FIFO Queue | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC43/14 | Read Device Identification | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade (native MEI by design) |
+| FC09/10, 25–42, 44–64 | reserved / legacy | — | ✅ forwarded bare (`FC<n>`, `proxy.py:527`) | ⚠️ exception 01 (`inverter.py:273`) | Forward-grade |
+| FC65–72/73–94/100+ | vendor-specific | — | ✅ forwarded bare (`FC<n>`, `proxy.py:527`) | ⚠️ exception 01 (`inverter.py:273`) | Forward-grade |
 
 (The cache's write gate is the three-layer ladder — allow-write, client
 ACL, register allow-list — then the shared shape check; every refusal is

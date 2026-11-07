@@ -29,10 +29,10 @@ from common.logutil import UtcFormatter
 from common.audit import AuditLog
 from common.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.control import ControlServer as _ControlServer, num, numi
-from common.options import control_command, grouped_rows, match_setting_path, describe_node
+from common.options import control_command, grouped_rows, match_setting_path, describe_node, describe_root
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
-from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME, KNOWN_VERBS, \
-    CFG_KEYS, CFG_FORMATTERS
+from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
+    KNOWN_VERBS, CFG_KEYS, CFG_FORMATTERS
 from .cache import build_blocks
 from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection, parse_listen, parse_control_target
 from .metrics import MetricsServer, describe_metrics
@@ -165,6 +165,9 @@ class ControlServer(_ControlServer):
                 if key == 'dump-interval' and not self.proxy.dump_path:
                     return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
                 return 'ok %s' % describe_setting(key)
+            node_path = '/'.join(w.lower() for w in args)   # a node path spells as words too — the walk the ? offers
+            if node_path in NODE_BY_NAME:
+                return 'ok %s' % describe_node(OPTIONS, node_path)
             if args:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             return 'ok ' + self.command_help()
@@ -229,6 +232,9 @@ class ControlServer(_ControlServer):
             return self.knobs_dictionary()
         if low.startswith('show'):
             args = cmd.split()[1:]
+            if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
+                return 'ok %s' % describe_root(OPTIONS, SHOW_OPTIONS,
+                                               hidden_words=() if self.proxy.dump_path else ('dump-interval',))
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
                 opt = OPTION_BY_LIVE.get(key)
@@ -242,8 +248,9 @@ class ControlServer(_ControlServer):
                 return 'ok %s=%s' % (key, self._get(key))
             if key is not None and rest:
                 return 'err %s: unexpected %s' % (key, ' '.join(rest))
-            if len(args) == 1 and args[0].lower() in NODE_BY_NAME:
-                return 'ok %s' % describe_node(OPTIONS, args[0].lower())
+            node_path = '/'.join(w.lower() for w in args)   # the walk the ? offers: every word of the path answers
+            if node_path in NODE_BY_NAME:
+                return 'ok %s' % describe_node(OPTIONS, node_path)
             if len(args) == 1:
                 return 'err unknown setting %s (try help)' % args[0].lower()
         if low == 'inspect':
@@ -715,6 +722,22 @@ class ControlServer(_ControlServer):
             return not self.is_unix and target == self.port
         return self.is_unix and str(target) == self.sockpath
 
+    @staticmethod
+    def _retire_listener(srv):
+        """The retired listener: shutdown BEFORE close — a bare close leaves
+        a Linux accept() blocked on the kernel-live listener (a connect in
+        the window still succeeds; the CI caught the old control port
+        answering once), the shutdown wakes the accept and the loop's
+        identity check retires it."""
+        try:
+            srv.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        try:
+            srv.close()
+        except OSError:
+            pass
+
     def _rebind_control(self, target):
         """The live control target (the `set control/port` plumb): bind the
         new socket FIRST (a failed bind leaves the old listener untouched —
@@ -728,10 +751,7 @@ class ControlServer(_ControlServer):
             self._srv = None
             self.stopped = True
             if old is not None:
-                try:
-                    old.close()
-                except OSError:
-                    pass
+                self._retire_listener(old)
             logger.info('control: the control server stopped (a control/port set re-enables it)')
             return 'off'
         self.is_unix = not isinstance(target, int)
@@ -746,10 +766,7 @@ class ControlServer(_ControlServer):
         old = self._srv
         self._srv = srv
         if old is not None:
-            try:
-                old.close()
-            except OSError:
-                pass
+            self._retire_listener(old)
         logger.info('control: the control server rebound to %s (the old listener closed)', self.describe())
         threading.Thread(target=self._accept_loop, args=(srv,), daemon=True).start()
         return self.describe()

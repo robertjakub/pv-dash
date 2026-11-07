@@ -559,11 +559,13 @@ try:
     r = cli('request clear cache\nquit\n')
     check('cache_cli: request clear cache confirms silently', r.returncode == 0
           and '\ncache:15514 > % ok\n' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show control token ?\nshow control ops ?\nset connections ?\nquit\n')
+    r = cli('show control token ?\nshow control ops ?\nset connections ?\nrequest?\nquit\n')
     check("cache_cli: ? at a hidden leaf describes it (the wire's help answer)",
           'control/token - require a token on control connections' in r.stdout, repr(r.stdout[-300:]))
     check("cache_cli: ? at a hidden-only namespace stays Invalid input (the secrets never list)",
           r.stdout.count('% Invalid input.') == 2, repr(r.stdout[-300:]))
+    check('cache_cli: the command tree describes by its registry row (the walk-on borrows the node descr)',
+          'request the state machinery: the dump written and restored' in r.stdout, repr(r.stdout[-300:]))
     r = cli('shutdown\nn\n')
     check('cache_cli: shutdown refuses without confirming', r.returncode == 0
           and 'Proceed with shutdown? [confirm]' in r.stdout and '% Aborted.' in r.stdout, repr(r.stdout))
@@ -1216,6 +1218,31 @@ try:
     ctl_cmd('unset control socket-group', 15530)
     r = ctl_cmd('show audit rotate max-size', 15530)
     check('audit rotate: show answers the configured MB', r == 'ok audit/rotate/max-size=10', r)
+    listing = '\n'.join([
+        '    disable  disable the audit trail entirely',
+        "    log-file the audit trail's file: a path, - for stdout, empty = the XDG state home",
+        '    requests audit one REQUESTS tally per client per this many seconds',
+        "    rotate   the audit trail's rotation: the size trigger, the UTC-midnight trigger and the backup count"])
+    r = ctl_cmd('show audit', 15530)
+    check('audit node: the listing mimics the ? output byte for byte', r == 'ok ' + listing, r)
+    r = ctl_cmd('show audit rotate', 15530)
+    check('audit node: the walk answers the intermediate node in the same shape',
+          r == 'ok ' + '\n'.join([
+              '    daily    also rotate the audit trail at UTC midnight',
+              '    files    the rotated audit backups kept',
+              '    max-size rotate the audit trail at this size in MB, 0 = no size rotation']), r)
+    r = ctl_cmd('help audit', 15530)
+    check('audit node: help answers the same listing', r == 'ok ' + listing, r)
+    r = ctl_cmd('show modbus', 15530)
+    check('modbus node: the listing hides the secret rows (the pools rule — the typed path still answers)',
+          r.count('\n') == 9 and 'auth/key' not in r and 'auth-upstream-key' not in r, r[:160])
+    r = ctl_cmd('show', 15530)
+    words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
+             if line.strip() and not line.strip().startswith('[')]
+    check("bare show: the walk's first position mimics the ? output (the gated word hidden while the dump is off)",
+          words == ['acl', 'audit', 'cache', 'config', 'connections', 'control', 'dump', 'knobs',
+                    'limits', 'local-time', 'log-level', 'metrics', 'modbus', 'uplink', 'version', 'write'],
+          r[:220])
     r = ctl_cmd('set audit rotate max-size 5', 15530)
     check('audit rotate: max-size set', r.startswith('ok audit/rotate/max-size=5'), r[:90])
     r = ctl_cmd('show audit log-file', 15530)
@@ -1253,6 +1280,10 @@ try:
     live_dump = '/tmp/reg_live_dump.json'
     r = ctl_cmd('set dump/path %s' % live_dump, 15530)
     check('dump path: set live', r.startswith('ok dump/path=%s' % live_dump), r[:120])
+    r = ctl_cmd('show', 15530)
+    words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
+             if line.strip() and not line.strip().startswith('[')]
+    check('bare show: the dump on, the gated word lists', 'dump-interval' in words, r[:160])
     r = ctl_cmd('request dump', 15530)
     check('dump path: request dump writes the live path', r.startswith('ok dumped') and live_dump in r, r[:90])
     r = ctl_cmd('set dump with-cache on', 15530)
@@ -1264,6 +1295,10 @@ try:
     ctl_cmd('unset dump restore-on-start', 15530)
     r = ctl_cmd('unset dump/path', 15530)
     check('dump path: unset restores off', r.startswith('ok dump/path=off'), r[:90])
+    r = ctl_cmd('show', 15530)
+    words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
+             if line.strip() and not line.strip().startswith('[')]
+    check('bare show: the dump off again, the gated word hides', 'dump-interval' not in words, r[:160])
     r = ctl_cmd('request dump', 15530)
     check('dump path: request dump without a path is a clean err', r.startswith('err no dump path configured'),
           r[:80])
@@ -1609,9 +1644,9 @@ print('mode 0600 ok')
     r = ctl_cmd('help write acl', 15532)
     check('alias: help write acl describes the row', r.startswith('ok acl/write -'), r[:80])
     r = ctl_cmd('show write', 15532)
-    check('alias: the write node lists the aliased acl child',
-          r.startswith('ok write - ') and 'acl - clients allowed to write' in r
-          and '(the alias of acl/write)' in r, r[:120])
+    check('alias: the write node lists the aliased acl child, the ? shape',
+          'clients allowed to write (requires allow-write)' in r
+          and '(the alias of acl/write)' in r and r.count('\n') == 2, r[:160])
 
     # the profile write acl: --write-registers profile compiles the device
     # profile's acl/write tree (allow minus deny) — the deye profile allows

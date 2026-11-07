@@ -108,11 +108,14 @@ def prompt_for(target, is_unix):
 def help_text(commands_help, command_groups, command_hidden, pins, command_internal=()):
     """The `?` listing — the same shape as the setting help: bare words on
     top, then the filed groups, soft-alphabetical within; the pins ride
-    last (they are syntax, not words). The internal rows (the machinery's
-    own words) never list. The '/'-path rows spell as words — the wire's
-    spelling, the options' dictionary rule."""
+    last (they are syntax, not words), and `quit` rides just before them —
+    the leave-word sits beside the navigation syntax, on every tool. The
+    internal rows (the machinery's own words) never list. The '/'-path
+    rows spell as words — the wire's spelling, the options' dictionary
+    rule."""
     disp = {n.replace('/', ' '): d for n, d in commands_help.items()
             if n not in command_hidden and n not in command_internal}
+    quit_help = disp.pop('quit', None)
     groups = {n.replace('/', ' '): g for n, g in command_groups.items()}
     width = max([len(n) for n in disp] + [len(n) for n, _ in pins]) + 1
     out = ['commands (TAB completes, ? lists the options + descriptions in any position):']
@@ -121,6 +124,8 @@ def help_text(commands_help, command_groups, command_hidden, pins, command_inter
             out.append('[%s]' % g)
         for n in sorted(ws, key=str.lower):
             out.append('    %-*s %s' % (width, n, disp[n]))
+    if quit_help is not None:
+        out.append('    %-*s %s' % (width, 'quit', quit_help))
     for n, d in pins:
         out.append('    %-*s %s' % (width, n, d))
     return '\n'.join(out)

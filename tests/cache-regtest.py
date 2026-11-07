@@ -1676,9 +1676,10 @@ print('mode 0600 ok')
     check('profile acl deny: the refusal names the carved gate',
           'outside the write allow-list profile (0:127,129:19,178:65358)' in pdl_log, pdl_log[-200:])
 
-    # the rule-chain form: the last matching rule decides, defer resets the
-    # decision for its span, an undecided register refuses (default deny)
-    for name, gate in [('defer', [{'defer': 'any'}, {'allow': '148:30'}]),
+    # the rule-chain form: the last matching rule decides, an undecided
+    # register refuses (default deny) — the deny-any chain opens from a
+    # clean slate
+    for name, gate in [('clean', [{'deny': 'any'}, {'allow': '148:30'}]),
                        ('reopen', [{'allow': 'any'}, {'deny': '148:30'}, {'allow': '148:1'}])]:
         cp = '/tmp/reg_deye_%s.json' % name
         with open(deye) as fh:
@@ -1687,15 +1688,15 @@ print('mode 0600 ok')
         with open(cp, 'w') as fh:
             _json.dump(dj, fh)
         start([sys.executable, P, '--upstream', '127.0.0.1:15584',
-               '--listen', '127.0.0.1:%d' % (15590 if name == 'defer' else 15591),
+               '--listen', '127.0.0.1:%d' % (15590 if name == 'clean' else 15591),
                '--interval', '1', '--profile', cp,
                '--allow-write', '--write-acl', 'any', '--write-registers', 'profile'],
               log='/tmp/reg_profile_%s.log' % name)
     time.sleep(2)
     b = wr6(148, 1, port=15590)
-    check('profile acl chain (defer): the allowed span passes', b[0] == 6, b.hex())
+    check('profile acl chain (clean slate): the allowed span passes', b[0] == 6, b.hex())
     b = wr6(130, 1, port=15590)
-    check('profile acl chain (defer): an undecided register refuses', b[0] == 0x86 and b[1] == 1, b.hex())
+    check('profile acl chain (clean slate): an undecided register refuses', b[0] == 0x86 and b[1] == 1, b.hex())
     b = wr6(148, 1, port=15591)
     check('profile acl chain (re-open): 148 re-allowed by the last rule', b[0] == 6, b.hex())
     b = wr6(160, 1, port=15591)

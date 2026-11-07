@@ -146,14 +146,13 @@ def load_profile_write_acl(path, label=None):
     """The device profile's write acl: the optional top-level "acl" object
     keyed by access kind — "write" is the one the cache speaks. The gate is
     either an object with optional "allow"/"deny" (+ "desc"), or an ordered
-    rule list — one {"allow"|"deny"|"defer": matcher} object per rule (+ an
+    rule list — one {"allow"|"deny": matcher} object per rule (+ an
     optional "desc" each). A matcher is a "START:COUNT" range or a list of
     them, or the bare word "any" (all registers) / "none". The chain reads
-    top to bottom and the LAST matching rule decides; "defer" matches but
-    resets the decision back to refused, and an undecided register refuses
-    (the default deny) — so the object form is the sugar for the chain
-    "allow, deny" (the deny wins), and a deny-only object carves its ranges
-    out of everything (an absent allow is "any"). Compiles to the
+    top to bottom and the LAST matching rule decides; an undecided register
+    refuses (the default deny) — so the object form is the sugar for the
+    chain "allow, deny" (the deny wins), and a deny-only object carves its
+    ranges out of everything (an absent allow is "any"). Compiles to the
     write-registers shapes: None (any register writable), () (none), else
     the (start, count) tuple — the chain never needs a second check at
     write time. A profile without acl/write refuses: the caller asked for
@@ -188,10 +187,10 @@ def load_profile_write_acl(path, label=None):
         for i, rule in enumerate(gate):
             where = '%s acl/write rule %d' % (label, i + 1)
             if not isinstance(rule, dict) or not rule:
-                raise SystemExit('%s must be an object with one verb (allow/deny/defer)' % where)
+                raise SystemExit('%s must be an object with one verb (allow/deny)' % where)
             verbs = [k for k in rule if k != 'desc']
-            if len(verbs) != 1 or verbs[0] not in ('allow', 'deny', 'defer'):
-                raise SystemExit('%s: exactly one verb (allow/deny/defer), got %s'
+            if len(verbs) != 1 or verbs[0] not in ('allow', 'deny'):
+                raise SystemExit('%s: exactly one verb (allow/deny), got %s'
                                  % (where, ', '.join(verbs) or 'none'))
             _acl_desc(rule.get('desc'), where)
             rules.append((verbs[0], rule[verbs[0]], where))
@@ -199,7 +198,7 @@ def load_profile_write_acl(path, label=None):
     bits = bytearray(MAX_REGISTERS)   # 0 = refused (the default), 1 = writable
     for verb, matcher, where in rules:
         kind, ranges = _acl_matcher(matcher, where)
-        byte = b'\x01' if verb == 'allow' else b'\x00'   # deny and defer both reset to refused
+        byte = b'\x01' if verb == 'allow' else b'\x00'   # deny resets to refused
         if kind == 'any':
             bits[:] = byte * MAX_REGISTERS
         elif kind == 'ranges':

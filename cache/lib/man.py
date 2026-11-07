@@ -24,8 +24,8 @@ codes are forwarded live, and writes (FC05/06/15/16/22/23) are forwarded
 when explicitly enabled and audited \\(em gated by a register allow-list
 (\\fB--write-registers\\fR) that spells its ranges directly or takes the
 device profile's \\fBacl\\fR/\\fBwrite\\fR tree (an allow/deny object or
-an ordered rule chain \\(em the last matching rule decides, \\fBdefer\\fR
-resets, the word \\fBany\\fR = all registers). Every function code crossing the
+an ordered rule chain \\(em the last matching rule decides, the word
+\\fBany\\fR = all registers). Every function code crossing the
 wire is named in the log and the audit trail (all standard FCs, FC1
 through FC43). A synthesized diagnostics block at registers
 65000\\(en65003 lets clients tell cached data from live data.

@@ -452,9 +452,9 @@ restrict all); the config-file/env/NixOS forms are
   client, `any` lifts the register check entirely. **`profile`** takes the
   gate from the device profile: the profile's `"acl"` → `"write"` tree —
   an `allow`/`deny` object (the deny wins, an absent allow is `any`) or an
-  ordered rule list (`{"allow"|"deny"|"defer": "START:COUNT"|[...]|{"START:COUNT": "desc"}|"any"}`
-  — the last matching rule decides, `defer` resets the decision, an
-  undecided register refuses), each range optionally described by a
+  ordered rule list (`{"allow"|"deny": "START:COUNT"|[...]|{"START:COUNT": "desc"}|"any"}`
+  — the last matching rule decides, an undecided register refuses), each
+  range optionally described by a
   terse-ASCII `desc` (per gate, per rule, or per entry in the range map).
   `deye-sg05lp3`, for example, allows only the TOU schedule slots
   (148–177) and the grid-start registers (127–128). A profile without an

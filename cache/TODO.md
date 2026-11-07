@@ -58,13 +58,12 @@ no scheme yet dormant); the live `set` enforces the pair's invariant
 The profile write-acl wave: **`write-registers` speaks the device
 profile** — the new `profile` value compiles the register gate out of the
 profile's `"acl"`/`"write"` tree: an allow/deny object (the deny wins, an
-absent allow is `any`) or an ordered rule chain (`allow`/`deny`/`defer`
+absent allow is `any`) or an ordered rule chain (`allow`/`deny`
 rules — a `START:COUNT` matcher, a list of them, a
 `{ "START:COUNT": "desc" }` map describing each entry, or the bare word
 `any`/`none`; an optional terse-ASCII `desc` per gate and rule) — the
-chain reads top to bottom, the LAST matching rule decides, `defer` resets
-the decision for its span and an undecided register refuses (the default
-deny). The shipped `deye-sg05lp3` profile allows exactly the TOU schedule
+chain reads top to bottom, the LAST matching rule decides and an
+undecided register refuses (the default deny). The shipped `deye-sg05lp3` profile allows exactly the TOU schedule
 slots (148–177) and the grid-start registers (127–128), each entry
 described. The gate re-resolves when the profile swaps live and refuses a
 profile without the section; `show write registers` answers `profile`

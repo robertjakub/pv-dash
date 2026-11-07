@@ -164,6 +164,16 @@ def check_tool(tool):
                        | {a for a in alias_names if alias_names.count(a) > 1})
     rows.append((not alias_bad, '%s: every alias is a clean word-path unique in the setting space%s'
                  % (tool, ' — bad: %s' % ', '.join(alias_bad) if alias_bad else '')))
+    # the control commands: '/'-paths spelled as words on the wire
+    # (`request/clear/cache` is `request clear cache`) — one clean word-path
+    # each, unique in the command space, a description each
+    cmd_words = list(mod.COMMANDS)
+    cmd_dupes = sorted({w for w in cmd_words if cmd_words.count(w) > 1})
+    cmd_spaced = sorted(w for w in cmd_words if any(c.isspace() for c in w))
+    cmd_bare = sorted(w for w in cmd_words if not mod.COMMAND_HELP.get(w))
+    cmd_bad = sorted(set(cmd_dupes) | set(cmd_spaced) | set(cmd_bare))
+    rows.append((not cmd_bad, '%s: every command row is a clean unique word-path with a description%s'
+                 % (tool, ' — bad: %s' % ', '.join(cmd_bad) if cmd_bad else '')))
 
     got, err = parser_flags(bin_script)
     if err:

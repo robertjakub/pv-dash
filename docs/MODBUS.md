@@ -187,7 +187,22 @@ scraper is **read-only** — it never issues writes (no write API — the
 shared client exposes reads only); only the cache originates them (when
 enabled), and the fake implements FC5/6/15/16 behind its write gate.
 
-### The support classes — every standard FC, and what "support" means
+### The support map — the surface, then every standard FC
+
+Two maps: first the protocol surface the family speaks (framing,
+exceptions, the handshakes, the transport), then every standard function
+code, tool by tool ("—" = the tool has no surface for it).
+
+| Surface | modbus-cache | modbus-scraper | fake inverter |
+|---|---|---|---|
+| MBAP framing (txn/proto/length/unit; `proto` must be 0) | serve + forward | client | server |
+| MBAP overruns (length < 7 / over the PDU cap) | ✅ shared `read_frame`, frame refused (`protocol.py:191`) | ✅ same | ✅ same — logged, connection closed |
+| Exception replies (`func\|0x80` + code) | ✅ passes device codes through; emits 01/02/03/04 itself | ✅ surfaces them on `ctl` | ✅ emits 01/02/03/04 |
+| The suite handshake (PVA1, HMAC-SHA256 — rides the MBAP leg) | ✅ client + server (`protocol.py:50`, `protocol.py:67`) | ✅ client (`protocol.py:50`) | ✅ server (`protocol.py:67`) |
+| The waveshare handshake (upstream auth) | ✅ client, upstream leg (`protocol.py:94`) | — | — |
+| Transport | Modbus TCP only | Modbus TCP only | Modbus TCP only — RTU/ASCII out of scope |
+
+**The function codes:**
 
 Every standard function code is transported; none falls through
 silently. The per-code map, tool by tool ("—" = the tool has no surface

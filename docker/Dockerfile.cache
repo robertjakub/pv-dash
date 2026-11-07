@@ -19,7 +19,10 @@
 # The config volume: the entrypoint seeds /config with the bundled defaults
 # on start (files the volume lacks are copied in, existing ones stay) — edit
 # /config/modbus_cache.conf and /config/selection.json there, they survive
-# recreation. The ENV vars below point the tool at the volume copies.
+# recreation. The ENV vars below point the tool at the volume copies and
+# carry the demo stack's default upstream (the compose stack's .env
+# overrides it; a flag beats the env — `docker run ... modbus-cache
+# --upstream 10.0.0.9:5502` on top).
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \
@@ -39,10 +42,13 @@ RUN chmod +x cache/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/cache/bin/modbus-cache-cli.py /usr/local/bin/modbus-cache-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
+# UPSTREAM is the image's default upstream peer (fake-inverter:5502 — the
+# compose stack's fake service; the flag would pin it past every env).
 ENV CONFIG=/config/modbus_cache.conf \
-    SELECTION=/config/selection.json
+    SELECTION=/config/selection.json \
+    UPSTREAM=fake-inverter:5502
 VOLUME /config
 ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 15502
-CMD ["modbus-cache", "--upstream", "fake-inverter:5502", "--listen", "0.0.0.0:15502", "--audit-log", "-"]
+CMD ["modbus-cache", "--listen", "0.0.0.0:15502", "--audit-log", "-"]

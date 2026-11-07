@@ -12,6 +12,30 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **docker** — **the stack speaks .env**: `docker/.env.example` ships the
+  deployment-shaped knobs commented — the poll chain's upstreams
+  (`CACHE_UPSTREAM`/`SCRAPER_UPSTREAM`, point the cache at a real inverter),
+  the cadence (`POLL_INTERVAL`, `CACHE_TTL`), the fake's device profile
+  (`FAKE_PROFILE`), the exporter's token file (`SCRAPER_TOKEN_FILE`) and
+  metric prefix (`METRIC_PREFIX`), the dashboard's published port
+  (`DASHBOARD_PORT`) and `PROM_URL`, one shared `LOG_LEVEL` — cp it to
+  `docker/.env` and compose interpolates the values into compose.yaml's
+  new `${...}` pass-throughs (the names are compose-side keys, mapped onto
+  the services' bare-name env twins one service at a time: `UPSTREAM`
+  alone names a different peer per tool). An empty env value is treated as
+  unset by every tool's resolver, so a commented-out line is always safe.
+  The cache's and scraper's `--upstream` defaults move from the CMD flags
+  to image `ENV` (`UPSTREAM=fake-inverter:5502` /
+  `UPSTREAM=modbus-cache:15502`) — a CMD flag would pin the peer past
+  every env forever, while the env keeps the plain `docker run` default
+  and makes `-e UPSTREAM=...` work there too. The `/config` volume stays:
+  the generated `metrics.token` (one shared secret, two containers,
+  survives recreation), the JSON specs (`selection.json`, `metrics.json`)
+  and the served `config.js` are files by nature, not knobs; the seeded
+  conf scripts become the edit-a-file option under the env layer (env
+  beats config script in the resolution). The README gains the .env
+  section and the env-or-volume split.
+
 - **profiles** — **the write allow-list speaks the device profile**:
   the cache's `write-registers` knob takes the new value **`profile`** —
   the register gate compiles out of the device profile's `"acl"` tree

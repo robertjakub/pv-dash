@@ -23,6 +23,9 @@
 # value the entrypoint generates on the first seed, 0600, owner pvsuite) and
 # the Prometheus service reads its copy of the same file from the config
 # volume. Read the token: docker compose exec modbus-scraper cat /config/metrics.token
+#
+# The overrides: cp .env.example .env and edit — compose interpolates .env
+# into the ${...} defaults below (see .env.example for every knob).
 services:
   fake-inverter:
     build:
@@ -32,6 +35,9 @@ services:
         scripts: ../docker
         common: ../common
     image: fake-inverter
+    environment:
+      # .env pass-throughs — an empty value is treated as unset by the tool
+      PROFILE: ${FAKE_PROFILE:-}
     volumes:
       - config:/config
     networks:
@@ -46,6 +52,12 @@ services:
         scripts: ../docker
         common: ../common
     image: modbus-cache
+    environment:
+      # .env pass-throughs (the image ENV carries the same upstream default)
+      UPSTREAM: ${CACHE_UPSTREAM:-fake-inverter:5502}
+      INTERVAL: ${POLL_INTERVAL:-}
+      TTL: ${CACHE_TTL:-}
+      LOG_LEVEL: ${LOG_LEVEL:-}
     volumes:
       - config:/config
     networks:
@@ -65,7 +77,12 @@ services:
     environment:
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the demo exporter never serves unauthenticated (the audit's F13)
-      AUTH_TOKEN_FILE: /config/metrics.token
+      AUTH_TOKEN_FILE: ${SCRAPER_TOKEN_FILE:-/config/metrics.token}
+      # .env pass-throughs (the image ENV carries the same upstream default)
+      UPSTREAM: ${SCRAPER_UPSTREAM:-modbus-cache:15502}
+      INTERVAL: ${POLL_INTERVAL:-}
+      METRIC_PREFIX: ${METRIC_PREFIX:-}
+      LOG_LEVEL: ${LOG_LEVEL:-}
     networks:
       - modbus
     depends_on:
@@ -96,7 +113,7 @@ services:
     environment:
       # the proxy target: the stack's internal Prometheus service (the
       # dashboard never needs the token — the scrape stays prometheus-side)
-      PROM_URL: http://prometheus:9090
+      PROM_URL: ${PROM_URL:-http://prometheus:9090}
     volumes:
       - config:/config
     networks:
@@ -104,7 +121,7 @@ services:
     ports:
       # the stack's one published port, loopback-only (the audit's F7
       # discipline: an explicit operator act, not reachable from the LAN)
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${DASHBOARD_PORT:-8080}:8080"
     depends_on:
       - prometheus
     restart: unless-stopped

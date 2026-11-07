@@ -26,7 +26,10 @@ collector, and a `compose.yaml` wiring the demo stack. The pattern:
   copied in on start (existing ones stay) — the bundled ones are the
   defaults, the `/config` copies are the live ones (edit them there, they
   survive container recreation). The `ENV` vars point each tool at the
-  volume copies.
+  volume copies (and carry the demo stack's default upstream peers). See
+  [env or the config volume?](#env-or-the-config-volume) for the split:
+  the env twins (and the compose `.env`) cover the knobs, the volume holds
+  the file-shaped artifacts.
 - the build context = the subproject; the profiles, the entrypoint and the
   shared [`common/`](../common/README.md) package ride in as named build
   contexts (`additional_contexts` in the compose, `--build-context` for
@@ -62,6 +65,51 @@ ports, no outbound route), so the Modbus listeners, the exporter's
 Prometheus UI directly from the host as well, add
 `ports: ["127.0.0.1:9090:9090"]` to the service in a
 `docker-compose.override.yaml` — loopback-only, an explicit operator act.)
+
+### The .env overrides
+
+The compose file interpolates a `.env` from this directory —
+`cp .env.example .env` and edit (a different file: `docker compose
+--env-file other.env ...`). The example carries the deployment-shaped
+knobs: the poll chain's upstreams (`CACHE_UPSTREAM` — point the cache at a
+real inverter; `SCRAPER_UPSTREAM`), the cadence (`POLL_INTERVAL`,
+`CACHE_TTL`), the fake's device profile (`FAKE_PROFILE`), the exporter's
+token file (`SCRAPER_TOKEN_FILE`) and its metric prefix, the dashboard's
+published port (`DASHBOARD_PORT`) and `PROM_URL`, and one `LOG_LEVEL` for
+the two file-config pollers. The names are compose-side keys, mapped onto
+the services' bare-name env twins one service at a time — `UPSTREAM` alone
+would be ambiguous (it names a different peer per tool). Every default
+stays while the line is commented; the tools treat an empty env value as
+unset, so commenting a line out is always safe.
+
+The values land as plain env twins — flag > env > config script > default —
+so a `.env` setting beats the seeded `/config` conf file, and a
+`--upstream` CMD override beats it in turn. Anything beyond the curated
+set (the control-plane tokens, the write gates, the state dump): add the
+env mapping to a `docker-compose.override.yaml` (it layers over
+compose.yaml) instead of editing the compose file.
+
+### env or the config volume?
+
+Both, on purpose — they split by shape. The `.env` covers what an env twin
+can carry (every knob has one; the env beats the conf file in the
+resolution). The `/config` volume stays because the things it holds are
+files by nature, not knobs:
+
+- **the generated `metrics.token`** — one shared secret, produced once by
+  the entrypoint (0600, owner pvsuite), read by the exporter and the
+  stack's Prometheus; it must survive recreation unchanged and be the same
+  value in two containers — and a secret in `.env` would sit unencrypted
+  in the project directory, ripe for committing (the F12 discipline
+  prefers owner-only files; the knobs accept `file:` references for
+  exactly this)
+- **`selection.json` and `metrics.json`** — JSON specs, not knobs: the
+  `SELECTION`/`METRICS_SPEC` env twins only point at the files
+- **`config.js`** — the dashboard's served front-end file (`CONFIG_JS`
+  points at it)
+
+The three conf scripts stay seeded for the edit-a-file workflow; with a
+`.env` in play they are simply overridden and inert.
 
 **The scraper/token story ships in the stack** (the audit's F13 closed for
 the demo): the exporter never serves unauthenticated — the compose sets
@@ -138,8 +186,9 @@ every listener binds inside the network only:
    │   │      └──────────────┘        (127.0.0.1 only)            │      │
    │   └──────────────────────────────────────────────────────────┘      │
    │                                                                     │
-   │   shared "config" volume (/config): the ini files + metrics.token,  │
-   │   mounted by the Modbus services + the dashboard; prometheus ro     │
+   │   shared "config" volume (/config): the conf scripts, the JSON     │
+   │   specs, config.js + metrics.token — mounted by the Modbus         │
+   │   services + the dashboard; prometheus reads it read-only          │
    │                                                                     │
    │   docker compose exec <service> …  — the way in                     │
    └─────────────────────────────────────────────────────────────────────┘
@@ -202,10 +251,12 @@ and `/config/selection.json` (`CONFIG` /
 cd docker
 docker build -t modbus-cache --build-context profiles=../profiles \
     --build-context scripts=../docker --build-context common=../common ../cache
-docker run --rm -p 127.0.0.1:15502:15502 modbus-cache    # upstream defaults to the fake-inverter service name
+docker run --rm -p 127.0.0.1:15502:15502 modbus-cache    # upstream defaults to fake-inverter:5502 (the image's UPSTREAM env)
 docker run --rm -it modbus-cache bash          # poke around as pvsuite
 docker run --rm -p 127.0.0.1:15502:15502 modbus-cache \
     modbus-cache --upstream 192.168.1.100:5502          # any flags via the CMD override
+docker run --rm -p 127.0.0.1:15502:15502 \
+    -e UPSTREAM=192.168.1.100:5502 modbus-cache         # the peer via env (a --upstream flag beats it)
 ```
 
 Without `-v` the volume is anonymous (thrown away with `--rm`); name it to
@@ -222,10 +273,12 @@ configs are `/config/scraper.conf` and `/config/metrics.json`
 cd docker
 docker build -t modbus-scraper --build-context profiles=../profiles \
     --build-context scripts=../docker --build-context common=../common ../scraper
-docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper    # upstream defaults to the modbus-cache service name (port 15502)
+docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper    # upstream defaults to modbus-cache:15502 (the image's UPSTREAM env)
 docker run --rm -it modbus-scraper bash        # poke around as pvsuite
 docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper \
     modbus-scraper --upstream 192.168.1.100:502        # any flags via the CMD override
+docker run --rm -p 127.0.0.1:9350:9350 \
+    -e UPSTREAM=192.168.1.100:15502 modbus-scraper     # the peer via env (a --upstream flag beats it)
 ```
 
 Standalone runs stay token-less by default — the compose stack is what

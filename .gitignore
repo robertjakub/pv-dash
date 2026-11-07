@@ -2,3 +2,4 @@ audit.log
 result
 result*
 .DS_Store
+.env

@@ -1,14 +1,116 @@
-"""Configuration plumbing shared by the Modbus tools (stdlib only): the
-listen-address parser, the token-file loader and the device-profile
-resolution (the shared profiles/ schema from the profiles/ subproject).
-
-The per-tool ini loaders stay in the subprojects on purpose: they agree on
-the shape (configparser, missing file fine, one [section]) but not on the
-failure policy (the cache logs and continues, the scraper dies)."""
+"""Configuration plumbing shared by the family (stdlib only): the
+listen-address parser, the token-file loader, the device-profile
+resolution (the shared profiles/ schema from the profiles/ subproject),
+the set-grammar config-script loader, the resolver (the family's
+precedence: CLI flags > env > config script > defaults) and the
+control-token rules."""
 import ipaddress
 import os
 
 from common.modbus import AUTH_MIN_KEY
+
+
+def resolve_target(explicit, default_socket):
+    """The control server target for the daemon and its clients: the
+    --control-port flag wins, then the CTL environment, then the tool's
+    default unix socket."""
+    if explicit is not None and str(explicit).strip():
+        return str(explicit).strip()
+    env = os.environ.get('CTL')
+    if env and env.strip():
+        return env.strip()
+    return default_socket
+
+
+def load_config_script(path, options):
+    """The set-grammar config script: every line a `set <name> <value>` (or
+    the bare `<name> <value>` shorthand), `#` comments stay comments — a
+    config file pipes through a ctl client unchanged. Returns {key: raw-
+    string value} with the dash names underscore-normalized (the resolver's
+    keys). A missing file is no config at all; an unreadable one or a
+    legacy ini file fails fast with the pointer to the new grammar. The
+    tool's OPTIONS registry rows gate the grammar (the CLI spelling + the
+    unknown-setting fail fast)."""
+    from common.options import parse_config_script   # lazy: options sits above config in the layering
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding='utf-8') as fh:
+            text = fh.read()
+    except OSError as e:
+        raise SystemExit('cannot read config file %s: %s' % (path, e))
+    try:
+        rows = parse_config_script(text, path, options)
+    except ValueError as e:
+        raise SystemExit(str(e))
+    out = {}
+    for name, value in rows:
+        key = name.replace('-', '_')
+        if key in out:
+            raise SystemExit('%s: %s is set twice (the file applies top to bottom — say it once)'
+                             % (path, name))
+        out[key] = value
+    return out
+
+
+def str_to_bool(value):
+    """The conv for a boolean knob's resolve(): the words true/yes/on/1."""
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in ('true', 'yes', 'on', '1'):
+        return True
+    if text in ('false', 'no', 'off', '0'):
+        return False
+    raise ValueError('not a boolean')
+
+
+class Resolver:
+    """The family's precedence for one effective-config dict: CLI flags >
+    env > config script > defaults. An empty flag or env value counts as
+    unset (the value falls through to the next layer); a bad value logs and
+    falls back to the default (keep-last-good)."""
+
+    def __init__(self, cfg, logger):
+        self.cfg = cfg
+        self.logger = logger
+
+    def resolve(self, cli_value, env_name, cfg_key, default, conv):
+        raw = cli_value
+        if raw is None or raw == '':
+            raw = os.environ.get(env_name) if env_name else None
+        if raw is None or raw == '':
+            raw = self.cfg.get(cfg_key)
+        if raw is None or raw == '':
+            return default
+        try:
+            return conv(raw)
+        except (TypeError, ValueError) as e:
+            self.logger.error('invalid %s = %r: %s (using %r)', cfg_key, raw, e, default)
+            return default
+
+    def resolve_bool(self, cli_value, env_name, cfg_key, default):
+        return self.resolve(cli_value, env_name, cfg_key, default, str_to_bool)
+
+
+def check_token_chars(value, name):
+    """The token charset rule: no whitespace, no control characters (a
+    secret rides one wire frame and one header)."""
+    if value and any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in value):
+        raise SystemExit('invalid %s: must not contain whitespace or control characters' % name)
+
+
+def check_control_tokens(token, ops_token, sep=': '):
+    """The control-token pairing rules: the read-only ops token supplements
+    the admin token (never stands alone), and the two must differ (the same
+    secret would hand every holder the role the server picks first)."""
+    if ops_token:
+        if not token:
+            raise SystemExit('the read-only ops token supplements the admin token%s'
+                             'set --control-token too' % sep)
+        if ops_token == token:
+            raise SystemExit('the ops token must differ from the admin token (the same secret would '
+                             'hand every holder the role the server picks first)')
 
 
 def check_token_file_mode(path, label='token-file'):

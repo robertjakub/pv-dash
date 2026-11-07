@@ -30,7 +30,7 @@ import socket
 import sys
 
 from common.audit import AuditLog
-from common.config import load_token_file, parse_secret
+from common.config import parse_secret
 from common.wiresec import sign_request, verify_reply
 from lib.paths import resolve_control_target
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S
@@ -46,7 +46,6 @@ def main():
     p.add_argument('command', nargs='*', help='control command, e.g. set pv 2500, set scenario noon, show status, reset, shutdown')
     p.add_argument('--timeout', type=float, default=CLI_TIMEOUT_S, help='socket timeout in seconds (default %(default)s)')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN); a file:<path> value reads the first line of an owner-only 0600 file')
-    p.add_argument('--control-token-file', default=None, help='the token from a file (the first line; must be owner-only 0600); not for use with --control-token (env CONTROL_TOKEN_FILE)')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
     p.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB, help='rotate the audit log at this size, 0 = off')
     p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
@@ -71,12 +70,7 @@ def main():
         if not commands:
             p.error('no commands on stdin')
 
-    token_file = args.control_token_file or os.environ.get('CONTROL_TOKEN_FILE')
     token = args.control_token or os.environ.get('CONTROL_TOKEN')
-    if token and token_file:
-        p.error('--control-token and --control-token-file are mutually exclusive')
-    if token_file:
-        token = load_token_file(token_file)
     token = parse_secret(token, 'control-token')   # the inline form may be file:<path> — the same loader
     target = resolve_control_target(args.control_port)
     if target.isdigit():

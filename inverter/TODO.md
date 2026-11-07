@@ -5,6 +5,14 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The `-file` sibling removal: **`file:` is the one spelling** — the fake's
+`--control-token-file`/`--control-ops-token-file`/`--metrics-token-file`
+flags, their env twins and the ctl/cli's `--control-token-file` are GONE
+(still experimental — behaviour may change). Every token knob takes the
+inline string or a `file:<path>` reference (the same loader and 0600
+discipline the siblings enforced, F12), and the secret-error strings say
+"by flag/env, or as `file:<path>`".
+
 The bit-space + float wave: the fake **serves all four address spaces from
 the profile's per-entry `fc`** — `3` holding / `4` input registers for the
 word types, `1` coils / `2` discrete inputs for `bit` entries (the

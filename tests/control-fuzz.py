@@ -207,17 +207,17 @@ def main():
         except (OSError, ValueError) as e:
             check('fuzz: the right token authenticates', False, str(e))
 
-        # 6b. the token from a file: the fake reads it, the ctl authenticates with it
-        #     (the file must be owner-only 0600 — F12 in docs/AUDIT.md)
+        # 6b. the token as a file: reference: the fake reads it, the ctl authenticates
+        #     with it (the file must be owner-only 0600 — F12 in docs/AUDIT.md)
         open('/tmp/ctl_fuzz_token', 'w').write('filesecret\n')
         os.chmod('/tmp/ctl_fuzz_token', 0o600)
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15965',
-                                       '--control-port', '15964', '--control-token-file',
-                                       '/tmp/ctl_fuzz_token'],
+                                       '--control-port', '15964', '--control-token',
+                                       'file:/tmp/ctl_fuzz_token'],
                                       stdout=open('/tmp/ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
         time.sleep(0.9)
         st, tx = roundtrip(15964, b'{"cmd": "show version"}\n')
-        check('fuzz: token-file server rejects the unauthenticated', st == 'err' and 'authenticate' in tx,
+        check('fuzz: token reference server rejects the unauthenticated', st == 'err' and 'authenticate' in tx,
               '%s %s' % (st, tx))
         try:
             c = connect(15964)
@@ -226,74 +226,45 @@ def main():
             while not buf.endswith(b'\n'):
                 buf += c.recv(4096)
             auth = _json.loads(buf.decode())
-            check('fuzz: the file token authenticates', auth.get('status') == 'ok', str(auth))
+            check('fuzz: the file: token authenticates', auth.get('status') == 'ok', str(auth))
             c.close()
         except (OSError, ValueError) as e:
-            check('fuzz: the file token authenticates', False, str(e))
+            check('fuzz: the file: token authenticates', False, str(e))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
-                            '--control-port', '15964', '--control-token-file', '/tmp/ctl_fuzz_token',
+                            '--control-port', '15964', '--control-token', 'file:/tmp/ctl_fuzz_token',
                             'show', 'version'], capture_output=True, text=True, timeout=15)
-        check('fuzz: fake_ctl authenticates with the file token', r.returncode == 0
+        check('fuzz: fake_ctl authenticates with the file: token', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
-                            '--port', '15962', '--dry-run', '--control-token', 'a',
-                            '--control-token-file', '/tmp/ctl_fuzz_token'],
-                           capture_output=True, text=True, timeout=15)
-        check('fuzz: both token sources is a clean error', r.returncode != 0
-              and 'mutually exclusive' in (r.stderr + r.stdout)
-              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
-                            '--control-port', '15963', '--control-token-file', '/tmp/ctl_fuzz_no_file',
+                            '--control-port', '15963', '--control-token', 'file:/tmp/ctl_fuzz_no_file',
                             'status'], capture_output=True, text=True, timeout=15)
-        check('fuzz: a missing token file fails fast, one line', r.returncode != 0
-              and 'cannot read control-token-file' in (r.stderr + r.stdout)
+        check('fuzz: a missing token reference fails fast, one line', r.returncode != 0
+              and 'cannot read control-token' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
         open('/tmp/ctl_fuzz_token_lax', 'w').write('laxsecret\n')          # the umask default (0644)
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--port', '15962', '--dry-run',
-                            '--control-token-file', '/tmp/ctl_fuzz_token_lax'],
+                            '--control-token', 'file:/tmp/ctl_fuzz_token_lax'],
                            capture_output=True, text=True, timeout=15)
         check('fuzz: a group/world-readable token file refuses to start (F12)',
               r.returncode != 0 and '0600' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
 
-        # 6c. the token-file env vars the help promises: honored like the flags
+        # 6c. the file: reference rides the token env like the flag
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
                             '--control-port', '15964', 'show', 'version'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
-        check('fuzz: fake_ctl honors CONTROL_TOKEN_FILE', r.returncode == 0
+                           env={**os.environ, 'CONTROL_TOKEN': 'file:/tmp/ctl_fuzz_token'})
+        check('fuzz: fake_ctl honors CONTROL_TOKEN=file:...', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
-                            '--control-port', '15964', 'status'],
-                           capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'CONTROL_TOKEN': 'x',
-                                'CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
-        check('fuzz: the token env + the token-file env is a clean error', r.returncode != 0
-              and 'mutually exclusive' in (r.stderr + r.stdout)
-              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
-                            '--port', '15962', '--dry-run', '--control-token', 'a'],
-                           capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'CONTROL_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
-        check('fuzz: flag token + the control token-file env is a clean error', r.returncode != 0
-              and 'mutually exclusive' in (r.stderr + r.stdout)
-              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--port', '15962', '--dry-run', '--metrics-server',
                             '--metrics-listen', '127.0.0.1:15967'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
-        check('fuzz: the fake honors METRICS_TOKEN_FILE', r.returncode == 0
+                           env={**os.environ, 'METRICS_TOKEN': 'file:/tmp/ctl_fuzz_token'})
+        check('fuzz: the fake honors METRICS_TOKEN=file:...', r.returncode == 0
               and 'bearer token' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
-                            '--port', '15962', '--dry-run', '--metrics-token', 'a'],
-                           capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'METRICS_TOKEN_FILE': '/tmp/ctl_fuzz_token'})
-        check('fuzz: flag metrics token + the metrics token-file env is a clean error', r.returncode != 0
-              and 'mutually exclusive' in (r.stderr + r.stdout)
-              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
 
         # 6d. the read-only ops token: the show/clear verbs only, both audited
         OPS_AUDIT = '/tmp/ctl_fuzz_ops_audit.log'

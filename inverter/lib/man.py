@@ -113,7 +113,7 @@ the default control target for the clients.
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the clients' TCP token and idle-ping interval.
 .TP
-.B CONTROL_OPS_TOKEN ", " CONTROL_OPS_TOKEN_FILE
+.B CONTROL_OPS_TOKEN
 the daemon's read-only ops token (the flagless start; the OPTIONS above)."""
     files = """.SH FILES
 .TP

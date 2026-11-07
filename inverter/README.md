@@ -218,7 +218,7 @@ sha256 HMAC of its payload, keyed by the token (`"mac": …`,
 or altered in flight, and over TCP the signed commands are mandatory (on
 the unix socket the mac is verify-if-present, so the trusted peers keep
 speaking without the secret). A **second, read-only token**
-(`--control-ops-token`/`--control-ops-token-file`) authenticates into the
+(`--control-ops-token`) authenticates into the
 **`show` verbs only** — no `set`/`unset`, no `reset`, no `shutdown`: the
 ops shift against the admin key (the fake has no `clear` verb — watching is
 what the ops shift does here). Denied commands answer `err forbidden: the
@@ -227,17 +227,18 @@ the INV trail's COMMAND entries name the session's role
 (`role=ops`/`role=admin`, the denials included), and each session's frames
 are mac'd with the key it authenticated with. The clients
 take `--control-token`
-/ **`CONTROL_TOKEN`** — or the hardened way, **`--control-token-file`**
+/ **`CONTROL_TOKEN`** — the value may be a **`file:<path>` reference**
 (the first line of a key file or a systemd
-`LoadCredential`) — and authenticate automatically (the ops staff pass the
+`LoadCredential`, owner-only `0600`) — and authenticate automatically (the ops staff pass the
 read-only ops token the same way):
 
-> **A token flag lands in `ps`.** Tokens passed as `--control-token` /
+> **A token flag lands in `ps`.** Tokens passed as `--control-token <secret>` /
 > `--metrics-token <secret>` are visible on the process command line — every
 > local user can read them in `ps` output or `/proc/*/cmdline` (the audit's
-> F9; the clients included). Prefer the **`-file`**
-> variants — the file must be **owner-only (`0600`)**: group/world-accessible
-> token files refuse to start (F12) — or the `CONTROL_TOKEN` env var.
+> F9; the clients included). Prefer the **`file:<path>` reference form** —
+> the file must be **owner-only (`0600`)**: group/world-accessible
+> token files refuse to start (F12) — or the `CONTROL_TOKEN` env var
+> carrying the same `file:` reference.
 > The flag form is for quick tests (the fake is a test tool — F11).
 
 | Command | Effect |
@@ -291,9 +292,9 @@ read-only ops token the same way):
 | `connect-acl` | `any` \| `none` \| IP/CIDR list | the Modbus connect ACL (`--connect-acl` startup value, tunable live): who may connect to the Modbus surface at all |
 | `modbus auth` / `modbus auth key` | `suite` \| `none` / key | the auth scheme the fake's Modbus clients must speak (`--auth` startup value, tunable live): `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect and drops the client on `ERR`/anything else; `none`/empty = no auth at all — the key is a secret: **`show` refuses it**, `unset` refuses it |
 | `metrics-server` | `on`/`off` | the fake's own `/metrics` endpoint (default off; the address is `--metrics-listen`, tunable live); a token-less listen beyond loopback logs a warning |
-| `control token` / `control token-file` | `<token>` \| `off` | rotate the **admin control token** live (the sessions re-auth); `off` drops the token entirely (the trusted-LAN posture, F11). A secret: **`show` refuses it**, `unset` refuses it — pass it by flag/env/token-file |
-| `control ops token` / `control ops token-file` | `<token>` \| `off` | rotate the **read-only ops token** live (must differ from the admin token); `off` signs the ops shift out |
-| `metrics token` / `metrics token-file` | `<token>` \| `off` | rotate the **/metrics bearer token** live; `off` serves tokenless (F11) |
+| `control token` | `<token>` \| `off` | rotate the **admin control token** live (the sessions re-auth); `off` drops the token entirely (the trusted-LAN posture, F11). A secret: **`show` refuses it**, `unset` refuses it — pass it by flag/env, or as `file:<path>` |
+| `control ops token` | `<token>` \| `off` | rotate the **read-only ops token** live (must differ from the admin token); `off` signs the ops shift out |
+| `metrics token` | `<token>` \| `off` | rotate the **/metrics bearer token** live; `off` serves tokenless (F11) |
 | `dump path` / `dump restore-on-start` | `<file>` / `on`\|`off` | the state dump's file (the pins, the machines — the tokens apart) and the restore-on-start mark (prospective: the running session's start already chose) |
 | `register` | `addr value` | `set register <addr> <value>` — write a raw register into the **write overlay** (the same store the FC06/FC16 writes use, so the scrapers read it); `reset` clears it, `show registers` marks the rows with `*` |
 | `coil` | `addr 0\|1` | `set coil <addr> <0|1>` — pin a coil in the coil space (what FC1 reads and FC5/FC15 write); `reset` clears the pins |
@@ -404,8 +405,7 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 | `--grid-frequency` | `50` | nominal grid frequency (Hz); the machine wanders ±0.2 Hz around it |
 | `--metrics-server` | off | serve the fake's own Prometheus `/metrics` endpoint — **live-settable** (`set metrics-server on/off`; the token-less-beyond-loopback warning holds on both paths) |
 | `--metrics-listen` | `127.0.0.1:9452` | the metrics bind address `HOST:PORT` (`0.0.0.0:PORT` serves every interface — mind the values) |
-| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`) |
-| `--metrics-token-file` | off | the metrics bearer token from a file (the first line; owner-only `0600`, F12) — instead of `--metrics-token`, giving both is an error |
+| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); the value may be `file:<path>` — the first line of an owner-only `0600` file, F12 |
 | `--metrics-max-clients` | `64` | cap concurrent HTTP clients on the metrics endpoint; extras get an immediate `503 # rate limited` (`0` = unlimited) |
 | `--metrics-client-timeout` | `5` | seconds an idle metrics client is kept before the socket times out (`0` = the same built-in 5 s cap) |
 | `--metrics-max-conn-per-ip` | `0` | cap concurrent metrics connections from one peer IP (`0` = no per-IP limit) |
@@ -429,10 +429,8 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 | `--profile` | `sun2000` | register-map profile: the built-in name or a JSON path (name → register + optional type/scale); `PROFILE` when unset |
 | `--strict` | off | reject undefined registers with exception 02 |
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
-| `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `CONTROL_TOKEN`) |
-| `--control-token-file` | off | the control token from a file (the first line; a key file or a systemd `LoadCredential`, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12), instead of `--control-token`; giving both is an error |
-| `--control-ops-token` | off | a second, **read-only** control token: its sessions run the `show` verbs only (no `set`/`unset`, no `reset`, no `shutdown`) — needs `--control-token`/`--control-token-file`, must differ from it; both roles audited (`CONTROL_OPS_TOKEN`) |
-| `--control-ops-token-file` | off | the read-only ops token from a file (the first line; **owner-only `0600`**, F12), instead of `--control-ops-token`; giving both is an error |
+| `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `CONTROL_TOKEN`; the value may be `file:<path>` — the first line of an owner-only `0600` file, F12) |
+| `--control-ops-token` | off | a second, **read-only** control token: its sessions run the `show` verbs only (no `set`/`unset`, no `reset`, no `shutdown`) — needs `--control-token`, must differ from it; both roles audited (`CONTROL_OPS_TOKEN`) |
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (`CONTROL_OPS_VERBS`) |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `CONTROL_TRUST_UIDS`) |
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user |
@@ -533,8 +531,9 @@ Honest scope of a demo device:
 - **The control surface is plain-text by design** — a demo harness: the TCP
   control server binds `127.0.0.1` only, and `--control-token` adds a
   token-auth handshake (the clients authenticate with
-  `CONTROL_TOKEN`, or `--control-token-file` / `CONTROL_TOKEN_FILE`
-  — the first line of a key file or a `LoadCredential`); over the unix
+  `CONTROL_TOKEN` / `--control-token`, the value a bare token or a
+  `file:<path>` reference — the first line of a key file or a
+  `LoadCredential`, owner-only `0600`); over the unix
   socket a kernel-vouched peer (root, the daemon's own user or
   `--control-trust-uids` — `SO_PEERCRED`) skips the token. The container
   runs as the unprivileged `pvsuite` user. Do not expose the control port

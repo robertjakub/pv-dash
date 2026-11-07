@@ -23,7 +23,7 @@ import threading
 import time
 
 from common.audit import AuditLog
-from common.config import acl_summary, acl_text, load_token_file, parse_acl, parse_auth_type, parse_secret
+from common.config import acl_summary, acl_text, parse_acl, parse_auth_type, parse_secret
 from common.cred import peer_uid
 from common.human import secs
 from common import dump as state
@@ -573,16 +573,6 @@ class ControlServer:
                                  'every holder the role the server picks first)')
             self.token = val
             return '<set>'
-        if key == 'control/token-file':
-            try:
-                tok = load_token_file(val, 'control-token-file')
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if self.ops_token and hmac.compare_digest(tok, self.ops_token):
-                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
-                                 'every holder the role the server picks first)')
-            self.token = tok
-            return '<set>'
         if key == 'control/ops/token':
             if val in ('off', 'none', ''):
                 self.ops_token = None   # the ops shift signs off; the admin role is untouched
@@ -595,16 +585,6 @@ class ControlServer:
                 raise ValueError('the ops token must differ from the admin token (the same secret would hand '
                                  'every holder the role the server picks first)')
             self.ops_token = val
-            return '<set>'
-        if key == 'control/ops/token-file':
-            try:
-                tok = load_token_file(val, 'control-ops-token-file')
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if self.token and hmac.compare_digest(tok, self.token):
-                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
-                                 'every holder the role the server picks first)')
-            self.ops_token = tok
             return '<set>'
         if key == 'metrics/token':
             if not fake:
@@ -624,19 +604,6 @@ class ControlServer:
             if fake.metrics_srv:
                 fake.metrics_srv.token = val
             fake.metrics_desc = describe_metrics(fake.metrics_listen, val,
-                                                 fake.metrics_caps[0], fake.metrics_caps[2])
-            return '<set>'
-        if key == 'metrics/token-file':
-            if not fake:
-                raise ValueError('no modbus device attached')
-            try:
-                tok = load_token_file(val, 'metrics-token-file')
-            except SystemExit as e:
-                raise ValueError(str(e))
-            fake.metrics_token = tok
-            if fake.metrics_srv:
-                fake.metrics_srv.token = tok
-            fake.metrics_desc = describe_metrics(fake.metrics_listen, tok,
                                                  fake.metrics_caps[0], fake.metrics_caps[2])
             return '<set>'
         if key == 'dump/path':
@@ -720,11 +687,11 @@ class ControlServer:
             return '%s (%s)' % (sim.profile.description, profile_label(sim.profile.path))
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel())
-        if key in ('control/token', 'control/token-file'):
+        if key == 'control/token':
             return '<set>' if self.token else 'off'   # the secret never renders
-        if key in ('control/ops/token', 'control/ops/token-file'):
+        if key == 'control/ops/token':
             return '<set>' if self.ops_token else 'off'   # the secret never renders
-        if key in ('metrics/token', 'metrics/token-file'):
+        if key == 'metrics/token':
             return '<set>' if (fake and fake.metrics_token) else 'off'   # the secret never renders
         if key == 'dump/path':
             return self.dump_path or 'off'
@@ -850,7 +817,7 @@ class ControlServer:
             if key is not None and not rest:
                 opt = OPTION_BY_LIVE.get(key)
                 if opt is not None and opt.secret:
-                    return 'err %s is a secret — it never shows (pass it by flag/env/token-file)' % key
+                    return 'err %s is a secret — it never shows (pass it by flag/env, or as file:<path>)' % key
                 word = SHOW_BY_LIVE.get(key)
                 if word:
                     return self.command('show ' + word)   # a show command's report, by its word
@@ -900,7 +867,7 @@ class ControlServer:
                 return 'err restart required (startup-only knob)'
             value = ' '.join(rest)
             if value == SECRET_REMOVED and getattr(SETTING_BY_NAME.get(key), 'secret', False):
-                return 'err *** SECRET REMOVED *** is not a value — pass the secret by flag/env/token-file'
+                return 'err *** SECRET REMOVED *** is not a value — pass the secret by flag/env, or as file:<path>'
             try:
                 shown = self._apply(key, value)
             except ValueError as e:
@@ -1078,7 +1045,7 @@ class ControlServer:
                 failed.append(name)
                 continue
             if str(value) == SECRET_REMOVED:
-                failed.append('%s (secret, not restored — re-pass by flag/env/token-file)' % name)
+                failed.append('%s (secret, not restored — re-pass by flag/env, or as file:<path>)' % name)
                 continue
             try:
                 self._apply(name, str(value))
@@ -1147,8 +1114,8 @@ class ControlServer:
         daemon. The fresh process re-resolves the flags and the env — the
         fake has no config file (F11) — and start() re-applies the saved
         overrides once. The secrets never save (the dump rule): an
-        overridden secret is named in the reply, to re-pass by flag/env/
-        token-file."""
+        overridden secret is named in the reply, to re-pass by flag/env,
+        or as file:<path>."""
         try:
             settings, lost = self._save_reload_state()
         except OSError as e:
@@ -1160,7 +1127,7 @@ class ControlServer:
         msg = 'ok reload: %s, the daemon restarts now' % (
             '%d override(s) saved' % len(settings) if settings else 'no overrides to save')
         if lost:
-            msg += ' (%s: secret, not saved — re-pass by flag/env/token-file)' % ', '.join(lost)
+            msg += ' (%s: secret, not saved — re-pass by flag/env, or as file:<path>)' % ', '.join(lost)
         return msg
 
     def _exec_reload(self):

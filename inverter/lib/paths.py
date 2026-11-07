@@ -8,10 +8,10 @@ source tree.
 
 Both programs resolve the control target the same way: --control-port flag
 > CTL environment variable > default socket for the Modbus port.
-The control token comes from --control-token / CONTROL_TOKEN, or —
-the hardened way — from --control-token-file / CONTROL_TOKEN_FILE:
-a key file or a systemd LoadCredential, first line = the token (the
-loader itself is the shared common.config.load_token_file)."""
+The control token comes from --control-token / CONTROL_TOKEN — the value
+may be a file:<path> reference (the first line of an owner-only 0600
+file — a key file or a systemd LoadCredential; the loader is the shared
+common.config.load_token_file)."""
 import os
 
 from .statics import DEFAULT_MODBUS_PORT

@@ -38,7 +38,7 @@ import os
 import threading
 
 from common.audit import AuditLog
-from common.config import acl_text, check_auth_key, load_token_file, parse_acl, parse_auth_type, parse_listen, parse_secret
+from common.config import acl_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, parse_secret
 from common.cred import parse_trust_uids
 from common.options import build_parser
 from common.version import version_string
@@ -98,9 +98,8 @@ def validate(args):
 
 def configured_defaults(args, frozen, profile_text):
     """Every setting's configured startup value — what `unset <setting>`
-    restores. The secret rows (control/token, control/token-file,
-    control/ops/token, control/ops/token-file, metrics/token,
-    metrics-token-file, auth-key) carry NO entry: `unset` refuses them (the
+    restores. The secret rows (control/token, control/ops/token,
+    metrics/token, auth-key) carry NO entry: `unset` refuses them (the
     metrics/token treatment) — a secret never renders, never re-applies."""
     connect_acl = parse_acl(args.connect_acl or os.environ.get('CONNECT_ACL'), 'connect-acl')
     modbus_auth = parse_auth_type(args.auth or os.environ.get('AUTH'), 'auth')
@@ -222,24 +221,12 @@ def main():
     chaos = Chaos(args.chaos, seed=args.seed)
     target = resolve_control_target(args.control_port, args.port)
     dump_key = parse_secret((args.dump_key or os.environ.get('DUMP_KEY') or '').strip() or None, 'dump/key')
-    control_token_file = args.control_token_file or os.environ.get('CONTROL_TOKEN_FILE')
-    if args.control_token and control_token_file:
-        logger.error('--control-token and --control-token-file are mutually exclusive')
-        raise SystemExit(1)
-    control_token = parse_secret(args.control_token, 'control/token')
-    if control_token_file:
-        control_token = load_token_file(control_token_file)
-    control_ops_token_file = args.control_ops_token_file or os.environ.get('CONTROL_OPS_TOKEN_FILE')
-    if args.control_ops_token and control_ops_token_file:
-        logger.error('--control-ops-token and --control-ops-token-file are mutually exclusive')
-        raise SystemExit(1)
+    control_token = parse_secret(args.control_token or os.environ.get('CONTROL_TOKEN'), 'control/token')
     control_ops_token = parse_secret(args.control_ops_token or os.environ.get('CONTROL_OPS_TOKEN'),
                                      'control-ops-token')
-    if control_ops_token_file:
-        control_ops_token = load_token_file(control_ops_token_file, 'control-ops-token-file')
     if control_ops_token and not control_token:
-        logger.error('the read-only ops token supplements the admin token: set --control-token or '
-                     '--control-token-file too (an ops token alone would leave the control plane unusable)')
+        logger.error('the read-only ops token supplements the admin token: set --control-token too '
+                     '(an ops token alone would leave the control plane unusable)')
         raise SystemExit(1)
     if control_ops_token and control_ops_token == control_token:
         logger.error('the ops token must differ from the admin token (the same secret would hand '
@@ -254,19 +241,13 @@ def main():
         raise SystemExit(1)
     trust_uids = parse_trust_uids(args.control_trust_uids or os.environ.get('CONTROL_TRUST_UIDS'),
                                   'control-trust-uids')
-    metrics_token_file = args.metrics_token_file or os.environ.get('METRICS_TOKEN_FILE')
-    if args.metrics_token and metrics_token_file:
-        logger.error('--metrics-token and --metrics-token-file are mutually exclusive')
-        raise SystemExit(1)
-    metrics_token = parse_secret(args.metrics_token, 'metrics/token')
-    if metrics_token_file:
-        metrics_token = load_token_file(metrics_token_file, 'metrics-token-file')
+    metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics/token')
     metrics_listen = parse_listen(args.metrics_listen)
     if args.metrics_server and metrics_token is None:
         from common.config import is_loopback_host
         if not is_loopback_host(metrics_listen[0]):
             logger.warning('serving /metrics on %s without a token: the values are production-shaped '
-                           'even though this is a test tool — set --metrics-token', args.metrics_listen)
+                           'even though this is a test tool — set --metrics-token (or file:<path>)', args.metrics_listen)
     if args.dump_path and not dump_key:
         logger.warning('the state dump %s is not sealed (the integrity hash only — plaintext at rest): '
                        'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '
@@ -308,11 +289,8 @@ def main():
                                 ops_token=control_ops_token, ops_verbs=ops_verbs,
                                 startup_values=startup_values(args, {
                                     'control-token': bool(control_token),
-                                    'control-token-file': bool(control_token_file),
                                     'control-ops-token': bool(control_ops_token),
-                                    'control-ops-token-file': bool(control_ops_token_file),
                                     'metrics-token': bool(metrics_token),
-                                    'metrics-token-file': bool(metrics_token_file),
                                     'auth-key': bool(modbus_auth_key),
                                     'dump-key': bool(dump_key)}),
                                 dump_path=args.dump_path, restore_on_start=args.restore_on_start,

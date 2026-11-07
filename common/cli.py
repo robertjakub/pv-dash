@@ -109,16 +109,18 @@ def help_text(commands_help, command_groups, command_hidden, pins, command_inter
     """The `?` listing — the same shape as the setting help: bare words on
     top, then the filed groups, soft-alphabetical within; the pins ride
     last (they are syntax, not words). The internal rows (the machinery's
-    own words) never list."""
-    rows = [(n, d) for n, d in commands_help.items()
-            if n not in command_hidden and n not in command_internal]
-    width = max([len(n) for n, _ in rows] + [len(n) for n, _ in pins]) + 1
+    own words) never list. The '/'-path rows spell as words — the wire's
+    spelling, the options' dictionary rule."""
+    disp = {n.replace('/', ' '): d for n, d in commands_help.items()
+            if n not in command_hidden and n not in command_internal}
+    groups = {n.replace('/', ' '): g for n, g in command_groups.items()}
+    width = max([len(n) for n in disp] + [len(n) for n, _ in pins]) + 1
     out = ['commands (TAB completes, ? lists the options + descriptions in any position):']
-    for g, ws in word_groups([n for n, _ in rows], command_groups):
+    for g, ws in word_groups(list(disp), groups):
         if g:
             out.append('[%s]' % g)
         for n in sorted(ws, key=str.lower):
-            out.append('    %-*s %s' % (width, n, commands_help[n]))
+            out.append('    %-*s %s' % (width, n, disp[n]))
     for n, d in pins:
         out.append('    %-*s %s' % (width, n, d))
     return '\n'.join(out)
@@ -260,7 +262,10 @@ def candidates(buf):
     values_mode = False
     base = ''
     if not done:
-        pool, hint, desc = _SPEC['command_pool'](), None, _SPEC['describe']
+        # the first position walks the command paths segment-wise — the
+        # settings' rule: `request` offers itself, then its children; a
+        # slash never renders or inserts
+        pool, hint, desc = command_path_pool(done, _SPEC['command_pool']()), None, _SPEC['describe']
     elif head in ('set', 'unset'):
         names = tuple(n for n in _SPEC['setting_pool']() if n not in _SPEC['show_lives'])
         by = {n: _SPEC['settings'][n] for n in names if n in _SPEC['settings']}   # the exact match obeys the pool:

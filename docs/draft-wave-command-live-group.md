@@ -14,7 +14,11 @@ it internal everywhere (the audit's one gap — the session verbs
 help/?/ping/quit were already wiresec's RBAC-exempt SESSION_VERBS, the
 rows make the registry say so), and the fake's register/coil/discrete
 cli pin died with its spec plumbing (the rowing question filed in
-docs/TODO.md's control-plane section).
+docs/TODO.md's control-plane section). FOLLOW-UP, same day: the cli
+faces spell the '/'-paths as words — the ? listing renders `request
+clear cache` (the options' dictionary rule) and the first TAB position
+walks the command paths segment-wise (a slash never renders or
+inserts).
 
 ---
 

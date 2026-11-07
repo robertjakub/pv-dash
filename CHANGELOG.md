@@ -33,7 +33,12 @@ before the repo restructured into one suite.
   were listed before; `help` was never rowed anywhere). The session
   verbs — `help`, `?`, `ping`, `quit` — stay the RBAC-exempt
   housekeeping every role speaks (wiresec's SESSION_VERBS, the policy
-  never gates them); the registry rows say so now too. Every
+  never gates them); the registry rows say so now too. The cli faces
+  spell the paths as words — the `?` listing renders `request clear
+  cache` (the options' dictionary rule, not the slash path), and the
+  first TAB position walks the command paths segment-wise (`request`
+  offers its children; a slash never renders or inserts — the whole-path
+  pool's common-prefix insert used to write `request/`). Every
   row spells its `live` today —
   the wire, the pools and the listings are otherwise unchanged; a row
   whose `live` differs from its `name`'s words is a

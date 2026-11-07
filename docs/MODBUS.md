@@ -3,8 +3,10 @@
 This is the reference for the Modbus implementation across the family: the
 **scraper** (client), the **cache** (server toward its own clients *and*
 client toward the inverter) and the **fake inverter** (server). The wire
-core lives in `common/protocol.py` — one module, stdlib only — and the
-per-tool layers stack on it (`scraper/lib/protocol.py`,
+core and the shared primitives live in the **`common/modbus`** package —
+one implementation, stdlib only (`protocol.py` the wire core,
+`client.py` the connect/reply ladders, `writes.py` the write shapes) —
+and the per-tool layers stack on it (`scraper/lib/protocol.py`,
 `cache/lib/upstream.py`, `cache/lib/proxy.py`, `inverter/lib/inverter.py`).
 The dashboard never speaks Modbus.
 
@@ -21,7 +23,7 @@ Clients use `socket.create_connection`; servers `bind`/`listen`. Every
 multi-byte field is **big-endian** (`struct` format `>`).
 
 Each frame is the standard **MBAP header (7 bytes) + PDU**, read with
-`recv_exact` (`common/protocol.py`), which loops until it has exactly
+`recv_exact` (`common/modbus/protocol.py`), which loops until it has exactly
 `n` bytes and raises `ConnectionError` on a closed peer:
 
 | Offset | Size | Field | Notes |
@@ -47,7 +49,7 @@ default upstream for scraper and cache is `127.0.0.1:5502`. (The scraper's
 
 ## 2. The suite auth handshake (PVA1)
 
-Implemented once in `common/protocol.py` (`auth_handshake_client` /
+Implemented once in `common/modbus/protocol.py` (`auth_handshake_client` /
 `auth_handshake_server`), shared by every tool. One round trip, client
 speaks first: after the TCP connect and **before any Modbus frame**, the
 client proves the shared key.
@@ -118,7 +120,7 @@ from an owner-only `0600` file.
 
 ### The Waveshare connection password (`waveshare` — cache upstream only)
 
-Implemented once in `common/protocol.py` (`waveshare_handshake_client`,
+Implemented once in `common/modbus/protocol.py` (`waveshare_handshake_client`,
 beside the suite pair). A Waveshare RS485-to-TCP gateway guards its serial
 side with an optional connection password, and the cache's upstream leg
 speaks it (`--auth-upstream waveshare`): after the TCP connect and before
@@ -149,7 +151,7 @@ pv-suite tool ever demands a Waveshare password from its own clients.
 
 ## 3. Function codes
 
-The one table is `FC_NAMES` (`common/protocol.py`); `describe_fc`
+The one table is `FC_NAMES` (`common/modbus/protocol.py`); `describe_fc`
 renders `FC6 (write single register)` or bare `FC<n>` for unlisted codes.
 
 | FC | Name | Cache | Scraper | Fake |
@@ -181,8 +183,30 @@ renders `FC6 (write single register)` or bare `FC<n>` for unlisted codes.
 The cache's sets: `READ_FUNCS = (1, 2, 3, 4)` — the four address spaces,
 each cached separately — and `WRITE_FUNCS = {5, 6, 15, 16, 22, 23}`
 (`cache/lib/static.json`). Unknown codes forward untouched. The
-scraper is **read-only** — it never issues writes; only the cache
-originates them (when enabled), and the fake implements FC5/6/15/16.
+scraper is **read-only** — it never issues writes (no write API — the
+shared client exposes reads only); only the cache originates them (when
+enabled), and the fake implements FC5/6/15/16 behind its write gate.
+
+### The support classes — every standard FC, and what "support" means
+
+Every standard function code is transported; none falls through
+silently. Each code lands in exactly one class:
+
+| Class | Codes | Meaning |
+|---|---|---|
+| **native reads** | 1, 2, 3, 4 | all three tools speak them natively — the fake serves all four address spaces, the cache caches all four, the scraper reads all four |
+| **native writes** | 5, 6, 15, 16 | the fake implements them (write overlays, behind its gate); the cache gated-forwards them |
+| **gated forward, native refusal** | 22, 23 | the cache gates and forwards them; the fake answers exception 01 (unimplemented there — nothing to gate) |
+| **forward / named refusal** | 7, 8, 11–14, 17–21, 24, 43 | the cache forwards untouched (named in the log: `forwarded FC17 (report slave id), N byte(s)`); the fake names them (`describe_fc`) and refuses with exception 01 |
+| **vendor / reserved** | 9, 10, 25–42, 44+ | the cache forwards bare (`FC<n>` — `FC_NAMES` has no standard name); the fake refuses with 01 |
+
+Not implemented anywhere **by design**: the FC8 diagnostics
+sub-functions, native FC43/MEI device identification, and the serial
+RTU/ASCII transports — the family speaks Modbus TCP and forwards what it
+does not itself serve. A tool "supports" a code when it terminates the
+exchange itself; everything else rides the forward/refusal classes
+above, so a client against the cache always gets an answer (a reply or
+a named exception), never a dropped frame.
 
 ---
 
@@ -245,7 +269,7 @@ discrete-input space (profile `bit`/`fc: 2` entries + `set discrete`).
 
 ## 5. Writes (FC5/6/15/16/22/23)
 
-PDU shapes as validated by the cache (`cache/lib/protocol.py` `describe_write`):
+PDU shapes as validated by the shared parser (`common/modbus/writes.py` `describe_write`):
 
 | FC | Request PDU | Response PDU |
 |---|---|---|
@@ -258,8 +282,11 @@ PDU shapes as validated by the cache (`cache/lib/protocol.py` `describe_write`):
 
 The fake inverter implements **FC5, FC6, FC15 and FC16** (into write
 overlays on top of the simulated maps: FC6/16 the holding registers,
-FC5/15 the coil space); every other write gets exception 01. A malformed
-write shape (wrong length, inconsistent byte count) gets exception 03 —
+FC5/15 the coil space) — behind its write gate: `write/allow` off (the
+default) refuses every write with exception 01 and audits
+`WRITE-REFUSED`, `--allow-write` opens it (audited `WRITE`); the cache's
+gate, mirrored. Every other write gets exception 01. A malformed write
+shape (wrong length, inconsistent byte count) gets exception 03 —
 FC5's coil value must be `0x0000` or `0xFF00` (the spec's rule; anything
 else is exception 03), and FC15's byte count must equal
 `(count + 7) // 8`.
@@ -279,7 +306,7 @@ drop the coil space (FC1).
 
 ## 6. Exceptions
 
-The builder is `exception_frame` (`common/protocol.py`): a PDU of
+The builder is `exception_frame` (`common/modbus/protocol.py`): a PDU of
 `[func | 0x80, code]`, `length = 3`. Codes the suite generates
 (`cache/lib/static.json`):
 
@@ -304,16 +331,18 @@ or hostile reply becoming 11. A bad MBAP `length` closes the connection
 without a reply.
 
 **Fake inverter decision table** (`inverter/lib/inverter.py`): bad
-`length` → log and close; FC3/4 count outside `1..125` or address
+`length` → log and close; writes disabled (`write/allow` off — the
+default) with a well-addressed write frame → 01, audited
+`WRITE-REFUSED`; FC3/4 count outside `1..125` or address
 overflow → 03; FC1/2 count outside `1..2000` → 03; strict mode with any
 undefined register/bit → 02 (otherwise missing addresses read 0);
 FC5 with a value outside `0x0000`/`0xFF00` → 03; FC5/6/15/16 with a
-consistent shape → overlay write + echo; an implemented FC with a
-malformed shape — **including a frame too short to carry its address** —
-→ 03; any other FC → 01. The fake does **not** validate the unit
-id — it serves any requested unit and echoes it back. The cache's cached
-and diag replies echo the client's unit too; the configured `modbus/unit`
-governs only its own poll reads.
+consistent shape → overlay write + echo (audited `WRITE`); an
+implemented FC with a malformed shape — **including a frame too short
+to carry its address** — → 03; any other FC → 01. The fake does **not**
+validate the unit id — it serves any requested unit and echoes it back.
+The cache's cached and diag replies echo the client's unit too; the
+configured `modbus/unit` governs only its own poll reads.
 
 Shared client error texts: `transaction id mismatch`,
 `unexpected protocol id %d`, `reply from unit id %d, expected %d`,
@@ -413,7 +442,7 @@ path as words normalize to the canonical key.
 | `unit` / `modbus-unit` | `--unit` / `--modbus-unit` | `UNIT` / `MODBUS_UNIT` | `modbus/unit` | cache, scraper, fake (flag only) |
 | `timeout` | `--timeout` | `TIMEOUT` | `modbus/timeout` | cache, scraper |
 | `offset` | `--modbus-offset` | `MODBUS_OFFSET` | `modbus/offset` | scraper |
-| `allow-write` | `--allow-write` | `ALLOW_WRITE` | `write/allow` | cache |
+| `allow-write` | `--allow-write` | `ALLOW_WRITE` | `write/allow` | cache, fake |
 | `write-registers` | `--write-registers` | `WRITE_REGISTERS` | `write/registers` | cache |
 | `connect-acl` | `--connect-acl` | `CONNECT_ACL` | `acl/connect` | cache, fake |
 | `write-acl` | `--write-acl` | `WRITE_ACL` | `acl/write` | cache |

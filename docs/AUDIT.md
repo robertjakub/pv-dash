@@ -1,9 +1,19 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 13)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 14)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
 tree after `2db6cfa` (absorbing the former per-subproject `secaudit.md`s);
-rev. 2 re-audited at main after `84b4387` — the tree that carried the
+**rev. 14** re-audited at main after the modbus-common move — the Modbus
+sources gather into `common/modbus` (one implementation: the wire core,
+the client ladders, the write shapes; the trust posture does not move —
+same handshakes, same texts), and the fake inverter's Modbus writes are
+**gated by default** (`write/allow` off refuses FC05/06/15/16 with
+exception 01, audited `WRITE-REFUSED`; `--allow-write` opens the gate,
+audited `WRITE`) — the cache's three-layer write gate (allow/ACL/
+allow-list) stays the family's one gate shape, the fake mirrors its
+on/off layer; rev. 13 removed the bare `-file` secret spellings (the
+`file:` reference is the one form); rev. 2 re-audited at main after
+`84b4387` — the tree that carried the
 state-persistence wave (`--dump-path`/restore, `lib/persist.py`), the
 peer-cred control auth (`common/cred.py`, `--control-trust-uids`), the
 F2–F8 fixes, the audit-vocabulary rename (`READS` → `REQUESTS`) and the

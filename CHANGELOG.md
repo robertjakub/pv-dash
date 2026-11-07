@@ -31,6 +31,32 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **everywhere** — **the Modbus sources gather into a `common/modbus`
+  package** — one implementation for the family: `protocol.py` (the wire
+  core: the `ModbusError`/`DeviceError` types, `recv_exact`, the MBAP
+  `frame`/`check_head`/`read_frame` helpers, `exception_frame`, the
+  LSB-first `pack_bits`/`unpack_bits`, the `FC_NAMES` table, the suite
+  auth + Waveshare handshakes), `client.py` (the connect + reply
+  validation ladders both client legs speak — `open_socket`,
+  `check_reply`, `check_data_bytes`) and `writes.py` (`describe_write`,
+  `write_target`, `write_shape_error` — the write shapes the cache's
+  gate vets with and the fake parses with). The per-tool protocol
+  modules die (`cache/lib/protocol.py` gone, the scraper's keeps only
+  its `ModbusTCP` class riding the shared ladders), and the fake
+  inverter serves from the shared core — its hand-rolled framing, bit
+  packing and write descriptions were three of the family's copies.
+- **inverter** — **the fake's Modbus writes are gated like the cache's**:
+  `--allow-write` (env `ALLOW_WRITE`, live `write/allow` under the new
+  `write` node) accepts FC05/06/15/16 into the write overlays — logged
+  via the shared `describe_write` and audited `WRITE` like the cache's
+  forwarded ones; **off (the default) refuses every write with
+  exception 01** and audits `WRITE-REFUSED` (a breaking default for
+  demo setups that wrote straight to the fake — pass `--allow-write`;
+  the control verbs `set register`/`set coil`/`set discrete` are the
+  control plane, RBAC-gated, and never touch the gate). `show status`
+  carries `write=`, the serve log names `writes on|off`, `unset` restores
+  the startup value.
+
 - **everywhere** — **the Modbus bit spaces and the float types are first
   class**: the shared device-profile schema gains the `bit` type (one
   address = one binary value, read on FC1 coils or FC2 discrete inputs —
@@ -65,7 +91,7 @@ before the repo restructured into one suite.
   upstream fault and the poller retries. The scheme joins `suite` and
   `none` on the upstream leg only (`--auth-upstream suite|waveshare|none`;
   the cache's own clients still speak suite or nothing), the handshake
-  rides `common/protocol.py` beside the suite pair
+  rides `common/modbus/protocol.py` beside the suite pair
   (`waveshare_handshake_client`), the key's floor is the scheme's (suite
   ≥ 16 characters, waveshare non-empty ASCII — a key set while no scheme
   is chosen is dormant material, the floor bites when the scheme names
@@ -187,13 +213,21 @@ before the repo restructured into one suite.
   is dropped before it ever sees a frame) and
   `modbus/auth-upstream` + `modbus/auth-upstream-key` (`--auth-upstream`,
   `AUTH_UPSTREAM`, `--auth-upstream-key`, `AUTH_UPSTREAM_KEY`) authenticate
-  it toward the inverter. The handshake lives in `common/protocol.py`
+  it toward the inverter. The handshake lives in `common/modbus/protocol.py`
   (one implementation for the family); `show status` carries
   `auth=`/`upstream_auth=` (cache) and `modbus_auth=` (scraper); the
   NixOS modules gain `auth`/`authKey` (scraper) and
   `auth`/`authKey`/`authUpstream`/`authUpstreamKey` (cache); the regtests
   pin the good-key round trip, the wrong-key `ERR`, the plain-client drop
   and the live `set` on all three shapes.
+
+### Changed
+
+- **inverter** — the fake's MBAP-length refusal log renders the shared
+  check's text (`malformed frame from … (bad response length N)`) and a
+  zero-count FC15/FC16 write is now refused with exception 03 (the
+  cache's shape rule — `write_shape_error`) instead of echoing a no-op
+  write; everything else on the wire is byte-identical.
 
 ### Security
 

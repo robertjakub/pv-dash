@@ -22,7 +22,7 @@ on all four too (the per-tool extras carry their own rows below).
 | kind | name | group | live | cache | scraper | inverter | dashboard |
 |---|---|---|---|---|---|---|---|
 | c | `acl` |  | *(startup-only)* | ✓ |  |  |  |
-| k | `allow-write` |  | `set write allow` | ✓ live |  |  |  |
+| k | `allow-write` |  | `set write allow` | ✓ live |  | ✓ live |  |
 | c | `audit` |  | *(startup-only)* | ✓ |  |  |  |
 | k | `audit-daily` |  | `set audit rotate daily` | ✓ live |  | ✓ |  |
 | k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** | **✓** | **✓** |
@@ -119,7 +119,7 @@ on all four too (the per-tool extras carry their own rows below).
 | s | `uplink` |  | `show uplink` | ✓ |  |  |  |
 | k | `upstream` | `upstream` | `set modbus upstream` | ✓ live | ✓ live |  | ✓ |
 | s | `version` |  | `show version` | **✓** | **✓** | **✓** | **✓** |
-| c | `write` |  | *(startup-only)* | ✓ |  |  |  |
+| c | `write` |  | *(startup-only)* | ✓ |  | ✓ |  |
 | k | `write-acl` |  | `set acl write` | ✓ live |  |  |  |
 | k | `write-registers` |  | `set write registers` | ✓ live |  |  |  |
 

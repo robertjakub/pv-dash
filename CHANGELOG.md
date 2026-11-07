@@ -319,6 +319,28 @@ before the repo restructured into one suite.
 
 ### Fixed
 
+- **everywhere** — **the ctl/cli clients and the control servers converge
+  on one behavior** (the drift the four-way copies carried): the fake's
+  cli passes `--audit-max-mb`/`--audit-files` to its audit trail (they
+  parsed but never reached it), its TAB completion inserts a single match
+  with the trailing space (the family shape — without it tab-tab
+  re-completes the same word and never lists) and its shutdown confirm
+  survives a connection lost right after the confirm (the reply's
+  ConnectionLost no longer aborts the goodbye); the dashboard's state
+  summary renders `upstream_ok=` (it spelled `upstream=` twice, the
+  second carrying the health state); the cache's cli/ctl read the audit
+  and timeout defaults from `lib/static.json` (the other three already
+  did — the hardcoded `10.0`/`3`/`5.0` die) and the cache cli's `?` help
+  lists the `help <setting>` pin beside `?` like the family; the dead
+  `describe_setting` local (cache cli) and the unused imports (the
+  cache/inverter/dashboard control servers, the scraper/dashboard clis)
+  die; the fake's SIGHUP env layer loses its doubled `LOG_LEVEL` read and
+  the control plane's `_parse_hour` rides the same `parse_time` the
+  signals layer speaks (a malformed HH:MM now answers the clean
+  `time out of range` text, not a Python unpack message); the fake's
+  startup parses the connect ACL and the auth type once (it computed the
+  same pair twice — once for the defaults, once for the device).
+
 - **everywhere** — **the Modbus shape/consistency round**: the cache's
   `--allow-write` help (and the generated man/OPTIONS rows) claimed
   FC05/06/15/16 while the write gate has covered FC22/23 since the

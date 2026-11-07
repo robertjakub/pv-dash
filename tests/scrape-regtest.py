@@ -178,8 +178,7 @@ def write_ini(path, extra=''):
 procs = []
 try:
     # 1. baseline: fake with battery + scraper with battery enabled
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(PORT),
-                                   '--allow-write'],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     write_ini('/tmp/scr_base.ini')
@@ -426,7 +425,7 @@ try:
         return '%s %s' % (obj.get('status', 'err'), str(obj.get('text', '')))
 
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15570',
-                                   '--control-port', '15571'],
+                                   '--control-port', '15571', '--allow-write'],
                                   stdout=open('/tmp/scr_ctl_fake.log', 'w'), stderr=subprocess.STDOUT))
     write_ini('/tmp/scr_ctl.ini')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_ctl.ini',

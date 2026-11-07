@@ -30,6 +30,7 @@ from common.human import secs
 from common.logutil import UtcFormatter
 from common.audit import AuditLog
 from common.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.control import ControlServer as _ControlServer
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME, KNOWN_VERBS
@@ -48,7 +49,7 @@ TYPED_CONVS = (int, float, str)
 MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
 
 
-class ControlServer:
+class ControlServer(_ControlServer):
     """JSON-lines control socket for the cache. The target is either a TCP
     port (bound to 127.0.0.1) or a unix socket path (stale files are
     replaced, unlinked on shutdown). A TCP connection must authenticate with
@@ -60,44 +61,26 @@ class ControlServer:
     callback shared with the signal handlers; it runs after the shutdown
     reply left the wire."""
 
+    LOG = logger
+    OPTIONS = OPTIONS
+    SETTINGS = SETTING_BY_NAME
+    WHO = 'the modbus-cache'
+    EXIT_TEXT = 'the modbus-cache proxy is shutting down'
+    RELOAD_TEXT = 'the modbus-cache proxy is reloading — the daemon restarts with the saved configuration'
+
     def __init__(self, proxy, target, stopper=None, audit=None, token=None, defaults=None, trust_uids=None,
                  socket_group=False, ops_token=None, ops_verbs=None, config_path=None):
         self.proxy = proxy
-        self.config_path = config_path  # the config script the daemon started from — the reload state lives beside it
-        self.reload_pending = False     # a reload saved the state; the exec runs after the reply leaves the wire
-        self.audit = audit               # the CACHE audit trail (common.audit), None = off
-        self.token = token               # the TCP auth token (the admin role); None = no auth (the unix = the perms)
-        self.ops_token = ops_token       # the read-only ops token (the ops role); None = off
-        self.ops_verbs = frozenset(v.lower() for v in (ops_verbs or OPS_VERBS))   # the ops role's RBAC policy
-        self.is_unix = not isinstance(target, int)
-        self.port = None if self.is_unix else int(target)
-        self.sockpath = str(target) if self.is_unix else None
-        self.socket_group = bool(socket_group)   # chmod 0660 instead of 0600 on the unix socket
-        self.trust_uids = trust_uids or frozenset()   # extra peer uids the unix socket trusts without the token
-        self.stopper = stopper
-        self.shutdown_pending = False
-        self.defaults = defaults or {}   # setting -> configured startup value (what `unset` restores)
-        self.overridden = set()          # settings changed live (`show status` carries the overridden= row)
-        self.clients = set()             # the live control sockets (announce_exit)
-        self.clients_lock = threading.Lock()
+        super().__init__(target, stopper=stopper, audit=audit, token=token, defaults=defaults,
+                         trust_uids=trust_uids, socket_group=socket_group, ops_token=ops_token,
+                         ops_verbs=ops_verbs, config_path=config_path)
         self._srv = None                 # the current accept() socket — a live control/port rebind swaps it
         self.stopped = False             # the listener is retired (set control/port off); sessions keep serving
-
-    def start(self):
-        self._restore_reload_state()   # a reload exec: the saved overrides re-apply once, the state file is consumed
-        threading.Thread(target=self.serve, daemon=True).start()
 
     def describe(self):
         if self.stopped:
             return 'off'
         return 'unix:%s' % self.sockpath if self.is_unix else '127.0.0.1:%d' % self.port
-
-    def cleanup(self):
-        if self.is_unix and self.sockpath and os.path.exists(self.sockpath):
-            try:
-                os.unlink(self.sockpath)
-            except OSError:
-                pass
 
     def _open_sock(self):
         """Bind+listen the control socket per the current target attrs: the
@@ -150,171 +133,6 @@ class ControlServer:
                 logger.error('control accept failed (%s), retrying', e)
                 time.sleep(0.1)
 
-    @staticmethod
-    def peer(addr):
-        """Where the client sits: an IP:port for TCP, the socket for unix."""
-        if isinstance(addr, (tuple, list)) and len(addr) >= 2:
-            return '%s:%d' % (addr[0], addr[1])
-        return 'unix socket'
-
-    def trusted_peer(self, client, who):
-        """The peer-cred auth on the unix control socket: with a token
-        configured, a peer the kernel vouches for — root, the daemon's own
-        user or one of trust_uids — is authenticated without the token (a
-        local systemd unit speaks without sharing the secret) and holds the
-        admin role. TCP peers always need a token (admin or ops)."""
-        if not (self.token and self.is_unix):
-            return None
-        uid = peer_uid(client)
-        if uid is None:
-            return None
-        if uid == 0 or uid == os.getuid() or uid in self.trust_uids:
-            logger.debug('control client from %s: trusted peer uid %d, no token required', who, uid)
-            return ROLE_ADMIN
-        logger.info('control client from %s: peer uid %d is not trusted, the token is required', who, uid)
-        return None
-
-    def session_key(self, role):
-        """The hmac key of one session's role: the ops sessions sign and
-        verify with the ops token, everything else (admin, trusted peer,
-        pre-auth) with the admin token."""
-        return self.ops_token if role == ROLE_OPS else self.token
-
-    def auth_role(self, given):
-        """Which role a presented token authenticates into (hmac.compare_digest
-        against both keys): the admin token, the ops token, or None."""
-        if isinstance(given, str):
-            if self.token and hmac.compare_digest(given, self.token):
-                return ROLE_ADMIN
-            if self.ops_token and hmac.compare_digest(given, self.ops_token):
-                return ROLE_OPS
-        return None
-
-    def framed(self, line, who, role):
-        """One wire frame in, one out: parse {"cmd": ...}, gate the TCP auth,
-        gate the ops role (show/clear only), verify the frame mac keyed by
-        the session's token, run the command. Returns (cmd, reply-obj,
-        internal-reply, role) — the role so the auth reply can promote the
-        session. The text of a multi-line reply keeps its embedded newlines;
-        the '.' terminator of the internal form is stripped (the JSON frame
-        needs no framing)."""
-        try:
-            obj = json.loads(line) if line else {}
-        except ValueError:
-            obj = None
-        if not isinstance(obj, dict) or not isinstance(obj.get('cmd'), str):
-            return '', {'status': 'err',
-                        'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request', role
-        cmd = obj['cmd']
-        if self.token and cmd.lower() != 'auth' and role is None:
-            return cmd, {'status': 'err', 'text': 'authenticate first: {"cmd": "auth", "token": "..."}'}, \
-                'err authenticate first', role
-        if cmd.lower() == 'auth':
-            granted = self.auth_role(obj.get('token'))
-            if granted:
-                key = self.session_key(granted)
-                reply = 'ok authenticated'
-                return 'auth', {'status': 'ok', 'text': 'authenticated', 'mac': sign_reply(key, reply)}, reply, granted
-            return 'auth', {'status': 'err', 'text': 'bad token'}, 'err bad token', role
-        key = self.session_key(role)
-        if key and obj.get('mac') is None and not self.is_unix:
-            return cmd, {'status': 'err',
-                         'text': 'unsigned command rejected: TCP commands carry the hmac-sha256 of the command, keyed by the token'}, \
-                'err unsigned command', role
-        if key and obj.get('mac') is not None and not verify_request_mac(key, cmd, obj.get('mac')):
-            return cmd, {'status': 'err',
-                         'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac', role
-        if not role_allows(role, cmd, self.ops_verbs):
-            verb = command_verb(cmd) or cmd
-            text = ('forbidden: the ops token runs the %s verbs only (%s needs the admin token)'
-                    % ('/'.join(sorted(self.ops_verbs)), verb))
-            reply = 'err ' + text
-            reply_obj = {'status': 'err', 'text': text}
-            if key:
-                reply_obj['mac'] = sign_reply(key, reply)
-            logger.warning('control: ops session from %s denied %r (read-only role)', who, cmd)
-            return cmd, reply_obj, reply, role
-        reply = self.command(cmd)
-        if reply is None:              # quit: no reply, just close
-            return cmd, None, 'bye', role
-        status, _, text = reply.partition(' ')
-        reply_obj = {'status': status, 'text': text}
-        if key:
-            reply_obj['mac'] = sign_reply(key, reply)
-        return cmd, reply_obj, reply, role
-
-    def announce_exit(self, reason, text=None):
-        """The daemon is going down: send every connected control client a
-        bye frame (the consoles print the notice and exit instead of trying
-        to reconnect to a dead proxy) and close their sockets. `text`
-        replaces the shutdown wording (the reload speaks of restarting)."""
-        frame = (json.dumps({'status': 'bye',
-                             'text': text or 'daemon-exit: the modbus-cache proxy is shutting down (%s)' % reason}, ensure_ascii=False)
-                 + '\n').encode()
-        with self.clients_lock:
-            clients, self.clients = list(self.clients), set()
-        for client in clients:
-            try:
-                client.sendall(frame)
-            except OSError:
-                pass
-            try:
-                client.close()
-            except OSError:
-                pass
-
-    def handle(self, client, addr):
-        who = self.peer(addr)
-        logger.debug('control client connected from %s', who)
-        role = self.trusted_peer(client, who)   # the peer-cred shortcut = the admin role; TCP starts unauthenticated
-        with self.clients_lock:
-            self.clients.add(client)
-        try:
-            client.settimeout(CONTROL_IDLE_TIMEOUT_S)
-            buf = b''
-            while True:
-                if b'\n' not in buf:      # buffered reads: a 1 MB frame must not
-                    chunk = client.recv(65536)   # cost a syscall per byte
-                    if not chunk:
-                        break
-                else:
-                    chunk = b''
-                buf += chunk
-                if len(buf) > MAX_LINE:   # no newline = no frame: drop the amplifier
-                    logger.warning('control client from %s: the line exceeded %d bytes, dropping it', who, MAX_LINE)
-                    break
-                if b'\n' not in buf:
-                    continue
-                line, buf = buf.split(b'\n', 1)
-                cmd, obj, reply, role = self.framed(line.decode('utf-8', 'replace').strip(), who, role)
-                if cmd == 'auth':
-                    ok = reply.startswith('ok')
-                    if not ok and self.audit:
-                        self.audit.event('AUTH-FAIL', 'peer=%s' % who)
-                elif self.audit and cmd.lower() != 'ping':
-                    self.audit.event('COMMAND', "peer=%s%s '%s'%s -> %s"
-                                     % (who, role_tag(role), cmd, proof_tag(obj), reply.split(' ', 1)[0]))
-                logger.debug('control from %s: %s -> %s', who, cmd, reply)
-                if obj is not None:
-                    client.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())
-                if reply.startswith('bye'):
-                    break
-                if self.reload_pending:
-                    break   # the reply is out — the post-loop hook re-execs
-            if self.shutdown_pending and self.stopper:
-                self.stopper('control command')   # reply is out, now really stop
-            if self.reload_pending:
-                self._exec_reload()               # reply is out, now really re-exec
-        except (ConnectionError, OSError):
-            pass
-        except Exception as e:
-            logger.error('control handler crashed (%s)', e)
-        finally:
-            logger.debug('control client from %s disconnected', who)
-            with self.clients_lock:
-                self.clients.discard(client)
-            client.close()
-
     def command_help(self):
         """The one-line command reference: the state-dump commands appear
         only when a dump path is configured (there is nothing to dump
@@ -325,28 +143,6 @@ class ControlServer:
             cmds += ', request dump [with-cache], request restore'
         cmds += ', clear cache, reload, restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
         return cmds
-
-    def config_mapping(self):
-        """The knob -> control-command mapper (help config): every option of
-        the registry under its display group (the row's `group`, ungrouped
-        rows headerless), with the command that changes it on a running daemon — or
-        the restart note when the knob is startup-only."""
-        from .options import OPTIONS
-        lines = ['ok config mapping']
-        for key, rows in grouped_rows(OPTIONS):
-            if key:
-                lines.append('# --- %s ---' % key)
-            for o in rows:
-                lines.append('%-24s %s' % (o.name, control_command(o)))
-        return '\n'.join(lines)
-
-    def knobs_dictionary(self):
-        """The dictionary of all knobs (show knobs): every option of the
-        registry under its display group, with its flag, its env twin(s),
-        the control command that changes it and the secret marker."""
-        from .options import OPTIONS
-        from common.options import knob_dictionary
-        return knob_dictionary(OPTIONS, who='the modbus-cache')
 
     def show_config(self):
         """The effective configuration as a set-grammar script: every line a
@@ -493,15 +289,6 @@ class ControlServer:
             logger.info('control: shutdown requested')
             return 'bye shutdown'
         return 'err unknown command %r (try help)' % cmd
-
-    def _gate_range(self, key, v, what=''):
-        """The row's min/max (inclusive) — the registry is the one home for
-        a knob's bounds; the branch parses and plumbs, the row gates."""
-        opt = OPTION_BY_LIVE.get(key)
-        if opt is None or opt.conv not in TYPED_CONVS:
-            return
-        if (opt.min is not None and not v >= opt.min) or (opt.max is not None and not v <= opt.max):
-            raise ValueError('%s must be %s..%s%s' % (key, opt.min, opt.max, (' ' + what) if what else ''))
 
     def _apply(self, key, value):
         """Apply a live setting; returns the display string or raises
@@ -1432,20 +1219,6 @@ class ControlServer:
         if lost:
             msg += ' (%s: secret, not saved — re-pass by flag/env, or as file:<path>)' % ', '.join(lost)
         return msg
-
-    def _exec_reload(self):
-        """The reply is out (the session loop calls this after it): announce
-        to the consoles and re-exec in place — the same argv re-resolves the
-        config, the fresh daemon rebinds the control target (stale sockets
-        are replaced) and restores the saved overrides."""
-        if self.audit:
-            self.audit.event('RELOAD', 'exec: the daemon re-execs (pid %d)' % os.getpid())
-        self.announce_exit('reload', text='daemon-exit: the modbus-cache proxy is reloading — '
-                                          'the daemon restarts with the saved configuration')
-        sys.stdout.flush()
-        sys.stderr.flush()
-        time.sleep(0.2)   # let the bye frames drain
-        os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def dump_state(self, with_cache):
         """The write-behind: the live setting overrides and — when

@@ -250,8 +250,8 @@ def main():
               st == 'ok' and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show cache')
         check('ops: show cache honored', st == 'ok' and macok, '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('clear cache')
-        check('ops: clear cache honored (the read-only shift may flush)',
+        st, tx, macok = ops_roundtrip('request clear cache')
+        check('ops: request clear cache honored (the read-only shift may flush)',
               st == 'ok' and 'cache cleared' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('set modbus interval 5')
         check('ops: set is forbidden', st == 'err' and 'forbidden' in tx and 'admin' in tx and macok,
@@ -260,10 +260,10 @@ def main():
         check('ops: unset is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request restore')
         check('ops: request restore is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('restart')
-        check('ops: restart is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('reload')
-        check('ops: reload is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('request restart')
+        check('ops: request restart is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('request reload')
+        check('ops: request reload is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('shutdown')
         check('ops: shutdown is forbidden', st == 'err' and 'forbidden' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show status', unsigned=True)
@@ -276,7 +276,7 @@ def main():
         check('ops: a bogus token is refused', st == 'auth-fail', '%s %s' % (st, tx))
         aud = open(OPS_AUDIT).read()
         check('ops: both roles audited (role=ops clear, role=admin set, the denials included)',
-              "role=ops 'clear cache'" in aud and "role=admin 'set modbus interval 5'" in aud
+              "role=ops 'request clear cache'" in aud and "role=admin 'set modbus interval 5'" in aud
               and "role=ops 'shutdown'" in aud and "role=ops 'set modbus interval 5' wire=h" in aud, aud[-300:])
         r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15960',
                             '--listen', '127.0.0.1:15968', '--control-port', str(OPS_PORT),

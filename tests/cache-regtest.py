@@ -440,11 +440,11 @@ try:
           and r.startswith('ok connections 127.0.0.1:'), r)
     r = ctl_cmd('show cache', 15514)
     check('control: show cache counters', 'hits 1' in r and 'range(s)' in r and 'map v0' in r, r)
-    r = ctl_cmd('clear cache', 15514)
+    r = ctl_cmd('request clear cache', 15514)
     check('control: clear cache', r.startswith('ok cache cleared (') and 'repolling now' in r, r)
     b = rd(32064, 2, port=15513)
     check('control: cache refills after clear', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
-    r = ctl_cmd('restart', 15514)
+    r = ctl_cmd('request restart', 15514)
     check('control: restart drops the upstream session', r.startswith('ok upstream session restarted'), r)
     b = rd(32064, 2, port=15513)
     check('control: upstream reconnects after restart', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
@@ -826,7 +826,7 @@ try:
     d = _json.load(open(dumpfile))
     check('request dump: the settings-only dump keeps the words out', d.get('registers') == []
           and d.get('settings', {}).get('modbus/interval') == 2.0, str(d.get('settings')))
-    ctl_cmd('clear cache', 15537)
+    ctl_cmd('request clear cache', 15537)
     r = ctl_cmd('show cache', 15537)
     check('request restore: the clear emptied the cache first', '0 word(s) cached' in r, r[:80])
     r = ctl_cmd('request restore', 15537)
@@ -834,7 +834,7 @@ try:
           r.startswith('ok restored 0 word(s), 1 setting(s)'), r[:120])
     time.sleep(1.4)   # the poller refills (interval 1 s) before the with-cache dump
     ctl_cmd('request dump with-cache', 15537)
-    ctl_cmd('clear cache', 15537)
+    ctl_cmd('request clear cache', 15537)
     r = ctl_cmd('request restore', 15537)
     check('request restore: the with-cache dump brings the words back',
           r.startswith('ok restored 91 word(s), 1 setting(s)'), r[:120])
@@ -1027,7 +1027,7 @@ try:
     r = ctl_cmd('request dump', 15537)
     check('dump-with-cache: the flag turns the plain request dump full', r.startswith('ok dumped 91 word(s)'),
           r[:120])
-    ctl_cmd('clear cache', 15537)
+    ctl_cmd('request clear cache', 15537)
     r = ctl_cmd('request restore', 15537)
     check('restore-on-start: the manual request restore still works', r.startswith('ok restored 91 word(s), ')
           and 'setting(s) from' in r, r[:120])
@@ -1495,7 +1495,7 @@ try:
     time.sleep(2)
     r = ctl_cmd('set modbus interval 7', 15582)
     check('reload: the override lands before the reload', r.startswith('ok modbus/interval=7'), r[:120])
-    r = ctl_cmd('reload', 15582)
+    r = ctl_cmd('request reload', 15582)
     check('reload: the reply reports the saved override', r.startswith('ok reload: 1 override(s) saved'), r[:120])
     back = None
     for _ in range(100):     # the exec is fast; a connect that lands on the dying daemon (the bye frame, unsigned) retries
@@ -1533,7 +1533,7 @@ print('mode 0600 ok')
     check('reload: the state file saves 0600 (F23, the F18 posture)',
           r.returncode == 0 and 'mode 0600 ok' in r.stdout, repr((r.stderr or r.stdout)[-160:]))
     open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset unit 7\n')   # rewrite: a name set twice fails the start
-    r = ctl_cmd('reload', 15582)
+    r = ctl_cmd('request reload', 15582)
     back = None
     for _ in range(100):
         try:
@@ -2055,7 +2055,7 @@ print('mode 0600 ok')
     # the reconnect re-proves: the restart verb drops the session, the next
     # poll dials fresh and hands the password over again
     ok_before = ws.ok_attempts
-    r = ctl_ws('restart')
+    r = ctl_ws('request restart')
     check('waveshare auth: the restart verb restarts the upstream session',
           r.startswith('ok upstream session restarted'), r[:100])
     for _ in range(40):

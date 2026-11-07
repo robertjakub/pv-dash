@@ -42,7 +42,7 @@ fault and the poller retries. The upstream leg also speaks
 gateway: the shared key goes out as the gateway's connection password
 (raw ASCII, right after every connect) and the gateway's \\fBOK\\fR opens
 the plain Modbus session \\(em anything else fails the exchange like any
-other upstream fault. Empty auth (the default) = no auth at all.
+other upstream fault. Empty auth = no auth at all.
 .PP
 Resilience: when the device dies, cached reads keep serving last-known
 values and forwarded reads get exception 0x0B; when the device rejects a
@@ -73,8 +73,8 @@ the reports
 .BR inspect ", " "show status" ", " "show connections" ,
 .BR "show cache" " [all]" ", " "show uplink" ", " "show version" ,
 the ops
-.BR "request dump" ", " "request restore" ", " clear\\ cache ,
-.BR reload ", " restart ", " shutdown ", " quit .
+.BR "request dump" ", " "request restore" ", " "request clear cache" ,
+.BR "request reload" ", " "request restart" ", " shutdown ", " quit .
 .RS
 .IP \\(bu 2
 .B set <setting> <value>
@@ -116,9 +116,9 @@ refuses a wrong or missing key). The dump
 commands \\(em and the \\fBdump-interval\\fR setting \\(em show up in the
 listings only when a dump path is configured.
 .IP \\(bu 2
-.B clear cache
-/ SIGUSR1, \\fBrestart\\fR (drop the upstream + the cache, repoll),
-\\fBreload\\fR (save the live overrides to a state file and re-exec the
+.B request clear cache
+/ SIGUSR1, \\fBrequest restart\\fR (drop the upstream + the cache, repoll),
+\\fBrequest reload\\fR (save the live overrides to a state file and re-exec the
 whole daemon \\(em the fresh process re-resolves the config, so the
 restart-marked knobs take their configured values, and the saved
 overrides re-apply once; the cache starts empty),
@@ -126,8 +126,9 @@ overrides re-apply once; the cache starts empty),
 .RE
 .PP
 A second, read-only token (\\fB--control-ops-token\\fR) authenticates
-sessions into the show/clear verbs only \\(em no set/unset, no request
-dump/restore, no reload, no restart, no shutdown \\(em the ops shift against the
+sessions into the show/clear verbs only \\(em no set/unset, no
+request dump/restore, no request reload, no request restart, no
+shutdown \\(em the ops shift against the
 admin key, both roles audited. A secret knob (control token, the ops
 token, the metrics token) never shows its value:
 \\fBshow\\fR
@@ -144,8 +145,8 @@ for the clients."""
     environment = """.SH ENVIRONMENT
 .TP
 .B CTL
-default control target for the daemon's clients (flag \\fB--control-port\\fR
-wins).
+control target for the daemon's clients when the flag is unset (flag
+\\fB--control-port\\fR wins).
 .TP
 .B HOST ", " LISTEN ", " ALLOW_WRITE ", " ...
 every flag has an environment twin of the same bare name (no tool
@@ -153,10 +154,11 @@ prefix); the flag wins over the env, the env over the config script."""
     files = """.SH FILES
 .TP
 .I /tmp/modbus-cache-<port>.socket
-the default control socket (stale files replaced, unlinked on shutdown).
+the control socket used when \\fB--control-port\\fR is unset (stale files
+replaced, unlinked on shutdown).
 .TP
 .I ~/.local/state/modbus-cache/audit.log
-the default audit trail.
+the audit trail when \\fB--audit-log\\fR is unset.
 .TP
 .I cache/modbus_cache.conf ", " cache/selection.json
 the packaged sample config and the example selection."""
@@ -191,7 +193,8 @@ The command grammar is the daemon's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
 \\fBhelp\\fR (the settings registry), \\fBinspect\\fR, \\fBshow status\\fR,
 \\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR], \\fBshow uplink\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
-\\fBclear cache\\fR, \\fBrestart\\fR, \\fBshutdown\\fR,
+\\fBrequest clear cache\\fR, \\fBrequest reload\\fR, \\fBrequest restart\\fR,
+\\fBshutdown\\fR,
 \\fBquit\\fR. See
 .BR modbus-cache (1)
 CONTROL."""
@@ -200,9 +203,9 @@ CONTROL."""
 .IP \\(bu 2
 .B modbus-cache-ctl show status
 .IP \\(bu 2
-.B modbus-cache-ctl clear cache
+.B modbus-cache-ctl request clear cache
 .IP \\(bu 2
-.B printf 'show cache\\\\nclear cache\\\\n' | modbus-cache-ctl
+.B printf 'show cache\\\\nrequest clear cache\\\\n' | modbus-cache-ctl
 .RE"""
     exit_status = """.SH EXIT STATUS
 .TP
@@ -233,22 +236,24 @@ the poll health and the uptime; the prompt shows the connected port
 their descriptions (the listings group the settings under the registry's
 own groups \\(em ungrouped rows render bare, no header \\(em, with
 [values] beside);
-\\fB?\\fR prints the same in any position; \\fBclear cache\\fR/\\fBrestart\\fR
+\\fB?\\fR prints the same in any position; \\fBrequest clear cache\\fR/
+\\fBrequest restart\\fR
 confirm; \\fBshutdown\\fR asks \\fBProceed with shutdown? [confirm]\\fR first.
 .PP
-While idle the session sends wire pings every 55 s so the server's idle
+While idle the session sends wire pings so the server's idle
 timeout never drops it; when the connection dies anyway, the console
-retries (default 3 times, 10 s apart) and resumes on the first success.
+retries (\\fB--reconnect\\fR attempts, \\fB--reconnect-wait\\fR seconds
+apart) and resumes on the first success.
 The session (connect/disconnect, local commands, an aborted shutdown) is
 audited with the \\fBCLI\\fR prefix; the wire commands are audited once, by
 the server."""
     environment = """.SH ENVIRONMENT
 .TP
 .B CLI_KEEPALIVE
-idle ping interval, seconds (default \\fB55\\fR); \\fB0\\fR = off.
+idle ping interval, seconds; \\fB0\\fR = off.
 .TP
 .B CTL ", " CONTROL_TOKEN
-the default control target and TCP token."""
+the control target and TCP token when the flags are unset."""
     exit_status = """.SH EXIT STATUS
 .TP
 .B 0

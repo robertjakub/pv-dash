@@ -20,7 +20,8 @@ The command grammar is the daemon's: \fBset\fR/\fBunset\fR/\fBshow\fR/
 \fBhelp\fR (the settings registry), \fBinspect\fR, \fBshow status\fR,
 \fBshow connections\fR, \fBshow cache\fR [\fBall\fR], \fBshow uplink\fR,
 \fBshow version\fR, \fBshow knobs\fR (the dictionary of the registry),
-\fBclear cache\fR, \fBrestart\fR, \fBshutdown\fR,
+\fBrequest clear cache\fR, \fBrequest reload\fR, \fBrequest restart\fR,
+\fBshutdown\fR,
 \fBquit\fR. See
 .BR modbus-cache (1)
 CONTROL.
@@ -29,31 +30,30 @@ CONTROL.
 .TP
 .B \-\-control\-port
 control server target: unix socket path or TCP port on 127.0.0.1,
-auto\-detected (default: /tmp/modbus\-cache\-15502.socket; env CTL when
-unset) — same flag as the proxy itself
+auto\-detected (env CTL when unset) — same flag as the proxy itself
 .TP
 .B command
-control command, e.g. inspect, show status, show cache, clear cache,
-restart, shutdown
+control command, e.g. inspect, show status, show cache, request clear
+cache, request restart, shutdown
 .TP
 .BI \-\-timeout " N"
-socket timeout in seconds (default 5.0)
+socket timeout in seconds
 .TP
 .B \-\-control\-token
 control auth token for TCP (env CONTROL_TOKEN); a file:<path> value
 reads the first line of an owner\-only 0600 file
 .TP
 .B \-\-audit\-log
-audit trail: a file path or \- for stdout; default: the XDG state home
+audit trail: a file path or \- for stdout; the XDG state home when unset
 .TP
 .BI \-\-audit\-max\-mb " N"
-rotate the audit log at this size, 0 = off (default: 10.0)
+rotate the audit log at this size, 0 = off
 .TP
 .BI \-\-audit\-files " N"
-rotated audit backups to keep (default 3)
+rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
-disable the audit trail (default: off)
+disable the audit trail
 
 
 .SH EXAMPLES
@@ -61,9 +61,9 @@ disable the audit trail (default: off)
 .IP \(bu 2
 .B modbus-cache-ctl show status
 .IP \(bu 2
-.B modbus-cache-ctl clear cache
+.B modbus-cache-ctl request clear cache
 .IP \(bu 2
-.B printf 'show cache\\nclear cache\\n' | modbus-cache-ctl
+.B printf 'show cache\\nrequest clear cache\\n' | modbus-cache-ctl
 .RE
 
 .SH EXIT STATUS

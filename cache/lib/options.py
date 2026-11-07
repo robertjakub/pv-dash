@@ -90,8 +90,10 @@ def _load_options():
 
 
 # The verbs the control grammar speaks (the RBAC vocabulary — an ops verb
-# set must name verbs this server knows).
-KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'request', 'clear', 'reload', 'restart', 'shutdown',
+# set must name verbs this server knows). `request` is the namespace
+# prefix, not a verb: the verb is the word past it (`request clear cache`
+# decides on `clear`).
+KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'dump', 'restore', 'clear', 'reload', 'restart', 'shutdown',
                'help', 'ping', 'quit')
 
 # the control commands (the registries' `commands` rows — _load_options

@@ -6,11 +6,11 @@ require the token first ({"cmd": "auth", "token": ...}) — pass it with
 --control-token or the CONTROL_TOKEN environment variable.
 
   python3 modbus-cache-ctl.py --control-port 15509 show status
-  python3 modbus-cache-ctl.py --control-port 15509 clear cache
-  printf 'show cache\\nclear cache\\n' | python3 modbus-cache-ctl.py --control-port 15509
+  python3 modbus-cache-ctl.py --control-port 15509 request clear cache
+  printf 'show cache\\nrequest clear cache\\n' | python3 modbus-cache-ctl.py --control-port 15509
 
 Commands (see the server's help): show <status|connections|cache|version>,
-clear cache, restart, shutdown, quit.
+request clear cache, request reload, request restart, shutdown, quit.
 
 Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.
 """
@@ -28,6 +28,6 @@ from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S
 if __name__ == '__main__':
     run_ctl(daemon='modbus-cache', bin_name='modbus-cache-ctl', app='modbus-cache',
             self_note='the proxy itself',
-            command_help='e.g. inspect, show status, show cache, clear cache, restart, shutdown',
+            command_help='e.g. inspect, show status, show cache, request clear cache, request restart, shutdown',
             resolve=resolve_control_target, timeout_s=CLI_TIMEOUT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES, ctl_page=ctl_page)

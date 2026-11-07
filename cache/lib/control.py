@@ -141,7 +141,7 @@ class ControlServer(_ControlServer):
                 'uplink|version|config|knobs>')
         if self.proxy.dump_path:
             cmds += ', request dump [with-cache], request restore'
-        cmds += ', clear cache, reload, restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
+        cmds += ', request clear cache, request reload, request restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
         return cmds
 
     def show_config(self):
@@ -263,7 +263,7 @@ class ControlServer(_ControlServer):
                 return 'err unknown setting %s (try help)' % args[0].lower()
         if low == 'inspect':
             return self.inspect()
-        if low == 'clear cache':
+        if low == 'request clear cache':
             dropped = self.proxy.cache.clear()
             self.proxy.poll_wake.set()
             logger.info('control: cache cleared (%d register word(s) dropped), repolling now', dropped)
@@ -274,7 +274,7 @@ class ControlServer(_ControlServer):
             return self.dump_state(True)
         if low == 'request restore':
             return self.restore_state()
-        if low == 'restart':
+        if low == 'request restart':
             with self.proxy.upstream.lock:
                 self.proxy.upstream.close()
             dropped = self.proxy.cache.clear()
@@ -282,7 +282,7 @@ class ControlServer(_ControlServer):
             logger.info('control: upstream session restarted (connection dropped, %d register word(s) dropped, repolling now)',
                         dropped)
             return 'ok upstream session restarted (connection dropped, %d register word(s) dropped, repolling now)' % dropped
-        if low == 'reload':
+        if low == 'request reload':
             return self.reload_daemon()
         if low == 'shutdown':
             self.shutdown_pending = True

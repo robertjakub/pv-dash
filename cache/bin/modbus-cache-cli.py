@@ -3,8 +3,8 @@
 
 A session front-end on top of the control socket: prompt with the connected
 port, TAB completion and `?` in every position, `show` commands print the
-state lines, `clear cache` and `restart` confirm with a plain `ok`, and
-`shutdown` asks before it stops the proxy.
+state lines, `request clear cache` and `request restart` confirm with a
+plain `ok`, and `shutdown` asks before it stops the proxy.
 
 The session itself (connect/disconnect, the local commands like quit and
 the aborted shutdown) is appended to an audit log (default in the XDG state
@@ -35,12 +35,15 @@ SESSION = {'dump': False}
 
 HELP = cli.help_text(COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, cli.HELP_PINS)
 
+DUMP_GATED = ('request/dump', 'request/dump/with-cache', 'request/restore')
+
 
 def command_pool():
-    """The first words the daemon offers right now (the hidden rows never list)."""
-    if SESSION['dump']:
-        return tuple(n for n in COMMANDS if n not in COMMAND_HIDDEN)
-    return tuple(n for n in COMMANDS if n != 'request' and n not in COMMAND_HIDDEN)
+    """The first words the daemon offers right now: the dump node's request
+    children ride the dump gate (they list only while the dump node is on);
+    the other hidden rows never list."""
+    return tuple(n for n in COMMANDS
+                 if n not in COMMAND_HIDDEN or (SESSION['dump'] and n in DUMP_GATED))
 
 
 def setting_pool():
@@ -83,7 +86,7 @@ def _render_special(low, reply):
 
 SPEC = dict(label='the cache proxy', daemon_label='modbus-cache control server',
             cli_name='modbus-cache-cli', app='modbus-cache', self_note='the proxy itself',
-            command_help='e.g. inspect, show status, show cache, clear cache, restart, shutdown',
+            command_help='e.g. inspect, show status, show cache, request clear cache, request restart, shutdown',
             prompt_word='cache', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,
@@ -92,7 +95,7 @@ SPEC = dict(label='the cache proxy', daemon_label='modbus-cache control server',
             command_pool=command_pool, setting_pool=setting_pool, set_extra=(),
             describe=describe_word,
             help=HELP, welcome=welcome, loop=cli.typed_loop,
-            silent_ok=lambda low: low.startswith(('clear ', 'restart')),
+            silent_ok=lambda low: low.startswith(('request clear', 'request restart')),
             render=_render_special, cli_page=cli_page)
 
 if __name__ == '__main__':

@@ -188,7 +188,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--connect-acl` | `any` | clients allowed to connect: `any`, `none` (refuse everyone) or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `none` | clients allowed to write — still requires `--allow-write`; `none` = no client writes (the default) — see [Access control](#access-control) |
 | `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (config `set control token`, env `CONTROL_TOKEN`) |
-| `--control-ops-token` | none | a **second, read-only control token**: sessions authenticating with it may run the `show`/`clear` verbs only — no `set`/`unset`, no `request dump`/`restore`, no `reload`, no `restart`, no `shutdown` — the ops shift against the admin key, both audited (`role=ops`/`role=admin` in the CACHE trail); needs `--control-token` and must differ from it — see [Runtime control](#runtime-control---control-port) (config `set control ops token`, env `CONTROL_OPS_TOKEN`; the value may be `file:<path>` — the first line of an owner-only `0600` file, F12) |
+| `--control-ops-token` | none | a **second, read-only control token**: sessions authenticating with it may run the `show`/`clear` verbs only — no `set`/`unset`, no `request dump`/`restore`, no `request reload`, no `request restart`, no `shutdown` — the ops shift against the admin key, both audited (`role=ops`/`role=admin` in the CACHE trail); needs `--control-token` and must differ from it — see [Runtime control](#runtime-control---control-port) (config `set control ops token`, env `CONTROL_OPS_TOKEN`; the value may be `file:<path>` — the first line of an owner-only `0600` file, F12) |
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (config `set control ops-verbs`, env `CONTROL_OPS_VERBS`) |
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user (config `set control socket-group`, env `CONTROL_SOCKET_GROUP`) |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (config `set control trust-uids`, env `CONTROL_TRUST_UIDS`) |
@@ -292,7 +292,7 @@ cryptographically matches the command the client sent.
 **The read-only ops role**: a daemon may carry a second token
 (`--control-ops-token`, or its `file:<path>` form) beside the admin one.
 Sessions authenticating with the ops token may run the **`show`/`clear`
-verbs only** — no `set`/`unset`, no `request dump`/`restore`, no `reload`, no `restart`,
+verbs only** — no `set`/`unset`, no `request dump`/`restore`, no `request reload`, no `request restart`,
 no `shutdown` (the ops shift can look, flush the cache, and leave; steering
 needs the admin key). The gate is the command's head verb; a denied command
 answers `err forbidden: the ops token runs the show/clear verbs only (<verb>
@@ -329,9 +329,9 @@ token, an admin client against the admin token. The peer-cred trusted peers
 | `request restore` | load the dump back: the words return with their original stamps (their TTL bounds any staleness) and the overrides re-apply — what the startup restore does automatically |
 | `show version` | the modbus-cache version |
 | `show knobs` | the dictionary of all knobs: every registry knob under its display group (ungrouped rows bare) — its flag, its env twin(s), the command that changes it live (or the restart note), a `secret` marker on the tokens |
-| `clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
-| `restart` | drop the upstream connection **and** the cache, repoll now — for recovering from a wedged inverter session |
-| `reload` | **restart the whole daemon with the configuration kept**: the live overrides save to a state file beside the config (`<config>.reload`), the process re-execs with the same argv, the fresh daemon re-resolves the config file (so the `restart: true` knobs take their configured values) and re-applies the saved overrides once, then consumes the state file. The cache starts empty; overridden secrets save as `*** SECRET REMOVED ***` (the value never lands in the file) — the reply names them, to re-pass by flag/env, or as `file:<path>`. The ops role may not reload |
+| `request clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
+| `request restart` | drop the upstream connection **and** the cache, repoll now — for recovering from a wedged inverter session |
+| `request reload` | **restart the whole daemon with the configuration kept**: the live overrides save to a state file beside the config (`<config>.reload`), the process re-execs with the same argv, the fresh daemon re-resolves the config file (so the `restart: true` knobs take their configured values) and re-applies the saved overrides once, then consumes the state file. The cache starts empty; overridden secrets save as `*** SECRET REMOVED ***` (the value never lands in the file) — the reply names them, to re-pass by flag/env, or as `file:<path>`. The ops role may not request reload |
 | `shutdown` | gracefully stop the proxy (same as SIGTERM: listener closed, control socket unlinked) |
 | `help` / `?` | one-line command reference |
 | `quit` | close the connection |
@@ -407,8 +407,8 @@ Proceed with shutdown? [confirm] y
 
 The prompt shows the connected port, TAB completes commands with their
 descriptions (`show <TAB>` lists the tunables plus status/connections/cache/
-settings/version, `?` does the same in any position), `clear cache` and
-`restart` confirm with
+version, `?` does the same in any position), `request clear cache` and
+`request restart` confirm with
 `% ok`, and `shutdown` asks `Proceed with shutdown? [confirm]` first — RETURN
 or `y` proceeds, anything else aborts with `% Aborted.`. Every non-value
 line the console prints — the verdicts, the notes, the errors — carries the

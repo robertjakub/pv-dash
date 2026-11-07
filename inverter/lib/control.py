@@ -18,14 +18,11 @@ import logging
 import math
 import os
 import socket
-import sys
 import threading
 import time
 
 from common.config import acl_summary, acl_text, parse_acl, parse_auth_type, parse_secret
-from common.cred import peer_uid
 from common.human import secs
-from common import dump as state
 from common.modbus import AUTH_MIN_KEY
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.control import ControlServer as _ControlServer
@@ -59,9 +56,6 @@ class ControlServer(_ControlServer):
     second, read-only token (ops_token) may be configured beside the admin
     token: it authenticates into the show/clear verbs only — no set/unset,
     no reset, no reload, no shutdown (common/wiresec.py's roles)."""
-
-    def describe(self):
-        return 'unix:%s' % self.sockpath if self.is_unix else '127.0.0.1:%d' % self.port
 
     def serve(self):
         srv = socket.socket(socket.AF_UNIX if self.is_unix else socket.AF_INET, socket.SOCK_STREAM)
@@ -160,6 +154,8 @@ class ControlServer(_ControlServer):
     EXIT_TEXT = 'the fake inverter is shutting down'
     RELOAD_TEXT = 'the fake inverter is reloading — the daemon restarts with the saved configuration'
     RELOAD_NEEDS_CONFIG = False   # the fake has no config file (F11) — the reload state falls to the XDG state home
+    XDG_STATE_NAME = 'fake-inverter'   # the base's _reload_state_path fallback
+    APPLY_FIRST = ('scenario',)   # a preset release is the state the pins were pinned after — pins land on top
 
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
                  trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None, startup_values=None,
@@ -880,81 +876,12 @@ class ControlServer(_ControlServer):
         }
         return dump_filter(self.overridden, raw, SETTING_BY_NAME)
 
-    def apply_dump_settings(self, settings):
-        """Re-apply the dumped overrides; returns (applied, failed-name-list).
-        An unknown setting or a value the current config rejects is skipped,
-        never fatal; a *** SECRET REMOVED *** placeholder (the dump renders
-        an overridden secret's knob) is skipped and named — the secret keeps
-        its current value. `scenario` applies first: a preset release is the state
-        the pins were pinned after — the pins must land on top of it, never
-        under it."""
-        applied, failed = 0, []
-        for name in sorted(settings or {}, key=lambda k: k != 'scenario'):
-            value = settings[name]
-            if name not in SETTING_BY_NAME:
-                failed.append(name)
-                continue
-            if str(value) == SECRET_REMOVED:
-                failed.append('%s (secret, not restored — re-pass by flag/env, or as file:<path>)' % name)
-                continue
-            try:
-                self._apply(name, str(value))
-                self.overridden.add(name)
-                applied += 1
-            except ValueError as e:
-                failed.append('%s (%s)' % (name, e))
-        return applied, failed
+    # --- the whole-daemon reload (`reload`) and the dump family ride the
+    # base (_save/_restore/_reload_state_path/apply_dump_settings/reload_daemon):
+    # the reply leaves the wire, the process re-execs. The fresh daemon
+    # re-resolves the flags and the env (the fake has no config file — F11;
+    # XDG_STATE_NAME points the state file at the XDG state home, beside its
+    # audit trail) and re-applies the saved overrides once (start;
+    # APPLY_FIRST lands the scenario before the pins) — the flags stay the
+    # owners of the base, the state file is consumed, nothing lingers. ---
 
-    # --- the whole-daemon reload (`reload`): the live overrides serialize to
-    # a state file, the reply leaves the wire, the process re-execs. The
-    # fresh daemon re-resolves the flags and the env (the fake has no config
-    # file — F11) and re-applies the saved overrides once (start) — the
-    # flags stay the owners of the base, the state file is consumed, nothing
-    # lingers. The state lives beside the config when the daemon has one;
-    # the fake's home is the XDG state home, beside its audit trail. ---
-
-    def _reload_state_path(self):
-        if self.config_path:
-            return self.config_path + '.reload'
-        base = os.environ.get('XDG_STATE_HOME') or os.path.expanduser('~/.local/state')
-        return os.path.join(base, 'fake-inverter', 'reload.json')
-
-    def _save_reload_state(self):
-        """The overrides in their wire-parsable form (dump_settings) to the
-        state file — the shared dump writer (sealed when dump/key is
-        configured); the secrets ride as *** SECRET REMOVED *** (the value
-        never lands in the file). Returns (settings, lost-secret-names);
-        raises OSError on an unwritable home."""
-        settings = self.dump_settings()
-        lost = sorted(k for k in self.overridden if settings.get(k) == SECRET_REMOVED)
-        path = self._reload_state_path()
-        d = os.path.dirname(path)
-        if d and not os.path.isdir(d):
-            os.makedirs(d, exist_ok=True)
-        state.write_dump(path, settings, key=self.dump_key)
-        return settings, lost
-
-    def _restore_reload_state(self):
-        """One-shot, at start: a reload exec re-applies the saved overrides
-        and consumes the state file — a later manual start stays pure (the
-        flags alone). A state older than two minutes is stale (a failed
-        start in between): discarded, never applied. The file is the shared
-        dump shape — sealed when dump/key is configured (the re-exec
-        re-resolves the same key)."""
-        path = self._reload_state_path()
-        if not os.path.exists(path):
-            return
-        try:
-            state_obj = state.read_dump_state(path, key=self.dump_key)
-            if time.time() - state_obj.get('saved', 0) > 120:
-                logger.warning('reload: the state file %s is stale, discarding it', path)
-                os.unlink(path)
-                return
-            applied, failed = self.apply_dump_settings(state_obj.get('settings'))
-            os.unlink(path)
-            logger.info('reload: %d override(s) re-applied from %s%s', applied, path,
-                        (' (%d skipped: %s)' % (len(failed), ', '.join(failed))) if failed else '')
-            if self.audit:
-                self.audit.event('RELOAD', 'restored %d override(s) from %s' % (applied, path))
-        except (OSError, ValueError) as e:
-            logger.error('reload: the state file %s is unreadable (%s) — starting without it', path, e)

@@ -852,6 +852,23 @@ def main():
         check('suite auth: show modbus auth reads suite', tx == 'ok modbus/auth=suite', tx)
         tx = ctl(L_CTL, 'show modbus auth key')
         check('suite auth: the key never shows', tx.startswith('err modbus/auth/key is a secret'), tx[:80])
+        tx = ctl(L_CTL, 'show modbus')
+        words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
+                 if line.strip() and not line.strip().startswith('[')]
+        check('node walk: the modbus listing mimics the ? walk (the key never lists)',
+              words == ['auth'] and 'auth/key' not in tx, tx[:160])
+        tx = ctl(L_CTL, 'show')
+        words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
+                 if line.strip() and not line.strip().startswith('[')]
+        check("node walk: the bare show mimics the ? output (the walk's first position)",
+              words == ['batt', 'battery', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
+                        'connect-acl', 'connections', 'dump', 'grid', 'grid-frequency', 'grid-outage',
+                        'grid-voltage', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
+                        'metrics-server', 'modbus', 'mppt', 'profile', 'pv', 'registers', 'scenario', 'seed',
+                        'soc', 'static', 'status', 'strict', 'time', 'time-scale', 'timezone', 'version',
+                        'write'], tx[:220])
+        tx = ctl(L_CTL, 'show control ops')
+        check('node walk: the intermediate node answers', tx.startswith('ok control/ops - '), tx[:80])
         tx = ctl(L_CTL, 'unset modbus auth key')
         check('suite auth: unset refuses the key (no defaults entry)', tx.startswith('err unknown setting'), tx[:80])
         tx = ctl(L_CTL, 'set modbus auth key short')

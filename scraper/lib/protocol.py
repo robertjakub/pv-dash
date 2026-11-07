@@ -70,7 +70,7 @@ class ModbusTCP:
             raise ModbusError('reply from unit id %d, expected %d' % (unit, self.unit))
         func = body[0]
         if func == fc + 0x80:
-            raise ModbusError('modbus exception, code %d' % (body[1] if len(body) > 1 else -1))
+            raise ModbusError('FC%d modbus exception, code %d' % (fc, body[1] if len(body) > 1 else -1))
         if func != fc:
             raise ModbusError('unexpected function byte 0x%02x' % func)
         if len(body) < 2:

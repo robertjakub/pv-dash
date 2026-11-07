@@ -566,7 +566,7 @@ is set).
 | Connection refused (limit) | `connection refused: client limit of N reached (…)` |
 | Config/register-map reload (`SIGHUP`) | `SIGHUP: reload requested` / `SIGHUP: reloaded 13 range(s) …` / `SIGHUP: reload failed …` |
 | Cache clean (`SIGUSR1`) | `SIGUSR1: cache cleared (N register(s) dropped), repolling now` |
-| Cache poll failed/recovered | `poll of … failed (modbus exception, code 2), serving cached values` / `poll of … recovered` |
+| Cache poll failed/recovered | `poll of … failed (FC3 modbus exception, code 2), serving cached values` / `poll of … recovered` |
 | Client connect/disconnect (`--log-access`) | `client connected: 10.0.0.5:51234` / `client … disconnected (…)` |
 | Startup / shutdown | `caching 13 range(s) …` / `shutdown: SIGTERM received, closing the listener` |
 

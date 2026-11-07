@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The FC-awareness wave: the client's modbus errors **name the function
+code that failed** — an fc4-marked source on an FC3-only device now logs
+`inverter … unreachable: FC4 modbus exception, code 1` instead of a bare
+`modbus exception, code 1` (the shared `FC_NAMES`/`describe_fc()` table
+lives in common/protocol.py; the cache's upstream client carries the
+same shape).
+
 The state-machinery wave: `dump_settings`/`apply_dump_settings` land on
 the control server — the **state dump** (`dump/path`, `dump/restore-on-start`
 lives + the `--dump-path`/`--restore-on-start` flags/env/NixOS options;

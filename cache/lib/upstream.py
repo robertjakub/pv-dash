@@ -83,8 +83,8 @@ class Upstream:
             raise ModbusError('reply from unit id %d, expected %d' % (unit, self.unit))
         func = body[0]
         if func == fc + 0x80:
-            raise DeviceError('modbus exception, code %d' % (body[1] if len(body) > 1 else -1),
-                              body[1] if len(body) > 1 else -1)
+            code = body[1] if len(body) > 1 else -1
+            raise DeviceError('FC%d modbus exception, code %d' % (fc, code), code)
         if func != fc:
             raise ModbusError('unexpected function byte 0x%02x' % func)
         if len(body) < 2:

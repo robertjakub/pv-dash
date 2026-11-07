@@ -68,6 +68,13 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **scraper / cache** — **the client-side modbus errors name the
+  function code that failed**: `FC4 modbus exception, code 1` (was
+  `modbus exception, code 1`) — the scraper's `inverter … unreachable`
+  warnings and the cache's `poll of … failed` lines carry the failing
+  read's FC (an fc4-marked source on an FC3-only device reads as such
+  now).
+
 - **everywhere** — **the show verb refuses the secrets**: `show
   control/token` (the ops token, `metrics/token`, `auth/token`, the
   `-file` spellings) answers `err <name> is a secret — it never shows

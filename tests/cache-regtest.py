@@ -402,7 +402,7 @@ try:
             'the reply mac does not verify: %r' % obj
         return '%s %s' % (obj.get('status'), obj.get('text', ''))
 
-    start([sys.executable, F, '--static', '--port', '15512', '--control-port', '0'])
+    start([sys.executable, F, '--static', '--port', '15512', '--control-port', '0', '--allow-write'])
     # the shipped example selection: the essential set, by name
     SEL = os.path.join(CACHE_DIR, 'selection.json')
     start([sys.executable, P, '--upstream', '127.0.0.1:15512',

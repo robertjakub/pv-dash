@@ -12,6 +12,27 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **cache** — **the upstream auth speaks the Waveshare TCP connection
+  password** (`--auth-upstream waveshare`, idea and patches from MK): a
+  Waveshare RS485-to-TCP gateway guards its serial side with an optional
+  connection password, and the cache presents the shared
+  auth-upstream-key as exactly that — the password goes out raw (ASCII
+  bytes, no framing) right after every (re)connect and the gateway's
+  `OK` opens the plain Modbus session, while anything else (or nothing —
+  the socket timeout bounds the wait) fails the exchange like any other
+  upstream fault and the poller retries. The scheme joins `suite` and
+  `none` on the upstream leg only (`--auth-upstream suite|waveshare|none`;
+  the cache's own clients still speak suite or nothing), the handshake
+  rides `common/protocol.py` beside the suite pair
+  (`waveshare_handshake_client`), the key's floor is the scheme's (suite
+  ≥ 16 characters, waveshare non-empty ASCII — a key set while no scheme
+  is chosen is dormant material, the floor bites when the scheme names
+  it, and going `suite` over a short standing key refuses on the live
+  `set`), and the registry row, the NixOS module enum, the man page, the
+  README, docs/MODBUS.md (the wire section) and the regtest (a
+  stand-in gateway: the proved session, the wrong-password drop, the
+  reconnect re-proofs, the dormant-key live flow) follow.
+
 - **docker** — **the Dockerfiles and the image tags speak the daemon
   names** (`Dockerfile.inverter` → `Dockerfile.fake-inverter`,
   `Dockerfile.cache` → `Dockerfile.modbus-cache`, `Dockerfile.scraper` →

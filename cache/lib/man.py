@@ -37,7 +37,12 @@ HMAC\\-SHA256 proof; the cache answers \\fBOK\\fR (plain Modbus follows)
 or \\fBERR\\fR (the client is dropped before it ever sees a frame).
 \\fB--auth-upstream\\fR/\\fB--auth-upstream-key\\fR do the same toward
 the inverter: an \\fBERR\\fR fails the exchange like any other upstream
-fault and the poller retries. Empty auth (the default) = no auth at all.
+fault and the poller retries. The upstream leg also speaks
+\\fB--auth-upstream waveshare\\fR for a Waveshare RS485\\-to\\-TCP
+gateway: the shared key goes out as the gateway's connection password
+(raw ASCII, right after every connect) and the gateway's \\fBOK\\fR opens
+the plain Modbus session \\(em anything else fails the exchange like any
+other upstream fault. Empty auth (the default) = no auth at all.
 .PP
 Resilience: when the device dies, cached reads keep serving last-known
 values and forwarded reads get exception 0x0B; when the device rejects a

@@ -22,8 +22,8 @@ import threading
 import time
 
 from common.version import version_string
-from common.config import default_profile_path, parse_auth_type, parse_upstream, resolve_profile_file, \
-    load_token_file, parse_secret
+from common.config import auth_key_floor_error, default_profile_path, parse_auth_type, parse_upstream, \
+    resolve_profile_file, load_token_file, parse_secret
 from common.dump import SECRET_REMOVED, dump_filter
 from common.protocol import AUTH_MIN_KEY
 from common.cred import peer_uid, parse_trust_uids
@@ -588,12 +588,18 @@ class ControlServer:
             return '<set>'
         if key == 'modbus/auth-upstream':
             try:
-                v = parse_auth_type(val, 'modbus/auth-upstream')
+                v = parse_auth_type(val, 'modbus/auth-upstream', schemes=('suite', 'waveshare'))
             except SystemExit as e:
                 raise ValueError(str(e))
-            if v and not p.config.get('auth_upstream_key'):
-                raise ValueError('the suite auth needs a key: set modbus auth-upstream-key <value> first '
-                                 '(min %d characters)' % AUTH_MIN_KEY)
+            standing = p.config.get('auth_upstream_key')
+            if v and not standing:
+                raise ValueError('the %s auth needs a key: set modbus auth-upstream-key <value> first%s'
+                                 % (v, ' (min %d characters)' % AUTH_MIN_KEY if v == 'suite' else ''))
+            if v and standing is not None:
+                err = auth_key_floor_error(v, standing)
+                if err:
+                    raise ValueError('the %s auth rejects the standing key (modbus/auth-upstream-key %s) — '
+                                     'set modbus auth-upstream-key <value> first' % (v, err))
             p.config['auth_upstream'] = v
             p.upstream.auth = v
             p.upstream.close()   # the session re-proves the new scheme on the next exchange
@@ -603,9 +609,10 @@ class ControlServer:
                 v = parse_secret(val, 'modbus/auth-upstream-key')   # file: reads the first line of an owner-only file
             except SystemExit as e:
                 raise ValueError(str(e))
-            if v is not None and len(v) < AUTH_MIN_KEY:
-                raise ValueError('modbus/auth-upstream-key must be at least %d characters, got %d'
-                                 % (AUTH_MIN_KEY, len(v)))
+            if v is not None:
+                err = auth_key_floor_error(p.config.get('auth_upstream'), v)
+                if err:
+                    raise ValueError('modbus/auth-upstream-key %s' % err)
             p.config['auth_upstream_key'] = v
             p.upstream.auth_key = v
             p.upstream.close()   # the session re-proves the new key on the next exchange

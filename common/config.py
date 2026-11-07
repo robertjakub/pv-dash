@@ -142,25 +142,52 @@ def load_token_file(path, label='control-token-file'):
     return token
 
 
-def parse_auth_type(text, label='auth'):
+def parse_auth_type(text, label='auth', schemes=('suite',)):
     """The Modbus auth scheme: '' / none / off -> None (no auth at all —
-    the default); 'suite' -> 'suite' (the crypt handshake after every
-    connect); anything else fails fast with a clean one-liner."""
+    the default); one of `schemes` — the suite crypt handshake everywhere,
+    and the cache's upstream leg also speaks the Waveshare gateway
+    connection password; anything else fails fast with a clean one-liner."""
     t = (text or '').strip().lower()
     if t in ('', 'none', 'off'):
         return None
-    if t == 'suite':
-        return 'suite'
-    raise SystemExit("invalid %s = %r: use 'suite', or none/empty for no auth" % (label, text))
+    if t in schemes:
+        return t
+    raise SystemExit('invalid %s = %r: use %s, or none/empty for no auth'
+                     % (label, text, ' / '.join("'%s'" % s for s in schemes)))
 
 
-def check_auth_key(key, label='auth-key'):
-    """The suite handshake key's floor: at least 16 characters when set
-    (an empty/None key is the no-auth state, fine)."""
-    if key is None:
+def auth_key_floor_error(kind, key):
+    """The scheme's floor on a handshake key, as a short error phrase or
+    None when the key passes: 'suite' needs at least AUTH_MIN_KEY
+    characters; 'waveshare' needs non-empty ASCII (the gateway password
+    travels as raw bytes); None (a key set while the scheme is still
+    undecided) is dormant material — anything non-empty goes, the
+    scheme's floor bites when the scheme names it."""
+    if not key:
+        return 'cannot be empty'
+    if kind == 'waveshare':
+        try:
+            key.encode('ascii')
+        except UnicodeEncodeError:
+            return 'must be ASCII (the Waveshare password travels as raw bytes)'
+        return None
+    if kind is None:
         return None
     if len(key) < AUTH_MIN_KEY:
-        raise SystemExit('invalid %s: at least %d characters, got %d' % (label, AUTH_MIN_KEY, len(key)))
+        return 'must be at least %d characters, got %d' % (AUTH_MIN_KEY, len(key))
+    return None
+
+
+def check_auth_key(key, label='auth-key', kind='suite'):
+    """The handshake key's floor (auth_key_floor_error) raised as a
+    SystemExit. The kind is the resolved scheme: 'suite' — the default
+    every suite-only leg means, 'waveshare', or None (dormant). An
+    empty/None key is the no-auth state, fine."""
+    if key is None:
+        return None
+    err = auth_key_floor_error(kind, key)
+    if err:
+        raise SystemExit('invalid %s: %s' % (label, err))
     return key
 
 

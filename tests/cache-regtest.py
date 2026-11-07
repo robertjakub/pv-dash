@@ -1923,6 +1923,207 @@ print('mode 0600 ok')
     check('suite auth: a short key fails the config fast',
           r.returncode != 0 and 'at least 16 characters' in r.stderr, r.stderr[-160:])
 
+    # 6b-10. the waveshare upstream auth: the cache presents the shared key
+    #        as a Waveshare gateway's connection password — raw ASCII after
+    #        every connect, OK opens the session, anything else kills it
+    from common.protocol import waveshare_handshake_client
+
+    class WavesharePeer:
+        """A stand-in gateway: the first bytes on a connection must be the
+        password (raw), the verdict is OK or NO+drop, then canned MBAP
+        FC3/FC4 answers (echoing txn/unit, count*2 words)."""
+
+        def __init__(self, port, password):
+            self.password = password.encode('ascii')
+            self.ok_attempts = 0
+            self.bad_attempts = 0
+            self.lock = threading.Lock()
+            self.srv = socket.socket()
+            self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.srv.bind(('127.0.0.1', port))
+            self.srv.listen(16)
+            threading.Thread(target=self._accept_loop, daemon=True).start()
+
+        def _accept_loop(self):
+            while True:
+                try:
+                    conn, _ = self.srv.accept()
+                except OSError:
+                    return
+                threading.Thread(target=self._serve, args=(conn,), daemon=True).start()
+
+        def _serve(self, conn):
+            try:
+                conn.settimeout(5)
+                got = b''
+                while len(got) < len(self.password):
+                    chunk = conn.recv(len(self.password) - len(got))
+                    if not chunk:
+                        return
+                    got += chunk
+                if got != self.password:
+                    with self.lock:
+                        self.bad_attempts += 1
+                    conn.sendall(b'NO')
+                    return
+                with self.lock:
+                    self.ok_attempts += 1
+                conn.sendall(b'OK')
+                while True:
+                    head = b''
+                    while len(head) < 7:
+                        chunk = conn.recv(7 - len(head))
+                        if not chunk:
+                            return
+                        head += chunk
+                    t, p, l, u = struct.unpack('>HHHB', head)
+                    pdu = b''
+                    while len(pdu) < l - 1:
+                        chunk = conn.recv(l - 1 - len(pdu))
+                        if not chunk:
+                            return
+                        pdu += chunk
+                    fc, addr, count = struct.unpack('>BHH', pdu[:5])
+                    if fc in (3, 4):
+                        conn.sendall(struct.pack('>HHHB', t, 0, 3 + count * 2, u)
+                                     + bytes([fc, count * 2]) + b'\x12\x34' * count)
+                    else:
+                        conn.sendall(struct.pack('>HHHB', t, 0, 3, u) + bytes([fc + 0x80, 1]))
+            except OSError:
+                pass
+            finally:
+                try:
+                    conn.close()
+                except OSError:
+                    pass
+
+    WS_FAKE, WS_PORT, WS_CTL = 15565, 15566, 15567
+    GW_KEY = 'gw-pass1'
+    ws = WavesharePeer(WS_FAKE, GW_KEY)
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
+           '--listen', '127.0.0.1:%d' % WS_PORT, '--profile', R,
+           '--timeout', '2', '--interval', '2',
+           '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
+           '--auth-upstream', 'waveshare', '--auth-upstream-key', GW_KEY],
+          log='/tmp/reg_ws_cache.log')
+    time.sleep(1.2)
+
+    def ctl_ws(*cmds):
+        r = subprocess.run([sys.executable, os.path.join(CACHE_DIR, 'bin', 'modbus-cache-ctl.py'),
+                            '--control-port', str(WS_CTL), '--control-token', 'ctok-w'] + list(cmds),
+                           capture_output=True, text=True, timeout=15)
+        return r.stdout.strip()
+
+    logw = open('/tmp/reg_ws_cache.log').read()
+    check('waveshare auth: the start log names the scheme',
+          'client auth: none, upstream auth: waveshare' in logw, logw[-200:])
+    for _ in range(40):
+        r = ctl_ws('show', 'status')
+        if 'poll=ok' in r:
+            break
+        time.sleep(0.5)
+    check('waveshare auth: the gateway password opens the poll', 'poll=ok' in r, r[-200:])
+    check('waveshare auth: the gateway saw the password (no bad attempts)',
+          ws.ok_attempts >= 1 and ws.bad_attempts == 0,
+          'ok=%d bad=%d' % (ws.ok_attempts, ws.bad_attempts))
+    r = ctl_ws('show', 'status')
+    check('waveshare auth: show status carries upstream_auth=waveshare',
+          'upstream_auth=waveshare' in r, r[:200])
+    # the reconnect re-proves: the restart verb drops the session, the next
+    # poll dials fresh and hands the password over again
+    ok_before = ws.ok_attempts
+    r = ctl_ws('restart')
+    check('waveshare auth: the restart verb restarts the upstream session',
+          r.startswith('ok upstream session restarted'), r[:100])
+    for _ in range(40):
+        if ws.ok_attempts > ok_before:
+            break
+        time.sleep(0.5)
+    check('waveshare auth: the reconnect hands the password over again',
+          ws.ok_attempts > ok_before, 'ok=%d' % ws.ok_attempts)
+    r = ctl_ws('show', 'status')
+    check('waveshare auth: the poll recovers after the restart', 'poll=ok' in r, r[-200:])
+    # live rotation under waveshare: a new (non-empty, short) password is
+    # accepted, the session drops, the old password now fails, the poll goes
+    # down; back to the gateway's password and the poll recovers
+    r = ctl_ws('set', 'modbus', 'auth-upstream-key', 'gw-pass2')
+    check('waveshare auth: a short password rotates live (non-empty is the floor)',
+          r.startswith('ok modbus/auth-upstream-key=<set>'), r[:100])
+    for _ in range(200):
+        r = ctl_ws('show', 'status')
+        if 'poll=down' in r:
+            break
+        time.sleep(0.5)
+    check('waveshare auth: the rotated password fails against the gateway (poll=down)',
+          'poll=down' in r, r[-200:])
+    check('waveshare auth: the gateway counted the bad attempts',
+          ws.bad_attempts >= 1, 'bad=%d' % ws.bad_attempts)
+    logw = open('/tmp/reg_ws_cache.log').read()
+    check('waveshare auth: the failed proofs land in the log as exchange errors',
+          'Waveshare TCP auth failed' in logw, logw[-200:])
+    r = ctl_ws('set', 'modbus', 'auth-upstream-key', GW_KEY)
+    check('waveshare auth: the gateway password rotates back',
+          r.startswith('ok modbus/auth-upstream-key=<set>'), r[:100])
+    for _ in range(40):
+        r = ctl_ws('show', 'status')
+        if 'poll=ok' in r:
+            break
+        time.sleep(0.5)
+    check('waveshare auth: the poll recovers under the restored password', 'poll=ok' in r, r[-200:])
+    # the dormant flow: scheme none first, then the short password (the
+    # suite floor would refuse it — dormant material passes), then the
+    # scheme — and the poll proves the pairing end to end
+    r = ctl_ws('set', 'modbus', 'auth-upstream', 'none')
+    check('waveshare auth: the upstream auth disables live',
+          r.startswith('ok modbus/auth-upstream=none'), r[:100])
+    r = ctl_ws('set', 'modbus', 'auth-upstream-key', 'shorty')
+    check('waveshare auth: a short key with no scheme set is accepted (dormant)',
+          r.startswith('ok modbus/auth-upstream-key=<set>'), r[:100])
+    r = ctl_ws('set', 'modbus', 'auth-upstream', 'suite')
+    check('waveshare auth: going suite over a short standing key refuses',
+          r.startswith('err the suite auth rejects the standing key'), r[:120])
+    r = ctl_ws('set', 'modbus', 'auth-upstream', 'waveshare')
+    check('waveshare auth: the dormant key wakes with the scheme',
+          r.startswith('ok modbus/auth-upstream=waveshare'), r[:100])
+    for _ in range(200):
+        r = ctl_ws('show', 'status')
+        if 'poll=down' in r:
+            break
+        time.sleep(0.5)
+    check('waveshare auth: the dormant short key fails against the gateway (poll=down)',
+          'poll=down' in r, r[-200:])
+    r = ctl_ws('set', 'modbus', 'auth-upstream', 'none')
+    check('waveshare auth: the upstream auth disables again', r.startswith('ok'), r[:60])
+    # the start-time grammar: the waveshare fast-fails and the dry-run accept
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
+                        '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
+                        '--auth-upstream', 'waveshare'], capture_output=True, text=True, timeout=15)
+    check('waveshare auth: waveshare without a key fails the config fast',
+          r.returncode != 0 and 'needs a key' in r.stderr, r.stderr[-160:])
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
+                        '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
+                        '--auth-upstream', 'waveshare', '--auth-upstream-key', 'pässwört'],
+                       capture_output=True, text=True, timeout=15)
+    check('waveshare auth: a non-ASCII password fails the config fast',
+          r.returncode != 0 and 'ASCII' in r.stderr, r.stderr[-160:])
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
+                        '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
+                        '--auth-upstream', 'waveshare', '--auth-upstream-key', GW_KEY],
+                       capture_output=True, text=True, timeout=15)
+    check('waveshare auth: the dry-run accepts the waveshare pair',
+          r.returncode == 0 and 'dry-run' in (r.stdout + r.stderr), (r.stdout + r.stderr)[-160:])
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
+                        '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
+                        '--auth-upstream', 'bogus'], capture_output=True, text=True, timeout=15)
+    check('waveshare auth: a bogus upstream scheme names both schemes',
+          r.returncode != 0 and "use 'suite' / 'waveshare'" in r.stderr, r.stderr[-160:])
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
+                        '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
+                        '--auth', 'waveshare', '--auth-key', 'x' * 16],
+                       capture_output=True, text=True, timeout=15)
+    check('waveshare auth: waveshare on the client leg fails the config fast (upstream only)',
+          r.returncode != 0 and "use 'suite'" in r.stderr, r.stderr[-160:])
+
     # 7. clean shutdowns
     r = cli('shutdown\n\n', 15514)
     time.sleep(1)

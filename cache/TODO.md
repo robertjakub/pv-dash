@@ -5,6 +5,19 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The Waveshare upstream-auth wave: **`--auth-upstream waveshare`** — the
+cache presents the shared auth-upstream-key as a **Waveshare
+RS485-to-TCP gateway's connection password** (the upstream-only scheme
+beside suite/none): the password goes out raw (ASCII bytes, no framing)
+right after every (re)connect and the gateway's `OK` opens the plain
+Modbus session; anything else or silence (the socket timeout bounds the
+wait) fails the exchange like any other upstream fault and the poller
+retries. The handshake is `waveshare_handshake_client` in
+`common/protocol.py`, beside the suite pair; the key's floor is the
+scheme's (suite ≥ 16 characters, waveshare non-empty ASCII, a key with
+no scheme yet dormant); the live `set` enforces the pair's invariant
+(including refusing to go `suite` over a short standing key).
+
 The profile write-acl wave: **`write-registers` speaks the device
 profile** — the new `profile` value compiles the register gate out of the
 profile's `"acl"`/`"write"` tree: an allow/deny object (the deny wins, an

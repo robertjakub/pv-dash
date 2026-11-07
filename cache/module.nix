@@ -161,13 +161,16 @@ in
     };
 
     authUpstream = lib.mkOption {
-      type = lib.types.nullOr (lib.types.enum [ "suite" ]);
+      type = lib.types.nullOr (lib.types.enum [ "suite" "waveshare" ]);
       default = null;
       description = ''
         The auth scheme toward the upstream inverter: "suite" proves the
-        shared authUpstreamKey with the same crypt handshake right after
-        every connect (the peer answers OK, or ERR and the connection
-        fails — the poller keeps retrying). null = no auth at all.
+        shared authUpstreamKey with the crypt handshake right after every
+        connect (the peer answers OK, or ERR and the connection fails —
+        the poller keeps retrying); "waveshare" sends the shared
+        authUpstreamKey as the Waveshare TCP connection password right
+        after every connect (the gateway answers OK, or anything else or
+        nothing and the connection fails). null = no auth at all.
       '';
     };
 
@@ -175,8 +178,9 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = ''
-        The shared key the cache proves to the upstream inverter with the
-        suite handshake (min 16 characters). Needs authUpstream = "suite".
+        The key the cache presents to the upstream inverter: the suite
+        handshake's shared key (min 16 characters) or the Waveshare TCP
+        connection password (non-empty ASCII). Needs authUpstream.
       '';
     };
 

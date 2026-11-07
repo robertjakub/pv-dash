@@ -21,7 +21,7 @@ Clients use `socket.create_connection`; servers `bind`/`listen`. Every
 multi-byte field is **big-endian** (`struct` format `>`).
 
 Each frame is the standard **MBAP header (7 bytes) + PDU**, read with
-`recv_exact` (`common/protocol.py:110`), which loops until it has exactly
+`recv_exact` (`common/protocol.py:143`), which loops until it has exactly
 `n` bytes and raises `ConnectionError` on a closed peer:
 
 | Offset | Size | Field | Notes |
@@ -116,11 +116,40 @@ transport security layer. Keys are secrets: min 16 characters (enforced at
 start and on live `set`), never rendered back, loadable via `file:<path>`
 from an owner-only `0600` file.
 
+### The Waveshare connection password (`waveshare` — cache upstream only)
+
+Implemented once in `common/protocol.py` (`waveshare_handshake_client`,
+beside the suite pair). A Waveshare RS485-to-TCP gateway guards its serial
+side with an optional connection password, and the cache's upstream leg
+speaks it (`--auth-upstream waveshare`): after the TCP connect and before
+any Modbus frame, the cache sends the shared auth-upstream-key as the
+password itself — **raw ASCII bytes, no framing, no length prefix** — and
+waits for the gateway's verdict:
+
+1. TCP connect succeeds (the socket timeout is already armed).
+2. Client `sendall(password.encode('ascii'))` — one write, no wrapper.
+3. The gateway answers `OK` (the session then speaks plain Modbus TCP);
+   anything else — a wrong password's rejection, a non-Waveshare peer's
+   Modbus exception frame, silence (the socket timeout bites), an early
+   EOF — raises `ModbusError('Waveshare TCP auth failed: …')` (a
+   non-ASCII key never even reaches the wire: the config floors refuse
+   it, and the handshake backs that up).
+4. The reply is read in 2-byte chunks up to 16 bytes, stopping at the
+   first `OK` — the verdict arrives inside a few bytes on a real gateway.
+
+Failure handling is the suite discipline verbatim: the handshake runs on
+every (re)connect, inside the exchange — a failed proof counts as an
+exchange error (`errors`, `last_error`), the connector fails like any
+other device failure, the socket drops and the next poll interval retries.
+No retry count, no backoff at the Modbus layer. The scheme exists only on
+the cache's upstream leg — the gateway firmware is the other side, and no
+pv-suite tool ever demands a Waveshare password from its own clients.
+
 ---
 
 ## 3. Function codes
 
-The one table is `FC_NAMES` (`common/protocol.py:75`); `describe_fc`
+The one table is `FC_NAMES` (`common/protocol.py:108`); `describe_fc`
 renders `FC6 (write single register)` or bare `FC<n>` for unlisted codes.
 
 | FC | Name | Cache | Scraper | Fake |
@@ -225,7 +254,7 @@ never cached).
 
 ## 6. Exceptions
 
-The builder is `exception_frame` (`common/protocol.py:122`): a PDU of
+The builder is `exception_frame` (`common/protocol.py:155`): a PDU of
 `[func | 0x80, code]`, `length = 3`. Codes the suite generates
 (`cache/lib/static.json`):
 
@@ -341,7 +370,7 @@ path as words normalize to the canonical key.
 |---|---|---|---|---|
 | `auth` | `--auth suite\|none` | `AUTH` | `modbus/auth` | all three |
 | `auth-key` *(secret)* | `--auth-key` | `AUTH_KEY` | `modbus/auth/key` | all three |
-| `auth-upstream` | `--auth-upstream suite\|none` | `AUTH_UPSTREAM` | `modbus/auth-upstream` | cache |
+| `auth-upstream` | `--auth-upstream suite\|waveshare\|none` | `AUTH_UPSTREAM` | `modbus/auth-upstream` | cache |
 | `auth-upstream-key` *(secret)* | `--auth-upstream-key` | `AUTH_UPSTREAM_KEY` | `modbus/auth-upstream-key` | cache |
 | `upstream` | `--upstream HOST:PORT` | `UPSTREAM` | `modbus/upstream` | cache, scraper |
 | `unit` / `modbus-unit` | `--unit` / `--modbus-unit` | `UNIT` / `MODBUS_UNIT` | `modbus/unit` | cache, scraper, fake (flag only) |
@@ -352,12 +381,18 @@ path as words normalize to the canonical key.
 | `connect-acl` | `--connect-acl` | `CONNECT_ACL` | `acl/connect` | cache, fake |
 | `write-acl` | `--write-acl` | `WRITE_ACL` | `acl/write` | cache |
 
-Validation: `parse_auth_type` accepts `suite`, or `none`/empty for none —
-anything else exits with `use 'suite', or none/empty for no auth`
-(`common/config.py:145`). `check_auth_key` demands ≥ 16 characters.
+Validation: `parse_auth_type` accepts the leg's schemes — `suite`
+everywhere, the cache's upstream leg also `waveshare` — or `none`/empty
+for none; anything else exits with `use 'suite', or none/empty for no
+auth` (the upstream leg names both: `use 'suite' / 'waveshare', …`)
+(`common/config.py`). `check_auth_key` enforces the scheme's floor:
+≥ 16 characters for `suite`, non-empty ASCII for `waveshare` (the
+password travels as raw bytes), and a key set while no scheme is chosen
+yet is dormant material — the floor bites when the scheme names it.
 `parse_secret` takes an inline value or `file:<path>` (first line of an
-owner-only `0600` file). Starting with `suite` and no key refuses at
-start; the live `set` enforces the same.
+owner-only `0600` file). Starting with a scheme and no key refuses at
+start; the live `set` enforces the same (including going `suite` while a
+short waveshare password stands as the key).
 
 Secret behavior: the keys never render — `show modbus auth key` answers
 `err modbus/auth/key is a secret — it never shows`; dumps render

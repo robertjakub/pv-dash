@@ -168,8 +168,8 @@ with a clean one-line error instead of failing later at runtime.
 | `--timeout` | `3` | Modbus connect/read timeout, seconds |
 | `--auth` | `none` | the auth scheme the cache's **own Modbus clients** must speak: `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect — the cache answers `OK` and the session speaks plain Modbus, or `ERR` and the client is dropped before it ever sees a frame; `none`/empty = no auth at all — see [Modbus auth](#modbus-auth) (config `set modbus auth`, env `AUTH`) |
 | `--auth-key` | none | the shared key the cache's clients prove with the suite handshake, **min 16 characters**; the value may be `file:<path>` — the first line of an owner-only `0600` file (config `set modbus auth key`, env `AUTH_KEY`) |
-| `--auth-upstream` | `none` | the auth scheme **toward the upstream inverter**: `suite` proves the shared key with the same handshake after every connect — the peer answers `OK`, or `ERR` and the connection fails (the poller keeps retrying); `none`/empty = no auth at all — see [Modbus auth](#modbus-auth) (config `set modbus auth-upstream`, env `AUTH_UPSTREAM`) |
-| `--auth-upstream-key` | none | the shared key the cache proves to the upstream inverter, **min 16 characters**; the value may be `file:<path>` (config `set modbus auth-upstream-key`, env `AUTH_UPSTREAM_KEY`) |
+| `--auth-upstream` | `none` | the auth scheme **toward the upstream inverter**: `suite` proves the shared key with the same handshake after every connect — the peer answers `OK`, or `ERR` and the connection fails (the poller keeps retrying); `waveshare` presents the shared key as the Waveshare TCP connection password after every connect (the gateway answers `OK`, or anything else and the connection fails); `none`/empty = no auth at all — see [Modbus auth](#modbus-auth) (config `set modbus auth-upstream`, env `AUTH_UPSTREAM`) |
+| `--auth-upstream-key` | none | the key the cache presents to the upstream inverter — the suite handshake's shared key (**min 16 characters**) or the Waveshare gateway password (non-empty ASCII); the value may be `file:<path>` (config `set modbus auth-upstream-key`, env `AUTH_UPSTREAM_KEY`) |
 | **Proxy** | | |
 | `--listen` | `127.0.0.1:15502` | proxy listen address `HOST:PORT` (loopback by default) |
 | `--profile` | the bundled `sun2000` profile | device profile JSON to cache (see above) |
@@ -312,7 +312,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token`/`metrics token-file` (rotate live; the value never renders back), `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write`, `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the suite schemes and keys, both legs), `control port` (rebinds the listener live), `control token`/`control token-file` and `control ops token`/`control ops token-file` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
+| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token`/`metrics token-file` (rotate live; the value never renders back), `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write`, `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the auth schemes and keys, both legs — the upstream leg speaks suite or waveshare), `control port` (rebinds the listener live), `control token`/`control token-file` and `control ops token`/`control ops token-file` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
 | `set`/`unset` a startup-only knob | the registry's `restart: true` rows answer the note: `% restart required (startup-only knob)` — the config (and a SIGHUP, or a restart) changes them; `show <knob>` renders the configured value (a **secret knob refuses to show** — the value renders nowhere) |
 | `show <setting>` | the bare live value of one tunable |
@@ -496,18 +496,30 @@ The two legs are configured separately, with separate keys:
   *presents* to the upstream inverter (the client side): with
   `--auth-upstream suite`, every (re)connect handshakes first; an `ERR`
   fails the poll cycle like any other upstream failure and the poller
-  retries.
+  retries. `--auth-upstream waveshare` speaks to a **Waveshare
+  RS485-to-TCP gateway** instead: the gateway guards its serial side with
+  an optional connection password, and the cache presents the shared
+  auth-upstream-key as exactly that — the password goes out raw (ASCII
+  bytes, no framing) right after every (re)connect, and the gateway's
+  `OK` opens the plain Modbus session; anything else (or nothing — a
+  wrong password gets the connection dropped) fails the poll cycle and
+  the poller retries. The upstream-only scheme of the pair: the cache's
+  own clients always speak `suite` or nothing.
 
-Both keys are secrets (min 16 characters — enforced at start and on the
-live `set`; they never render back, and `file:<path>` references load from
-an owner-only `0600` file). Both knobs are live-settable: `set modbus auth
-suite` gates the next connection (standing sessions keep theirs), and `set
-modbus auth-upstream …` drops the upstream session so the next exchange
-re-proves under the new material. The peer must speak the same scheme with
-the same key — the fake inverter serves the server side (`--auth
-suite --auth-key …`) and the scraper speaks the client side (`--auth
-suite --auth-key …`), so a chain scraper → cache → inverter can run suite
-auth on either hop independently.
+Both keys are secrets (enforced at start and on the live `set`; they
+never render back, and `file:<path>` references load from an owner-only
+`0600` file). The floor is the scheme's: the suite handshake needs at
+least 16 characters, the Waveshare gateway password needs non-empty
+ASCII — a key set while no scheme is chosen yet is dormant material, and
+the floor bites when the scheme names it. Both knobs are live-settable:
+`set modbus auth suite` gates the next connection (standing sessions
+keep theirs), and `set modbus auth-upstream …` drops the upstream session
+so the next exchange re-proves under the new material. The peer must
+speak the same scheme with the same key — the fake inverter serves the
+server side (`--auth suite --auth-key …`) and the scraper speaks the
+client side (`--auth suite --auth-key …`), so a chain
+scraper → cache → inverter can run suite auth on either hop
+independently.
 
 ## Write-through invalidation
 
@@ -785,8 +797,8 @@ START:COUNT allow-list, `any` or `none`; null = the proxy default
 `none`), `connectAcl` (`any`/`none`/prefixes; null = `any`),
 `writeAcl` (`any`/`none`/prefixes; null = the proxy default `none`),
 `auth`/`authKey` (the suite scheme + key the cache's clients must speak;
-null = no auth), `authUpstream`/`authUpstreamKey` (the suite scheme + key
-toward the inverter; null = no auth),
+null = no auth), `authUpstream`/`authUpstreamKey` (the scheme + key toward
+the inverter — suite or waveshare; null = no auth),
 `maxClients`, `clientTimeout`, `logLevel`, `localTime`,
 `logAccess`, `openFirewall`, `auditLog` (null = the trail goes to
 **stdout**, which journald captures — the hardened service cannot write

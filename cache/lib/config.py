@@ -321,7 +321,8 @@ def validate_config(cfg):
     proper error, on SIGHUP the reload watcher keeps the previous settings.
     """
     def fail(key, rule):
-        raise SystemExit('invalid %s = %r: %s' % (key, cfg.get(key), rule))
+        shown = cfg.get(key, cfg.get(key.replace('-', '_')))   # the label keeps the knob's dash spelling
+        raise SystemExit('invalid %s = %r: %s' % (key, shown, rule))
 
     if not 1 <= cfg['port'] <= 65535:
         fail('port', 'must be 1..65535')
@@ -353,8 +354,9 @@ def validate_config(cfg):
     if cfg['auth'] and not cfg['auth_key']:
         fail('auth', "the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)")
     if cfg['auth_upstream'] and not cfg['auth_upstream_key']:
-        fail('auth-upstream', "the suite auth needs a key: set --auth-upstream-key/$AUTH_UPSTREAM_KEY too "
-                              "(min 16 characters)")
+        fail('auth-upstream', "the %s auth needs a key: set --auth-upstream-key/$AUTH_UPSTREAM_KEY too%s"
+                              % (cfg['auth_upstream'],
+                                 ' (min 16 characters)' if cfg['auth_upstream'] == 'suite' else ''))
     if cfg['level'] not in LOG_LEVELS:
         fail('log-level', 'must be one of %s' % ', '.join(LOG_LEVELS))
     if cfg['audit_max_mb'] < 0:
@@ -441,6 +443,9 @@ def resolve_config(args, script_dir=None):
     upstream = resolve(getattr(args, 'upstream', None), 'UPSTREAM', 'upstream',
                        DEFAULTS['upstream'], str)
     host, port = parse_upstream(upstream or DEFAULTS['upstream'])
+    upstream_auth = parse_auth_type(
+        resolve(getattr(args, 'auth_upstream', None), 'AUTH_UPSTREAM', 'auth_upstream', '', str),
+        'auth-upstream', schemes=('suite', 'waveshare'))
     cfg = {
         'upstream': '%s:%d' % (host, port),
         'host': host,
@@ -451,12 +456,11 @@ def resolve_config(args, script_dir=None):
         'auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
                           or '').strip() or None, 'auth-key'), 'auth-key'),
-        'auth_upstream': parse_auth_type(resolve(getattr(args, 'auth_upstream', None), 'AUTH_UPSTREAM',
-                                                 'auth_upstream', '', str), 'auth-upstream'),
+        'auth_upstream': upstream_auth,
         'auth_upstream_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'auth_upstream_key', None), 'AUTH_UPSTREAM_KEY',
                                   'auth_upstream_key', '', str) or '').strip() or None, 'auth-upstream-key'),
-            'auth-upstream-key'),
+            'auth-upstream-key', kind=upstream_auth),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
         'interval': interval,
         'read_delay': resolve(args.read_delay, 'READ_DELAY', 'read_delay', DEFAULTS['read_delay_s'], float),

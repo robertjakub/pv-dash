@@ -1,9 +1,9 @@
 """The Modbus TCP wire core shared by the tools (stdlib only): the error
 type, the recv-exact loop, the exception-frame builder, the function
-code table and the suite auth handshake. The client (scraper, cache
-upstream) and the servers (cache listener, fake inverter) layer their own
-framing on top; the per-tool limits come from each tool's lib/static.json
-(see its statics.py)."""
+code table, the suite auth handshake and the Waveshare connection-password
+handshake. The client (scraper, cache upstream) and the servers (cache
+listener, fake inverter) layer their own framing on top; the per-tool
+limits come from each tool's lib/static.json (see its statics.py)."""
 import hashlib
 import hmac
 import secrets
@@ -67,6 +67,39 @@ def auth_handshake_server(sock, key):
         return True
     sock.sendall(AUTH_ERR)
     return False
+
+
+# --- the Waveshare TCP connection password -----------------------------------
+# The Waveshare RS485-to-TCP gateways guard their serial side with an
+# optional connection password: the first bytes on a fresh TCP connection
+# are the password itself — raw ASCII, no framing, no length prefix — and
+# the gateway answers OK (the session speaks plain Modbus from there) or
+# anything else / nothing at all (the connection is dead: the client
+# raises, the connector fails, the usual reconnect logic tries again).
+# Same discipline as the suite handshake above: every (re)connect
+# re-proves, the socket timeout bounds the wait, and a failed proof is an
+# ordinary exchange error.
+WAVESHARE_REPLY_MAX = 16      # the verdict arrives inside a few bytes
+
+
+def waveshare_handshake_client(sock, password):
+    """The client side of the Waveshare TCP connection-password handshake:
+    send the password raw, then wait for the gateway's OK — the recv is
+    bounded by the socket timeout. Returns on OK; raises ModbusError on
+    anything else (a wrong password, a peer that is not a Waveshare
+    gateway, silence, an early EOF)."""
+    try:
+        sock.sendall(password.encode('ascii'))
+    except UnicodeEncodeError:
+        raise ModbusError('the Waveshare password must be ASCII')
+    resp = b''
+    while b'OK' not in resp and len(resp) < WAVESHARE_REPLY_MAX:
+        chunk = sock.recv(2)
+        if not chunk:
+            break
+        resp += chunk
+    if b'OK' not in resp:
+        raise ModbusError('Waveshare TCP auth failed: %r' % resp)
 
 
 # Every standard Modbus function code (the spec's public list, serial-line

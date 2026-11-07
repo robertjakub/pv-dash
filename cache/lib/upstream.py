@@ -5,7 +5,7 @@ import struct
 import threading
 import time
 
-from common.protocol import ModbusError, auth_handshake_client, recv_exact
+from common.protocol import ModbusError, auth_handshake_client, recv_exact, waveshare_handshake_client
 from .protocol import DeviceError
 from .statics import MAX_PDU
 
@@ -17,6 +17,7 @@ class Upstream:
         self.unit = unit
         self.timeout = timeout
         self.auth = auth          # None = no auth | 'suite' = the crypt handshake after every connect
+                                  # | 'waveshare' = the Waveshare gateway connection password after every connect
         self.auth_key = auth_key  # the shared key the handshake proves
         self.lock = threading.Lock()
         self.sock = None
@@ -44,6 +45,8 @@ class Upstream:
         self.sock.settimeout(self.timeout)
         if self.auth == 'suite' and self.auth_key:
             auth_handshake_client(self.sock, self.auth_key)
+        elif self.auth == 'waveshare' and self.auth_key:
+            waveshare_handshake_client(self.sock, self.auth_key)
         self.connects += 1
         self.connected_since = time.monotonic()
 

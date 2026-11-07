@@ -3,6 +3,9 @@
 Thanks to everyone who made the pv-suite what it is:
 
 - **MK** — patches and ideas:
+  - the `waveshare` auth-upstream scheme — the cache presenting the
+    shared key as a Waveshare RS485-to-TCP gateway's connection
+    password, idea and patches both;
   - the Modbus auth `suite` scheme — the one-round-trip HMAC-SHA256
     proof-of-key handshake in `common/protocol.py`, spoken by the
     scraper, the fake inverter and the cache;

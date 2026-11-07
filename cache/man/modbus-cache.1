@@ -31,7 +31,12 @@ HMAC\-SHA256 proof; the cache answers \fBOK\fR (plain Modbus follows)
 or \fBERR\fR (the client is dropped before it ever sees a frame).
 \fB--auth-upstream\fR/\fB--auth-upstream-key\fR do the same toward
 the inverter: an \fBERR\fR fails the exchange like any other upstream
-fault and the poller retries. Empty auth (the default) = no auth at all.
+fault and the poller retries. The upstream leg also speaks
+\fB--auth-upstream waveshare\fR for a Waveshare RS485\-to\-TCP
+gateway: the shared key goes out as the gateway's connection password
+(raw ASCII, right after every connect) and the gateway's \fBOK\fR opens
+the plain Modbus session \(em anything else fails the exchange like any
+other upstream fault. Empty auth (the default) = no auth at all.
 .PP
 Resilience: when the device dies, cached reads keep serving last-known
 values and forwarded reads get exception 0x0B; when the device rejects a
@@ -68,14 +73,19 @@ file:/run/credentials/...) (default: config, $AUTH_KEY)
 the auth scheme toward the upstream inverter: `suite` proves the shared
 auth\-upstream\-key with a crypt handshake right after every connect
 (the peer answers OK, or ERR and the connection fails — the poller keeps
-retrying); none/empty = no auth at all (default: config, $AUTH_UPSTREAM
-or none)
+retrying); `waveshare` sends the shared auth\-upstream\-key as the
+Waveshare TCP connection password right after every connect (the gateway
+answers OK, or anything else/nothing and the connection fails — the
+poller keeps retrying); none/empty = no auth at all (default: config,
+$AUTH_UPSTREAM or none)
 .TP
 .B \-\-auth\-upstream\-key
-the shared key the cache proves to the upstream inverter with the suite
-handshake (min 16 characters); the value may be `file:<path>` — the
-first line of an owner\-only 0600 file (a systemd LoadCredential rides
-as file:/run/credentials/...) (default: config, $AUTH_UPSTREAM_KEY)
+the key the cache presents to the upstream inverter — the suite
+handshake's shared key (min 16 characters) or the Waveshare TCP
+connection password (non\-empty ASCII, the gateway's own rule); the
+value may be `file:<path>` — the first line of an owner\-only 0600 file
+(a systemd LoadCredential rides as file:/run/credentials/...) (default:
+config, $AUTH_UPSTREAM_KEY)
 .TP
 .BI \-\-interval " N"
 seconds between cache polls (default: config, $INTERVAL or 10)

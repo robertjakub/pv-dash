@@ -3,7 +3,7 @@
 (stdlib only). The limits and codes come from lib/static.json (see statics.py)."""
 import struct
 
-from common.protocol import ModbusError, describe_fc
+from common.modbus import ModbusError, describe_fc
 
 
 class DeviceError(ModbusError):

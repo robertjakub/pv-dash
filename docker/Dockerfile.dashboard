@@ -32,6 +32,7 @@ RUN apk add --no-cache python3 bash su-exec \
 WORKDIR /pv-suite
 COPY --from=scripts entrypoint.sh /usr/local/bin/pv-entrypoint
 COPY --from=common *.py common/
+COPY --from=common modbus/*.py common/modbus/
 COPY --chown=pvsuite bin/ dashboard/bin/
 COPY --chown=pvsuite lib/ dashboard/lib/
 COPY --chown=pvsuite static/ dashboard/static/

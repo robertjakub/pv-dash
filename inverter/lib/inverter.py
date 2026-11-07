@@ -10,7 +10,7 @@ import struct
 import threading
 import time
 
-from common.protocol import auth_handshake_server, describe_fc, recv_exact
+from common.modbus import auth_handshake_server, describe_fc, recv_exact
 from common.connlimit import ConnGate
 from .statics import MAX_BITS, MAX_COUNT, MAX_PDU
 from common.version import version_string

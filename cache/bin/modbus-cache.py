@@ -10,7 +10,7 @@ connect and are served FC3 reads from the in-memory cache. Reads outside the
 cached ranges and every other function code are forwarded to the device
 (serialized, one at a time).
 
-Layout: common/protocol (the wire core), lib/upstream (inverter connection),
+Layout: common/modbus (the wire core package), lib/upstream (inverter connection),
 lib/cache (register cache + block plan), lib/proxy (poller + client
 handling), lib/control (JSON-lines control server), common/audit (the
 append-only audit trail), common/version, this file (CLI, logging, signals).
@@ -30,7 +30,7 @@ from common.audit import AuditLog, default_path as default_audit_path
 from common.config import default_profile_path, parse_listen, parse_secret
 from common.logutil import UtcFormatter
 from common.options import build_parser
-from common.protocol import exception_frame
+from common.modbus import exception_frame
 from common.version import version_string
 from lib.config import load_registers_file, load_selection, resolve_config, parse_control_target, acl_text, acl_summary
 from lib.options import KNOWN_VERBS, OPTIONS

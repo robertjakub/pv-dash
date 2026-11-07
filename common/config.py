@@ -8,7 +8,7 @@ failure policy (the cache logs and continues, the scraper dies)."""
 import ipaddress
 import os
 
-from common.protocol import AUTH_MIN_KEY
+from common.modbus import AUTH_MIN_KEY
 
 
 def check_token_file_mode(path, label='token-file'):

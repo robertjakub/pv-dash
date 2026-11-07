@@ -5,7 +5,7 @@ import struct
 import threading
 import time
 
-from common.protocol import ModbusError, auth_handshake_client, recv_exact, waveshare_handshake_client
+from common.modbus import ModbusError, auth_handshake_client, recv_exact, waveshare_handshake_client
 from .protocol import DeviceError
 from .statics import BIT_READ_FUNCS, MAX_PDU
 

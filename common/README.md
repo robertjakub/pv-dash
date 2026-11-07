@@ -14,7 +14,7 @@ the [fake inverter](../inverter/README.md) and the [dashboard](../dashboard/READ
 | `connlimit.py` | the concurrent-connection gate: a total client cap and a per-peer-IP cap on every serving surface |
 | `cred.py` | peer-credential lookup for the unix control sockets (`SO_PEERCRED`/`LOCAL_PEERCRED`) — the kernel-vouched trusted peers |
 | `manpage.py` | the man-page builder: the pages are GENERATED from the argparse parsers (`--man` prints one; `scripts/gen_man.py` ships them) |
-| `protocol.py` | the Modbus TCP wire core: `ModbusError`, `recv_exact`, `exception_frame` |
+| `modbus/` | the Modbus TCP implementation, one package for the family: `protocol.py` (the wire core — the `ModbusError`/`DeviceError` types, `recv_exact`, the MBAP `frame`/`check_head`/`read_frame` helpers, `exception_frame`, the bit `pack_bits`/`unpack_bits`, the `FC_NAMES` table, the suite auth + Waveshare handshakes), with the shared client ladders and the write shapes layered beside it |
 | `logutil.py` | `UtcFormatter` — UTC log timestamps |
 | `human.py` | `secs` — human time for the command reports: ms/s/m/h/d, one unit, always two decimals |
 

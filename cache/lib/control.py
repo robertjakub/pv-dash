@@ -25,11 +25,11 @@ from common.version import version_string
 from common.config import auth_key_floor_error, default_profile_path, parse_auth_type, parse_upstream, \
     resolve_profile_file, parse_secret
 from common.dump import SECRET_REMOVED, dump_filter
-from common.protocol import AUTH_MIN_KEY
+from common.modbus import AUTH_MIN_KEY
 from common.cred import peer_uid, parse_trust_uids
 from common.human import secs
 from common.logutil import UtcFormatter
-from common.protocol import ModbusError
+from common.modbus import ModbusError
 from common.audit import AuditLog
 from common.wiresec import frame_mac, sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, grouped_rows, match_setting_path, describe_node

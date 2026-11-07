@@ -35,7 +35,7 @@ from common.config import default_profile_path, is_loopback_host, parse_auth_typ
     parse_secret, parse_upstream, resolve_profile_file
 from common.dump import SECRET_REMOVED, dump_filter
 from common import dump as state
-from common.protocol import AUTH_MIN_KEY
+from common.modbus import AUTH_MIN_KEY
 from .config import build_sources, load_device_profile
 from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, KNOWN_VERBS
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS

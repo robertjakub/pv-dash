@@ -1,9 +1,10 @@
 """The Modbus TCP wire core shared by the tools (stdlib only): the error
-type, the recv-exact loop, the exception-frame builder, the function
-code table, the suite auth handshake and the Waveshare connection-password
-handshake. The client (scraper, cache upstream) and the servers (cache
-listener, fake inverter) layer their own framing on top; the per-tool
-limits come from each tool's lib/static.json (see its statics.py)."""
+types, the recv-exact loop, the exception-frame builder, the MBAP framing
+helpers, the bit packing, the function code table, the suite auth
+handshake and the Waveshare connection-password handshake. The client
+(scraper, cache upstream) and the servers (cache listener, fake inverter)
+layer their own framing on top; the per-tool limits come from each tool's
+lib/static.json (see its statics.py)."""
 import hashlib
 import hmac
 import secrets
@@ -12,6 +13,14 @@ import struct
 
 class ModbusError(Exception):
     pass
+
+
+class DeviceError(ModbusError):
+    """The device answered with a Modbus exception; .code carries it."""
+
+    def __init__(self, msg, code):
+        super().__init__(msg)
+        self.code = code
 
 
 # --- the suite auth handshake ------------------------------------------------
@@ -156,3 +165,50 @@ def exception_frame(txn, proto, unit, func, code):
     code = max(0, min(0xFF, code))
     body = struct.pack('>BB', func | 0x80, code)
     return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
+
+
+# --- the MBAP framing helpers ------------------------------------------------
+# The shape both servers read and every leg writes, so the framing exists
+# once: a reply is a header around the PDU bytes, a request is read with
+# the length bounds checked before the body (a bad length poisons the
+# whole frame — there is no reading past it, the caller closes).
+
+def frame(txn, unit, body, proto=0):
+    """One outgoing MBAP frame: the header around the PDU/data bytes."""
+    return struct.pack('>HHHB', txn, proto, len(body) + 1, unit) + body
+
+
+def check_head(head, max_pdu):
+    """The inbound MBAP head: unpacked, with the length bounds checked —
+    'bad response length %d' when out of bounds (both clients' text).
+    Returns (txn, proto, length, unit)."""
+    txn, proto, length, unit = struct.unpack('>HHHB', head)
+    if not 2 <= length <= max_pdu + 2:
+        raise ModbusError('bad response length %d' % length)
+    return txn, proto, length, unit
+
+
+def read_frame(sock, max_pdu):
+    """One inbound MBAP frame: the 7-byte head (bounds checked), then the
+    rest of the frame. Returns (txn, proto, length, unit, pdu); raises
+    ModbusError on a bad length (the caller logs and closes — the frame
+    is not parseable enough to answer) and ConnectionError/OSError on a
+    dead transport."""
+    txn, proto, length, unit = check_head(recv_exact(sock, 7), max_pdu)
+    return txn, proto, length, unit, recv_exact(sock, length - 1)
+
+
+def pack_bits(bits):
+    """The wire shape of a bit read reply: 8 bits per byte, LSB first —
+    bit i of the span lives in byte i >> 3, bit position i & 7."""
+    packed = bytearray((len(bits) + 7) // 8)
+    for i, bit in enumerate(bits):
+        if bit:
+            packed[i >> 3] |= 1 << (i & 7)
+    return bytes(packed)
+
+
+def unpack_bits(data, count):
+    """The inverse of pack_bits: a bit reply's data bytes -> one 0/1 per
+    address, the count clamped to what the bytes carry."""
+    return tuple((data[i >> 3] >> (i & 7)) & 1 for i in range(count))

@@ -804,7 +804,7 @@ def main():
         #      a wrong key gets ERR, a plain client is dropped, the knobs
         #      are live, the key is a secret
         sys.path.insert(0, REPO)
-        from common.protocol import AUTH_MAGIC, auth_handshake_client
+        from common.modbus import AUTH_MAGIC, auth_handshake_client
 
         L_MODBUS, L_CTL = 15991, 15992
         L_KEY = 'inv-suite-key-16chars!'

@@ -7,7 +7,7 @@ Thanks to everyone who made the pv-suite what it is:
     shared key as a Waveshare RS485-to-TCP gateway's connection
     password, idea and patches both;
   - the Modbus auth `suite` scheme — the one-round-trip HMAC-SHA256
-    proof-of-key handshake in `common/protocol.py`, spoken by the
+    proof-of-key handshake in `common/modbus/protocol.py`, spoken by the
     scraper, the fake inverter and the cache;
   - the write allow-list that speaks the device profile —
     `write-registers profile` compiled from the profile's `acl` tree,

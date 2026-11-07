@@ -34,6 +34,7 @@ WORKDIR /pv-suite
 COPY --chown=pvsuite --from=profiles profiles/profiles/ profiles/
 COPY --from=scripts entrypoint.sh /usr/local/bin/pv-entrypoint
 COPY --from=common *.py common/
+COPY --from=common modbus/*.py common/modbus/
 COPY --chown=pvsuite bin/ cache/bin/
 COPY --chown=pvsuite lib/ cache/lib/
 COPY --chown=pvsuite modbus_cache.conf selection.json cache/

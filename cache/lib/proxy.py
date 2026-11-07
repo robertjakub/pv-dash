@@ -8,7 +8,7 @@ import threading
 import time
 from collections import deque
 
-from common.protocol import ModbusError, auth_handshake_server, describe_fc, exception_frame, recv_exact
+from common.modbus import ModbusError, auth_handshake_server, describe_fc, exception_frame, recv_exact
 from common.connlimit import ConnGate
 from .protocol import DeviceError, describe_write
 from .config import load_profile_write_acl, load_registers_file, load_selection

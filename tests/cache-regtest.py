@@ -1831,7 +1831,7 @@ print('mode 0600 ok')
     #       (--auth-upstream/--auth-upstream-key) — one round trip after
     #       every connect, OK opens the session, ERR kills it
     sys.path.insert(0, REPO)
-    from common.protocol import auth_handshake_client
+    from common.modbus import auth_handshake_client
 
     AUTH_FAKE, AUTH_PORT, AUTH_CTL = 15561, 15562, 15563
     CL_KEY, UP_KEY = 'cl-suite-key-16chars!', 'up-suite-key-16chars!'
@@ -1947,7 +1947,7 @@ print('mode 0600 ok')
     # 6b-10. the waveshare upstream auth: the cache presents the shared key
     #        as a Waveshare gateway's connection password — raw ASCII after
     #        every connect, OK opens the session, anything else kills it
-    from common.protocol import waveshare_handshake_client
+    from common.modbus import waveshare_handshake_client
 
     class WavesharePeer:
         """A stand-in gateway: the first bytes on a connection must be the

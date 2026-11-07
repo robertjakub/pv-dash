@@ -27,7 +27,7 @@ from common.config import acl_summary, acl_text, parse_acl, parse_auth_type, par
 from common.cred import peer_uid
 from common.human import secs
 from common import dump as state
-from common.protocol import AUTH_MIN_KEY
+from common.modbus import AUTH_MIN_KEY
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
 from .metrics import MetricsServer, describe_metrics

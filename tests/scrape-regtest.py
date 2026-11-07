@@ -2011,7 +2011,7 @@ try:
     #     drops the session; then a plain fake under an authed scraper
     #     fails the same way (the peer must speak the scheme)
     sys.path.insert(0, REPO)
-    from common.protocol import auth_handshake_client
+    from common.modbus import auth_handshake_client
 
     SKEY = 'scr-suite-key-16chars!'
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15910',

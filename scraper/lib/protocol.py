@@ -4,7 +4,7 @@ The limits come from lib/static.json (see statics.py)."""
 import socket
 import struct
 
-from common.protocol import ModbusError, auth_handshake_client, recv_exact
+from common.modbus import ModbusError, auth_handshake_client, recv_exact
 from .statics import MAX_BITS, MAX_PDU, MAX_COUNT
 
 

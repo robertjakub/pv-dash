@@ -26,6 +26,15 @@ the **Done/history** records for their tool.
   overlay are untouched), and the registry should either gain their
   hidden command rows or the "set/show the registers" redesign (the
   product item below) subsumes them.
+- **check the values against the hints** `[common]` `[cache]`
+  `[scraper]` `[inverter]` `[dashboard]` — the value-shape hint's
+  convention is the FULL shape (the free-form parts and the vocabulary
+  words — `modbus/selection`'s `<file>|all|none`), but the rows drift:
+  `modbus/profile`'s hint is `<file>` while its values carry `default`
+  (the word missing from the hint), and the bool rows carry no hint at
+  all while `modbus/auth` spells `suite|none` — walk every row in the
+  four registries, align the hints (the missing value words in, the
+  stale words out) and decide the bool rule once (a hint or not).
 - **file the display groups** `[common]` `[cache]` `[inverter]`
   `[dashboard]` `[scraper]` — the registries lost their `section` field
   (the `group` is the one grouping now; ungrouped rows render bare, no

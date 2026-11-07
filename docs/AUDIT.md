@@ -1,4 +1,4 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 12)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 13)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
@@ -259,7 +259,7 @@ but hold no runtime trust of their own.
 | HTTP surface | the `/metrics` endpoint: `--metrics-server` (live-settable), off; binds `--metrics-listen` (default `127.0.0.1:9252`; `0.0.0.0` allowed, **the token is mandatory regardless**) | the exporter itself: `--listen`, default `127.0.0.1:9350` — two GET routes (`/`, `/metrics`), everything else a 404, `Cache-Control: no-store` | the `/metrics` endpoint: `--metrics-server`, off; binds `--metrics-listen` (default `127.0.0.1:9452`) | the page + the Prometheus proxy: `--bind`, default **`0.0.0.0`:8080** — GET-only, the static tree realpath-guarded (403 on escape), the proxy under `--prom-prefix` | bearer token (`hmac.compare_digest`): mandatory on the cache, mandatory beyond loopback on the scraper (F13's refusal), optional on the fake (test tool — a non-loopback bind without one logs a warning); **none on the dashboard (F21)** |
 | control server (JSON lines) | unix socket `/tmp/modbus-cache-<port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket `/tmp/modbus-scraper-<listen-port>.socket`, `chmod 0600` after bind; `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1 (exempt from the refusal — the F11 test-tool posture) | unix socket `/tmp/dashboard-<port>.socket`, `chmod 0600` after bind; `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | token on TCP (`hmac.compare_digest`), refused without; on unix a kernel-vouched peer (peer-cred: root, the daemon's own user, `--control-trust-uids`) skips the handshake; the signed wire (the full HMAC per frame) wherever a token is held |
 | state dump | `--dump-path`: the live setting overrides and — with `--dump-with-cache`/`request dump with-cache` — the cached words (+ stamps), as one atomic JSON — see F18 | n/a | n/a | n/a | **created `0600` explicitly** (never the umask) + a sha256 integrity hash checked at restore (F18) |
-| token files | `--control-token-file` / `--metrics-token-file` | `--auth-token-file` / `--control-token-file` | `--control-token-file` / `--metrics-token-file` | `--control-token-file` | **owner-only (0600) enforced** — a group/world-accessible token file refuses to start (F12); the env forms (`MCH_CONTROL_TOKEN_FILE`, `SCR_CONTROL_TOKEN_FILE`, `INV_CONTROL_TOKEN_FILE`/`INV_METRICS_TOKEN_FILE`, `DSH_CONTROL_TOKEN_FILE`) are honored by the daemons and the ctl/cli clients alike (F20 closed) |
+| token files | the token knobs take `file:` references — `--control-token file:/path` / `--metrics-token file:/path` | `--auth-token file:/path` / `--control-token file:/path` | `--control-token file:/path` / `--metrics-token file:/path` | `--control-token file:/path` | **owner-only (0600) enforced** — a group/world-accessible token file refuses the reference (F12); the bare `*_FILE` env/flag spellings were REMOVED rev. 13 (the reference rides the token knob's own flag/env/config/live paths) |
 | upstream connection | outbound to the inverter/SDongle | outbound poll to the inverter/SDongle (or the cache), every 10 s by default | n/a (it *is* the device) | outbound HTTP to the Prometheus (`--upstream`, default `http://localhost:9090`) | none (protocol-inherent); the Prometheus hop is plain HTTP too |
 | audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded (the shared `common/audit.py`) | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | local file perms + the per-writer hash chain, verified by `scripts/audit_verify.py` (F10) |
 | compose demo stack | the four services (`fake-inverter`, `modbus-cache`, `modbus-scraper`, `prometheus`) on one `internal: true` network (`pv-modbus`), **nothing published on the host**, no outbound route; one shared `config` volume (prometheus: read-only) with the generated 0600 `metrics.token` (F7) | | | | the internal network is the boundary; the exporter bearer-gated in the demo |
@@ -327,10 +327,11 @@ control-server access only.
   Config/ACL/token/profile/dump parsers fail fast with one-line messages,
   never partial state.
 - **Secrets handling** — tokens never logged (logged as `required on TCP` /
-  `none`); `--control-token-file` / `--metrics-token-file` /
-  `--auth-token-file` for LoadCredential-style files (`common/config.py` is
+  `none`); every token knob takes a `file:<path>` reference for
+  LoadCredential-style files (`common/config.py` is
   the shared loader, and it **enforces the owner-only mode (0600)** —
-  `check_token_file_mode`, F12's fix); the token-flag exposure (`ps` /
+  `check_token_file_mode`, F12's fix; the bare `-file` sibling spellings
+  were removed rev. 13); the token-flag exposure (`ps` /
   `/proc/*/cmdline`) is documented in every README and man page (F9's fix);
   the Nix modules warn when a token would be rendered into the
   world-readable store ini (`cache/module.nix:402`, `scrape/module.nix:214`).
@@ -378,9 +379,10 @@ control-server access only.
   constant time (`scrape/lib/server.py:32,90`), and unauthorized attempts
   are logged at WARNING with the peer; exactly two GET routes (`/`,
   `/metrics`), everything else a 404; responses carry
-  `Cache-Control: no-store`; `--auth-token-file` (LoadCredential-style,
-  SIGHUP-rereadable, mode-enforced) is preferred over `--auth-token` and
-  giving both is an error (`scrape/bin/modbus-scraper.py:89`);
+  `Cache-Control: no-store`; the bearer token takes a `file:` reference
+  (LoadCredential-style,
+  SIGHUP-rereadable, mode-enforced — `file:/path` preferred over the
+  inline token, rev. 13 removed the bare `-file` spelling);
   `--max-clients` (default 64) sheds excess HTTP clients with an immediate
   503 (`lib/server.py:119`) and `--client-timeout` kicks idle keep-alive
   connections — the fixed-rate poll loop (10 s by default) means request
@@ -733,7 +735,7 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   `scripts/lint_options.py --check` clean; the man pages regenerate
   (`mandoc -Tlint` clean).
 
-### Rev. 12 (this revision)
+### Rev. 12
 
 - **One secret knob, two forms: the `file:` reference** — every secret
   value (the dump/key, the control and ops tokens, the auth and metrics
@@ -790,6 +792,31 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   `scripts/check_options.py` + `scripts/lint_options.py --check` clean;
   the man pages regenerate (`mandoc -Tlint` clean); the SBOM's import
   scan re-reviewed `secrets` into the stdlib allowlist.
+
+### Rev. 13 (this revision)
+
+- **The `-file` secret siblings are removed; `file:` is the one
+  spelling** — `--control-token-file`, `--control-ops-token-file`,
+  `--auth-token-file` (the scraper), `--metrics-token-file`, their
+  `*_FILE` env twins, the `-file` config/live keys and the ctl/cli
+  clients' `--control-token-file` die (the tree is experimental —
+  behaviour may change; rev. 12 landed the reference the same day and it
+  fully subsumes the siblings). The trust posture does not move: the
+  reference rides the token knobs' own flag/env/config/live paths, the
+  shared `load_token_file` gate keeps enforcing the owner-only 0600 mode
+  (F12) and the fail-fast unreadable refusal. The user-facing secret
+  strings reword to "by flag/env, or as `file:<path>`"; the NixOS modules
+  render the reference form (`set control token
+  file:/run/credentials/...` — the module option names keep their
+  `*File` spellings); the compose stack passes
+  `AUTH_TOKEN=file:/config/metrics.token`. The F20 finding's record is
+  historical.
+- **The verified evidence**: the regtests pin the `file:` form end to
+  end (the bearer rotation through the reference + the SIGHUP re-read,
+  the F12 lax-mode refusal, the missing-reference fail-fast, the ctl
+  env `CONTROL_TOKEN=file:...`), all ten suites print ALL PASS;
+  `scripts/check_options.py` + `scripts/lint_options.py --check` clean;
+  the man pages regenerate (`mandoc -Tlint` clean).
 
 ## 5. NIS2 / DORA mapping (all modules; cache is the production-relevant one)
 | Requirement | Status | Where |

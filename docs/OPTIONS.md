@@ -14,7 +14,7 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (20): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-token-file`, `control-ops-verbs`, `control-port`, `control-token`, `control-token-file`, `control-trust-uids`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `no-audit-log`, `restore-on-start`. The control-plane block is
+Common to **all four** tools (18): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-token`, `control-trust-uids`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `no-audit-log`, `restore-on-start`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `status`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
@@ -31,7 +31,6 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `auth` | `modbus` | `set modbus auth` | ✓ live | ✓ live | ✓ live |  |
 | k | `auth-key` | `modbus` | `set modbus auth key` | ✓ live+secret | ✓ live+secret | ✓ live+secret |  |
 | k | `auth-token` |  | `set auth token` |  | ✓ live+secret |  |  |
-| k | `auth-token-file` |  | `set auth token-file` |  | ✓ live+secret |  |  |
 | k | `auth-upstream` |  | `set modbus auth-upstream` | ✓ live |  |  |  |
 | k | `auth-upstream-key` |  | `set modbus auth-upstream-key` | ✓ live+secret |  |  |  |
 | c | `batt` |  | `set batt` |  |  | ✓ live |  |
@@ -52,12 +51,10 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `control` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `control-log-replies` |  | *(startup-only)* |  |  | ✓ |  |
 | k | `control-ops-token` |  | `set control ops token` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
-| k | `control-ops-token-file` |  | `set control ops token-file` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
 | k | `control-ops-verbs` |  | `set control ops-verbs` | **✓** live | **✓** | **✓** | **✓** |
 | k | `control-port` |  | `set control port` | **✓** live | **✓** | **✓** | **✓** |
 | k | `control-socket-group` |  | `set control socket-group` | ✓ live |  | ✓ |  |
 | k | `control-token` |  | `set control token` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
-| k | `control-token-file` |  | `set control token-file` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
 | k | `control-trust-uids` |  | `set control trust-uids` | **✓** live | **✓** | **✓** | **✓** |
 | c | `dump` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `dump-interval` |  | `set dump-interval` | ✓ live |  |  |  |
@@ -92,7 +89,6 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `metrics-server` |  | `set metrics-server`, `set metrics enable` | ✓ live |  | ✓ live | ✓ live |
 | k | `metrics-spec` |  | *(startup-only)* |  | ✓ |  |  |
 | k | `metrics-token` |  | `set metrics token` | ✓ live+secret |  | ✓ live+secret | ✓ live+secret |
-| k | `metrics-token-file` |  | `set metrics token-file` | ✓ live+secret |  | ✓ live+secret | ✓ live+secret |
 | c | `modbus` |  | *(startup-only)* | ✓ | ✓ | ✓ |  |
 | k | `modbus-offset` |  | `set modbus offset` |  | ✓ live |  |  |
 | k | `modbus-unit` | `modbus` | `set modbus unit` |  | ✓ live |  |  |

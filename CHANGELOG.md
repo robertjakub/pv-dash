@@ -10,6 +10,25 @@ before the repo restructured into one suite.
 
 ## Unreleased
 
+### Removed
+
+- **everywhere** — **the `-file` secret siblings are gone; `file:` is the
+  one spelling**: `--control-token-file`, `--control-ops-token-file`,
+  `--auth-token-file` (the scraper) and `--metrics-token-file` — the
+  flags, their `*_FILE` env twins, the `-file` config/live keys and the
+  eight ctl/cli clients' `--control-token-file` all die (the project is
+  experimental — behaviour may change; the `file:` reference landed the
+  same day and fully subsumes them: the same `load_token_file` loader,
+  the same owner-only `0600` gate (F12), the same fail-fast, the same
+  re-read on reload). Every user-facing string rewords to the reference
+  form ("pass the secret by flag/env, or as `file:<path>`"), the NixOS
+  modules render `set control token file:/run/credentials/...` (the
+  module option names keep their `*File` spellings), and the compose
+  stack passes `AUTH_TOKEN=file:/config/metrics.token`. Migrating a
+  deployment: move the reference onto the token knob itself —
+  `--control-token file:<path>`, `AUTH_TOKEN=file:<path>`,
+  `set control token file:<path>`.
+
 ### Added
 
 - **everywhere** — **the Modbus bit spaces and the float types are first
@@ -92,7 +111,7 @@ before the repo restructured into one suite.
   `env/fake.env.example`, `env/dashboard.env.example` — cp one to
   `env/<tool>.env` and edit. The names are the **bare env twins** the
   tools' own docs speak (`UPSTREAM`, `INTERVAL`, `TTL`, `PROFILE`,
-  `METRIC_PREFIX`, `AUTH_TOKEN_FILE`, `LOG_LEVEL`, the fake's SIGHUP-layer
+  `METRIC_PREFIX`, `AUTH_TOKEN`, `LOG_LEVEL`, the fake's SIGHUP-layer
   `CHAOS`/`MAX_KWP`/`BATTERY`/`STRICT`/`TIME`/`TIME_SCALE`) — one file per
   tool, so no namespacing, and the same file is consumed two ways:
   `docker run --env-file env/<tool>.env <image>` for plain docker and the
@@ -206,7 +225,7 @@ before the repo restructured into one suite.
 - **everywhere** — **one secret knob, two forms: the `file:` reference**:
   every secret value now takes either the inline string or
   `file:<path>` — the first line of an owner-only `0600` file, loaded by
-  the same discipline the `-file` sibling knobs enforce (F12; a systemd
+  the shared `load_token_file` discipline (F12; a systemd
   LoadCredential rides as `file:/run/credentials/...`). `--dump-key
   file:/path` (env `DUMP_KEY=file:...`, config `set dump key file:...`)
   is the headline, and the same acceptance lands on `--control-token`,
@@ -215,8 +234,7 @@ before the repo restructured into one suite.
   rotating the file rotates the token). The config file carries the
   reference, never the material; a reference that cannot be read fails
   fast (a secret that silently vanishes is a misconfiguration, not a
-  fallback to plaintext). The `-file` siblings stay — same loader, same
-  discipline, the explicit-path spelling. Plaintext dumps stay the
+  fallback to plaintext). Plaintext dumps stay the
   no-key posture **by design**, and now say so: a `WARNING` at start and
   a `(not sealed — set dump/key to encrypt at rest)` note on the
   `set dump path` reply wherever a dump path is live without a key.
@@ -308,12 +326,12 @@ before the repo restructured into one suite.
   XDG state home beside its audit trail — the process re-execs, the fresh
   daemon re-applies the saved overrides once and consumes the file; the
   ops role may not reload). The **secret lives land too** (the registries
-  carry the six hidden rows each): `control/token`/`control/token-file`
-  and `control/ops/token`/`control/ops/token-file` rotate the control
+  carry the hidden secret rows): `control/token`
+  and `control/ops/token` rotate the control
   tokens live (the sessions re-auth, the ops token must differ from the
-  admin token on the wire), the scraper's `auth/token`(-file) rotates the
+  admin token on the wire), the scraper's `auth/token` rotates the
   /metrics bearer live (a non-loopback listen refuses to go tokenless —
-  F13), the metrics/token pair on the fake and the dashboard (F6: the
+  F13), metrics/token on the fake and the dashboard (F6: the
   endpoint's token is mandatory while it serves); the `control` node rows
   file the namespace, the secret defaults placeholders are deleted from
   the bins (unset refuses — the metrics/token treatment), and the
@@ -328,14 +346,14 @@ before the repo restructured into one suite.
   knob is public, the value never lands in a file (the dump stays 0600 +
   integrity-hashed; the restore and the reload's fresh start SKIP the
   placeholder — the secret keeps its current value — and name it
-  `(secret, not restored — re-pass by flag/env/token-file)` in the
+  `(secret, not restored — re-pass by flag/env, or as file:<path>)` in the
   skipped list, the reload reply keeps naming the lost secrets),
   `show config` renders every configured secret row as
   `set <name> *** SECRET REMOVED ***` (the trailing hidden-note line is
   gone — the placeholder line IS the marker), and the paste-back is
   gated: the config parser refuses the placeholder as a value
   (`*** SECRET REMOVED *** is not a value — pass the secret by
-  flag/env/token-file`) and so does the wire `set` — a rendered script
+  flag/env, or as file:<path>`) and so does the wire `set` — a rendered script
   piped back cannot poison a secret with a known constant. The dashboard's
   entry passes the control server the secret rows' configured-ness (its
   `show config` marks the placeholders too), the fake's `startup_values`
@@ -354,7 +372,7 @@ before the repo restructured into one suite.
 - **everywhere** — **the show verb refuses the secrets**: `show
   control/token` (the ops token, `metrics/token`, `auth/token`, the
   `-file` spellings) answers `err <name> is a secret — it never shows
-  (pass it by flag/env/token-file)` instead of the `<set>` guard's
+  (pass it by flag/env, or as file:<path>)` instead of the `<set>` guard's
   placeholder — a secret's value renders nowhere, on any tool (the set
   reply keeps `<set>` as the rotation's confirmation; the `?`/help still
   describes the knob — the vocabulary is public, the value is not).
@@ -427,7 +445,7 @@ before the repo restructured into one suite.
   consumes the state file (a state older than two minutes is stale and
   is discarded — a later manual start stays pure). The cache starts
   empty; an overridden secret is named in the reply, to re-pass by
-  flag/env/token-file. The ops role may not reload (the wiresec table
+  flag/env, or as file:<path>. The ops role may not reload (the wiresec table
   already named it); the console word-help and the man page carry the
   verb.
 - **everywhere** — **the knob dictionary says how a restart-marked knob
@@ -448,7 +466,7 @@ before the repo restructured into one suite.
   `value` line (the audit/dump rows' prose filled beside the metrics').
 - **cache** — **the metrics knobs are live**: the seven metrics rows carry
   their path lives (`metrics/enable`, `metrics/listen`, `metrics/token`,
-  `metrics/token-file`, `metrics/limits/{max-clients,timeout,
+  `metrics/limits/{max-clients,timeout,
   max-conn-per-ip}`) and the dispatch answers them — enable stops/starts
   the endpoint (the F6 token gate stands), listen rebinds (the old
   address closes, the new serves; the bind is probed first), the limits
@@ -566,9 +584,9 @@ before the repo restructured into one suite.
   RBAC read path covers it as is (`show` is an ops verb).
 - **everywhere (the family)** — **a read-only control role**: every
   control server accepts a second token
-  (`--control-ops-token`/`--control-ops-token-file`, ini + env twins:
-  `MCH_CONTROL_OPS_TOKEN(_FILE)`, `SCR_CONTROL_OPS_TOKEN(_FILE)`,
-  `INV_CONTROL_OPS_TOKEN(_FILE)`, `DSH_CONTROL_OPS_TOKEN(_FILE)`)
+  (`--control-ops-token`, ini + env twins:
+  `MCH_CONTROL_OPS_TOKEN`, `SCR_CONTROL_OPS_TOKEN`,
+  `INV_CONTROL_OPS_TOKEN`, `DSH_CONTROL_OPS_TOKEN`)
   beside the admin one, and sessions authenticating with it may run the
   **`show`/`clear` verbs only** — no `set`/`unset`, no `request
   dump`/`restore`/`reload`, no `poll now`, no `restart`, no `shutdown`:
@@ -1308,7 +1326,7 @@ before the repo restructured into one suite.
   write path explicitly (`--write-acl any --write-registers any` — the
   write defaults are none).
 - **scrape** — the audit finding F13 (docs/AUDIT.md) closed: a non-loopback
-  `/metrics` listen without `--auth-token`/`--auth-token-file` **refuses to
+  `/metrics` listen without `--auth-token` **refuses to
   start** with a one-liner (`refusing to expose /metrics beyond loopback
   without a token`) — the SIGHUP reload runs the same check and keeps the
   previous settings; the loopback default needs no token (localhost dev

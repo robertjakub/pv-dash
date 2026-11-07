@@ -190,6 +190,15 @@ the **Done/history** records for their tool.
 
 ## Done (the highlights; the git history has the details)
 
+- **the `-file` sibling removal** — `file:` is the one secret spelling
+  (the reference landed in the same day's file-reference wave and fully
+  subsumed the siblings): the `-file` flags, their `*_FILE` env twins and
+  the `-file` config/live keys are gone on all four tools and the eight
+  ctl/cli clients; the loader discipline (0600 F12, fail-fast, the
+  SIGHUP re-read) is unchanged, the user-facing secret strings say "by
+  flag/env, or as `file:<path>`", and the NixOS modules + the compose
+  stack render the reference form. The audit wave is docs/AUDIT.md
+  rev. 13.
 - **the state machinery, family-wide** — the three remaining control
   servers gained `dump_settings`/`apply_dump_settings`, the settings
   state dump (common/dump.py: 0600, integrity-hashed, fail-closed

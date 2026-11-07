@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common.audit import AuditLog, default_path as default_audit_path
-from common.config import default_profile_path, load_token_file, parse_listen, parse_secret
+from common.config import default_profile_path, parse_listen, parse_secret
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.protocol import exception_frame
@@ -195,14 +195,10 @@ def main():
     listen_host, listen_port = parse_listen(cfg['listen'])
     control_target = parse_control_target(cfg['control_port'], listen_port)
     control_token = cfg['control_token'] or None
-    if cfg['control_token_file']:
-        control_token = load_token_file(cfg['control_token_file'])
     control_ops_token = cfg['control_ops_token'] or None
-    if cfg['control_ops_token_file']:
-        control_ops_token = load_token_file(cfg['control_ops_token_file'], 'control-ops-token-file')
     if control_ops_token and not control_token:
-        logger.error('the read-only ops token supplements the admin token: set --control-token or '
-                     '--control-token-file too (an ops token alone would leave the control plane unusable)')
+        logger.error('the read-only ops token supplements the admin token: set --control-token too '
+                     '(an ops token alone would leave the control plane unusable)')
         raise SystemExit(2)
     if control_ops_token and control_ops_token == control_token:
         logger.error('the ops token must differ from the admin token (the same secret would hand '
@@ -216,19 +212,14 @@ def main():
         raise SystemExit(2)
     if isinstance(control_target, int) and not control_token:
         logger.error('the TCP control port %d without a token is open to every local process; '
-                     'set --control-token or --control-token-file (the default unix socket needs none), '
+                     'set --control-token (the default unix socket needs none), '
                      'or disable it with --control-port 0', control_target)
         raise SystemExit(2)
-    if args.metrics_token and args.metrics_token_file:
-        logger.error('--metrics-token and --metrics-token-file are mutually exclusive')
-        raise SystemExit(2)
     metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics/token')
-    if args.metrics_token_file:
-        metrics_token = load_token_file(args.metrics_token_file, 'metrics-token-file')
     metrics_listen = parse_listen(cfg['metrics_listen'])
     if cfg['metrics_server'] and not metrics_token:
-        logger.error('the metrics endpoint serves register values: set --metrics-token or '
-                     '--metrics-token-file when --metrics-server is on (or drop --metrics-server)')
+        logger.error('the metrics endpoint serves register values: set --metrics-token '
+                     '(or file:<path>) when --metrics-server is on (or drop --metrics-server)')
         raise SystemExit(2)
     metrics_desc = 'off'
     if cfg['metrics_server']:
@@ -349,8 +340,8 @@ def main():
                     'dump/with-cache': 'on' if cfg['dump_with_cache'] else 'off',
                     'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
                     'log-access': 'on' if cfg['log_access'] else 'off'}
-        # the secret rows (control/token, control/token-file, control/ops/token,
-        # control/ops/token-file) carry NO defaults entry: `unset` refuses them
+        # the secret rows (control/token, control/ops/token, metrics/token)
+        # carry NO defaults entry: `unset` refuses them
         # (the metrics/token treatment) — a secret never renders, never re-applies
         proxy.control = ControlServer(proxy, control_target, stop, audit=audit,
                                       token=control_token, defaults=defaults,

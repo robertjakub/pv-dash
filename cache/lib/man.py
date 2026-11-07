@@ -129,10 +129,10 @@ A second, read-only token (\\fB--control-ops-token\\fR) authenticates
 sessions into the show/clear verbs only \\(em no set/unset, no request
 dump/restore, no reload, no restart, no shutdown \\(em the ops shift against the
 admin key, both roles audited. A secret knob (control token, the ops
-token, the metrics token \\(em either spelling) never shows its value:
+token, the metrics token) never shows its value:
 \\fBshow\\fR
 answers \\fBerr <name> is a secret \\(em it never shows\\fR, \\fBunset\\fR
-refuses \\(em pass the secret by flag/env/token-file; \\fBshow config\\fR
+refuses \\(em pass the secret by flag/env, or as file:<path>; \\fBshow config\\fR
 and the dumps render the knob as \\fB*** SECRET REMOVED ***\\fR (the
 config parser refuses the placeholder \\(em it is never a value).
 .PP

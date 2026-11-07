@@ -382,14 +382,10 @@ def validate_config(cfg):
         fail('dump_interval', 'must be >= 0 (0 = off)')
     if cfg['dump_interval'] and not cfg['dump_path']:
         fail('dump_interval', 'needs dump_path set (there is nothing to dump into)')
-    if cfg['control_token'] and cfg['control_token_file']:
-        fail('control-token', 'set --control-token or --control-token-file, not both')
-    if cfg['control_ops_token'] and cfg['control_ops_token_file']:
-        fail('control-ops-token', 'set --control-ops-token or --control-ops-token-file, not both')
     if cfg['control_ops_token']:
         if not cfg['control_token']:
             fail('control-ops-token', 'the read-only ops token supplements the admin token — '
-                 'set --control-token/--control-token-file too')
+                 'set --control-token too')
         if cfg['control_ops_token'] == cfg['control_token']:
             fail('control-ops-token', 'the ops token must differ from the admin token '
                  '(the same secret would hand every holder the role the server picks first)')
@@ -515,12 +511,8 @@ def resolve_config(args, script_dir=None):
         'control_port': resolve(getattr(args, 'control_port', None), 'CTL', 'control_port', '', str),
         'control_token': parse_secret(resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
                                               'control_token', '', str), 'control/token'),
-        'control_token_file': resolve(getattr(args, 'control_token_file', None), 'CONTROL_TOKEN_FILE',
-                                      'control_token_file', '', str),
         'control_ops_token': parse_secret(resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
                                                   'control_ops_token', '', str), 'control-ops-token'),
-        'control_ops_token_file': resolve(getattr(args, 'control_ops_token_file', None),
-                                          'CONTROL_OPS_TOKEN_FILE', 'control_ops_token_file', '', str),
         'control_ops_verbs': resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
                                      'control_ops_verbs', 'show,clear', str),
         'audit_log': resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', '', str),

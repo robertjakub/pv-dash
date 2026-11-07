@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The `-file` sibling removal: **`file:` is the one spelling** — the
+`--control-token-file`/`--control-ops-token-file`/`--metrics-token-file`
+flags, their env twins and the `control/token-file`-style live keys are
+GONE (still experimental — behaviour may change). Every token knob takes
+the inline string or a `file:<path>` reference (the same loader and
+0600 discipline the siblings enforced, F12), the secret-error strings
+say "by flag/env, or as `file:<path>`", the NixOS module renders
+`set control token file:/run/credentials/...` (the module option names
+stay), and the bundled conf sample speaks the reference form.
+
 The bit-space + float wave: the cache **polls, caches and serves FC1
 (coils) and FC2 (discrete inputs) ranges** beside FC3/FC4 — a profile
 `bit` entry (one address = one binary value) rides the same map, block

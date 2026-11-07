@@ -149,7 +149,7 @@ Settings are resolved in this order (first hit wins), mirroring
    `CLIENT_TIMEOUT`, `CONNECT_ACL`,
    `WRITE_ACL`, `WRITE_REGISTERS`,
    `LOG_LEVEL`, `CONTROL_TOKEN`,
-   `CONTROL_TOKEN_FILE`, `CONTROL_TRUST_UIDS`,
+   `CONTROL_TRUST_UIDS`,
    `DUMP_PATH`, `DUMP_INTERVAL`,
    `AUDIT_LOG`,
    `AUDIT_MAX_MB`, `AUDIT_DAILY`,
@@ -188,9 +188,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--connect-acl` | `any` | clients allowed to connect: `any`, `none` (refuse everyone) or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `none` | clients allowed to write — still requires `--allow-write`; `none` = no client writes (the default) — see [Access control](#access-control) |
 | `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (config `set control token`, env `CONTROL_TOKEN`) |
-| `--control-token-file` | none | the token from a file (the first line; a systemd `LoadCredential` or a key file, **owner-only `0600`** — a group/world-accessible token file refuses to start, F12) — instead of `--control-token`, giving both is an error (config `set control token-file`, env `CONTROL_TOKEN_FILE`) |
-| `--control-ops-token` | none | a **second, read-only control token**: sessions authenticating with it may run the `show`/`clear` verbs only — no `set`/`unset`, no `request dump`/`restore`, no `reload`, no `restart`, no `shutdown` — the ops shift against the admin key, both audited (`role=ops`/`role=admin` in the CACHE trail); needs `--control-token`/`--control-token-file` and must differ from it — see [Runtime control](#runtime-control---control-port) (config `set control ops token`, env `CONTROL_OPS_TOKEN`) |
-| `--control-ops-token-file` | none | the read-only ops token from a file (the first line; **owner-only `0600`**, F12) — instead of `--control-ops-token`, giving both is an error (config `set control ops token-file`, env `CONTROL_OPS_TOKEN_FILE`) |
+| `--control-ops-token` | none | a **second, read-only control token**: sessions authenticating with it may run the `show`/`clear` verbs only — no `set`/`unset`, no `request dump`/`restore`, no `reload`, no `restart`, no `shutdown` — the ops shift against the admin key, both audited (`role=ops`/`role=admin` in the CACHE trail); needs `--control-token` and must differ from it — see [Runtime control](#runtime-control---control-port) (config `set control ops token`, env `CONTROL_OPS_TOKEN`; the value may be `file:<path>` — the first line of an owner-only `0600` file, F12) |
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (config `set control ops-verbs`, env `CONTROL_OPS_VERBS`) |
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user (config `set control socket-group`, env `CONTROL_SOCKET_GROUP`) |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): a comma-separated uid list — a local systemd unit speaks without the secret; root and the daemon's own user are always trusted (config `set control trust-uids`, env `CONTROL_TRUST_UIDS`) |
@@ -207,10 +205,9 @@ with a clean one-line error instead of failing later at runtime.
 | `--no-audit-log` | off | disable the audit trail |
 | `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds (who is hammering the cache), `0` = off (config `set audit requests`, env `REQUESTS_AUDIT`) |
 | **Metrics** | | |
-| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `scraper_cache_*` path); **live-settable** (`set metrics enable on/off`) and **refuses to start without `--metrics-token`/`--metrics-token-file`** (config `set metrics enable`, env `METRICS_SERVER`) |
+| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `scraper_cache_*` path); **live-settable** (`set metrics enable on/off`) and **refuses to start without `--metrics-token`** (config `set metrics enable`, env `METRICS_SERVER`) |
 | `--metrics-listen` | `127.0.0.1:9252` | the metrics bind address `HOST:PORT` — `0.0.0.0:PORT` serves every interface, **a token is mandatory regardless** (config `set metrics listen`, env `METRICS_LISTEN`) |
-| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-server` is on |
-| `--metrics-token-file` | off | the metrics bearer token from a file (the first line; owner-only `0600`, F12) — instead of `--metrics-token`, giving both is an error |
+| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-server` is on; the value may be `file:<path>` — the first line of an owner-only `0600` file, F12 |
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect clients silent for this many seconds — sheds connections from clients that died without closing (`0` = never) |
@@ -226,7 +223,7 @@ with a clean one-line error instead of failing later at runtime.
 config file pipes through `modbus-cache-ctl` unchanged, and `show config`
 regenerates it from the running daemon — the secret knobs render as
 `set <name> *** SECRET REMOVED ***`, the value never does, and the parser
-refuses the placeholder (pass the secret by flag/env/token-file);
+refuses the placeholder (pass the secret by flag/env, or as `file:<path>`);
 `show knobs` prints the whole
 registry — every knob with its flag, its env twin and how it changes,
 `help config` maps them to their control commands). Boolean config/env
@@ -293,7 +290,7 @@ carry the frame's mac (`wire=h…`) — the command the server logs
 cryptographically matches the command the client sent.
 
 **The read-only ops role**: a daemon may carry a second token
-(`--control-ops-token`/`--control-ops-token-file`) beside the admin one.
+(`--control-ops-token`, or its `file:<path>` form) beside the admin one.
 Sessions authenticating with the ops token may run the **`show`/`clear`
 verbs only** — no `set`/`unset`, no `request dump`/`restore`, no `reload`, no `restart`,
 no `shutdown` (the ops shift can look, flush the cache, and leave; steering
@@ -317,7 +314,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token`/`metrics token-file` (rotate live; the value never renders back), `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write`, `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the auth schemes and keys, both legs — the upstream leg speaks suite or waveshare), `control port` (rebinds the listener live), `control token`/`control token-file` and `control ops token`/`control ops token-file` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
+| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token` (rotate live; the value never renders back), `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write`, `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the auth schemes and keys, both legs — the upstream leg speaks suite or waveshare), `control port` (rebinds the listener live), `control token` and `control ops token` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
 | `set`/`unset` a startup-only knob | the registry's `restart: true` rows answer the note: `% restart required (startup-only knob)` — the config (and a SIGHUP, or a restart) changes them; `show <knob>` renders the configured value (a **secret knob refuses to show** — the value renders nowhere) |
 | `show <setting>` | the bare live value of one tunable |
@@ -334,7 +331,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 | `show knobs` | the dictionary of all knobs: every registry knob under its display group (ungrouped rows bare) — its flag, its env twin(s), the command that changes it live (or the restart note), a `secret` marker on the tokens |
 | `clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
 | `restart` | drop the upstream connection **and** the cache, repoll now — for recovering from a wedged inverter session |
-| `reload` | **restart the whole daemon with the configuration kept**: the live overrides save to a state file beside the config (`<config>.reload`), the process re-execs with the same argv, the fresh daemon re-resolves the config file (so the `restart: true` knobs take their configured values) and re-applies the saved overrides once, then consumes the state file. The cache starts empty; overridden secrets save as `*** SECRET REMOVED ***` (the value never lands in the file) — the reply names them, to re-pass by flag/env/token-file. The ops role may not reload |
+| `reload` | **restart the whole daemon with the configuration kept**: the live overrides save to a state file beside the config (`<config>.reload`), the process re-execs with the same argv, the fresh daemon re-resolves the config file (so the `restart: true` knobs take their configured values) and re-applies the saved overrides once, then consumes the state file. The cache starts empty; overridden secrets save as `*** SECRET REMOVED ***` (the value never lands in the file) — the reply names them, to re-pass by flag/env, or as `file:<path>`. The ops role may not reload |
 | `shutdown` | gracefully stop the proxy (same as SIGTERM: listener closed, control socket unlinked) |
 | `help` / `?` | one-line command reference |
 | `quit` | close the connection |
@@ -623,8 +620,9 @@ scraper's `scraper_cache_*` export path. The whole surface is live
 now: `set metrics listen` rebinds the endpoint (the old address
 closes, the new one serves), the `metrics limits` caps apply to the
 running gate (`max-clients` 503s past the cap, `timeout` kicks the
-idle, `max-conn-per-ip` sheds one peer), and `set metrics token` /
-`metrics token-file` rotate the credential without a restart — the
+idle, `max-conn-per-ip` sheds one peer), and `set metrics token`
+rotates the credential without a restart (the value may be `file:<path>`
+— the first line of an owner-only `0600` file) — the
 token never renders back (`show metrics token` **refuses** — it is a
 secret; `unset` refuses too: set the new one). The gauges:
 `modbus_cache_hits_total` /
@@ -641,7 +639,7 @@ uplink exports the session state — `modbus_cache_uplink_up`,
 `modbus_cache_uplink_block_latency_seconds{,_mean,_max}` (absent while
 the block fails) and `modbus_cache_uplink_block_fails_total` (see
 `show uplink`). With
-`--metrics-token` / `--metrics-token-file` set, requests need
+`--metrics-token` set, requests need
 `Authorization: Bearer <token>` — the same scheme the scraper's exporter
 speaks; anything but `/metrics` answers 404, an unauthenticated read 401.
 The endpoint is **loopback-only** and capped: `--metrics-max-clients`
@@ -762,7 +760,8 @@ python3 tests/cache-regtest.py    # the functional battery (cache + FC4, forward
                                   #   writes/refusals/allow-list, diagnostics registers,
                                   #   device death, poll status, reloads, live
                                   #   set/unset settings, inspect, hostile-upstream
-                                  #   phase, JSON control + token auth/token-file +
+                                  #   phase, JSON control + token auth (inline or
+                                  #   file:<path>) +
                                   #   audit trail + ctl/cli clients)
 python3 tests/cache-stress.py     # 100 clients / 15 s load + latency report
 python3 tests/cache-fuzz.py [n]   # n client-garbage frames (default 3000)

@@ -689,7 +689,7 @@ try:
     r = ctl_cmd('show knobs', 15514)
     check('show knobs: the dictionary of the registry — flag, env twin, how it changes',
           r.startswith('ok knobs') and '--interval' in r and '$INTERVAL' in r
-          and 'set modbus interval <value>' in r and 'control-ops-token-file' in r and ', secret' in r
+          and 'set modbus interval <value>' in r and '--control-ops-token' in r and ', secret' in r
           and 'set modbus upstream <value>, restart' in r, r[:200])   # the restart-marked knob carries the suffix
     r = ctl_cmd('help knobs', 15514)
     check('help knobs: the same dictionary under the help verb', r.startswith('ok knobs'), r[:80])
@@ -1759,54 +1759,41 @@ print('mode 0600 ok')
           'AUDIT CACHE REQUESTS' in fc4_audit and 'peer=127.0.0.1:' in fc4_audit
           and '(last 1s:' in fc4_audit and 'connected=' in fc4_audit, fc4_audit[-160:])
 
-    # the control token from a file (the LoadCredential pattern);
+    # the control token as a file: reference (the LoadCredential pattern);
     # the file must be owner-only 0600 (F12 in docs/AUDIT.md)
     tokfile = '/tmp/reg_token_file'
     open(tokfile, 'w').write('tokensecret\n')
     os.chmod(tokfile, 0o600)
-    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512',
-                        '--listen', '127.0.0.1:15523', '--interval', '1', '--profile', fc4map,
-                        '--control-port', '15524', '--control-token', 'a', '--control-token-file', tokfile],
-                       capture_output=True, text=True, timeout=15)
-    check('token file: both token sources is a clean error', r.returncode != 0
-          and 'not both' in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
     p_tok = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                               '--listen', '127.0.0.1:15523', '--interval', '1', '--profile', fc4map,
-                              '--control-port', '15524', '--control-token-file', tokfile],
+                              '--control-port', '15524', '--control-token', 'file:' + tokfile],
                              stdout=open('/tmp/reg_tok.log', 'w'), stderr=subprocess.STDOUT)
     procs.append(p_tok)
     time.sleep(1.5)
     r = subprocess.run([sys.executable, ctl, '--control-port', '15524',
-                        '--control-token-file', tokfile, 'show', 'version'],
+                        '--control-token', 'file:' + tokfile, 'show', 'version'],
                        capture_output=True, text=True, timeout=15)
-    check('token file: cache_ctl authenticates with the file token', r.returncode == 0
+    check('token file: cache_ctl authenticates with the file: reference', r.returncode == 0
           and r.stdout.startswith('ok modbus-cache'), repr(r.stdout[:80]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'show', 'version'],
                        capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'CONTROL_TOKEN_FILE': tokfile})
-    check('token file: cache_ctl honors CONTROL_TOKEN_FILE', r.returncode == 0
+                       env={**os.environ, 'CONTROL_TOKEN': 'file:' + tokfile})
+    check('token file: cache_ctl honors CONTROL_TOKEN=file:...', r.returncode == 0
           and r.stdout.startswith('ok modbus-cache'), repr(r.stdout[:80]))
-    r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'status'],
-                       capture_output=True, text=True, timeout=15,
-                       env={**os.environ, 'CONTROL_TOKEN': 'x',
-                            'CONTROL_TOKEN_FILE': tokfile})
-    check('token file: the token env + the token-file env is a clean error', r.returncode != 0
-          and 'mutually exclusive' in (r.stderr + r.stdout)
-          and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'show', 'version'],
                        capture_output=True, text=True, timeout=15)
     check('token file: token-less ctl refused', r.returncode == 0
           and 'err authenticate first' in r.stdout, repr(r.stdout[:80]))
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--listen', '127.0.0.1:15525',
-                        '--control-token-file', '/tmp/reg_no_such_token_file', '--dry-run'],
+                        '--control-token', 'file:/tmp/reg_no_such_token_file', '--dry-run'],
                        capture_output=True, text=True, timeout=15)
-    check('token file: a missing file fails fast, one line', r.returncode != 0
-          and 'cannot read control-token-file' in (r.stderr + r.stdout)
+    check('token file: a missing reference fails fast, one line', r.returncode != 0
+          and 'cannot read control/token' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
     lax = '/tmp/reg_token_file_lax'
     open(lax, 'w').write('laxsecret\n')                                 # the umask default (0644)
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--listen', '127.0.0.1:15525',
-                        '--control-token-file', lax, '--dry-run'],
+                        '--control-token', 'file:' + lax, '--dry-run'],
                        capture_output=True, text=True, timeout=15)
     check('token file: a group/world-readable file refuses to start (F12)',
           r.returncode != 0 and '0600' in (r.stderr + r.stdout)
@@ -1835,7 +1822,7 @@ print('mode 0600 ok')
     r = subprocess.run([sys.executable, P, '--config', ph, '--upstream', '127.0.0.1:15512',
                         '--listen', '127.0.0.1:15599', '--dry-run'],
                        capture_output=True, text=True, timeout=15)
-    check('config: a *** SECRET REMOVED *** line refuses to parse (pass the secret by flag/env/token-file)',
+    check('config: a *** SECRET REMOVED *** line refuses to parse (pass the secret by flag/env, or as file:<path)',
           r.returncode != 0 and 'not a value' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
 

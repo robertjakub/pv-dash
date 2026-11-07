@@ -60,12 +60,12 @@ let
     (lib.optionals (cfg.controlToken != null) [ (setLine "control-token" cfg.controlToken) ])
     (lib.optionals (cfg.controlTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      (setLine "control-token-file" "/run/credentials/modbus-cache/control-token")
+      (setLine "control-token" "file:/run/credentials/modbus-cache/control-token")
     ])
     (lib.optionals (cfg.controlOpsToken != null) [ (setLine "control-ops-token" cfg.controlOpsToken) ])
     (lib.optionals (cfg.controlOpsTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      (setLine "control-ops-token-file" "/run/credentials/modbus-cache/control-ops-token")
+      (setLine "control-ops-token" "file:/run/credentials/modbus-cache/control-ops-token")
     ])
     (lib.optionals (cfg.controlOpsVerbs != null) [ (setLine "control-ops-verbs" cfg.controlOpsVerbs) ])
     (lib.optionals (cfg.controlTrustUids != null) [ (setLine "control-trust-uids" cfg.controlTrustUids) ])
@@ -107,7 +107,7 @@ let
     (lib.optionals (cfg.metricsToken != null) [ (setLine "metrics-token" cfg.metricsToken) ])
     (lib.optionals (cfg.metricsTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      (setLine "metrics-token-file" "/run/credentials/modbus-cache/metrics-token")
+      (setLine "metrics-token" "file:/run/credentials/modbus-cache/metrics-token")
     ])
   ]));
 in
@@ -428,7 +428,8 @@ in
       description = ''
         The control token from a file (the first line is the token),
         mounted via systemd LoadCredential — the hardened way to pass the
-        secret. Mutually exclusive with controlToken.
+        secret. Passed to the daemon as a file: reference (the value form
+        the token knob speaks). Mutually exclusive with controlToken.
       '';
     };
 

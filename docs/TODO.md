@@ -7,6 +7,17 @@ the **Done/history** records for their tool.
 
 ## The control plane (the grammar follow-through)
 
+- **`request reload-config` on all four** `[cache]` `[scraper]`
+  `[inverter]` `[dashboard]` — the config re-read (the SIGHUP path, the
+  wire face the request-namespace wave named) speaks on the scraper and
+  the dashboard only: the cache and the fake have no config file today
+  (the fake answers from flags/env, the cache from flags/env/the config
+  script). Give every daemon the reloader wiring — the cache and the
+  fake grow a config story (or the command answers `err no reloader
+  configured` there, which the registry rows should then say) — so the
+  grammar is family-shaped: `request/reload-config` listed beside
+  `request/reload` on all four, the ops policy unchanged (the verb
+  stays out of the ops default).
 - **file the display groups** `[common]` `[cache]` `[inverter]`
   `[dashboard]` `[scraper]` — the registries lost their `section` field
   (the `group` is the one grouping now; ungrouped rows render bare, no

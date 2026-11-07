@@ -38,7 +38,9 @@ before the repo restructured into one suite.
   cache` (the options' dictionary rule, not the slash path), and the
   first TAB position walks the command paths segment-wise (`request`
   offers its children; a slash never renders or inserts — the whole-path
-  pool's common-prefix insert used to write `request/`). Every
+  pool's common-prefix insert used to write `request/`), and `quit`
+  anchors just before the pins — the leave-word beside the navigation
+  syntax on every tool. Every
   row spells its `live` today —
   the wire, the pools and the listings are otherwise unchanged; a row
   whose `live` differs from its `name`'s words is a

@@ -138,7 +138,8 @@ def _sections(head, done_len, matches, values=False, base=''):
     a hierarchy node's group (its `group`, else bare beside it), everything
     else bare (the report words, the commands)."""
     if values:
-        return [('values', matches)]
+        return [('', matches)]   # bare: the value words need no [values] header — the
+                                 # values branch is always the listing's sole section
     if head in ('set', 'unset', 'show') and done_len >= 1:
         return _grouped(matches, base)
     return [('', matches)]
@@ -283,7 +284,10 @@ def candidates(buf):
             if head == 'unset':
                 return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole; unset takes no value — ? describes it
             values_mode = True
-            pool, hint = tuple(s.values), s.value_shape
+            pool = tuple(s.values)
+            words = set(pool)
+            rest = [p for p in s.value_shape.split('|') if p and p not in words]   # the shape's own words
+            hint = '|'.join(rest) or None                                          # drop — the words spell them
             desc = lambda w, s=s: s.value_help.get(w, s.value_help.get(w.lower(), '')) or None
         else:
             base = '/'.join(w.lower() for w in done[1:])   # the path spelled so far — a segment's

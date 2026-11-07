@@ -9,3 +9,5 @@ from .protocol import (AUTH_DOMAIN, AUTH_ERR, AUTH_FRAME_LEN, AUTH_MAGIC,
                        describe_fc, exception_frame, frame, pack_bits,
                        read_frame, recv_exact, unpack_bits,
                        waveshare_handshake_client)
+from .client import check_data_bytes, check_reply, open_socket
+

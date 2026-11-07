@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Modbus TCP wire format and the single-client poller connection (stdlib only).
-The limits come from lib/static.json (see statics.py)."""
-import socket
+The limits come from lib/static.json (see statics.py); the framing and the
+reply ladders are the shared common.modbus ones."""
 import struct
 
-from common.modbus import ModbusError, auth_handshake_client, recv_exact
+from common.modbus import (ModbusError, check_data_bytes, check_head,
+                           check_reply, frame, open_socket, recv_exact,
+                           unpack_bits)
 from .statics import MAX_BITS, MAX_PDU, MAX_COUNT
 
 
@@ -62,10 +64,7 @@ class ModbusTCP:
 
     def _connect(self):
         self.close()
-        self.sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
-        self.sock.settimeout(self.timeout)
-        if self.auth == 'suite' and self.auth_key:
-            auth_handshake_client(self.sock, self.auth_key)
+        self.sock = open_socket(self.host, self.port, self.timeout, self.auth, self.auth_key)
 
     def read_registers(self, addr, count, fc=3):
         if not 1 <= count <= MAX_COUNT:
@@ -79,7 +78,7 @@ class ModbusTCP:
         if not 1 <= count <= MAX_BITS:
             raise ModbusError('bit count %d out of range' % count)
         raw = self._read(fc, addr, count, expect=lambda c: (c + 7) // 8)
-        return tuple((raw[i >> 3] >> (i & 7)) & 1 for i in range(count))
+        return unpack_bits(raw, count)
 
     def _read(self, fc, addr, count, expect):
         """The shared read exchange: pack, send, validate the MBAP and the
@@ -88,28 +87,12 @@ class ModbusTCP:
             self._connect()
         self.txn = (self.txn + 1) & 0xFFFF
         pdu = struct.pack('>BHH', fc, addr + self.offset, count)
-        self.sock.sendall(struct.pack('>HHHB', self.txn, 0, len(pdu) + 1, self.unit) + pdu)
-        txn, proto, length, unit = struct.unpack('>HHHB', self._recv_exact(7))
-        if not 2 <= length <= MAX_PDU + 2:
-            raise ModbusError('bad response length %d' % length)
+        self.sock.sendall(frame(self.txn, self.unit, pdu))
+        txn, proto, length, unit = check_head(self._recv_exact(7), MAX_PDU)
         body = self._recv_exact(length - 1)
-        if txn != self.txn:
-            raise ModbusError('transaction id mismatch')
-        if proto != 0:
-            raise ModbusError('unexpected protocol id %d' % proto)
-        if unit != self.unit:
-            raise ModbusError('reply from unit id %d, expected %d' % (unit, self.unit))
-        func = body[0]
-        if func == fc + 0x80:
-            raise ModbusError('FC%d modbus exception, code %d' % (fc, body[1] if len(body) > 1 else -1))
-        if func != fc:
-            raise ModbusError('unexpected function byte 0x%02x' % func)
-        if len(body) < 2:
-            raise ModbusError('short response: function byte only')
+        check_reply(txn, proto, unit, body, self.txn, self.unit, fc)
         got = body[1]
-        want = expect(count)
-        if got != want:
-            raise ModbusError('expected %d data bytes, got %d' % (want, got))
+        check_data_bytes(got, expect(count))
         return body[2:2 + got]
 
     def read_i32(self, addr, fc=3):

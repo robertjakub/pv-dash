@@ -12,6 +12,13 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **the value listing slims**: the `?` listing of a
+  setting's values drops the `[values]` header (the branch is always the
+  listing's sole section — the words render bare with their per-value
+  descriptions) and the hint tail keeps only the shape's non-completable
+  part (`any|none|IP,...` renders `IP,...`; a fully-completable shape
+  like `suite|none` no hint line at all). The wire's
+  `help <setting>` keeps the full value shape.
 - **everywhere** — **the lint files the namespaces**: a knob's
   `/`-prefix with live children and no node row gains one in the
   canonical render — the path-named, no-live spelling (no Setting, so

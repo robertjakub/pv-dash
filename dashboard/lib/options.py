@@ -163,18 +163,3 @@ describe_setting, describe_value = make_describe(SETTING_BY_NAME)
 # the show words ride the registry's `show` section (the loader reads them
 # into SHOW_COMMANDS/SHOW_WORDS/SHOW_HIDDEN/SHOW_VALUES)
 
-
-def config_value(name, cfg):
-    """The set-grammar form of one option's effective startup value (the
-    resolved config dict), or None when it should not render (secrets hide;
-    empty values drop — the defaults apply on re-run)."""
-    opt = OPTION_BY_NAME[name]
-    key = CFG_KEYS.get(name, name.replace('-', '_'))
-    v = cfg.get(key)
-    if opt.secret:
-        return None
-    if v is None or v == '':
-        return None
-    if isinstance(v, bool):
-        return 'true' if v else 'false'
-    return str(v)

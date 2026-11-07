@@ -27,23 +27,23 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 
 from common import cli
 from lib.man import cli_page
-from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
+from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
 from lib.paths import resolve_control_target
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, \
     CLI_TIMEOUT_S
 
-HELP = cli.help_text(COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, cli.HELP_PINS)
+HELP = cli.help_text(COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, cli.HELP_PINS, COMMAND_INTERNAL)
 
 POOL_NAMES = tuple(n for n in SETTING_NAMES + ALIAS_NAMES if n not in HIDDEN_SETTINGS
                    and (n in LIVE_SETTINGS or n in ALIAS_NAMES))   # a not-yet-live knob never lists
 
-describe_word = cli.make_describe_word(NODE_BY_NAME, COMMAND_HELP, SETTING_BY_NAME,
-                                       extra={'register': 'write a raw register (the same overlay as the FC16 writes)'})
+describe_word = cli.make_describe_word(NODE_BY_NAME, COMMAND_HELP, SETTING_BY_NAME)
 
 
 def command_pool():
-    """The first words the daemon offers right now (the hidden rows never list)."""
-    return tuple(n for n in COMMANDS if n not in COMMAND_HIDDEN)
+    """The first words the daemon offers right now (the hidden and the
+    internal rows never list)."""
+    return tuple(n for n in COMMANDS if n not in COMMAND_HIDDEN and n not in COMMAND_INTERNAL)
 
 
 def setting_pool():
@@ -78,7 +78,6 @@ SPEC = dict(label='the fake inverter', daemon_label='fake inverter control serve
             resolve=resolve_control_target, settings=SETTING_BY_NAME, nodes=NODE_BY_NAME,
             live_settings=LIVE_SETTINGS, show_lives=SHOW_LIVES,
             command_pool=command_pool, setting_pool=setting_pool,
-            set_extra=('register',),
             describe=describe_word,
             help=HELP, welcome=welcome, loop=cli.typed_loop,
             silent_ok=None, render=None, cli_page=cli_page)

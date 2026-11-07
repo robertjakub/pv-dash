@@ -12,6 +12,32 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **the row bools read tolerant, write canonical**: the
+  registries' bool fields (`secret`, `internal`, `hidden`, `restart`,
+  `node`) load the JSON booleans and the wire's `on`/`off` spelling alike
+  (anything else fails the load loudly — a typo can no longer hide as a
+  truthy string); the canonical file form is `true`/`false` — the lint
+  normalizes a string-bool row on sight (`"hidden": "on"` → `true`), and
+  the editor's marks pick from a true|false menu, never a string.
+- **everywhere** — **the commands rows speak `live`**: the registries'
+  `commands` rows take the show rows' field shape — the wire word comes
+  from the row's `live` (a `/`-path, the show rows' fallback: the live
+  when the row spells one, else the `name`), the `group` buckets the
+  console listings, and the `name` becomes the registry-internal key,
+  flattened to the family's dashed spelling (`request-dump`,
+  `request-clear-cache`, `poll-now` — never typed, never rendered). The
+  rows may carry an **`internal`** flag — the machinery's own words: the
+  wire answers, the describe helps, the cli never offers or lists them
+  (`ping` and `help` join every registry as internal rows — the cache's
+  and the fake's `ping` rows are new, the scraper's and the dashboard's
+  were listed before; `help` was never rowed anywhere). The session
+  verbs — `help`, `?`, `ping`, `quit` — stay the RBAC-exempt
+  housekeeping every role speaks (wiresec's SESSION_VERBS, the policy
+  never gates them); the registry rows say so now too. Every
+  row spells its `live` today —
+  the wire, the pools and the listings are otherwise unchanged; a row
+  whose `live` differs from its `name`'s words is a
+  rename wave (the dispatch strings and the suites follow).
 - **everywhere** — **the wire's reload/restart/clear commands join the
   request namespace**: `reload` → `request reload`, `restart` →
   `request restart`, `clear cache` → `request clear cache` — the old

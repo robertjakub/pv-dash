@@ -31,7 +31,7 @@ WIDTH = 118
 
 KEY_RANK = ('name', 'flag', 'env', 'conv', 'group', 'live', 'alias', 'negates',
             'setting-help', 'values', 'hint', 'value-help', 'default', 'help',
-            'min', 'max', 'check', 'secret', 'hidden', 'restart', 'node')
+            'min', 'max', 'check', 'secret', 'internal', 'hidden', 'restart', 'node')
 KNOWN = set(KEY_RANK)
 
 
@@ -148,7 +148,9 @@ def render_row(row, ind):
 
 
 def render_registry(meta):
-    """The canonical text of one parsed registry."""
+    """The canonical text of one parsed registry (the row bools normalized
+    to the JSON booleans first — see normalize_bools)."""
+    normalize_bools(meta)
     parts = []
     for key, rows in meta.items():
         if not isinstance(rows, list):
@@ -160,6 +162,27 @@ def render_registry(meta):
         parts.append('  %s: [\n%s\n  ]' % (json.dumps(key, ensure_ascii=False),
                                            ',\n'.join(render_row(r, '    ') for r in rows)))
     return '{\n' + ',\n'.join(parts) + '\n}\n'
+
+
+BOOL_KEYS = frozenset(('secret', 'internal', 'hidden', 'restart', 'node'))
+
+
+def normalize_bools(meta):
+    """The row bools to the JSON booleans in place: 'on'/'off' load fine
+    (common/options.py as_bool) but the file's canonical form is
+    true/false — the render coerces, so --check flags a string-bool row
+    and the write mode fixes it."""
+    for rows in meta.values():
+        if not isinstance(rows, list):
+            continue
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            for k in BOOL_KEYS:
+                if r.get(k) == 'on':
+                    r[k] = True
+                elif r.get(k) == 'off':
+                    r[k] = False
 
 
 def lint(path):

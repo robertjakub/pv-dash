@@ -18,6 +18,14 @@ the **Done/history** records for their tool.
   grammar is family-shaped: `request/reload-config` listed beside
   `request/reload` on all four, the ops policy unchanged (the verb
   stays out of the ops default).
+- **row the fake's write-emulation words** `[inverter]` — `register`,
+  `coil`, `discrete` are set-only pseudo-settings the wire answers (the
+  write-overlay emulation, `set register <addr>=<val>`) with no registry
+  rows: the cli's special-case pin died with the internal-mark wave (the
+  words stopped completing/describing — the wire, the suites and the
+  overlay are untouched), and the registry should either gain their
+  hidden command rows or the "set/show the registers" redesign (the
+  product item below) subsumes them.
 - **file the display groups** `[common]` `[cache]` `[inverter]`
   `[dashboard]` `[scraper]` — the registries lost their `section` field
   (the `group` is the one grouping now; ungrouped rows render bare, no

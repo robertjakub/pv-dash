@@ -302,6 +302,23 @@ def knob_dictionary(options, who='the tool'):
     return '\n'.join(lines)
 
 
+def as_bool(v):
+    """The registry row's bool field (secret/internal/hidden/restart/node):
+    the JSON booleans plus the wire's on/off spelling — 'on' is true,
+    'off' is false, absent is false; anything else fails loud (the
+    registries are lint-gated, a typo must never load as a truthy
+    string)."""
+    if v is None or v is False:
+        return False
+    if v is True:
+        return True
+    if v == 'on':
+        return True
+    if v == 'off':
+        return False
+    raise ValueError('a bool field is true/false (or on/off), got %r' % (v,))
+
+
 class Setting:
     """One live control setting — the registry's control-grammar view: the
     `set <name>` name (a '/'-path: the wire spells its segments as words —

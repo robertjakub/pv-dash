@@ -18,7 +18,7 @@ build_parser) and scripts/check_options.py all read this table."""
 import json
 import os
 
-from common.options import Option, make_describe, settings_of
+from common.options import Option, as_bool, make_describe, settings_of
 
 _CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 
@@ -40,8 +40,8 @@ def _load_options():
         meta = json.load(f)
         rows = meta['options']
         global SHOW_COMMANDS, SHOW_WORDS, SHOW_HIDDEN, SHOW_VALUES, SHOW_GROUPS, SHOW_OPTIONS, SHOW_BY_LIVE
-        global COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
-        SHOW_COMMANDS = tuple((r['name'], r.get('setting-help') or r.get('help', ''), bool(r.get('hidden', False)),
+        global COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, COMMAND_INTERNAL
+        SHOW_COMMANDS = tuple((r['name'], r.get('setting-help') or r.get('help', ''), as_bool(r.get('hidden')),
                                r.get('group'))
                               for r in meta.get('show') or [])
         SHOW_WORDS = tuple(w for w, _, _, _ in SHOW_COMMANDS)
@@ -55,29 +55,45 @@ def _load_options():
                                     live=r.get('live') or r['name'],
                                     group=r.get('group'),
                                     setting_help=r.get('setting-help'),
-                                    hidden=bool(r.get('hidden', False)))
+                                    hidden=as_bool(r.get('hidden')))
                              for r in meta.get('show') or [])
         SHOW_BY_LIVE = {o.live: o.name for o in SHOW_OPTIONS}   # the hierarchy live -> the report's word
         # the control commands: the registries' `commands` rows (the wire's
         # verb list — the console help, the completion pools and the editor
-        # read these)
+        # read these). The wire spells the row's `live` — the show rows'
+        # fallback (the live when the row spells one, else the name); the
+        # name is the registry key, never typed. The maps key by the wire
+        # word. An `internal` row is the machinery's own word — the wire
+        # answers, the cli never offers or lists it.
         cmd_rows = meta.get('commands') or []
-        COMMANDS = tuple(r['name'] for r in cmd_rows)
-        COMMAND_HELP = {r['name']: r.get('help', '') for r in cmd_rows}
-        COMMAND_GROUPS = {r['name']: r.get('group', '') for r in cmd_rows}
-        COMMAND_HIDDEN = frozenset(r['name'] for r in cmd_rows if r.get('hidden'))
+        commands, cmd_help, cmd_groups, cmd_hidden = [], {}, {}, set()
+        cmd_internal = set()
+        for r in cmd_rows:
+            w = r.get('live') or r['name']
+            commands.append(w)
+            cmd_help[w] = r.get('help', '')
+            cmd_groups[w] = r.get('group', '')
+            if as_bool(r.get('hidden')):
+                cmd_hidden.add(w)
+            if as_bool(r.get('internal')):
+                cmd_internal.add(w)
+        COMMANDS = tuple(commands)
+        COMMAND_HELP = cmd_help
+        COMMAND_GROUPS = cmd_groups
+        COMMAND_HIDDEN = frozenset(cmd_hidden)
+        COMMAND_INTERNAL = frozenset(cmd_internal)   # the machinery's words: the wire answers, the cli never offers
     out = []
     for row in rows:
         opt = Option(row['name'], row.get('flag'), row.get('env'),
                      help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
                      live=row.get('live'), alias=row.get('alias'),
-                     secret=bool(row.get('secret', False)),
+                     secret=as_bool(row.get('secret')),
                      group=row.get('group'),
                      setting_help=row.get('setting-help'), values=row.get('values'),
                      hint=row.get('hint'), value_help=row.get('value-help'),
-                     min=row.get('min'), max=row.get('max'), check=row.get('check'), hidden=bool(row.get('hidden', False)),
-                     restart=bool(row.get('restart', False)),
-                     node=bool(row.get('node', False)))
+                     min=row.get('min'), max=row.get('max'), check=row.get('check'), hidden=as_bool(row.get('hidden')),
+                     restart=as_bool(row.get('restart')),
+                     node=as_bool(row.get('node')))
         if 'default' in row:
             opt.default = row['default']
         elif opt.conv is bool:
@@ -103,6 +119,7 @@ COMMANDS = ()
 COMMAND_HELP = {}
 COMMAND_GROUPS = {}
 COMMAND_HIDDEN = frozenset()
+COMMAND_INTERNAL = frozenset()
 
 OPTIONS = _load_options()
 

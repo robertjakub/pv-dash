@@ -57,11 +57,10 @@ def status_map(reply):
     return st
 
 
-def make_describe_word(nodes, commands_help, settings, extra=None):
+def make_describe_word(nodes, commands_help, settings):
     """The describer bound to one tool's registries — the golden order:
     a hierarchy node describes its namespace, a command row its help, a
-    setting its own, the tool's extra words (the fake's `register`
-    pseudo-word) theirs, then the walk-ons: a word both a settings
+    setting its own, then the walk-ons: a word both a settings
     namespace and a command one describes by the settings' first child
     (the alias-first-segment rule), a pure command namespace (`request`)
     by its first command child's help."""
@@ -73,8 +72,6 @@ def make_describe_word(nodes, commands_help, settings, extra=None):
         s = settings.get(w)
         if s:
             return s.help
-        if extra and w in extra:
-            return extra[w]
         walk = next((s for k, s in settings.items() if k.startswith(w + '/')), None)
         if walk is not None:
             return walk.help
@@ -108,11 +105,13 @@ def prompt_for(target, is_unix):
     return '%s:%s > ' % (_SPEC['prompt_word'], target)
 
 
-def help_text(commands_help, command_groups, command_hidden, pins):
+def help_text(commands_help, command_groups, command_hidden, pins, command_internal=()):
     """The `?` listing — the same shape as the setting help: bare words on
     top, then the filed groups, soft-alphabetical within; the pins ride
-    last (they are syntax, not words)."""
-    rows = [(n, d) for n, d in commands_help.items() if n not in command_hidden]
+    last (they are syntax, not words). The internal rows (the machinery's
+    own words) never list."""
+    rows = [(n, d) for n, d in commands_help.items()
+            if n not in command_hidden and n not in command_internal]
     width = max([len(n) for n, _ in rows] + [len(n) for n, _ in pins]) + 1
     out = ['commands (TAB completes, ? lists the options + descriptions in any position):']
     for g, ws in word_groups([n for n, _ in rows], command_groups):
@@ -248,8 +247,7 @@ def candidates(buf):
     the first position offers the commands (the spec's command_pool — the
     '/'-path rows walk segment-wise: `request` completes its children,
     `request clear` the leaf's own), set/unset walk the setting paths (the
-    spec's setting_pool minus the show reports; the spec's set_extra words
-    — the fake's `register` — join the set side only), show walks the
+    spec's setting_pool minus the show reports), show walks the
     setting paths including the reports. A live setting's name may be a
     '/'-path (`inverter/profile`): set/unset/show spell it as words — the
     completion offers the next segment until the path is whole, then the
@@ -265,8 +263,6 @@ def candidates(buf):
         pool, hint, desc = _SPEC['command_pool'](), None, _SPEC['describe']
     elif head in ('set', 'unset'):
         names = tuple(n for n in _SPEC['setting_pool']() if n not in _SPEC['show_lives'])
-        if head == 'set' and _SPEC['set_extra']:
-            names = names + _SPEC['set_extra']
         by = {n: _SPEC['settings'][n] for n in names if n in _SPEC['settings']}   # the exact match obeys the pool:
         s, segs = setting_path_pool(done[1:], names, by)                          # a show report never offers a value
         if s is None:   # the hidden knobs (the secrets) never walk, but the typed whole path still describes

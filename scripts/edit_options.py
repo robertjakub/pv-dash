@@ -6,8 +6,8 @@
 
 The dialog: the knob index is the menu — arrows walk it, Enter opens the
 row as a form; arrows walk the fields, Enter edits an editable one
-row as a form; arrows walk the fields, Enter edits an editable one
-(group, live, alias, setting-help, hint, the marks: hidden hides the row
+(group, live, alias, setting-help, hint, the marks: internal keeps a
+command row off the cli (the wire answers), hidden hides the row
 from the ?/TAB pools, restart marks the startup-only knob; value-help
 opens its own key menu —
 Enter edits a value's text, a adds a key, d deletes it), Esc leaves the
@@ -45,7 +45,8 @@ EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hint', 'value-help', 'hid
 SHOW_EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hidden')   # the registry's `show` rows: the
                                                                        # bucket, the live hierarchy, the
                                                                        # alias, the word's description, the mark
-CMD_EDITABLE = ('group', 'help', 'hidden')   # the `commands` rows: the bucket, the description, the mark
+CMD_EDITABLE = ('group', 'help', 'hidden', 'internal')   # the `commands` rows: the bucket, the
+                                                         # description, the marks
 BEFORE_HELP = ('setting-help', 'values', 'hint', 'value-help', 'default')
 
 from scriptlib import clean_path, row_span   # the shared registry-editing helpers
@@ -59,7 +60,8 @@ def render_row(row):
     (group/live/negates after conv, the setting vocabulary before help)."""
     rank = {k: i for i, k in enumerate(INLINE)}
     rank.update({k: 100 + i for i, k in enumerate(BEFORE_HELP)})
-    rank['hidden'] = 105   # the show rows: the mark after the setting vocabulary
+    rank['internal'] = 105   # the marks after the setting vocabulary (internal
+    rank['hidden'] = 106     # before hidden — the lint rank)
     rank['help'] = 999
     keys = sorted(row.keys(), key=lambda k: rank.get(k, 50))   # stable: the row's own order kept inside a rank
 
@@ -177,8 +179,9 @@ def row_keys(row, editable=EDITABLE):
     keys = list(row.keys()) + [k for k in editable if k not in row]
     rank = {k: i for i, k in enumerate(INLINE)}
     rank.update({k: 100 + i for i, k in enumerate(BEFORE_HELP)})
-    rank['hidden'] = 105   # the marks after the setting vocabulary (every kind)
-    rank['restart'] = 106
+    rank['internal'] = 105   # the marks after the setting vocabulary (every kind;
+    rank['hidden'] = 106     # internal before hidden — the lint rank)
+    rank['restart'] = 107
     rank['help'] = 999
     return sorted(keys, key=lambda k: rank.get(k, 50))
 
@@ -189,7 +192,7 @@ def shown(row, key):
     if v is None:
         return '-'
     if isinstance(v, bool):
-        return 'on' if v else 'off'
+        return 'true' if v else 'false'
     if isinstance(v, dict):
         return ', '.join(v) if v else '-'
     if isinstance(v, list):
@@ -347,23 +350,28 @@ class Editor:
         name = self.row['name']
         if key == 'name':
             return False, 'err the name is the row\'s identity — it does not edit'
-        if key == 'hidden' or key == 'restart':   # the bool marks — hidden on the knobs, the
+        if key in ('hidden', 'restart', 'internal'):   # the bool marks — hidden on the knobs, the
+            # show rows and the command rows too; internal: command rows
+            # only; restart: option rows only. The editor writes true/false
+            # only (the loaders also read the wire's on/off spelling).
             if key == 'restart' and self.is_show(self.row):   # show rows and the command rows too;
                 return False, 'err %s is a show row — only %s edit' % (name, ' | '.join(SHOW_EDITABLE))   # restart: option rows only
             if key == 'restart' and self.is_cmd(self.row):
                 return False, 'err %s is a command row — only %s edit' % (name, ' | '.join(CMD_EDITABLE))
+            if key == 'internal' and not self.is_cmd(self.row):
+                return False, 'err internal is a command-row mark — %s is not one' % name
             if self.row.get('node'):
                 return False, 'err %s is a hierarchy node — only its setting-help and group edit' % name
-            v = (value or 'off').lower()   # the empty = the clear = off
-            if v not in ('on', 'off', 'true', 'false', '1', '0', 'yes', 'no'):
-                return False, 'err %s must be on or off' % key
-            if v in ('on', 'true', '1', 'yes'):
+            v = (value or 'false').lower()   # the empty = the clear = false
+            if v not in ('true', 'false'):
+                return False, 'err %s must be true or false' % key
+            if v == 'true':
                 self.row[key] = True
-                return True, 'ok %s.%s on%s' % (name, key, '' if key == 'restart' else ' (the pools drop it, the wire answers)')
+                return True, 'ok %s.%s true%s' % (name, key, '' if key == 'restart' else ' (the pools drop it, the wire answers)')
             if key not in self.row:
-                return False, '%s: %s already off' % (name, key)
-            del self.row[key]   # off = the field's absence
-            return True, 'ok %s.%s off (the mark cleared)' % (name, key)
+                return False, '%s: %s already false' % (name, key)
+            del self.row[key]   # false = the field's absence
+            return True, 'ok %s.%s false (the mark cleared)' % (name, key)
         if self.is_show(self.row):
             if key not in SHOW_EDITABLE:
                 return False, 'err %s is a show row — only %s edit' % (name, ' | '.join(SHOW_EDITABLE))
@@ -385,9 +393,9 @@ class Editor:
         if value:
             if isinstance(was, bool):   # a bool field stores a bool, whatever the spelling
                 v = value.lower()
-                if v not in ('on', 'off', 'true', 'false', '1', '0', 'yes', 'no'):
-                    return False, 'err %s must be on or off' % key
-                self.row[key] = v in ('on', 'true', '1', 'yes')
+                if v not in ('true', 'false'):
+                    return False, 'err %s must be true or false' % key
+                self.row[key] = v == 'true'
             else:
                 self.row[key] = value
         else:
@@ -568,10 +576,10 @@ def dialog(editor, screen):
                 curses.curs_set(0)   # back to the hidden-cursor face
 
     def bool_menu(key):
-        """A bool field's pick: on|off from the menu, not the string — the
+        """A bool field's pick: true|false from the menu, not the string — the
         arrows walk, Enter takes, Esc keeps the field as it is."""
-        options = (('on', 'set the field true'),
-                   ('off', 'clear the field (its absence = false)'))
+        options = (('true', 'set the field true'),
+                   ('false', 'clear the field (its absence = false)'))
         bcursor, msg = 0 if editor.row.get(key) in (True, None) else 1, ''
         while True:
             screen.erase()
@@ -595,7 +603,7 @@ def dialog(editor, screen):
         empty field opens with the shared draft as its initial buffer —
         Enter accepts the proposal, typing overwrites it, Esc aborts."""
         was = editor.row.get(key, '')
-        initial = ('on' if was else 'off') if isinstance(was, bool) else was
+        initial = ('true' if was else 'false') if isinstance(was, bool) else was
         if not was:
             initial = next((d for f, d, _ in proposals(editor.row) if f == key), initial)
         text = input_line('%s: ' % key, initial)
@@ -603,7 +611,7 @@ def dialog(editor, screen):
             return 'unchanged (esc)'
         text = text.strip()
         if isinstance(was, bool) and not text:
-            text = 'off'
+            text = 'false'
         ok, msg = editor.set_field(key, text)
         return msg
 
@@ -746,7 +754,7 @@ def dialog(editor, screen):
                     msg = '%s is view-only (the registry renders it elsewhere)' % key
                 elif key == 'value-help':
                     msg = vh_menu()
-                elif key in ('hidden', 'restart') or isinstance(editor.row.get(key), bool):
+                elif key in ('hidden', 'restart', 'internal') or isinstance(editor.row.get(key), bool):
                     msg = bool_menu(key)   # a bool picks from the menu, not the string
                 else:
                     msg = edit_value(key)
@@ -755,7 +763,7 @@ def dialog(editor, screen):
                 if key not in editor.editable_set(editor.row):
                     msg = '%s is view-only (the registry renders it elsewhere)' % key
                 else:
-                    ok, msg = editor.set_field(key, '')   # the empty = the clear; a bool = off
+                    ok, msg = editor.set_field(key, '')   # the empty = the clear; a bool = false
                     if ok:
                         fcursor = min(fcursor, len(row_keys(editor.row, editor.editable_set(editor.row))) - 1)
             elif k in (ord('p'), ord('P')):   # the proposals: one prefilled edit per field

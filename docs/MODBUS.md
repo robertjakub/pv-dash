@@ -190,15 +190,35 @@ enabled), and the fake implements FC5/6/15/16 behind its write gate.
 ### The support classes — every standard FC, and what "support" means
 
 Every standard function code is transported; none falls through
-silently. Each code lands in exactly one class:
+silently. The per-code map, tool by tool ("—" = the tool has no surface
+for it):
 
-| Class | Codes | Meaning |
-|---|---|---|
-| **native reads** | 1, 2, 3, 4 | all three tools speak them natively — the fake serves all four address spaces, the cache caches all four, the scraper reads all four |
-| **native writes** | 5, 6, 15, 16 | the fake implements them (write overlays, behind its gate); the cache gated-forwards them |
-| **gated forward, native refusal** | 22, 23 | the cache gates and forwards them; the fake answers exception 01 (unimplemented there — nothing to gate) |
-| **forward / named refusal** | 7, 8, 11–14, 17–21, 24, 43 | the cache forwards untouched (named in the log: `forwarded FC17 (report slave id), N byte(s)`); the fake names them (`describe_fc`) and refuses with exception 01 |
-| **vendor / reserved** | 9, 10, 25–42, 44+ | the cache forwards bare (`FC<n>` — `FC_NAMES` has no standard name); the fake refuses with 01 |
+| FC | Name | Scraper (client) | Cache (server) | Fake (server) | Verdict |
+|---|---|---|---|---|---|
+| FC01 | Read Coils | ✅ per-profile `fc` (`poller.py:65`) | ✅ cached, first-class bit space (`proxy.py:504`) | ✅ coil map + `--allow-write` overlays (`inverter.py:213`) | **Complete** |
+| FC02 | Read Discrete Inputs | ✅ per-profile `fc` (`poller.py:65`) | ✅ cached, own `(fc, addr)` space (`proxy.py:504`) | ✅ discrete map + overlays (`inverter.py:213`) | **Complete** |
+| FC03 | Read Holding Registers | ✅ `read_registers` (`protocol.py:83`) | ✅ cached, first-class (`proxy.py:496`) | ✅ register map + write overlay (`inverter.py:193`) | **Complete** |
+| FC04 | Read Input Registers | ✅ per-profile `fc` (`poller.py:65`) | ✅ cached, separate `(fc, addr)` space (`proxy.py:496`) | ⚠️ serves the *same* map as FC3 — no overlay (`inverter.py:203`) | Complete except fake |
+| FC05 | Write Single Coil | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, audited (`inverter.py:229`) | **Complete** (cache + fake) |
+| FC06 | Write Single Register | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, audited (`inverter.py:241`) | **Complete** (cache + fake) |
+| FC07 | Read Exception Status | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC08 | Diagnostics | — | ✅ forwarded, named — the sub-functions are not interpreted (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade (sub-functions by design) |
+| FC11 | Get Comm Event Counter | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC12 | Get Comm Event Log | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC15 | Write Multiple Coils | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, bit overlays (`inverter.py:247`) | **Complete** (cache + fake) |
+| FC16 | Write Multiple Registers | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, register overlays (`inverter.py:260`) | **Complete** (cache + fake) |
+| FC17 | Report Server ID | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC20/21 | File Record Read/Write | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC22 | Mask Write Register | — no write API | ✅ gated forward, shape-checked (`writes.py:80`) | ⚠️ exception 01 — nothing to gate (`inverter.py:273`) | Complete except fake |
+| FC23 | Read/Write Multiple Regs | — no write API | ✅ gated forward, shape-checked (`writes.py:80`) | ⚠️ exception 01 — nothing to gate (`inverter.py:273`) | Complete except fake |
+| FC24 | Read FIFO Queue | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
+| FC43/14 | Read Device Identification | — | ✅ forwarded, named (`proxy.py:522`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade (native MEI by design) |
+| FC09/10, 25–42, 44–64 | reserved / legacy | — | ✅ forwarded bare (`FC<n>`, `proxy.py:522`) | ⚠️ exception 01 (`inverter.py:273`) | Forward-grade |
+| FC65–72/73–94/100+ | vendor-specific | — | ✅ forwarded bare (`FC<n>`, `proxy.py:522`) | ⚠️ exception 01 (`inverter.py:273`) | Forward-grade |
+
+(The cache's write gate is the three-layer ladder — allow-write, client
+ACL, register allow-list — then the shared shape check; every refusal is
+a named exception and an audited `WRITE-REFUSED`.)
 
 Not implemented anywhere **by design**: the FC8 diagnostics
 sub-functions, native FC43/MEI device identification, and the serial

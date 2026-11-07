@@ -246,8 +246,7 @@ def lint(path):
             continue
         i = next(i for i, r in enumerate(rows)
                  if isinstance(r, dict) and r.get('live') and r['live'].startswith(p + '/'))
-        rows.insert(i, {'name': p, 'setting-help': 'TODO: describe %s for the control help' % p,
-                        'node': True})
+        rows.insert(i, {'name': p, 'setting-help': 'TODO: need update', 'node': True})
 
     if nits:
         return nits, None

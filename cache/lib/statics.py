@@ -37,6 +37,8 @@ DIAG_MAX = DIAGNOSTICS['max_age']              # the age/uptime clamp (0xFFFF)
 
 DEFAULTS = STATIC['defaults']
 DEFAULT_LISTEN_PORT = int(DEFAULTS['listen'].rsplit(':', 1)[1])
+AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
+AUDIT_FILES = DEFAULTS['audit_files']
 REQUESTS_AUDIT_S = DEFAULTS['requests_audit_s']  # the per-client REQUESTS audit period
 CLI_KEEPALIVE_S = DEFAULTS['cli_keepalive_s']
 CLI_TIMEOUT_S = DEFAULTS['cli_timeout_s']

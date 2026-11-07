@@ -16,7 +16,6 @@ import json
 import logging
 import os
 import socket
-import struct
 import sys
 import threading
 import time
@@ -29,9 +28,8 @@ from common.modbus import AUTH_MIN_KEY
 from common.cred import peer_uid, parse_trust_uids
 from common.human import secs
 from common.logutil import UtcFormatter
-from common.modbus import ModbusError
 from common.audit import AuditLog
-from common.wiresec import frame_mac, sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.options import control_command, grouped_rows, match_setting_path, describe_node
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, NODE_BY_NAME, KNOWN_VERBS

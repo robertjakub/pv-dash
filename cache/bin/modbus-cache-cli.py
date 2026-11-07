@@ -44,8 +44,8 @@ from common.human import secs
 from common.options import setting_path_pool, word_groups
 from common.wiresec import sign_request, verify_reply
 from lib.config import resolve_control_target
-from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, HIDDEN_SETTINGS, LIVE_SETTINGS, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES, describe_setting, NODE_BY_NAME
-from lib.statics import CLI_KEEPALIVE_S, CLI_TIMEOUT_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S
+from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_GROUPS, COMMAND_HELP, COMMAND_HIDDEN, HIDDEN_SETTINGS, LIVE_SETTINGS, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES, NODE_BY_NAME
+from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_TIMEOUT_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
 DEFAULT_KEEPALIVE = CLI_KEEPALIVE_S     # well under the control server's idle timeout
@@ -79,7 +79,10 @@ def settable_pool():
     return tuple(n for n in setting_pool() if n not in SHOW_LIVES)
 
 
-HELP_PINS = (('?', 'this help'),)
+HELP_PINS = (
+    ('help <setting>', "the setting's description"),
+    ('?', 'this help'),
+)
 
 
 def help_text():
@@ -259,11 +262,6 @@ def describe_word(w):
     return COMMAND_HELP.get(w) or setting_help(w)
 
 
-def describe_setting(name):
-    s = SETTING_BY_NAME.get(name)
-    return '%s - %s (values: %s)' % (name, s.help, s.value_shape) if s else None
-
-
 def setting_help(name):
     s = SETTING_BY_NAME.get(name)
     if s:
@@ -382,8 +380,8 @@ def main():
     p.add_argument('--reconnect-wait', type=float, default=CLI_RECONNECT_WAIT_S, help='seconds between the reconnect attempts (default %(default)s)')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN); a file:<path> value reads the first line of an owner-only 0600 file')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; default: the XDG state home")
-    p.add_argument('--audit-max-mb', type=float, default=10.0, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = off (default %(default)s)')
-    p.add_argument('--audit-files', type=int, default=3, help='rotated audit backups to keep (default %(default)s)')
+    p.add_argument('--audit-max-mb', type=float, default=AUDIT_MAX_MB, help='rotate the audit log at this size in MB, keeping 3 backups; 0 = off (default %(default)s)')
+    p.add_argument('--audit-files', type=int, default=AUDIT_FILES, help='rotated audit backups to keep (default %(default)s)')
     p.add_argument('--no-audit-log', action='store_true', help='disable the audit trail')
     p.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-cache-cli --man | man -l -)')
     args = p.parse_args()

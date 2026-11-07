@@ -24,8 +24,10 @@
 # the Prometheus service reads its copy of the same file from the config
 # volume. Read the token: docker compose exec modbus-scraper cat /config/metrics.token
 #
-# The overrides: cp .env.example .env and edit — compose interpolates .env
-# into the ${...} defaults below (see .env.example for every knob).
+# The overrides: per-tool env files — cp env/<tool>.env.example
+# env/<tool>.env and edit (bare env-twin names; required: false, so no
+# file = the image defaults). The SAME files serve plain
+# `docker run --env-file` runs. See README.md.
 services:
   fake-inverter:
     build:
@@ -35,9 +37,9 @@ services:
         scripts: ../docker
         common: ../common
     image: fake-inverter
-    environment:
-      # .env pass-throughs — an empty value is treated as unset by the tool
-      PROFILE: ${FAKE_PROFILE:-}
+    env_file:
+      - path: env/fake.env
+        required: false
     volumes:
       - config:/config
     networks:
@@ -52,12 +54,9 @@ services:
         scripts: ../docker
         common: ../common
     image: modbus-cache
-    environment:
-      # .env pass-throughs (the image ENV carries the same upstream default)
-      UPSTREAM: ${CACHE_UPSTREAM:-fake-inverter:5502}
-      INTERVAL: ${POLL_INTERVAL:-}
-      TTL: ${CACHE_TTL:-}
-      LOG_LEVEL: ${LOG_LEVEL:-}
+    env_file:
+      - path: env/cache.env
+        required: false
     volumes:
       - config:/config
     networks:
@@ -76,13 +75,12 @@ services:
     image: modbus-scraper
     environment:
       # the token the entrypoint generated into the volume (0600, pvsuite):
-      # the demo exporter never serves unauthenticated (the audit's F13)
-      AUTH_TOKEN_FILE: ${SCRAPER_TOKEN_FILE:-/config/metrics.token}
-      # .env pass-throughs (the image ENV carries the same upstream default)
-      UPSTREAM: ${SCRAPER_UPSTREAM:-modbus-cache:15502}
-      INTERVAL: ${POLL_INTERVAL:-}
-      METRIC_PREFIX: ${METRIC_PREFIX:-}
-      LOG_LEVEL: ${LOG_LEVEL:-}
+      # the demo exporter never serves unauthenticated (the audit's F13) —
+      # environment beats env_file, so scraper.env cannot override this
+      AUTH_TOKEN_FILE: /config/metrics.token
+    env_file:
+      - path: env/scraper.env
+        required: false
     networks:
       - modbus
     depends_on:
@@ -112,8 +110,11 @@ services:
     image: pv-dashboard
     environment:
       # the proxy target: the stack's internal Prometheus service (the
-      # dashboard never needs the token — the scrape stays prometheus-side)
-      PROM_URL: ${PROM_URL:-http://prometheus:9090}
+      # dashboard never needs the token — the scrape stays prometheus-side;
+      # there is no dashboard env_file — the stack's PROM_URL is a
+      # compose-level concern, see env/dashboard.env.example for the
+      # plain-docker spelling)
+      PROM_URL: http://prometheus:9090
     volumes:
       - config:/config
     networks:
@@ -121,7 +122,7 @@ services:
     ports:
       # the stack's one published port, loopback-only (the audit's F7
       # discipline: an explicit operator act, not reachable from the LAN)
-      - "127.0.0.1:${DASHBOARD_PORT:-8080}:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       - prometheus
     restart: unless-stopped

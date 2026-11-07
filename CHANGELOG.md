@@ -12,29 +12,36 @@ before the repo restructured into one suite.
 
 ### Added
 
-- **docker** — **the stack speaks .env**: `docker/.env.example` ships the
-  deployment-shaped knobs commented — the poll chain's upstreams
-  (`CACHE_UPSTREAM`/`SCRAPER_UPSTREAM`, point the cache at a real inverter),
-  the cadence (`POLL_INTERVAL`, `CACHE_TTL`), the fake's device profile
-  (`FAKE_PROFILE`), the exporter's token file (`SCRAPER_TOKEN_FILE`) and
-  metric prefix (`METRIC_PREFIX`), the dashboard's published port
-  (`DASHBOARD_PORT`) and `PROM_URL`, one shared `LOG_LEVEL` — cp it to
-  `docker/.env` and compose interpolates the values into compose.yaml's
-  new `${...}` pass-throughs (the names are compose-side keys, mapped onto
-  the services' bare-name env twins one service at a time: `UPSTREAM`
-  alone names a different peer per tool). An empty env value is treated as
-  unset by every tool's resolver, so a commented-out line is always safe.
-  The cache's and scraper's `--upstream` defaults move from the CMD flags
-  to image `ENV` (`UPSTREAM=fake-inverter:5502` /
+- **docker** — **each image gets its own env file**: the examples ship as
+  `docker/env/cache.env.example`, `env/scraper.env.example`,
+  `env/fake.env.example`, `env/dashboard.env.example` — cp one to
+  `env/<tool>.env` and edit. The names are the **bare env twins** the
+  tools' own docs speak (`UPSTREAM`, `INTERVAL`, `TTL`, `PROFILE`,
+  `METRIC_PREFIX`, `AUTH_TOKEN_FILE`, `LOG_LEVEL`, the fake's SIGHUP-layer
+  `CHAOS`/`MAX_KWP`/`BATTERY`/`STRICT`/`TIME`/`TIME_SCALE`) — one file per
+  tool, so no namespacing, and the same file is consumed two ways:
+  `docker run --env-file env/<tool>.env <image>` for plain docker and the
+  compose stack's per-service `env_file:` (`required: false` — compose
+  ≥ 2.24; no file = the image defaults, the stack runs out of the box).
+  An env value rides the tools' resolution (flag > env > config script >
+  default — an empty value is treated as unset by every resolver, the
+  fake's SIGHUP layer skips falsy ones), so it beats the seeded `/config`
+  conf file; compose recreates a service when its env file changes. Two
+  knobs stay compose-level by nature: the dashboard's published port and
+  its `PROM_URL` (`environment:` beats `env_file`, so the stack's
+  generated-token `AUTH_TOKEN_FILE` cannot be overridden by
+  `scraper.env` either — the token story stays the volume file). The
+  cache's and scraper's `--upstream` defaults move from the CMD flags to
+  image `ENV` (`UPSTREAM=fake-inverter:5502` /
   `UPSTREAM=modbus-cache:15502`) — a CMD flag would pin the peer past
-  every env forever, while the env keeps the plain `docker run` default
-  and makes `-e UPSTREAM=...` work there too. The `/config` volume stays:
-  the generated `metrics.token` (one shared secret, two containers,
-  survives recreation), the JSON specs (`selection.json`, `metrics.json`)
-  and the served `config.js` are files by nature, not knobs; the seeded
-  conf scripts become the edit-a-file option under the env layer (env
-  beats config script in the resolution). The README gains the .env
-  section and the env-or-volume split.
+  every env forever, while the env keeps the plain `docker run` default.
+  The `/config` volume stays: the generated `metrics.token` (one shared
+  secret, two containers, survives recreation), the JSON specs
+  (`selection.json`, `metrics.json`) and the served `config.js` are files
+  by nature, not knobs; the seeded conf scripts become the edit-a-file
+  option under the env layer. The README gains the env-files section and
+  the env-or-volume split, `.gitignore` the `docker/env/*.env` live
+  copies.
 
 - **profiles** — **the write allow-list speaks the device profile**:
   the cache's `write-registers` knob takes the new value **`profile`** —

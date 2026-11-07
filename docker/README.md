@@ -28,8 +28,8 @@ collector, and a `compose.yaml` wiring the demo stack. The pattern:
   survive container recreation). The `ENV` vars point each tool at the
   volume copies (and carry the demo stack's default upstream peers). See
   [env or the config volume?](#env-or-the-config-volume) for the split:
-  the env twins (and the compose `.env`) cover the knobs, the volume holds
-  the file-shaped artifacts.
+  the env twins (and the per-tool env files) cover the knobs, the volume
+  holds the file-shaped artifacts.
 - the build context = the subproject; the profiles, the entrypoint and the
   shared [`common/`](../common/README.md) package ride in as named build
   contexts (`additional_contexts` in the compose, `--build-context` for
@@ -66,50 +66,65 @@ Prometheus UI directly from the host as well, add
 `ports: ["127.0.0.1:9090:9090"]` to the service in a
 `docker-compose.override.yaml` — loopback-only, an explicit operator act.)
 
-### The .env overrides
+### The env files (one per tool)
 
-The compose file interpolates a `.env` from this directory —
-`cp .env.example .env` and edit (a different file: `docker compose
---env-file other.env ...`). The example carries the deployment-shaped
-knobs: the poll chain's upstreams (`CACHE_UPSTREAM` — point the cache at a
-real inverter; `SCRAPER_UPSTREAM`), the cadence (`POLL_INTERVAL`,
-`CACHE_TTL`), the fake's device profile (`FAKE_PROFILE`), the exporter's
-token file (`SCRAPER_TOKEN_FILE`) and its metric prefix, the dashboard's
-published port (`DASHBOARD_PORT`) and `PROM_URL`, and one `LOG_LEVEL` for
-the two file-config pollers. The names are compose-side keys, mapped onto
-the services' bare-name env twins one service at a time — `UPSTREAM` alone
-would be ambiguous (it names a different peer per tool). Every default
-stays while the line is commented; the tools treat an empty env value as
-unset, so commenting a line out is always safe.
+Each image has its own env file, shipped as an example:
+`env/cache.env.example`, `env/scraper.env.example`, `env/fake.env.example`,
+`env/dashboard.env.example` — `cp env/<tool>.env.example env/<tool>.env`
+and edit. The names are the **bare env twins** the tool's own docs speak
+(`UPSTREAM`, `INTERVAL`, `TTL`, `PROFILE`, `METRIC_PREFIX`, `LOG_LEVEL`,
+…) — one file per tool, so no namespacing is needed. Every line starts
+commented; the defaults live in the image.
 
-The values land as plain env twins — flag > env > config script > default —
-so a `.env` setting beats the seeded `/config` conf file, and a
-`--upstream` CMD override beats it in turn. Anything beyond the curated
-set (the control-plane tokens, the write gates, the state dump): add the
-env mapping to a `docker-compose.override.yaml` (it layers over
-compose.yaml) instead of editing the compose file.
+The same file is consumed two ways:
+
+```bash
+cd docker
+cp env/cache.env.example env/cache.env
+$EDITOR env/cache.env                            # UPSTREAM=192.168.1.100:5502
+
+docker run --rm -p 127.0.0.1:15502:15502 \
+    --env-file env/cache.env modbus-cache        # plain docker: --env-file
+
+docker compose up -d modbus-cache                # the stack: env_file: (required: false)
+```
+
+Compose reads the service's file via `env_file:` with `required: false`
+(compose ≥ 2.24) — **no file means the image defaults**, so the stack runs
+out of the box; when a file exists its values ride the tools' resolution
+(flag > env > config script > default), beating the seeded `/config` conf
+files. Compose recreates a service when its env file changes. Two knobs
+are compose-level by nature and stay in the compose file: the dashboard's
+published port and its `PROM_URL` (the stack's `environment:` block —
+environment beats env_file, so `scraper.env`'s `AUTH_TOKEN_FILE` cannot
+override the stack's generated-token file either; the token story stays
+the volume file, a plain-docker `AUTH_TOKEN_FILE` in `scraper.env` is
+fine). The fake's simulation envs (`CHAOS`, `MAX_KWP`, `BATTERY`, `STRICT`,
+`TIME`, `TIME_SCALE`) are its SIGHUP layer, not startup: they reach a
+container when it is created with them (compose recreates on the file
+change) or via `docker compose kill -s HUP fake-inverter`.
 
 ### env or the config volume?
 
-Both, on purpose — they split by shape. The `.env` covers what an env twin
-can carry (every knob has one; the env beats the conf file in the
+Both, on purpose — they split by shape. The env files cover what an env
+twin can carry (every knob has one; the env beats the conf file in the
 resolution). The `/config` volume stays because the things it holds are
 files by nature, not knobs:
 
 - **the generated `metrics.token`** — one shared secret, produced once by
   the entrypoint (0600, owner pvsuite), read by the exporter and the
   stack's Prometheus; it must survive recreation unchanged and be the same
-  value in two containers — and a secret in `.env` would sit unencrypted
-  in the project directory, ripe for committing (the F12 discipline
-  prefers owner-only files; the knobs accept `file:` references for
-  exactly this)
+  value in two containers — and a secret in an env file would sit
+  unencrypted in the project directory, ripe for committing (the F12
+  discipline prefers owner-only files; the knobs accept `file:`
+  references for exactly this)
 - **`selection.json` and `metrics.json`** — JSON specs, not knobs: the
   `SELECTION`/`METRICS_SPEC` env twins only point at the files
 - **`config.js`** — the dashboard's served front-end file (`CONFIG_JS`
   points at it)
 
-The three conf scripts stay seeded for the edit-a-file workflow; with a
-`.env` in play they are simply overridden and inert.
+The three conf scripts stay seeded for the edit-a-file workflow; with an
+env file in play they are simply overridden and inert.
 
 **The scraper/token story ships in the stack** (the audit's F13 closed for
 the demo): the exporter never serves unauthenticated — the compose sets
@@ -256,7 +271,7 @@ docker run --rm -it modbus-cache bash          # poke around as pvsuite
 docker run --rm -p 127.0.0.1:15502:15502 modbus-cache \
     modbus-cache --upstream 192.168.1.100:5502          # any flags via the CMD override
 docker run --rm -p 127.0.0.1:15502:15502 \
-    -e UPSTREAM=192.168.1.100:5502 modbus-cache         # the peer via env (a --upstream flag beats it)
+    --env-file env/cache.env modbus-cache       # the peer via the env file (a --upstream flag beats it)
 ```
 
 Without `-v` the volume is anonymous (thrown away with `--rm`); name it to
@@ -278,7 +293,7 @@ docker run --rm -it modbus-scraper bash        # poke around as pvsuite
 docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper \
     modbus-scraper --upstream 192.168.1.100:502        # any flags via the CMD override
 docker run --rm -p 127.0.0.1:9350:9350 \
-    -e UPSTREAM=192.168.1.100:15502 modbus-scraper     # the peer via env (a --upstream flag beats it)
+    --env-file env/scraper.env modbus-scraper   # the peer via the env file (a --upstream flag beats it)
 ```
 
 Standalone runs stay token-less by default — the compose stack is what

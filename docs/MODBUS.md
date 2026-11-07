@@ -21,7 +21,7 @@ Clients use `socket.create_connection`; servers `bind`/`listen`. Every
 multi-byte field is **big-endian** (`struct` format `>`).
 
 Each frame is the standard **MBAP header (7 bytes) + PDU**, read with
-`recv_exact` (`common/protocol.py:143`), which loops until it has exactly
+`recv_exact` (`common/protocol.py`), which loops until it has exactly
 `n` bytes and raises `ConnectionError` on a closed peer:
 
 | Offset | Size | Field | Notes |
@@ -47,7 +47,7 @@ default upstream for scraper and cache is `127.0.0.1:5502`. (The scraper's
 
 ## 2. The suite auth handshake (PVA1)
 
-Implemented once in `common/protocol.py:17-69` (`auth_handshake_client` /
+Implemented once in `common/protocol.py` (`auth_handshake_client` /
 `auth_handshake_server`), shared by every tool. One round trip, client
 speaks first: after the TCP connect and **before any Modbus frame**, the
 client proves the shared key.
@@ -149,16 +149,16 @@ pv-suite tool ever demands a Waveshare password from its own clients.
 
 ## 3. Function codes
 
-The one table is `FC_NAMES` (`common/protocol.py:108`); `describe_fc`
+The one table is `FC_NAMES` (`common/protocol.py`); `describe_fc`
 renders `FC6 (write single register)` or bare `FC<n>` for unlisted codes.
 
 | FC | Name | Cache | Scraper | Fake |
 |---|---|---|---|---|
-| 1 | read coils | forwards (not cached) | — | exception 01 |
-| 2 | read discrete inputs | forwards | — | exception 01 |
+| 1 | read coils | cached / forwarded | reads (`bit`, `fc: 1`) | serves the coil space |
+| 2 | read discrete inputs | cached / forwarded | reads (`bit`, `fc: 2`) | serves the discrete-input space |
 | 3 | read holding registers | cached / forwarded, diag block | reads | reads |
-| 4 | read input registers | cached / forwarded (separate space) | reads | reads |
-| 5 | write single coil | gated + forwarded | — | exception 01 |
+| 4 | read input registers | cached / forwarded (separate space) | reads | reads (the input space) |
+| 5 | write single coil | gated + forwarded | — | writes (coil overlay; `0x0000`/`0xFF00` only) |
 | 6 | write single register | gated + forwarded | — | writes (overlay) |
 | 7 | read exception status | forwards | — | exception 01 |
 | 8 | diagnostics | forwards | — | exception 01 |
@@ -166,7 +166,7 @@ renders `FC6 (write single register)` or bare `FC<n>` for unlisted codes.
 | 12 | get comm event log | forwards | — | exception 01 |
 | 13 | program 484 | forwards | — | exception 01 |
 | 14 | poll 484 | forwards | — | exception 01 |
-| 15 | write multiple coils | gated + forwarded | — | exception 01 |
+| 15 | write multiple coils | gated + forwarded | — | writes (coil overlay) |
 | 16 | write multiple registers | gated + forwarded | — | writes (overlay) |
 | 17 | report slave id | forwards | — | exception 01 |
 | 18 | program 884 | forwards | — | exception 01 |
@@ -178,10 +178,11 @@ renders `FC6 (write single register)` or bare `FC<n>` for unlisted codes.
 | 24 | read fifo queue | forwards | — | exception 01 |
 | 43 | read device identification | forwards | — | exception 01 |
 
-The cache's sets: `READ_FUNCS = (3, 4)`, `WRITE_FUNCS = {5, 6, 15, 16, 22,
-23}` (`cache/lib/static.json`). Unknown codes forward untouched. The
+The cache's sets: `READ_FUNCS = (1, 2, 3, 4)` — the four address spaces,
+each cached separately — and `WRITE_FUNCS = {5, 6, 15, 16, 22, 23}`
+(`cache/lib/static.json`). Unknown codes forward untouched. The
 scraper is **read-only** — it never issues writes; only the cache
-originates them (when enabled), and the fake implements only FC6/FC16.
+originates them (when enabled), and the fake implements FC5/6/15/16.
 
 ---
 
@@ -201,8 +202,8 @@ B    B            N × 2 bytes
 FC   byte_count   word0 word1 ...      # byte_count = count × 2
 ```
 
-Client-side validation, in order (`scraper/lib/protocol.py:77-101`,
-`cache/lib/upstream.py:64-99`): header length bounds; `txn` matches the
+Client-side validation, in order (`scraper/lib/protocol.py` `_read`,
+`cache/lib/upstream.py` `read`): header length bounds; `txn` matches the
 outstanding one; `proto == 0`; `unit` matches the configured unit;
 `func == fc + 0x80` → Modbus exception (the cache raises `DeviceError`
 carrying `.code` so it can replay the device's code to its clients);
@@ -220,13 +221,31 @@ exception (code 2): 00 09 00 00 00 03 01 83 02
 ```
 
 Every read address carries the scraper's `modbus-offset` added on
-(`scraper/lib/protocol.py:75`).
+(`scraper/lib/protocol.py` `_read`).
+
+### The bit reads (FC1 / FC2)
+
+Request PDU — identical shape to FC3/FC4 (5 bytes): `FC addr count`.
+Response PDU — the bits **packed 8 per byte, LSB first**:
+
+```
+B    B            ceil(count / 8) bytes
+FC   byte_count   packed bits          # byte_count = (count + 7) // 8
+```
+
+Bit `i` of the request span lives in byte `i >> 3`, bit position `i & 7`.
+Read quantity: 1..2000 bits (the spec's `0x7D0`; `MAX_BITS` in each
+tool's `lib/static.json`). The cache stores each bit as a 0/1 word in its
+`(fc, addr)` map and repacks on reply; the scraper's `read_bits` returns
+one 0/1 per address. The fake serves FC1 from its coil space (profile
+`bit`/`fc: 1` entries + the FC5/FC15 writes + `set coil`), FC2 from the
+discrete-input space (profile `bit`/`fc: 2` entries + `set discrete`).
 
 ---
 
 ## 5. Writes (FC5/6/15/16/22/23)
 
-PDU shapes as validated by the cache (`cache/lib/protocol.py:17-65`):
+PDU shapes as validated by the cache (`cache/lib/protocol.py` `describe_write`):
 
 | FC | Request PDU | Response PDU |
 |---|---|---|
@@ -237,24 +256,30 @@ PDU shapes as validated by the cache (`cache/lib/protocol.py:17-65`):
 | 22 mask write register | `16 addr(2) and(2) or(2)` | echo |
 | 23 read/write multiple | `17 raddr(2) rcount(2) waddr(2) wcount(2) bytecount(1) words` — the **write** span is the second address pair | `17 bytecount(1) words` |
 
-The fake inverter implements **only FC6 and FC16** (into a write overlay
-on top of the simulated registers); every other write gets exception 01.
-A malformed write shape (wrong length, inconsistent byte count) gets
-exception 03.
+The fake inverter implements **FC5, FC6, FC15 and FC16** (into write
+overlays on top of the simulated maps: FC6/16 the holding registers,
+FC5/15 the coil space); every other write gets exception 01. A malformed
+write shape (wrong length, inconsistent byte count) gets exception 03 —
+FC5's coil value must be `0x0000` or `0xFF00` (the spec's rule; anything
+else is exception 03), and FC15's byte count must equal
+`(count + 7) // 8`.
 
 The cache forwards writes only when **both** gates pass: `write/allow`
 must be on *and* the client must pass the write ACL *and* the write span
 must sit inside the register allow-list (`write/registers`) — both default
-to closed. Every write outcome is audited: `WRITE`, `WRITE-REFUSED`,
-`WRITE-REJECTED`, `WRITE-FAILED`. A successful write-through invalidates
-the cached span (FC6/16/22/23; coil writes invalidate nothing — they are
-never cached).
+to closed; a bulk write (FC15/16) whose byte count disagrees with its
+declared register count is refused at the cache itself (exception 03,
+audited — the device never sees it). Every write outcome is audited:
+`WRITE`, `WRITE-REFUSED`, `WRITE-REJECTED`, `WRITE-FAILED`. A successful
+write-through invalidates the cached span: FC6/16/22/23 drop it in **both**
+register spaces (holding and input — a device is free to mirror), FC5/15
+drop the coil space (FC1).
 
 ---
 
 ## 6. Exceptions
 
-The builder is `exception_frame` (`common/protocol.py:155`): a PDU of
+The builder is `exception_frame` (`common/protocol.py`): a PDU of
 `[func | 0x80, code]`, `length = 3`. Codes the suite generates
 (`cache/lib/static.json`):
 
@@ -265,22 +290,27 @@ The builder is `exception_frame` (`common/protocol.py:155`): a PDU of
 | 3 | ILLEGAL_VALUE | malformed frame/count; nonzero protocol id |
 | 11 (`0x0B`) | GATEWAY_FAILED | upstream unreachable, timed out or hostile |
 
-**Cache server decision table** (`cache/lib/proxy.py:444-499`), in order:
-nonzero `proto` or empty PDU → 03; write frame too short to carry an
-address → 03; writes disabled / client not on the write ACL / span outside
-the allow-list → 01; FC3/4 PDU `< 5` bytes → 03; count outside `1..125` or
-`addr + count > 65536` → 03; FC3 inside the diagnostics block → the
-synthesized reply (§7); FC3 touching ≥ 65000 outside the block or
-straddling it → 02; range with a remembered poll failure → replay the
-device's exception code; range fully cached → cache reply, no device
-contact; otherwise → forward, with an upstream failure or hostile reply
-becoming 11. A bad MBAP `length` closes the connection without a reply.
+**Cache server decision table** (`cache/lib/proxy.py`), in order: nonzero
+`proto` or empty PDU → 03; write frame too short to carry an address →
+03; writes disabled / client not on the write ACL / span outside the
+allow-list → 01; FC15/16 byte count inconsistent with the register count
+→ 03; FC1-FC4 PDU `< 5` bytes → 03; count outside `1..125` (registers) /
+`1..2000` (bits) or `addr + count > 65536` → 03; FC3 inside the
+diagnostics block → the synthesized reply (§7); FC3 touching ≥ 65000
+outside the block or straddling it → 02; range with a remembered poll
+failure → replay the device's exception code; range fully cached → cache
+reply, no device contact; otherwise → forward, with an upstream failure
+or hostile reply becoming 11. A bad MBAP `length` closes the connection
+without a reply.
 
-**Fake inverter decision table** (`inverter/lib/inverter.py:153-211`):
-bad `length` → log and close; FC3/4 count outside `1..125` or address
-overflow → 03; strict mode with any undefined register → 02 (otherwise
-missing registers read 0); FC6/FC16 with a consistent shape → overlay
-write + echo; any other FC → 01. The fake does **not** validate the unit
+**Fake inverter decision table** (`inverter/lib/inverter.py`): bad
+`length` → log and close; FC3/4 count outside `1..125` or address
+overflow → 03; FC1/2 count outside `1..2000` → 03; strict mode with any
+undefined register/bit → 02 (otherwise missing addresses read 0);
+FC5 with a value outside `0x0000`/`0xFF00` → 03; FC5/6/15/16 with a
+consistent shape → overlay write + echo; an implemented FC with a
+malformed shape — **including a frame too short to carry its address** —
+→ 03; any other FC → 01. The fake does **not** validate the unit
 id — it serves any requested unit and echoes it back. The cache's cached
 and diag replies echo the client's unit too; the configured `modbus/unit`
 governs only its own poll reads.
@@ -295,7 +325,7 @@ Shared client error texts: `transaction id mismatch`,
 ## 7. The diagnostics block (registers 65000-65003)
 
 Four synthesized words served by the cache on **FC3 only** — never
-fetched, never cached, never forwarded (`cache/lib/proxy.py:501-514`):
+fetched, never cached, never forwarded (`cache/lib/proxy.py` `_diag`):
 
 | Register | Word | Meaning |
 |---|---|---|
@@ -313,22 +343,29 @@ and checking the magic; the fake always mocks `(0xCAFE, 1, 7, 4242)`.
 ## 8. Register types and device profiles
 
 Values are **big-endian 16-bit registers**; the composite types are
-`i16`/`u16` (1 register) and `i32`/`u32` (2 registers, hi word first).
-Scale semantics: wire = value × scale.
+`i16`/`u16` (1 register), `i32`/`u32` (2 registers, hi word first),
+`i32swap`/`u32swap` (2 registers, **lo word first** — the swapped word
+order some devices ship), `f32`/`f32swap` (an IEEE 754 single, 2
+registers, hi/lo or lo/hi) and `bit` (1 address = one binary value on the
+FC1/FC2 spaces). Scale semantics: wire = value × scale (a `bit` entry
+serves `1` when the scaled value is nonzero; the decode divides by the
+gain).
 
 Device register maps live in `profiles/profiles/*.json`
 (`sun2000.json`, `demo-fc4.json`, `deye-sg03lp1.json`,
 `deye-sg04lp3.json`, `deye-sg05lp3.json`); the schema is
 `profiles/README.md`. Per entry: `name`, `register`, `type`, optional
-`fc` (3 default, or 4), optional per-entry `ttl`, `scale`, `desc`. A
+`fc` — word types `3` (default) or `4`, `bit` entries `1` (default) or
+`2` — optional per-entry `ttl`, `scale`, `desc`. A
 profile may carry a top-level `acl.write` tree — an allow/deny object
 (sugar) or an ordered rule chain (`allow`/`deny`/`defer`, last matching
 rule decides) — which the cache's write gate compiles to register ranges.
 
-The cache merges adjacent ranges up to `merge-gap` registers and
-125 registers per block, caches FC3 and FC4 in **separate spaces**, and on
-a failed block bisects it in half within the same cycle (single-leaf
-blocks are marked failed and their exception replayed to clients).
+The cache merges adjacent ranges up to `merge-gap` addresses and 125
+registers (2000 bits) per block, caches the four spaces in **separate
+`(fc, addr)` maps**, and on a failed block bisects it in half within the
+same cycle (single-leaf blocks are marked failed and their exception
+replayed to clients).
 
 ---
 

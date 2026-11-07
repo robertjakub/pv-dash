@@ -12,6 +12,29 @@ before the repo restructured into one suite.
 
 ### Added
 
+- **everywhere** — **the Modbus bit spaces and the float types are first
+  class**: the shared device-profile schema gains the `bit` type (one
+  address = one binary value, read on FC1 coils or FC2 discrete inputs —
+  the entry's `fc` picks the space, `1` the default) and the
+  lo-word-first / IEEE 754 `i32swap`/`u32swap`/`f32`/`f32swap` word types.
+  The **fake inverter** serves all four address spaces from the profile's
+  per-entry `fc` (an `fc: 4` entry is no longer served on FC3 — the spaces
+  are separate, like the cache always treated them), reads FC1/FC2 from
+  its coil/discrete maps, and takes FC05/FC15 coil writes into a coil
+  overlay beside the FC06/FC16 register overlay (FC5 demands the spec
+  values `0x0000`/`0xFF00`); the control surface gains `set coil <addr>
+  <0|1>` / `set discrete <addr> <0|1>` (pinned bits, `reset`/SIGUSR1 clear
+  them). The **scraper** reads bit sources over FC1/FC2 (`read_bits`) and
+  decodes the swap/float types, and now polls **every** profile-bound
+  metric source (the spec's phase rows were declared but silently never
+  read) — soft: a rejected extra read keeps its metric absent instead of
+  failing the poll. The **cache** polls, caches and serves FC1/FC2 ranges
+  (bits stored as 0/1 words, packed 8-per-byte on the wire), forwarded
+  bit reads cache on the way through, and the profile schema's
+  `register_types` carries the new widths. The profile linter learns the
+  types and the `fc` pairs; docs/MODBUS.md, the three tool READMEs and
+  profiles/README.md follow.
+
 - **cache** — **the upstream auth speaks the Waveshare TCP connection
   password** (`--auth-upstream waveshare`, idea and patches from MK): a
   Waveshare RS485-to-TCP gateway guards its serial side with an optional
@@ -243,6 +266,20 @@ before the repo restructured into one suite.
   the log used to say illegal function for both).
 
 ### Fixed
+
+- **everywhere** — **the Modbus shape/consistency round**: the cache's
+  `--allow-write` help (and the generated man/OPTIONS rows) claimed
+  FC05/06/15/16 while the write gate has covered FC22/23 since the
+  write-acl wave — the text now names all six; the cache validates a
+  forwarded FC15/FC16 frame's byte count against its declared register
+  count and answers exception 03 itself (audited) instead of forwarding
+  garbage to the device; the cache's write-through invalidation drops the
+  written span in **both** register spaces (FC4 copies stayed stale until
+  the TTL); the **fake inverter** answers a frame too short to carry its
+  address with a Modbus exception (03 on an implemented code) instead of
+  silently closing the connection; and the exported `READ_FUNCS` static
+  is actually the cache's read dispatch now (the `func == 3 or func == 4`
+  hardcode is gone — FC1/FC2 ride the same table).
 
 - **cache** — **the write allow-list vets FC23's WRITE span**: the
   request's second address pair (read addr/count rides first, write

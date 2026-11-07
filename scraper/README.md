@@ -245,12 +245,25 @@ Commands: `set`/`unset` over the live settings (**`profile`** (the device
 profile: the register map swaps live, `default` restores the bundled
 sun2000 profile), **`interval`**,
 **`timeout`**, **`max-clients`**, **`client-timeout`**,
-**`max-conn-per-ip`**, **`log-access`**, **`log-level`**),
+**`max-conn-per-ip`**, **`log-access`**, **`log-level`** — and the
+**token lives**: `control token`/`control token-file` and `control ops
+token`/`control ops token-file` rotate the control tokens live (the
+sessions re-auth), `auth token`/`auth token-file` rotate the /metrics
+bearer live; a token value never renders back — **`show <secret>` refuses**
+(it is a secret: pass it by flag/env/token-file)),
 `show status` (the key=value report), `show connections` (the live HTTP
 clients of /metrics), `poll now` (the loop wakes immediately), `request
 reload` (the SIGHUP path — the token file re-reads, so the bearer token
 rotates too), `restart` (the Modbus session drops; the next poll
-reconnects), `inspect`, `show version`, `show knobs` (the dictionary of
+reconnects), `reload` (**the whole-daemon restart that keeps the sets**:
+the live overrides save to a state file beside the config
+(``<config>.reload``), the process re-execs, the fresh daemon re-resolves
+the config file and re-applies the saved overrides once, then consumes the
+state file — overridden secrets never save (the dump rule), the reply
+names them), the state dump (`--dump-path`): `request dump` /
+`request restore` (the live overrides as one `0600` JSON with an
+integrity hash; `--restore-on-start` loads it at start), `inspect`,
+`show version`, `show knobs` (the dictionary of
 the registry: every knob with its flag, its env twin, how it changes,
 under its display group — ungrouped rows bare), `shutdown`.
 
@@ -266,11 +279,11 @@ and over TCP the signed commands are mandatory (the same wire the cache
 and the fake speak). A **second, read-only token**
 (`--control-ops-token`/`--control-ops-token-file`) authenticates into the
 **`show`/`clear` verbs only** — no `set`/`unset`, no `poll now`, no
-`request reload`, no `restart`, no `shutdown`: the ops shift against the
-admin key. Denied commands answer `err forbidden: the ops token runs the
-show/clear verbs only (<verb> needs the admin token)`; the SCR trail's
-COMMAND entries name the session's role (`role=ops`/`role=admin`, the
-denials included), and each session's frames are mac'd with the key it
+`request reload`, no `reload`, no `restart`, no `shutdown`: the ops shift
+against the admin key. Denied commands answer `err forbidden: the ops token
+runs the show/clear verbs only (<verb> needs the admin token)`; the SCR
+trail's COMMAND entries name the session's role (`role=ops`/`role=admin`,
+the denials included), and each session's frames are mac'd with the key it
 authenticated with. The control commands (with their wire macs), the auth
 failures, the reloads and the shutdowns land in the **SCR audit trail**
 (`--audit-log`, the XDG state home by default — `scripts/audit_verify.py`
@@ -333,6 +346,8 @@ journald adds one.
 | `--control-ops-token-file` | off | the read-only ops token from a file (the first line; **owner-only `0600`**, F12), instead of `--control-ops-token`; giving both is an error |
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (`CONTROL_OPS_VERBS`) |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `CONTROL_TRUST_UIDS`) |
+| `--dump-path` | off | the state dump (write-behind): the live setting overrides — the tokens apart — as one JSON, created `0600` with an integrity hash, written on the `request dump` command and the graceful shutdown; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (config `set dump path`, env `DUMP_PATH`) |
+| `--restore-on-start` | off | load the state dump when the daemon starts (needs `--dump-path`) — the live overrides ride again instead of a cold start (config `set restore-on-start`, env `RESTORE_ON_START`) |
 | `--audit-log` | the XDG state home | the SCR audit trail: a file path or `-` for stdout (the docker/journald way) |
 | `--audit-max-mb` / `--audit-files` / `--no-audit-log` | `10` / `3` / off | the audit trail's rotation and the off switch |
 | `--man` | off | print the generated man page (roff) to stdout and exit (`modbus-scraper --man \| man -l -`) |

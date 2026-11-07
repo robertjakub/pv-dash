@@ -175,6 +175,20 @@ log every HTTP request at INFO (default: config, $LOG_ACCESS or quiet)
 .B \-\-log\-level
 log level (default: config, $LOG_LEVEL or INFO)
 .TP
+.B \-\-dump\-path
+the state dump: the live setting overrides (the poll plan, the caps, the
+log surface — the tokens apart) as one JSON, written 0600 with an
+integrity hash (a restore refuses a tampered, unsigned or
+group\-writable dump); dumped on the request dump command and the
+graceful shutdown; loaded on start only with \-\-restore\-on\-start, on
+demand with the request restore command (default: config, $DUMP_PATH or
+none)
+.TP
+.B \-\-restore\-on\-start
+load the state dump when the daemon starts (needs \-\-dump\-path) — the
+live overrides ride again instead of a cold start; default: start cold,
+load only on demand (default: config, $RESTORE_ON_START) (default: off)
+.TP
 .B \-\-config
 config file — the set grammar: every line a `set <name> <value>`,
 comments start with # (default: $CONFIG, then scraper.conf next to this
@@ -202,10 +216,18 @@ The control server speaks JSON lines ({"cmd": "..."} ->
 configured and refuses to start without one). Commands:
 \fBset\fR/\fBunset\fR/\fBshow\fR/\fBhelp\fR (the settings: interval,
 timeout, max-clients, client-timeout, max-conn-per-ip, log-access,
-log-level), \fBshow status\fR, \fBshow connections\fR (the live HTTP
-clients), \fBshow version\fR, \fBshow knobs\fR
+log-level \(em and the token lives: control token, the ops token,
+auth token, each rotating live, the value never rendering \(em
+\fBshow <secret>\fR refuses), \fBshow status\fR, \fBshow connections\fR
+(the live HTTP clients), \fBshow version\fR, \fBshow knobs\fR
 (the dictionary of the registry), \fBpoll now\fR,
-\fBinspect\fR, \fBrequest reload\fR, \fBrestart\fR, \fBshutdown\fR,
+\fBinspect\fR, \fBrequest reload\fR (the SIGHUP path),
+\fBreload\fR (the whole-daemon restart that keeps the sets: the live
+overrides save to a state file beside the config, the process re-execs,
+the fresh daemon re-applies them once), with a dump path configured
+(\fB--dump-path\fR): \fBrequest dump\fR / \fBrequest restore\fR
+(the overrides as one 0600 integrity-hashed JSON; \fB--restore-on-start\fR
+loads it at start), \fBrestart\fR, \fBshutdown\fR,
 \fBquit\fR. See
 .BR modbus-scraper-ctl (1)
 and

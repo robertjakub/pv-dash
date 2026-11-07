@@ -60,10 +60,18 @@ The control server speaks JSON lines ({"cmd": "..."} ->
 configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: interval,
 timeout, max-clients, client-timeout, max-conn-per-ip, log-access,
-log-level), \\fBshow status\\fR, \\fBshow connections\\fR (the live HTTP
-clients), \\fBshow version\\fR, \\fBshow knobs\\fR
+log-level \\(em and the token lives: control token, the ops token,
+auth token, each rotating live, the value never rendering \\(em
+\\fBshow <secret>\\fR refuses), \\fBshow status\\fR, \\fBshow connections\\fR
+(the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
 (the dictionary of the registry), \\fBpoll now\\fR,
-\\fBinspect\\fR, \\fBrequest reload\\fR, \\fBrestart\\fR, \\fBshutdown\\fR,
+\\fBinspect\\fR, \\fBrequest reload\\fR (the SIGHUP path),
+\\fBreload\\fR (the whole-daemon restart that keeps the sets: the live
+overrides save to a state file beside the config, the process re-execs,
+the fresh daemon re-applies them once), with a dump path configured
+(\\fB--dump-path\\fR): \\fBrequest dump\\fR / \\fBrequest restore\\fR
+(the overrides as one 0600 integrity-hashed JSON; \\fB--restore-on-start\\fR
+loads it at start), \\fBrestart\\fR, \\fBshutdown\\fR,
 \\fBquit\\fR. See
 .BR modbus-scraper-ctl (1)
 and

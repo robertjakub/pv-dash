@@ -59,6 +59,10 @@ let
     (lib.optionals (cfg.metricsSpec != null) [ (setLine "metrics-spec" cfg.metricsSpec) ])
     (lib.optionals (cfg.metricPrefix != null) [ (setLine "metric-prefix" cfg.metricPrefix) ])
     ""
+    "# --- the state dump (the live overrides' write-behind) ---"
+    (lib.optionals (cfg.dumpPath != null) [ (setLine "dump-path" cfg.dumpPath) ])
+    (setLine "restore-on-start" (lib.boolToString cfg.restoreOnStart))
+    ""
     "# --- the audit trail ---"
     (lib.optionals (cfg.auditLog != null) [
       (setLine "audit-log" cfg.auditLog)
@@ -349,6 +353,23 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = "The prefix on the profile- and compute-fed metric names (default: huawei).";
+    };
+
+    dumpPath = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The state dump file: the live setting overrides (set through the
+        control surface) as one JSON, written 0600 with an integrity hash on
+        `request dump` and the graceful shutdown, and re-applied on start
+        when restoreOnStart is set. null = the dumps are off.
+      '';
+    };
+
+    restoreOnStart = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Load the state dump when the service starts (needs dumpPath) — the live overrides ride again instead of a cold start.";
     };
   };
 

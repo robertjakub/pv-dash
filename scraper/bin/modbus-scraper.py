@@ -176,6 +176,10 @@ def main():
     Handler.auth_token = cfg['auth_token']
     Handler.timeout = cfg['client_timeout'] or None
     logger.info('%s', describe(cfg, args, control_desc))
+    logger.info('state dumps: %s',
+                'off' if not cfg['dump_path']
+                else '%s (request dump, the graceful shutdown%s)'
+                % (cfg['dump_path'], ', restore on start' if cfg['restore_on_start'] else ''))
     if args.dry_run:
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
@@ -189,11 +193,13 @@ def main():
         # registry rows (live name, config key, conv), the choice/bool
         # knobs stay hand-rendered (their convs do not round-trip a string)
         defaults = {'log-access': 'on' if cfg['log_access'] else 'off',
-                    'log-level': cfg['level']}
+                    'log-level': cfg['level'],
+                    'dump/path': cfg['dump_path'] or 'off',
+                    'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off'}
         for o in OPTIONS:
-            if o.live and o.conv in (int, float, str):
+            if o.live and o.conv in (int, float, str) and not o.secret:
                 key = o.name.replace('-', '_')
-                if key in cfg:
+                if key in cfg and cfg[key] is not None:
                     defaults[o.live] = str(cfg[key])
             if o.restart:   # the startup-only knobs: what `show <knob>` answers
                 key = o.name.replace('-', '_')
@@ -204,18 +210,23 @@ def main():
                                         else (args.audit_log or 'the XDG state home'))
                 elif o.name == 'control-port':
                     defaults[o.name] = 'off' if control_target == '0' else control_target
-                elif o.secret:
-                    defaults[o.name] = '<set>' if v else 'off'
                 elif o.conv is bool:
                     defaults[o.name] = 'on' if v else 'off'
                 elif o.name == 'control-trust-uids':
                     defaults[o.name] = ','.join(str(u) for u in sorted(trust_uids or [])) or 'off'
                 else:
                     defaults[o.name] = str(v) if v not in (None, '') else 'off'
+        # the secret rows (control/token, control/token-file, control/ops/token,
+        # control/ops/token-file, auth/token, auth/token-file) carry NO defaults
+        # entry: `unset` refuses them (the metrics/token treatment) — a secret
+        # never renders, never re-applies
         control = ControlServer(scraper, httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
-                                ops_token=control_ops_token, ops_verbs=ops_verbs)
+                                ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
+                                dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'])
         control.start()
+        if control.dump_path and cfg['restore_on_start']:
+            logger.info('restore-on-start: %s', control.restore_state())
 
     def apply_reload():
         """The SIGHUP and the `request reload` command share this: re-resolve
@@ -246,6 +257,7 @@ def main():
             audit.event('SHUTDOWN', '%s: uptime=%ds errors=%d'
                         % (reason, int(time.monotonic() - started), scraper.errors))
         if control:
+            control.shutdown_dump()   # the write-behind: the overrides ride the next start
             control.announce_exit(reason)   # the consoles print the notice and exit
             control.cleanup()
         httpd.shutdown()

@@ -152,7 +152,7 @@ def candidates(buf):
             pool, hint = segs, None                        # description lives on the full live name
             desc = lambda w, base=base: describe_word((base + '/' if base else '') + w)
     elif head == 'request' and len(done) == 1:
-        pool, hint, desc = ('reload',), None, describe_word
+        pool, hint, desc = ('dump', 'reload', 'restore'), None, describe_word
     elif head == 'poll' and len(done) == 1:
         pool, hint, desc = ('now',), None, describe_word
     elif head == 'show':

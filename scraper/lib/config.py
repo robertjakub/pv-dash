@@ -342,6 +342,9 @@ def resolve_config(args, script_dir=None):
         if not token:
             raise SystemExit('auth_token_file %s is empty' % cfg['auth_token_file'])
         cfg['auth_token'] = token
+    cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', None, str)
+    cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
+                                      'restore_on_start', False, str_to_bool)
     cfg['listen'] = cfg['listen'].strip()
     cfg['sources'] = sources
     validate_config(cfg)

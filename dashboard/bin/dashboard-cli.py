@@ -51,23 +51,15 @@ def setting_pool():
 
 
 def welcome(sock):
-    """The first-connect greeting: probe the status and introduce the
-    dashboard — the upstream, its health, how long it has been running, the
-    clients — and the one-line navigation hint."""
-    reply = cli.exchange(sock, cli.wire('show status'))
-    if not reply or not reply.startswith('ok status'):
-        return
-    st = cli.status_map(reply)
+    """The first-connect greeting: the console's two fixed lines — the
+    daemon's name and the one-line navigation hint."""
     print('%   Welcome to the dashboard console')
-    print('%%   %s upstream (%s) | running for %s | %s client(s)'
-          % (st.get('upstream', '?'), st.get('upstream_ok', '?'), st.get('uptime', '?'),
-             st.get('clients', '?')))
     print('%   TAB completes, ? lists the commands, quit leaves')
 
 
 SPEC = dict(label='the dashboard', daemon_label='dashboard control server',
             cli_name='dashboard-cli', app='dashboard', self_note='the server itself',
-            command_help='e.g. inspect, show status, set battery on, request reload-config, shutdown',
+            command_help='e.g. inspect, show config, set battery on, request reload-config, shutdown',
             prompt_word='dashboard', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,

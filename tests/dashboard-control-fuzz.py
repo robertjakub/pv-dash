@@ -169,7 +169,7 @@ def main():
             check('fuzz: %s rejected cleanly' % label, st == 'fail', '%s %s' % (st, tx))
 
         # 2. the overlong request (1 MB): answered or closed, never a crash
-        st, tx = roundtrip(CTRL_PORT, signed('show status')[:-2] + b', "pad": "' + b'a' * (1024 * 1024) + b'"}\n',
+        st, tx = roundtrip(CTRL_PORT, signed('show version')[:-2] + b', "pad": "' + b'a' * (1024 * 1024) + b'"}\n',
                            timeout=10)
         check('fuzz: 1 MB request handled', st in ('ok', 'fail', 'dead'), '%s %s' % (st, tx[:80]))
 
@@ -198,7 +198,7 @@ def main():
 
         # 4. no newline, then close: no crash, the server keeps serving
         s = connect(CTRL_PORT)
-        s.sendall(b'{"cmd": "show status"}')
+        s.sendall(b'{"cmd": "show version"}')
         s.close()
         st, tx = roundtrip(CTRL_PORT, signed('show version'))
         check('fuzz: frameless close does not wedge the server', st == 'ok', '%s %s' % (st, tx))
@@ -209,7 +209,7 @@ def main():
             st, tx = roundtrip(CTRL_PORT, signed('ping'), timeout=10)
             ok = ok and st == 'ok'
         check('fuzz: ping flood survives (100x)', ok)
-        st, tx = roundtrip(CTRL_PORT, signed('show status'))
+        st, tx = roundtrip(CTRL_PORT, signed('show version'))
         check('fuzz: real command after the flood', st == 'ok', '%s %s' % (st, tx))
 
         # 5b. the wire's help branch speaks the commands (the rider)
@@ -282,8 +282,8 @@ def main():
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
                                       stdout=open('/tmp/dash_ctl_fuzz_ops.log', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.2)
-        st, tx, macok = ops_roundtrip('show status')
-        check('ops: the ops token authenticates, show status honored, mac\'d with the ops key',
+        st, tx, macok = ops_roundtrip('show version')
+        check('ops: the ops token authenticates, show version honored, mac\'d with the ops key',
               st == 'ok' and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show version')
         check('ops: show version honored', st == 'ok' and macok, '%s %s' % (st, tx))
@@ -310,7 +310,7 @@ def main():
               st == 'ok' and macok, '%s %s' % (st, tx))
         aud = open(OPS_AUDIT).read()
         check('ops: both roles audited (role=ops show, role=admin set, the denials included)',
-              "role=ops 'show status'" in aud and "role=admin 'set log-level DEBUG'" in aud
+              "role=ops 'show version'" in aud and "role=admin 'set log-level DEBUG'" in aud
               and "role=ops 'shutdown'" in aud and '-> err' in aud, aud[-300:])
         r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
                             '--control-port', str(OPS_CTRL_PORT), '--control-token', OPS_TOKEN,

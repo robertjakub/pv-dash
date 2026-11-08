@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """JSON-lines control server for the dashboard: inspect and steer the running
-server — show status/connections/version, the live settings (the
+server — show connections/version/config, the live settings (the
 connection caps, the log surface, the battery flag), the config reload (the
 SIGHUP path), graceful shutdown. One command per line, one reply line. Every
 request and reply is one JSON object per line (the stdlib json module): the
@@ -154,8 +154,6 @@ class ControlServer(_ControlServer):
             if s is not None and s.restart:   # the value is recorded; the restart applies it — a note, not a verdict
                 return 'note restart required (startup-only knob)'
             return 'ok %s=%s %s' % (key, shown, self.summary())
-        if low == 'show status':
-            return self.status_report()
         if low == 'show connections':
             return 'ok connections ' + self.connections_line()
         if low == 'show version':
@@ -291,7 +289,10 @@ class ControlServer(_ControlServer):
                 caps = DEFAULT_METRICS_CAPS
                 srv = MetricsServer(self.httpd, listen, token=self.metrics_token,
                                     max_clients=caps[0], client_timeout=caps[1], max_per_ip=caps[2])
-                srv.start()
+                try:
+                    srv.start()
+                except SystemExit:
+                    raise ValueError('cannot bind %s:%d: %s' % (listen[0], listen[1], srv.bind_error))
                 self.metrics_srv = srv
                 self.metrics_desc = describe_metrics(listen, self.metrics_token, caps[0], caps[2])
                 return 'on'
@@ -453,29 +454,6 @@ class ControlServer(_ControlServer):
         rows = ['%d active' % total]
         rows += ['%s: %d' % (ip, n) for ip, n in sorted(per_ip.items())]
         return '; '.join(rows)
-
-    def status_report(self):
-        """The status as a compact multi-field report: one stable key=value
-        per line (scriptable)."""
-        h = self.httpd.RequestHandlerClass
-        gate = self.httpd.gate
-        rows = [
-            'upstream=%s' % h.upstream,
-            'upstream_ok=%s' % ('yes' if h.upstream_ok else 'no'),
-            'listen=%s:%d' % (self.httpd.server_address[0], self.httpd.server_address[1]),
-            'control=%s' % self.describe(),
-            'uptime=%s' % secs(time.monotonic() - self.started),
-            'clients=%d' % gate.total(),
-            'max_clients=%s' % (gate.max_total or 'none'),
-            'client_timeout=%s' % (secs(h.timeout) if h.timeout else 'off'),
-            'max_conn_per_ip=%s' % (gate.max_per_ip or 'none'),
-            'log_access=%s' % ('on' if h.log_access else 'off'),
-            'log_queries=%s' % ('on' if h.log_queries else 'off'),
-            'battery=%s' % ('on' if h.battery else 'off'),
-            'config_js=%s' % h.config_js,
-            'overridden=%s' % (','.join(sorted(self.overridden)) or 'none'),
-        ]
-        return 'ok status\n' + '\n'.join(rows)
 
     def inspect(self):
         """One pretty dump of everything — the state, the counters, the caps,

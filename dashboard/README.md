@@ -214,9 +214,9 @@ authenticated with).
 
 ```bash
 python3 bin/dashboard.py --control-port /tmp/dashboard-8080.socket &
-python3 bin/dashboard-ctl.py show status          # one-shot
+python3 bin/dashboard-ctl.py show upstream         # one-shot
 python3 bin/dashboard-ctl.py request reload-config  # the SIGHUP path
-printf 'set battery on\nshow status\n' | python3 bin/dashboard-ctl.py
+printf 'set battery on\nshow battery\n' | python3 bin/dashboard-ctl.py
 python3 bin/dashboard-cli.py                      # the console: TAB completion, ?, reconnect
 ```
 
@@ -227,7 +227,7 @@ Commands: `set <setting> <value>` / `unset <setting>` (the live settings:
 (the sessions re-auth),
 `metrics token` rotates the /metrics bearer live; a
 token value never renders back — **`show <secret>` refuses** (it is a
-secret: pass it by flag/env, or as `file:<path>`)), `show <setting>` / `show status` /
+secret: pass it by flag/env, or as `file:<path>`)), `show <setting>` /
 `show connections` (the live HTTP clients per peer IP) /
 `show version` / `show knobs` (the dictionary of every registry knob: its
 flag, its env twin, how it changes),
@@ -252,8 +252,8 @@ at start and on `set`, and every secret value takes a `file:` reference —
 an owner-only `0600` file, so the config carries the reference, never the
 material), `shutdown`, `quit`;
 `help <setting>` describes a
-setting. A SIGHUP or `request reload-config` also clears the live overrides
-(`show status`'s `overridden=` row lists them).
+setting. A SIGHUP or `request reload-config` also clears the live
+overrides (the values read back configured through `show <setting>`).
 
 Every control command, auth failure, reload and shutdown lands in the audit
 trail (prefix `DSH`, default `~/.local/state/dashboard/audit.log`;

@@ -5,6 +5,12 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The show-status removal: **`show status` is gone** (nothing replaces it) —
+the registry row, the dispatch branch and the key=value report body die;
+the per-setting `show <setting>`, `show config`, `inspect` and the
+set/unset replies carry the same truths. The cli console greets with the
+two fixed lines (the banner's status line rode the report).
+
 The welcome-alignment wave: the console's greeting runs the cache's
 segment order — the `client(s)` count moves behind `running for` (the
 status line reads upstream, its health, `running for`, the trailing

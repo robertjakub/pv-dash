@@ -59,7 +59,7 @@ configured and refuses to start without one). Commands:
 client-timeout, max-conn-per-ip, log-access, log-queries, battery,
 log-level \\(em and the token lives: control token, the ops token,
 metrics token, each rotating live, the value never rendering \\(em
-\\fBshow <secret>\\fR refuses), \\fBshow status\\fR, \\fBshow connections\\fR
+\\fBshow <secret>\\fR refuses), \\fBshow connections\\fR
 (the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
 (the dictionary of the registry), \\fBinspect\\fR,
 \\fBrequest reload-config\\fR (the SIGHUP path), \\fBrequest reload\\fR (the
@@ -128,7 +128,7 @@ A session front-end on top of the dashboard's JSON-lines control socket:
 prompt with the connected port, TAB completion and \\fB?\\fR in every
 position (with the short descriptions from the shared command registry),
 \\fBset\\fR commands print only the confirmation, \\fBshow <setting>\\fR
-prints the bare value, \\fBshow status\\fR the key=value report, and
+prints the bare value, \\fBinspect\\fR dumps the state, and
 \\fBshutdown\\fR asks before it stops the server. When the connection dies
 mid-session the console
 retries (\\fB--reconnect\\fR attempts, \\fB--reconnect-wait\\fR seconds

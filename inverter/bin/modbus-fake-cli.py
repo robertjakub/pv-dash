@@ -59,13 +59,13 @@ def welcome(sock):
     if not reply or not reply.startswith('ok status'):
         return
     st = cli.status_map(reply)
-    print('% Welcome to the Fake Inverter console')
+    print('%   Welcome to the fake-inverter console')
     print('%%   %s' % st.get('profile', 'unknown profile'))
-    print('%   running for %s | %s clock | %s V grid | battery %s'
+    print('%%   running for %s | %s clock | %s V grid | battery %s'
           % (st.get('uptime', '?'), st.get('timezone', 'utc'), st.get('grid_voltage', '230'),
              ('on (%s W, %s %%SoC)' % (st.get('battery', '?'), st.get('soc', '?')))
              if 'soc' in st else 'off'))
-    print('%   TAB completes, ? lists the commands, help <setting> explains one, quit leaves')
+    print('%   TAB completes, ? lists the commands, quit leaves')
 
 
 SPEC = dict(label='the fake inverter', daemon_label='fake inverter control server',

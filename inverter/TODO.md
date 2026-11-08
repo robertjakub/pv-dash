@@ -5,6 +5,17 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The welcome-alignment wave: the four consoles' greetings wear one shape —
+the three lines' texts start at one column (the welcome line indents into
+its own block), the fake greets as **`Welcome to the fake-inverter
+console`** (was "the Fake Inverter") and its hint line drops the extra
+`help <setting>` clause. The welcome's status line renders for the first
+time: its
+leading `%   ` rode the print format string unescaped, so `%   r` parsed
+as a `%r` conversion and the banner died in a TypeError after two lines
+(latent since the family wave — the same `%`-escape the status-face wave
+hit in display(); only a TTY greets, and the suites never pty the cli).
+
 The status-face wave: the wire's reply status speaks **`ok` | `fail` |
 `bye`** (the internal 'err' maps at the frame, the mac signs the wire
 form; the bare help return's 'commands:' pseudo-status died — the

@@ -5,6 +5,12 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The welcome-alignment wave: the console's greeting runs the cache's
+segment order — the `client(s)` count moves behind `running for` (the
+status line reads upstream, its health, `running for`, the trailing
+count; the `upstream (yes)` health spelling keeps the dashboard's own
+voice) — and the hint line is the family's one shape.
+
 The status-face wave: the wire's reply status speaks **`ok` | `fail` |
 `bye`** (the internal 'err' maps at the frame, the mac signs the wire
 form), the console prints the ok messages bare and the failures as

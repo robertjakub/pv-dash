@@ -52,16 +52,16 @@ def setting_pool():
 
 def welcome(sock):
     """The first-connect greeting: probe the status and introduce the
-    dashboard — the upstream, its health, the clients, how long it has been
-    running — and the one-line navigation hint."""
+    dashboard — the upstream, its health, how long it has been running, the
+    clients — and the one-line navigation hint."""
     reply = cli.exchange(sock, cli.wire('show status'))
     if not reply or not reply.startswith('ok status'):
         return
     st = cli.status_map(reply)
-    print('% Welcome to the dashboard console')
-    print('%%   %s upstream (%s) | %s client(s) | running for %s'
-          % (st.get('upstream', '?'), st.get('upstream_ok', '?'), st.get('clients', '?'),
-             st.get('uptime', '?')))
+    print('%   Welcome to the dashboard console')
+    print('%%   %s upstream (%s) | running for %s | %s client(s)'
+          % (st.get('upstream', '?'), st.get('upstream_ok', '?'), st.get('uptime', '?'),
+             st.get('clients', '?')))
     print('%   TAB completes, ? lists the commands, quit leaves')
 
 

@@ -329,10 +329,10 @@ An interactive front-end on the same socket (same flag/env resolution): on
 the first connect it probes the status and greets you —
 
 ```
-% Welcome to the Fake Inverter console
+%   Welcome to the fake-inverter console
 %   SUN2000 with optional LUNA2000 battery and meter
 %   running for 30 s | utc clock | 230 V grid | battery on
-%   TAB completes, ? lists the commands, help <setting> explains one, quit leaves
+%   TAB completes, ? lists the commands, quit leaves
 ```
 
 The prompt shows the connected port, `set`/`unset` print only the `% changed`

@@ -27,6 +27,28 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **the four console greetings wear one shape** (the
+  cache's): the three lines' texts start at one column — the welcome
+  line indents into its own block (`%   Welcome to the modbus-cache
+  console`), the welcome names the daemon like the prompt does
+  (`Welcome to the fake-inverter console` — was "the Fake Inverter
+  console"), the status line's segments run in the cache's order —
+  upstream, poll health, `running for`, the trailing count — so the
+  scraper's `error(s)` and the dashboard's `client(s)` move behind
+  `running for` (the dashboard keeps its `upstream (yes)` health
+  spelling), and the hint line is the same `TAB completes, ? lists the
+  commands, quit leaves` everywhere (the fake's extra `help <setting>`
+  clause drops). The fake's README sample follows.
+
+- **scraper, dashboard, inverter** — **`dump/restore-on-start` wears the
+  restart mark** (the cache's flip rides `59689b0`): the knob was
+  prospective-only (the branch's own comment — the START behaviour this
+  session already chose stands), so the set records the pending value and
+  answers **`note restart required (startup-only knob)`**; the three
+  control planes port the cache's record flow (the gate narrows to the
+  secrets, the `_apply` record branch, the `_get` configured-value shadow
+  out, the dump overlay, and the mains' pre-decision fold).
+
 - **everywhere** — **the control wire folds the command to the grammar's
   printable 8-bit before it decides** (common/wiresec.py
   `sanitize_command`, in the shared base's frame ladder after the mac
@@ -45,15 +67,6 @@ before the repo restructured into one suite.
   the workflow's extract-the-changelog-section step retires and the local
   `--release` cut speaks the same pointer (the 0.4.0 body — 97 KB of
   pasted section — re-cut by hand).
-
-- **scraper, dashboard, inverter** — **`dump/restore-on-start` wears the
-  restart mark** (the cache's flip rides `59689b0`): the knob was
-  prospective-only (the branch's own comment — the START behaviour this
-  session already chose stands), so the set records the pending value and
-  answers **`note restart required (startup-only knob)`**; the three
-  control planes port the cache's record flow (the gate narrows to the
-  secrets, the `_apply` record branch, the `_get` configured-value shadow
-  out, the dump overlay, and the mains' pre-decision fold).
 
 ## 0.4.2 — 2026-11-08
 ### Changed

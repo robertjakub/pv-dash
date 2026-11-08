@@ -374,7 +374,7 @@ the first connect (a TTY) it probes the status and greets you —
 ```
 $ python3 cache/bin/modbus-cache-cli.py
 
-% Welcome to the modbus-cache console
+%   Welcome to the modbus-cache console
 %   192.168.1.100:5502 upstream | poll ok, last poll 2.00s | running for 1.00h | 1 client(s)
 %   TAB completes, ? lists the commands, quit leaves
 

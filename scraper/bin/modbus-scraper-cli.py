@@ -52,16 +52,16 @@ def setting_pool():
 
 def welcome(sock):
     """The first-connect greeting: probe the status and introduce the scraper —
-    the upstream, the poll health, the errors, how long it has been running —
+    the upstream, the poll health, how long it has been running, the errors —
     and the one-line navigation hint."""
     reply = cli.exchange(sock, cli.wire('show status'))
     if not reply or not reply.startswith('ok status'):
         return
     st = cli.status_map(reply)
-    print('% Welcome to the modbus-scraper console')
-    print('%%   %s upstream | poll %s, last poll %s | %s error(s) | running for %s'
+    print('%   Welcome to the modbus-scraper console')
+    print('%%   %s upstream | poll %s, last poll %s | running for %s | %s error(s)'
           % (st.get('upstream', '?'), st.get('poll', '?'), st.get('last_poll', '?'),
-             st.get('errors', '?'), st.get('uptime', '?')))
+             st.get('uptime', '?'), st.get('errors', '?')))
     print('%   TAB completes, ? lists the commands, quit leaves')
 
 

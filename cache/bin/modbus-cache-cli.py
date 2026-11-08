@@ -69,7 +69,7 @@ def welcome(sock):
         return
     st = cli.status_map(reply)
     SESSION['dump'] = st.get('dump', 'off') != 'off'
-    print('% Welcome to the modbus-cache console')
+    print('%   Welcome to the modbus-cache console')
     print('%%   %s upstream | poll %s, last poll %s | running for %s | %s client(s)'
           % (st.get('upstream', '?'), st.get('poll', '?'), st.get('last_poll', '?'),
              st.get('uptime', '?'), st.get('clients', '?')))

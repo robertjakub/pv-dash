@@ -421,9 +421,12 @@ Device register maps live in `profiles/profiles/*.json`
 `profiles/README.md`. Per entry: `name`, `register`, `type`, optional
 `fc` — word types `3` (default) or `4`, `bit` entries `1` (default) or
 `2` — optional per-entry `ttl`, `scale`, `desc`. A
-profile may carry a top-level `acl.write` tree — an allow/deny object
-(sugar) or an ordered rule chain (`allow`/`deny`, last matching
-rule decides) — which the cache's write gate compiles to register ranges.
+profile may carry a top-level `acl.write` gate — an optional `desc` and
+the ordered `rules` list (one `{"type": "allow"|"deny", "range": ...}`
+object per rule; a whitelist: the last matching rule decides, a register
+no rule decides refuses) — which the cache's write gate compiles to
+register ranges, and its `show write registers profile` answers back as
+the chain.
 
 The cache merges adjacent ranges up to `merge-gap` addresses and 125
 registers (2000 bits) per block, caches the four spaces in **separate

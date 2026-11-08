@@ -9,6 +9,15 @@ before the repo restructured into one suite.
 ## Unreleased
 ### Added
 
+- **cache** — the **`show write registers profile`** report (show-only —
+  nothing to set): the write gate answered as its acl chain — `allow any`
+  / `deny any`, a range list as its whitelist (`deny any`, then one
+  `allow START:COUNT` line per range), and in profile mode the device
+  profile's own rules (the gate's `desc` as the `% ` line, then one
+  `allow|deny <range> # desc` line per range). The set/unset verbs match
+  the knob rows only, so the report's live path never shadows the knob
+  value `profile` — `set write registers profile` keeps setting the knob.
+
 - **scraper** — the cache's **`--control-socket-group`** mirrors over: the
   unix control socket stays `0600` by default and the flag (env
   `CONTROL_SOCKET_GROUP`, config `set control socket-group`) opts into

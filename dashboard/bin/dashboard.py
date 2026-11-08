@@ -32,7 +32,7 @@ from common.connlimit import GatedHTTPServer
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.version import version_string
-from common.config import parse_listen, parse_secret
+from common.config import is_loopback_host, parse_listen, parse_secret
 from lib.config import resolve_config, resolve_control_target
 from lib.control import ControlServer
 from lib.man import daemon_page
@@ -223,7 +223,7 @@ class Server(GatedHTTPServer):
             request.sendall(RATE_LIMIT_503)
         except OSError:
             pass
-        self.shutdown_request(request)
+        self._refuse_close(request)
 
     def handle_error(self, request, client_address):
         exc = sys.exc_info()[1]
@@ -338,9 +338,10 @@ def main():
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
     metrics_token = parse_secret(args.metrics_token or cfg.get('metrics_token'), 'metrics/token')
     metrics_listen = parse_listen(cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9452'))
-    if cfg['metrics_server'] and not metrics_token:
-        logger.error('the metrics endpoint serves the request counters: set --metrics-token '
-                     '(or file:<path>) when --metrics-server is on (or drop --metrics-server)')
+    if cfg['metrics_server'] and not metrics_token and not is_loopback_host(metrics_listen[0]):
+        logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
+                     'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
+                     % (cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9452')))
         raise SystemExit(2)
     metrics_desc = 'off'
     if cfg['metrics_server']:

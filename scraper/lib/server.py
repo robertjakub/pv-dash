@@ -132,7 +132,7 @@ class Server(GatedHTTPServer):
 
     def acl_refused(self, request, client_address):
         logger.info('connection rejected: %s:%d not on the metrics ACL', *client_address[:2])
-        self.shutdown_request(request)
+        self._refuse_close(request)
 
     def gate_refused(self, request, client_address, why):
         logger.info('rejected %s: too many concurrent clients (%s, max %d/%d)',
@@ -141,7 +141,7 @@ class Server(GatedHTTPServer):
             request.sendall(RATE_LIMIT_503)
         except OSError:
             pass
-        self.shutdown_request(request)
+        self._refuse_close(request)
 
     def handle_error(self, request, client_address):
         """ThreadingMixIn's default prints a full traceback per reset client — one line instead."""

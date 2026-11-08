@@ -14,7 +14,7 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (19): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `no-audit-log`, `restore-on-start`. The control-plane block is
+Common to **all four** tools (20): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `no-audit-log`, `restore-on-start`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `status`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
@@ -23,27 +23,28 @@ on all four too (the per-tool extras carry their own rows below).
 |---|---|---|---|---|---|---|---|
 | c | `acl` |  | *(startup-only)* | ✓ |  |  |  |
 | k | `allow-write` |  | `set write allow` | ✓ live |  | ✓ live |  |
-| c | `audit` |  | *(startup-only)* | ✓ |  |  |  |
+| c | `audit` |  | *(startup-only)* | ✓ | ✓ |  |  |
 | k | `audit-daily` |  | `set audit rotate daily` | ✓ live |  | ✓ |  |
-| k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** | **✓** | **✓** |
-| k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** | **✓** | **✓** |
-| k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** | **✓** | **✓** |
-| c | `audit/rotate` |  | *(startup-only)* | ✓ |  |  |  |
-| k | `auth` | `modbus` | `set modbus auth` | ✓ live | ✓ live | ✓ live |  |
-| k | `auth-key` | `modbus` | `set modbus auth key` | ✓ live+secret | ✓ live+secret | ✓ live+secret |  |
-| k | `auth-token` |  | `set auth token` |  | ✓ live+secret |  |  |
+| k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** live | **✓** | **✓** |
+| k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** live | **✓** | **✓** |
+| k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** live | **✓** | **✓** |
+| c | `audit/rotate` |  | *(startup-only)* | ✓ | ✓ |  |  |
+| k | `auth` |  | `set modbus auth` | ✓ live | ✓ live | ✓ live |  |
+| k | `auth-key` |  | `set modbus auth key` | ✓ live+secret | ✓ live+secret | ✓ live+secret |  |
+| k | `auth-token` |  | `set metrics auth token` |  | ✓ live+secret |  |  |
 | k | `auth-upstream` |  | `set modbus auth-upstream` | ✓ live |  |  |  |
 | k | `auth-upstream-key` |  | `set modbus auth-upstream-key` | ✓ live+secret |  |  |  |
 | c | `batt` |  | `set batt` |  |  | ✓ live |  |
-| k | `battery` |  | `set battery` |  | ✓ | ✓ live | ✓ live |
+| k | `battery` |  | `set battery`, `set modbus battery` |  | ✓ live | ✓ live | ✓ live |
 | k | `battery-kwh` |  | `set battery-kwh` |  |  | ✓ live |  |
 | c | `battery-state` |  | `set battery-state` |  |  | ✓ live |  |
 | k | `bind` |  | *(startup-only)* |  |  |  | ✓ |
 | s | `cache` |  | `show cache` | ✓ |  |  |  |
 | s | `cache-all` |  | `show cache-all` | ✓ hidden |  |  |  |
 | k | `cache-ttl` |  | `set cache ttl` | ✓ live |  |  |  |
+| c | `caps` |  | *(startup-only)* |  | ✓ |  |  |
 | k | `chaos` |  | `set chaos` |  |  | ✓ live |  |
-| k | `client-timeout` |  | `set client-timeout`, `set limits client-timeout` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `client-timeout` |  | `set client-timeout`, `set limits client-timeout`, `set metrics limits timeout` | **✓** live | **✓** live | **✓** live | **✓** live |
 | c | `cloud` |  | `set cloud` |  |  | ✓ live |  |
 | s | `config` |  | `show config` | **✓** | **✓** | **✓** hidden | **✓** hidden |
 | k | `config-js` |  | *(startup-only)* |  |  |  | ✓ |
@@ -52,11 +53,11 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `control` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `control-log-replies` |  | *(startup-only)* |  |  | ✓ |  |
 | k | `control-ops-token` |  | `set control ops token` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
-| k | `control-ops-verbs` |  | `set control ops-verbs` | **✓** live | **✓** | **✓** | **✓** |
-| k | `control-port` |  | `set control port` | **✓** live | **✓** | **✓** | **✓** |
-| k | `control-socket-group` |  | `set control socket-group` | ✓ live |  | ✓ |  |
+| k | `control-ops-verbs` |  | `set control ops-verbs`, `set control ops verbs` | **✓** live | **✓** live | **✓** | **✓** |
+| k | `control-port` |  | `set control port` | **✓** live | **✓** live | **✓** | **✓** |
+| k | `control-socket-group` |  | `set control socket-group` | ✓ live | ✓ live | ✓ |  |
 | k | `control-token` |  | `set control token` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
-| k | `control-trust-uids` |  | `set control trust-uids` | **✓** live | **✓** | **✓** | **✓** |
+| k | `control-trust-uids` |  | `set control trust-uids` | **✓** live | **✓** live | **✓** | **✓** |
 | c | `control/ops` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | c | `dump` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `dump-interval` |  | `set dump-interval` | ✓ live |  |  |  |
@@ -66,38 +67,39 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `grid` |  | `set grid` |  |  | ✓ live |  |
 | k | `grid-frequency` |  | `set grid-frequency` |  |  | ✓ live |  |
 | c | `grid-outage` |  | `set grid-outage` |  |  | ✓ live |  |
-| k | `grid-positive-import` |  | *(startup-only)* |  | ✓ |  |  |
+| k | `grid-positive-import` |  | `set modbus grid-positive-import` |  | ✓ live |  |  |
 | k | `grid-voltage` |  | `set grid-voltage` |  |  | ✓ live |  |
 | k | `host` |  | *(startup-only)* |  |  | ✓ |  |
-| k | `interval` |  | `set interval`, `set modbus interval` | ✓ live | ✓ live |  |  |
+| k | `interval` |  | `set metrics interval`, `set modbus interval` | ✓ live | ✓ live |  |  |
 | s | `knobs` |  | `show knobs` | **✓** | **✓** | **✓** hidden | **✓** hidden |
-| c | `limits` |  | *(startup-only)* | ✓ | ✓ |  |  |
-| k | `listen` |  | `set system listen, restart` | ✓ live | ✓ |  |  |
+| c | `limits` |  | *(startup-only)* | ✓ |  |  |  |
+| k | `listen` |  | `set metrics listen, restart`, `set system listen, restart` | ✓ live | ✓ live |  |  |
 | c | `load` |  | `set load` |  |  | ✓ live |  |
-| k | `local-time` |  | `set local-time` | ✓ live | ✓ |  | ✓ |
+| k | `local-time` |  | `set local-time` | ✓ live | ✓ live |  | ✓ |
 | k | `log-access` |  | `set log-access`, `set system log-access` | ✓ live | ✓ live |  | ✓ live |
 | k | `log-level` |  | `set log-level` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `log-queries` |  | `set log-queries` |  |  |  | ✓ live |
-| k | `max-clients` | `limits` | `set limits max-clients`, `set max-clients` | **✓** live | **✓** live | **✓** live | **✓** live |
-| k | `max-conn-per-ip` | `limits` | `set limits max-conn-per-ip`, `set max-conn-per-ip` | **✓** live | **✓** live | **✓** live | **✓** live |
-| k | `max-grid-kw` |  | *(startup-only)* |  | ✓ |  |  |
-| k | `max-kwp` |  | `set max-kwp` |  | ✓ | ✓ live |  |
+| k | `max-clients` |  | `set limits max-clients`, `set max-clients`, `set metrics limits max-clients` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `max-conn-per-ip` |  | `set limits max-conn-per-ip`, `set max-conn-per-ip`, `set metrics limits max-conn-per-ip` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `max-grid-kw` |  | `set caps max-grid` |  | ✓ live |  |  |
+| k | `max-kwp` |  | `set caps max-pv`, `set max-kwp` |  | ✓ live | ✓ live |  |
 | k | `merge-gap` |  | `set modbus merge-gap` | ✓ live |  |  |  |
-| k | `metric-prefix` |  | *(startup-only)* |  | ✓ |  |  |
-| c | `metrics` |  | *(startup-only)* | ✓ |  | ✓ | ✓ |
+| k | `metric-prefix` |  | `set metrics prefix` |  | ✓ live |  |  |
+| c | `metrics` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `metrics-client-timeout` |  | `set metrics limits timeout` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-listen` |  | `set metrics listen, restart` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-max-clients` |  | `set metrics limits max-clients` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-max-conn-per-ip` |  | `set metrics limits max-conn-per-ip` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-server` |  | `set metrics-server`, `set metrics enable` | ✓ live |  | ✓ live | ✓ live |
-| k | `metrics-spec` |  | *(startup-only)* |  | ✓ |  |  |
+| k | `metrics-spec` |  | `set metrics filter` |  | ✓ live |  |  |
 | k | `metrics-token` |  | `set metrics token` | ✓ live+secret |  | ✓ live+secret | ✓ live+secret |
-| c | `metrics/limits` |  | *(startup-only)* | ✓ |  |  |  |
+| c | `metrics/auth` |  | *(startup-only)* |  | ✓ |  |  |
+| c | `metrics/limits` |  | *(startup-only)* | ✓ | ✓ |  |  |
 | c | `modbus` |  | *(startup-only)* | ✓ | ✓ | ✓ |  |
 | k | `modbus-offset` |  | `set modbus offset` |  | ✓ live |  |  |
-| k | `modbus-unit` | `modbus` | `set modbus unit` |  | ✓ live |  |  |
+| k | `modbus-unit` |  | `set modbus unit` |  | ✓ live |  |  |
 | c | `mppt` |  | `set mppt` |  |  | ✓ live |  |
-| k | `no-audit-log` |  | `set audit disable` | **✓** live | **✓** | **✓** | **✓** |
+| k | `no-audit-log` |  | `set audit disable` | **✓** live | **✓** live | **✓** | **✓** |
 | k | `no-battery` |  | *(startup-only)* |  |  | ✓ |  |
 | k | `port` |  | *(startup-only)* |  |  | ✓ | ✓ |
 | k | `profile` |  | `set modbus profile`, `set profile` | ✓ live | ✓ live | ✓ live |  |
@@ -118,11 +120,11 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `system` |  | *(startup-only)* | ✓ |  |  |  |
 | k | `time` |  | `set time` |  |  | ✓ live |  |
 | k | `time-scale` |  | `set time-scale` |  |  | ✓ live |  |
-| k | `timeout` |  | `set modbus timeout`, `set timeout` | ✓ live | ✓ live |  |  |
+| k | `timeout` |  | `set modbus timeout` | ✓ live | ✓ live |  |  |
 | k | `timezone` |  | `set timezone` |  |  | ✓ live |  |
 | k | `unit` |  | `set modbus unit` | ✓ live |  | ✓ |  |
 | s | `uplink` |  | `show uplink` | ✓ |  |  |  |
-| k | `upstream` | `upstream` | `set modbus upstream` | ✓ live | ✓ live |  | ✓ |
+| k | `upstream` |  | `set modbus upstream` | ✓ live | ✓ live |  | ✓ |
 | s | `version` |  | `show version` | **✓** | **✓** | **✓** | **✓** |
 | c | `write` |  | *(startup-only)* | ✓ |  | ✓ |  |
 | k | `write-acl` |  | `set acl write` | ✓ live |  |  |  |

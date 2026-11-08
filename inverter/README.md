@@ -248,7 +248,7 @@ read-only ops token the same way):
 | `set <setting> <value>` | configure a setting (below) |
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
-| `show knobs` | the dictionary of all knobs: every registry knob under its display group (ungrouped rows bare) — its flag, its env twin(s) when it has one, the command that changes it live (or the restart note) |
+| `show knobs` | the dictionary of all knobs: every registry knob — its flag, its env twin(s) when it has one, the command that changes it live (or the restart note) |
 | `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `clients`, `chaos`, `chaos_hits`, `pinned`, `profile`, `metrics`, `timezone`) — scriptable |
 | `show connections` | the fake's live **Modbus** clients: peer, connection age, requests served (`none` when idle) — the cache's `show connections`, pointed at the simulator |
 | `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins, the metrics endpoint state — the baton for a bug report |

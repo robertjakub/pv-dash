@@ -32,17 +32,14 @@ the **Done/history** records for their tool.
   words — `modbus/selection`'s `<file>|all|none`), but the rows drift:
   `modbus/profile`'s hint is `<file>` while its values carry `default`
   (the word missing from the hint), and the bool rows carry no hint at
-  all while `modbus/auth` spells `suite|none` — walk every row in the
+  all while   `modbus/auth` spells `suite|none` — walk every row in the
   four registries, align the hints (the missing value words in, the
   stale words out) and decide the bool rule once (a hint or not).
-- **file the display groups** `[common]` `[cache]` `[inverter]`
-  `[dashboard]` `[scraper]` — the registries lost their `section` field
-  (the `group` is the one grouping now; ungrouped rows render bare, no
-  header), and only the scraper carries real groups so far (`upstream`,
-  `modbus`, `limits`): the show config / show knobs / help config
-  dictionaries and the cli ?/TAB listings render mostly bare. File the
-  groups row by row (`scripts/set_group.py <project> <name> <group>`) so
-  the dictionaries read filed again.
+- **internally key on the flattened name, not the live** `[common]` —
+  the internal lookups still spell the bare live name
+  (`'timeout': cfg['timeout']`); switch them to the flattened form
+  (`'modbus/timeout': cfg['timeout']`): the live name is editable on
+  the wire, for identification use the flattened name (not editable).
 
 ## The security wave (the audit follow-ups)
 

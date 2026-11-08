@@ -9,6 +9,12 @@ before the repo restructured into one suite.
 ## Unreleased
 ### Added
 
+- **scraper** — the cache's **`--control-socket-group`** mirrors over: the
+  unix control socket stays `0600` by default and the flag (env
+  `CONTROL_SOCKET_GROUP`, config `set control socket-group`) opts into
+  `0660` — a local group may speak to the control without being the service
+  user; `set control socket-group` re-modes the live socket.
+
 - **everywhere** — **the control wire's reply status gains `note`** (besides
   `ok` | `fail` | `bye`): the verdict of a command that ran and whose effect
   waits. A `set`/`unset` of a restart-marked knob no longer refuses — the
@@ -26,6 +32,24 @@ before the repo restructured into one suite.
   marked restart again in `dda97b9`); the audit rev. 17 entry follows.
 
 ### Changed
+
+- **scraper** — **the wire settings re-spell to the family's path shapes**:
+  `set interval` is `set metrics interval`, `set timeout`/`set profile` are
+  `set modbus timeout`/`set modbus profile`, the serving caps ride
+  `set metrics limits …`, the display caps `set caps max-pv`/`caps max-grid`,
+  the audit family `set audit log-file`/`audit rotate …`/`audit disable`,
+  the bearer `set metrics auth token` (the flat dashed names still read in
+  config files), `--listen` joins the restart-marked knobs, and the display
+  groups hand their filing to the node walk (family-wide — the registries
+  carry no group fields, `show knobs` renders one headerless dictionary and
+  `show <node>`/`?` describe each namespace). The deadwood rows the re-spell
+  exposed got their support finished: the bool knobs (`modbus battery`,
+  `modbus grid-positive-import`, `local-time`) gained the live set/show/dump
+  paths (`local-time` had carried a live name since the note wave and never
+  answered either), the audit family is live now the cache's way
+  (`audit/log-file` moves the trail — the fresh writer re-chains from the
+  file's tail — the rotation rows re-render, `audit/disable` flips the
+  kill switch on the shared AuditLog), and the dump carries every live row.
 
 - **everywhere** — **the four console greetings wear one shape** (the
   cache's): the three lines' texts start at one column — the welcome
@@ -119,6 +143,14 @@ before the repo restructured into one suite.
   the wire's `describe_node`.
 
 ### Fixed
+
+- **everywhere** — **the cli reconnect tries before it waits**: the first
+  attempt runs immediately after the loss (a daemon that is already back
+  answers on the spot), the announced `--reconnect-wait` sleep only sits
+  between the tries; when every try fails the console says
+  **`% error: reconnect failed, exiting`** and exits 1 (was: a bare
+  stderr note and a `NoneType.close` traceback from the session
+  teardown).
 
 - **cache** — **the metrics listen rebinds live again**: the system/
   namespace wave dropped a stray `restart` mark on the metrics-listen

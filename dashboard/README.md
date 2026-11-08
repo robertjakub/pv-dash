@@ -230,8 +230,8 @@ token value never renders back — **`show <secret>` refuses** (it is a
 secret: pass it by flag/env, or as `file:<path>`)), `show <setting>` / `show status` /
 `show connections` (the live HTTP clients per peer IP) /
 `show version` / `show knobs` (the dictionary of every registry knob: its
-flag, its env twin, how it changes — under its display group, ungrouped
-rows bare), `inspect` (the one-page
+flag, its env twin, how it changes),
+`inspect` (the one-page
 dump for a bug report), `request
 reload-config` (re-read `server.conf` — the SIGHUP path; the listen address
 and port are bound and stay), `request reload` (**the whole-daemon restart

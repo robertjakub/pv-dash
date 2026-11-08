@@ -21,9 +21,9 @@ cache fetches its selection from it, the scraper binds its metrics to it —
 and the console tools (`*-ctl`, `*-cli`) share the family pattern (a
 JSON-lines control server, a settings registry, an append-only audit trail,
 a reconnecting console session — TAB/`?` complete and describe every word,
-the registry's display groups file the listings, the non-value reply lines
+the registry's hierarchy nodes file the listings, the non-value reply lines
 ride the `% ` prefix). Every knob of the four daemons, side by
-side — name, group, the live `set` command, who has it: [OPTIONS.md](docs/OPTIONS.md)
+side — name, the live `set` command, who has it: [OPTIONS.md](docs/OPTIONS.md)
 (generated from the option registries).
 
 ## The flake

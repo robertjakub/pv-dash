@@ -20,11 +20,13 @@ The checks: valid JSON and the top-level shape; a non-empty
 register bounds (0\(en65536 minus the type width); the valid types
 (\fBi16/u16/i32/u32\fR); \fBfc\fR \(is {3, 4}; a numeric \fBttl\fR \(>= 0;
 terse-ASCII \fBdesc\fRs; the mappings against a profile register word;
-the write acl tree (\fBacl\fR/\fBwrite\fR: an allow/deny object or an
-ordered allow/deny rule chain, \fBSTART:COUNT\fR matchers \(em bare,
-listed or as a range map with a terse-ASCII \fBdesc\fR per entry \(em or the
-bare words \fBany\fR/\fBnone\fR, bounds checked, a terse-ASCII \fBdesc\fR
-per gate and rule); duplicate
+the write acl gate (\fBacl\fR/\fBwrite\fR: an optional terse-ASCII
+\fBdesc\fR and the ordered \fBrules\fR list, one
+\fB{"type": "allow"|"deny", "range": ...}\fR object per rule \(em
+\fBSTART:COUNT\fR matchers \(em bare, listed or as a range map with a
+terse-ASCII \fBdesc\fR per entry \(em or the bare words
+\fBany\fR/\fBnone\fR, bounds checked, a terse-ASCII \fBdesc\fR
+per rule); duplicate
 names; same-fc register overlaps. One issue per line, exit non-zero on
 the first failure.
 .SH EXIT STATUS

@@ -78,10 +78,10 @@ def lint_desc(d, where):
 
 def lint_acl(data, path):
     """The optional "acl" tree: keyed by access kind ("write" is the one
-    the cache speaks). The gate is an object with optional "allow"/"deny"
-    (+ "desc"), or an ordered rule list — one {"allow"|"deny":
-    matcher} object per rule (+ an optional "desc" each). Returns the
-    issue list."""
+    the cache speaks). The gate is one object: an optional terse-ASCII
+    "desc" and the ordered "rules" list — one {"type": "allow"|"deny",
+    "range": matcher} object per rule (+ an optional "desc" each). Returns
+    the issue list."""
     issues = []
     acl = data.get('acl')
     if not isinstance(acl, dict) or not acl:
@@ -91,30 +91,35 @@ def lint_acl(data, path):
             issues.append('"acl" kind %r is not known (the cache speaks "write")' % kind)
             continue
         base = '%s acl/write' % os.path.basename(path)
-        if isinstance(gate, dict):
-            for k in gate:
-                if k not in ('allow', 'deny', 'desc'):
-                    issues.append('%s: unknown key %r (allow/deny/desc, or the rule-list form)' % (base, k))
-            issues.extend(lint_desc(gate.get('desc'), base))
-            for side in ('allow', 'deny'):
-                if side in gate:
-                    issues.extend(lint_matcher(gate[side], '%s/%s' % (base, side)))
-        elif isinstance(gate, list):
-            if not gate:
-                issues.append('%s: the rule list is empty' % base)
-            for i, rule in enumerate(gate):
-                where = '%s rule %d' % (base, i + 1)
-                if not isinstance(rule, dict) or not rule:
-                    issues.append('%s must be an object with one verb (allow/deny)' % where)
-                    continue
-                verbs = [k for k in rule if k != 'desc']
-                if len(verbs) != 1 or verbs[0] not in ('allow', 'deny'):
-                    issues.append('%s: exactly one verb (allow/deny)' % where)
-                    continue
+        if not isinstance(gate, dict):
+            issues.append('%s must be an object: an optional "desc" and the "rules" list '
+                          '(one {"type": "allow"|"deny", "range": ...} per rule)' % base)
+            continue
+        for k in gate:
+            if k not in ('desc', 'rules'):
+                issues.append('%s: unknown key %r ("desc" and the "rules" list)' % (base, k))
+        issues.extend(lint_desc(gate.get('desc'), base))
+        rules = gate.get('rules')
+        if not isinstance(rules, list) or not rules:
+            issues.append('%s: the "rules" list is missing or empty (a whole-space deny is '
+                          '[{"type": "deny", "range": "any"}])' % base)
+            continue
+        for i, rule in enumerate(rules):
+            where = '%s rule %d' % (base, i + 1)
+            if not isinstance(rule, dict) or not rule:
+                issues.append('%s must be an object with a "type" (allow/deny) and a "range"' % where)
+                continue
+            for k in rule:
+                if k not in ('type', 'range', 'desc'):
+                    issues.append('%s: unknown key %r (type/range/desc)' % (where, k))
+            verb = rule.get('type')
+            if verb not in ('allow', 'deny'):
+                issues.append('%s: "type" must be allow or deny, got %r' % (where, verb))
+            if 'range' not in rule:
+                issues.append('%s: the rule needs a "range"' % where)
+            else:
                 issues.extend(lint_desc(rule.get('desc'), where))
-                issues.extend(lint_matcher(rule[verbs[0]], where))
-        else:
-            issues.append('%s must be an object (allow/deny) or a rule list' % base)
+                issues.extend(lint_matcher(rule['range'], where))
     return issues
 
 

@@ -43,7 +43,13 @@ One JSON object per device:
 ```json
 {
   "description": "Huawei SUN2000 with meter and optional battery",
-  "acl": {"write": {"allow": {"32089:1": "the inverter on/off switch"}}},
+  "acl": {
+    "write": {
+      "rules": [
+        {"type": "allow", "range": "32089:1", "desc": "the inverter on/off switch"}
+      ]
+    }
+  },
   "mappings": [
     {"register": "device-status", "values": {"512": "on-grid", "40960": "standby"}}
   ],
@@ -56,19 +62,19 @@ One JSON object per device:
 
 - **`description`** — one line, what device this profile emulates.
 - **`acl`** — the optional access-control tree, keyed by access kind.
-  **`write`** is the one the cache speaks: the gate is either an object
-  with optional `allow`/`deny` (+ a terse-ASCII `desc`), or an ordered
-  rule list — one `{"allow"|"deny": matcher}` object per rule,
-  each with an optional `desc`. A matcher is a `START:COUNT` range or a
-  list of them, or a `{ "START:COUNT": "desc" }` map describing each
-  entry, or the bare word `any` (all registers) / `none`. The
-  chain reads top to bottom and **the last matching rule decides**;
-  an undecided register refuses (the default deny). The object form is
-  the sugar for the chain `allow, deny` (the deny wins; an absent allow
-  is `any`, so a deny-only gate carves its ranges out of everything). The
-  cache's `write-registers profile` value compiles the chain into the
-  register ranges a forwarded write may touch (see the cache README); a
-  profile without the `acl` section simply offers no profile gate.
+  **`write`** is the one the cache speaks: the gate is one object — an
+  optional terse-ASCII `desc` and the ordered **`rules`** list, one
+  `{"type": "allow"|"deny", "range": matcher}` object per rule, each with
+  an optional `desc`. A matcher is a `START:COUNT` range or a list of
+  them, or a `{ "START:COUNT": "desc" }` map describing each entry, or
+  the bare word `any` (all registers) / `none`. The chain is a
+  **whitelist**: it reads top to bottom and **the last matching rule
+  decides**; a register no rule decides refuses (the default deny any).
+  The cache's `write-registers profile` value compiles the chain into the
+  register ranges a forwarded write may touch, and its
+  `show write registers profile` answers the chain back, one
+  `allow`/`deny` line per range (see the cache README); a profile without
+  the `acl` section simply offers no profile gate.
 - **`mappings`** — optional list for coded registers: one
   `{"register": <name>, "values": {code: word}}` object per coded register.
   The values are the **real device's** codes (the sun2000:
@@ -107,18 +113,18 @@ One JSON object per device:
   in strict mode). A device without, say, per-string data simply omits
   `string-1-voltage`.
 - **The write acl chain reads top to bottom, the last matching rule
-  decides**; an undecided register refuses. Worked examples:
-  - `{"allow": "47400:100", "deny": "47442:1"}` — 47400–47499 writable,
-    47442 refuses: the deny carves the one register out of the allowed
-    range (the object form is the sugar for the chain allow, deny — the
-    deny wins).
-  - `[{"allow": "any"}, {"deny": "148:30"}, {"allow": "148:1"}]` —
+  decides**; an undecided register refuses (the default deny any — the
+  chain is a whitelist). Worked examples:
+  - `[{"type": "allow", "range": "47400:100"}, {"type": "deny", "range": "47442:1"}]` —
+    47400–47499 writable, 47442 refuses: the deny carves the one register
+    out of the allowed range.
+  - `[{"type": "allow", "range": "any"}, {"type": "deny", "range": "148:30"}, {"type": "allow", "range": "148:1"}]` —
     everything writable except 149–177: the opening `any` grants the
     whole space, the deny carves the span out, the last rule re-opens
     148.
-  - `[{"deny": "any"}, {"allow": "148:30"}]` — only 148–177 writable:
-    the opening deny-any clears the slate, everything else matches no
-    deciding rule and refuses.
+  - `[{"type": "deny", "range": "any"}, {"type": "allow", "range": "148:30"}]` —
+    only 148–177 writable: the opening deny-any clears the slate,
+    everything else matches no deciding rule and refuses.
 - Every fact lives in the JSON — no hardcoded tables anywhere in the suite.
 - A profile is addressed by bare name (this directory) or by path.
 

@@ -31,28 +31,29 @@ def fmt_array(items, order):
     return '[\n' + ',\n'.join('    ' + fmt_entry(i, order) for i in items) + '\n  ]'
 
 
-def fmt_matcher(v, depth):
-    """A matcher value: scalars and lists inline, the range map one entry
-    per line."""
-    if isinstance(v, dict):
-        pad, inner = '  ' * depth, '  ' * (depth + 1)
-        rows = ',\n'.join('%s%s: %s' % (inner, json.dumps(k), json.dumps(v[k])) for k in v)
-        return '{\n%s\n%s}' % (rows, pad)
-    return json.dumps(v)
-
-
 def fmt_gate(gate, depth):
-    """The acl gate: the object form one key per line, the rule list one
-    rule per line; depth = the indent level of the gate itself."""
+    """The acl gate: the optional desc, then the rule list one rule per
+    line (keys in the family order type -> range -> desc); depth = the
+    indent level of the gate itself."""
     pad, inner = '  ' * depth, '  ' * (depth + 1)
-    if isinstance(gate, list):
-        rows = ',\n'.join(inner + fmt_entry(r, ['allow', 'deny', 'desc']) for r in gate)
-        return '[\n%s\n%s]' % (rows, pad)
-    keys = [k for k in ('allow', 'deny', 'desc') if k in gate] \
-        + [k for k in gate if k not in ('allow', 'deny', 'desc')]
-    rows = ',\n'.join('%s%s: %s' % (inner, json.dumps(k), fmt_matcher(gate[k], depth + 1))
-                      for k in keys)
-    return '{\n%s\n%s}' % (rows, pad)
+    keys = [k for k in ('desc', 'rules') if k in gate] \
+        + [k for k in gate if k not in ('desc', 'rules')]
+    rows = []
+    for k in keys:
+        if k == 'rules':
+            rows.append('%s"rules": %s' % (inner, fmt_rules(gate['rules'], depth + 1)))
+        else:
+            rows.append('%s%s: %s' % (inner, json.dumps(k), json.dumps(gate[k])))
+    return '{\n%s\n%s}' % (',\n'.join(rows), pad)
+
+
+def fmt_rules(rules, depth):
+    """The rule list: one rule per line, a bare [] when empty."""
+    if not rules:
+        return '[]'
+    pad, inner = '  ' * depth, '  ' * (depth + 1)
+    rows = ',\n'.join(inner + fmt_entry(r, ['type', 'range', 'desc']) for r in rules)
+    return '[\n%s\n%s]' % (rows, pad)
 
 
 def fmt_acl(acl, depth):

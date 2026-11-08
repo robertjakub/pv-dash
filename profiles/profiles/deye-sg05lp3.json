@@ -2,11 +2,11 @@
   "description": "Deye SUN-12K-SG05LP3-EU three-phase hybrid with battery",
   "acl": {
     "write": {
-      "allow": {
-        "127:2": "operational mode registers",
-        "148:30": "Time-of-Use schedule slots"
-      },
-      "desc": "Time-of-Use schedule slots (148-177) and operational mode registers (127-128)"
+      "desc": "Time-of-Use schedule slots (148-177) and operational mode registers (127-128)",
+      "rules": [
+        {"type": "allow", "range": "127:2", "desc": "operational mode registers"},
+        {"type": "allow", "range": "148:30", "desc": "Time-of-Use schedule slots"}
+      ]
     }
   },
   "mappings": [

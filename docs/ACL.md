@@ -169,13 +169,18 @@ Modbus write refused), with no IP write-acl and no register allow-list.
 
 ## modbus-scraper — the metrics listener, IP kind
 
-The scraper's exposure is the /metrics exposition, and it takes the
-connect-ACL half of the story — one IP-kind gate on the HTTP listener
-doing what the cache's `acl/connect` does on the Modbus listener (the
-cache's own /metrics endpoint speaks the same `metrics/acl` gate). The
-check is the shared accept ladder: ahead of the connection caps, an
-off-ACL client closed without a reply (`connection rejected: … not on the
-metrics ACL`).
+The scraper's exposure is the /metrics exposition, and one IP-kind gate
+covers all of it — `metrics/acl` on the HTTP listener, doing what the
+cache's `acl/connect` does on the Modbus listener (the cache's own
+/metrics endpoint speaks the same gate). This is the scraper's WHOLE acl
+story, not half of one: the write/register plane has nothing to gate
+here, by posture and not by omission — the scraper is a read-only Modbus
+client (the poller speaks `read_registers`/`read_bits` and sends no
+write) and forwards no writes, so no write-acl and no register gate
+exist on it, and nothing is pending behind this one. The check is the
+shared accept ladder: ahead of the connection caps, an off-ACL client
+closed without a reply (`connection rejected: … not on the metrics
+ACL`).
 
 `--metrics-acl` (env `METRICS_ACL`, live `set metrics acl <value>` /
 `unset metrics acl`, config `metrics_acl`, NixOS `metricsAcl` +

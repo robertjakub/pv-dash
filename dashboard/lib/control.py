@@ -72,6 +72,10 @@ class ControlServer(_ControlServer):
                          ops_verbs=ops_verbs, config_path=config_path, dump_path=dump_path,
                          restore_on_start=restore_on_start, dump_key=dump_key)
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
+        self.config_path = config_path   # the config script the daemon started from — the reload state lives beside it
+        self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
+        self.dump_path = dump_path or None   # the state dump file (the dump family)
+        self.dump_restore = bool(restore_on_start)   # prospective-only: the START already chose
         self.metrics_srv = None          # set by the entry (the live metrics-server toggle)
         self.metrics_token = None        # the /metrics bearer token (the entry passes it)
         self.metrics_listen = None       # the /metrics bind address (the entry passes it)

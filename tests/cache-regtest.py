@@ -1869,6 +1869,14 @@ print('mode 0600 ok')
     check('acl file: a bad file fails the start',
           p.returncode == 1 and 'cannot read acl file /nonexistent/acl.json' in p.stderr,
           '%s %r' % (p.returncode, p.stderr[-120:]))
+    p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15584',
+                        '--listen', '127.0.0.1:15600', '--profile', R,
+                        '--write-registers', 'file:' + os.path.join(CACHE_DIR, 'acl.json'),
+                        '--dry-run'],
+                       capture_output=True, text=True, timeout=60)
+    check('acl file: the shipped example loads (the deye gate)',
+          p.returncode == 0 and 'dry-run: configuration and register map are valid' in (p.stdout + p.stderr),
+          '%s %r' % (p.returncode, (p.stdout + p.stderr)[-120:]))
 
 
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,

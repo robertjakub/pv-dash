@@ -470,7 +470,8 @@ restrict all); the config-file/env/NixOS forms are
   whitelist semantics), read and compiled at start and on every `set`; a
   missing or bad file refuses the start and answers `err` on the wire
   with the old gate standing, and the spelling round-trips through the
-  dumps and `unset`. `show write registers profile` answers the gate
+  dumps and `unset`. An example ships as `cache/acl.json` (the
+  `deye-sg05lp3` gate). `show write registers profile` answers the gate
   back as its chain — one `allow`/`deny` line per range, the profile's
   descs included (the file's rules render the same way).
 
@@ -870,8 +871,9 @@ cache/
 │   ├── modbus-cache.py  # CLI, logging setup, signal handling
 │   ├── modbus-cache-ctl.py     # one-shot control client (args / piped commands)
 │   └── modbus-cache-cli.py     # console-style interactive control session
-├── modbus_cache.ini     # sample config (the default --config target)
-├── selection.json       # example selection: the essential monitoring set
+├── modbus_cache.conf      # sample config (the default --config target)
+├── selection.json         # example selection: the essential monitoring set
+├── acl.json               # example acl file: the deye-sg05lp3 write gate (--write-registers file:...)
 └── lib/
     ├── static.json      # the static constants: protocol limits, diagnostics block, defaults
     ├── statics.py       # its loader (the STATIC dict + the named aliases)

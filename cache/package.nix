@@ -31,6 +31,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../common}/modbus/*.py $out/share/modbus-cache/common/modbus/
     install -Dm644 modbus_cache.conf $out/share/modbus-cache/modbus_cache.conf
     install -Dm644 selection.json $out/share/modbus-cache/selection.json
+    install -Dm644 acl.json $out/share/modbus-cache/acl.json
     install -dm755 $out/share/modbus-cache/profiles
     install -m644 ${../profiles/profiles}/*.json $out/share/modbus-cache/profiles/
     install -dm755 $out/share/man/man1

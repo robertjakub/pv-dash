@@ -53,7 +53,7 @@ def main():
         c = AuditLog(log, 'CLI')
         a.event('START', 'version=test')
         c.event('CONNECT', 'target=127.0.0.1:1')
-        a.event('COMMAND', "'show status' -> ok")
+        a.event('COMMAND', "'show version' -> ok")
         c.event('COMMAND', "'quit' -> local")
         a.event('REQUESTS', 'clients=1 reads=3 writes=0')
         ok, out = verify(log, contain=['OK'])
@@ -66,7 +66,7 @@ def main():
 
         # 2. an edited line breaks the chain at that line
         lines = open(log).read().splitlines()
-        lines[2] = lines[2].replace("'show status'", "'show secrets'")
+        lines[2] = lines[2].replace("'show version'", "'show secrets'")
         open(log, 'w').write('\n'.join(lines) + '\n')
         ok, out = verify(log, rc=1, contain=['line 3 [CACHE]: hash mismatch'])
         check('edited line detected (right line, right prefix)', ok, out)

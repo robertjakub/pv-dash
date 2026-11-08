@@ -114,7 +114,7 @@ def main():
             (b'{"cmd": null}\n', 'null cmd'),
             (b'\xff\xfe\x00binary\n', 'binary bytes'),
             (b'{"cmd": "show stat\xc3\xbc\u007f"}\n', 'unicode cmd'),
-            (b'{"cmd": "show status", "extra": ' + b'[' * 40 + b']' * 40 + b'}\n', 'deeply nested'),   # the extra field is ignored
+            (b'{"cmd": "show version", "extra": ' + b'[' * 40 + b']' * 40 + b'}\n', 'deeply nested'),   # the extra field is ignored
             (b'\n', 'empty line'),
             (b'   \n', 'whitespace line'),
         ]
@@ -127,7 +127,7 @@ def main():
                   st == want, '%s %s' % (st, tx))
 
         # 2. the overlong request (1 MB): answered or closed, never a crash
-        st, tx = roundtrip(15961, b'{"cmd": "show status", "pad": "' + b'a' * (1024 * 1024) + b'"}\n', timeout=10)
+        st, tx = roundtrip(15961, b'{"cmd": "show version", "pad": "' + b'a' * (1024 * 1024) + b'"}\n', timeout=10)
         check('fuzz: 1 MB request handled', st in ('ok', 'fail', 'dead'), '%s %s' % (st, tx[:80]))
 
         # 3. split packets: one byte at a time, the server assembles the frame
@@ -151,7 +151,7 @@ def main():
 
         # 4. no newline, then close: no crash, the server keeps serving
         s = connect(15961)
-        s.sendall(b'{"cmd": "show status"}')
+        s.sendall(b'{"cmd": "show version"}')
         s.close()
         st, tx = roundtrip(15961, b'{"cmd": "show version"}\n')
         check('fuzz: frameless close does not wedge the server', st == 'ok', '%s %s' % (st, tx))
@@ -162,7 +162,7 @@ def main():
             st, tx = roundtrip(15961, b'{"cmd": "ping"}\n', timeout=10)
             ok = ok and st == 'ok'
         check('fuzz: ping flood survives (100x)', ok)
-        st, tx = roundtrip(15961, b'{"cmd": "show status"}\n')
+        st, tx = roundtrip(15961, b'{"cmd": "show version"}\n')
         check('fuzz: real command after the flood', st == 'ok', '%s %s' % (st, tx))
 
         # 6. the token server: the auth abuse is rejected, the real token works
@@ -237,7 +237,7 @@ def main():
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
                             '--control-port', '15963', '--control-token', 'file:/tmp/ctl_fuzz_no_file',
-                            'status'], capture_output=True, text=True, timeout=15)
+                            'show', 'version'], capture_output=True, text=True, timeout=15)
         check('fuzz: a missing token reference fails fast, one line', r.returncode != 0
               and 'cannot read control-token' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
@@ -277,8 +277,8 @@ def main():
         r = authed_roundtrip(15982, 'opstok', 'show version')
         check('ops: the ops token authenticates and the reply is mac\'d with the ops key',
               r.get('status') == 'ok' and 'fake-inverter' in r.get('text', '') and r.get('_mac_ok'), str(r))
-        r = authed_roundtrip(15982, 'opstok', 'show status')
-        check('ops: show status honored', r.get('status') == 'ok' and r.get('_mac_ok'), str(r)[:120])
+        r = authed_roundtrip(15982, 'opstok', 'show version')
+        check('ops: show version honored', r.get('status') == 'ok' and r.get('_mac_ok'), str(r)[:120])
         r = authed_roundtrip(15982, 'opstok', 'set pv 100')
         check('ops: set is forbidden', r.get('status') == 'fail' and 'forbidden' in r.get('text', '')
               and 'admin' in r.get('text', '') and r.get('_mac_ok'), str(r))

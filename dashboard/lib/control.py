@@ -24,10 +24,12 @@ from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.control import ControlServer as _ControlServer, num, numi
-from common.options import control_command, describe_node, describe_root, grouped_rows, match_setting_path
+from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
+    match_setting_path
 from common.config import parse_secret
 from common.dump import SECRET_REMOVED, dump_filter
-from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS
+from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
+    COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
@@ -86,14 +88,19 @@ class ControlServer(_ControlServer):
                 return self.config_mapping()
             if args and args[0].lower() == 'knobs':
                 return self.knobs_dictionary()
+            path = '/'.join(w.lower() for w in args)   # the command paths spell as words too — the golden ladder: the commands before the settings
+            listing = describe_command_node(COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, path)
+            if listing is not None:
+                return 'ok %s' % listing
+            if path in COMMAND_HELP:   # a command word — or a childless command node — describes itself
+                return 'ok %s' % COMMAND_HELP[path]
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
                 return 'ok %s' % describe_setting(key)
-            node_path = '/'.join(w.lower() for w in args)   # a node path spells as words too — the walk the ? offers
-            if node_path in NODE_BY_NAME:
-                return 'ok %s' % describe_node(OPTIONS, node_path)
+            if path in NODE_BY_NAME:
+                return 'ok %s' % describe_node(OPTIONS, path)
             if args:
-                return 'err unknown setting %s (try help)' % ' '.join(args)
+                return 'err unknown command or setting %s (try ?)' % ' '.join(args)
             return 'ok ' + self.command_help()
         if low == '?':
             return 'ok ' + self.command_help()

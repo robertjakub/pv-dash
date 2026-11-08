@@ -50,7 +50,7 @@ and stay.
 graceful shutdown (the connected consoles get the daemon-exit frame)."""
     control = """.SH CONTROL
 The control server speaks JSON lines ({"cmd": "..."} ->
-{"status": "ok|err|bye", "text": "..."}; TCP requires the token when
+{"status": "ok|fail|bye", "text": "..."}; TCP requires the token when
 configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: max-clients,
 client-timeout, max-conn-per-ip, log-access, log-queries, battery,

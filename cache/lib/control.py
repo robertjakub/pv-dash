@@ -19,7 +19,7 @@ import threading
 import time
 
 from common.version import version_string
-from common.config import auth_key_floor_error, default_profile_path, parse_auth_type, parse_upstream, \
+from common.config import auth_key_floor_error, default_profile_path, is_loopback_host, parse_auth_type, parse_upstream, \
     resolve_profile_file, parse_secret
 from common.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
@@ -340,6 +340,10 @@ class ControlServer(_ControlServer):
                         raise ValueError('cannot bind %s:%d: %s' % (t[0], t[1], e))
                     finally:
                         probe.close()
+                    if p.metrics_srv is not None and not p.metrics_token and not is_loopback_host(t[0]):
+                        raise ValueError('metrics/listen cannot move beyond loopback while the endpoint '
+                                         'serves without a token (F13 in docs/AUDIT.md) — '
+                                         'set metrics/token first')
                 self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
             if key == 'dump/restore-on-start':
@@ -559,8 +563,11 @@ class ControlServer(_ControlServer):
                 if p.metrics_srv:
                     return 'on'
                 if not p.metrics_token:
-                    raise ValueError('the metrics endpoint serves register values: '
-                                     'set --metrics-token first (or file:<path>) (F6 in docs/AUDIT.md)')
+                    host, _port = p.metrics_listen
+                    if not is_loopback_host(host):
+                        raise ValueError('the metrics endpoint serves register values: refusing to expose '
+                                         '/metrics beyond loopback without a token (F13 in docs/AUDIT.md) — '
+                                         'set metrics/token first or bind metrics/listen on 127.0.0.1')
                 srv = MetricsServer(p, p.metrics_listen, token=p.metrics_token,
                                     max_clients=p.metrics_caps[0], client_timeout=p.metrics_caps[1],
                                     max_per_ip=p.metrics_caps[2])
@@ -584,7 +591,16 @@ class ControlServer(_ControlServer):
             raise ValueError('metrics enable must be on or off')
         if key == 'metrics/token':
             if not val or val in ('off', 'none', '0'):
-                raise ValueError('metrics/token is mandatory while the endpoint serves (F6 in docs/AUDIT.md) — set the new token')
+                host, _port = p.metrics_listen
+                if not is_loopback_host(host):
+                    raise ValueError('metrics/token is mandatory while the listen is non-loopback '
+                                     '(F13 in docs/AUDIT.md) — set the new token')
+                p.metrics_token = None
+                p.config['metrics_token'] = None
+                if p.metrics_srv:
+                    p.metrics_srv.token = None   # the handler reads it per request — the swap is live
+                p.metrics_desc = describe_metrics(p.metrics_listen, None, p.metrics_caps[0], p.metrics_caps[2])
+                return 'off'
             try:
                 val = parse_secret(val, 'metrics/token')   # file: reads the first line of an owner-only file
             except SystemExit as e:

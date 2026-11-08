@@ -1238,6 +1238,26 @@ try:
     r = ctl_cmd('show metrics listen', 15530)
     check('metrics listen: the unset restored the configured value',
           r.startswith('ok metrics/listen=127.0.0.1:15529'), r[:90])
+    # the F13 posture live: the token comes off on the loopback listen and
+    # the endpoint serves tokenless; a pending listen cannot move beyond
+    # loopback while the endpoint serves without a token
+    r = ctl_cmd('set metrics token off', 15530)
+    check('metrics token: off on the loopback listen (the F13 shape)',
+          r.startswith('ok metrics/token=off'), r[:90])
+    st, _ = get_metrics()
+    check('metrics token: the tokenless loopback endpoint serves', st == 200, str(st))
+    r = ctl_cmd('set metrics enable off', 15530)
+    check('metrics enable: off for the token-less re-enable', r.startswith('ok metrics/enable=off'), r[:80])
+    r = ctl_cmd('set metrics enable on', 15530)
+    check('metrics enable: on without a token on the loopback listen (the F13 shape)',
+          r.startswith('ok metrics/enable=on'), r[:80])
+    r = ctl_cmd('set metrics listen 0.0.0.0:15536', 15530)
+    check('metrics listen: the pending move beyond loopback refuses while serving tokenless (F13)',
+          r.startswith('fail metrics/listen cannot move beyond loopback') and 'F13' in r, r[:140])
+    r = ctl_cmd('set metrics token sekrit2', 15530)
+    check('metrics token: the token is back for the acl block', r.startswith('ok metrics/token=<set>'), r[:90])
+    st, _ = get_metrics('sekrit2')
+    check('metrics token: the token serves again', st == 200, str(st))
 
     # the metrics/acl gate: the acl/connect reading on the /metrics listener
     # (the scraper's metrics/acl shape) — the inline grammar + the file:
@@ -2248,8 +2268,10 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           r.returncode != 0 and '0600' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
 
-    # the audit-finding refusals (F5/F6 in docs/AUDIT.md): the token-less
-    # TCP control and the token-less metrics endpoint refuse to start
+    # the audit-finding refusals (F5/F13 in docs/AUDIT.md): the token-less
+    # TCP control refuses to start; the metrics endpoint serves tokenless
+    # on the loopback default and refuses beyond loopback without a token
+    # (the F13 posture — the scraper's golden shape, the cache conformed)
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--dry-run',
                         '--listen', '127.0.0.1:15599', '--control-port', '15599', '--profile', R],
                        capture_output=True, text=True, timeout=15)
@@ -2259,9 +2281,20 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--dry-run',
                         '--listen', '127.0.0.1:15599', '--metrics-listen', '127.0.0.1:15598', '--metrics-server', '--profile', R],
                        capture_output=True, text=True, timeout=15)
-    check('metrics: the metrics endpoint without a token refuses to start',
-          r.returncode != 0 and 'serves register values' in (r.stderr + r.stdout)
+    check('metrics: the loopback endpoint serves without a token (the F13 shape)',
+          r.returncode == 0 and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--dry-run',
+                        '--listen', '127.0.0.1:15599', '--metrics-listen', '0.0.0.0:15598', '--metrics-server', '--profile', R],
+                       capture_output=True, text=True, timeout=15)
+    check('metrics: a non-loopback endpoint without a token refuses to start (F13)',
+          r.returncode != 0 and 'refusing to expose /metrics beyond loopback' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--dry-run',
+                        '--listen', '127.0.0.1:15599', '--metrics-listen', '0.0.0.0:15598', '--metrics-server',
+                        '--metrics-token', 'sekrit', '--profile', R],
+                       capture_output=True, text=True, timeout=15)
+    check('metrics: a non-loopback endpoint with a token starts',
+          r.returncode == 0 and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
 
     # the paste-back gate: a rendered `set <secret> *** SECRET REMOVED ***`
     # line refuses to parse — the placeholder is never a value

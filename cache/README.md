@@ -204,9 +204,9 @@ with a clean one-line error instead of failing later at runtime.
 | `--no-audit-log` | off | disable the audit trail |
 | `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds (who is hammering the cache), `0` = off (config `set audit requests`, env `REQUESTS_AUDIT`) |
 | **Metrics** | | |
-| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `scraper_cache_*` path); **live-settable** (`set metrics enable on/off`) and **refuses to start without `--metrics-token`** (config `set metrics enable`, env `METRICS_SERVER`) |
-| `--metrics-listen` | `127.0.0.1:9252` | the metrics bind address `HOST:PORT` — `0.0.0.0:PORT` serves every interface, **a token is mandatory regardless** (config `set metrics listen`, env `METRICS_LISTEN`) |
-| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-server` is on; the value may be `file:<path>` — the first line of an owner-only `0600` file, F12 |
+| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `scraper_cache_*` path); **live-settable** (`set metrics enable on/off`) and **refuses to start beyond loopback without `--metrics-token`** (the F13 posture — the loopback bind needs none) (config `set metrics enable`, env `METRICS_SERVER`) |
+| `--metrics-listen` | `127.0.0.1:9252` | the metrics bind address `HOST:PORT` — `0.0.0.0:PORT` serves every interface, **a token is mandatory beyond loopback — a token-less non-loopback bind refuses to start (F13)** (config `set metrics listen`, env `METRICS_LISTEN`) |
+| `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when the listen is non-loopback (F13); the value may be `file:<path>` — the first line of an owner-only `0600` file, F12 |
 | `--metrics-acl` | `any` | clients allowed to connect to `/metrics`: the same grammar as `--connect-acl` (`any`/`none`/the comma-separated IPs/prefixes/`file:<path>`); checked at accept — a client off the ACL is closed without a reply (config `set metrics acl`, env `METRICS_ACL`) — see [Access control](#access-control) |
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
@@ -673,7 +673,10 @@ at rest)` note on the `set dump path` reply.
 on/off`) serves the cache's own Prometheus `/metrics` on the
 `--metrics-listen HOST:PORT` address (default `127.0.0.1:9252`; `0.0.0.0`
 serves every interface) — the self-observability without the
-scraper's `scraper_cache_*` export path. Beside the bearer token the
+scraper's `scraper_cache_*` export path. The bearer token is **mandatory
+beyond loopback** — a token-less non-loopback bind refuses to start (the
+F13 posture, the scraper's refusal the family's golden shape); the
+loopback default serves tokenless. Beside the bearer token the
 endpoint carries the **metrics ACL** (`--metrics-acl`, live `set metrics
 acl`): the `connect-acl` grammar checked at accept — a client off the ACL
 is closed without a reply (logged `connection rejected: … not on the
@@ -686,7 +689,9 @@ idle, `max-conn-per-ip` sheds one peer), and `set metrics token`
 rotates the credential without a restart (the value may be `file:<path>`
 — the first line of an owner-only `0600` file) — the
 token never renders back (`show metrics token` **refuses** — it is a
-secret; `unset` refuses too: set the new one). The gauges:
+secret; `unset` refuses too: set the new one). `set metrics token off`
+takes the endpoint tokenless on the loopback listen (beyond loopback the
+off refuses, F13). The gauges:
 `modbus_cache_hits_total` /
 `modbus_cache_misses_total`, `modbus_cache_poll_up` +
 `modbus_cache_last_poll_age_seconds`, `modbus_cache_age_seconds` (the
@@ -704,7 +709,8 @@ the block fails) and `modbus_cache_uplink_block_fails_total` (see
 `--metrics-token` set, requests need
 `Authorization: Bearer <token>` — the same scheme the scraper's exporter
 speaks; anything but `/metrics` answers 404, an unauthenticated read 401.
-The endpoint is capped on every bind (the token stays mandatory regardless): `--metrics-max-clients`
+The endpoint is capped on every bind (the token stays mandatory beyond
+loopback, F13): `--metrics-max-clients`
 (default 64; extras get an immediate `503 # rate limited`),
 `--metrics-client-timeout` (default 5 s; 0 = the same built-in cap) and
 `--metrics-max-conn-per-ip` (default 0 = no per-IP limit). A scrape job

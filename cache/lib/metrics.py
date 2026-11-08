@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """The cache's own Prometheus endpoint: a small /metrics on its own port,
-gated (off by default, and the bearer token is mandatory when on).
+gated (off by default, the bearer token mandatory beyond loopback — the
+F13 posture, the scraper's refusal the family's golden shape).
 Serves the cache's self-observability in the
 Prometheus text format: the hit/miss counters, the poll health and age, the
 poll-cycle durations, the client count, the uplink session counters and the

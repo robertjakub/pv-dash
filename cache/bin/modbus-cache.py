@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common.audit import AuditLog, default_path as default_audit_path
-from common.config import default_profile_path, parse_listen, parse_secret, parse_upstream
+from common.config import default_profile_path, is_loopback_host, parse_listen, parse_secret, parse_upstream
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.modbus import exception_frame
@@ -232,9 +232,10 @@ def main():
         raise SystemExit(2)
     metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics/token')
     metrics_listen = parse_listen(cfg['metrics_listen'])
-    if cfg['metrics_server'] and not metrics_token:
-        logger.error('the metrics endpoint serves register values: set --metrics-token '
-                     '(or file:<path>) when --metrics-server is on (or drop --metrics-server)')
+    if cfg['metrics_server'] and not metrics_token and not is_loopback_host(metrics_listen[0]):
+        logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
+                     'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
+                     % cfg['metrics_listen'])
         raise SystemExit(2)
     metrics_desc = 'off'
     if cfg['metrics_server']:

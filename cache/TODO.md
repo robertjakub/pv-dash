@@ -5,6 +5,14 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The F13 conformance: **the metrics token is mandatory beyond loopback,
+not whenever on** — the startup refusal, the live `metrics/enable on`,
+the live `metrics/token` off and the restart-marked `metrics/listen`'s
+pending check all fire only for a non-loopback bind without a token; the
+loopback default serves tokenless (the scraper's F13 refusal is the
+family's golden master; F6's mandatory-when-on retires — docs/AUDIT.md
+rev. 20 records the move on the closure).
+
 The show-status removal: **`show status` is gone** (nothing replaces it) —
 the registry row, the dispatch branch and the key=value report body die;
 the per-setting `show <setting>`, `show config`, `inspect` and the

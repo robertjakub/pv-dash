@@ -195,7 +195,8 @@ metrics enable` toggle exists too)
 .TP
 .B \-\-metrics\-listen
 the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every
-interface, a token is mandatory regardless
+interface, a token is mandatory beyond loopback (a token\-less
+non\-loopback bind refuses to start, F13)
 .TP
 .B \-\-metrics\-token
 require Authorization: Bearer <token> on the /metrics endpoint (the same

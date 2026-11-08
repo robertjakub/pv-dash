@@ -9,6 +9,16 @@ before the repo restructured into one suite.
 ## Unreleased
 ### Added
 
+- **scripts** — **`scripts/validate_json.py`**: a stdlib-only JSON Schema
+  validator for the shipped spec files (`scraper/schema/`, `cache/schema/`)
+  — the draft-2020-12 keyword set the schemas speak (`type`/`enum`/`const`,
+  the object/array/string/number bounds, `pattern`/`propertyNames`,
+  `allOf`/`anyOf`/`oneOf`/`not`, local `#/...` `$ref` into `$defs`),
+  `SCHEMA [FILE|- ...]` argv with `-` the stdin, one error line per
+  distinct cause at its JSON pointer (the `oneOf` candidates that `$ref`
+  one subschema dedupe to one line), exit 0 every document validates / 1 a
+  document failed or would not parse / 2 bad usage or an unusable schema.
+
 - **docs** — **`docs/ACL.md`**: the family-wide ACL map — the one
   rule-chain semantics (the typed gate object, the two matcher kinds, the
   last matching rule deciding, the default deny any), the standalone acl

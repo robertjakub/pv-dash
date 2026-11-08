@@ -52,7 +52,7 @@
       "properties": [
         {
           "name": "pv-suite:content",
-          "value": "5 device-profile JSONs + profile-lint.py + profile-format.py (stdlib only)"
+          "value": "6 device-profile JSONs + profile-lint.py + profile-format.py (stdlib only)"
         }
       ]
     },

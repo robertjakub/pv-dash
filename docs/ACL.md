@@ -28,27 +28,27 @@ section below maps the boundary.
 | modbus-cache | `write-registers` | register | `none` | `START:COUNT,...\|any\|none\|profile\|file:` | the register gate on forwarded writes |
 | modbus-fake-inverter | `connect-acl` | IP | `any` | `any\|none\|IP,...` (no `file:`) | accept on the Modbus listen port |
 | modbus-scraper | `metrics/acl` | IP | `any` | `any\|none\|IP,...\|file:` | accept on the /metrics port |
-| dashboard | — | — | — | — | no ACL surface — the page carries no auth (the bind/proxy posture, docs/AUDIT.md F7); its /metrics is token-mandatory when on (F6) |
+| dashboard | — | — | — | — | no ACL surface — the page rides the bearer token + the loopback default instead (F21 closed, rev. 21); its /metrics is token-mandatory beyond loopback (F13's refusal) |
 
 ## The listeners (the serving surfaces)
 
 Eleven listeners across the four tools: four carry an IP-kind ACL, every
 serving surface carries the connection caps, the control sockets are
-loopback + token by decision, and the dashboard's page is the one
-deliberately-open surface (F21).
+loopback + token by decision, and every HTTP surface speaks the F13
+token shape beyond the loopback (the page's F21 closed it — rev. 21).
 
 | tool | listener | the default bind | the stack at it |
 |---|---|---|---|
 | cache | the Modbus mirror | `127.0.0.1:15502` | `acl/connect` (accept, ahead of the caps) → the caps → the suite auth; the write path then adds `--allow-write` + `acl/write` + `write-registers` |
-| cache | /metrics | `127.0.0.1:9252`, off | the token mandatory whenever on (F6) → `metrics/acl` → the caps |
+| cache | /metrics | `127.0.0.1:9252`, off | the token mandatory beyond loopback (F13's refusal) → `metrics/acl` → the caps |
 | cache | control | unix \| TCP `127.0.0.1` | the TCP bind refuses without the admin token (F5); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660` |
 | fake | the Modbus listener | `:5502` | `connect-acl` (the system grammar, no `file:`) → the caps → the suite auth; `--allow-write` |
-| fake | /metrics | `127.0.0.1:9452`, off | no ACL; the token optional — a non-loopback bind without one warns (the test-tool posture) → the caps |
+| fake | /metrics | `127.0.0.1:9452`, off | no ACL; the token mandatory beyond loopback (F13's refusal — the warn retired, rev. 21) → the caps |
 | fake | control | unix \| TCP `127.0.0.1` | the F11 tokenless-TCP exemption |
 | scraper | /metrics | `127.0.0.1:9350`, always on | the token mandatory beyond loopback (F13's refusal) → `metrics/acl` → the caps |
 | scraper | control | unix \| TCP `127.0.0.1` | the token refusal on TCP, like the cache's |
-| dashboard | the page + the config proxy | `0.0.0.0:8080` | no auth (F21, the recorded exception) — the bind/reverse-proxy posture (F7 publishes nothing), GET-only, the realpath guard, the cap gate |
-| dashboard | /metrics | `127.0.0.1:9452`, off | the token mandatory when on; the shared hooks' admit-all base — no IP gate |
+| dashboard | the page + the config proxy | `127.0.0.1:8080` | the bearer token (`auth/token`, F21 closed — the `?auth=` bootstrap sets the session cookie, the header for scripts; a token-less non-loopback bind refuses to start) — GET-only, the realpath guard, the cap gate |
+| dashboard | /metrics | `127.0.0.1:9452`, off | the token mandatory beyond loopback (F13's refusal); the shared hooks' admit-all base — no IP gate |
 | dashboard | control | unix \| TCP `127.0.0.1` | the token refusal on TCP, like the cache's |
 
 The defaults come from each tool's `statics.py`; the authoritative
@@ -256,11 +256,11 @@ beyond loopback — until then the fake's tokenless-loopback TCP exemption
   and its verb set (the RBAC roles), the `trust-uids` peer-cred path, the
   signed wire. docs/AUDIT.md.
 - **the bearer token** — the request-time auth on the HTTP surfaces: the
-  cache's /metrics (mandatory whenever it is on), the scraper's
-  (mandatory beyond loopback — F13's refusal), the dashboard's own
-  /metrics (mandatory whenever it is on), the fake's (optional — a
-  non-loopback bind without one warns, the test-tool posture), and none
-  on the dashboard's page (F21, the recorded exception). The accept-time
+  cache's /metrics, the scraper's, the dashboard's own /metrics and the
+  fake's (all mandatory beyond loopback — F13's refusal; the loopback
+  bind serves tokenless), and the dashboard's page + proxy (the same
+  shape, F21 closed rev. 21 — the `?auth=` bootstrap sets the session
+  cookie, the raw header stays for scripts). The accept-time
   ACL decides who may connect, the bearer decides whether the request
   authenticates — both stack, neither replaces the other
   (docs/AUDIT.md rev. 19).

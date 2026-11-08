@@ -92,8 +92,10 @@ internal-network only, nothing published on the host) — are documented in
 [`docker/README.md`](docker/README.md), topology diagram included. Every
 `/metrics` surface ships with the caps (`--metrics-max-clients`,
 `--metrics-client-timeout`, `--metrics-max-conn-per-ip`; the scraper's own
-are `--max-clients`/`--client-timeout`/`--max-conn-per-ip`), the scraper
-refuses a non-loopback listen without a token (F13), and the audit trails
+are `--max-clients`/`--client-timeout`/`--max-conn-per-ip`), every HTTP
+surface refuses a non-loopback bind without a token (the F13 shape — the
+scraper's refusal is the family's golden master; the dashboard's page
+rides it too, F21), and the audit trails
 carry a per-writer hash chain verified by `scripts/audit_verify.py` (F10).
 
 ## License

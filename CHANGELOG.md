@@ -257,6 +257,35 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
 
 ### Changed
 
+- **everywhere** — **the /metrics token posture is the F13 shape
+  family-wide** (the scraper's refusal is the golden master): the cache's,
+  the dashboard's and the fake's own endpoints serve tokenless on the
+  loopback bind and **refuse a non-loopback bind without a token** — at
+  start, on the live enable and on the live `metrics/token` unset (off
+  works on the loopback listen now; beyond loopback it refuses); the
+  cache's restart-marked `metrics/listen` refuses the pending move beyond
+  loopback while the endpoint serves tokenless. The fake retires its
+  non-loopback warning (F11's softness stays on the Modbus surface). The
+  F6 mandatory-when-on rule retires — the loopback bind is the auth, the
+  trust the tokenless unix control socket already assumes;
+  docs/AUDIT.md rev. 20 records the move on the F6 closure.
+
+- **dashboard** — **the page takes a bearer token; F21 closes** (the
+  audit's rev. 21): `--auth-token`/`$AUTH_TOKEN` (config `auth-token`,
+  live `set auth token`, `file:<path>` rides, a secret — it never
+  renders) gates every GET on the main listener — the page, the static
+  tree, `config.js`, the `/prom` proxy — constant-time, three
+  credentials: the `Authorization: Bearer` header, the `auth` session
+  cookie (HttpOnly, SameSite=Strict), and the **`?auth=<token>`
+  bootstrap** that exchanges the query token for the cookie (stripped
+  from the path before anything logs or forwards). The default
+  `--bind` is **`127.0.0.1`** now and **a token-less non-loopback bind
+  refuses to start** — the loopback dev stays friction-free; the NixOS
+  module gains `authToken`/`authTokenFile` (LoadCredential), the demo
+  compose binds wide in-container with a generated `page.token` (the
+  entrypoint seeds it 0600), the plain-docker env example documents the
+  exposure path. Breaking: a `0.0.0.0` bare start now needs the token.
+
 - **cache, scraper, inverter, dashboard** — **`show status` is removed**
   (breaking): the key=value state report dies family-wide — the registry
   rows, the dispatch branches and the `status_report()` bodies are gone.

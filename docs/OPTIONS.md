@@ -14,7 +14,7 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (20): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `no-audit-log`, `restore-on-start`. The control-plane block is
+Common to **all four** tools (21): `audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `no-audit-log`, `restore-on-start`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
@@ -29,9 +29,9 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** live | **✓** | **✓** |
 | k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** live | **✓** | **✓** |
 | c | `audit/rotate` |  | *(startup-only)* | ✓ | ✓ |  |  |
-| k | `auth` |  | `set modbus auth` | ✓ live | ✓ live | ✓ live |  |
+| k | `auth` |  | `set modbus auth` | **✓** live | **✓** live | **✓** live | **✓** |
 | k | `auth-key` |  | `set modbus auth key` | ✓ live+secret | ✓ live+secret | ✓ live+secret |  |
-| k | `auth-token` |  | `set metrics auth token` |  | ✓ live+secret |  |  |
+| k | `auth-token` |  | `set auth token`, `set metrics auth token` |  | ✓ live+secret |  | ✓ live+secret |
 | k | `auth-upstream` |  | `set modbus auth-upstream` | ✓ live |  |  |  |
 | k | `auth-upstream-key` |  | `set modbus auth-upstream-key` | ✓ live+secret |  |  |  |
 | c | `batt` |  | `set batt` |  |  | ✓ live |  |

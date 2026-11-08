@@ -26,22 +26,22 @@ grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashb
     | sed -E 's/^(import|from) ([a-zA-Z_0-9.]+).*/\2/' | sort -u
 ```
 
-Every name in that list is stdlib (`argparse`, `collections`, `getpass`,
-`glob`, `hashlib`, `hmac`, `http`, `ipaddress`, `json`, `logging`, `math`,
-`mimetypes`, `os`, `random`, `re`, `readline`, `secrets`, `signal`,
-`socket`, `struct`, `subprocess`, `sys`, `textwrap`, `threading`, `time`,
-`urllib`) or `common`/`lib`. Nothing else. No `requests`, no `pyserial`, no
-`prometheus_client`.
+Every name in that list is stdlib (`argparse`, `ast`, `collections`,
+`getpass`, `glob`, `hashlib`, `hmac`, `http`, `ipaddress`, `json`,
+`logging`, `math`, `mimetypes`, `operator`, `os`, `random`, `re`,
+`readline`, `secrets`, `signal`, `socket`, `struct`, `subprocess`, `sys`,
+`textwrap`, `threading`, `time`, `unicodedata`, `urllib`) or `common`/`lib`.
+Nothing else. No `requests`, no `pyserial`, no `prometheus_client`.
 
 ## Per subproject
 
 | Subproject | First-party code | Third-party runtime | Notes |
 |---|---|---|---|
 | [`common/`](../../common/README.md) | the package (15 modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
-| [`profiles/`](../../profiles/README.md) | 5 device-profile JSONs + 2 tools | none — stdlib only | data + linter/formatter |
+| [`profiles/`](../../profiles/README.md) | 6 device-profile JSONs + 2 tools | none — stdlib only | data + linter/formatter |
 | [`cache/`](../../cache/README.md) | `modbus-cache.py` + `lib/` (10 modules) + 2 control clients | none — stdlib only (+ `common`) | proxy daemon |
 | [`inverter/`](../../inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (12 modules) + 2 control clients | none — stdlib only (+ `common`) | simulator |
-| [`scraper/`](../../scraper/README.md) | `modbus-scraper.py` + `lib/` (9 modules) + 2 control clients | none — stdlib only (+ `common`) | exporter |
+| [`scraper/`](../../scraper/README.md) | `modbus-scraper.py` + `lib/` (10 modules) + 2 control clients | none — stdlib only (+ `common`) | exporter |
 | [`dashboard/`](../../dashboard/README.md) | `bin/dashboard.py` + `lib/` (6 modules) + 2 control clients + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
 
 ## Runtime and deployment layers

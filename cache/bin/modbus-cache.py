@@ -339,7 +339,8 @@ def main():
                     'dump/path': cfg['dump_path'] or 'off',
                     'dump/with-cache': 'on' if cfg['dump_with_cache'] else 'off',
                     'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
-                    'log-access': 'on' if cfg['log_access'] else 'off'}
+                    'system/listen': cfg['listen'],
+                    'system/log-access': 'on' if cfg['log_access'] else 'off'}
         # the secret rows (control/token, control/ops/token, metrics/token)
         # carry NO defaults entry: `unset` refuses them
         # (the metrics/token treatment) — a secret never renders, never re-applies

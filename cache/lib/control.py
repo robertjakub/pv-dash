@@ -661,6 +661,15 @@ class ControlServer(_ControlServer):
             if not swapped:
                 raise ValueError('no log handler to re-format')
             return 'on' if on else 'off'
+        if key == 'system/log-access':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('system/log-access must be on or off')
+            p.log_access = on   # the next connect/disconnect log line picks it up
+            return 'on' if on else 'off'
         if key == 'log-level':
             lvl = val.upper()
             if lvl not in LOG_LEVELS:
@@ -886,6 +895,8 @@ class ControlServer(_ControlServer):
                 if f is not None and getattr(f, '_fmt', None):
                     return 'off' if isinstance(f, UtcFormatter) else 'on'
             return 'off'
+        if key == 'system/log-access':
+            return 'on' if p.log_access else 'off'
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         if key == 'modbus/timeout':

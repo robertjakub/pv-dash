@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/robertjakub/pv-dash/main/cache/examples/acl-write-registers.schema.json",
+  "$id": "https://raw.githubusercontent.com/robertjakub/pv-dash/main/cache/schema/acl-write-registers.schema.json",
   "title": "pv-dash standalone acl file — the write-registers gate",
   "description": "The standalone acl file the modbus-cache --write-registers file:<path> knob reads (cache/examples/acl-write-registers.json is the shipped example) — the same object a device profile carries under \"acl\"/\"write\": an optional terse-ASCII desc, the optional gate type naming the schema, and the ordered rules list. The chain reads top to bottom, the LAST matching rule decides, and a register no rule decides refuses (the default deny any). The register kind's matcher is the bare word any (all registers), ONE \"START:COUNT\" string, or a JSON array of those (the profile's multi-range form; a comma-joined string is NOT the register kind's list form); the loader bounds every range (count >= 1, start + count <= 65536 — the 16-bit space; the canonical spelling carries no leading zeros). A typeless register gate reads as write-registers (the legacy shape). The loader (cache/lib/config.py's _write_gate_object) stays the strict word (the exact bounds, the dead-rule linting lives in scripts/lint_acl.py); a group/world-readable acl file warns (chmod 0600 silences it).",
   "type": "object",

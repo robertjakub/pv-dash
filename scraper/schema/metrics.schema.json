@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/robertjakub/pv-dash/main/scraper/examples/metrics.schema.json",
+  "$id": "https://raw.githubusercontent.com/robertjakub/pv-dash/main/scraper/schema/metrics.schema.json",
   "title": "pv-dash metrics spec — the scraper's metric tree",
   "description": "The metrics spec the modbus-scraper --metrics-spec knob reads (scraper/examples/metrics.json is the shipped example; scraper/lib/metrics.json is the built-in one merged under it — the configured file's entries win by name): the SECTIONED form — \"metrics\" (the merged tree: one entry per metric, profile- or expr-fed — the exported name is <prefix>_<key>), \"scraper\" (the exporter's own observability, the keys verbatim) and \"inputs\" (the declared expression vocabulary: the reserved five pv/grid/batt/soc/battery plus the spec's profile keys). The legacy flat form (one dict of full names, every entry carrying \"help\") is still accepted and schema'd here; the 'profile'/'compute' section names are gone (the entries live in one \"metrics\" tree). The schema documents the blessed shape — the loader (scraper/lib/metrics.py's Metrics) stays the strict word and checks what a schema cannot: the profile register existing, the expr/when compiling over the declared inputs, the reserved-input declarations, a register bound twice.",
   "oneOf": [

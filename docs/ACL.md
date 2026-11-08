@@ -71,12 +71,12 @@ embedded profile gates belong to `profiles/bin/profile-lint.py`. The
 shipped examples: `cache/examples/acl-write-registers.json` (the deye
 register policy: the clean-slate deny, the allows, the deny carves, the
 re-opens) and `cache/examples/acl-ip-prefix.json` (the same shape for
-IPs). The ip-prefix file's **JSON Schema** ships beside it
-(`cache/examples/acl-ip-prefix.schema.json`, draft 2020-12) — the
-schema-valid-files-are-maybe-loader-refused direction is the honest one:
-the loader stays the strict word (it additionally refuses the host-bit
-prefix spellings and the malformed v6); wire it into an editor by
-`"$schema"` pattern-matching for live feedback while editing.
+IPs). Both acl files' **JSON Schemas** ship beside them
+(`acl-write-registers.schema.json` / `acl-ip-prefix.schema.json`, draft
+2020-12) — schema-valid can still be loader-refused (the strict-CIDR
+host-bit spellings, the range bounds), so the loader stays the strict
+word; wire them into an editor by `"$schema"` pattern-matching for live
+feedback while editing.
 
 ## modbus-cache — the full story
 

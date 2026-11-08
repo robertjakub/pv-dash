@@ -391,7 +391,7 @@ journald adds one.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--config` | `$CONFIG`, then `scraper.conf` next to the script, then the subproject root's | config file path (the set grammar) |
-| `--metrics-spec` | `$METRICS_SPEC` or the bundled `metrics.json` | metrics spec JSON, sectioned: {inputs?, metrics (profile?/expr?/when?), scraper} — merged in memory over the built-in `lib/metrics.json` (the inputs declaration + the scraper_* block) |
+| `--metrics-spec` | `$METRICS_SPEC` or the bundled `metrics.json` | metrics spec JSON, sectioned: {inputs?, metrics (profile?/expr?/when?), scraper} — merged in memory over the built-in `lib/metrics.json` (the inputs declaration + the scraper_* block); the file's JSON Schema ships as `examples/metrics.schema.json` |
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--modbus-unit` | `1` | Modbus unit id |
 | `--modbus-offset` | `0` | added to register addresses (set `-1` for gateways that need 0-based addressing) |
@@ -554,7 +554,8 @@ scraper/
 │   └── modbus-scraper-cli.py     # console-style control session
 ├── examples/
 │   ├── scraper.conf         # sample config in the set grammar (installed beside the script)
-│   └── metrics.json         # the phase rows' + the compute expressions' specs (the canonical four are built-in)
+│   ├── metrics.json         # the phase rows' + the compute expressions' specs (the canonical four are built-in)
+│   └── metrics.schema.json  # the metrics spec's JSON Schema (draft 2020-12 — the loader stays the strict word)
 └── lib/
     ├── static.json        # the static constants: protocol limits, diagnostics block, defaults
     ├── metrics.json       # the built-in inputs declaration + the four canonical metrics + the scraper_* specs — always merged in over the configured spec

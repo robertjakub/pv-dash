@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/robertjakub/pv-dash/main/cache/examples/selection.schema.json",
+  "title": "pv-dash selection file — the cache's fetch list",
+  "description": "The selection file the modbus-cache --selection knob reads: WHICH device-profile entries the poller fetches into the cache (profile names only; everything else forwards live). The shipped example (cache/examples/selection.json) is the essential SUN2000 monitoring set. The loader (cache/lib/config.py's load_selection) checks the names against the device profile at load — the schema cannot; a name not in the profile refuses with the name in the error. The loader also tolerates a bare name array (the object form is the blessed spelling) and ignores any extra keys; both tolerances are documented here, not blessed by the strict readers.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "registers"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Free prose — what the set is for; the loader ignores it."
+        },
+        "registers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "description": "The device-profile entry NAMES to fetch, in poll order; duplicates keep the profile's order anyway (a name not in the profile refuses at load)."
+        }
+      }
+    },
+    {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+      },
+      "description": "The tolerated bare-list form — the same list without the wrapper."
+    }
+  ]
+}

@@ -911,9 +911,10 @@ cache/
 │   └── modbus-cache-cli.py     # console-style interactive control session
 ├── examples/
 │   ├── modbus_cache.conf    # sample config in the set grammar (installed beside the script)
-│   ├── selection.json       # example selection: the essential monitoring set
+│   ├── selection.json       # example selection: the essential monitoring set (+ its JSON Schema)
 │   ├── acl-write-registers.json  # example acl file: the deye write policy, worked out (--write-registers file:...)
 │   ├── acl-ip-prefix.json   # example acl file: the connect/write IP policy (--connect-acl file:... / --write-acl file:...)
+│   ├── acl-write-registers.schema.json  # the write-registers acl file's JSON Schema (draft 2020-12)
 │   └── acl-ip-prefix.schema.json  # the ip-prefix acl file's JSON Schema (draft 2020-12 — the loader stays the strict word)
 ├── man/                     # the generated man pages (scripts/gen_man.py)
 ├── module.nix               # the NixOS service module

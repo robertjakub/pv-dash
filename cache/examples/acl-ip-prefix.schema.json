@@ -58,15 +58,18 @@
       "oneOf": [
         {
           "pattern": "^[Aa][Nn][Yy]$",
-          "description": "any — the whole space, both families (the table shows spell it 0.0.0.0/0)."
+          "description": "any — the whole space, both families (the table shows spell it 0.0.0.0/0).",
+          "type": "string"
         },
         {
           "pattern": "^(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}(?:/(?:3[0-2]|[12][0-9]|[0-9]))?(\\s*,\\s*(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}(?:/(?:3[0-2]|[12][0-9]|[0-9]))?)*$",
-          "description": "A comma-separated IPv4 list — an address or an IP/prefix length (/0-32)."
+          "description": "A comma-separated IPv4 list — an address or an IP/prefix length (/0-32).",
+          "type": "string"
         },
         {
           "pattern": "^[0-9A-Fa-f]*:[0-9A-Fa-f:.]*(?:/(?:12[0-8]|1[01][0-9]|[0-9]{1,2}))?(\\s*,\\s*[0-9A-Fa-f]*:[0-9A-Fa-f:.]*(?:/(?:12[0-8]|1[01][0-9]|[0-9]{1,2}))?)*$",
-          "description": "A comma-separated IPv6 list — an address (the :: forms and the v4-mapped tails included) or an IP/prefix length (/0-128); at least one colon so the v4 list cannot ride this branch."
+          "description": "A comma-separated IPv6 list — an address (the :: forms and the v4-mapped tails included) or an IP/prefix length (/0-128); at least one colon so the v4 list cannot ride this branch.",
+          "type": "string"
         }
       ]
     }

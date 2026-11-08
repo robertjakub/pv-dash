@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/robertjakub/pv-dash/main/cache/examples/acl-write-registers.schema.json",
+  "title": "pv-dash standalone acl file — the write-registers gate",
+  "description": "The standalone acl file the modbus-cache --write-registers file:<path> knob reads (cache/examples/acl-write-registers.json is the shipped example) — the same object a device profile carries under \"acl\"/\"write\": an optional terse-ASCII desc, the optional gate type naming the schema, and the ordered rules list. The chain reads top to bottom, the LAST matching rule decides, and a register no rule decides refuses (the default deny any). The register kind's matcher is the bare word any (all registers), ONE \"START:COUNT\" string, or a JSON array of those (the profile's multi-range form; a comma-joined string is NOT the register kind's list form); the loader bounds every range (count >= 1, start + count <= 65536 — the 16-bit space; the canonical spelling carries no leading zeros). A typeless register gate reads as write-registers (the legacy shape). The loader (cache/lib/config.py's _write_gate_object) stays the strict word (the exact bounds, the dead-rule linting lives in scripts/lint_acl.py); a group/world-readable acl file warns (chmod 0600 silences it).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rules"
+  ],
+  "properties": {
+    "desc": {
+      "type": "string",
+      "description": "The gate's terse-ASCII description — the % line of the show write registers profile report."
+    },
+    "type": {
+      "const": "write-registers",
+      "description": "The schema kind: range rules. Optional — a typeless register gate reads as write-registers (the legacy shape); a file spelling the ip-prefix type refuses this reader."
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The ordered rule chain: the clean-slate deny (\"any\"), the allows, the deny carves, the re-opens. A rule never the last match for any register is dead (scripts/lint_acl.py catches it).",
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "range"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "allow",
+            "deny"
+          ],
+          "description": "The verdict this rule hands every register its matcher decides."
+        },
+        "range": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[Aa][Nn][Yy]$",
+              "description": "any — every register in the 16-bit space."
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9]{1,5}:(?:65536|[1-9][0-9]{0,4})$",
+              "description": "One range START:COUNT (a bare IP-style single range; the loader bounds it)."
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9]{1,5}:(?:65536|[1-9][0-9]{0,4})$"
+              },
+              "description": "The multi-range list form (the profile's shape); the word any stands alone, never inside a list."
+            }
+          ],
+          "description": "The matcher: what this rule's verdict decides."
+        },
+        "desc": {
+          "type": "string",
+          "description": "The rule's terse-ASCII description — speaks for the whole matcher (a list's ranges share the one comment)."
+        }
+      }
+    }
+  }
+}

@@ -46,9 +46,11 @@ before the repo restructured into one suite.
   rule descs as aligned `# ` comments). A `set acl connect table` /
   `set acl write table` (the show word typed into the set verb) answers
   the pointer to the report instead of the network-parser error. The
-  ip-prefix acl file ships a **JSON Schema** beside the example
-  (`examples/acl-ip-prefix.schema.json`, draft 2020-12 — the loader
-  stays the strict word).
+  example **JSON Schemas** ship beside the shipped files (draft 2020-12):
+  `examples/acl-ip-prefix.schema.json` + `acl-write-registers.schema.json`
+  + `selection.schema.json` (the loader stays the strict word), and the
+  scraper's spec gains `examples/metrics.schema.json` (the sectioned
+  form, the legacy flat form, the scraper section's mapping-fed shape).
 
 - **profiles** — the **`sun2000_full`** profile: the Huawei SUN2000 full
   register map — 645 numeric registers from the newest official Modbus

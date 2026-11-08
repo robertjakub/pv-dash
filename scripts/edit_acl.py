@@ -1,33 +1,40 @@
 #!/usr/bin/env python3
-"""The standalone write-acl file's editor — two faces, one core:
+"""The standalone acl file's editor — two faces, one core:
 
-  python3 scripts/edit_acl.py <file>           the dialog (curses) on a tty
-  python3 scripts/edit_acl.py --line <file>    the line mode (also when piped)
+  python3 scripts/edit_acl.py                  <file>   the dialog (curses) on a tty
+  python3 scripts/edit_acl.py --type <t>       <file>   name the gate on a fresh file
+  python3 scripts/edit_acl.py --line           <file>   the line mode (also when piped)
 
-The file is the write gate object (--write-registers file:<path>): an
-optional terse-ASCII "desc" and the ordered "rules" list — one
-{"type": "allow"|"deny", "range": matcher} object per rule. The chain is
-a whitelist that reads top to bottom, the LAST matching rule decides,
-and a register no rule decides refuses — so the editor's move/drop are
-semantic edits, not cosmetics. The matcher grammar on the edit line:
-any | START:COUNT | a,b,c (the list form). A path that does not exist
-starts from the seeded whole-space deny and the file lands on the
-first save (0600); quitting first leaves nothing behind.
+The file is the acl gate object: an optional terse-ASCII "desc", the
+optional gate "type" and the ordered "rules" list — one {"type":
+"allow"|"deny", matcher-key: matcher} object per rule. THE MATCHER KEY
+IS THE GRAMMAR: "range" matches registers (any | START:COUNT | a,b,c),
+"prefix" matches addresses (any | ip | ip/bits | comma-separated) — one
+grammar per gate, a file mixing the two keys refuses. The gate "type"
+names the schema — write-registers (range rules) or ip-prefix (prefix
+rules) — and must agree with the rules' key when spelled. The editor
+speaks the file's grammar (the edit command and the form field say
+range or prefix); --type seeds a fresh file with the typed whole-space
+deny and lands the type on the first save, migrates a
+typeless file by adding the key (an edit, saved with s), and refuses a
+mismatch with what the file already is. A path that does not exist
+starts from the seeded whole-space deny (write-registers unless --type
+says otherwise) and the file lands on the first save (0600); quitting
+first leaves nothing behind.
 
 Save is loader-gated: cache/lib/config.py's _write_gate_object (the
 schema is the daemon's, not the editor's) refuses the write, and the
 landed file is always the canonical layout (scripts/lint_acl.py's
 renderer — content byte-for-byte as edited). The lint's no-op / dead
 rule / overlap findings warn but never block — the loader accepts them.
-The connect acl is the planned second kind (docs/TODO.md) — the editor
-speaks the write gate until it lands.
 
 The dialog: the rule list is the menu (Enter opens the rule form, a
 adds a rule seeded to the whole-space deny, d drops, +/- nudge the rule
 down/up one slot, m jumps to a position, v flips allow/deny, g edits
-the gate desc, l shows the lint findings, s saves, q quits — warned
+the gate desc, t picks the fresh file's gate type (a saved file keeps
+its type), l shows the lint findings, s saves, q quits — warned
 while unsaved edits stand); the rule form walks
-type/range/desc (Enter edits, Esc/c keeps the edits and returns, s
+type/range|prefix/desc (Enter edits, Esc/c keeps the edits and returns, s
 saves and returns). ^C
 never leaves a traceback: it cancels the input line, backs out of the
 form, or shows the quit notice on the list — q stays the quit path,
@@ -44,7 +51,7 @@ for _p in (ROOT, os.path.join(ROOT, 'scripts'), os.path.join(ROOT, 'cache')):
     sys.path.insert(0, _p)
 
 from lint_acl import fmt_gate, label, lint_desc, lint_gate, lint_matcher   # noqa: E402
-from lib.config import _write_gate_object   # the loader's own gate validator  # noqa: E402
+from lib.config import _GATE_TYPES, _write_gate_object   # the loader's own gate validator  # noqa: E402
 
 try:
     import readline
@@ -71,14 +78,20 @@ def render_matcher(v):
     return str(v)
 
 
-def parse_matcher_text(text):
+def parse_matcher_text(text, kind):
     """The edit-line grammar -> (matcher, error). The bare word, one
-    START:COUNT, or a comma list of them."""
+    item, or a comma list of them — the register kind's items
+    START:COUNT (the canonical form the JSON list), the IP kind's items
+    an IP or IP/prefix (the canonical form one comma-joined string)."""
     t = text.strip()
     if t.lower() == 'any':
         return t.lower(), None
     items = [x.strip() for x in t.split(',')]
-    if len(items) > 1:
+    if len(items) > 1 or kind == 'prefix':
+        if not all(items):
+            return None, 'the matcher has an empty item in the comma list'
+        if kind == 'prefix':
+            return ','.join(items), None
         for x in items:
             try:
                 int(x.split(':')[0]), int(x.split(':')[1])
@@ -102,29 +115,63 @@ def split_matcher(rest):
 class Editor:
     """The file's working gate: the edits land in memory, save writes
     (loader-gated, canonical, stamp-guarded, parse-back guarded, the
-    file write SIGINT-blocked so ^C cannot truncate it). A path
-    that does not exist starts from the seeded whole-space deny — the
-    file lands (0600, the acl trust posture) on the first save; quitting
-    first leaves nothing behind."""
+    file write SIGINT-blocked so ^C cannot truncate it). The grammar key
+    (range/prefix) is sniffed from the rules — one grammar per gate, a
+    mixed file refuses to open. A path that does not exist starts from
+    the seeded whole-space deny, typed write-registers unless --type
+    says otherwise — the file lands (0600, the acl trust posture) on the
+    first save; quitting first leaves nothing behind. --type on a
+    typeless file adds the key (an edit, saved with s); a mismatch with
+    what the file already is refuses."""
 
-    def __init__(self, path):
+    def __init__(self, path, gate_type=None):
         self.path = path
         self.rel = label(path)
+        self._type_arg = gate_type
+        if gate_type is not None and gate_type not in _GATE_TYPES:
+            raise ValueError('unknown gate type %r (write-registers | ip-prefix)' % gate_type)
         self.fresh = not os.path.exists(path)
         if self.fresh:
-            self.gate = {'rules': [{'type': 'deny', 'range': 'any'}]}
+            self.kind = _GATE_TYPES[gate_type or 'write-registers']
+            self.gate = {'type': gate_type or 'write-registers',
+                         'rules': [{'type': 'deny', self.kind: 'any'}]}
         else:
             with open(path, encoding='utf-8') as f:
                 self.text = f.read()
             self.gate = json.loads(self.text)
             if not isinstance(self.gate, dict):
                 raise ValueError('%s: the root must be the gate object: {"desc": ..., '
-                                 '"rules": [...]}' % self.rel)
+                                 '"type": ..., "rules": [...]}' % self.rel)
             if 'acl' in self.gate:
                 raise ValueError('%s: the root IS the gate — an "acl" key is the full-profile '
                                  'shape (move the gate object up, or edit the profile with '
                                  'scripts/edit_options.py)' % self.rel)
+            declared = self.gate.get('type')
+            if declared is not None and declared not in _GATE_TYPES:
+                raise ValueError('%s: unknown gate type %r (write-registers | ip-prefix)'
+                                 % (self.rel, declared))
+            kind = None
+            for i, rule in enumerate(self.rules()):
+                has = [k for k in ('range', 'prefix') if k in rule] \
+                    if isinstance(rule, dict) else []
+                if len(has) > 1 or (kind and has and has[0] != kind):
+                    raise ValueError('%s: the rules mix "range" and "prefix" — one grammar '
+                                     'per gate (rule %d; range matches registers, prefix '
+                                     'matches IPs)' % (self.rel, i + 1))
+                if has:
+                    kind = has[0]
+            if declared is not None and kind and _GATE_TYPES[declared] != kind:
+                raise ValueError('%s: the gate type %s matches by "%s" — the rules match '
+                                 'by "%s"' % (self.rel, declared, _GATE_TYPES[declared], kind))
+            if gate_type is not None and declared is not None and gate_type != declared:
+                raise ValueError('%s: the file is the %s gate — --type %s refuses'
+                                 % (self.rel, declared, gate_type))
+            self.kind = _GATE_TYPES[declared] if declared else (kind or 'range')
         self.pristine = json.loads(json.dumps(self.gate))
+        if not self.fresh and self._type_arg is not None \
+                and self.gate.get('type') is None:
+            self.gate['type'] = self._type_arg   # the migration edit — lands with the save
+            self.kind = _GATE_TYPES[self._type_arg]
         self.rule = None
         self.stamp = self._stamp()
 
@@ -145,7 +192,7 @@ class Editor:
         return self.fresh or self.gate != self.pristine
 
     def _validate_matcher(self, m, where):
-        issues, _spans = lint_matcher(m, where)
+        issues, _spans = lint_matcher(m, where, self.kind)
         return issues
 
     def set_gate_desc(self, text):
@@ -173,20 +220,40 @@ class Editor:
         rules[n - 1]['type'] = verb
         return True, 'ok rule %d is now %s' % (n, verb)
 
-    def set_range(self, n, text):
+    def set_gate_type(self, gate_type):
+        """The GATE type (the schema kind) — a fresh file's choice: the
+        flip re-seeds the whole-space deny in the new grammar (the rules
+        added before the flip were edits to the OLD grammar's seed, and
+        a matcher does not convert across grammars). A saved file keeps
+        its type — --type on open migrates a typeless one, it never
+        re-types a typed one."""
+        if gate_type not in _GATE_TYPES:
+            return False, 'err the type must be write-registers or ip-prefix'
+        if not self.fresh:
+            return False, ('err the gate type is the saved file\'s — only a fresh file '
+                           'flips it (--type on open migrates a typeless one)')
+        if self.gate.get('type') == gate_type:
+            return False, 'the gate is already the %s type' % gate_type
+        key = _GATE_TYPES[gate_type]
+        self.gate = {'type': gate_type, 'rules': [{'type': 'deny', key: 'any'}]}
+        self.kind = key
+        return True, ('ok the gate type %s — the rules re-seeded to the whole-space deny'
+                      % gate_type)
+
+    def set_matcher(self, n, text):
         rules = self.rules()
         if not 1 <= n <= len(rules):
             return False, 'err no rule %d (%d rule(s))' % (n, len(rules))
-        m, err = parse_matcher_text(text)
+        m, err = parse_matcher_text(text, self.kind)
         if err:
             return False, 'err %s' % err
         bad = self._validate_matcher(m, 'rule %d' % n)
         if bad:
             return False, 'err %s' % bad[0]
-        if rules[n - 1].get('range') == m:
-            return False, 'rule %d already carries that range' % n
-        rules[n - 1]['range'] = m
-        return True, 'ok rule %d range %s' % (n, show_matcher(m))
+        if rules[n - 1].get(self.kind) == m:
+            return False, 'rule %d already carries that %s' % (n, self.kind)
+        rules[n - 1][self.kind] = m
+        return True, 'ok rule %d %s %s' % (n, self.kind, show_matcher(m))
 
     def set_desc(self, n, text):
         rules = self.rules()
@@ -208,14 +275,14 @@ class Editor:
     def add(self, verb, matcher_text, desc=None, before=None):
         if verb not in ('allow', 'deny'):
             return False, 'err the type must be allow or deny (got %r)' % verb
-        m, err = parse_matcher_text(matcher_text)
+        m, err = parse_matcher_text(matcher_text, self.kind)
         if err:
             return False, 'err %s' % err
         n = before if before is not None else len(self.rules()) + 1
         bad = self._validate_matcher(m, 'rule %d' % n)
         if bad:
             return False, 'err %s' % bad[0]
-        rule = {'type': verb, 'range': m}
+        rule = {'type': verb, self.kind: m}
         if desc:
             bad = lint_desc(desc, 'rule %d' % n)
             if bad:
@@ -232,9 +299,10 @@ class Editor:
         if len(rules) == 1:
             return False, ('err the last rule cannot drop — a gate that gates nothing is a '
                            'config error (spell the whole-space deny as [{"type": "deny", '
-                           '"range": "any"}])')
+                           '"%s": "any"}])' % self.kind)
         gone = rules.pop(n - 1)
-        return True, 'ok rule %d dropped (%s %s)' % (n, gone.get('type'), show_matcher(gone.get('range')))
+        return True, 'ok rule %d dropped (%s %s)' % (n, gone.get('type'),
+                                                     show_matcher(gone.get(self.kind)))
 
     def move(self, n, pos):
         rules = self.rules()
@@ -251,7 +319,9 @@ class Editor:
     def save(self):
         issues = self.issues()
         try:
-            _write_gate_object(self.gate, 'acl file %s' % self.rel)
+            _write_gate_object(self.gate, 'acl file %s' % self.rel,
+                               allow=(self.gate.get('type'),) if self.gate.get('type')
+                               else tuple(_GATE_TYPES))
         except SystemExit as e:
             return False, 'err the loader refuses the save: %s' % e
         new_text = fmt_gate(self.gate)
@@ -288,7 +358,7 @@ class Editor:
         return True, 'ok saved (%d rule(s))%s' % (len(self.rules()), note)
 
     def reload(self):
-        self.__init__(self.path)
+        self.__init__(self.path, self._type_arg)
         return True, 'ok back to the disk state (%d rule(s))' % len(self.rules())
 
 
@@ -299,23 +369,26 @@ def report(ed):
     print('# %s' % desc if desc else '# (no gate desc)')
     for i, r in enumerate(ed.rules()):
         print('  %2d  %-5s  %-34s  %s'
-              % (i + 1, r.get('type', '?'), show_matcher(r.get('range')), r.get('desc') or ''))
+              % (i + 1, r.get('type', '?'), show_matcher(r.get(ed.kind)), r.get('desc') or ''))
     print()
 
 
-HELP = ('show — the gate, one rule per line',
-        'add <allow|deny> <matcher> [desc...] — a rule appended',
-        'insert <n> <allow|deny> <matcher> [desc...] — a rule before rule n',
-        'type <n> <allow|deny> — flip a rule',
-        'range <n> <any|START:COUNT|a,b,c>',
-        'desc <n> <text...> (- clears)',
-        'gatedesc <text...> (- clears)',
-        'move <n> <pos> — the chain reads top to bottom, the last match decides',
-        'drop <n>',
-        'lint — the issue report (the warnings never block the save)',
-        'save — loader-gated write, the canonical layout',
-        'reload — discard the edits, back to the disk state',
-        'quit')
+def help_lines(kind):
+    matcher = 'any|START:COUNT|a,b,c' if kind == 'range' else 'any|ip|ip/bits|a,b,c'
+    return ('show — the gate, one rule per line',
+            'add <allow|deny> <matcher> [desc...] — a rule appended',
+            'insert <n> <allow|deny> <matcher> [desc...] — a rule before rule n',
+            'type <n> <allow|deny> — flip a rule',
+            '%s <n> <%s>' % (kind, matcher),
+            'desc <n> <text...> (- clears)',
+            'gatedesc <text...> (- clears)',
+            'gatetype <write-registers|ip-prefix> — the fresh file\'s gate (a saved file keeps its type)',
+            'move <n> <pos> — the chain reads top to bottom, the last match decides',
+            'drop <n>',
+            'lint — the issue report (the warnings never block the save)',
+            'save — loader-gated write, the canonical layout',
+            'reload — discard the edits, back to the disk state',
+            'quit')
 
 
 def line_mode(ed):
@@ -346,7 +419,7 @@ def line_mode(ed):
         cmd = parts[0].lower()
         rest = parts[1].strip() if len(parts) > 1 else ''
         if cmd == 'help' or line == '?':
-            for h in HELP:
+            for h in help_lines(ed.kind):
                 print('  %s' % h)
         elif cmd == 'show':
             report(ed)
@@ -375,7 +448,7 @@ def line_mode(ed):
             print(msg)
             if ok:
                 report(ed)
-        elif cmd in ('type', 'range', 'desc', 'move', 'drop'):
+        elif cmd in ('type', 'desc', 'move', 'drop') or cmd == ed.kind:
             words = rest.split(None, 1)
             try:
                 n = int(words[0])
@@ -385,11 +458,13 @@ def line_mode(ed):
             arg = words[1].strip() if len(words) > 1 else ''
             if cmd == 'type':
                 ok, msg = ed.set_type(n, arg.lower())
-            elif cmd == 'range':
+            elif cmd == ed.kind:
                 if not arg:
-                    print('err range <n> <any|START:COUNT|a,b,c>')
+                    what = 'any|START:COUNT|a,b,c' if ed.kind == 'range' \
+                        else 'any|ip|ip/bits|a,b,c'
+                    print('err %s <n> <%s>' % (ed.kind, what))
                     continue
-                ok, msg = ed.set_range(n, arg)
+                ok, msg = ed.set_matcher(n, arg)
             elif cmd == 'desc':
                 ok, msg = ed.set_desc(n, arg)
             elif cmd == 'move':
@@ -405,6 +480,9 @@ def line_mode(ed):
         elif cmd == 'gatedesc':
             ok, msg = ed.set_gate_desc(rest)
             print(msg)
+        elif cmd == 'gatetype':
+            ok, msg = ed.set_gate_type(rest.strip())
+            print(msg)
         elif cmd == 'save':
             ok, msg = ed.save()
             print(msg)
@@ -416,20 +494,22 @@ def line_mode(ed):
 
 
 class Completer:
-    """The line-mode TAB completion: the commands at the top level,
-    allow/deny after add/insert/type."""
+    """The line-mode TAB completion: the commands at the top level
+    (the grammar's word for the matcher command), allow/deny after
+    add/insert/type."""
 
-    CMDS = ('show', 'add', 'insert', 'type', 'range', 'desc', 'gatedesc', 'move',
-            'drop', 'lint', 'save', 'reload', 'help', 'quit')
+    CMDS = ('show', 'add', 'insert', 'type', 'range', 'desc', 'gatedesc', 'gatetype',
+            'move', 'drop', 'lint', 'save', 'reload', 'help', 'quit')
 
     def __init__(self, ed):
         self.ed = ed
+        self.cmds = tuple(ed.kind if c == 'range' else c for c in self.CMDS)
 
     def complete(self, text, state):
         buf = readline.get_line_buffer()
         words = buf.split()
         if not words or (len(words) == 1 and not buf.endswith(' ')):
-            pool = list(self.CMDS)
+            pool = list(self.cmds)
         elif words[0] in ('add', 'insert', 'type') and len(words) <= 2 and not buf.endswith(' '):
             pool = ['allow', 'deny']
         else:
@@ -442,7 +522,11 @@ def dialog(ed, screen):
     """The curses face: the rule list, the rule form, the input line."""
     import curses
 
-    FIELDS = ('type', 'range', 'desc')
+    def fields():
+        """The form's field rows — the matcher row speaks the CURRENT
+        grammar's key (the gate type can flip mid-session on a fresh
+        file; the label and the routing must follow)."""
+        return ('type', ed.kind, 'desc')
 
     def get_key(screen):
         """One key, with the ESC sequences decoded BY HAND — this box's
@@ -527,15 +611,16 @@ def dialog(ed, screen):
             rule_at[len(lines)] = i
             lines.append(('  %s%-3d %-5s %-34s %s'
                           % (edited_mark(i), i + 1, r.get('type', '?'),
-                             show_matcher(r.get('range')), r.get('desc') or ''), 0))
+                             show_matcher(r.get(ed.kind)), r.get('desc') or ''), 0))
         if not rules:
             lines.append(('  (no rules — a adds the first)', curses.A_DIM))
         screen.erase()
         note = ' — unsaved edits (s saves)' if ed.dirty() else ''
         lm, lm_dim = lint_msg()
         frame('pv-dash acl editor — %s — %d rule(s)%s (Enter edits, a adds, d drops, '
-              '+/- move, m to position, v flips, g gate desc, l lint, s save, q quit)'
-              % (ed.path, len(rules), note))
+              '+/- move, m to position, v flips, g gate desc, t gate type%s, l lint, '
+              's save, q quit)'
+              % (ed.path, len(rules), note, '' if ed.fresh else ' (saved)'))
         height = curses.LINES - 4
         top = fit(top, cursor, lines, height)
         for i in range(height):
@@ -561,14 +646,15 @@ def dialog(ed, screen):
               % (i + 1, state))
         pr = (ed.pristine.get('rules') or [])
         height = curses.LINES - 4
-        ftop = fit(ftop, fcursor, FIELDS, height)
-        for j, key in enumerate(FIELDS):
+        ftop = fit(ftop, fcursor, fields(), height)
+        for j, key in enumerate(fields()):
             mark = ''
             if i >= len(pr):
                 mark = '   [new]'
             elif rule.get(key) != pr[i].get(key):
                 mark = '   [edited]'
-            shown = render_matcher(rule.get('range', '')) if key == 'range' else (rule.get('desc') or '-')
+            shown = render_matcher(rule.get(ed.kind, '')) if key == ed.kind \
+                else (rule.get('desc') or '-')
             if key == 'type':
                 shown = rule.get('type', '-')
             put(2 + j, 0, '  *%-6s %s%s' % (key, shown, mark),
@@ -633,12 +719,39 @@ def dialog(ed, screen):
         screen.clrtoeol()
         return yes
 
+    def gate_type_menu():
+        """The GATE type pick (a fresh file only): write-registers |
+        ip-prefix from the menu, the arrows walk, Enter takes (the rules
+        re-seed to the new grammar's whole-space deny), Esc keeps."""
+        options = (('write-registers', 'the registers gate — the rules match by range'),
+                   ('ip-prefix', 'the IP gate — the rules match by prefix'))
+        bcursor = 0 if ed.gate.get('type') == 'write-registers' else 1
+        while True:
+            screen.erase()
+            frame('the gate type — Enter takes, Esc keeps the gate as it is')
+            for i, (word, what) in enumerate(options):
+                put(2 + i, 0, '  %-16s %s' % (word, what),
+                    curses.A_REVERSE if i == bcursor else 0)
+            status('')
+            screen.refresh()
+            k = get_key(screen)
+            if k in (curses.KEY_UP, curses.KEY_DOWN):
+                bcursor = 1 - bcursor
+            elif k in (10, 13, curses.KEY_ENTER):
+                _ok, msg = ed.set_gate_type(options[bcursor][0])
+                return msg
+            elif k == INTR:
+                return 'unchanged (^C)'
+            elif k == 27:
+                return 'unchanged (esc)'
+
     def verb_menu():
         """The type pick: allow|deny from the menu, the arrows walk, Enter
         takes, Esc keeps the field as it is."""
         n = ed.rule + 1
-        options = (('allow', 'the rule allows the range'),
-                   ('deny', 'the rule refuses the range'))
+        what = 'registers' if ed.kind == 'range' else 'addresses'
+        options = (('allow', 'the rule allows the %s' % what),
+                   ('deny', 'the rule refuses the %s' % what))
         bcursor = 0 if ed.rules()[ed.rule].get('type') == 'allow' else 1
         while True:
             screen.erase()
@@ -661,12 +774,12 @@ def dialog(ed, screen):
     def edit_field(key):
         n = ed.rule + 1
         rule = ed.rules()[ed.rule]
-        if key == 'range':
-            initial = render_matcher(rule.get('range', ''))
-            text = input_line('range %d: ' % n, initial)
+        if key == ed.kind:
+            initial = render_matcher(rule.get(key, ''))
+            text = input_line('%s %d: ' % (key, n), initial)
             if text is None:
                 return 'unchanged (esc)'
-            _ok, msg = ed.set_range(n, text)
+            _ok, msg = ed.set_matcher(n, text)
             return msg
         initial = rule.get('desc') or ''
         text = input_line('desc %d: ' % n, initial)
@@ -675,7 +788,8 @@ def dialog(ed, screen):
         _ok, msg = ed.set_desc(n, text.strip())
         return msg
 
-    cursor, top, msg = 0, 0, ('new file — the seeded deny-any gate, s saves' if ed.fresh else '')
+    cursor, top, msg = 0, 0, ('new file — the seeded %s gate (t flips the type), s saves'
+                              % ed.gate.get('type') if ed.fresh else '')
     fcursor, ftop = 0, 0
     while True:
         if ed.rule is None:
@@ -744,6 +858,8 @@ def dialog(ed, screen):
                 text = input_line('gate desc: ', ed.gate.get('desc') or '')
                 if text is not None:
                     ok, msg = ed.set_gate_desc(text.strip())
+            elif k in (ord('t'), ord('T')):
+                msg = gate_type_menu()
             elif k in (ord('l'), ord('L')):
                 issues = ed.issues()
                 msg = 'lint: clean' if not issues else ' | '.join(issues[:2]) + \
@@ -769,9 +885,9 @@ def dialog(ed, screen):
             msg = ''
             k = get_key(screen)
             if k in (curses.KEY_UP, curses.KEY_DOWN):
-                fcursor = max(0, min(len(FIELDS) - 1, fcursor + (1 if k == curses.KEY_DOWN else -1)))
+                fcursor = max(0, min(len(fields()) - 1, fcursor + (1 if k == curses.KEY_DOWN else -1)))
             elif k in (10, 13, curses.KEY_ENTER):
-                key = FIELDS[fcursor]
+                key = fields()[fcursor]
                 if key == 'type':
                     msg = verb_menu()
                 else:
@@ -807,15 +923,30 @@ def dialog_wrapper(ed):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if a != '--line']
-    forced_line = '--line' in sys.argv[1:]
-    if len(args) > 1 or (args and args[0] in ('-h', '--help')):
-        print('usage: edit_acl.py [--line] <acl-file>')
+    raw = sys.argv[1:]
+    forced_line = '--line' in raw
+    gate_type, args = None, []
+    i = 0
+    while i < len(raw):
+        a = raw[i]
+        if a == '--type':
+            i += 1
+            gate_type = raw[i] if i < len(raw) else ''
+        elif a.startswith('--type='):
+            gate_type = a.split('=', 1)[1]
+        elif a != '--line':
+            args.append(a)
+        i += 1
+    if gate_type == '' or (args and args[0] in ('-h', '--help')) or len(args) > 1:
+        print('usage: edit_acl.py [--type write-registers|ip-prefix] [--line] <acl-file>')
+        return 1
+    if gate_type is not None and gate_type not in _GATE_TYPES:
+        print('edit_acl.py: unknown gate type %r (write-registers | ip-prefix)' % gate_type)
         return 1
     path = args[0] if args else None
     if path is None:
         if forced_line or not sys.stdin.isatty():
-            print('usage: edit_acl.py [--line] <acl-file>')
+            print('usage: edit_acl.py [--type write-registers|ip-prefix] [--line] <acl-file>')
             return 1
         try:
             path = input('acl file: ').strip()
@@ -825,7 +956,7 @@ def main():
         if not path:
             return 1
     try:
-        ed = Editor(path)
+        ed = Editor(path, gate_type)
     except (OSError, ValueError) as e:
         print('edit_acl.py: %s' % e)
         return 1

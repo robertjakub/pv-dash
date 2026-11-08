@@ -1,31 +1,42 @@
 #!/usr/bin/env python3
-"""Lint and reformat the standalone write-acl files — the json a cache
---write-registers file:<path> points at (cache/examples/acl-write-registers.json is
-the shipped example; scripts/edit_acl.py edits one). A device profile's
+"""Lint and reformat the standalone acl files — the json a cache acl
+option's file:<path> points at (cache/examples/acl-write-registers.json is
+the shipped write example, acl-ip-prefix.json the shipped IP-kind one;
+scripts/edit_acl.py edits one). A device profile's
 embedded acl/write gate belongs to profiles/bin/profile-lint.py +
-profile-format.py. The connect acl is the planned second kind
-(docs/TODO.md) — the lint speaks the write gate until it lands.
+profile-format.py.
 
 The root of the file IS the gate object: an optional terse-ASCII "desc"
-and the ordered "rules" list — one {"type": "allow"|"deny", "range":
-matcher} object per rule (+ an optional "desc" each); a matcher is a
-"START:COUNT" range, a list of them, or the bare word "any". The chain
-is a whitelist: it reads top to bottom, the LAST matching rule decides,
-and a register no rule decides refuses (the default deny any).
+and the ordered "rules" list — one {"type": "allow"|"deny", matcher-key:
+matcher} object per rule (+ an optional "desc" each). THE MATCHER KEY IS
+THE KIND: "range" is the register kind (a "START:COUNT" range, a list of
+them, or the bare word "any"), "prefix" is the IP kind (an IP or IP/prefix,
+comma-separated, or "any"). The gate "type" names the schema —
+"write-registers" (range rules) or "ip-prefix" (prefix rules) — and must
+agree with the rules' key when spelled. ONE GRAMMAR PER GATE: the first
+matcher key pins
+the file, and a file whose rules mix "range" and "prefix" refuses. The
+chain is a whitelist: it reads top to bottom, the LAST matching rule
+decides, and a client/register no rule decides refuses (the default deny
+any).
 
 The lint: the loader's schema (cache/lib/config.py's _write_gate_object —
 the old spellings refuse as unknown keys, a gate that gates nothing is a
-config error, the whole-space deny is [{"type": "deny", "range": "any"}])
-plus what the loader cannot say: a matcher that decides a register twice,
-a rule that decides nothing (an empty list), and — the big one — a DEAD
-rule: every register it decides a later rule re-decides, so it never
-speaks (the last match wins). When the checks find nothing, the file is
-handed to the real loader as the final word.
+config error, the whole-space deny is [{"type": "deny", "range": "any"}]
+for registers, "prefix": "any" for IPs) plus what the loader cannot say:
+a matcher that decides a register/address twice, a rule that decides
+nothing (an empty list), and — the big one — a DEAD rule: everything it
+decides a later rule re-decides, so it never speaks (the last match
+wins). The register kind rides the decision bitmasks; the IP kind rides
+family-tagged address intervals (v4 and v6 share no number line; "any"
+is the '*' family both fall inside). When the checks find nothing, the
+file is handed to the real loader as the final word (both kinds allowed —
+the daemon's readers pin their own).
 
 The canonical layout, so hand styles stop diverging: two-space indent,
-the "desc" first, the rules one per line (keys type -> range -> desc,
-the unknown keys after), the matchers inline, the trailing newline. The
-content is untouched — descs, ranges and their spellings land
+the "desc" first, the rules one per line (keys type -> range/prefix ->
+desc, the unknown keys after), the matchers inline, the trailing newline.
+The content is untouched — descs, matchers and their spellings land
 byte-for-byte as parsed.
 
   python3 scripts/lint_acl.py                # the shipped example(s)
@@ -35,6 +46,7 @@ byte-for-byte as parsed.
 """
 import difflib
 import glob
+import ipaddress
 import json
 import os
 import sys
@@ -43,7 +55,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 for _p in (os.path.join(REPO, 'cache'), REPO):
     sys.path.insert(0, _p)
 
-from lib.config import load_write_gate_file   # noqa: E402
+from lib.config import _GATE_TYPES, load_write_gate_file   # noqa: E402
 from lib.statics import MAX_REGISTERS         # noqa: E402
 
 
@@ -67,9 +79,14 @@ def parse_range(t, where, issues):
     return (s, s + c)
 
 
-def lint_matcher(v, where):
-    """One rule matcher -> (issues, [(label, span)]): the spans the
-    matcher decides, for the overlap and dead-rule passes."""
+def lint_matcher(v, where, kind='range'):
+    """One rule matcher -> (issues, spans): the spans the matcher
+    decides, for the overlap and dead-rule passes. The register kind's
+    span is the (start, end) half-open pair; the IP kind's is the
+    (family, lo, hi) inclusive triple — family-tagged, for v4 and v6
+    share no number line."""
+    if kind == 'prefix':
+        return lint_prefix_matcher(v, where)
     issues = []
     out = []
     if isinstance(v, str):
@@ -94,45 +111,174 @@ def lint_matcher(v, where):
     return (['%s must be a range ("START:COUNT"), a list of ranges, or "any"' % where], out)
 
 
+def lint_prefix_matcher(v, where):
+    """The IP-kind matcher -> (issues, spans): the bare word 'any' (the
+    '*' family — every address), or a comma-separated string of IP
+    addresses / IP prefixes, strict CIDR (host bits set refuse, one
+    family per matcher); the spans the family-tagged inclusive address
+    intervals the matcher decides."""
+    issues = []
+    if not isinstance(v, str):
+        return ['%s must be "any" or a comma-separated IP/IP-prefix string' % where], []
+    t = v.strip()
+    if t.lower() == 'any':
+        return issues, [(t, ('*', 0, (1 << 128) - 1))]
+    spans = []
+    fam = None
+    first = None
+    for x in [s.strip() for s in t.split(',')]:
+        if not x:
+            issues.append('%s: empty item in the comma-separated prefix list' % where)
+            continue
+        try:
+            net = ipaddress.ip_network(x, strict=True)
+        except ValueError:
+            try:
+                wide = ipaddress.ip_network(x, strict=False)
+                issues.append('%s: %r has host bits set — spell the network %s'
+                              % (where, x, wide.with_prefixlen))
+            except ValueError:
+                issues.append('%s: %r must be an IP or IP/prefix' % (where, x))
+            continue
+        if fam is None:
+            fam = net.version
+            first = x
+        elif net.version != fam:
+            issues.append('%s: the matcher mixes IPv4 and IPv6 (%s and %s)' % (where, first, x))
+            continue
+        lo = int(net.network_address)
+        spans.append((x, (str(net.version), lo, lo + net.num_addresses - 1)))
+    for j in range(len(spans)):
+        for k in range(j + 1, len(spans)):
+            (la, (_, s0, e0)), (lb, (_, s1, e1)) = spans[j], spans[k]
+            if s0 <= e1 and s1 <= e0:
+                issues.append('%s: the matcher decides addresses twice (%s and %s overlap)'
+                              % (where, la, lb))
+    return issues, spans
+
+
+def _merge_intervals(spans):
+    """[(family, lo, hi)] -> the disjoint merged union; touching
+    intervals join, families never mix ('*' merges with '*' only)."""
+    out = []
+    for fam, lo, hi in sorted(spans, key=lambda s: (s[0], s[1], s[2])):
+        if out and out[-1][0] == fam and lo <= out[-1][2] + 1:
+            out[-1] = (fam, out[-1][1], max(out[-1][2], hi))
+        else:
+            out.append((fam, lo, hi))
+    return out
+
+
+def _prefix_dead(masks, base):
+    """The IP kind's dead-rule pass: a rule is dead when every address
+    interval it decides is re-decided by the union of the LATER rules'
+    (the last match wins). An 'any' rule is dead only when the later
+    union covers both families whole."""
+    def covered(fam, lo, hi, union):
+        if fam == '*':
+            return (covered('4', 0, (1 << 32) - 1, union)
+                    and covered('6', 0, (1 << 128) - 1, union))
+        return any((lf == fam or lf == '*') and llo <= lo and hi <= lhi
+                   for lf, llo, lhi in union)
+    issues = []
+    later = []
+    for i in range(len(masks) - 1, -1, -1):
+        spans = masks[i]
+        if spans:
+            if all(covered(fam, lo, hi, later) for _l, (fam, lo, hi) in spans):
+                issues.append('%s rule %d: the rule is dead — every address it decides a later '
+                              'rule re-decides (the last match wins)' % (base, i + 1))
+            later = _merge_intervals(later + [s for _l, s in spans])
+    return issues
+
+
 def lint_gate(gate, base):
-    """The gate object -> the issue list; the no-op and dead-rule passes
-    ride the per-rule decision masks (a rule is dead when the union of
-    the LATER rules' masks covers its own — the last match wins)."""
+    """The gate object -> the issue list. The matcher key pins the kind:
+    "range" the registers, "prefix" the addresses — a file mixing the
+    two keys is the finding (one kind per gate). The no-op and dead-rule
+    passes ride the per-rule decisions (a rule is dead when the union of
+    the LATER rules' decisions covers its own — the last match wins):
+    the register kind as decision bitmasks, the IP kind as merged
+    family-tagged address intervals."""
     issues = []
     if not isinstance(gate, dict):
-        return issues + ['%s must be the gate object: {"desc": ..., "rules": '
-                         '[{"type": "allow"|"deny", "range": "START:COUNT"}]}' % base]
-    unknown = sorted(k for k in gate if k not in ('desc', 'rules'))
+        return issues + ['%s must be the gate object: {"desc": ..., "type": ..., "rules": '
+                         '[{"type": "allow"|"deny", "range"|"prefix": ...}]}' % base]
+    unknown = sorted(k for k in gate if k not in ('desc', 'type', 'rules'))
     if unknown:
-        issues.append('%s: unknown key(s) %s ("desc" and the "rules" list — one '
-                      '{"type": "allow"|"deny", "range": ...} object per rule)'
-                      % (base, ', '.join(unknown)))
+        issues.append('%s: unknown key(s) %s ("desc", the optional gate "type" and the '
+                      '"rules" list — one {"type": "allow"|"deny", "range"|"prefix": ...} '
+                      'object per rule)' % (base, ', '.join(unknown)))
+    gate_type = gate.get('type')
+    if gate_type is not None and gate_type not in _GATE_TYPES:
+        issues.append('%s: unknown gate "type" %r (write-registers | ip-prefix)'
+                      % (base, gate_type))
+        gate_type = None
     issues += lint_desc(gate.get('desc'), base)
     rules = gate.get('rules')
     if not isinstance(rules, list) or not rules:
         return issues + ['%s: the "rules" list is missing or empty (a gate that gates nothing '
                          'is a config error — spell the whole-space deny as '
-                         '[{"type": "deny", "range": "any"}])' % base]
+                         '[{"type": "deny", "range": "any"}], or "prefix": "any" for the '
+                         'IP kind)' % base]
+    kind = None
+    for i, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            continue
+        has = [k for k in ('range', 'prefix') if k in rule]
+        if len(has) > 1:
+            issues.append('%s rule %d: the rule carries both "range" and "prefix" — one kind '
+                          'per gate (range matches registers, prefix matches IPs)'
+                          % (base, i + 1))
+        elif has and kind and has[0] != kind:
+            issues.append('%s: the rules mix "range" and "prefix" — one kind per gate '
+                          '(range matches registers, prefix matches IPs)' % base)
+        elif has:
+            kind = has[0]
+    if gate_type in _GATE_TYPES:
+        want = _GATE_TYPES[gate_type]
+        if kind and want != kind:
+            issues.append('%s: the gate "type" %s matches by "%s" — the rules match by "%s"'
+                          % (base, gate_type, want, kind))
+        elif not kind:
+            kind = want   # a typed gate: the rules must match by the type's key
+    elif not gate_type and kind == 'prefix':
+        issues.append('%s: the gate matches by "prefix" and carries no "type" — spell '
+                      '"type": "ip-prefix"' % base)
     masks = []
     for i, rule in enumerate(rules):
         where = '%s rule %d' % (base, i + 1)
         if not isinstance(rule, dict) or not rule:
-            issues.append('%s must be an object with a "type" (allow/deny) and a "range"' % where)
+            issues.append('%s must be an object with a "type" (allow/deny) and a '
+                          '"range" or "prefix"' % where)
             masks.append(None)
             continue
-        unknown = sorted(k for k in rule if k not in ('type', 'range', 'desc'))
+        unknown = sorted(k for k in rule if k not in ('type', 'range', 'prefix', 'desc'))
         if unknown:
-            issues.append('%s: unknown key(s) %s (type/range/desc)' % (where, ', '.join(unknown)))
+            issues.append('%s: unknown key(s) %s (type/range-or-prefix/desc)'
+                          % (where, ', '.join(unknown)))
         verb = rule.get('type')
         if verb not in ('allow', 'deny'):
             issues.append('%s: "type" must be allow or deny, got %r' % (where, verb))
-        if 'range' not in rule:
-            issues.append('%s: the rule needs a "range"' % where)
+        has = [k for k in ('range', 'prefix') if k in rule]
+        if len(has) > 1:   # the both-keys finding already fired — no grammar to run
+            masks.append(None)
+            continue
+        key = has[0] if has else None
+        if key is None:
+            issues.append('%s: the rule needs a %s'
+                          % (where, '"prefix"' if kind == 'prefix' else '"range"'))
             masks.append(None)
             continue
         issues += lint_desc(rule.get('desc'), where)
-        m_issues, spans = lint_matcher(rule['range'], where)
+        m_issues, spans = lint_matcher(rule[key], where, key)
         issues += m_issues
+        if kind and key != kind:   # the mixed-in rule: the scan's finding covers it
+            masks.append(None)
+            continue
+        if key == 'prefix':   # the overlap pass ran in the matcher lint
+            masks.append(None if m_issues else spans)
+            continue
         for j in range(len(spans)):
             for k in range(j + 1, len(spans)):
                 (la, (s0, e0)), (lb, (s1, e1)) = spans[j], spans[k]
@@ -146,18 +292,21 @@ def lint_gate(gate, base):
         for _label, (s, e) in spans:
             mask |= ((1 << (e - s)) - 1) << s
         masks.append(mask)
-    for i, m in enumerate(masks):
-        if m == 0:
-            issues.append('%s rule %d: the rule is a no-op — an empty list decides '
-                          'nothing (drop it, or spell the whole-space deny as "any")'
-                          % (base, i + 1))
-    later = 0
-    for i in range(len(masks) - 1, -1, -1):
-        m = masks[i]
-        if m and m & later == m:
-            issues.append('%s rule %d: the rule is dead — every register it decides a later '
-                          'rule re-decides (the last match wins)' % (base, i + 1))
-        later |= m or 0
+    if kind != 'prefix':
+        for i, m in enumerate(masks):
+            if m == 0:
+                issues.append('%s rule %d: the rule is a no-op — an empty list decides '
+                              'nothing (drop it, or spell the whole-space deny as "any")'
+                              % (base, i + 1))
+        later = 0
+        for i in range(len(masks) - 1, -1, -1):
+            m = masks[i]
+            if m and m & later == m:
+                issues.append('%s rule %d: the rule is dead — every register it decides a later '
+                              'rule re-decides (the last match wins)' % (base, i + 1))
+            later |= m or 0
+    else:
+        issues += _prefix_dead(masks, base)
     return issues
 
 
@@ -183,8 +332,8 @@ def lint_file(path):
         return 0, ['%s: not valid JSON: %s' % (base, e)], None, None
     issues = []
     if not isinstance(data, dict):
-        return 0, ['%s: the root must be the gate object: {"desc": ..., "rules": [...]}'
-                   % base], text, None
+        return 0, ['%s: the root must be the gate object: {"desc": ..., "type": ..., '
+                   '"rules": [...]}' % base], text, None
     if 'acl' in data:
         issues.append('%s: the root IS the gate — an "acl" key is the full-profile shape and '
                       'refuses (move the gate object up, or lint the profile with '
@@ -194,7 +343,7 @@ def lint_file(path):
     issues += lint_gate(data, base)
     if not issues:
         try:
-            load_write_gate_file(path, base)
+            load_write_gate_file(path, base, allow=tuple(_GATE_TYPES))
         except SystemExit as e:
             issues.append('%s: the loader refuses: %s' % (base, e))
     return n_rules, issues, text, fmt_gate(data)
@@ -202,16 +351,17 @@ def lint_file(path):
 
 def fmt_rule(rule):
     """One rule on one line, keys in the family order, extras after."""
-    keys = [k for k in ('type', 'range', 'desc') if k in rule] \
-        + [k for k in rule if k not in ('type', 'range', 'desc')]
+    keys = [k for k in ('type', 'range', 'prefix', 'desc') if k in rule] \
+        + [k for k in rule if k not in ('type', 'range', 'prefix', 'desc')]
     return json.dumps({k: rule[k] for k in keys})
 
 
 def fmt_gate(gate):
-    """The canonical file: the desc first, then the rule list one rule
-    per line, the unknown keys after — two-space indent, trailing \\n."""
-    keys = [k for k in ('desc', 'rules') if k in gate] \
-        + [k for k in gate if k not in ('desc', 'rules')]
+    """The canonical file: the desc, the gate type, then the rule list
+    one rule per line, the unknown keys after — two-space indent,
+    trailing \\n."""
+    keys = [k for k in ('desc', 'type', 'rules') if k in gate] \
+        + [k for k in gate if k not in ('desc', 'type', 'rules')]
     rows = []
     for k in keys:
         if k == 'rules' and isinstance(gate['rules'], list) and gate['rules']:
@@ -228,10 +378,10 @@ def main():
     write = not check and not diff
     paths = [a for a in args if not a.startswith('--')]
     if not paths:
-        paths = sorted(glob.glob(os.path.join(REPO, 'cache', '**', 'write-acl.json'),
+        paths = sorted(glob.glob(os.path.join(REPO, 'cache', '**', 'acl-*.json'),
                                  recursive=True))
         if not paths:
-            print('no write-acl file under cache/ — pass the path(s)')
+            print('no acl-*.json file under cache/ — pass the path(s)')
             return 1
     bad = False
     for path in paths:

@@ -1305,7 +1305,11 @@ try:
     r = ctl_cmd('unset dump with-cache', 15530)
     check('dump with-cache: unset restores off', r.startswith('ok dump/with-cache=off'), r[:90])
     r = ctl_cmd('set dump restore-on-start on', 15530)
-    check('dump restore-on-start: set answers on', r.startswith('ok dump/restore-on-start=on'), r[:90])
+    check('dump restore-on-start: the set answers the restart note (the value records pending)',
+          r.startswith('note restart required (startup-only knob)'), r[:90])
+    r = ctl_cmd('show dump restore-on-start', 15530)
+    check('dump restore-on-start: show renders the recorded pending value',
+          r.startswith('ok dump/restore-on-start=on'), r[:90])
     ctl_cmd('unset dump restore-on-start', 15530)
     r = ctl_cmd('unset dump/path', 15530)
     check('dump path: unset restores off', r.startswith('ok dump/path=off'), r[:90])

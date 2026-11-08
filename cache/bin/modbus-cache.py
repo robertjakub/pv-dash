@@ -203,6 +203,8 @@ def main():
         elif name == 'modbus/upstream':
             fold_host, fold_port = parse_upstream(pending, label='modbus/upstream')
             cfg['upstream'], cfg['host'], cfg['port'] = '%s:%d' % (fold_host, fold_port), fold_host, fold_port
+        elif name == 'dump/restore-on-start':
+            cfg['restore_on_start'] = str(pending).strip() in ('on', 'true', '1', 'yes')
         logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
 
     listen_host, listen_port = parse_listen(cfg['listen'])

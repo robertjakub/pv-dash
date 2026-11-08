@@ -335,6 +335,11 @@ class ControlServer(_ControlServer):
                         probe.close()
                 self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
+            if key == 'dump/restore-on-start':
+                if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
+                    raise ValueError('dump/restore-on-start must be on or off')
+                self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
+                return self.defaults[key]
             raise ValueError('unknown setting %s' % key)
 
         if key == 'modbus/interval':
@@ -648,15 +653,6 @@ class ControlServer(_ControlServer):
                 raise ValueError('dump/with-cache must be on or off')
             p.dump_with_cache = on
             return 'on' if on else 'off'
-        if key == 'dump/restore-on-start':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('dump/restore-on-start must be on or off')
-            p.restore_on_start = on   # prospective: the START behaviour this session already chose stands
-            return 'on' if on else 'off'
         if key == 'local-time':
             if val in ('on', 'true', '1', 'yes'):
                 on = True
@@ -892,8 +888,6 @@ class ControlServer(_ControlServer):
             return p.dump_path or 'off'
         if key == 'dump/with-cache':
             return 'on' if p.dump_with_cache else 'off'
-        if key == 'dump/restore-on-start':
-            return 'on' if getattr(p, 'restore_on_start', False) else 'off'
         if key == 'requests-audit':
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
         if key == 'dump-interval':

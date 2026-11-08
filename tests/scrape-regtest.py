@@ -2145,6 +2145,30 @@ try:
     check('scraper control: a TCP control port without a token refuses to start (F5)',
           r.returncode == 1 and 'TCP control port' in r.stderr and 'Traceback' not in r.stderr,
           r.stderr[-160:])
+    # the live rebind (`set control port`): the listener swaps by identity,
+    # the old port closes, unset restores the configured target
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
+                        'set', 'control', 'port', '15603'], capture_output=True, text=True, timeout=15)
+    check('scraper control: the control rebinds live', r.stdout.startswith('ok control/port=127.0.0.1:15603'),
+          repr(r.stdout[:90]))
+    old_gone = False
+    try:
+        socket.create_connection(('127.0.0.1', 15597), timeout=1).close()
+    except OSError:
+        old_gone = True
+    check('scraper control: the old port is closed', old_gone)
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15603', '--control-token', STOK,
+                        'show', 'version'], capture_output=True, text=True, timeout=15)
+    check('scraper control: the new port speaks', r.returncode == 0 and r.stdout.startswith('ok modbus-scraper'),
+          repr(r.stdout[:60]) + repr(r.stderr[-80:]))
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15603', '--control-token', STOK,
+                        'unset', 'control', 'port'], capture_output=True, text=True, timeout=15)
+    check('scraper control: unset restores the configured target',
+          r.stdout.startswith('ok control/port=127.0.0.1:15597'), repr(r.stdout[:90]))
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
+                        'show', 'version'], capture_output=True, text=True, timeout=15)
+    check('scraper control: the restored target speaks', r.returncode == 0 and r.stdout.startswith('ok modbus-scraper'),
+          repr(r.stdout[:60]) + repr(r.stderr[-80:]))
     # the group-accessible unix socket (--control-socket-group): 0660,
     # and the live set re-modes it
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
@@ -2164,6 +2188,10 @@ try:
     check('scraper control: set control socket-group off re-modes the live socket 0600',
           r.stdout.startswith('ok control/socket-group=off') and os.stat(gsock).st_mode & 0o777 == 0o600,
           repr(r.stdout[:120]) + ' ' + oct(os.stat(gsock).st_mode))
+    r = subprocess.run([sys.executable, CTLB, 'set', 'control', 'port', '15603'],
+                       capture_output=True, text=True, timeout=15, env={**os.environ, 'CTL': gsock})
+    check('scraper control: a tokenless TCP rebind refuses on the live wire (F5)',
+          r.stdout.startswith('% error: control/port cannot serve TCP without a token'), repr(r.stdout[:120]))
     # 7b. the suite auth: an authed fake + an authed scraper — the good key
     #     polls, the wrong key fails the connector (ERR), the live `set`
     #     drops the session; then a plain fake under an authed scraper

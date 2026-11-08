@@ -2,22 +2,33 @@
 
 This is the reference for the ACL support across the family: what the rule
 chain says, where it is enforced, and which surfaces speak it. The story
-has two planes. The **IP plane** decides who may reach a listener at all —
-the Modbus listeners' `acl/connect` (and the cache's `acl/write` for the
-write frames), the cache's and the scraper's `metrics/acl` for the
-/metrics expositions. The
-**register plane** decides which registers a forwarded write may
-touch — the `write-registers` knob and the device profiles' embedded
-`acl`/`write` gate. Both planes speak ONE gate-object schema with TWO
-matcher kinds (registers, IP prefixes), one loader validates both, and the
-standalone acl file is the same object whether a knob points at it with
-`file:<path>` or a profile carries it embedded.
+has two planes. The **IP plane** decides who may reach a listener — the
+Modbus listeners' `acl/connect`, the /metrics expositions' `metrics/acl`
+(cache and scraper), and the cache's `acl/write` for the write frames
+already inside. The **register plane** decides which registers a forwarded
+write may touch — the `write-registers` knob and the device profiles'
+embedded `acl`/`write` gate. Both planes speak ONE gate-object schema with
+TWO matcher kinds (registers, IP prefixes); one loader validates both, and
+the standalone acl file is the same object whether a knob points at it
+with `file:<path>` or a profile carries it embedded.
 
-The control-plane auth is NOT an ACL: the tokens, the RBAC ops role and the
-`trust-uids` list decide who may drive the control socket, and the suite
-auth (`modbus/auth`) is a wire-level proof between Modbus peers. Those
-stories live in docs/AUDIT.md and docs/MODBUS.md; the Related section
-below maps the boundary.
+The control-plane auth is NOT an ACL: the tokens, the RBAC ops role and
+the `trust-uids` list decide who may drive the control socket, and the
+suite auth (`modbus/auth`) is a wire-level proof between Modbus peers.
+Those stories live in docs/AUDIT.md and docs/MODBUS.md; the Related
+section below maps the boundary.
+
+## The surfaces (the family at a glance)
+
+| tool | knob | kind | default | the inline grammar | enforced |
+|---|---|---|---|---|---|
+| modbus-cache | `acl/connect` | IP | `any` | `any\|none\|IP,...\|file:` | accept on the Modbus listen port |
+| modbus-cache | `acl/write` | IP | `none` | `any\|none\|IP,...\|file:` | the write-frame forward |
+| modbus-cache | `metrics/acl` | IP | `any` | `any\|none\|IP,...\|file:` | accept on the /metrics port |
+| modbus-cache | `write-registers` | register | `none` | `START:COUNT,...\|any\|none\|profile\|file:` | the register gate on forwarded writes |
+| modbus-fake-inverter | `connect-acl` | IP | `any` | `any\|none\|IP,...` (no `file:`) | accept on the Modbus listen port |
+| modbus-scraper | `metrics/acl` | IP | `any` | `any\|none\|IP,...\|file:` | accept on the /metrics port |
+| dashboard | — | — | — | — | no ACL surface (token + bind posture, docs/AUDIT.md F6) |
 
 ## The rule chain (the one semantics)
 
@@ -35,29 +46,42 @@ in its matcher). THE MATCHER KEY IS THE GRAMMAR:
 The chain is a whitelist, said out loud: it reads top to bottom, **the last
 matching rule decides**, and a register or client no rule decides refuses
 (the default deny any). `any` is the whole space — every register for the
-register kind, every address for the IP kind (both address families; the
-table shows spell it `0.0.0.0/0`).
+register kind, every address of either family for the IP kind (the table
+shows spell it `0.0.0.0/0`).
 
 The gate `type` names the schema, not the daemon surface, and must agree
 with the rules' key when spelled: a typeless register gate reads as
 `write-registers` (the legacy shape — every existing profile and file keeps
 working), a typeless prefix gate refuses (say the type), and a gate whose
 rules mix `range` and `prefix` refuses (one grammar per gate). One loader
-validates the object — `common/config.py`'s `_write_gate_object`, one gate
-validator for the family — and
-each consumer pins the kind it takes (`allow=('write-registers',)` or
-`allow=('ip-prefix',)`): a file of the wrong kind is a clean, named refusal,
-not a mis-compiled gate.
+validates the object — `_write_gate_object` in `common/config.py`, one
+gate validator for the family — and each consumer pins the kind it takes
+(`allow=('write-registers',)` or `allow=('ip-prefix',)`): a file of the
+wrong kind is a clean, named refusal, not a mis-compiled gate.
+
+The listener gates are **accept-time checks that run ahead of the
+connection caps** (the ACL first, then the caps): an off-ACL peer is
+closed without a reply — nothing was parsed to answer — and never counts
+against a cap; a cap refusal is only ever answered to a peer the ACL
+admitted. The forward gates (`acl/write`, `write-registers`) are
+per-frame checks on the already-accepted connection and do not touch the
+caps at all.
+
+The IP matchers speak both address families — the strict-CIDR validation
+takes v4 and v6 spellings, `any` matches both. The shipped listeners are
+IPv4 today (every listening socket is `AF_INET`); the v6 listening
+surface and its v4-mapped-peer normalization are sketched in
+docs/TODO.md's security section.
 
 ## The standalone acl file
 
-`file:<path>` on a consuming knob points at a file whose root object IS the
-gate (the same object a profile carries under `acl`/`write`). The file is
-read at start and on every `set`/`unset`:
+`file:<path>` on a consuming knob points at a file whose root object IS
+the gate (the same object a profile carries under `acl`/`write`). The
+file is read at start and on every `set`/`unset`:
 
-- a missing or bad file **refuses the start** and answers `err` on the wire
-  **with the old gate standing** — a broken edit never widens a running
-  daemon;
+- a missing or bad file **refuses the start** and answers `err` on the
+  wire **with the old gate standing** — a broken edit never widens a
+  running daemon;
 - the `file:<path>` spelling is the re-appliable form — it round-trips
   through `unset`, the state dumps and `show config`;
 - a **group/world-readable acl file warns** (the gate is config trust any
@@ -76,27 +100,27 @@ register policy: the clean-slate deny, the allows, the deny carves, the
 re-opens) and the ip-prefix example — `cache/examples/acl-ip-prefix.json`
 for the cache's connect policy, `scraper/examples/acl-ip-prefix.json` for
 the scraper's (the same shape, each tool's tree self-contained). The
-**JSON Schemas** ship beside them (`acl-write-registers.schema.json` under
-`cache/schema/`; `acl-ip-prefix.schema.json` under both tools' `schema/`,
-draft 2020-12) — schema-valid can still be loader-refused (the strict-CIDR
-host-bit spellings, the range bounds), so the loader stays the strict
-word; wire them into an editor by `"$schema"` pattern-matching for live
-feedback while editing.
+**JSON Schemas** ship beside them (`cache/schema/` and
+`scraper/schema/`, draft 2020-12) — schema-valid can still be
+loader-refused (the strict-CIDR host-bit spellings, the range bounds), so
+the loader stays the strict word; wire them into an editor by `$schema`
+pattern-matching for live feedback while editing.
 
 ## modbus-cache — the full story
 
 The cache consumes both planes, both matcher kinds, both spellings
-(embedded and file):
+(embedded and file) — four gates on one forwarded write:
 
-| knob | the gate | the check |
-|---|---|---|
-| `acl/connect` | the IP kind | who may open the Modbus connection at all — the accept check on the listen port (`connection rejected: … not on the connect ACL`) |
-| `acl/write` | the IP kind | whose write frames forward — the client half of the write path (refused 86/1, `WRITE-REFUSED` audited, the connection stays up) |
-| `metrics/acl` | the IP kind | who may reach the /metrics exposition — the accept check on the metrics port (`connection rejected: … not on the metrics ACL`, closed without a reply) |
-| `write-registers` | the register kind | which registers a forwarded write may touch — the register half (the profile's `acl`/`write` gate, or the standalone file, or an inline `START:COUNT` list) |
+1. the frame parses;
+2. `--allow-write` is on;
+3. the client is on the `acl/write` IP gate (refused 86/1, the
+   `WRITE-REFUSED` audit event, the connection stays up);
+4. every touched register is inside the `write-registers` allow-list.
 
-The three IP knobs speak one value grammar: `any`, `none`, a
-comma-separated
+`acl/write` and `write-registers` default to `none` — enabling
+`--allow-write` alone still refuses every write until both are opened
+deliberately. The three IP knobs (`acl/connect`, `acl/write`,
+`metrics/acl`) speak one value grammar: `any`, `none`, a comma-separated
 `IP,IP/prefix, ...` list, or `file:<path>` (the ip-prefix acl file — a
 typeless or wrong-kind file refuses). The inline forms are the compact
 spellings of three fixed chains, and the table shows render exactly that,
@@ -114,36 +138,33 @@ grammar stays the three fixed chains. `show acl connect table` and
 `show acl write table` render either form as its chain — a file gate
 renders its own rules behind the `% ` desc header, the comments aligned —
 and `show write registers profile` does the same for the register gate.
-A `set acl connect table` (the show word typed into the set verb) answers
-the pointer to the report — `show metrics acl table` is the third report,
-same renderer.
+`show metrics acl table` is the third report, same renderer. A `set acl
+connect table` (the show word typed into the set verb) answers the
+pointer to the report.
 
-A forwarded write passes **four gates**: the frame parses, `--allow-write`
-is on, the client is on the write ACL, and every touched register is inside
-the write-registers allow-list. `acl/write` and `write-registers` default
-to `none` — enabling `--allow-write` alone still refuses every write until
-both are opened deliberately. The IP ACLs re-resolve on SIGHUP like every
-setting; the file gates resolve **before** the state swaps, so a bad file
-keeps the previous settings wholesale.
+The IP ACLs re-resolve on SIGHUP like every setting; the file gates
+resolve **before** the state swaps, so a bad file keeps the previous
+settings wholesale.
 
-The forms: `--connect-acl` / `--write-acl` / `--write-registers` / `--metrics-acl`
-(env `CONNECT_ACL` / `WRITE_ACL` / `WRITE_REGISTERS` / `METRICS_ACL`, the
-config-file spellings
-`connect_acl` / `write_acl` / `write_registers` / `metrics_acl`, NixOS
-`connectAcl` / `writeAcl` / `writeRegisters` / `metricsAcl`), live via
-`set acl connect|acl/write|metrics acl|write registers <value>`.
+The forms: `--connect-acl` / `--write-acl` / `--write-registers` /
+`--metrics-acl` (env `CONNECT_ACL` / `WRITE_ACL` / `WRITE_REGISTERS` /
+`METRICS_ACL`, the config-file spellings `connect_acl` / `write_acl` /
+`write_registers` / `metrics_acl`, NixOS `connectAcl` / `writeAcl` /
+`writeRegisters` / `metricsAcl` — one str option each, `file:` rides
+inline), live via `set acl connect|acl/write|metrics acl|write registers
+<value>`.
 
 ## modbus-fake-inverter — the mirror, system grammar only
 
 The fake's Modbus listener speaks the **connect ACL only**, mirrored from
-the cache: `--connect-acl` (env `CONNECT_ACL`, live
-`set connect-acl <value>`) takes `any` (the default — the trusted-LAN
-posture), `none`, or the comma-separated IP/CIDR list, evaluated with the
-same whitelist semantics (the ip must land in one network). The refusals
-log `connection rejected: … not on the connect ACL`, and the fake's ctl/cli
-carry the knob like the cache's. The fake takes NO `file:` gates and no
-chains — a test instrument on a trusted LAN keeps its soft-edge posture
-(F11 in docs/AUDIT.md); its write gate is `--allow-write` alone (off = every
+the cache: `--connect-acl` (env `CONNECT_ACL`, live `set connect-acl
+<value>`) takes `any` (the default — the trusted-LAN posture), `none`, or
+the comma-separated IP/CIDR list, evaluated with the same whitelist
+semantics (the ip must land in one network). The refusals log `connection
+rejected: … not on the connect ACL`, and the fake's ctl/cli carry the
+knob like the cache's. The fake takes NO `file:` gates and no chains — a
+test instrument on a trusted LAN keeps its soft-edge posture (F11 in
+docs/AUDIT.md); its write gate is `--allow-write` alone (off = every
 Modbus write refused), with no IP write-acl and no register allow-list.
 
 ## modbus-scraper — the metrics listener, IP kind
@@ -151,28 +172,22 @@ Modbus write refused), with no IP write-acl and no register allow-list.
 The scraper's exposure is the /metrics exposition, and it takes the
 connect-ACL half of the story — one IP-kind gate on the HTTP listener
 doing what the cache's `acl/connect` does on the Modbus listener (the
-cache's own /metrics endpoint speaks the same `metrics/acl` gate):
-
-| knob | the gate | the check |
-|---|---|---|
-| `metrics/acl` | the IP kind | who may reach the /metrics exposition — the accept check on the metrics port (`connection rejected: … not on the metrics ACL`, closed without a reply) |
+cache's own /metrics endpoint speaks the same `metrics/acl` gate). The
+check is the shared accept ladder: ahead of the connection caps, an
+off-ACL client closed without a reply (`connection rejected: … not on the
+metrics ACL`).
 
 `--metrics-acl` (env `METRICS_ACL`, live `set metrics acl <value>` /
-`unset metrics acl`, config `metrics_acl`, NixOS
-`metricsAcl`/`metricsAclFile`) takes the same one value grammar as the
-cache's IP knobs — `any` (the default), `none`, a comma-separated
-`IP,IP/prefix, ...` list, or `file:<path>` (the ip-prefix acl file). The
-check runs at **accept**, ahead of the connection caps (the ACL first,
-then the caps — a cap refusal is only ever answered to a peer the ACL
-admitted): a client off the ACL is closed **without a reply** — nothing
-was parsed to answer. The acl file re-resolves on
-every `set`/`unset` and on SIGHUP, a bad file keeps the old gate
-standing, and a group/world-readable file warns (the log, the audit
-trail's `ACL-FILE` event, the `set` reply's suffix). The chain renders as
-`show metrics acl table` — the same three fixed chains for the inline
-forms, the file gate's own rules behind the `% ` desc header — and a `set
-metrics acl table` (the show word typed into the set verb) answers the
-pointer to the report.
+`unset metrics acl`, config `metrics_acl`, NixOS `metricsAcl` +
+`metricsAclFile` — the split options, the file rides a LoadCredential
+mount) takes the same one value grammar as the cache's IP knobs. The acl
+file re-resolves on every `set`/`unset` and on SIGHUP, a bad file keeps
+the old gate standing, and a group/world-readable file warns (the log,
+the audit trail's `ACL-FILE` event, the `set` reply's suffix). The chain
+renders as `show metrics acl table` — the three fixed chains for the
+inline forms, the file gate's own rules behind the `% ` desc header — and
+a `set metrics acl table` (the show word typed into the set verb) answers
+the pointer to the report.
 
 The gate never replaces the bearer: `--auth-token`'s request-time check
 and F13's non-loopback refusal stand on top of it — the ACL decides who
@@ -180,23 +195,28 @@ may connect, the token decides whether the scrape authenticates (an
 ACL'd but tokenless non-loopback listen still refuses to start;
 docs/AUDIT.md rev. 19).
 
-The control socket is NOT this gate: the tokens, the RBAC ops role and the
-`trust-uids` list are that socket's own admission story (docs/AUDIT.md,
-F5). The dashboard consumes the scraper's metrics and carries no ACL
-surface.
+The control socket is NOT this gate — see below.
 
-## the dashboard — no ACL surface
+## the control plane — loopback binds, no IP gate
 
-The dashboard's own HTTP surface keeps the token + bind posture
-(docs/AUDIT.md, F6) — no IP gate.
+Every control TCP bind is hardcoded `127.0.0.1`
+(`common/control.py`'s `_open_sock`; the unix sockets are peer-cred), so
+no control surface carries an IP gate — an IP filter on loopback decides
+on the one address that always matches. The plane's admission story is
+the tokens + the signed wire + the RBAC roles (docs/AUDIT.md, F5). An
+explicit `acl/control` gate is sketched in docs/TODO.md's security
+section and earns its place the moment the control target learns to bind
+beyond loopback — until then the fake's tokenless-loopback TCP exemption
+(F11) rides on the same bind.
 
 ## Related — the neighbouring gates that are not ACLs
 
 - **the suite auth** (`modbus/auth`, `modbus/auth-upstream`) — the
   PVA1/HMAC-SHA256 handshake on the Modbus wire itself: a proof of key
-  between peers, orthogonal to the address gates (both stack). docs/MODBUS.md.
-- **the control-plane auth** — the admin token, the read-only ops token and
-  its verb set (the RBAC roles), the `trust-uids` peer-cred path, the
+  between peers, orthogonal to the address gates (both stack).
+  docs/MODBUS.md.
+- **the control-plane auth** — the admin token, the read-only ops token
+  and its verb set (the RBAC roles), the `trust-uids` peer-cred path, the
   signed wire. docs/AUDIT.md.
 - **the bearer token** — the request-time auth on the token'd HTTP
   surfaces (the cache's and the scraper's /metrics): the accept-time ACL
@@ -205,4 +225,5 @@ The dashboard's own HTTP surface keeps the token + bind posture
   non-loopback refusal stands; docs/AUDIT.md rev. 19).
 - **the connection caps** — `max-clients`, `client-timeout`,
   `max-conn-per-ip` (and the metrics triple): the DoS posture, applied
-  beside the connect ACL, never instead of it.
+  beside the connect ACL, never instead of it — and always answered
+  after it.

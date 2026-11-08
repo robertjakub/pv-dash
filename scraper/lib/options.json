@@ -200,7 +200,7 @@
     { "name": "request-restore", "live": "request/restore",
       "help": "re-apply a state dump's overrides (when the daemon has a dump path)" },
     { "name": "set", "help": "configure a setting (set metrics interval 5, set log-access on)" },
-    { "name": "show", "help": "print a setting, the status report, or all of them" },
+    { "name": "show", "help": "print a setting's live value, or a report" },
     { "name": "shutdown", "help": "stop the scraper (asks to confirm)" },
     { "name": "unset", "help": "restore a setting to its configured value (unset metrics interval, unset log-level)" }
   ]

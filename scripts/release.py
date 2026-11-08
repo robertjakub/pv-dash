@@ -152,6 +152,18 @@ def notes_for(version):
     return m.group(1).strip() if m else None
 
 
+def notes_pointer(version):
+    """The release notes are the pointer now — the changes list lives in
+    CHANGELOG.md; the notes name it at the tag."""
+    remote = git('remote', 'get-url', 'origin')
+    m = re.search(r'github\.com[:/]([^/]+)/(.+?)(?:\.git)?$', remote)
+    if not m:
+        return 'For the changes see the /CHANGELOG.md.'
+    return ('For the changes see the [/CHANGELOG.md]'
+            '(https://github.com/%s/%s/blob/%s/CHANGELOG.md).'
+            % (m.group(1), m.group(2), version))
+
+
 def main():
     ap = argparse.ArgumentParser(description='pv-suite release orchestrator')
     ap.add_argument('version', help='the version to release (X.Y.Z)')
@@ -219,15 +231,12 @@ def main():
     if not sh(['bash', '-c', 'command -v gh'], dry=dry):
         print('release: no gh on PATH, skipping the GitHub release (the workflow will cut it)')
         return
-    body = notes_for(new)
-    if not body:
-        print('release: no changelog section for %s, skipping the release notes' % new)
-        return
+    body = notes_pointer(new)
     if not dry and new in sh(['gh', 'release', 'list', '--json', 'tagName', '--jq', '.[].tagName']).split():
         print('release: the GitHub release %s exists' % new)
         return
     run(['gh', 'release', 'create', new, '--title', 'pv-suite %s' % new,
-         '--notes', body or new], dry=dry)
+         '--notes', body], dry=dry)
     print('release: GitHub release %s is out — fly me to the moon' % new)
 
 

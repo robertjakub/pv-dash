@@ -53,14 +53,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: extract the changelog section
+      - name: the release notes (the changelog pointer)
         run: |
-          python3 - "$GITHUB_REF_NAME" > body.md <<'EOF'
-          import re, sys
-          v, text = sys.argv[1], open('CHANGELOG.md').read()
-          m = re.search(r'^## %s[^\n]*\n(.*?)(?=^## |\Z)' % re.escape(v), text, re.M | re.S)
-          print(m.group(1).strip() if m else 'pv-suite %s' % v)
-          EOF
+          printf 'For the changes see the [/CHANGELOG.md](%s/blob/%s/CHANGELOG.md).\n' \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" > body.md
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

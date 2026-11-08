@@ -39,6 +39,13 @@ before the repo restructured into one suite.
   with a signed utf-8 command on the authenticated session; the
   dashboard man page's control-wire paragraph follows.
 
+- **scripts** — **the GitHub release notes point at the changelog**: the
+  body is the one line `For the changes see the /CHANGELOG.md.` (linked
+  at the tag) — the changes list stays where it lives, in `CHANGELOG.md`;
+  the workflow's extract-the-changelog-section step retires and the local
+  `--release` cut speaks the same pointer (the 0.4.0 body — 97 KB of
+  pasted section — re-cut by hand).
+
 ## 0.4.2 — 2026-11-08
 ### Changed
 

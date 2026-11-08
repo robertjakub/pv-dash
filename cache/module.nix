@@ -109,6 +109,7 @@ let
       # systemd LoadCredential mounts the file here (see serviceConfig below)
       (setLine "metrics-token" "file:/run/credentials/modbus-cache/metrics-token")
     ])
+    (lib.optionals (cfg.metricsAcl != null) [ (setLine "metrics-acl" cfg.metricsAcl) ])
   ]));
 in
 {
@@ -479,6 +480,19 @@ in
         The /metrics bearer token from a file (the first line is the
         token), mounted via systemd LoadCredential. Mutually exclusive
         with metricsToken; mandatory when metricsServer is on.
+      '';
+    };
+
+    metricsAcl = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Clients allowed to connect to the cache's /metrics endpoint: "any",
+        "none" (refuse every peer), a comma-separated list of IPs and CIDR
+        prefixes, or "file:<path>" — the standalone ip-prefix acl file (the
+        same gate acl/connect reads). Checked at accept — a client off the
+        ACL is closed without a reply. Re-read at startup and on every
+        SIGHUP reload. null = the tool's default ("any").
       '';
     };
 

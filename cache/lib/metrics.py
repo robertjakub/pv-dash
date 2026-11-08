@@ -9,10 +9,14 @@ per-block poll latency/errors — without depending on the scraper's
 `Authorization: Bearer <token>` (the same scheme the scraper speaks).
 The gated endpoint skeleton (the 401/404/503, the caps, the thread
 start/stop) is the family's common/metrics_server."""
+import logging
 import time
 
+from common.config import acl_admits
 from common.metrics_server import MetricsServer as _MetricsServer
 from common.metrics_server import describe_metrics
+
+logger = logging.getLogger('modbus-cache')
 
 
 class MetricsServer(_MetricsServer):
@@ -21,7 +25,11 @@ class MetricsServer(_MetricsServer):
     address is --metrics-listen HOST:PORT. Caps (F13 round):
     --metrics-max-clients (immediate 503 past it), --metrics-client-timeout
     (0 = the built-in 5 s slowloris cap), --metrics-max-conn-per-ip; 0 = no
-    per-IP limit."""
+    per-IP limit. Beside the caps the metrics/acl gate checks the peer IP
+    at accept (the acl/connect reading, the scraper's metrics/acl shape):
+    a client off the ACL is closed without a reply — nothing was parsed to
+    answer. The gate reads through the proxy per connection: one live
+    state, the set/unset swap needs no push here."""
 
     REALM = 'modbus-cache'
     LOG_NAME = 'modbus-cache'
@@ -31,6 +39,13 @@ class MetricsServer(_MetricsServer):
         super().__init__(listen, token=token, started=started, max_clients=max_clients,
                          client_timeout=client_timeout, max_per_ip=max_per_ip)
         self.proxy = proxy
+
+    def acl_allows(self, ip):
+        return acl_admits(self.proxy.metrics_acl, ip)
+
+    def acl_refused(self, request, client_address):
+        logger.info('connection rejected: %s:%d not on the metrics ACL', *client_address[:2])
+        self._http.shutdown_request(request)
 
     def snapshot(self):
         p = self.proxy

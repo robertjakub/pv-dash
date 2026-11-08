@@ -270,7 +270,7 @@ def main():
     proxy.audit_params = {'path': cfg['audit_log'] or None, 'max_mb': cfg['audit_max_mb'],
                           'daily': cfg['audit_daily'], 'files': cfg['audit_files'],
                           'disabled': bool(cfg['no_audit_log'])}   # the audit lives rebuild from here
-    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, client auth: %s, upstream auth: %s, control token: %s, ops token: %s, audit trail: %s, requests audit: %s, metrics: %s)',
+    logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, client auth: %s, upstream auth: %s, control token: %s, ops token: %s, audit trail: %s, requests audit: %s, metrics: %s, metrics acl: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if cfg['allow_write'] else 'disabled (write requests are refused)',
@@ -288,7 +288,7 @@ def main():
                 'read-only ops token set' if control_ops_token else 'no ops token',
                 audit_display,
                 '%gs' % cfg['requests_audit_s'] if cfg['requests_audit_s'] else 'off',
-                metrics_desc)
+                metrics_desc, acl_gate_summary(proxy.metrics_acl))
     logger.info('state dumps: %s',
                 'off' if not proxy.dump_path
                 else '%s every %s (plus request dump and the shutdown)%s, restore on start'
@@ -316,7 +316,7 @@ def main():
                        cfg['selection'] or cfg['profile']))
         if proxy.write_gate_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
             audit.event('ACL-FILE', proxy.write_gate_warn)
-        for warn in (proxy.connect_acl_warn, proxy.write_acl_warn):
+        for warn in (proxy.connect_acl_warn, proxy.write_acl_warn, proxy.metrics_acl_warn):
             if warn:
                 audit.event('ACL-FILE', warn)
     stop = install_signal_handlers(proxy, cache, args)
@@ -345,6 +345,7 @@ def main():
                     'modbus/selection': cfg['selection'] or 'all',
                     'acl/connect': acl_value_text(cfg['connect_acl']),
                     'acl/write': acl_value_text(cfg['write_acl']),
+                    'metrics/acl': acl_value_text(cfg['metrics_acl']),
                     'modbus/timeout': '%g' % cfg['timeout'],
                     'modbus/auth': cfg['auth'] or 'none',
                     'modbus/auth-upstream': cfg['auth_upstream'] or 'none',

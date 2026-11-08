@@ -75,8 +75,13 @@ class Proxy:
         self.requests_audit_s = max(0.0, float(self.config.get('requests_audit_s', REQUESTS_AUDIT_S)))
         self.connect_acl_warn = None   # the acl/connect file's permission warning (the stash, None = no warning standing)
         self.write_acl_warn = None     # the acl/write file's warning
-        self.connect_acl = self._resolve_ip_acl(self.config.get('connect_acl'), 'connect')
-        self.write_acl = self._resolve_ip_acl(self.config.get('write_acl'), 'write')
+        self.metrics_acl_warn = None   # the metrics/acl file's warning
+        try:
+            self.connect_acl = self._resolve_ip_acl(self.config.get('connect_acl'), 'connect')
+            self.write_acl = self._resolve_ip_acl(self.config.get('write_acl'), 'write')
+            self.metrics_acl = self._resolve_ip_acl(self.config.get('metrics_acl'), 'metrics')
+        except ValueError as e:
+            raise SystemExit(str(e))   # the start refuses clean (the SIGHUP watcher keeps the previous settings)
         self.no_cache = self.config.get('selection') == 'none'   # selection none: forward only
         self.poll_secs_last = 0.0        # the poll-cycle durations for /metrics
         self.poll_secs_max = 0.0
@@ -167,6 +172,7 @@ class Proxy:
         # the previous settings wholesale (the watcher logs the failure)
         connect_acl = self._resolve_ip_acl(self.config.get('connect_acl'), 'connect')
         write_acl = self._resolve_ip_acl(self.config.get('write_acl'), 'write')
+        metrics_acl = self._resolve_ip_acl(self.config.get('metrics_acl'), 'metrics')
         self.upstream.host = self.config['host']
         self.upstream.port = self.config['port']
         self.upstream.unit = self.config['unit']
@@ -189,6 +195,7 @@ class Proxy:
         self.requests_audit_s = max(0.0, float(self.config.get('requests_audit_s', REQUESTS_AUDIT_S)))
         self.connect_acl = connect_acl
         self.write_acl = write_acl
+        self.metrics_acl = metrics_acl
         self.cache.cache_ttl = self.config['cache_ttl']
         self.cache.update_map(ranges, names, ttls)
         self.generation += 1
@@ -332,6 +339,7 @@ class Proxy:
                 if self.audit is not None:
                     self.audit.event('ACL-FILE', warn)
             return IPGate(t, desc, rules)
+        setattr(self, '%s_acl_warn' % knob, None)   # an inline set clears a standing file warning
         try:
             return parse_acl(t, 'acl/%s' % knob)
         except SystemExit as e:
@@ -351,6 +359,15 @@ class Proxy:
         self.write_acl = self._resolve_ip_acl(val, 'write')
         self.config['write_acl'] = self.write_acl
         return acl_value_text(self.write_acl)
+
+    def set_metrics_acl(self, val):
+        """Swap the metrics/acl knob (the acl/connect grammar on the
+        /metrics listener): resolve first — a bad value or acl file leaves
+        the old gate standing. The live swap is read-through: the
+        MetricsServer's accept hook reads self.metrics_acl per connection."""
+        self.metrics_acl = self._resolve_ip_acl(val, 'metrics')
+        self.config['metrics_acl'] = self.metrics_acl
+        return acl_value_text(self.metrics_acl)
 
     def _write_allowed(self, target):
         """The register-range allow-list: every touched register must land

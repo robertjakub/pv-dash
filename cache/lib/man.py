@@ -75,7 +75,7 @@ The control server speaks JSON lines: one request
 the reports
 .BR inspect ", " "show status" ", " "show connections" ,
 .BR "show cache" " [all]" ", " "show write registers profile" ", " "show uplink" ", " "show version" ,
-.BR "show acl connect table" ", " "show acl write table" ,
+.BR "show acl connect table" ", " "show acl write table" ", " "show metrics acl table" ,
 the ops
 .BR "request dump" ", " "request restore" ", " "request clear cache" ,
 .BR "request reload" ", " "request restart" ", " shutdown ", " quit .
@@ -85,13 +85,13 @@ the ops
 changes a setting live (modbus interval, cache ttl, modbus read-delay,
 modbus merge-gap, write allow, write registers, limits max-clients,
 limits client-timeout, modbus upstream, modbus unit, metrics enable,
-metrics listen, the metrics limits caps, metrics token, audit requests,
-dump-interval, log-level, local-time, modbus profile, modbus selection,
-acl connect, acl write, modbus timeout, modbus auth, modbus auth key,
-modbus auth-upstream, modbus auth-upstream-key, control port, control token,
-control ops-token, control ops-verbs, control trust-uids, control
-socket-group, audit log-file, audit rotate max-size, audit disable,
-dump path, dump with-cache); a SIGHUP re-applies the config
+metrics listen, the metrics limits caps, metrics token, metrics acl,
+audit requests, dump-interval, log-level, local-time, modbus profile,
+modbus selection, acl connect, acl write, modbus timeout, modbus auth,
+modbus auth key, modbus auth-upstream, modbus auth-upstream-key, control
+port, control token, control ops-token, control ops-verbs, control
+trust-uids, control socket-group, audit log-file, audit rotate max-size,
+audit disable, dump path, dump with-cache); a SIGHUP re-applies the config
 (the file always wins). A knob the registry marks
 .B restart: true
 answers the note
@@ -119,10 +119,11 @@ the gate's desc as the % line, then one allow/deny line per range with
 its desc, the comments aligned.
 .IP \\(bu 2
 .B show acl connect table
-/ \\fBshow acl write table\\fR render either IP ACL as its chain, one
+/ \\fBshow acl write table\\fR / \\fBshow metrics acl table\\fR render the
+IP ACL as its chain, one
 entry per line (show-only): \\fBallow 0.0.0.0/0\\fR (any), \\fBdeny
 0.0.0.0/0\\fR (none), \\fBdeny 0.0.0.0/0\\fR then one \\fBallow\\fR line
-per network (the whitelist) \\(em and in file mode the ip-prefix gate's
+per network (the whitelist) \(em and in file mode the ip-prefix gate's
 own rules, the gate desc as the % line, the rule descs as aligned
 comments.
 .IP \\(bu 2

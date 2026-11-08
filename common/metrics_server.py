@@ -4,7 +4,9 @@ family: the bearer-token 401, the /metrics-only 404, the connlimit gate
 with its immediate 503, the thread start and the live stop. The tool
 subclasses MetricsServer with its snapshot()/render() (and its own
 constructor state); the 401 realm and the gate-refusal logger name are
-class attributes. Stdlib only."""
+class attributes; the accept-time acl_allows/acl_refused hooks ride the
+instance (the defaults admit every peer and close silently — the cache's
+metrics/acl overrides them). Stdlib only."""
 import hmac
 import http.server
 import logging
@@ -56,6 +58,17 @@ class MetricsServer:
         """The Prometheus text — the tool's."""
         raise NotImplementedError
 
+    def acl_allows(self, ip):
+        """The accept-time ACL hook beside the caps: the default admits
+        every peer — the tool subclass with an IP knob overrides (the
+        cache's metrics/acl, common/config.py acl_admits on its gate)."""
+        return True
+
+    def acl_refused(self, request, client_address):
+        """The ACL-rejected peer: the default closes without a reply (the
+        accept-check reading — nothing was parsed to answer)."""
+        self._http.shutdown_request(request)
+
     class _Handler(http.server.BaseHTTPRequestHandler):
         timeout = 5   # a silent peer cannot pin a handler thread (slowloris)
 
@@ -99,6 +112,12 @@ class MetricsServer:
                 except OSError:
                     pass
                 httpd.shutdown_request(request)
+
+            def acl_allows(httpd, ip):
+                return httpd.metrics_server.acl_allows(ip)
+
+            def acl_refused(httpd, request, client_address):
+                httpd.metrics_server.acl_refused(request, client_address)
 
         httpd = Server(self.listen, self._Handler)
         httpd.setup_gate(self.max_clients, self.max_per_ip)

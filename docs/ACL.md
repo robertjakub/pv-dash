@@ -4,7 +4,8 @@ This is the reference for the ACL support across the family: what the rule
 chain says, where it is enforced, and which surfaces speak it. The story
 has two planes. The **IP plane** decides who may reach a listener at all —
 the Modbus listeners' `acl/connect` (and the cache's `acl/write` for the
-write frames), the scraper's `metrics/acl` for the /metrics exposition. The
+write frames), the cache's and the scraper's `metrics/acl` for the
+/metrics expositions. The
 **register plane** decides which registers a forwarded write may
 touch — the `write-registers` knob and the device profiles' embedded
 `acl`/`write` gate. Both planes speak ONE gate-object schema with TWO
@@ -91,9 +92,11 @@ The cache consumes both planes, both matcher kinds, both spellings
 |---|---|---|
 | `acl/connect` | the IP kind | who may open the Modbus connection at all — the accept check on the listen port (`connection rejected: … not on the connect ACL`) |
 | `acl/write` | the IP kind | whose write frames forward — the client half of the write path (refused 86/1, `WRITE-REFUSED` audited, the connection stays up) |
+| `metrics/acl` | the IP kind | who may reach the /metrics exposition — the accept check on the metrics port (`connection rejected: … not on the metrics ACL`, closed without a reply) |
 | `write-registers` | the register kind | which registers a forwarded write may touch — the register half (the profile's `acl`/`write` gate, or the standalone file, or an inline `START:COUNT` list) |
 
-The two IP knobs speak one value grammar: `any`, `none`, a comma-separated
+The three IP knobs speak one value grammar: `any`, `none`, a
+comma-separated
 `IP,IP/prefix, ...` list, or `file:<path>` (the ip-prefix acl file — a
 typeless or wrong-kind file refuses). The inline forms are the compact
 spellings of three fixed chains, and the table shows render exactly that,
@@ -112,7 +115,8 @@ grammar stays the three fixed chains. `show acl connect table` and
 renders its own rules behind the `% ` desc header, the comments aligned —
 and `show write registers profile` does the same for the register gate.
 A `set acl connect table` (the show word typed into the set verb) answers
-the pointer to the report.
+the pointer to the report — `show metrics acl table` is the third report,
+same renderer.
 
 A forwarded write passes **four gates**: the frame parses, `--allow-write`
 is on, the client is on the write ACL, and every touched register is inside
@@ -122,11 +126,12 @@ both are opened deliberately. The IP ACLs re-resolve on SIGHUP like every
 setting; the file gates resolve **before** the state swaps, so a bad file
 keeps the previous settings wholesale.
 
-The forms: `--connect-acl` / `--write-acl` / `--write-registers` (env
-`CONNECT_ACL` / `WRITE_ACL` / `WRITE_REGISTERS`, the config-file spellings
-`connect_acl` / `write_acl` / `write_registers`, NixOS
-`connectAcl` / `writeAcl` / `writeRegisters`), live via
-`set acl connect|acl/write|write registers <value>`.
+The forms: `--connect-acl` / `--write-acl` / `--write-registers` / `--metrics-acl`
+(env `CONNECT_ACL` / `WRITE_ACL` / `WRITE_REGISTERS` / `METRICS_ACL`, the
+config-file spellings
+`connect_acl` / `write_acl` / `write_registers` / `metrics_acl`, NixOS
+`connectAcl` / `writeAcl` / `writeRegisters` / `metricsAcl`), live via
+`set acl connect|acl/write|metrics acl|write registers <value>`.
 
 ## modbus-fake-inverter — the mirror, system grammar only
 
@@ -145,7 +150,8 @@ Modbus write refused), with no IP write-acl and no register allow-list.
 
 The scraper's exposure is the /metrics exposition, and it takes the
 connect-ACL half of the story as **`metrics/acl`** — the cache's
-`acl/connect` reading on the HTTP listener: `--metrics-acl` (env
+`acl/connect` reading on the HTTP listener (the cache's own /metrics
+endpoint speaks the same `metrics/acl` gate now): `--metrics-acl` (env
 `METRICS_ACL`, live `set metrics acl <value>` / `unset metrics acl`,
 config `metrics_acl`, NixOS `metricsAcl`/`metricsAclFile`) takes the same
 one value grammar as the cache's IP knobs — `any` (the default), `none`,

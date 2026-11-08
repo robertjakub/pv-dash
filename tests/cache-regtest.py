@@ -1251,6 +1251,92 @@ try:
     check('metrics listen: the unset restored the configured value',
           r.startswith('ok metrics/listen=127.0.0.1:15529'), r[:90])
 
+    # the metrics/acl gate: the acl/connect reading on the /metrics listener
+    # (the scraper's metrics/acl shape) — the inline grammar + the file:
+    # chain, checked at accept: a client off the ACL is closed without a reply
+    r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:15512',
+                        '--listen', '127.0.0.1:15600', '--profile', R,
+                        '--metrics-acl', 'file:' + os.path.join(CACHE_DIR, 'examples', 'acl-ip-prefix.json')],
+                       capture_output=True, text=True, timeout=60)
+    check('metrics acl: the shipped ip-prefix example loads (dry-run)',
+          r.returncode == 0 and 'dry-run: configuration and register map are valid' in (r.stdout + r.stderr),
+          '%s %r' % (r.returncode, (r.stdout + r.stderr)[-120:]))
+    r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:15512',
+                        '--listen', '127.0.0.1:15600', '--profile', R,
+                        '--metrics-acl', 'file:/nonexistent/acl.json'],
+                       capture_output=True, text=True, timeout=60)
+    check('metrics acl: a missing acl file refuses the start (rc 1, clean)',
+          r.returncode == 1 and 'cannot read acl file' in r.stderr, r.stderr[-100:])
+    r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:15512',
+                        '--listen', '127.0.0.1:15600', '--profile', R,
+                        '--metrics-acl', '10.0.0.0/999'],
+                       capture_output=True, text=True, timeout=60)
+    check('metrics acl: a bad inline entry refuses the start (rc 1, clean)',
+          r.returncode == 1 and 'bad ACL entry' in r.stderr, r.stderr[-100:])
+
+    def metrics_acl_raw(tok):
+        # one GET over a raw socket, the full reply or the close: the
+        # accept-check refusal closes without a reply — a reset on some stacks
+        try:
+            s = socket.create_connection(('127.0.0.1', 15529), timeout=5)
+            s.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\nAuthorization: Bearer ' + tok.encode()
+                      + b'\r\nConnection: close\r\n\r\n')
+            buf = b''
+            while True:
+                chunk = s.recv(4096)
+                if not chunk:
+                    break
+                buf += chunk
+            s.close()
+            return buf
+        except (ConnectionResetError, BrokenPipeError):
+            return b''
+
+    check('metrics acl: any serves (the default)', metrics_acl_raw('sekrit2').startswith(b'HTTP/1.0 200'),
+          metrics_acl_raw('sekrit2').split(b'\r\n')[0].decode()[:60])
+    r = ctl_cmd('set metrics acl none', 15530)
+    check('metrics acl: set none answers ok', r.startswith('ok metrics/acl=none'), r[:80])
+    check('metrics acl: none closes the client without a reply', metrics_acl_raw('sekrit2') == b'',
+          repr(metrics_acl_raw('sekrit2')[:40]))
+    r = ctl_cmd('show metrics acl', 15530)
+    check('metrics acl: the none show', r == 'ok metrics/acl=none', r[:60])
+    r = ctl_cmd('show config', 15530)
+    check('metrics acl: the live set rides show config', 'set metrics acl none' in r, r[:200])
+    r = ctl_cmd('show metrics acl table', 15530)
+    check('metrics acl: none spells the deny-any chain', r == 'ok acl-metrics-table\ndeny 0.0.0.0/0', r[:80])
+    r = ctl_cmd('set metrics acl table', 15530)
+    check('metrics acl: the show word is not a value (the pointer to the report)',
+          r.startswith('fail') and 'show metrics acl table' in r, r[:120])
+    r = ctl_cmd('set metrics acl 127.0.0.1', 15530)
+    check('metrics acl: the whitelist set canonicalizes', r.startswith('ok metrics/acl=127.0.0.1/32'), r[:80])
+    check('metrics acl: the whitelist serves the lab', metrics_acl_raw('sekrit2').startswith(b'HTTP/1.0 200'))
+    r = ctl_cmd('show metrics acl table', 15530)
+    check('metrics acl: the whitelist table',
+          r == 'ok acl-metrics-table\ndeny 0.0.0.0/0\nallow 127.0.0.1/32', r[:80])
+    mgate = '/tmp/reg_acl_metrics-%d.json' % PORT
+    with open(mgate, 'w') as fh:
+        _json.dump({'desc': 'the lab gate', 'type': 'ip-prefix', 'rules': [
+            {'type': 'deny', 'prefix': 'any'},
+            {'type': 'allow', 'prefix': '127.0.0.1', 'desc': 'the loopback lab'},
+        ]}, fh)
+    r = ctl_cmd('set metrics acl file:%s' % mgate, 15530)
+    check('metrics acl: the file gate loads', r.startswith('ok metrics/acl=file:%s' % mgate), r[:100])
+    r = ctl_cmd('show metrics acl', 15530)
+    check('metrics acl: the file spelling shows', r == 'ok metrics/acl=file:%s' % mgate, r[:80])
+    r = ctl_cmd('show metrics acl table', 15530)
+    check('metrics acl: the file gate renders its own rules',
+          r == 'ok acl-metrics-table\n% the lab gate\ndeny 0.0.0.0/0\nallow 127.0.0.1 # the loopback lab', r[:160])
+    check('metrics acl: the file gate serves the lab', metrics_acl_raw('sekrit2').startswith(b'HTTP/1.0 200'))
+    with open(mgate, 'w') as fh:   # the gate re-reads on every set: a bad prefix refuses, the old gate stands
+        _json.dump({'type': 'ip-prefix', 'rules': [{'type': 'allow', 'prefix': '127.0.0.1/8'}]}, fh)
+    r = ctl_cmd('set metrics acl file:%s' % mgate, 15530)
+    check('metrics acl: a bad file answers err with the old gate standing',
+          r.startswith('fail') and 'spell the network' in r
+          and metrics_acl_raw('sekrit2').startswith(b'HTTP/1.0 200'), r[:140])
+    r = ctl_cmd('unset metrics acl', 15530)
+    check('metrics acl: unset restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
+    check('metrics acl: any serves again', metrics_acl_raw('sekrit2').startswith(b'HTTP/1.0 200'))
+
     # the control plane, audit trail and dump lives (the same metrics pattern:
     # set/show/unset on the wire, the secrets never render, the rebind moves it)
     def ctl_tok(cmd, port, tok):

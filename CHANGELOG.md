@@ -9,6 +9,24 @@ before the repo restructured into one suite.
 ## Unreleased
 ### Added
 
+- **cache** — **`metrics/acl`** (`--metrics-acl`, env `METRICS_ACL`,
+  config `metrics_acl`, NixOS `metricsAcl`, live `set metrics acl` /
+  `unset metrics acl`): the scraper's metrics/acl wave migrates to the
+  cache's own /metrics endpoint — the same value grammar (`any` the
+  default, `none`, the comma-separated whitelist, `file:<path>` the
+  standalone ip-prefix acl file), checked at **accept** beside the
+  connection caps: a client off the ACL is closed without a reply and
+  logged `connection rejected: … not on the metrics ACL`. The gate
+  re-resolves on every `set`/`unset` and on SIGHUP (a bad file keeps the
+  old gate standing; an inline set clears a standing file warning), the
+  group/world-readable file warns (the log, the audit trail's `ACL-FILE`
+  event, the `set` reply's suffix), **`show metrics acl table`** renders
+  the gate as its chain and `set metrics acl table` answers the pointer
+  to the report. The accept hooks ride the common MetricsServer now
+  (`acl_allows`/`acl_refused` delegate to the instance — the defaults
+  admit every peer and close silently, so the dashboard's endpoint is
+  untouched).
+
 - **scraper** — **`metrics/acl`** (`--metrics-acl`, env `METRICS_ACL`,
   config `metrics_acl`, NixOS `metricsAcl`/`metricsAclFile`, live `set
   metrics acl` / `unset metrics acl`): the cache's `acl/connect` reading

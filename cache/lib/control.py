@@ -252,6 +252,8 @@ class ControlServer(_ControlServer):
             return self.acl_table_report('connect')
         if low == 'show write-acl-table':
             return self.acl_table_report('write')
+        if low == 'show metrics-acl-table':
+            return self.acl_table_report('metrics')
         if low.startswith('show'):
             args = cmd.split()[1:]
             if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
@@ -768,6 +770,14 @@ class ControlServer(_ControlServer):
             if p.write_acl_warn:
                 shown += ' (%s)' % p.write_acl_warn
             return shown
+        if key == 'metrics/acl':
+            if val.lower() == 'table':   # the show word is never a value — point at the report
+                raise ValueError('"table" is not a metrics/acl value — the table is the show: '
+                                 'show metrics acl table')
+            shown = p.set_metrics_acl(val)
+            if p.metrics_acl_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
+                shown += ' (%s)' % p.metrics_acl_warn
+            return shown
         if key in ('modbus/profile', 'modbus/selection'):
             cfg = self._live_cfg()
             if key == 'modbus/profile':
@@ -798,7 +808,8 @@ class ControlServer(_ControlServer):
                    cache_ttl=p.cache.cache_ttl, allow_write=p.allow_write,
                    write_registers=p.write_registers, max_clients=p.max_clients,
                    client_timeout=p.client_timeout, requests_audit_s=p.requests_audit_s,
-                   connect_acl=p.connect_acl, write_acl=p.write_acl, timeout=p.upstream.timeout,
+                   connect_acl=p.connect_acl, write_acl=p.write_acl, metrics_acl=p.metrics_acl,
+                   timeout=p.upstream.timeout,
                    upstream='%s:%d' % (p.upstream.host, p.upstream.port),
                    host=p.upstream.host, port=p.upstream.port, unit=p.upstream.unit)
         return cfg
@@ -969,6 +980,8 @@ class ControlServer(_ControlServer):
             return self._acl_text(p.connect_acl)
         if key == 'acl/write':
             return self._acl_text(p.write_acl)
+        if key == 'metrics/acl':
+            return self._acl_text(p.metrics_acl)
         if key == 'modbus/profile':
             return p.config.get('profile') or p.profile
         if key == 'modbus/selection':
@@ -1139,15 +1152,15 @@ class ControlServer(_ControlServer):
         return '\n'.join(lines)
 
     def acl_table_report(self, which):
-        """The acl/connect/table + acl/write/table show reports (the
-        show-only view of the two IP ACLs, one entry per line): the system
-        forms spell the chain they implement — 'allow 0.0.0.0/0' (any),
-        'deny 0.0.0.0/0' (none), 'deny 0.0.0.0/0' + one allow line per
-        network (the whitelist); a file gate renders its own rules — the
-        gate desc as the '% ' line, the rule descs as aligned '# '
-        comments, the matcher 'any' spelled 0.0.0.0/0."""
+        """The acl/connect/table + acl/write/table + metrics/acl/table
+        show reports (the show-only view of the three IP ACLs, one entry
+        per line): the system forms spell the chain they implement —
+        'allow 0.0.0.0/0' (any), 'deny 0.0.0.0/0' (none), 'deny 0.0.0.0/0'
+        + one allow line per network (the whitelist); a file gate renders
+        its own rules — the gate desc as the '% ' line, the rule descs as
+        aligned '# ' comments, the matcher 'any' spelled 0.0.0.0/0."""
         p = self.proxy
-        acl = p.connect_acl if which == 'connect' else p.write_acl
+        acl = {'connect': p.connect_acl, 'write': p.write_acl, 'metrics': p.metrics_acl}[which]
         return 'ok acl-%s-table\n%s' % (which, '\n'.join(acl_table(acl)))
 
     def cache_all_report(self):
@@ -1215,6 +1228,7 @@ class ControlServer(_ControlServer):
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'modbus/profile': p.config.get('profile'), 'modbus/selection': p.config.get('selection') or 'all',
             'acl/connect': self._acl_text(p.connect_acl), 'acl/write': self._acl_text(p.write_acl),
+            'metrics/acl': self._acl_text(p.metrics_acl),
             'modbus/auth': p.config.get('auth') or 'none',
             'modbus/auth-upstream': p.config.get('auth_upstream') or 'none',
             'modbus/upstream': '%s:%d' % (p.upstream.host, p.upstream.port),

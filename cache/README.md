@@ -146,7 +146,7 @@ Settings are resolved in this order (first hit wins), mirroring
    `WRITE_ACL`, `WRITE_REGISTERS`, `AUTH`, `AUTH_KEY`, `AUTH_UPSTREAM`,
    `AUTH_UPSTREAM_KEY`, `MAX_CLIENTS`, `CLIENT_TIMEOUT`,
    `MAX_CONN_PER_IP`, `METRICS_SERVER`, `METRICS_LISTEN`, `METRICS_TOKEN`,
-   `METRICS_MAX_CLIENTS`, `METRICS_CLIENT_TIMEOUT`,
+   `METRICS_ACL`, `METRICS_MAX_CLIENTS`, `METRICS_CLIENT_TIMEOUT`,
    `METRICS_MAX_CONN_PER_IP`, `LOG_LEVEL`, `LOG_ACCESS`, `LOCAL_TIME`,
    `CONTROL_TOKEN`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`,
    `CONTROL_SOCKET_GROUP`, `CONTROL_TRUST_UIDS`, `DUMP_PATH`,
@@ -207,6 +207,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint (the hit/miss counters, the poll health and age, the poll-cycle durations, the client count — no dependency on the scraper's `scraper_cache_*` path); **live-settable** (`set metrics enable on/off`) and **refuses to start without `--metrics-token`** (config `set metrics enable`, env `METRICS_SERVER`) |
 | `--metrics-listen` | `127.0.0.1:9252` | the metrics bind address `HOST:PORT` — `0.0.0.0:PORT` serves every interface, **a token is mandatory regardless** (config `set metrics listen`, env `METRICS_LISTEN`) |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); mandatory when `--metrics-server` is on; the value may be `file:<path>` — the first line of an owner-only `0600` file, F12 |
+| `--metrics-acl` | `any` | clients allowed to connect to `/metrics`: the same grammar as `--connect-acl` (`any`/`none`/the comma-separated IPs/prefixes/`file:<path>`); checked at accept — a client off the ACL is closed without a reply (config `set metrics acl`, env `METRICS_ACL`) — see [Access control](#access-control) |
 | **Limits** | | |
 | `--max-clients` | `64` | refuse further connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect clients silent for this many seconds — sheds connections from clients that died without closing (`0` = never) |
@@ -230,15 +231,19 @@ registry — every knob with its flag, its env twin and how it changes,
 `help config` maps them to their control commands). Boolean config/env
 values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 
-> **The six secret knobs** — `--auth-key`, `--auth-upstream-key`,
-> `--control-token`, `--control-ops-token`, `--metrics-token`,
-> `--dump-key` — are secrets and are not dumped: the values never render
-> back, and the config file, the state dumps and the reload state file
-> carry the `*** SECRET REMOVED ***` placeholder where a value would sit.
-> Pass them on every start by flag (`--auth-key <secret>`) or by env
-> (`AUTH_KEY`, `AUTH_UPSTREAM_KEY`, `CONTROL_TOKEN`, `CONTROL_OPS_TOKEN`,
-> `METRICS_TOKEN`, `DUMP_KEY` — `show knobs` names each knob's twin), or
-> as `file:<path>` — the first line of an owner-only `0600` file.
+The six **secret knobs** are secrets and are not dumped: the values never
+render back, and the config file, the state dumps and the reload state file
+carry the `*** SECRET REMOVED ***` placeholder where a value would sit.
+Pass each one on every start — by flag, by env (`show knobs` names each
+knob's twin), or as `file:<path>` (the first line of an owner-only `0600`
+file):
+
+- `--auth-key` / `AUTH_KEY`
+- `--auth-upstream-key` / `AUTH_UPSTREAM_KEY`
+- `--control-token` / `CONTROL_TOKEN`
+- `--control-ops-token` / `CONTROL_OPS_TOKEN`
+- `--metrics-token` / `METRICS_TOKEN`
+- `--dump-key` / `DUMP_KEY`
 
 ## Diagnostics registers
 
@@ -327,7 +332,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile`/`file:<path>` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token` (rotate live; the value never renders back), `audit requests`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write` (the IP ACLs: `any`/`none`/the networks/`file:<path>` — a file gate re-reads on every set), `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the auth schemes and keys, both legs — the upstream leg speaks suite or waveshare), `control port` (rebinds the listener live), `control token` and `control ops token` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
+| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile`/`file:<path>` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token` (rotate live; the value never renders back), `metrics acl` (the /metrics IP ACL: `any`/`none`/the networks/`file:<path>` — a file gate re-reads on every set), `audit requests`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write` (the IP ACLs: `any`/`none`/the networks/`file:<path>` — a file gate re-reads on every set), `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the auth schemes and keys, both legs — the upstream leg speaks suite or waveshare), `control port` (rebinds the listener live), `control token` and `control ops token` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/config said at start) |
 | `set`/`unset` a startup-only knob | the registry's `restart: true` rows answer the note: `% restart required (startup-only knob)` — the config (and a SIGHUP, or a restart) changes them; `show <knob>` renders the configured value (a **secret knob refuses to show** — the value renders nowhere) |
 | `show <setting>` | the bare live value of one tunable |
@@ -340,6 +345,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 | `show write registers profile` | the write gate as its acl chain (show-only — nothing to set): `allow any` / `deny any`, a range list as its whitelist (`deny any`, then one `allow START:COUNT` line per range), and in profile mode the device profile's own rules — the gate's `desc` as a `% ` line, then one `allow\|deny <range> # desc` line per range, the comments aligned |
 | `show acl connect table` | the connect ACL as its rule chain, one entry per line (show-only): `allow 0.0.0.0/0` (any), `deny 0.0.0.0/0` (none), the whitelist spelled out (`deny 0.0.0.0/0`, then one `allow` line per network) — or the ip-prefix acl file's own rules (the gate `desc` as the `% ` line, the descs as aligned `# ` comments) |
 | `show acl write table` | the write ACL as its rule chain, one entry per line — the `show acl connect table` report for `acl/write` |
+| `show metrics acl table` | the metrics ACL as its rule chain, one entry per line — the `show acl connect table` report for `metrics/acl` |
 | `show uplink` | the inverter link: session counters (state, connects, exchanges, bytes in/out, errors, last error) plus one row per poll block — status (`ok`/`ex N`/`error`/`pending`), latency (last/mean/max), failure count, last error |
 | `request dump` | write the live setting overrides — and, with `--dump-with-cache` (or the `with-cache` suffix: `request dump with-cache`), the cached words (+ their stamps) — to the `--dump-path` file; the write-behind state, see [Persistence](#persistence); the dump commands (and the `dump-interval` setting) show up in the listings only when a dump path is configured |
 | `request restore` | load the dump back: the words return with their original stamps (their TTL bounds any staleness) and the overrides re-apply — what the startup restore does automatically |
@@ -465,6 +471,11 @@ described below; the config-file/env/NixOS forms are
 - **Connect ACL** — who may connect at all; `none` rejects every connection
   at accept (logged: `connection rejected: … not on the connect ACL`). From
   the client's view the connection opens and immediately dies.
+- **Metrics ACL** — who may connect to the `/metrics` endpoint
+  (`--metrics-acl`, the same grammar and default `any`); a client off the
+  ACL is closed without a reply at accept (logged: `connection rejected: …
+  not on the metrics ACL`), live-settable with `set metrics acl` and
+  rendered by `show metrics acl table`.
 - **Write ACL** — whose write requests are forwarded; everything else is
   refused with a Modbus illegal-function exception, logged with the client
   IP and the attempted payload. The connection stays up and reads keep
@@ -500,9 +511,10 @@ described below; the config-file/env/NixOS forms are
    back as its chain — one `allow`/`deny` line per range, the profile's
    descs included (the file's rules render the same way).
 
-**The connect and write ACLs read the same standalone acl files**:
-`--connect-acl file:<path>` / `--write-acl file:<path>` (and their `set`
-spellings) load the gate whose root object is the
+**The connect, write and metrics ACLs read the same standalone acl files**:
+`--connect-acl file:<path>` / `--write-acl file:<path>` / `--metrics-acl
+file:<path>` (and their `set` spellings) load the gate whose root object
+is the
 `"type": "ip-prefix"` gate — the shipped `examples/acl-ip-prefix.json`:
 an optional terse-ASCII `desc`, the ordered `rules` list, one
 `{"type": "allow"|"deny", "prefix": "any"|IP|IP/prefix, ...}`
@@ -516,7 +528,8 @@ spelling round-trips through the dumps and `unset`, and a
 group/world-readable file warns exactly like the write-registers acl
 file (the log, the audit trail's `ACL-FILE` event, the set/unset reply's
 suffix; a `0600` file is silent). **`show acl connect table` /
-`show acl write table`** (show-only) render either ACL as its chain, one
+`show acl write table` / `show metrics acl table`** (show-only) render
+the ACL as its chain, one
 entry per line: the system forms spell the chain they implement —
 `allow 0.0.0.0/0` (any), `deny 0.0.0.0/0` (none), `deny 0.0.0.0/0` then
 one `allow` line per network (the whitelist) — and a file gate renders
@@ -677,7 +690,12 @@ at rest)` note on the `set dump path` reply.
 on/off`) serves the cache's own Prometheus `/metrics` on the
 `--metrics-listen HOST:PORT` address (default `127.0.0.1:9252`; `0.0.0.0`
 serves every interface) — the self-observability without the
-scraper's `scraper_cache_*` export path. The whole surface is live
+scraper's `scraper_cache_*` export path. Beside the bearer token the
+endpoint carries the **metrics ACL** (`--metrics-acl`, live `set metrics
+acl`): the `connect-acl` grammar checked at accept — a client off the ACL
+is closed without a reply (logged `connection rejected: … not on the
+metrics ACL`), and `show metrics acl table` renders the gate as its
+chain. The whole surface is live
 now: `set metrics listen` rebinds the endpoint (the old address
 closes, the new one serves), the `metrics limits` caps apply to the
 running gate (`max-clients` 503s past the cap, `timeout` kicks the

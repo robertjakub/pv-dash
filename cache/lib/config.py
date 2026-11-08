@@ -452,6 +452,8 @@ def resolve_config(args, script_dir=None):
                                        'METRICS_SERVER', 'metrics_server', False),
         'metrics_listen': resolve(getattr(args, 'metrics_listen', None), 'METRICS_LISTEN',
                                   'metrics_listen', DEFAULTS['metrics_listen'], str),
+        'metrics_acl': parse_acl_value(resolve(getattr(args, 'metrics_acl', None), 'METRICS_ACL',
+                                               'metrics_acl', 'any', str), 'metrics-acl'),
         'connect_acl': parse_acl_value(resolve(args.connect_acl, 'CONNECT_ACL', 'connect_acl', 'any', str),
                                        'connect-acl'),
         'write_acl': parse_acl_value(resolve(args.write_acl, 'WRITE_ACL', 'write_acl', 'none', str),

@@ -164,6 +164,11 @@
       "hint": "TOKEN",
       "help": "require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks); the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
       "secret": true, "hidden": true },
+    { "name": "metrics-acl", "flag": "--metrics-acl", "env": "METRICS_ACL", "conv": "str", "live": "metrics/acl",
+      "setting-help": "clients allowed to connect to /metrics: \"any\", \"none\", comma-separated IPs/prefixes, or file:<path> (the ip-prefix acl file)",
+      "values": [ "any", "none" ], "hint": "any|none|IP,...|file:<path>",
+      "value-help": { "any": "every client may connect (the default)",
+                      "none": "no client may connect: every connection is rejected" }, "help": "clients allowed to connect to the /metrics endpoint: \"any\", \"none\" (refuse everyone), comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or \"file:<path>\" — the standalone ip-prefix acl file (the gate object {\"type\": \"ip-prefix\", \"rules\": [{\"type\": \"allow\"|\"deny\", \"prefix\": ...}]}: the last matching rule decides, a client no rule decides refuses; \"any\" = 0.0.0.0/0, the whole space); checked at accept — a client off the ACL is closed without a reply" },
     { "name": "metrics/limits",
       "setting-help": "the metrics endpoint's connection caps: the simultaneous-client and per-IP limits",
       "node": true },
@@ -263,7 +268,9 @@
     { "name": "connect-acl-table", "live": "acl/connect/table",
       "setting-help": "the connect ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs" },
     { "name": "write-acl-table", "live": "acl/write/table",
-      "setting-help": "the write ACL as its rule chain, one entry per line (the acl/connect/table report for acl/write)" }
+      "setting-help": "the write ACL as its rule chain, one entry per line (the acl/connect/table report for acl/write)" },
+    { "name": "metrics-acl-table", "live": "metrics/acl/table",
+      "setting-help": "the metrics ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs" }
   ],
   "commands": [
     { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true },

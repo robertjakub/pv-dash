@@ -5,6 +5,25 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The metrics/acl wave: **the /metrics endpoint takes the IP plane** —
+`--metrics-acl` (env `METRICS_ACL`, config `metrics_acl`, NixOS
+`metricsAcl`, live `set metrics acl` / `unset metrics acl`) migrates the
+scraper's metrics/acl wave onto the cache's own exposition: the
+`acl/connect` value grammar (`any` the default, `none`, the whitelist,
+`file:<path>` the standalone ip-prefix acl file), checked at accept
+beside the connection caps — a client off the ACL is closed without a
+reply (logged `connection rejected: … not on the metrics ACL`), the file
+gate re-resolves on every set/unset and on SIGHUP (a bad file keeps the
+old gate standing; an inline set clears a standing file warning — the
+shared `_resolve_ip_acl` resets the stash now, so `acl/connect` and
+`acl/write` speak the same fresh-state semantics), a group/world-readable
+file warns (the log, the audit trail's `ACL-FILE` event, the reply's
+suffix), and **`show metrics acl table`** renders the gate as its chain.
+The accept hooks ride the common MetricsServer
+(`acl_allows`/`acl_refused` delegate to the instance — the defaults admit
+every peer and close silently, the dashboard's endpoint untouched), and a
+bad acl file at start refuses clean (SystemExit — was a traceback).
+
 The show-config write-back wave: **`show config` speaks the live
 overrides** — the `_apply` branches changed the running values but never
 wrote back into the resolved config dict the render reads (only

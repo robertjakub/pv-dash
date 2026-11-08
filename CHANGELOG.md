@@ -18,7 +18,12 @@ before the repo restructured into one suite.
   no-ACL posture), the system forms spelled as the chains they implement,
   and the boundary to the neighbouring gates that are not ACLs (the suite
   auth, the control-plane RBAC, the connection caps). The book gains the
-  `acl.md` page.
+  `acl.md` page; the audit re-runs at **rev. 18** (the ACL wave walked:
+  the posture rows updated — the cache's IP-gated Modbus plane, the
+  fake's connect-ACL'd mirror — the F11 closure annotated, the
+  control-plane ACL recorded as decided-against-while-loopback), and the
+  READMEs/`MODBUS.md` carry the `file:` spellings and the table shows
+  (the fake's man SECURITY block drops its stale "no ACL" claim).
 
 - **cache** — the connect and write ACLs read the **ip-prefix acl file**:
   `--connect-acl file:<path>` / `--write-acl file:<path>` (env, config

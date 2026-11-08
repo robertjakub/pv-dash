@@ -299,8 +299,11 @@ and
 
 .SH SECURITY
 The fake is a development/test instrument, not a security-first design
-(the audit's F11): the Modbus surface speaks to any peer that can reach
-the port \(em no TLS, no ACL; the optional \fB--auth suite\fR
+(the audit's F11): the Modbus surface speaks by default to any peer that
+can reach the port \(em no TLS; the opt-in \fB--connect-acl\fR IP gate
+(the cache's connect-acl, mirrored: \fBany\fR/\fBnone\fR/the
+IP/CIDR list, live-settable) filters who may connect at all, and the
+optional \fB--auth suite\fR
 shared-key handshake authenticates clients when a demo wants it \(em and
 the metrics endpoint
 serves without a token unless one is configured. Run it on a trusted,

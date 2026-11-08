@@ -459,7 +459,9 @@ Pacing and caps, not rate limiting: one serialized upstream connection;
 (after a failure the sweep runs unpaced); pass-through reads wait for a
 free slot between poll reads; `max_clients` / per-IP caps gate the
 listeners (`common/connlimit.py`); the connect ACL (`acl/connect`,
-default any, `none` refuses all) filters before auth; audit `REQUESTS`
+default any, `none` refuses all — the inline grammar or the standalone
+ip-prefix acl file via `file:<path>`; see docs/ACL.md) filters before
+auth; audit `REQUESTS`
 events are throttled to one per client per 300 s. The handshake read uses
 the client idle timeout, so a silent plain client lingers until it drops.
 

@@ -46,7 +46,7 @@ class MetricsServer(_MetricsServer):
 
     def acl_refused(self, request, client_address):
         logger.info('connection rejected: %s:%d not on the metrics ACL', *client_address[:2])
-        self._http.shutdown_request(request)
+        self._http._refuse_close(request)
 
     def snapshot(self):
         p = self.proxy

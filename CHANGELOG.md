@@ -18,7 +18,9 @@ before the repo restructured into one suite.
   refuses the start, the wire answers `err` with the old gate standing,
   the spelling is the re-appliable dump form, and the
   `show write registers profile` report renders the file's rules like the
-  profile's.
+  profile's. An example ships as `cache/acl.json` (the `deye-sg05lp3`
+  gate; the nix package and the cache image carry it beside the sample
+  conf).
 
 - **cache** — the **`show write registers profile`** report (show-only —
   nothing to set): the write gate answered as its acl chain — `allow any`

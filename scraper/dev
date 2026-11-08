@@ -5,8 +5,7 @@
 # is the fake inverter: $SCRAPER_UPSTREAM overrides. Extra flags/env pass
 # through: scraper/dev --dry-run, scraper/dev --battery
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
-UPSTREAM=${SCRAPER_UPSTREAM:-127.0.0.1:15502}
 exec python3 "$DIR/bin/modbus-scraper.py" \
     --config "$DIR/examples/scraper.conf" \
     --metrics-spec "$DIR/examples/metrics.json" \
-    --upstream "$UPSTREAM" "$@"
+    --upstream "${SCRAPER_UPSTREAM:-127.0.0.1:15502}" "$@"

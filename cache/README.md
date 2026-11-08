@@ -184,7 +184,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Behaviour toggles** | | |
 | `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (config `set write allow`, env `ALLOW_WRITE` accepts `true`/`false`) |
-| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default), `profile` = the device profile's `acl`/`write` gate (the allow/deny object or the ordered rule chain, allow minus deny; `any` = all registers) (config `set write registers`, env `WRITE_REGISTERS`) |
+| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default), `profile` = the device profile's `acl`/`write` gate (the ordered rule chain — one `type` allow/deny and a `range` per rule, a whitelist: the last matching rule decides, a register no rule decides refuses; `any` = all registers) (config `set write registers`, env `WRITE_REGISTERS`) |
 | `--connect-acl` | `any` | clients allowed to connect: `any`, `none` (refuse everyone) or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `none` | clients allowed to write — still requires `--allow-write`; `none` = no client writes (the default) — see [Access control](#access-control) |
 | `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (config `set control token`, env `CONTROL_TOKEN`) |
@@ -326,6 +326,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 | `show connections` | connected clients: peer, connection age, requests served |
 | `show cache` | cache contents: ranges, cached words, oldest entry, TTL, map version, failed ranges, hit/miss counters |
 | `show cache all` | every cached entry, one row per profile range: name, words cached, their values (`-` = not cached), age of the oldest, when it expires, poll status (`ok`/`partial`/`empty`/`failed (ex N)`) |
+| `show write registers profile` | the write gate as its acl chain (show-only — nothing to set): `allow any` / `deny any`, a range list as its whitelist (`deny any`, then one `allow START:COUNT` line per range), and in profile mode the device profile's own rules — the gate's `desc` as a `% ` line, then one `allow\|deny <range> # desc` line per range |
 | `show uplink` | the inverter link: session counters (state, connects, exchanges, bytes in/out, errors, last error) plus one row per poll block — status (`ok`/`ex N`/`error`/`pending`), latency (last/mean/max), failure count, last error |
 | `request dump` | write the live setting overrides — and, with `--dump-with-cache` (or the `with-cache` suffix: `request dump with-cache`), the cached words (+ their stamps) — to the `--dump-path` file; the write-behind state, see [Persistence](#persistence); the dump commands (and the `dump-interval` setting) show up in the listings only when a dump path is configured |
 | `request restore` | load the dump back: the words return with their original stamps (their TTL bounds any staleness) and the overrides re-apply — what the startup restore does automatically |
@@ -453,16 +454,19 @@ restrict all); the config-file/env/NixOS forms are
 - **Write registers** (`write-registers`) — the ranges a forwarded write
   may touch; `none` (the default) refuses every write regardless of the
   client, `any` lifts the register check entirely. **`profile`** takes the
-  gate from the device profile: the profile's `"acl"` → `"write"` tree —
-  an `allow`/`deny` object (the deny wins, an absent allow is `any`) or an
-  ordered rule list (`{"allow"|"deny": "START:COUNT"|[...]|{"START:COUNT": "desc"}|"any"}`
-  — the last matching rule decides, an undecided register refuses), each
-  range optionally described by a
-  terse-ASCII `desc` (per gate, per rule, or per entry in the range map).
-  `deye-sg05lp3`, for example, allows only the TOU schedule slots
+  gate from the device profile: the profile's `"acl"` → `"write"` gate —
+  an optional terse-ASCII `desc` and the ordered `rules` list, one
+  `{"type": "allow"|"deny", "range": "START:COUNT"|[...]|{"START:COUNT": "desc"}|"any"}`
+  object per rule, each range optionally described by a terse-ASCII
+  `desc` (per gate, per rule, or per entry in the range map). The chain
+  is a whitelist: it reads top to bottom, **the last matching rule
+  decides**, and a register no rule decides refuses (the default deny
+  any). `deye-sg05lp3`, for example, allows only the TOU schedule slots
   (148–177) and the grid-start registers (127–128). A profile without an
   `acl`/`write` section refuses the `profile` value (a gate that is not
-  there would be silent).
+  there would be silent). `show write registers profile` answers the gate
+  back as its chain — one `allow`/`deny` line per range, the profile's
+  descs included.
 
 Writing is therefore gated four times: `--allow-write` **and** the client
 on the write ACL **and** every touched register inside the allow-list

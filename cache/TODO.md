@@ -5,6 +5,28 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The acl whitelist wave: the device profile's write acl re-shapes to the
+**typed rule chain** — `"acl": {"write": {"desc": ..., "rules": [...]}}`,
+one `{"type": "allow"|"deny", "range": matcher}` object per rule (the
+matchers keep their shapes: a `START:COUNT` range, a list of them, a
+`{ "START:COUNT": "desc" }` map describing each entry, or the bare word
+`any`/`none`; the terse-ASCII `desc` rides per gate, per rule and per map
+entry) — and the chain is a **whitelist, said out loud**: the last
+matching rule decides and a register no rule decides refuses (the default
+deny any). The old spellings (the allow/deny object whose absent allow
+was `any`, the `{"allow": ...}` chain keys) refuse to load; the shipped
+`deye-sg05lp3` migrated in the same wave. The new **`show write registers
+profile`** report (show-only — nothing to set) answers the write gate as
+its chain: `allow any` / `deny any`, a range list as its whitelist (deny
+any, then one `allow START:COUNT` line per range), and in profile mode
+the profile's own rules — the gate's desc as the `% ` line, one
+`allow|deny <range> # desc` line per range. The set/unset verbs match the
+knob rows only (`SET_BY_NAME`), so the report's live path never shadows a
+knob value — `set write registers profile` keeps handing the knob the
+word — and a bad `set write registers <value>` answers `err` now instead
+of dropping the control session (the parser's SystemExit is a ValueError
+on the wire).
+
 The status-face wave: the wire's reply status speaks **`ok` | `fail` |
 `bye`** — the internal 'err' verdicts map to `fail` at the frame (the mac
 signs the wire form), the console prints the ok replies' messages **bare**

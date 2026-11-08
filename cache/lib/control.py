@@ -32,10 +32,11 @@ from common.control import ControlServer as _ControlServer, num, numi
 from common.options import control_command, grouped_rows, match_setting_path, describe_node, describe_root, \
     describe_command_node
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
-from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
+from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
     KNOWN_VERBS, CFG_KEYS, CFG_FORMATTERS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .cache import build_blocks
-from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection, parse_listen, parse_control_target
+from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection, parse_listen, parse_control_target, \
+    render_write_acl
 from .metrics import MetricsServer, describe_metrics
 from . import persist
 
@@ -146,7 +147,7 @@ class ControlServer(_ControlServer):
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|cache|'
-                'uplink|version|config|knobs>')
+                'uplink|version|config|knobs|write-registers-profile>')
         if self.proxy.dump_path:
             cmds += ', request dump [with-cache], request restore'
         cmds += ', request clear cache, request reload, request restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
@@ -187,8 +188,8 @@ class ControlServer(_ControlServer):
             args = cmd.split()[1:]
             if not args:
                 return 'err unset needs a setting (try help)'
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
-            s = SETTING_BY_NAME.get(key) if key is not None else None
+            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports have nothing to unset
+            s = SET_BY_NAME.get(key) if key is not None else None
             if s is not None and not rest and s.restart:
                 if s.secret:   # a secret never rides the reload state — the wire refuses it
                     return 'err restart required (startup-only knob)'
@@ -209,12 +210,12 @@ class ControlServer(_ControlServer):
             args = cmd.split()[1:]
             if len(args) < 2:
                 return 'err set needs a setting and a value (try help)'
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports are not settable (and a show path never shadows a knob value)
             if key is None:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             if not rest:
                 return 'err set needs a setting and a value (try help)'
-            s = SETTING_BY_NAME.get(key)
+            s = SET_BY_NAME.get(key)
             if s is not None and s.restart and s.secret:
                 return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
             value = ' '.join(rest)
@@ -245,6 +246,8 @@ class ControlServer(_ControlServer):
             return self.show_config()
         if low == 'show knobs':
             return self.knobs_dictionary()
+        if low == 'show write-registers-profile':
+            return self.write_registers_profile_report()
         if low.startswith('show'):
             args = cmd.split()[1:]
             if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
@@ -432,7 +435,10 @@ class ControlServer(_ControlServer):
             p.allow_write = val == 'on'
             return val
         if key == 'write/registers':
-            p.set_write_registers(parse_write_registers(val, 'write-registers'))
+            try:
+                p.set_write_registers(parse_write_registers(val, 'write-registers'))
+            except SystemExit as e:
+                raise ValueError(str(e))
             return p.describe_write_ranges()
         if key == 'limits/max-clients':
             v = numi(val, 'max-clients', 'clients')
@@ -1051,6 +1057,30 @@ class ControlServer(_ControlServer):
                 % (len(c.ranges), ' (fc4 %d)' % fc4 if fc4 else '', words,
                    ', oldest %s' % (self._oldest() or 'n/a'),
                    secs(c.cache_ttl), c.map_version, failed, self.proxy.cache_hits, self.proxy.cache_misses))
+
+    def write_registers_profile_report(self):
+        """The write/registers/profile show report (the show-only view of
+        the write gate): 'allow any' when the knob is any, 'deny any' when
+        it is none; a range list renders as its whitelist — 'deny any' and
+        one allow line per range; in profile mode the device profile's own
+        rules render — the gate's desc as the '% ' line, then one
+        '<verb> <range> # <desc>' line per range (the live gate: the rules
+        the running gate resolved from, not the file's current state)."""
+        p = self.proxy
+        lines = ['ok write-registers-profile']
+        wr = p.write_registers
+        if wr is None:
+            lines.append('allow any')
+        elif wr == 'profile':
+            if p.write_gate_rules is None:
+                return 'err write/registers/profile: the profile gate is not resolved'
+            lines.extend(render_write_acl(*p.write_gate_rules))
+        elif not wr:
+            lines.append('deny any')
+        else:   # a range list renders as its whitelist: the default deny, then the opens
+            lines.append('deny any')
+            lines.extend('allow %d:%d' % r for r in wr)
+        return '\n'.join(lines)
 
     def cache_all_report(self):
         """Every cached entry, one row per profile range: the words cached,

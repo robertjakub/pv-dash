@@ -13,7 +13,7 @@ from common.modbus import (DeviceError, ModbusError, auth_handshake_server,
                            frame, pack_bits, read_frame, unpack_bits,
                            write_shape_error, write_target)
 from common.connlimit import ConnGate
-from .config import load_profile_write_acl, load_registers_file, load_selection
+from .config import load_profile_write_gate, compile_write_acl, load_registers_file, load_selection
 from .cache import build_blocks, span
 from .statics import (MAX_COUNT, MAX_PDU, MAX_BITS, READ_FUNCS, BIT_READ_FUNCS, WRITE_FUNCS,
                       GATEWAY_FAILED, ILLEGAL_FUNCTION,
@@ -60,6 +60,7 @@ class Proxy:
         self.audit = audit   # the CACHE audit trail (common.audit), None = off
         self.allow_write = bool(self.config.get('allow_write', False))
         self.write_registers = self.config.get('write_registers')   # the knob: None = any, () = none, 'profile' = the profile's acl
+        self.write_gate_rules = None   # the profile gate's parsed rules (the write/registers/profile show report), None = not in profile mode
         try:
             self.write_ranges = self._resolve_write_ranges(self.write_registers)   # the effective gate
         except ValueError as e:
@@ -315,13 +316,19 @@ class Proxy:
         """The knob value -> the effective ranges. 'profile' loads the
         device profile's write acl against the CURRENT config (ValueError
         on a missing or bad acl — the start re-raises as SystemExit, the
-        wire answers err); everything else passes through unchanged."""
+        wire answers err) and keeps the parsed gate for the
+        write/registers/profile show report — the stash swaps only on a
+        successful resolve, so a bad acl leaves the old gate AND its
+        report standing; everything else passes through unchanged."""
         if val != 'profile':
             return val
         try:
-            return load_profile_write_acl(self.config.get('profile'))
+            desc, rules = load_profile_write_gate(self.config.get('profile'))
+            ranges = compile_write_acl(rules)
         except SystemExit as e:
             raise ValueError(str(e))
+        self.write_gate_rules = (desc, rules)
+        return ranges
 
     def set_write_registers(self, val):
         """Swap the write-registers knob (None/()/(ranges)/'profile'):

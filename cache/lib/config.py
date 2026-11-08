@@ -142,22 +142,20 @@ def _ranges_from_bits(bits):
     return out
 
 
-def load_profile_write_acl(path, label=None):
-    """The device profile's write acl: the optional top-level "acl" object
-    keyed by access kind — "write" is the one the cache speaks. The gate is
-    either an object with optional "allow"/"deny" (+ "desc"), or an ordered
-    rule list — one {"allow"|"deny": matcher} object per rule (+ an
-    optional "desc" each). A matcher is a "START:COUNT" range or a list of
-    them, or the bare word "any" (all registers) / "none". The chain reads
-    top to bottom and the LAST matching rule decides; an undecided register
-    refuses (the default deny) — so the object form is the sugar for the
-    chain "allow, deny" (the deny wins), and a deny-only object carves its
-    ranges out of everything (an absent allow is "any"). Compiles to the
-    write-registers shapes: None (any register writable), () (none), else
-    the (start, count) tuple — the chain never needs a second check at
-    write time. A profile without acl/write refuses: the caller asked for
-    the profile's gating, silence would look like a gate that is not
-    there."""
+def load_profile_write_gate(path, label=None):
+    """The device profile's write acl, parsed but not compiled: the optional
+    top-level "acl" object keyed by access kind — "write" is the one the
+    cache speaks; its gate is one object, an optional terse-ASCII "desc"
+    and the ordered "rules" list. One {"type": "allow"|"deny", "range":
+    matcher} object per rule (+ an optional "desc" each); a matcher is a
+    "START:COUNT" range or a list of them, or a {"START:COUNT": "desc"} map
+    describing each entry, or the bare word "any" (all registers) /
+    "none". The chain is a whitelist: it reads top to bottom and the LAST
+    matching rule decides, and a register no rule decides refuses — the
+    default deny any. Returns (desc, rules), the rules as (verb, matcher,
+    desc, where) tuples in chain order. A profile without acl/write
+    refuses: the caller asked for the profile's gating, silence would look
+    like a gate that is not there."""
     label = label or 'device profile %s' % path
     try:
         with open(path, encoding='utf-8') as fh:
@@ -166,37 +164,48 @@ def load_profile_write_acl(path, label=None):
         raise SystemExit('cannot read device profile %s: %s' % (path, e))
     acl = data.get('acl') if isinstance(data, dict) else None
     gate = acl.get('write') if isinstance(acl, dict) else None
-    if not isinstance(gate, (dict, list)):
+    if not isinstance(gate, dict):
         raise SystemExit('%s carries no "acl"/"write" gate for write-registers profile '
-                         '(add "acl": {"write": {"allow": ["START:COUNT", ...]}})' % label)
-
-    rules = []   # (verb, matcher-value, where) in chain order
-    if isinstance(gate, dict):
-        unknown = sorted(k for k in gate if k not in ('allow', 'deny', 'desc'))
+                         '(add "acl": {"write": {"rules": '
+                         '[{"type": "allow", "range": "START:COUNT"}]}})' % label)
+    unknown = sorted(k for k in gate if k not in ('desc', 'rules'))
+    if unknown:
+        raise SystemExit('%s: unknown acl/write key(s) %s ("desc" and the "rules" list — one '
+                         '{"type": "allow"|"deny", "range": ...} object per rule)'
+                         % (label, ', '.join(unknown)))
+    _acl_desc(gate.get('desc'), '%s acl/write' % label)
+    gate_rules = gate.get('rules')
+    if not isinstance(gate_rules, list) or not gate_rules:
+        raise SystemExit('%s: the acl/write "rules" list is missing or empty (a gate that '
+                         'gates nothing is a config error — spell the whole-space deny as '
+                         '[{"type": "deny", "range": "any"}])' % label)
+    rules = []   # (verb, matcher-value, desc, where) in chain order
+    for i, rule in enumerate(gate_rules):
+        where = '%s acl/write rule %d' % (label, i + 1)
+        if not isinstance(rule, dict) or not rule:
+            raise SystemExit('%s must be an object with a "type" (allow/deny) and a "range"' % where)
+        unknown = sorted(k for k in rule if k not in ('type', 'range', 'desc'))
         if unknown:
-            raise SystemExit('%s: unknown acl/write key(s) %s (allow/deny/desc, or the rule-list form)'
-                             % (label, ', '.join(unknown)))
-        _acl_desc(gate.get('desc'), '%s acl/write' % label)
-        rules.append(('allow', gate.get('allow', 'any'), '%s acl/write/allow' % label))
-        if 'deny' in gate:
-            rules.append(('deny', gate['deny'], '%s acl/write/deny' % label))
-    else:
-        if not gate:
-            raise SystemExit('%s: the acl/write rule list is empty (an empty gate would be '
-                             'indistinguishable from a whole-space deny)' % label)
-        for i, rule in enumerate(gate):
-            where = '%s acl/write rule %d' % (label, i + 1)
-            if not isinstance(rule, dict) or not rule:
-                raise SystemExit('%s must be an object with one verb (allow/deny)' % where)
-            verbs = [k for k in rule if k != 'desc']
-            if len(verbs) != 1 or verbs[0] not in ('allow', 'deny'):
-                raise SystemExit('%s: exactly one verb (allow/deny), got %s'
-                                 % (where, ', '.join(verbs) or 'none'))
-            _acl_desc(rule.get('desc'), where)
-            rules.append((verbs[0], rule[verbs[0]], where))
+            raise SystemExit('%s: unknown key(s) %s (type/range/desc)' % (where, ', '.join(unknown)))
+        verb = rule.get('type')
+        if verb not in ('allow', 'deny'):
+            raise SystemExit('%s: "type" must be allow or deny, got %r' % (where, verb))
+        if 'range' not in rule:
+            raise SystemExit('%s: the rule needs a "range"' % where)
+        _acl_desc(rule.get('desc'), where)
+        rules.append((verb, rule['range'], rule.get('desc'), where))
+    return gate.get('desc'), rules
 
+
+def compile_write_acl(rules):
+    """The parsed rule chain (load_profile_write_gate's rules) -> the
+    write-registers shapes: None (any register writable), () (none), else
+    the disjoint (start, count) ranges. Compiles to a bitmap — allow sets
+    1, deny clears to 0, so the last rule touching a register decides and
+    the untouched bits stay refused (the default deny any) — the chain
+    never needs a second check at write time."""
     bits = bytearray(MAX_REGISTERS)   # 0 = refused (the default), 1 = writable
-    for verb, matcher, where in rules:
+    for verb, matcher, _desc, where in rules:
         kind, ranges = _acl_matcher(matcher, where)
         byte = b'\x01' if verb == 'allow' else b'\x00'   # deny resets to refused
         if kind == 'any':
@@ -210,6 +219,36 @@ def load_profile_write_acl(path, label=None):
     if all(bits):
         return None
     return tuple(_ranges_from_bits(bits))
+
+
+def load_profile_write_acl(path, label=None):
+    """The device profile's write acl, loaded and compiled (see
+    load_profile_write_gate for the schema) -> the write-registers
+    shapes."""
+    _desc, rules = load_profile_write_gate(path, label)
+    return compile_write_acl(rules)
+
+
+def render_write_acl(desc, rules):
+    """The parsed gate as the write/registers/profile show report's lines:
+    the gate-level desc first as the '% ' line, then one
+    '<verb> <range>[ # desc]' line per range — a list or map matcher fans
+    out (the map's per-entry desc wins, a list repeats the rule's desc),
+    the bare words 'any'/'none' stand alone. A chain with no deciding rule
+    renders as the default it is: 'deny any'."""
+    lines = ['%% %s' % desc] if desc else []
+    for verb, matcher, rdesc, _where in rules:
+        if isinstance(matcher, dict):
+            entries = [(str(k).strip().lower(), d) for k, d in matcher.items()]
+        elif isinstance(matcher, list):
+            entries = [(str(x).strip().lower(), rdesc) for x in matcher]
+        else:
+            entries = [(str(matcher).strip().lower(), rdesc)]
+        for rng, d in entries:
+            lines.append('%s %s%s' % (verb, rng, (' # %s' % d) if d else ''))
+    if not lines:
+        lines.append('deny any')
+    return lines
 
 
 def check_range(start, count, label):

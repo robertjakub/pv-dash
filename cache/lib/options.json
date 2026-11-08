@@ -64,7 +64,7 @@
       "values": [ "any", "none", "profile" ], "hint": "START:COUNT,...|any|none|profile",
       "value-help": { "any": "every register writable",
                       "none": "no register writable (the default)",
-                      "profile": "the device profile's write acl (acl/write: allow minus deny)" }, "help": "address ranges a (forwarded) write may touch — the register writes (FC06/16/22/23) and the coil writes (FC05/15, the coil space) are gated by the same ranges: comma-separated START:COUNT, e.g. 47400:100,47600:100; \"any\" = unrestricted; \"none\" = nothing writable; \"profile\" = the device profile's write acl (\"acl\": {\"write\": {\"allow\": [...], \"deny\": [...]}} — allow minus deny, \"any\" = all registers)" },
+                      "profile": "the device profile's write acl (acl/write: the rule chain, default deny any)" }, "help": "address ranges a (forwarded) write may touch — the register writes (FC06/16/22/23) and the coil writes (FC05/15, the coil space) are gated by the same ranges: comma-separated START:COUNT, e.g. 47400:100,47600:100; \"any\" = unrestricted; \"none\" = nothing writable; \"profile\" = the device profile's write acl (\"acl\": {\"write\": {\"rules\": [{\"type\": \"allow\"|\"deny\", \"range\": \"START:COUNT\"}]}} — a whitelist: the last matching rule decides, a register no rule decides refuses)" },
     { "name": "profile", "flag": "--profile", "env": "PROFILE", "conv": "str", "live": "modbus/profile",
       "setting-help": "device profile JSON: the register ranges to cache (a bare name resolves in profiles/profiles/)",
       "values": [ "default" ], "hint": "<file>", "value-help": { "default": "the bundled sun2000 profile" },
@@ -257,7 +257,9 @@
     { "name": "config", "live": "config",
       "setting-help": "the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***)" },
     { "name": "knobs", "live": "knobs",
-      "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes" }
+      "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes" },
+    { "name": "write-registers-profile", "live": "write/registers/profile",
+      "setting-help": "the write-registers gate as its acl chain: one allow/deny line per range (the profile's rules with their descs when the knob rides profile)" }
   ],
   "commands": [
     { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true },

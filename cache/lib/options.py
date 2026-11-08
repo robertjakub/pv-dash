@@ -145,6 +145,17 @@ for s in SETTINGS:   # the row's `alias` spelling answers the same Setting — t
         alias_names.append(s.alias)
 SETTING_NAMES = tuple(s.name for s in SETTINGS)   # the canonical spellings — the dump keys and the unset defaults iterate these
 ALIAS_NAMES = tuple(alias_names)                  # the ?/TAB pools ride them beside the canonicals
+
+# the set/unset vocabulary: the KNOB rows only — a show report's live path
+# never joins it, so it cannot shadow a knob VALUE on the wire: `set write
+# registers profile` is the write-registers knob taking 'profile', while
+# `show write registers profile` answers the write/registers/profile
+# report — one spelling per side of the verb
+_KNOB_SETTINGS = settings_of(OPTIONS)
+SET_BY_NAME = {s.name: s for s in _KNOB_SETTINGS}
+for s in _KNOB_SETTINGS:   # the aliases ride the set vocabulary beside the canonicals
+    if s.alias and s.alias not in SET_BY_NAME:
+        SET_BY_NAME[s.alias] = s
 SHOW_LIVES = frozenset(o.live for o in SHOW_OPTIONS)   # the show reports' lives: show answers them, set/unset never offers them
 LIVE_SETTINGS = frozenset(o.live for o in OPTIONS if o.live) | SHOW_LIVES   # the live-named settings: the pools list these — a row the registry spells
 # without a `live` name (the restart-marked startup knobs, mid-grant) never lists

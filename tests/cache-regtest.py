@@ -1688,7 +1688,8 @@ print('mode 0600 ok')
           and '(the alias of acl/write)' in r and r.count('\n') == 2, r[:160])
 
     # the profile write acl: --write-registers profile compiles the device
-    # profile's acl/write tree (allow minus deny) — the deye profile allows
+    # profile's acl/write rule chain (the whitelist: the last matching rule
+    # decides, a register no rule decides refuses) — the deye profile allows
     # the TOU schedule slots (148-177) and the grid-start registers (127-128)
     deye = os.path.join(REPO, 'profiles', 'profiles', 'deye-sg05lp3.json')
     start([sys.executable, F, '--static', '--port', '15584', '--profile', deye,
@@ -1712,31 +1713,58 @@ print('mode 0600 ok')
           'outside the write allow-list profile (127:2,148:30)' in pal_log, pal_log[-200:])
     r = ctl_cmd('show write registers', 15586)
     check('profile acl: show answers the profile spelling', r == 'ok write/registers=profile', r[:80])
+    r = ctl_cmd('show write registers profile', 15586)
+    check('profile acl: the show report renders the profile rules',
+          r == 'ok write-registers-profile\n'
+               '% Time-of-Use schedule slots (148-177) and operational mode registers (127-128)\n'
+               'allow 127:2 # operational mode registers\n'
+               'allow 148:30 # Time-of-Use schedule slots', repr(r[:220]))
+    r = ctl_cmd('show write-registers-profile', 15586)
+    check('profile acl: the word spelling answers the same report',
+          r.startswith('ok write-registers-profile'), r[:80])
     r = ctl_cmd('show status', 15586)
     check('profile acl: status renders the effective gate',
           'write_allow_list=profile (127:2,148:30)' in r, r[:200])
     r = ctl_cmd('set write registers 100:1', 15586)
     check('profile acl: explicit ranges still set', r.startswith('ok write/registers=100:1'), r[:80])
+    r = ctl_cmd('show write registers profile', 15586)
+    check('profile acl: a range knob renders as its whitelist',
+          r == 'ok write-registers-profile\ndeny any\nallow 100:1', repr(r[:80]))
     b = wr6(130, 1, port=15585)
     check('profile acl: the explicit range gates instead', b[0] == 0x86 and b[1] == 1, b.hex())
+    r = ctl_cmd('set write registers none', 15586)
+    check('profile acl: the none knob renders deny any',
+          r.startswith('ok write/registers=none')
+          and ctl_cmd('show write registers profile', 15586) == 'ok write-registers-profile\ndeny any', r[:80])
+    r = ctl_cmd('set write registers any', 15586)
+    check('profile acl: the any knob renders allow any',
+          r.startswith('ok write/registers=any')
+          and ctl_cmd('show write registers profile', 15586) == 'ok write-registers-profile\nallow any', r[:80])
     r = ctl_cmd('unset write registers', 15586)
     check('profile acl: unset restores the configured profile mode',
           r.startswith('ok write/registers=profile'), r[:80])
     r = ctl_cmd('set write registers profile', 15586)
     check('profile acl: the wire set answers the profile spelling',
           r.startswith('ok write/registers=profile'), r[:80])
+    r = ctl_cmd('set write registers profile any', 15586)
+    check('profile acl: a value past the profile word is a clean err (the show path never shadows the knob value)',
+          r.startswith('fail write-registers entries must be START:COUNT'), r[:80])
 
     # the deny side: a profile copy with allow any + the deye spans denied —
     # everything EXCEPT 127-128/148-177 becomes writable
     deny_prof = '/tmp/reg_deye_deny.json'
     with open(deye) as fh:
         dj = _json.load(fh)
-    dj['acl'] = {'write': {'allow': 'any', 'deny': ['127:2', '148:30']}}
+    dj['acl'] = {'write': {'rules': [
+        {'type': 'allow', 'range': 'any'},
+        {'type': 'deny', 'range': ['127:2', '148:30'], 'desc': 'the deye write spans'},
+    ]}}
     with open(deny_prof, 'w') as fh:
         _json.dump(dj, fh)
     start([sys.executable, P, '--upstream', '127.0.0.1:15584',
            '--listen', '127.0.0.1:15587', '--interval', '1', '--profile', deny_prof,
-           '--allow-write', '--write-acl', 'any', '--write-registers', 'profile'],
+           '--allow-write', '--write-acl', 'any', '--write-registers', 'profile',
+           '--control-port', '15588', '--control-token', 'sekrit'],
           log='/tmp/reg_profile_deny.log')
     time.sleep(2)
     b = wr6(200, 1, port=15587)
@@ -1749,16 +1777,23 @@ print('mode 0600 ok')
     pdl_log = open('/tmp/reg_profile_deny.log').read()
     check('profile acl deny: the refusal names the carved gate',
           'outside the write allow-list profile (0:127,129:19,178:65358)' in pdl_log, pdl_log[-200:])
+    r = ctl_cmd('show write registers profile', 15588)
+    check('profile acl deny: the show report renders the deny chain',
+          r == 'ok write-registers-profile\n'
+               'allow any\n'
+               'deny 127:2 # the deye write spans\n'
+               'deny 148:30 # the deye write spans', repr(r[:160]))
 
     # the rule-chain form: the last matching rule decides, an undecided
-    # register refuses (default deny) — the deny-any chain opens from a
-    # clean slate
-    for name, gate in [('clean', [{'deny': 'any'}, {'allow': '148:30'}]),
-                       ('reopen', [{'allow': 'any'}, {'deny': '148:30'}, {'allow': '148:1'}])]:
+    # register refuses (default deny any — the chain is a whitelist) — the
+    # deny-any chain opens from a clean slate
+    for name, gate in [('clean', [{'type': 'deny', 'range': 'any'}, {'type': 'allow', 'range': '148:30'}]),
+                       ('reopen', [{'type': 'allow', 'range': 'any'}, {'type': 'deny', 'range': '148:30'},
+                                   {'type': 'allow', 'range': '148:1'}])]:
         cp = '/tmp/reg_deye_%s.json' % name
         with open(deye) as fh:
             dj = _json.load(fh)
-        dj['acl'] = {'write': gate}
+        dj['acl'] = {'write': {'rules': gate}}
         with open(cp, 'w') as fh:
             _json.dump(dj, fh)
         start([sys.executable, P, '--upstream', '127.0.0.1:15584',

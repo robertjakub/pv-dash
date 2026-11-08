@@ -92,7 +92,7 @@ class ControlServer:
         self.shutdown_pending = False
         self.defaults = defaults or {}   # setting -> configured value (the restart-marked knobs' pending writes land here)
         self.baseline = dict(self.defaults)   # the startup-resolved values — what `unset` restores
-        self.overridden = set()          # settings changed live (`show status` carries the overridden= row)
+        self.overridden = set()          # settings changed live (the dumps carry the overrides)
         self.clients = set()             # the live control sockets (announce_exit)
         self.clients_lock = threading.Lock()
         self.started = time.monotonic()

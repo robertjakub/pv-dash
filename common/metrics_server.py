@@ -22,6 +22,27 @@ METRICS_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
                b'# rate limited: too many concurrent clients\n')
 
 
+class _GatedMetricsHTTPServer(GatedHTTPServer):
+    """The endpoint's server: the gate refusals and the acl hooks read the
+    MetricsServer instance (metrics_server) — its LOG_NAME names the tool."""
+
+    def gate_refused(httpd, request, client_address, why):
+        logging.getLogger(httpd.metrics_server.LOG_NAME).info(
+            'metrics: rejected %s: too many concurrent clients (%s, max %d/%d)',
+            client_address, why, httpd.gate.max_total, httpd.gate.max_per_ip)
+        try:
+            request.sendall(METRICS_503)
+        except OSError:
+            pass
+        httpd.shutdown_request(request)
+
+    def acl_allows(httpd, ip):
+        return httpd.metrics_server.acl_allows(ip)
+
+    def acl_refused(httpd, request, client_address):
+        httpd.metrics_server.acl_refused(request, client_address)
+
+
 def describe_metrics(listen, token, max_clients=0, max_per_ip=0):
     """The status/inspect one-liner for the endpoint state."""
     host, port = listen
@@ -48,6 +69,7 @@ class MetricsServer:
         self.max_clients = max(0, int(max_clients or 0))
         self.client_timeout = max(0.0, float(client_timeout or 0.0))
         self.max_per_ip = max(0, int(max_per_ip or 0))
+        self.bind_error = None          # the OSError _bind died with (the live set turns it into the err reply)
         self._http = None
 
     def snapshot(self):
@@ -101,29 +123,24 @@ class MetricsServer:
     def serve(self):
         self.started = self.started or time.monotonic()
         self._Handler.timeout = self.client_timeout or 5   # 0 = the built-in slowloris cap
+        self._http.serve_forever()
 
-        class Server(GatedHTTPServer):
-            def gate_refused(httpd, request, client_address, why):
-                logging.getLogger(httpd.metrics_server.LOG_NAME).info(
-                    'metrics: rejected %s: too many concurrent clients (%s, max %d/%d)',
-                    client_address, why, httpd.gate.max_total, httpd.gate.max_per_ip)
-                try:
-                    request.sendall(METRICS_503)
-                except OSError:
-                    pass
-                httpd.shutdown_request(request)
-
-            def acl_allows(httpd, ip):
-                return httpd.metrics_server.acl_allows(ip)
-
-            def acl_refused(httpd, request, client_address):
-                httpd.metrics_server.acl_refused(request, client_address)
-
-        httpd = Server(self.listen, self._Handler)
+    def _bind(self):
+        """Construct and bind the listener in the caller's context: the bind
+        error is the caller's to answer — the startup exits rc 1 after the
+        note, the live `set metrics-server on` turns it into the err reply
+        (bind_error). Binding on the thread would spew the traceback (or
+        worse, limp on silently without the endpoint)."""
+        try:
+            httpd = _GatedMetricsHTTPServer(self.listen, self._Handler)
+        except OSError as e:
+            host, port = self.listen
+            self.bind_error = e
+            logging.getLogger(self.LOG_NAME).error('cannot bind %s:%d: %s', host, port, e)
+            raise SystemExit(1)
         httpd.setup_gate(self.max_clients, self.max_per_ip)
         httpd.metrics_server = self
         self._http = httpd
-        httpd.serve_forever()
 
     def stop(self):
         """Stop the serving loop and close the socket (the live
@@ -135,4 +152,7 @@ class MetricsServer:
         httpd.server_close()
 
     def start(self):
+        """Bind (the caller's context — a bind failure exits rc 1 with the
+        note), then serve on the daemon thread."""
+        self._bind()
         threading.Thread(target=self.serve, daemon=True).start()

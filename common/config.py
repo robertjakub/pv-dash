@@ -218,7 +218,7 @@ def acl_text(acl):
 
 
 def acl_summary(acl):
-    """The ACL for humans (the start log, show status, inspect): 'any' (no
+    """The ACL for humans (the start log, inspect): 'any' (no
     restriction), 'none' (everybody refused) or the network count."""
     if acl is None:
         return 'any'
@@ -469,8 +469,8 @@ def acl_value_text(acl):
 
 
 def acl_gate_summary(acl):
-    """The IP-kind acl knob's gate for humans (the start log, show status,
-    inspect): the system forms as acl_summary spells them, the file gate
+    """The IP-kind acl knob's gate for humans (the start log, inspect):
+    the system forms as acl_summary spells them, the file gate
     as 'file:<path> (N rule(s))'."""
     if isinstance(acl, IPGate):
         return '%s (%d rule(s))' % (acl.reference, len(acl.rules))

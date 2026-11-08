@@ -41,17 +41,6 @@ class DaemonExit(Exception):
     there is nothing on the other end to reconnect to."""
 
 
-def status_map(reply):
-    """The key=value report rows of a `show status` reply as one dict
-    (the welcome greetings read their fields here)."""
-    st = {}
-    for line in reply.splitlines()[1:]:
-        if '=' in line:
-            k, v = line.split('=', 1)
-            st[k] = v
-    return st
-
-
 def make_describe_word(nodes, commands_help, settings):
     """The describer bound to one tool's registries — the golden order:
     a hierarchy node describes its namespace, a command row its help, a

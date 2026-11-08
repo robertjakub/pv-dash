@@ -47,7 +47,8 @@ class ConnGate:
                 self._per_ip[ip] = n
 
     def total(self):
-        """The concurrent-connection count right now (show status)."""
+        """The concurrent-connection count right now (the connections
+        line, inspect)."""
         with self._lock:
             return self._total
 

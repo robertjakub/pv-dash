@@ -616,14 +616,18 @@ def dialog(editor, screen):
         return msg
 
     def confirm_quit():
-        put(curses.LINES - 2, 0, 'really quit discarding? (y/n)', curses.A_BOLD)
-        screen.refresh()
-        return get_key(screen) in (ord('y'), ord('Y'))
+        return confirm('quit discarding')
 
     def confirm(word):
-        """The y/n gate on the bottom line; Esc or anything but y = no."""
-        a = input_line('%s? [y/N] ' % word, '')
-        return a is not None and a.strip().lower() in ('y', 'yes')
+        """The y/n gate on the bottom line: ONE key — y acks, any other
+        key (n, esc, ...) declines. No Enter."""
+        put(curses.LINES - 1, 0, ' %s? [y/N] ' % word, curses.A_BOLD)
+        screen.clrtoeol()
+        screen.refresh()
+        yes = get_key(screen) in (ord('y'), ord('Y'))
+        put(curses.LINES - 1, 0, ' %s? [y/N] %s' % (word, 'y' if yes else 'n'), curses.A_BOLD)
+        screen.clrtoeol()
+        return yes
 
     def vh_menu():
         """The value-help key menu for the open row."""

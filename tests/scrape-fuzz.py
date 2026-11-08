@@ -17,6 +17,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRAPER_DIR = os.path.join(REPO, 'scraper')
 P = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+# the suite's spec — via the env; examples/ is never a loader default
+os.environ['METRICS_SPEC'] = os.path.join(SCRAPER_DIR, 'examples', 'metrics.json')
 INV_PORT, PORT = 15545, 19455
 ROUNDS = 3000
 

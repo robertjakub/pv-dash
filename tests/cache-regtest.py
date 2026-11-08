@@ -405,7 +405,7 @@ try:
 
     start([sys.executable, F, '--static', '--port', '15512', '--control-port', '0', '--allow-write'])
     # the shipped example selection: the essential set, by name
-    SEL = os.path.join(CACHE_DIR, 'selection.json')
+    SEL = os.path.join(CACHE_DIR, 'examples', 'selection.json')
     start([sys.executable, P, '--upstream', '127.0.0.1:15512',
            '--listen', '127.0.0.1:15518', '--interval', '1', '--profile', R,
            '--selection', SEL], log='/tmp/reg_sel.log')
@@ -414,9 +414,8 @@ try:
     b = rd(32064, 2, port=15518)
     check('selection: the essential set polls pv-power', b[0] == 3
           and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
-    check('selection: 22 selected ranges, essentials in the plan',
-          'caching 22 range(s)' in plan and 'pv-power' in plan
-          and 'battery-soc' in plan and 'meter-export' in plan)
+    check('selection: 22 selected ranges, the plan logs pools',
+          'caching 22 range(s)' in plan and 'poll plan: ' in plan and 'pool 1:' in plan)
     b = rd(32089, 1, port=15518)
     check('selection: an unselected register forwards (device-status 512)',
           b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 512, b.hex())
@@ -1829,12 +1828,21 @@ print('mode 0600 ok')
         _json.dump({'desc': 'the regtest gate',
                     'rules': [{'type': 'allow', 'range': '148:30', 'desc': 'the TOU slots'},
                               {'type': 'deny', 'range': '148:1', 'desc': 'carved back'}]}, fh)
+    os.chmod(aclf, 0o644)   # group/world-readable: the permission warning fires at start and on the set/unset replies
     start([sys.executable, P, '--upstream', '127.0.0.1:15584',
            '--listen', '127.0.0.1:15600', '--interval', '1',
            '--allow-write', '--write-acl', 'any', '--write-registers', 'file:' + aclf,
-           '--control-port', '15601', '--control-token', 'sekrit'],
+           '--control-port', '15601', '--control-token', 'sekrit',
+           '--audit-log', '/tmp/reg_acl_audit.log'],
           log='/tmp/reg_acl_file.log')
     time.sleep(2)
+    acl_start_log = open('/tmp/reg_acl_file.log').read()
+    check('acl file: a group/world-readable file warns at start',
+          'the acl file %s is group/world-readable, mode 644 — chmod 0600' % aclf in acl_start_log,
+          acl_start_log[-200:])
+    acl_audit = open('/tmp/reg_acl_audit.log').read()
+    check('acl file: the warning lands in the audit trail (ACL-FILE)',
+          'ACL-FILE' in acl_audit and 'group/world-readable' in acl_audit, acl_audit[-200:])
     b = wr6(149, 1, port=15600)
     check('acl file: 149 passes (the allow 148:30)', b[0] == 6, b.hex())
     b = wr6(148, 1, port=15600)
@@ -1850,6 +1858,15 @@ print('mode 0600 ok')
                '% the regtest gate\n'
                'allow 148:30 # the TOU slots\n'
                'deny 148:1   # carved back', repr(r[:160]))
+    r = ctl_cmd('set write registers file:%s' % aclf, 15601)
+    check('acl file: the set reply carries the permission warning',
+          r.startswith('ok write/registers=file:%s' % aclf)
+          and 'the acl file %s is group/world-readable, mode 644 — chmod 0600' % aclf in r, r[:200])
+    os.chmod(aclf, 0o600)
+    r = ctl_cmd('unset write registers', 15601)
+    check('acl file: a 0600 acl file is silent (the unset restores the file gate)',
+          r.startswith('ok write/registers=file:%s' % aclf)
+          and 'group/world-readable' not in r, r[:160])
     r = ctl_cmd('show status', 15601)
     check('acl file: status renders the resolved gate',
           'write_allow_list=file:%s (149:29)' % aclf in r, r[:200])
@@ -1871,12 +1888,27 @@ print('mode 0600 ok')
           '%s %r' % (p.returncode, p.stderr[-120:]))
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15584',
                         '--listen', '127.0.0.1:15600', '--profile', R,
-                        '--write-registers', 'file:' + os.path.join(CACHE_DIR, 'acl.json'),
+                        '--write-registers', 'file:' + os.path.join(CACHE_DIR, 'examples', 'acl-write-registers.json'),
                         '--dry-run'],
                        capture_output=True, text=True, timeout=60)
     check('acl file: the shipped example loads (the deye gate)',
           p.returncode == 0 and 'dry-run: configuration and register map are valid' in (p.stdout + p.stderr),
           '%s %r' % (p.returncode, (p.stdout + p.stderr)[-120:]))
+
+    # the matcher grammar: a range, a list of ranges, or the word any —
+    # the range-map form and the none word refuse
+    for what, matcher in [('the range-map matcher', {'148:18': 'the TOU slots'}),
+                          ('the none word', 'none')]:
+        badf = '/tmp/reg_acl_bad_matcher.json'
+        with open(badf, 'w') as fh:
+            _json.dump({'rules': [{'type': 'allow', 'range': matcher}]}, fh)
+        p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15584',
+                            '--listen', '127.0.0.1:15600', '--profile', R,
+                            '--write-registers', 'file:' + badf, '--dry-run'],
+                           capture_output=True, text=True, timeout=60)
+        check('acl file: %s refuses (a range, a list of ranges, or "any")' % what,
+              p.returncode == 1 and 'must be' in p.stderr,
+              '%s %r' % (p.returncode, p.stderr[-160:]))
 
 
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,

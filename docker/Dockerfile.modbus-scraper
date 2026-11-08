@@ -42,8 +42,8 @@ COPY --from=common *.py common/
 COPY --from=common modbus/*.py common/modbus/
 COPY --chown=pvsuite bin/ scraper/bin/
 COPY --chown=pvsuite lib/ scraper/lib/
-COPY --chown=pvsuite scraper.conf metrics.json scraper/
-COPY --chown=pvsuite metrics.json metrics.token config-defaults/
+COPY --chown=pvsuite examples/scraper.conf examples/metrics.json scraper/
+COPY --chown=pvsuite examples/metrics.json examples/metrics.token config-defaults/
 RUN chmod +x scraper/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/scraper/bin/modbus-scraper.py /usr/local/bin/modbus-scraper \
     && ln -s /pv-suite/scraper/bin/modbus-scraper-ctl.py /usr/local/bin/modbus-scraper-ctl \

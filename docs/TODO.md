@@ -73,6 +73,21 @@ the **Done/history** records for their tool.
   without one (a test tool, trusted LAN); an opt-in `--connect-acl`
   mirroring the cache's would let the paranoid demo the ACL story end to
   end without touching the fake's soft-edge posture.
+- **the connect kind in the standalone acl file** `[cache]` — the acl
+  file (`--write-registers file:<path>`, the shipped
+  `cache/examples/acl-write-registers.json`) carries the **write** gate alone; the
+  plan is two acl's per file (write + connect): the file grows the keyed
+  `"acl"` tree the device profiles already speak
+  (`{"acl": {"write": ..., "connect": ...}}` — the connect gate
+  compiling to the `acl/connect` client set; the exact shape is the
+  wave's to settle), and `scripts/lint_acl.py` + `scripts/edit_acl.py`
+  follow the second kind.
+- **the connect acl (ip whitelists)** `[cache]` — the connect gate next
+  to the write gate: an allowed-peers whitelist deciding who may open
+  the Modbus connection at all (the `acl/connect` chain the
+  standalone-acl-file item above plans — the same typed rules, the
+  matched value the peer address), so the connect/write gates ship as
+  one acl story.
 - **the audit trail forwarding** `[common]` — F10's strong answer as an
   option: `--audit-forward syslog` (stdlib `SysLogHandler`, journald picks
   it up sealed) next to the file/stdout sinks; the hash chains + the
@@ -359,6 +374,23 @@ the **Done/history** records for their tool.
   clients, the metrics endpoint skeleton, the resolver pieces, the
   control-server base: one implementation each, the tools subclass or
   pass their spec).
+- **the compute-expression wave** — the scraper's compute metrics are
+  expression-fed: the spec's one merged `metrics` tree carries entries
+  with `expr` (+ the optional `when` gate) or a `profile` binding (the
+  field says what feeds it; the old `profile`/`compute` sections refuse),
+  a stdlib-safe whitelist evaluator (`lib/expr.py`) compiles them once at
+  startup and the poller evaluates per poll (an unavailable input or a
+  failed eval keeps the metric absent); the "inputs" declaration and the
+  four canonical metrics (the power math's inputs, always bound and
+  fetched) ship in the built-in lib/metrics.json (merged into every spec;
+  a spec's own section rewords the inputs, a double-bound register
+  refuses), `show inputs` / `show inputs metrics` (normal
+  registry rows) render the vocabulary and the exported metrics, the five
+  classic compute metrics ride as the built-in eval-table defaults, and
+  the default spec resolves from a source checkout's `examples/` (the
+  packaging re-flattens it) — the double-`Metrics()` wart in the bin (the
+  daemon exported the default spec over `--metrics-spec`) fell out of the
+  same wave.
 
 Per-tool **Done/history** lives in each subproject's own TODO.md
 ([cache](../cache/TODO.md), [scraper](../scraper/TODO.md),

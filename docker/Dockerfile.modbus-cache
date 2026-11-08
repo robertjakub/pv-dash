@@ -37,8 +37,8 @@ COPY --from=common *.py common/
 COPY --from=common modbus/*.py common/modbus/
 COPY --chown=pvsuite bin/ cache/bin/
 COPY --chown=pvsuite lib/ cache/lib/
-COPY --chown=pvsuite modbus_cache.conf selection.json acl.json cache/
-COPY --chown=pvsuite selection.json config-defaults/
+COPY --chown=pvsuite examples/modbus_cache.conf examples/selection.json examples/acl-write-registers.json cache/
+COPY --chown=pvsuite examples/selection.json config-defaults/
 RUN chmod +x cache/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/cache/bin/modbus-cache.py /usr/local/bin/modbus-cache \
     && ln -s /pv-suite/cache/bin/modbus-cache-ctl.py /usr/local/bin/modbus-cache-ctl \

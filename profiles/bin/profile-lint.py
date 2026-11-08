@@ -25,38 +25,20 @@ WORD_TYPES = ('i16', 'u16', 'i32', 'u32', 'i32swap', 'u32swap', 'f32', 'f32swap'
 
 
 def lint_matcher(v, where):
-    """One rule matcher: 'any'/'none', START:COUNT (a string, a list or a
-    {"START:COUNT": "desc"} map)."""
+    """One rule matcher: 'any', START:COUNT (a string or a list)."""
     issues = []
     if isinstance(v, str):
         t = v.strip().lower()
-        if t in ('any', 'none'):
+        if t == 'any':
             return issues
         items = [t]
-    elif isinstance(v, dict):
-        for k, d in v.items():
-            t = str(k).strip().lower()
-            if t in ('any', 'none'):
-                continue
-            try:
-                start, count = (int(x) for x in t.split(':'))
-            except ValueError:
-                issues.append('%s: %r must be START:COUNT' % (where, k))
-                continue
-            if start < 0 or count < 1 or start + count > MAX_REGISTERS:
-                issues.append('%s: range %d:%d out of bounds (0..%d)'
-                              % (where, start, count, MAX_REGISTERS - 1))
-            if not isinstance(d, str) or not d.strip() or not d.isascii():
-                issues.append("%s entry %r: the description must be terse ASCII" % (where, k))
-        return issues
     elif isinstance(v, list):
         items = v
     else:
-        return ['%s must be a range, a list of ranges, a {"START:COUNT": "desc"} map, '
-                '"any" or "none"' % where]
+        return ['%s must be a range ("START:COUNT"), a list of ranges, or "any"' % where]
     for x in items:
-        if not isinstance(x, str) or x.strip().lower() in ('any', 'none'):
-            issues.append('%s: %r must be START:COUNT (the words any/none stand alone)'
+        if not isinstance(x, str) or x.strip().lower() == 'any':
+            issues.append('%s: %r must be START:COUNT (the word any stands alone)'
                           % (where, x))
             continue
         try:

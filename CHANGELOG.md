@@ -18,9 +18,14 @@ before the repo restructured into one suite.
   refuses the start, the wire answers `err` with the old gate standing,
   the spelling is the re-appliable dump form, and the
   `show write registers profile` report renders the file's rules like the
-  profile's. An example ships as `cache/acl.json` (the `deye-sg05lp3`
-  gate; the nix package and the cache image carry it beside the sample
-  conf).
+   profile's. An example ships as
+  `cache/examples/acl-write-registers.json` — the deye
+  policy worked out: the clean-slate deny, the allows (the plain range,
+  the list), the deny carves and the re-opens —
+  and **a group/world-readable acl file warns**: in the log, the audit
+  trail's `ACL-FILE` event, and as the suffix of the `set`/`unset` reply
+  (the write gate is config trust any local user could have loosened —
+  chmod 0600 silences it).
 
 - **cache** — the **`show write registers profile`** report (show-only —
   nothing to set): the write gate answered as its acl chain — `allow any`
@@ -36,6 +41,53 @@ before the repo restructured into one suite.
   `CONTROL_SOCKET_GROUP`, config `set control socket-group`) opts into
   `0660` — a local group may speak to the control without being the service
   user; `set control socket-group` re-modes the live socket.
+
+- **scraper** — **the compute metrics are expression-fed**: the spec's
+  `metrics` tree (one merged section — the entry's own field says what
+  feeds it) carries compute entries with an **`expr`** (and an optional
+  **`when`** presence gate) over the poll's inputs, compiled once at
+  startup and evaluated per poll (a stdlib-safe whitelist evaluator —
+  numbers, the inputs, `+ - * / // % **`, comparisons, `and`/`or`/`not`,
+  the ternary and `abs`/`min`/`max`/round`; no attributes, no subscripts,
+  one compute metric cannot feed another). An unavailable input (`soc`
+  with the battery flag off, a failed read), a division by zero or a
+  non-finite result keeps the metric absent for that poll. The
+  **`inputs` section declares the vocabulary**: `{name: {help}}` — the
+  reserved five (`pv`, `grid`, `batt`, `soc`, `battery`) are declared in
+  the built-in **`lib/metrics.json`** (merged into every spec; every
+  reserved input must be declared there) with their fixed semantics (the
+  sanity checks, the sign flips, the battery-off rules), the spec's own
+  "inputs" entries may reword them, the spec's own profile-fed keys are
+  inputs too, and an unknown name — referenced or declared — is a clean
+  startup error. The
+  five classic compute metrics (the export/import split, home consumption,
+  the charge/discharge split — `when: battery` keeps the pair absent while
+  the battery flag is off) are the built-in eval-table defaults under
+  every spec that doesn't define them. The four **canonical metrics** (the
+  power math's inputs — `pv_generation_watts`, `grid_net_watts`,
+  `battery_net_watts`, `battery_soc_percent`) move into the built-in
+  **`lib/metrics.json`** too: always declared, always bound, always
+  fetched — the compute inputs' sources — and a spec binding one of their
+  registers a second time refuses at startup. The **`show inputs`** report
+  lists
+  the declared inputs (the reserved five and the spec's declared entries —
+  the profile-fed keys stay referenceable without declaring them), each
+  bracketed with the spec's own metric whose value it carries, and the
+  **`show inputs metrics`** report lists the exported metrics (one
+  `[section]`-bracketed line per metric the exposition serves, sorted by
+  name); both share the aligned `name  [bracket]  help` shape and cap the
+  help at a word-boundary 40 for display (the full text lives in the
+  exposition and the docs). The live **`set metrics prefix` re-builds the
+  spec** (and the sources) and wakes the poll — the exported names carried
+  the startup prefix while the knob claimed live before. The former
+  `profile`/`compute` sections are gone — their entries live in
+  the one `metrics` tree, and an old-section spec refuses at startup.
+
+- **scraper** — **the default spec resolves from a source checkout**: the
+  loader tries the packaged root, then the checkout's `examples/metrics.json`
+  (the examples wave moved the bundled sample there, which left a bare
+  `python3 ./modbus-scraper.py` failing) — the error names every candidate
+  tried.
 
 - **everywhere** — **the control wire's reply status gains `note`** (besides
   `ok` | `fail` | `bye`): the verdict of a command that ran and whose effect
@@ -54,6 +106,17 @@ before the repo restructured into one suite.
   marked restart again in `dda97b9`); the audit rev. 17 entry follows.
 
 ### Changed
+
+- **cache, scraper, dashboard** — **the shipped examples move into
+  `examples/` subdirs** (the sample confs, the JSON specs, the token
+  placeholder — `cache/examples/`, `scraper/examples/`,
+  `dashboard/examples/`): the loaders keep their search paths (in the
+  package and the images the files still install beside the scripts, so
+  the default `--config`/spec targets stand) — a bare checkout now passes
+  `--config`/`$CONFIG` (or the spec/selection/acl paths) explicitly, the
+  root no longer pretends to be live config. The packaging, the Dockerfile
+  COPYs, the regtests, the lint's bundled-config legs, the book include
+  and the docs follow.
 
 - **scraper** — **the wire settings re-spell to the family's path shapes**:
   `set interval` is `set metrics interval`, `set timeout`/`set profile` are

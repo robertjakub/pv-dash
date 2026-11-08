@@ -24,6 +24,9 @@ SCRAPER_DIR = os.path.join(REPO, 'scraper')
 
 P = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+# the suite's spec — via the env (a test's explicit --metrics-spec still wins);
+# examples/ is never a loader default, a checkout has no bundled spec
+os.environ['METRICS_SPEC'] = os.path.join(SCRAPER_DIR, 'examples', 'metrics.json')
 PORT = 15541
 PORT_A, PORT_B = 19441, 19442
 
@@ -283,7 +286,7 @@ try:
                     {'name': 'meter-status', 'register': 40020, 'type': 'bit', 'scale': 1},
                 ]}, open(profx, 'w'))
     specx = '/tmp/scr_bits_spec.json'
-    _json.dump({'profile': {
+    _json.dump({'metrics': {
         'pv_generation_watts': {'profile': 'pv-power', 'help': 'pv watts'},
         'grid_net_watts': {'profile': 'grid-power', 'help': 'grid watts'},
         'float_value': {'profile': 'device-insulation', 'help': 'an f32 row'},
@@ -406,6 +409,22 @@ try:
     status, m = wait_metrics(PORT_B)
     check('battery off: flag 0', m.get('scraper_battery') == 0)
     check('battery off: no battery metrics', 'huawei_battery_net_watts' not in m)
+
+    # 2b. the compute expressions: a custom spec evaluates per poll
+    with open('/tmp/scr_spec_expr.json', 'w') as fh:
+        _json.dump({'metrics': {'pv_generation_watts': {'profile': 'pv-power', 'help': 'Current PV power in watts.'},
+                                'grid_net_watts': {'profile': 'grid-power', 'help': 'Net grid power in watts.'},
+                                'battery_net_watts': {'profile': 'battery-power', 'help': 'Battery net power in watts.'},
+                                'battery_soc_percent': {'profile': 'battery-soc', 'help': 'Battery state of charge in percent.'},
+                                'pv_kilowatts': {'expr': 'pv / 1000', 'help': 'PV power in kilowatts.'}}}, fh)
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
+                                   '--upstream', '127.0.0.1:%d' % PORT, '--battery',
+                                   '--metrics-spec', '/tmp/scr_spec_expr.json',
+                                   '--listen', '127.0.0.1:19470'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    status, m = wait_metrics(19470)
+    check('compute expr: pv / 1000 exports 4.0', m.get('huawei_pv_kilowatts') == 4.0,
+          str(m.get('huawei_pv_kilowatts')))
 
     # 2c. fake extras: control server (runtime overrides) + chaos injection
     def ctl(cmd, port):
@@ -1440,10 +1459,10 @@ try:
                         'print(m.section_of("scraper_up"), m.section_of("huawei_pv_generation_watts"),'
                         'list(m.specs)[0], list(m.specs)[-1])'
                         % SCRAPER_DIR], capture_output=True)
-    check('default spec: scraper_* merged in, profile first, scraper last',
-          r.returncode == 0 and b'scraper profile huawei_pv_generation_watts scraper_cache_uptime_seconds' in r.stdout)
+    check('default spec: scraper_* merged in, the canonical metrics built-in, scraper last',
+          r.returncode == 0 and b'scraper profile huawei_phase_a_voltage_volts scraper_cache_uptime_seconds' in r.stdout)
     with open('/tmp/scr_spec_noscraper.json', 'w') as fh:
-        _json.dump({'profile': {'pv_generation_watts': {'profile': 'pv-power', 'help': 'Current PV power in watts.'}}}, fh)
+        _json.dump({'metrics': {'pv_generation_watts': {'profile': 'pv-power', 'help': 'Current PV power in watts.'}}}, fh)
     r = subprocess.run([sys.executable, '-c',
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; m = Metrics(%r);'
@@ -1459,7 +1478,54 @@ try:
                         'print(m.help["scraper_up"], len(m.specs))'
                         % (SCRAPER_DIR, '/tmp/scr_spec_override.json')], capture_output=True)
     check('custom scraper section: its entries override the built-ins by name',
-          r.returncode == 0 and b'custom up help. 10' in r.stdout, r.stdout.decode().strip())
+          r.returncode == 0 and b'custom up help. 14' in r.stdout, r.stdout.decode().strip())
+
+    # 3h. the compute expressions: the bundled five compile (and the bad specs fail fast)
+    r = subprocess.run([sys.executable, '-c',
+                        'import sys; sys.path.insert(0, %r);'
+                        'from lib.metrics import Metrics; m = Metrics();'
+                        'print(len(m.compute), list(m.compute)[0], m.section_of("huawei_home_consumption_watts"),'
+                        'len(m.inputs), m.inputs["batt"]["register"], m.inputs["batt"]["help"][:20])'
+                        % SCRAPER_DIR], capture_output=True)
+    check('default spec: the five compute metrics compiled, the declared vocabulary is the reserved five',
+          r.returncode == 0 and b'5 huawei_grid_export_watts compute 5 battery-power Net battery power' in r.stdout,
+          r.stdout.decode().strip())
+    for case, spec, needle in (
+            ('no-expr', {'metrics': {'custom_watts': {'help': 'A compute entry without an expr.'}}},
+             b'has no "expr"'),
+            ('unknown-input', {'metrics': {'custom_watts': {'expr': 'pv + mystery', 'help': 'x.'}}},
+             b'unknown input(s) mystery'),
+            ('bad-syntax', {'metrics': {'custom_watts': {'expr': 'pv +', 'help': 'x.'}}},
+             b'cannot parse'),
+            ('compute-chained', {'metrics': {'a_watts': {'expr': 'pv', 'help': 'x.'},
+                                             'b_watts': {'expr': 'a_watts + 1', 'help': 'x.'}}},
+             b'unknown input(s) a_watts'),
+            ('both-fields', {'metrics': {'custom_watts': {'profile': 'pv-power', 'expr': 'pv', 'help': 'x.'}}},
+             b'one or the other'),
+            ('old-sections', {'profile': {'pv_generation_watts': {'profile': 'pv-power', 'help': 'x.'}}},
+             b'live in one "metrics" tree'),
+            ('inputs-unknown', {'inputs': {'mystery': {'help': 'not a real input.'}},
+                                'metrics': {'custom_watts': {'expr': 'pv', 'help': 'x.'}}},
+             b'declares \'mystery\', which is not an input'),
+            ('inputs-no-help', {'inputs': {'pv': {}},
+                                'metrics': {'custom_watts': {'expr': 'pv', 'help': 'x.'}}},
+             b'declares no "help" string'),
+            ('inputs-shape', {'inputs': [], 'metrics': {'custom_watts': {'expr': 'pv', 'help': 'x.'}}},
+             b'the "inputs" section must be a non-empty object'),
+            ('unknown-section', {'metrics': {'custom_watts': {'expr': 'pv', 'help': 'x.'}},
+                                 'gauge': {'loose': {'help': 'x.'}}},
+             b'unknown section'),
+            ('rebind-canonical', {'metrics': {'panel_watts': {'profile': 'pv-power', 'help': 'x.'}}},
+             b'bound twice')):
+        path = '/tmp/scr_spec_%s.json' % case
+        with open(path, 'w') as fh:
+            _json.dump(spec, fh)
+        r = subprocess.run([sys.executable, '-c',
+                            'import sys; sys.path.insert(0, %r);'
+                            'from lib.metrics import Metrics; Metrics(%r)'
+                            % (SCRAPER_DIR, path)], capture_output=True)
+        check('compute spec %s: clean rc=1' % case, r.returncode == 1 and needle in r.stderr,
+              r.stderr.decode().strip()[-90:])
 
     # 4. sanity-check controls against a scripted inverter (every F5 claim, live)
     regs = {}
@@ -1659,6 +1725,28 @@ try:
     time.sleep(1.5)
     r = sctl('show version', 15597)
     check('scraper control: show version', r.startswith('ok modbus-scraper'), r[:80])
+    r = sctl('set metrics prefix deye', 15597)
+    check('scraper control: the prefix set re-builds the spec', r.startswith('ok metrics/prefix=deye'), r[:80])
+    m = {}
+    for _ in range(10):
+        m = metrics_dict(get('/metrics', 19457)[1])
+        if 'deye_pv_generation_watts' in m:
+            break
+        time.sleep(0.3)
+    check('control: the exported names carry the live prefix', 'deye_pv_generation_watts' in m
+          and 'huawei_pv_generation_watts' not in m, str(sorted(m))[:80])
+    r = sctl('set metrics prefix 9bad', 15597)
+    check('control: an invalid prefix refuses', r.startswith('fail invalid metric_prefix'), r[:80])
+    r = sctl('unset metrics prefix', 15597)
+    check('control: the prefix unset re-applies huawei', r.startswith('ok metrics/prefix=huawei'), r[:80])
+    m = {}
+    for _ in range(10):
+        m = metrics_dict(get('/metrics', 19457)[1])
+        if 'huawei_pv_generation_watts' in m:
+            break
+        time.sleep(0.3)
+    check('control: the exported names carry huawei again', 'huawei_pv_generation_watts' in m
+          and 'deye_pv_generation_watts' not in m, str(sorted(m))[:80])
     r = sctl('show status', 15597)
     check('scraper control: the status report', r.startswith('ok status\n')
           and 'upstream=127.0.0.1:%d' % PORT in r and 'metrics' not in r and 'listen=127.0.0.1:19457' in r,
@@ -1730,6 +1818,20 @@ try:
     check('scraper control: show knobs, the dictionary of the registry — flag, env twin, how it changes',
           r.startswith('ok knobs') and '--metric-prefix' in r and '$METRIC_PREFIX' in r
           and 'set metrics interval <value>' in r and ', secret' in r, r[:200])
+    r = sctl('show inputs', 15597)
+    check('scraper control: show inputs shows the declared inputs only, aligned, the help capped',
+          r.startswith('ok inputs') and '[battery_net_watts]' in r
+          and 'The battery flag (1 on, 0 off).' in r
+          and '[pv_generation_watts]' in r
+          and 'phase_a_voltage_volts' not in r, r[:240])
+    r = sctl('show inputs metrics', 15597)
+    check('scraper control: show inputs metrics (the words forward to the dashed report) lists the exported metrics',
+          r.startswith('ok inputs-metrics') and 'huawei_battery_charge_watts' in r and '[compute]' in r
+          and '[profile]' in r and '\nscraper_battery  ' in r and 'gauge' not in r
+          and list(r.splitlines()[1:]) == sorted(r.splitlines()[1:]), r[:240])
+    r = sctl('show inputs-metrics', 15597)
+    check('scraper control: the dashed spelling answers the same report',
+          r.startswith('ok inputs-metrics') and 'huawei_battery_charge_watts' in r, r[:80])
     r = sctl('poll now', 15597)
     check('scraper control: poll now', r.startswith('ok poll now'), r[:80])
     r = sctl('request reload-config', 15597)
@@ -2027,7 +2129,7 @@ try:
              if line.strip() and not line.strip().startswith('[')]
     check("scraper_ctl: the bare show mimics the ? output (the walk's first position)",
           r.returncode == 0 and words == ['audit', 'caps', 'config', 'connections', 'control', 'dump',
-                                          'knobs', 'local-time', 'log-access', 'log-level', 'metrics',
+                                          'inputs', 'knobs', 'local-time', 'log-access', 'log-level', 'metrics',
                                           'modbus', 'status', 'version'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,

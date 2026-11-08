@@ -23,10 +23,10 @@ sys.path.insert(0, REPO)
 
 # tool -> (bin script, registry module dir, module.nix, README, bundled config, flag-table headings)
 TOOLS = {
-    'cache': ('cache/bin/modbus-cache.py', 'cache', 'cache/module.nix', 'cache/README.md', 'cache/modbus_cache.conf'),
-    'scraper': ('scraper/bin/modbus-scraper.py', 'scraper', 'scraper/module.nix', 'scraper/README.md', 'scraper/scraper.conf'),
+    'cache': ('cache/bin/modbus-cache.py', 'cache', 'cache/module.nix', 'cache/README.md', 'cache/examples/modbus_cache.conf'),
+    'scraper': ('scraper/bin/modbus-scraper.py', 'scraper', 'scraper/module.nix', 'scraper/README.md', 'scraper/examples/scraper.conf'),
     'inverter': ('inverter/bin/modbus-fake-inverter.py', 'inverter', None, 'inverter/README.md', None),
-    'dashboard': ('dashboard/bin/dashboard.py', 'dashboard', 'dashboard/module.nix', 'dashboard/README.md', 'dashboard/server.conf'),
+    'dashboard': ('dashboard/bin/dashboard.py', 'dashboard', 'dashboard/module.nix', 'dashboard/README.md', 'dashboard/examples/server.conf'),
 }
 
 # the nix option names that deliberately diverge from lowerCamel(flag), and

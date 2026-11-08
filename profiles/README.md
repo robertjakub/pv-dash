@@ -66,8 +66,7 @@ One JSON object per device:
   optional terse-ASCII `desc` and the ordered **`rules`** list, one
   `{"type": "allow"|"deny", "range": matcher}` object per rule, each with
   an optional `desc`. A matcher is a `START:COUNT` range or a list of
-  them, or a `{ "START:COUNT": "desc" }` map describing each entry, or
-  the bare word `any` (all registers) / `none`. The chain is a
+  them, or the bare word `any` (all registers). The chain is a
   **whitelist**: it reads top to bottom and **the last matching rule
   decides**; a register no rule decides refuses (the default deny any).
   The cache's `write-registers profile` value compiles the chain into the

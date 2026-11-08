@@ -4,6 +4,7 @@ result*
 .DS_Store
 .env
 docker/env/*.env
+scraper/metrics.json
 
 # the wave drafts — invented against the tree, deleted at landing
 /docs/draft-*.md

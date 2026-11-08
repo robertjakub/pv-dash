@@ -37,10 +37,10 @@ SCAN_DIRS = ('common', 'profiles', 'cache', 'inverter', 'scraper', 'dashboard')
 # is reviewed in here; every name is cross-checked against
 # sys.stdlib_module_names on 3.10+, so a non-stdlib entry cannot hide
 STDLIB = (
-    'argparse', 'collections', 'getpass', 'glob', 'hashlib', 'hmac', 'http',
-    'ipaddress', 'json', 'logging', 'math', 'mimetypes', 'os', 'random',
+    'argparse', 'ast', 'collections', 'getpass', 'glob', 'hashlib', 'hmac', 'http',
+    'ipaddress', 'json', 'logging', 'math', 'mimetypes', 'operator', 'os', 'random',
     'readline', 're', 'secrets', 'signal', 'socket', 'struct', 'subprocess',
-    'sys', 'textwrap', 'threading', 'time', 'urllib',
+    'sys', 'textwrap', 'threading', 'time', 'unicodedata', 'urllib',
 )
 FIRST_PARTY = ('common', 'lib')
 

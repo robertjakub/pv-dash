@@ -13,4 +13,4 @@ filed under the hierarchy nodes the wire spells as words (`modbus`,
 `scripts/check_options.py` gates the four surfaces (the flags, the env
 twins, the NixOS modules, the README tables) against the registry.
 
-{{#include ../../../cache/modbus_cache.conf}}
+{{#include ../../../cache/examples/modbus_cache.conf}}

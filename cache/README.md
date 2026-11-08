@@ -338,7 +338,6 @@ token, an admin client against the admin token. The peer-cred trusted peers
 | `show <setting>` | the bare live value of one tunable |
 | `help <setting>` | the registry description of one setting |
 | `inspect` | one pretty multi-line dump of everything — version, upstream, listen/control, profile, cache state, poll plan, counters, the write gate, the audit sink: the baton for a bug report |
-| `show status` | the **effective state report**: one stable `key=value` line per field (`upstream`, `unit`, `listen`, `control`, `uptime`, `poll`, `last_poll`, `interval`, `ttl`, `merge_gap`, `ranges`, `fc4_ranges`, `map_version`, `hits`, `misses`, `clients`, `writes`, `write_allow_list`, `requests_audit`, `dump`, `profile`, `selection`) — scriptable |
 | `show connections` | connected clients: peer, connection age, requests served |
 | `show cache` | cache contents: ranges, cached words, oldest entry, TTL, map version, failed ranges, hit/miss counters |
 | `show cache all` | every cached entry, one row per profile range: name, words cached, their values (`-` = not cached), age of the oldest, when it expires, poll status (`ok`/`partial`/`empty`/`failed (ex N)`) |
@@ -363,7 +362,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 Every `set` applies immediately and keeps working until the daemon stops —
 **or** the next `SIGHUP`, which re-resolves the config (flags, env, the config file) and
 re-applies it wholesale: the file always wins on reload. A setting changed
-live is listed in `show status`'s `overridden=` row; `unset <setting>`
+live reads back with `show <setting>`; `unset <setting>`
 restores the configured value and clears the entry. This makes the policy
 explicit: live settings are
 runtime nudges, the config files stay the source of truth.
@@ -374,7 +373,7 @@ A small client for scripts and quick pokes: one command as arguments (or a
 batch piped on stdin), the replies on stdout, done.
 
 ```bash
-python3 cache/bin/modbus-cache-ctl.py --control-port 15509 show status
+python3 cache/bin/modbus-cache-ctl.py --control-port 15509 show modbus upstream
 python3 cache/bin/modbus-cache-ctl.py --control-port 15509 clear cache
 printf 'show cache\nclear cache\n' | python3 cache/bin/modbus-cache-ctl.py --control-port 15509
 ```
@@ -389,35 +388,19 @@ Every invocation lands in the audit log (below, prefix `CTL`).
 ### `modbus-cache-cli` — console-style session
 
 An interactive front-end on the same socket (same flag/env resolution): on
-the first connect (a TTY) it probes the status and greets you —
+the first connect (a TTY) it greets you —
 
 ```
 $ python3 cache/bin/modbus-cache-cli.py
 
 %   Welcome to the modbus-cache console
-%   192.168.1.100:5502 upstream | poll ok, last poll 2.00s | running for 1.00h | 1 client(s)
 %   TAB completes, ? lists the commands, quit leaves
 
-cache:15502 > show status
-upstream=192.168.1.100:5502
-unit=1
-listen=127.0.0.1:15502
-control=unix:/tmp/modbus-cache-15502.socket
-uptime=1.00h
-poll=ok
-last_poll=2.00s
-interval=10.00s
-ttl=30.00s
-merge_gap=8
-ranges=13
-fc4_ranges=0
-map_version=0
-hits=412
-misses=9
-clients=1
-writes=disabled
-write_allow_list=any
-requests_audit=5.00m
+cache:15502 > show modbus upstream
+192.168.1.100:5502
+
+cache:15502 > show cache
+13 range(s), 88 word(s) cached, oldest 2.00s, ttl 30.00s, map v3, failed range(s) 0, hits 412, misses 9
 
 cache:15502 > clear cache
 
@@ -427,7 +410,7 @@ Proceed with shutdown? [confirm] y
 ```
 
 The prompt shows the connected port, TAB completes commands with their
-descriptions (`show <TAB>` lists the tunables plus status/connections/cache/
+descriptions (`show <TAB>` lists the tunables plus connections/cache/
 version, `?` does the same in any position), `request clear cache` and
 `request restart` confirm silently (the prompt returning is the
 confirmation), `set`/`unset` confirm `% changed`, and `shutdown` asks

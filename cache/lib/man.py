@@ -73,7 +73,7 @@ The control server speaks JSON lines: one request
 (the settings registry drives the grammar):
 .BR set ", " unset ", " show ", " help ,
 the reports
-.BR inspect ", " "show status" ", " "show connections" ,
+.BR inspect ", " "show connections" ,
 .BR "show cache" " [all]" ", " "show write registers profile" ", " "show uplink" ", " "show version" ,
 .BR "show acl connect table" ", " "show acl write table" ", " "show metrics acl table" ,
 the ops
@@ -216,7 +216,7 @@ stdout, one per line. Every invocation lands in the audit trail (prefix
 \\fBCTL\\fR).
 .PP
 The command grammar is the daemon's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
-\\fBhelp\\fR (the settings registry), \\fBinspect\\fR, \\fBshow status\\fR,
+\\fBhelp\\fR (the settings registry), \\fBinspect\\fR,
 \\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR],
 \\fBshow write registers profile\\fR, \\fBshow uplink\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
@@ -228,7 +228,7 @@ CONTROL."""
     examples = """.SH EXAMPLES
 .RS
 .IP \\(bu 2
-.B modbus-cache-ctl show status
+.B modbus-cache-ctl show connections
 .IP \\(bu 2
 .B modbus-cache-ctl request clear cache
 .IP \\(bu 2

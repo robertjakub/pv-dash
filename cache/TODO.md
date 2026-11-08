@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The show-status removal: **`show status` is gone** (nothing replaces it) —
+the registry row, the dispatch branch and the key=value report body die;
+the per-setting `show <setting>`, `show config`, `inspect` and the
+set/unset replies' state summary carry the same truths. The cli console
+greets with the two fixed lines (the banner's status line rode the
+report) and probes `show dump path` for the dump-gated completion pools.
+
 The metrics/acl wave: **the /metrics endpoint takes the IP plane** —
 `--metrics-acl` (env `METRICS_ACL`, config `metrics_acl`, NixOS
 `metricsAcl`, live `set metrics acl` / `unset metrics acl`) migrates the

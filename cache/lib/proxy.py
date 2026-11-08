@@ -435,7 +435,7 @@ class Proxy:
         return self._ranges_text()
 
     def describe_write_gate(self):
-        """The gate for humans (the logs, show status, inspect): like
+        """The gate for humans (the logs, inspect): like
         describe_write_ranges, but a profile- or file-mode gate names the
         effective ranges it resolved to."""
         if isinstance(self.write_registers, str):

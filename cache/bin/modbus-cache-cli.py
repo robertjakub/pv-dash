@@ -61,18 +61,12 @@ describe_word = cli.make_describe_word(NODE_BY_NAME, COMMAND_HELP, SETTING_BY_NA
 
 
 def welcome(sock):
-    """The first-connect greeting: probe the status and introduce the proxy —
-    the upstream, the poll health, how long it has been running — and the
-    one-line navigation hint."""
-    reply = cli.exchange(sock, cli.wire('show status'))
-    if not reply or not reply.startswith('ok status'):
-        return
-    st = cli.status_map(reply)
-    SESSION['dump'] = st.get('dump', 'off') != 'off'
+    """The first-connect greeting: probe the dump state (the dump-gated
+    command/setting rows pool by it) and print the navigation hint."""
+    reply = cli.exchange(sock, cli.wire('show dump path'))
+    val = reply[3:].split('=', 1)[-1].strip() if reply and reply.startswith('ok ') else ''
+    SESSION['dump'] = val not in ('', 'off', 'none')
     print('%   Welcome to the modbus-cache console')
-    print('%%   %s upstream | poll %s, last poll %s | running for %s | %s client(s)'
-          % (st.get('upstream', '?'), st.get('poll', '?'), st.get('last_poll', '?'),
-             st.get('uptime', '?'), st.get('clients', '?')))
     print('%   TAB completes, ? lists the commands, quit leaves')
 
 
@@ -87,7 +81,7 @@ def _render_special(low, reply):
 
 SPEC = dict(label='the cache proxy', daemon_label='modbus-cache control server',
             cli_name='modbus-cache-cli', app='modbus-cache', self_note='the proxy itself',
-            command_help='e.g. inspect, show status, show cache, request clear cache, request restart, shutdown',
+            command_help='e.g. inspect, show config, show cache, request clear cache, request restart, shutdown',
             prompt_word='cache', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,

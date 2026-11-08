@@ -147,7 +147,7 @@ def main():
             (b'{"cmd": null}\n', 'null cmd'),
             (b'\xff\xfe\x00binary\n', 'binary bytes'),
             (b'{"cmd": "show stat\xc3\xbc\u007f"}\n', 'unicode cmd'),
-            (signed('show status')[:-2] + b', "extra": ' + b'[' * 40 + b']' * 40 + b'}\n', 'deeply nested'),   # the extra field is ignored
+            (signed('show version')[:-2] + b', "extra": ' + b'[' * 40 + b']' * 40 + b'}\n', 'deeply nested'),   # the extra field is ignored
             (b'\n', 'empty line'),
             (b'   \n', 'whitespace line'),
         ]
@@ -160,7 +160,7 @@ def main():
                   st == want, '%s %s' % (st, tx))
 
         # 2. the overlong request (1 MB): answered or closed, never a crash
-        st, tx = roundtrip(15965, b'{"cmd": "show status", "pad": "' + b'a' * (1024 * 1024) + b'"}\n', timeout=10)
+        st, tx = roundtrip(15965, b'{"cmd": "show version", "pad": "' + b'a' * (1024 * 1024) + b'"}\n', timeout=10)
         check('fuzz: 1 MB request handled', st in ('ok', 'fail', 'dead'), '%s %s' % (st, tx[:80]))
 
         # 3. split packets: one byte at a time, the server assembles the frame
@@ -188,7 +188,7 @@ def main():
 
         # 4. no newline, then close: no crash, the server keeps serving
         s = connect(15965)
-        s.sendall(b'{"cmd": "show status"}')
+        s.sendall(b'{"cmd": "show version"}')
         s.close()
         st, tx = roundtrip(15965, signed('show version'))
         check('fuzz: frameless close does not wedge the server', st == 'ok', '%s %s' % (st, tx))
@@ -199,7 +199,7 @@ def main():
             st, tx = roundtrip(15965, signed('ping'), timeout=10)
             ok = ok and st == 'ok'
         check('fuzz: ping flood survives (100x)', ok)
-        st, tx = roundtrip(15965, signed('show status'))
+        st, tx = roundtrip(15965, signed('show version'))
         check('fuzz: real command after the flood', st == 'ok', '%s %s' % (st, tx))
 
         # 6. the token server: the auth abuse is rejected, the real token works
@@ -245,8 +245,8 @@ def main():
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
                                       stdout=open('/tmp/cache_ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.5)
-        st, tx, macok = ops_roundtrip('show status')
-        check('ops: the ops token authenticates, show status honored, mac\'d with the ops key',
+        st, tx, macok = ops_roundtrip('show version')
+        check('ops: the ops token authenticates, show version honored, mac\'d with the ops key',
               st == 'ok' and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show cache')
         check('ops: show cache honored', st == 'ok' and macok, '%s %s' % (st, tx))
@@ -266,7 +266,7 @@ def main():
         check('ops: request reload is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('shutdown')
         check('ops: shutdown is forbidden', st == 'fail' and 'forbidden' in tx and macok, '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('show status', unsigned=True)
+        st, tx, macok = ops_roundtrip('show version', unsigned=True)
         check('ops: an unsigned command is still refused first', st == 'fail' and 'unsigned command' in tx,
               '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('set modbus interval 5', token='admintok2')

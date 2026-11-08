@@ -252,7 +252,6 @@
       "node": true }
   ],
   "show": [
-    { "name": "status", "setting-help": "multi-line effective state report: one key=value per field", "hidden": true },
     { "name": "connections", "setting-help": "connected clients: peer, age, requests served" },
     { "name": "cache", "live": "cache", "setting-help": "cache contents: ranges, words, freshness, hits/misses" },
     { "name": "cache-all", "live": "cache/all",

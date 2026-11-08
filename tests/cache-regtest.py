@@ -370,7 +370,7 @@ try:
           'Traceback' not in evil_log and 'poll of' in evil_log)
     evil.stop()
 
-    # 5. control server: show status/connections/cache, request clear cache,
+    # 5. control server: show config/connections/cache, request clear cache,
     #    request restart,
     #    cache_cli, shutdown (+ the default unix socket / CTL)
     K = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py')
@@ -426,11 +426,11 @@ try:
            '--control-port', '15514'], log='/tmp/reg_ctl.log',
           env_extra={'CONTROL_TOKEN': 'sekrit'})
     time.sleep(2)
-    r = ctl_cmd('show status', 15514)
-    check('control: show status multi-line report', r.startswith('ok status\n')
-          and 'upstream=127.0.0.1:15512' in r and 'listen=127.0.0.1:15513' in r
-          and 'poll=ok' in r and 'hits=0' in r
-          and 'poll=' in r and 'hits=0' in r, r)
+    r = ctl_cmd('show modbus upstream', 15514)
+    check('control: the per-setting show (upstream)', r == 'ok modbus/upstream=127.0.0.1:15512', r)
+    r = ctl_cmd('inspect', 15514)
+    check('control: inspect carries the state', 'upstream  127.0.0.1:15512' in r
+          and 'listen    127.0.0.1:15513' in r and 'hits 0' in r, r[:400])
     c1 = socket.create_connection(('127.0.0.1', 15513), timeout=5)
     pdu = struct.pack('>BHH', 3, 32064, 2)
     c1.sendall(struct.pack('>HHHB', 78, 0, len(pdu) + 1, 1) + pdu)
@@ -484,7 +484,7 @@ try:
            '--control-port', '15520', '--control-token', 'sekrit',
            '--audit-log', '/tmp/reg_audit_ctl.log'], log='/tmp/reg_ctl_tok.log')
     time.sleep(1.5)
-    r = ctl_raw(b'{"cmd": "show status"}\n', 15520)
+    r = ctl_raw(b'{"cmd": "show version"}\n', 15520)
     check('control: token server rejects the unauthenticated', r.get('status') == 'fail'
           and 'authenticate first' in r.get('text', ''), str(r))
     ok = True
@@ -498,8 +498,8 @@ try:
     while not buf.endswith(b'\n'):
         buf += s.recv(4096)
     auth = _json.loads(buf.decode())
-    signed_cmd = _json.dumps({'cmd': 'show status',
-                              'mac': hmac.new(b'sekrit', b'show status', hashlib.sha256).hexdigest()})
+    signed_cmd = _json.dumps({'cmd': 'show version',
+                              'mac': hmac.new(b'sekrit', b'show version', hashlib.sha256).hexdigest()})
     s.sendall(signed_cmd.encode() + b'\n')
     buf = b''
     while not buf.endswith(b'\n'):
@@ -508,17 +508,17 @@ try:
     s.close()
     check('control: the right token authenticates, signed commands work after it',
           auth.get('status') == 'ok' and st.get('status') == 'ok'
-          and 'upstream=127.0.0.1:15512' in st.get('text', ''), '%s %s' % (auth, st))
-    r = ctl_raw(b'{"cmd": "show status"}\n', 15520, token='sekrit')
+          and 'ok modbus-cache' in st.get('text', ''), '%s %s' % (auth, st))
+    r = ctl_raw(b'{"cmd": "show version"}\n', 15520, token='sekrit')
     check('control: an unsigned command over TCP is refused (the signed wire)',
           r.get('status') == 'fail' and 'unsigned command' in r.get('text', ''), str(r))
-    r = ctl_raw(_json.dumps({'cmd': 'show status', 'mac': 'ab' * 32}).encode() + b'\n', 15520, token='sekrit')
+    r = ctl_raw(_json.dumps({'cmd': 'show version', 'mac': 'ab' * 32}).encode() + b'\n', 15520, token='sekrit')
     check('control: a bad command mac is refused',
           r.get('status') == 'fail' and 'mac does not verify' in r.get('text', ''), str(r))
     tok_audit = open('/tmp/reg_audit_ctl.log').read()
     check('audit: AUTH-FAIL + COMMAND events with the peer and the wire mac',
           'AUTH-FAIL' in tok_audit and 'AUDIT CACHE COMMAND ' in tok_audit
-          and 'peer=127.0.0.1:' in tok_audit and "'show status' wire=h" in tok_audit
+          and 'peer=127.0.0.1:' in tok_audit and "'show version' wire=h" in tok_audit
           and ' -> ok' in tok_audit, tok_audit[-240:])
 
     # show config: the secret knobs render as the placeholder — the knob is
@@ -552,9 +552,9 @@ try:
             args += ['--control-port', str(port)]
         return subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=30, env=env)
 
-    r = cli('show status\nquit\n')
-    check('cache_cli: show status prints the report', r.returncode == 0
-          and '\ncache:15514 > upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-160:]))
+    r = cli('show modbus upstream\nquit\n')
+    check('cache_cli: the per-setting show prints the bare value', r.returncode == 0
+          and '\ncache:15514 > 127.0.0.1:15512' in r.stdout, repr(r.stdout[-160:]))
     r = cli('request clear cache\nquit\n')
     check('cache_cli: request clear cache confirms silently', r.returncode == 0
           and '\ncache:15514 > \ncache:15514 > ' in r.stdout, repr(r.stdout[-120:]))
@@ -573,14 +573,14 @@ try:
                          text=True,
                          env={**os.environ, 'CLI_KEEPALIVE': '0.2', 'CONTROL_TOKEN': 'sekrit'})
     time.sleep(1.2)          # the CLI idles, pinging every 0.2s
-    p.stdin.write('show status\n')
+    p.stdin.write('show modbus upstream\n')
     p.stdin.flush()
     time.sleep(0.4)
     p.stdin.write('quit\n')
     p.stdin.flush()
     out, _ = p.communicate(timeout=15)
     check('cache_cli: keepalive keeps an idle session alive (pongs absorbed)',
-          p.returncode == 0 and 'upstream=127.0.0.1:15512' in out
+          p.returncode == 0 and '127.0.0.1:15512' in out
           and 'ok pong' not in out, repr(out[-120:]))
     p_unix = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
                                '--listen', '127.0.0.1:15515', '--interval', '1', '--profile', R],
@@ -591,16 +591,16 @@ try:
     check('control: the unix socket mode is 0600 (not the umask)',
           os.stat('/tmp/modbus-cache-15515.socket').st_mode & 0o777 == 0o600,
           oct(os.stat('/tmp/modbus-cache-15515.socket').st_mode))
-    r = cli('show status\nquit\n', 15515, {'CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+    r = cli('show modbus upstream\nquit\n', 15515, {'CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
     check('cache_cli: CTL reaches the default socket', r.returncode == 0
-          and 'upstream=127.0.0.1:15512' in r.stdout and 'cache:15515 > ' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show status\nquit\n', 15515, {'CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
+          and '127.0.0.1:15512' in r.stdout and 'cache:15515 > ' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('show modbus upstream\nquit\n', 15515, {'CTL': '/tmp/modbus-cache-15515.socket'}, use_flag=False)
     check('cache_cli: short CTL env works too', r.returncode == 0
-          and 'upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show status\nquit\n', 15520, {'CONTROL_TOKEN': 'sekrit'})
+          and '127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('show modbus upstream\nquit\n', 15520, {'CONTROL_TOKEN': 'sekrit'})
     check('cache_cli: token env authenticates the TCP control session', r.returncode == 0
-          and 'upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show status\nquit\n', 15520, {'CONTROL_TOKEN': ''})
+          and '127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('show version\nquit\n', 15520, {'CONTROL_TOKEN': ''})
     check('cache_cli: token server refuses the token-less CLI', r.returncode == 0
           and '% error: authenticate first' in r.stdout, repr(r.stdout[-160:]))
 
@@ -620,11 +620,11 @@ try:
 
     # 5c. cache_ctl: the one-shot client (args, piped batches, token)
     ctl = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-ctl.py')
-    r = subprocess.run([sys.executable, ctl, '--control-port', '15514', 'show', 'status'],
+    r = subprocess.run([sys.executable, ctl, '--control-port', '15514', 'show', 'modbus', 'upstream'],
                        capture_output=True, text=True, timeout=30,
                        env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
-    check('cache_ctl: one-shot show status', r.returncode == 0
-          and r.stdout.startswith('ok status\nupstream=127.0.0.1:15512'), repr(r.stdout[:120]))
+    check('cache_ctl: one-shot per-setting show', r.returncode == 0
+          and r.stdout.startswith('ok modbus/upstream=127.0.0.1:15512'), repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '15520'],
                        input='show cache\nrequest clear cache\n', capture_output=True, text=True,
                        timeout=30, env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
@@ -635,10 +635,8 @@ try:
     r = ctl_cmd('set modbus interval 2', 15514)
     check('set: interval applied with the state summary', r.startswith('ok modbus/interval=2.00s upstream=127.0.0.1:15512')
           and 'poll=' in r and 'hits=' in r, r[:120])
-    r = ctl_cmd('show status', 15514)
-    check('set: show status reflects the new interval', 'interval=2.00s' in r, r[:120])
-    r = ctl_cmd('show status', 15514)
-    check('set: the overridden row lists the setting', 'overridden=modbus/interval' in r, r[-160:])
+    r = ctl_cmd('show modbus interval', 15514)
+    check('set: the per-setting show reflects the new interval', r == 'ok modbus/interval=2.00s', r[:120])
     r = ctl_cmd('set modbus interval bogus', 15514)
     check('set: a bogus value is a clean err', r.startswith('fail interval must be seconds'), r[:100])
     r = ctl_cmd('set bogus 1', 15514)
@@ -666,8 +664,6 @@ try:
           r == 'fail unknown command or setting bogus (try ?)', r)
     r = ctl_cmd('unset modbus interval', 15514)
     check('unset: restores the configured value', r.startswith('ok modbus/interval=1.00s'), r[:110])
-    r = ctl_cmd('show status', 15514)
-    check('unset: the override marker clears', 'overridden=none' in r, r[-160:])
     r = ctl_cmd('set modbus timeout 5', 15514)
     check('set: modbus timeout applied (the rekeyed branch)', r.startswith('ok modbus/timeout=5.00s upstream='), r[:120])
     r = ctl_cmd('show modbus timeout', 15514)
@@ -718,8 +714,9 @@ try:
     # selection none: the map empties, every read forwards, nothing is stored
     r = ctl_cmd('set modbus selection none', 15514)
     check('set modbus selection none: accepted', r.startswith('ok modbus/selection=none'), r[:100])
-    r = ctl_cmd('show status', 15514)
-    check('set selection none: the map empties', 'ranges=0' in r and 'selection=none' in r, r[:160])
+    r = ctl_cmd('show cache', 15514)
+    check('set selection none: the map empties', '0 range(s)' in r
+          and ctl_cmd('show modbus selection', 15514) == 'ok modbus/selection=none', r[:160])
     m1 = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache.log'],
                         capture_output=True, text=True).stdout.strip()
     rd(47415, 1)
@@ -729,8 +726,9 @@ try:
     check('selection none: repeat reads forward, nothing is stored', int(m2) == int(m1) + 2,
           '%s -> %s' % (m1, m2))
     ctl_cmd('unset modbus selection', 15514)
-    r = ctl_cmd('show status', 15514)
-    check('unset selection: the map refills', 'ranges=49' in r and 'selection=all' in r, r[:160])
+    r = ctl_cmd('show cache', 15514)
+    check('unset selection: the map refills', '49 range(s)' in r
+          and ctl_cmd('show modbus selection', 15514) == 'ok modbus/selection=all', r[:160])
 
     # --selection none at startup: the same, straight from the command line
     p_none = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
@@ -742,15 +740,12 @@ try:
     time.sleep(1.5)
     b = rd(47415, 1, port=15526)
     check('selection none at startup: the read forwards', b[0] == 3, b.hex())
-    r = ctl_cmd('show status', 15527)
+    r = ctl_cmd('show cache', 15527)
     check('selection none at startup: 0 range(s), nothing cached',
-          'ranges=0' in r and 'selection=none' in r, r[:160])
+          '0 range(s)' in r and ctl_cmd('show modbus selection', 15527) == 'ok modbus/selection=none', r[:160])
     ctl_cmd('shutdown', 15527)
 
-    # the poll-cycle durations ride in show status + inspect
-    r = ctl_cmd('show status', 15514)
-    check('show status: the poll-cycle durations', 'poll_duration=' in r
-          and 'poll_duration_mean=' in r, r[:200])
+    # the poll-cycle durations ride in inspect
     r = ctl_cmd('inspect', 15514)
     check('inspect: the poll-cycle durations', 'poll cyc  last ' in r and 'mean ' in r, r[:300])
 
@@ -855,10 +850,8 @@ try:
           r.startswith('ok restored 91 word(s), 1 setting(s)'), r[:120])
     r = ctl_cmd('show modbus interval', 15537)
     check('request restore: the setting override re-applied', r == 'ok modbus/interval=2.00s', r)
-    r = ctl_cmd('show status', 15537)
-    check('request restore: the override is listed again', 'overridden=modbus/interval' in r, r[-160:])
-    r = ctl_cmd('show status', 15537)
-    check('dump: the status carries the dump row', 'dump=%s every off' % dumpfile in r, r[-160:])
+    r = ctl_cmd('show dump path', 15537)
+    check('dump: the dump path shows (the per-setting row)', r == 'ok dump/path=%s' % dumpfile, r[-160:])
     # the F18 restore gates: tampering, a group-writable dump and an unsigned dump all refuse
     good = open(dumpfile).read()
     d = _json.loads(good); d['registers'][0][2] = 65535
@@ -986,9 +979,6 @@ try:
           'restored the state dump' in line and '91 word(s)' in line, line[-220:])
     r = ctl_cmd('show cache', 15539)
     check('sealed dump: the restored words serve', '91 word(s) cached' in r, r[:80])
-    r = ctl_cmd('show status', 15539)
-    check('sealed dump: the status dump row marks the seal',
-          'dump=%s every off, sealed' % kdumpfile in r, r[-160:])
     p_right.kill()
     time.sleep(0.4)
     # the file: reference form (one secret knob, two forms): the key
@@ -1042,8 +1032,8 @@ try:
 
     r = ctl_cmd('set dump-interval 1', 15537)
     check('dump-interval: the live setting accepted', r.startswith('ok dump-interval=1.00s'), r[:120])
-    r = ctl_cmd('show status', 15537)
-    check('dump-interval: the live setting shows in the dump row', 'dump=%s every 1.00s' % dumpfile in r, r[-160:])
+    r = ctl_cmd('show dump-interval', 15537)
+    check('dump-interval: the live setting shows', r == 'ok dump-interval=1.00s', r[-160:])
     m1 = os.stat(dumpfile).st_mtime
     time.sleep(2.5)
     m2 = os.stat(dumpfile).st_mtime
@@ -1095,8 +1085,6 @@ try:
     check('restore-on-start: the gate loads the dump', '91 word(s) cached' in r, r[:80])
     r = ctl_cmd('show modbus interval', 15537)
     check('restore-on-start: the override came back with the gate', r == 'ok modbus/interval=3.00s', r)
-    r = ctl_cmd('show status', 15537)
-    check('restore-on-start: the override is listed with the gate', 'overridden=modbus/interval' in r, r[-160:])
     ctl_cmd('unset modbus interval', 15537)
     ctl_cmd('shutdown', 15537)
     p_dump.wait(timeout=10)
@@ -1141,8 +1129,8 @@ try:
                                   'modbus_cache_uplink_errors_total', 'modbus_cache_uplink_bytes_total',
                                   'modbus_cache_uplink_block_up{fc="3"', 'modbus_cache_uplink_block_latency_seconds',
                                   'modbus_cache_uplink_block_fails_total')), repr(body[:200]))
-    r = ctl_cmd('show status', 15530)
-    check('metrics: show status carries the endpoint', 'metrics=127.0.0.1:15529 (bearer token), clients 1, per-ip none' in r, r[:400])
+    r = ctl_cmd('show metrics listen', 15530)
+    check('metrics: the per-setting show carries the endpoint', 'ok metrics/listen=127.0.0.1:15529' in r, r[:160])
     # the metrics caps: a parked (silent) connection holds the one slot, the next request gets 503
     parked = socket.create_connection(('127.0.0.1', 15529), timeout=5)
     time.sleep(0.3)
@@ -1530,8 +1518,8 @@ try:
     g2.sendall(struct.pack('>HHHB', 2, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 1))
     g2r = g2.recv(512)
     check('per-IP: the second connection admitted after the raise', len(g2r) >= 10, g2r.hex() if g2r else 'empty')
-    r = ctl_cmd('show status', 15534)
-    check('per-IP: show status carries the cap', 'max_conn_per_ip=2' in r, r[:160])
+    r = ctl_cmd('show limits max-conn-per-ip', 15534)
+    check('per-IP: the cap shows (the per-setting row)', r == 'ok limits/max-conn-per-ip=2', r[:160])
     g1.close(); g2.close()
     p_pip.send_signal(signal.SIGTERM)
     p_pip.wait(timeout=10)
@@ -1705,12 +1693,12 @@ try:
     back = None
     for _ in range(100):     # the exec is fast; a connect that lands on the dying daemon (the bye frame, unsigned) retries
         try:
-            back = ctl_cmd('show status', 15582)
+            back = ctl_cmd('show modbus interval', 15582)
             break
         except Exception:
             time.sleep(0.1)
     check('reload: the daemon came back with the override re-applied (above the flag)',
-          back is not None and 'interval=7.00s' in back and 'overridden=modbus/interval' in back, repr((back or '')[-200:]))
+          back is not None and back.startswith('ok modbus/interval=7.00s'), repr((back or '')[-200:]))
     check('reload: the state file is consumed', not os.path.exists(ini_r + '.reload'), ini_r + '.reload')
     # the startup-only override rides the reload: the set records the pending
     # value (the note), the fold lands it in the fresh process before the binds
@@ -1772,12 +1760,14 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     back = None
     for _ in range(100):
         try:
-            back = ctl_cmd('show status', 15582)
+            back = ctl_cmd('show modbus unit', 15582)
             break
         except Exception:
             time.sleep(0.1)
     check('reload: the fresh resolve takes the config edit (unit=7), the override still rides',
-          back is not None and 'unit=7' in back and 'interval=7.00s' in back, repr((back or '')[-200:]))
+          back is not None and back.startswith('ok modbus/unit=7')
+          and ctl_cmd('show modbus interval', 15582).startswith('ok modbus/interval=7.00s'),
+          repr((back or '')[-200:]))
     # the console path: the reload's bye frame rides utf-8 and the notice decodes it (no raw \u escapes)
     p = subprocess.Popen([sys.executable, K, '--control-port', '15582'], stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
@@ -1793,7 +1783,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     back = None
     for _ in range(100):
         try:
-            back = ctl_cmd('show status', 15582)
+            back = ctl_cmd('show version', 15582)
             break
         except Exception:
             time.sleep(0.1)
@@ -1882,9 +1872,6 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     r = ctl_cmd('show write-registers-profile', 15586)
     check('profile acl: the word spelling answers the same report',
           r.startswith('ok write-registers-profile'), r[:80])
-    r = ctl_cmd('show status', 15586)
-    check('profile acl: status renders the effective gate',
-          'write_allow_list=profile (127:2,148:30)' in r, r[:200])
     r = ctl_cmd('set write registers 100:1', 15586)
     check('profile acl: explicit ranges still set', r.startswith('ok write/registers=100:1'), r[:80])
     r = ctl_cmd('show write registers profile', 15586)
@@ -2028,9 +2015,6 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('acl file: a 0600 acl file is silent (the unset restores the file gate)',
           r.startswith('ok write/registers=file:%s' % aclf)
           and 'group/world-readable' not in r, r[:160])
-    r = ctl_cmd('show status', 15601)
-    check('acl file: status renders the resolved gate',
-          'write_allow_list=file:%s (149:29)' % aclf in r, r[:200])
     r = ctl_cmd('set write registers file:/nonexistent/acl.json', 15601)
     check('acl file: a bad file is a clean err, the old gate stands',
           r.startswith('fail cannot read acl file /nonexistent/acl.json')
@@ -2203,7 +2187,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
 
     # the audit trail folds control characters: a \n inside a command cannot
     # forge a second, attacker-crafted trail line
-    r = ctl_cmd('show status\n2026-01-01T00:00:00Z AUDIT CACHE WRITE forged line', 15522)
+    r = ctl_cmd('show version\n2026-01-01T00:00:00Z AUDIT CACHE WRITE forged line', 15522)
     check('control: the injection attempt is a clean err', r.startswith('fail unknown command'), r[:100])
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     forged = [line for line in fc4_audit.splitlines() if 'AUDIT CACHE WRITE forged' in line]
@@ -2327,9 +2311,13 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('suite auth: the proved client reads through the cache',
           body[0] == 3 and body[1] == 4, body.hex())
     c.close()
-    r = ctl_auth('show', 'status')
-    check('suite auth: show status carries auth= + upstream_auth=',
-          'auth=suite' in r and 'upstream_auth=suite' in r and 'poll=ok' in r, r[:200])
+    r = ctl_auth('show', 'modbus', 'auth')
+    check('suite auth: the per-setting show carries auth=', r == 'ok modbus/auth=suite', r[:120])
+    r = ctl_auth('show', 'modbus', 'auth-upstream')
+    check('suite auth: the per-setting show carries auth-upstream=', r == 'ok modbus/auth-upstream=suite', r[:120])
+    ins = ctl_auth('inspect')
+    check('suite auth: the poll is healthy (no FAILING mark)',
+          'upstream' in ins and '(FAILING)' not in ins, ins[:200])
     c = socket.create_connection(('127.0.0.1', AUTH_PORT), timeout=5)
     c.sendall(b'\x00' * 52)     # 52 bytes that are not the handshake
     c.settimeout(5)
@@ -2376,23 +2364,22 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('suite auth: a plain client reads after the disable', body[0] == 3, body.hex())
     r = ctl_auth('set', 'modbus', 'auth-upstream', 'none')
     check('suite auth: the upstream auth disables live', r.startswith('ok modbus/auth-upstream=none'), r[:100])
-    r = ctl_auth('show', 'status')
     for _ in range(200):
-        r = ctl_auth('show', 'status')
-        if 'poll=down' in r:
+        r = ctl_auth('inspect')
+        if '(FAILING)' in r:
             break
         time.sleep(0.5)
     check('suite auth: the plain upstream session fails against the authed fake (poll=down)',
-          'poll=down' in r, r[-200:])
+          '(FAILING)' in r, r[-200:])
     r = ctl_auth('set', 'modbus', 'auth-upstream', 'suite')
     check('suite auth: the upstream auth re-enables live (the key persisted)',
           r.startswith('ok modbus/auth-upstream=suite'), r[:100])
     for _ in range(90):
-        r = ctl_auth('show', 'status')
-        if 'poll=ok' in r:
+        r = ctl_auth('inspect')
+        if '(FAILING)' not in r:
             break
         time.sleep(0.5)
-    check('suite auth: the upstream poll recovers under the re-enabled scheme', 'poll=ok' in r, r[-200:])
+    check('suite auth: the upstream poll recovers under the re-enabled scheme', '(FAILING)' not in r, r[-200:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
                         '--listen', '127.0.0.1:%d' % AUTH_PORT, '--dry-run',
                         '--auth', 'bogus'], capture_output=True, text=True, timeout=15)
@@ -2504,17 +2491,17 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('waveshare auth: the start log names the scheme',
           'client auth: none, upstream auth: waveshare' in logw, logw[-200:])
     for _ in range(40):
-        r = ctl_ws('show', 'status')
-        if 'poll=ok' in r:
+        r = ctl_ws('inspect')
+        if '(FAILING)' not in r:
             break
         time.sleep(0.5)
-    check('waveshare auth: the gateway password opens the poll', 'poll=ok' in r, r[-200:])
+    check('waveshare auth: the gateway password opens the poll', '(FAILING)' not in r, r[-200:])
     check('waveshare auth: the gateway saw the password (no bad attempts)',
           ws.ok_attempts >= 1 and ws.bad_attempts == 0,
           'ok=%d bad=%d' % (ws.ok_attempts, ws.bad_attempts))
-    r = ctl_ws('show', 'status')
-    check('waveshare auth: show status carries upstream_auth=waveshare',
-          'upstream_auth=waveshare' in r, r[:200])
+    r = ctl_ws('show', 'modbus', 'auth-upstream')
+    check('waveshare auth: the per-setting show carries auth-upstream=',
+          r == 'ok modbus/auth-upstream=waveshare', r[:200])
     # the reconnect re-proves: the restart verb drops the session, the next
     # poll dials fresh and hands the password over again
     ok_before = ws.ok_attempts
@@ -2527,8 +2514,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
         time.sleep(0.5)
     check('waveshare auth: the reconnect hands the password over again',
           ws.ok_attempts > ok_before, 'ok=%d' % ws.ok_attempts)
-    r = ctl_ws('show', 'status')
-    check('waveshare auth: the poll recovers after the restart', 'poll=ok' in r, r[-200:])
+    r = ctl_ws('inspect')
+    check('waveshare auth: the poll recovers after the restart', '(FAILING)' not in r, r[-200:])
     # live rotation under waveshare: a new (non-empty, short) password is
     # accepted, the session drops, the old password now fails, the poll goes
     # down; back to the gateway's password and the poll recovers
@@ -2536,12 +2523,12 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('waveshare auth: a short password rotates live (non-empty is the floor)',
           r.startswith('ok modbus/auth-upstream-key=<set>'), r[:100])
     for _ in range(200):
-        r = ctl_ws('show', 'status')
-        if 'poll=down' in r:
+        r = ctl_ws('inspect')
+        if '(FAILING)' in r:
             break
         time.sleep(0.5)
     check('waveshare auth: the rotated password fails against the gateway (poll=down)',
-          'poll=down' in r, r[-200:])
+          '(FAILING)' in r, r[-200:])
     check('waveshare auth: the gateway counted the bad attempts',
           ws.bad_attempts >= 1, 'bad=%d' % ws.bad_attempts)
     logw = open('/tmp/reg_ws_cache.log').read()
@@ -2551,11 +2538,11 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('waveshare auth: the gateway password rotates back',
           r.startswith('ok modbus/auth-upstream-key=<set>'), r[:100])
     for _ in range(40):
-        r = ctl_ws('show', 'status')
-        if 'poll=ok' in r:
+        r = ctl_ws('inspect')
+        if '(FAILING)' not in r:
             break
         time.sleep(0.5)
-    check('waveshare auth: the poll recovers under the restored password', 'poll=ok' in r, r[-200:])
+    check('waveshare auth: the poll recovers under the restored password', '(FAILING)' not in r, r[-200:])
     # the dormant flow: scheme none first, then the short password (the
     # suite floor would refuse it — dormant material passes), then the
     # scheme — and the poll proves the pairing end to end
@@ -2572,12 +2559,12 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('waveshare auth: the dormant key wakes with the scheme',
           r.startswith('ok modbus/auth-upstream=waveshare'), r[:100])
     for _ in range(200):
-        r = ctl_ws('show', 'status')
-        if 'poll=down' in r:
+        r = ctl_ws('inspect')
+        if '(FAILING)' in r:
             break
         time.sleep(0.5)
     check('waveshare auth: the dormant short key fails against the gateway (poll=down)',
-          'poll=down' in r, r[-200:])
+          '(FAILING)' in r, r[-200:])
     r = ctl_ws('set', 'modbus', 'auth-upstream', 'none')
     check('waveshare auth: the upstream auth disables again', r.startswith('ok'), r[:60])
     # the start-time grammar: the waveshare fast-fails and the dry-run accept

@@ -17,7 +17,7 @@ stdout, one per line. Every invocation lands in the audit trail (prefix
 \fBCTL\fR).
 .PP
 The command grammar is the daemon's: \fBset\fR/\fBunset\fR/\fBshow\fR/
-\fBhelp\fR (the settings registry), \fBinspect\fR, \fBshow status\fR,
+\fBhelp\fR (the settings registry), \fBinspect\fR,
 \fBshow connections\fR, \fBshow cache\fR [\fBall\fR],
 \fBshow write registers profile\fR, \fBshow uplink\fR,
 \fBshow version\fR, \fBshow knobs\fR (the dictionary of the registry),
@@ -34,7 +34,7 @@ control server target: unix socket path or TCP port on 127.0.0.1,
 auto\-detected (env CTL when unset) — same flag as the proxy itself
 .TP
 .B command
-control command, e.g. inspect, show status, show cache, request clear
+control command, e.g. inspect, show config, show cache, request clear
 cache, request restart, shutdown
 .TP
 .BI \-\-timeout " N"
@@ -60,7 +60,7 @@ disable the audit trail
 .SH EXAMPLES
 .RS
 .IP \(bu 2
-.B modbus-cache-ctl show status
+.B modbus-cache-ctl show connections
 .IP \(bu 2
 .B modbus-cache-ctl request clear cache
 .IP \(bu 2

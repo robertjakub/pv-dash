@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """JSON-lines control server for modbus-cache: inspect and steer the running
-proxy — show status/connections/cache/version, clear the cache, restart the
+proxy — show connections/cache/version/config, clear the cache, restart the
 upstream session, reload the whole daemon (the overrides saved, then a
 re-exec), graceful shutdown. One command per line, one reply line.
 Every request and reply is one JSON object per line (the stdlib json
@@ -230,8 +230,6 @@ class ControlServer(_ControlServer):
             if s is not None and s.restart:   # the value is recorded; the restart applies it — a note, not a verdict
                 return 'note restart required (startup-only knob)'
             return 'ok %s=%s %s' % (key, shown, self.summary())
-        if low == 'show status':
-            return self.status_report()
         if low == 'show connections':
             return 'ok connections ' + self.connections_line()
         if low == 'show cache-all':
@@ -566,7 +564,11 @@ class ControlServer(_ControlServer):
                 srv = MetricsServer(p, p.metrics_listen, token=p.metrics_token,
                                     max_clients=p.metrics_caps[0], client_timeout=p.metrics_caps[1],
                                     max_per_ip=p.metrics_caps[2])
-                srv.start()
+                try:
+                    srv.start()
+                except SystemExit:
+                    host, port = p.metrics_listen
+                    raise ValueError('cannot bind %s:%d: %s' % (host, port, srv.bind_error))
                 p.metrics_srv = srv
                 p.config['metrics_server'] = True
                 p.metrics_desc = describe_metrics(p.metrics_listen, p.metrics_token,
@@ -990,54 +992,6 @@ class ControlServer(_ControlServer):
         if s is not None and s.restart:   # a startup-only knob: the configured value
             return self.defaults.get(key, '?')   # renders (the secrets answer '<set>'/'off')
         return '?'
-
-    def status_report(self):
-        """The status as a compact multi-field report: one stable key=value
-        per line (scriptable)."""
-        p = self.proxy
-        now = time.monotonic()
-        age = 'never' if p.last_ok is None else secs(max(0, now - p.last_ok))
-        fc4 = sum(1 for r in p.cache.ranges if r[0] == 4)
-        cfg = p.config or {}
-        rows = [
-            'upstream=%s:%d' % (p.upstream.host, p.upstream.port),
-            'unit=%d' % p.upstream.unit,
-            'timeout=%s' % secs(p.upstream.timeout),
-            'listen=%s:%d' % (p.listen_addr[0], p.listen_addr[1]),
-            'control=%s' % self.describe(),
-            'uptime=%s' % secs(now - p.started),
-            'poll=%s' % ('ok' if p.poll_ok else 'down'),
-            'last_poll=%s' % age,
-            'poll_duration=%s' % secs(p.poll_secs_last),
-            'poll_duration_mean=%s' % secs(p.poll_secs_sum / p.poll_count if p.poll_count else 0),
-            'interval=%s' % secs(p.interval),
-            'ttl=%s' % secs(p.cache.cache_ttl),
-            'merge_gap=%d' % p.merge_gap,
-            'ranges=%d' % len(p.cache.ranges),
-            'fc4_ranges=%d' % fc4,
-            'map_version=%d' % p.cache.map_version,
-            'hits=%d' % p.cache_hits,
-            'misses=%d' % p.cache_misses,
-            'clients=%d' % p.client_count,
-            'max_clients=%s' % (p.max_clients or 'none'),
-            'client_timeout=%s' % (secs(p.client_timeout) if p.client_timeout else 'none'),
-            'max_conn_per_ip=%s' % (p.conn_gate.max_per_ip or 'none'),
-            'connect_acl=%s' % acl_gate_summary(p.connect_acl),
-            'auth=%s' % (p.config.get('auth') or 'none'),
-            'upstream_auth=%s' % (p.config.get('auth_upstream') or 'none'),
-            'writes=%s' % ('enabled' if p.allow_write else 'disabled'),
-            'write_acl=%s' % acl_gate_summary(p.write_acl),
-            'write_allow_list=%s' % p.describe_write_gate(),
-            'requests_audit=%s' % ('off' if not p.requests_audit_s else secs(p.requests_audit_s)),
-            'dump=%s' % ('off' if not p.dump_path else '%s every %s%s' % (
-                p.dump_path, 'off' if not p.dump_interval else secs(p.dump_interval),
-                ', sealed' if p.dump_key else '')),
-            'profile=%s' % (cfg.get('profile') or p.profile),
-            'selection=%s' % (cfg.get('selection') or 'all'),
-            'metrics=%s' % getattr(p, 'metrics_desc', 'off'),
-            'overridden=%s' % (','.join(sorted(self.overridden)) or 'none'),
-        ]
-        return 'ok status\n' + '\n'.join(rows)
 
     def clear_overrides(self):
         """The config was re-applied (SIGHUP): nothing is live-overridden anymore."""

@@ -91,7 +91,7 @@ resolved as `--selection` flag, env `SELECTION`, ini
 `selection`; the default fetches **every** profile entry (`all`), and
 **`none`** empties the map: every read forwards to the inverter and nothing
 is stored (a pass-through proxy, the cache gauges go quiet). The shipped
-**`selection.json`** (in the subproject root) is an example — the essential
+**`selection.json`** (in `examples/`) is an example — the essential
 SUN2000 monitoring
 set (the classic 13-range map, by name). Reads outside the selected set are
 forwarded to the inverter (any FC1-FC4 read is cached on its way through,
@@ -218,7 +218,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--log-access` | `DEBUG` | log client connects/disconnects at `INFO` instead of `DEBUG` |
 | `--local-time` | UTC | log timestamps in the system time zone instead of UTC |
 
-`cache/modbus_cache.conf` is a sample in the set grammar (every line a
+`cache/examples/modbus_cache.conf` is a sample in the set grammar (every line a
 `set <name> <value>` in the CLI spelling, `#` comments stay comments — the
 config file pipes through `modbus-cache-ctl` unchanged, and `show config`
 regenerates it from the running daemon — the secret knobs render as
@@ -456,9 +456,10 @@ restrict all); the config-file/env/NixOS forms are
   client, `any` lifts the register check entirely. **`profile`** takes the
   gate from the device profile: the profile's `"acl"` → `"write"` gate —
   an optional terse-ASCII `desc` and the ordered `rules` list, one
-  `{"type": "allow"|"deny", "range": "START:COUNT"|[...]|{"START:COUNT": "desc"}|"any"}`
-  object per rule, each range optionally described by a terse-ASCII
-  `desc` (per gate, per rule, or per entry in the range map). The chain
+  `{"type": "allow"|"deny", "range": "START:COUNT"|[...]|"any"}`
+  object per rule, each rule optionally described by a terse-ASCII
+  `desc` (per gate or per rule; a rule's `desc` speaks for every range
+  in its list). The chain
   is a whitelist: it reads top to bottom, **the last matching rule
   decides**, and a register no rule decides refuses (the default deny
   any).   `deye-sg05lp3`, for example, allows only the TOU schedule slots
@@ -470,8 +471,14 @@ restrict all); the config-file/env/NixOS forms are
   whitelist semantics), read and compiled at start and on every `set`; a
   missing or bad file refuses the start and answers `err` on the wire
   with the old gate standing, and the spelling round-trips through the
-  dumps and `unset`. An example ships as `cache/acl.json` (the
-  `deye-sg05lp3` gate). `show write registers profile` answers the gate
+  dumps and `unset`. An example ships as
+  `cache/examples/acl-write-registers.json` (the
+  deye policy, worked out: the clean-slate deny, the allows, the deny
+  carves and the re-opens — every matcher form). **A group/world-readable
+  acl file warns** (the gate is config trust any local user could have
+  loosened: chmod 0600) — in the log, the audit trail's `ACL-FILE`
+  event, and as the suffix of the `set`/`unset` reply; a `0600` file is
+  silent. `show write registers profile` answers the gate
   back as its chain — one `allow`/`deny` line per range, the profile's
   descs included (the file's rules render the same way).
 
@@ -871,9 +878,10 @@ cache/
 │   ├── modbus-cache.py  # CLI, logging setup, signal handling
 │   ├── modbus-cache-ctl.py     # one-shot control client (args / piped commands)
 │   └── modbus-cache-cli.py     # console-style interactive control session
-├── modbus_cache.conf      # sample config (the default --config target)
-├── selection.json         # example selection: the essential monitoring set
-├── acl.json               # example acl file: the deye-sg05lp3 write gate (--write-registers file:...)
+├── examples/
+│   ├── modbus_cache.conf    # sample config in the set grammar (installed beside the script)
+│   ├── selection.json       # example selection: the essential monitoring set
+│   └── acl-write-registers.json  # example acl file: the deye write policy, worked out (--write-registers file:...)
 └── lib/
     ├── static.json      # the static constants: protocol limits, diagnostics block, defaults
     ├── statics.py       # its loader (the STATIC dict + the named aliases)

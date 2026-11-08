@@ -439,7 +439,10 @@ class ControlServer(_ControlServer):
                 p.set_write_registers(parse_write_registers(val, 'write-registers'))
             except SystemExit as e:
                 raise ValueError(str(e))
-            return p.describe_write_ranges()
+            shown = p.describe_write_ranges()
+            if p.write_gate_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
+                shown += ' (%s)' % p.write_gate_warn
+            return shown
         if key == 'limits/max-clients':
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)

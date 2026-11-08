@@ -92,37 +92,22 @@ def _acl_range(text, where):
 
 
 def _acl_matcher(v, where):
-    """A rule matcher: 'any' (all registers) / 'none' (matches nothing) /
-    'START:COUNT' / a list of those / a {"START:COUNT": "desc"} map (the
-    desc documents the entry, terse ASCII) -> ('any' | 'none' | 'ranges',
-    ranges)."""
+    """A rule matcher: 'any' (all registers) / 'START:COUNT' / a list of
+    those -> ('any' | 'ranges', ranges)."""
     if isinstance(v, str):
         t = v.strip().lower()
         if t == 'any':
             return 'any', None
-        if t == 'none':
-            return 'none', None
         return 'ranges', [_acl_range(t, where)]
-    if isinstance(v, dict):
-        ranges = []
-        for k, d in v.items():
-            _acl_desc(d, '%s entry %r' % (where, k))
-            t = str(k).strip().lower()
-            if t == 'any':
-                ranges.append((0, MAX_REGISTERS))
-            elif t != 'none':
-                ranges.append(_acl_range(t, where))
-        return 'ranges', ranges
     if isinstance(v, list):
         ranges = []
         for x in v:
             t = str(x).strip().lower()
-            if t in ('any', 'none'):
+            if t == 'any':
                 raise SystemExit('%s: the word %r stands alone, not in a list' % (where, t))
             ranges.append(_acl_range(t, where))
         return 'ranges', ranges
-    raise SystemExit('%s must be a range, a list of ranges, a {"START:COUNT": "desc"} map, '
-                     '"any" or "none"' % where)
+    raise SystemExit('%s must be a range ("START:COUNT"), a list of ranges, or "any"' % where)
 
 
 def _acl_desc(d, where):
@@ -151,9 +136,8 @@ def _write_gate_object(gate, base):
     "acl"/"write", what a standalone acl file is): an optional terse-ASCII
     "desc" and the ordered "rules" list — one {"type": "allow"|"deny",
     "range": matcher} object per rule (+ an optional "desc" each); a
-    matcher is a "START:COUNT" range or a list of them, or a
-    {"START:COUNT": "desc"} map describing each entry, or the bare word
-    "any" (all registers) / "none". The chain is a whitelist: it reads top
+    matcher is a "START:COUNT" range or a list of them, or the bare word
+    "any" (all registers). The chain is a whitelist: it reads top
     to bottom and the LAST matching rule decides, and a register no rule
     decides refuses — the default deny any. Returns (desc, rules), the
     rules as (verb, matcher, desc, where) tuples in chain order; `base`
@@ -239,10 +223,9 @@ def compile_write_acl(rules):
         byte = b'\x01' if verb == 'allow' else b'\x00'   # deny resets to refused
         if kind == 'any':
             bits[:] = byte * MAX_REGISTERS
-        elif kind == 'ranges':
+        else:
             for s, c in ranges:
                 bits[s:s + c] = byte * c
-        # 'none' matches nothing: the rule is a no-op
     if not any(bits):
         return ()
     if all(bits):
@@ -261,18 +244,15 @@ def load_profile_write_acl(path, label=None):
 def render_write_acl(desc, rules):
     """The parsed gate as the write/registers/profile show report's lines:
     the gate-level desc first as the '% ' line, then one
-    '<verb> <range>[ # desc]' line per range — a list or map matcher fans
-    out (the map's per-entry desc wins, a list repeats the rule's desc),
-    the bare words 'any'/'none' stand alone, and the lines that carry a
-    desc ALIGN: the '<verb> <range>' prefixes pad to one width so the
-    '# <desc>' comments start at one column. A chain with no deciding rule
-    renders as the default it is: 'deny any'."""
+    '<verb> <range>[ # desc]' line per range — a list matcher fans out
+    (the rule's desc repeats), the bare word 'any' stands alone, and the
+    lines that carry a desc ALIGN: the '<verb> <range>' prefixes pad to
+    one width so the '# <desc>' comments start at one column. A chain
+    with no deciding rule renders as the default it is: 'deny any'."""
     lines = ['%% %s' % desc] if desc else []
     rows = []   # ('<verb> <range>', desc-or-None) in chain order
     for verb, matcher, rdesc, _where in rules:
-        if isinstance(matcher, dict):
-            entries = [(str(k).strip().lower(), d) for k, d in matcher.items()]
-        elif isinstance(matcher, list):
+        if isinstance(matcher, list):
             entries = [(str(x).strip().lower(), rdesc) for x in matcher]
         else:
             entries = [(str(matcher).strip().lower(), rdesc)]

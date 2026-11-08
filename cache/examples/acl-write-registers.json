@@ -1,0 +1,12 @@
+{
+  "desc": "the deye-sg05lp3 write policy, worked out - a whitelist: the chain reads top to bottom, the LAST matching rule decides, and a register no rule decides refuses (the default deny any)",
+  "rules": [
+    {"type": "deny", "range": "any", "desc": "the clean slate: nothing writable yet"},
+    {"type": "allow", "range": "127:2", "desc": "operational mode registers (grid-start soc, grid charge current)"},
+    {"type": "allow", "range": "148:18", "desc": "the TOU time slots"},
+    {"type": "allow", "range": "166:12", "desc": "the TOU target socs and grid-charge enables"},
+    {"type": "deny", "range": "148:1", "desc": "tou-time-1 (the schedule arm) stays read-only: the deny carves it out of the allowed span"},
+    {"type": "deny", "range": "166:5", "desc": "tou-soc-1..5 follow the bms: read-only"},
+    {"type": "allow", "range": ["171:1", "177:1"], "desc": "the exceptions re-open: tou-soc-6 by hand, the last grid-charge enable"}
+  ]
+}

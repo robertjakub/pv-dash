@@ -313,6 +313,8 @@ def main():
                        'off' if control_target is None else
                        ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target),
                        cfg['selection'] or cfg['profile']))
+        if proxy.write_gate_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
+            audit.event('ACL-FILE', proxy.write_gate_warn)
     stop = install_signal_handlers(proxy, cache, args)
     if control_target is not None:
         defaults = {'modbus/interval': '%g' % cfg['interval'],

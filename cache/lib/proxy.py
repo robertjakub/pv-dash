@@ -2,6 +2,7 @@
 """The proxy itself: poller thread, client handling, forwarding and reload (stdlib only)."""
 import ipaddress
 import logging
+import os
 import socket
 import struct
 import threading
@@ -47,6 +48,20 @@ def _read_shape(fc, count):
     return count * 2
 
 
+def acl_file_warn(path):
+    """The acl file's permission posture: group/world-READABLE is warned
+    about, not refused (the file is config trust like the profile — but
+    whoever can read it can also loosen the write gate before the daemon
+    reads it) — returns the one-line warning or None."""
+    try:
+        mode = os.stat(path).st_mode & 0o777
+    except OSError:
+        return None
+    if mode & 0o044:
+        return 'the acl file %s is group/world-readable, mode %03o — chmod 0600' % (path, mode)
+    return None
+
+
 class Proxy:
     def __init__(self, upstream, cache, read_delay=0.0, merge_gap=0, interval=10.0, profile=None, config=None,
                  audit=None):
@@ -60,7 +75,8 @@ class Proxy:
         self.audit = audit   # the CACHE audit trail (common.audit), None = off
         self.allow_write = bool(self.config.get('allow_write', False))
         self.write_registers = self.config.get('write_registers')   # the knob: None = any, () = none, 'profile' = the profile's acl, 'file:<path>' = the standalone acl file
-        self.write_gate_rules = None   # the profile gate's parsed rules (the write/registers/profile show report), None = not in profile mode
+        self.write_gate_rules = None   # the profile/file gate's parsed rules (the write/registers/profile show report), None = not in profile/file mode
+        self.write_gate_warn = None    # the acl file's permission warning (set on a resolved file: gate, None otherwise)
         try:
             self.write_ranges = self._resolve_write_ranges(self.write_registers)   # the effective gate
         except ValueError as e:
@@ -118,13 +134,13 @@ class Proxy:
             self.poll_wake.clear()
 
     def log_map(self):
-        for fc, start, count in self.cache.ranges:
-            name = self.cache.names.get((fc, start, count))
-            logger.info('caching %s%d:%d%s', '' if fc == 3 else 'fc%d ' % fc, start, count,
-                        ' ' + name if name else '')
-        logger.info('poll plan: %d block(s): %s', len(self.blocks),
-                    ' '.join('%s%d:%d' % ('' if fc == 3 else 'fc%d ' % fc, start, count)
-                             for fc, start, count, _ in self.blocks))
+        """The start/reload map log: the generated poll pools, one line
+        each — not one line per cached range."""
+        logger.info('poll plan: %d pool(s) over %d range(s)',
+                    len(self.blocks), len(self.cache.ranges))
+        for i, (fc, start, count, leaves) in enumerate(self.blocks, 1):
+            logger.info('  pool %d: fc%d %d:%d [ %d range%s ]', i, fc,
+                        start, count, len(leaves), '' if len(leaves) == 1 else '(s)')
 
     def load_map(self):
         """The register map from the current config: the profile + the
@@ -321,17 +337,26 @@ class Proxy:
         the parsed rules for the write/registers/profile show report, the
         stash swapping only on a successful resolve so a bad gate leaves
         the old one AND its report standing; everything else passes
-        through unchanged."""
+        through unchanged. A group/world-readable acl file warns — the
+        log, the audit trail's ACL-FILE event, and the set/unset reply's
+        suffix all carry it (the file is config trust: chmod 0600)."""
         try:
             if val == 'profile':
                 desc, rules = load_profile_write_gate(self.config.get('profile'))
+                self.write_gate_warn = None
             elif isinstance(val, str) and val.startswith('file:'):
                 desc, rules = load_write_gate_file(val[5:])
+                self.write_gate_warn = acl_file_warn(val[5:])
+                if self.write_gate_warn is not None:
+                    logger.warning('acl file: %s', self.write_gate_warn)
+                    if self.audit is not None:
+                        self.audit.event('ACL-FILE', self.write_gate_warn)
             else:
+                self.write_gate_warn = None
                 return val
             ranges = compile_write_acl(rules)
         except SystemExit as e:
-            raise ValueError(str(e))
+            raise ValueError(str(e))   # the old gate and its warning stand
         self.write_gate_rules = (desc, rules)
         return ranges
 

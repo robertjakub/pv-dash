@@ -440,7 +440,8 @@ default to `none`** — the write path is closed even before `--allow-write`
 enters the picture. Both ACLs take a comma-separated list of IPs and CIDR
 prefixes (IPv4 or IPv6, e.g. `--connect-acl 127.0.0.1,10.48.3.0/24`), or
 the two words `any` (no restriction) and `none` (refuse every peer —
-restrict all); the config-file/env/NixOS forms are
+restrict all), or **`file:<path>`** — the standalone ip-prefix acl file
+described below; the config-file/env/NixOS forms are
 `connect_acl`/`write_acl`/`write_registers` (NixOS
 `connectAcl`/`writeAcl`/`writeRegisters`).
 
@@ -479,8 +480,31 @@ restrict all); the config-file/env/NixOS forms are
   loosened: chmod 0600) — in the log, the audit trail's `ACL-FILE`
   event, and as the suffix of the `set`/`unset` reply; a `0600` file is
   silent. `show write registers profile` answers the gate
-  back as its chain — one `allow`/`deny` line per range, the profile's
-  descs included (the file's rules render the same way).
+   back as its chain — one `allow`/`deny` line per range, the profile's
+   descs included (the file's rules render the same way).
+
+**The connect and write ACLs read the same standalone acl files**:
+`--connect-acl file:<path>` / `--write-acl file:<path>` (and their `set`
+spellings) load the gate whose root object is the
+`"type": "ip-prefix"` gate — the shipped `examples/acl-ip-prefix.json`:
+an optional terse-ASCII `desc`, the ordered `rules` list, one
+`{"type": "allow"|"deny", "prefix": "any"|IP|IP/prefix, ...}`
+object per rule (comma-separated prefixes fan out), each rule optionally
+described. The chain reads top to bottom, **the last matching rule
+decides**, and a client no rule decides refuses (the default deny any);
+the matcher word `any` is the whole space — `0.0.0.0/0`. The file is read
+at start and on every `set`/`unset`: a missing or bad file refuses the
+start and answers `err` on the wire with the old gate standing, the
+spelling round-trips through the dumps and `unset`, and a
+group/world-readable file warns exactly like the write-registers acl
+file (the log, the audit trail's `ACL-FILE` event, the set/unset reply's
+suffix; a `0600` file is silent). **`show acl connect table` /
+`show acl write table`** (show-only) render either ACL as its chain, one
+entry per line: the system forms spell the chain they implement —
+`allow 0.0.0.0/0` (any), `deny 0.0.0.0/0` (none), `deny 0.0.0.0/0` then
+one `allow` line per network (the whitelist) — and a file gate renders
+its own rules, the gate desc as the `%` line, the rule descs as aligned
+`#` comments.
 
 Writing is therefore gated four times: `--allow-write` **and** the client
 on the write ACL **and** every touched register inside the allow-list

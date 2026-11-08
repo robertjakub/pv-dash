@@ -131,43 +131,125 @@ def _ranges_from_bits(bits):
     return out
 
 
-def _write_gate_object(gate, base):
+def _prefix_matcher(v, where):
+    """The IP-kind rule matcher: the bare word 'any' (every address), or a
+    comma-separated string of IP addresses / IP prefixes — strict CIDR, a
+    prefix with host bits set refuses (spell the network). Returns the
+    value normalized (the items stripped, comma-joined)."""
+    if not isinstance(v, str):
+        raise SystemExit('%s must be "any" or a comma-separated IP/IP-prefix string' % where)
+    t = v.strip()
+    if t.lower() == 'any':
+        return 'any'
+    items = [x.strip() for x in t.split(',')]
+    if not all(items):
+        raise SystemExit('%s: empty item in the comma-separated prefix list' % where)
+    fam = None
+    for x in items:
+        try:
+            net = ipaddress.ip_network(x, strict=True)
+        except ValueError:
+            try:
+                wide = ipaddress.ip_network(x, strict=False)
+                hint = ' — spell the network %s' % wide.with_prefixlen
+            except ValueError:
+                hint = ''
+            raise SystemExit('%s: %r must be an IP or IP/prefix%s' % (where, x, hint))
+        if fam is None:
+            fam = net.version
+        elif net.version != fam:
+            raise SystemExit('%s: the matcher mixes IPv4 and IPv6 (%s and %s)' % (where, items[0], x))
+    return ','.join(items)
+
+
+_GATE_TYPES = {'write-registers': 'range', 'ip-prefix': 'prefix'}
+
+
+def _write_gate_object(gate, base, allow=('write-registers',)):
     """The acl gate OBJECT (what a device profile carries under
     "acl"/"write", what a standalone acl file is): an optional terse-ASCII
-    "desc" and the ordered "rules" list — one {"type": "allow"|"deny",
-    "range": matcher} object per rule (+ an optional "desc" each); a
-    matcher is a "START:COUNT" range or a list of them, or the bare word
-    "any" (all registers). The chain is a whitelist: it reads top
-    to bottom and the LAST matching rule decides, and a register no rule
-    decides refuses — the default deny any. Returns (desc, rules), the
-    rules as (verb, matcher, desc, where) tuples in chain order; `base`
-    names the gate in the errors ('<profile> acl/write', 'acl file <path>')."""
-    unknown = sorted(k for k in gate if k not in ('desc', 'rules'))
+    "desc", the optional gate "type" and the ordered "rules" list — one
+    {"type": "allow"|"deny", matcher-key: matcher} object per rule (+ an
+    optional "desc" each). THE MATCHER KEY IS THE GRAMMAR: "range" is the
+    register kind (a "START:COUNT" range or a list of them, or the bare
+    word "any" — all registers), "prefix" is the IP kind (an IP or
+    IP/prefix, comma-separated, or "any" — every address). The gate
+    "type" names the schema — "write-registers" (range rules),
+    "ip-prefix" (prefix rules) — and must agree with the rules' key when
+    spelled; a typeless register gate reads as "write-registers" (the
+    legacy shape), a typeless IP gate refuses. ONE GRAMMAR PER GATE: the
+    first matcher key pins the gate, and a gate whose rules mix "range"
+    and "prefix" refuses. `allow` says which gate types this reader
+    takes (the wrong-typed file refuses with the name in the error). The
+    chain is a whitelist: it reads top to bottom and the LAST matching
+    rule decides, and a client/register no rule decides refuses — the
+    default deny any. Returns (desc, rules), the rules as (verb,
+    matcher, desc, where) tuples in chain order; `base` names the gate
+    in the errors ('<profile> acl/write', 'acl file <path>')."""
+    unknown = sorted(k for k in gate if k not in ('desc', 'type', 'rules'))
     if unknown:
-        raise SystemExit('%s: unknown key(s) %s ("desc" and the "rules" list — one '
-                         '{"type": "allow"|"deny", "range": ...} object per rule)'
-                         % (base, ', '.join(unknown)))
+        raise SystemExit('%s: unknown key(s) %s ("desc", the optional gate "type" and the '
+                         '"rules" list — one {"type": "allow"|"deny", "range"|"prefix": ...} '
+                         'object per rule)' % (base, ', '.join(unknown)))
+    gate_type = gate.get('type')
+    if gate_type is not None and gate_type not in _GATE_TYPES:
+        raise SystemExit('%s: unknown gate "type" %r (write-registers | ip-prefix)'
+                         % (base, gate_type))
     _acl_desc(gate.get('desc'), base)
     gate_rules = gate.get('rules')
     if not isinstance(gate_rules, list) or not gate_rules:
         raise SystemExit('%s: the "rules" list is missing or empty (a gate that '
                          'gates nothing is a config error — spell the whole-space deny as '
                          '[{"type": "deny", "range": "any"}])' % base)
-    rules = []   # (verb, matcher-value, desc, where) in chain order
+    kind = None
     for i, rule in enumerate(gate_rules):
         where = '%s rule %d' % (base, i + 1)
         if not isinstance(rule, dict) or not rule:
-            raise SystemExit('%s must be an object with a "type" (allow/deny) and a "range"' % where)
-        unknown = sorted(k for k in rule if k not in ('type', 'range', 'desc'))
+            raise SystemExit('%s must be an object with a "type" (allow/deny) and a '
+                             '"range" or "prefix"' % where)
+        unknown = sorted(k for k in rule if k not in ('type', 'range', 'prefix', 'desc'))
         if unknown:
-            raise SystemExit('%s: unknown key(s) %s (type/range/desc)' % (where, ', '.join(unknown)))
+            raise SystemExit('%s: unknown key(s) %s (type/range-or-prefix/desc)'
+                             % (where, ', '.join(unknown)))
+        has = [k for k in ('range', 'prefix') if k in rule]
+        if len(has) > 1:
+            raise SystemExit('%s: the rule carries both "range" and "prefix" — one grammar '
+                             'per gate (range matches registers, prefix matches IPs)' % where)
+        if kind and has and has[0] != kind:
+            raise SystemExit('%s: the gate mixes "range" and "prefix" rules — one grammar '
+                             'per gate (range matches registers, prefix matches IPs)' % where)
+        if has:
+            kind = has[0]
+    if gate_type and kind and _GATE_TYPES[gate_type] != kind:
+        raise SystemExit('%s: the gate "type" %s matches by "%s" — the rules match by "%s"'
+                         % (base, gate_type, _GATE_TYPES[gate_type], kind))
+    eff = None
+    if gate_type:
+        eff = gate_type
+        kind = _GATE_TYPES[gate_type]
+    elif kind == 'range':
+        eff = 'write-registers'   # the legacy shape: a typeless register gate
+    elif kind == 'prefix':
+        raise SystemExit('%s: the gate matches by "prefix" and carries no "type" — spell '
+                         '"type": "ip-prefix"' % base)
+    if eff is not None and eff not in allow:
+        raise SystemExit('%s: the gate is the %s gate — this reader takes the %s gate'
+                         % (base, eff, ' or '.join(allow)))
+    rules = []   # (verb, matcher-value, desc, where) in chain order
+    for i, rule in enumerate(gate_rules):
+        where = '%s rule %d' % (base, i + 1)
         verb = rule.get('type')
         if verb not in ('allow', 'deny'):
             raise SystemExit('%s: "type" must be allow or deny, got %r' % (where, verb))
-        if 'range' not in rule:
-            raise SystemExit('%s: the rule needs a "range"' % where)
         _acl_desc(rule.get('desc'), where)
-        rules.append((verb, rule['range'], rule.get('desc'), where))
+        if kind == 'prefix':
+            if 'prefix' not in rule:
+                raise SystemExit('%s: the rule needs a "prefix"' % where)
+            rules.append((verb, _prefix_matcher(rule['prefix'], where), rule.get('desc'), where))
+        else:
+            if 'range' not in rule:
+                raise SystemExit('%s: the rule needs a "range"' % where)
+            rules.append((verb, rule['range'], rule.get('desc'), where))
     return gate.get('desc'), rules
 
 
@@ -193,10 +275,115 @@ def load_profile_write_gate(path, label=None):
     return _write_gate_object(gate, '%s acl/write' % label)
 
 
-def load_write_gate_file(path, label=None):
-    """The standalone acl file for write-registers file:<path>: the root
-    object IS the gate — the same acl gate object a device profile carries
-    under "acl"/"write" (see _write_gate_object). Returns (desc, rules)."""
+ANY_NET = '0.0.0.0/0'   # the table spelling of the whole IPv4 space — the word 'any'
+
+
+class IPGate:
+    """The file-loaded ip-prefix gate (the acl/connect + acl/write
+    file:<path> value): the rule chain reads top to bottom, the LAST
+    matching rule decides, and a peer no rule decides is refused — the
+    default deny any (the same whitelist reading the write-registers gate
+    speaks). The matchers precompile to networks (the loader validated
+    them strict); the bare word 'any' matches every address (any =
+    0.0.0.0/0, the whole space — both families)."""
+
+    def __init__(self, reference, desc, rules):
+        self.reference = reference   # the knob spelling 'file:<path>' — the re-appliable text
+        self.desc = desc
+        self.rules = rules           # (verb, matcher, desc, where) tuples in chain order
+        self.compiled = []           # (verb, networks-or-None) — None = the 'any' wildcard
+        for verb, matcher, _rdesc, _where in rules:
+            if str(matcher).strip().lower() == 'any':
+                self.compiled.append((verb, None))
+            else:
+                nets = [ipaddress.ip_network(x.strip(), strict=False)
+                        for x in str(matcher).split(',') if x.strip()]
+                self.compiled.append((verb, nets))
+
+    def allows(self, ip):
+        """The chain on one peer address: the last matching rule decides,
+        no match denies."""
+        try:
+            a = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        decided = False
+        for verb, nets in self.compiled:
+            if nets is None or any(a.version == n.version and a in n for n in nets):
+                decided = verb == 'allow'
+        return decided
+
+
+def parse_acl_value(text, label):
+    """The acl/connect + acl/write knob: the system words and the network
+    lists ride parse_acl; a `file:<path>` value passes through as the
+    reference (the proxy reads the standalone ip-prefix gate file — a bad
+    file refuses at start, like the write-registers acl). Modbus-cache
+    only: the family's other listeners keep the strict system grammar."""
+    t = (text or '').strip() if text is not None else None
+    if t and t.startswith('file:'):
+        return t
+    return parse_acl(text, label)
+
+
+def acl_value_text(acl):
+    """The acl/connect + acl/write value as its set-grammar text (what
+    `unset` re-parses and show config renders): 'any', 'none', the network
+    list — or the file: reference (a raw string value or the resolved
+    IPGate)."""
+    if isinstance(acl, IPGate):
+        return acl.reference
+    if isinstance(acl, str) and acl.startswith('file:'):
+        return acl
+    return acl_text(acl)
+
+
+def acl_gate_summary(acl):
+    """The acl/connect + acl/write gate for humans (the start log, show
+    status, inspect): the system forms as acl_summary spells them, the
+    file gate as 'file:<path> (N rule(s))'."""
+    if isinstance(acl, IPGate):
+        return '%s (%d rule(s))' % (acl.reference, len(acl.rules))
+    return acl_summary(acl)
+
+
+def acl_table(acl):
+    """The acl/connect + acl/write table show's lines (one entry per
+    line): the system forms spell the chain they implement — 'allow
+    0.0.0.0/0' (any), 'deny 0.0.0.0/0' (none), 'deny 0.0.0.0/0' + one
+    'allow <net>' line per network (the whitelist); a file gate renders
+    its own rules — the gate desc as the '% ' line, the descs as aligned
+    '# ' comments, the matcher 'any' spelled 0.0.0.0/0, a comma list
+    fanned out one entry per line."""
+    if isinstance(acl, IPGate):
+        lines = ['%% %s' % acl.desc] if acl.desc else []
+        rows = []
+        for verb, matcher, rdesc, _where in acl.rules:
+            if str(matcher).strip().lower() == 'any':
+                entries = [ANY_NET]
+            else:
+                entries = [x.strip() for x in str(matcher).split(',') if x.strip()]
+            for entry in entries:
+                rows.append(('%s %s' % (verb, entry), (rdesc or '').strip() or None))
+        width = max((len(prefix) for prefix, d in rows if d), default=0)
+        for prefix, d in rows:
+            lines.append(('%s # %s' % (prefix.ljust(width), d)) if d else prefix.rstrip())
+        return lines
+    if acl is None:
+        return ['allow %s' % ANY_NET]
+    if not acl:
+        return ['deny %s' % ANY_NET]
+    return ['deny %s' % ANY_NET] + ['allow %s' % n for n in acl]
+
+
+def load_write_gate_file(path, label=None, allow=('write-registers',)):
+    """The standalone acl file (the write-registers file:<path> reference,
+    and the acl/connect + acl/write file:<path> values): the root object
+    IS the gate — the same acl gate object a device profile carries
+    under "acl"/"write" (see _write_gate_object). `allow` says which gate
+    types the caller takes (the default gates registers; the IP kind's
+    readers pass their own type, or all of them for the generic tools).
+    Returns (desc, rules)."""
     label = label or 'acl file %s' % path
     try:
         with open(path, encoding='utf-8') as fh:
@@ -205,9 +392,9 @@ def load_write_gate_file(path, label=None):
         raise SystemExit('cannot read acl file %s: %s' % (path, e))
     if not isinstance(data, dict):
         raise SystemExit('%s must be the acl gate object: {"desc": ..., "rules": '
-                         '[{"type": "allow"|"deny", "range": "START:COUNT"}]} — the same '
+                         '[{"type": "allow"|"deny", "range"|"prefix": ...}]} — the same '
                          'object a device profile carries under "acl"/"write"' % label)
-    return _write_gate_object(data, label)
+    return _write_gate_object(data, label, allow)
 
 
 def compile_write_acl(rules):
@@ -216,7 +403,9 @@ def compile_write_acl(rules):
     the disjoint (start, count) ranges. Compiles to a bitmap — allow sets
     1, deny clears to 0, so the last rule touching a register decides and
     the untouched bits stay refused (the default deny any) — the chain
-    never needs a second check at write time."""
+    never needs a second check at write time. Register kind only (range
+    rules) — a prefix chain is the IP kind's, its reader compiles its
+    own."""
     bits = bytearray(MAX_REGISTERS)   # 0 = refused (the default), 1 = writable
     for verb, matcher, _desc, where in rules:
         kind, ranges = _acl_matcher(matcher, where)
@@ -510,10 +699,10 @@ def resolve_config(args, script_dir=None):
                                        'METRICS_SERVER', 'metrics_server', False),
         'metrics_listen': resolve(getattr(args, 'metrics_listen', None), 'METRICS_LISTEN',
                                   'metrics_listen', DEFAULTS['metrics_listen'], str),
-        'connect_acl': parse_acl(resolve(args.connect_acl, 'CONNECT_ACL', 'connect_acl', 'any', str),
-                                 'connect-acl'),
-        'write_acl': parse_acl(resolve(args.write_acl, 'WRITE_ACL', 'write_acl', 'none', str),
-                               'write-acl'),
+        'connect_acl': parse_acl_value(resolve(args.connect_acl, 'CONNECT_ACL', 'connect_acl', 'any', str),
+                                       'connect-acl'),
+        'write_acl': parse_acl_value(resolve(args.write_acl, 'WRITE_ACL', 'write_acl', 'none', str),
+                                     'write-acl'),
         'level': resolve(args.log_level, 'LOG_LEVEL', 'log_level', DEFAULTS['log_level'], str).upper(),
         'control_port': resolve(getattr(args, 'control_port', None), 'CTL', 'control_port', '', str),
         'control_token': parse_secret(resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',

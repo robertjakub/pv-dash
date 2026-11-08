@@ -35,7 +35,7 @@ from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
     KNOWN_VERBS, CFG_KEYS, CFG_FORMATTERS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .cache import build_blocks
-from .config import parse_write_registers, parse_acl, acl_text, acl_summary, parse_selection, parse_listen, parse_control_target, \
+from .config import parse_write_registers, acl_value_text, acl_gate_summary, acl_table, parse_selection, parse_listen, parse_control_target, \
     render_write_acl
 from .metrics import MetricsServer, describe_metrics
 from . import persist
@@ -147,7 +147,7 @@ class ControlServer(_ControlServer):
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|cache|'
-                'uplink|version|config|knobs|write-registers-profile>')
+                'uplink|version|config|knobs|write-registers-profile|acl-connect-table|acl-write-table>')
         if self.proxy.dump_path:
             cmds += ', request dump [with-cache], request restore'
         cmds += ', request clear cache, request reload, request restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
@@ -248,6 +248,10 @@ class ControlServer(_ControlServer):
             return self.knobs_dictionary()
         if low == 'show write-registers-profile':
             return self.write_registers_profile_report()
+        if low == 'show connect-acl-table':
+            return self.acl_table_report('connect')
+        if low == 'show write-acl-table':
+            return self.acl_table_report('write')
         if low.startswith('show'):
             args = cmd.split()[1:]
             if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
@@ -702,15 +706,21 @@ class ControlServer(_ControlServer):
             p.config['timeout'] = v
             return secs(v)
         if key == 'acl/connect':
-            acl = self._acl(val, 'acl/connect')
-            p.connect_acl = acl
-            p.config['connect_acl'] = acl
-            return self._acl_text(acl)
+            if val.lower() == 'table':   # the show word is never a value — point at the report
+                raise ValueError('"table" is not an acl/connect value — the table is the show: '
+                                 'show acl connect table')
+            shown = p.set_connect_acl(val)
+            if p.connect_acl_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
+                shown += ' (%s)' % p.connect_acl_warn
+            return shown
         if key == 'acl/write':
-            acl = self._acl(val, 'acl/write')
-            p.write_acl = acl
-            p.config['write_acl'] = acl
-            return self._acl_text(acl)
+            if val.lower() == 'table':
+                raise ValueError('"table" is not an acl/write value — the table is the show: '
+                                 'show acl write table')
+            shown = p.set_write_acl(val)
+            if p.write_acl_warn:
+                shown += ' (%s)' % p.write_acl_warn
+            return shown
         if key in ('modbus/profile', 'modbus/selection'):
             cfg = self._live_cfg()
             if key == 'modbus/profile':
@@ -822,14 +832,9 @@ class ControlServer(_ControlServer):
 
     @staticmethod
     def _acl_text(acl):
-        """'any' | 'none' | the normalized network list (what `unset` re-parses)."""
-        return acl_text(acl)
-
-    def _acl(self, val, label):
-        try:
-            return parse_acl(val, label)
-        except SystemExit as e:
-            raise ValueError(str(e))
+        """'any' | 'none' | the normalized network list | the file: reference
+        (what `unset` re-parses)."""
+        return acl_value_text(acl)
 
     def _get(self, key):
         p = self.proxy
@@ -957,11 +962,11 @@ class ControlServer(_ControlServer):
             'max_clients=%s' % (p.max_clients or 'none'),
             'client_timeout=%s' % (secs(p.client_timeout) if p.client_timeout else 'none'),
             'max_conn_per_ip=%s' % (p.conn_gate.max_per_ip or 'none'),
-            'connect_acl=%s' % acl_summary(p.connect_acl),
+            'connect_acl=%s' % acl_gate_summary(p.connect_acl),
             'auth=%s' % (p.config.get('auth') or 'none'),
             'upstream_auth=%s' % (p.config.get('auth_upstream') or 'none'),
             'writes=%s' % ('enabled' if p.allow_write else 'disabled'),
-            'write_acl=%s' % acl_summary(p.write_acl),
+            'write_acl=%s' % acl_gate_summary(p.write_acl),
             'write_allow_list=%s' % p.describe_write_gate(),
             'requests_audit=%s' % ('off' if not p.requests_audit_s else secs(p.requests_audit_s)),
             'dump=%s' % ('off' if not p.dump_path else '%s every %s%s' % (
@@ -1013,7 +1018,7 @@ class ControlServer(_ControlServer):
                                                                                        '' if p.poll_ok else ' (FAILING)'),
             'listen    %s:%d, control %s, connect-acl %s, client auth %s'
             % (p.listen_addr[0], p.listen_addr[1], self.describe(),
-               acl_summary(p.connect_acl), p.config.get('auth') or 'none'),
+               acl_gate_summary(p.connect_acl), p.config.get('auth') or 'none'),
             'profile   %s, map v%d' % (cfg.get('profile') or p.profile,
                                        p.cache.map_version),
             'selection %s' % (cfg.get('selection') or 'all'),
@@ -1035,7 +1040,7 @@ class ControlServer(_ControlServer):
                p.conn_gate.max_per_ip or 'none'),
             'writes    %s, write-acl %s, write-registers %s'
             % ('ENABLED' if p.allow_write else 'disabled',
-               acl_summary(p.write_acl),
+               acl_gate_summary(p.write_acl),
                p.describe_write_gate()),
             'audit     %s%s' % ('off' if p.audit is None else (p.audit.path if p.audit.path != '-' else 'stdout'),
                                 ', requests accounting every %s' % secs(p.requests_audit_s) if p.audit and p.requests_audit_s else ''),
@@ -1085,6 +1090,18 @@ class ControlServer(_ControlServer):
             lines.append('deny any')
             lines.extend('allow %d:%d' % r for r in wr)
         return '\n'.join(lines)
+
+    def acl_table_report(self, which):
+        """The acl/connect/table + acl/write/table show reports (the
+        show-only view of the two IP ACLs, one entry per line): the system
+        forms spell the chain they implement — 'allow 0.0.0.0/0' (any),
+        'deny 0.0.0.0/0' (none), 'deny 0.0.0.0/0' + one allow line per
+        network (the whitelist); a file gate renders its own rules — the
+        gate desc as the '% ' line, the rule descs as aligned '# '
+        comments, the matcher 'any' spelled 0.0.0.0/0."""
+        p = self.proxy
+        acl = p.connect_acl if which == 'connect' else p.write_acl
+        return 'ok acl-%s-table\n%s' % (which, '\n'.join(acl_table(acl)))
 
     def cache_all_report(self):
         """Every cached entry, one row per profile range: the words cached,

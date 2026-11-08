@@ -5,6 +5,23 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The ip-prefix acl wave: **`acl/connect` and `acl/write` read
+`file:<path>`** — the standalone ip-prefix acl gate (the shipped
+`examples/acl-ip-prefix.json` shape: `"type": "ip-prefix"`, `prefix`
+rules) evaluated in the connect and write logic as a chain — the last
+matching rule decides, a client no rule decides refuses (the default deny
+any; the matcher word `any` is the whole space, `0.0.0.0/0`). The
+missing or bad file refuses the start and answers `err` on the wire with
+the old gate standing, the spelling round-trips through the dumps and
+`unset`, and a group/world-readable acl file warns (the log, the audit
+trail's `ACL-FILE` event, the set/unset reply's suffix). The new
+**`show acl connect table` / `show acl write table`** reports
+(show-only) render either ACL as its chain, one entry per line: the
+system forms spell the chain they implement — `allow 0.0.0.0/0` (any),
+`deny 0.0.0.0/0` (none), `deny 0.0.0.0/0` then one `allow` line per
+network (the whitelist) — and a file gate renders its own rules (the
+gate desc as the `% ` line, the rule descs as aligned `# ` comments).
+
 The acl whitelist wave: the device profile's write acl re-shapes to the
 **typed rule chain** — `"acl": {"write": {"desc": ..., "rules": [...]}}`,
 one `{"type": "allow"|"deny", "range": matcher}` object per rule (the

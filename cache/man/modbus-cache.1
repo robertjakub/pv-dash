@@ -126,12 +126,18 @@ selection JSON: {"registers": ["pv\-power",...]} — the profile names to
 fetch
 .TP
 .B \-\-connect\-acl
-clients allowed to connect: "any", "none" (refuse everyone) or
-comma\-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16
+clients allowed to connect: "any", "none" (refuse everyone),
+comma\-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or
+"file:<path>" — the standalone ip\-prefix acl file (the gate object
+{"type": "ip\-prefix", "rules": [{"type": "allow"|"deny", "prefix":
+\&...}]}: the last matching rule decides, a client no rule decides
+refuses; "any" = 0.0.0.0/0, the whole space)
 .TP
 .B \-\-write\-acl
 clients allowed to write (requires \-\-allow\-write): "any", "none"
-(refuse everyone) or comma\-separated IPs/prefixes
+(refuse everyone), comma\-separated IPs/prefixes, or "file:<path>" — the
+standalone ip\-prefix acl file (the same gate object acl/connect reads:
+the last matching rule decides, a client no rule decides refuses)
 .TP
 .B \-\-listen
 listen address HOST:PORT
@@ -302,6 +308,7 @@ The control server speaks JSON lines: one request
 the reports
 .BR inspect ", " "show status" ", " "show connections" ,
 .BR "show cache" " [all]" ", " "show write registers profile" ", " "show uplink" ", " "show version" ,
+.BR "show acl connect table" ", " "show acl write table" ,
 the ops
 .BR "request dump" ", " "request restore" ", " "request clear cache" ,
 .BR "request reload" ", " "request restart" ", " shutdown ", " quit .
@@ -343,6 +350,14 @@ renders the write gate as its acl chain (show-only): \fBallow any\fR /
 line per range), and in profile or file mode the gate's own rules \(em
 the gate's desc as the % line, then one allow/deny line per range with
 its desc, the comments aligned.
+.IP \(bu 2
+.B show acl connect table
+/ \fBshow acl write table\fR render either IP ACL as its chain, one
+entry per line (show-only): \fBallow 0.0.0.0/0\fR (any), \fBdeny
+0.0.0.0/0\fR (none), \fBdeny 0.0.0.0/0\fR then one \fBallow\fR line
+per network (the whitelist) \(em and in file mode the ip-prefix gate's
+own rules, the gate desc as the % line, the rule descs as aligned
+comments.
 .IP \(bu 2
 .B request dump
 / \fBrequest restore\fR: the write-behind state (the cached words + stamps,

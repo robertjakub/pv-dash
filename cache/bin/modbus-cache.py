@@ -32,7 +32,7 @@ from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.modbus import exception_frame
 from common.version import version_string
-from lib.config import load_registers_file, load_selection, resolve_config, parse_control_target, acl_text, acl_summary
+from lib.config import load_registers_file, load_selection, resolve_config, parse_control_target, acl_value_text, acl_gate_summary
 from lib.options import KNOWN_VERBS, OPTIONS
 from lib.metrics import MetricsServer, describe_metrics
 from lib import persist
@@ -279,8 +279,8 @@ def main():
                 'local' if cfg['local_time'] else 'UTC',
                 cfg['max_clients'] or 'none', '%gs' % cfg['client_timeout'] if cfg['client_timeout'] else 'none',
                 cfg['max_conn_per_ip'] or 'none',
-                acl_summary(cfg['connect_acl']),
-                acl_summary(cfg['write_acl']),
+                acl_gate_summary(proxy.connect_acl),
+                acl_gate_summary(proxy.write_acl),
                 proxy.describe_write_gate(),
                 cfg['auth'] or 'none', cfg['auth_upstream'] or 'none',
                 'required on TCP' if control_token else 'none',
@@ -315,6 +315,9 @@ def main():
                        cfg['selection'] or cfg['profile']))
         if proxy.write_gate_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
             audit.event('ACL-FILE', proxy.write_gate_warn)
+        for warn in (proxy.connect_acl_warn, proxy.write_acl_warn):
+            if warn:
+                audit.event('ACL-FILE', warn)
     stop = install_signal_handlers(proxy, cache, args)
     if control_target is not None:
         defaults = {'modbus/interval': '%g' % cfg['interval'],
@@ -339,8 +342,8 @@ def main():
                     'local-time': 'on' if cfg['local_time'] else 'off',
                     'modbus/profile': cfg['profile'],
                     'modbus/selection': cfg['selection'] or 'all',
-                    'acl/connect': acl_text(cfg['connect_acl']),
-                    'acl/write': acl_text(cfg['write_acl']),
+                    'acl/connect': acl_value_text(cfg['connect_acl']),
+                    'acl/write': acl_value_text(cfg['write_acl']),
                     'modbus/timeout': '%g' % cfg['timeout'],
                     'modbus/auth': cfg['auth'] or 'none',
                     'modbus/auth-upstream': cfg['auth_upstream'] or 'none',

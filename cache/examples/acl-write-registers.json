@@ -1,5 +1,6 @@
 {
   "desc": "the deye-sg05lp3 write policy, worked out - a whitelist: the chain reads top to bottom, the LAST matching rule decides, and a register no rule decides refuses (the default deny any)",
+  "type": "write-registers",
   "rules": [
     {"type": "deny", "range": "any", "desc": "the clean slate: nothing writable yet"},
     {"type": "allow", "range": "127:2", "desc": "operational mode registers (grid-start soc, grid charge current)"},

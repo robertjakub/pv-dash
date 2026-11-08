@@ -14,7 +14,9 @@ from common.modbus import (DeviceError, ModbusError, auth_handshake_server,
                            frame, pack_bits, read_frame, unpack_bits,
                            write_shape_error, write_target)
 from common.connlimit import ConnGate
-from .config import load_profile_write_gate, load_write_gate_file, compile_write_acl, load_registers_file, load_selection
+from .config import (IPGate, acl_gate_summary, acl_value_text, load_profile_write_gate,
+                     load_write_gate_file, compile_write_acl, load_registers_file, load_selection,
+                     parse_acl)
 from .cache import build_blocks, span
 from .statics import (MAX_COUNT, MAX_PDU, MAX_BITS, READ_FUNCS, BIT_READ_FUNCS, WRITE_FUNCS,
                       GATEWAY_FAILED, ILLEGAL_FUNCTION,
@@ -86,8 +88,10 @@ class Proxy:
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
         self.conn_gate = ConnGate(0, max(0, int(self.config.get('max_conn_per_ip') or 0)))
         self.requests_audit_s = max(0.0, float(self.config.get('requests_audit_s', REQUESTS_AUDIT_S)))
-        self.connect_acl = self.config.get('connect_acl')
-        self.write_acl = self.config.get('write_acl')
+        self.connect_acl_warn = None   # the acl/connect file's permission warning (the stash, None = no warning standing)
+        self.write_acl_warn = None     # the acl/write file's warning
+        self.connect_acl = self._resolve_ip_acl(self.config.get('connect_acl'), 'connect')
+        self.write_acl = self._resolve_ip_acl(self.config.get('write_acl'), 'write')
         self.no_cache = self.config.get('selection') == 'none'   # selection none: forward only
         self.poll_secs_last = 0.0        # the poll-cycle durations for /metrics
         self.poll_secs_max = 0.0
@@ -174,6 +178,10 @@ class Proxy:
 
     def reload(self):
         """Apply a freshly resolved config + register map (SIGHUP)."""
+        # the gates resolve BEFORE the swaps: a bad value or acl file keeps
+        # the previous settings wholesale (the watcher logs the failure)
+        connect_acl = self._resolve_ip_acl(self.config.get('connect_acl'), 'connect')
+        write_acl = self._resolve_ip_acl(self.config.get('write_acl'), 'write')
         self.upstream.host = self.config['host']
         self.upstream.port = self.config['port']
         self.upstream.unit = self.config['unit']
@@ -194,8 +202,8 @@ class Proxy:
         self.client_timeout = max(0.0, float(self.config.get('client_timeout') or 0.0))
         self.conn_gate = ConnGate(0, max(0, int(self.config.get('max_conn_per_ip') or 0)))
         self.requests_audit_s = max(0.0, float(self.config.get('requests_audit_s', REQUESTS_AUDIT_S)))
-        self.connect_acl = self.config.get('connect_acl')
-        self.write_acl = self.config.get('write_acl')
+        self.connect_acl = connect_acl
+        self.write_acl = write_acl
         self.cache.cache_ttl = self.config['cache_ttl']
         self.cache.update_map(ranges, names, ttls)
         self.generation += 1
@@ -309,8 +317,12 @@ class Proxy:
                                  % (key, entry['requests'], int(self.requests_audit_s), delta))
 
     def _allowed(self, acl, ip):
-        """None = the ACL is off (everybody allowed); () = nobody allowed
-        (the 'none' mode); otherwise the ip must land in one network."""
+        """The IP ACL on one peer: None = the ACL is off (everybody
+        allowed); () = nobody allowed (the 'none' mode); the networks =
+        the whitelist (the ip must land in one network); an IPGate (the
+        file's chain) = the last matching rule decides, no match denies."""
+        if isinstance(acl, IPGate):
+            return acl.allows(ip)
         if acl is None:
             return True
         try:
@@ -318,6 +330,52 @@ class Proxy:
         except ValueError:
             return False
         return any(a.version == n.version and a in n for n in acl)
+
+    def _resolve_ip_acl(self, val, knob):
+        """The acl/connect + acl/write knob value -> the effective gate:
+        the system words and the network lists ride parse_acl; 'file:<path>'
+        loads the standalone ip-prefix gate file (the chain evaluates at
+        connect/write: last matching rule decides, no match denies).
+        ValueError on a bad value or file — the caller keeps the old gate.
+        A group/world-readable acl file warns (the log, the audit trail's
+        ACL-FILE event, the set/unset reply's suffix — the <knob>_acl_warn
+        stash; chmod 0600 silences all three). The resolved shapes pass
+        through: None / () / the networks tuple from the config resolution,
+        an IPGate from a live set."""
+        if not isinstance(val, str):   # None, () or the networks tuple: resolved already
+            return val
+        t = val.strip()
+        if t.startswith('file:'):
+            try:
+                desc, rules = load_write_gate_file(t[5:], allow=('ip-prefix',))
+            except SystemExit as e:
+                raise ValueError(str(e))
+            warn = acl_file_warn(t[5:])
+            setattr(self, '%s_acl_warn' % knob, warn)
+            if warn is not None:
+                logger.warning('acl file: %s', warn)
+                if self.audit is not None:
+                    self.audit.event('ACL-FILE', warn)
+            return IPGate(t, desc, rules)
+        try:
+            return parse_acl(t, 'acl/%s' % knob)
+        except SystemExit as e:
+            raise ValueError(str(e))
+
+    def set_connect_acl(self, val):
+        """Swap the acl/connect knob (any/none/the networks/file:<path>):
+        resolve first — a bad value or acl file leaves the old gate
+        standing."""
+        self.connect_acl = self._resolve_ip_acl(val, 'connect')
+        self.config['connect_acl'] = self.connect_acl
+        return acl_value_text(self.connect_acl)
+
+    def set_write_acl(self, val):
+        """Swap the acl/write knob (the same grammar): resolve first — a
+        bad value or acl file leaves the old gate standing."""
+        self.write_acl = self._resolve_ip_acl(val, 'write')
+        self.config['write_acl'] = self.write_acl
+        return acl_value_text(self.write_acl)
 
     def _write_allowed(self, target):
         """The register-range allow-list: every touched register must land

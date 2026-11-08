@@ -1928,6 +1928,108 @@ print('mode 0600 ok')
     check('connect-acl any: the client connects again',
           b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
 
+    # the acl/connect + acl/write file: gates — the standalone ip-prefix
+    # acl file (the chain: the last matching rule decides, no match denies,
+    # the matcher word any = 0.0.0.0/0); the table shows spell either ACL
+    # one entry per line
+    aclc = '/tmp/reg_acl_connect.json'
+    with open(aclc, 'w') as fh:
+        _json.dump({'desc': 'the lab connect policy', 'type': 'ip-prefix', 'rules': [
+            {'type': 'allow', 'prefix': '127.0.0.0/8', 'desc': 'the loopback lab'}]}, fh)
+    r = ctl_cmd('set acl connect file:%s' % aclc, 15540)
+    check('acl connect: the file: gate sets (the reference is the reply)',
+          r.startswith('ok acl/connect=file:%s' % aclc), r[:120])
+    b = rd(32064, 2, port=15539)
+    check('acl connect file: the peer the allow rule decides serves',
+          b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
+    r = ctl_cmd('show acl connect table', 15540)
+    check('acl connect table: the file gate renders its rules',
+          r == 'ok acl-connect-table\n'
+               '% the lab connect policy\n'
+               'allow 127.0.0.0/8 # the loopback lab', repr(r[:160]))
+    with open(aclc, 'w') as fh:   # the gate re-reads on every set: the whole-space deny refuses now
+        _json.dump({'desc': 'the lab connect policy', 'type': 'ip-prefix', 'rules': [
+            {'type': 'allow', 'prefix': '127.0.0.0/8', 'desc': 'the loopback lab'},
+            {'type': 'deny', 'prefix': 'any', 'desc': 'the clean slate wins: the last match decides'}]}, fh)
+    r = ctl_cmd('set acl connect file:%s' % aclc, 15540)
+    check('acl connect file: the re-set takes the new chain', r.startswith('ok acl/connect=file:'), r[:120])
+    try:
+        b = rd(32064, 2, port=15539)
+        ok = False
+    except (ConnectionError, OSError):
+        ok = True
+    check('acl connect file: the deny-any last rule refuses the peer', ok)
+    r = ctl_cmd('show acl connect table', 15540)
+    check('acl connect table: the any matcher spells 0.0.0.0/0',
+          'deny 0.0.0.0/0' in r and 'the clean slate wins: the last match decides' in r, r[:200])
+    r = ctl_cmd('set acl connect file:/tmp/reg_acl_missing-%d.json' % PORT, 15540)
+    check('acl connect: a missing acl file answers err, the old gate stands',
+          r.startswith('fail cannot read acl file')
+          and ctl_cmd('show acl connect', 15540).startswith('ok acl/connect=file:%s' % aclc), r[:120])
+    with open(aclc, 'w') as fh:   # restore the allow-only gate
+        _json.dump({'desc': 'the lab connect policy', 'type': 'ip-prefix', 'rules': [
+            {'type': 'allow', 'prefix': '127.0.0.0/8', 'desc': 'the loopback lab'}]}, fh)
+    ctl_cmd('set acl connect file:%s' % aclc, 15540)
+    # the write acl speaks the same grammar (the file gate)
+    r = ctl_cmd('set acl write file:%s' % aclc, 15540)
+    check('acl write: the file: gate sets', r.startswith('ok acl/write=file:%s' % aclc), r[:120])
+    r = ctl_cmd('show acl write table', 15540)
+    check('acl write table: the file gate renders its rules',
+          r.startswith('ok acl-write-table') and 'allow 127.0.0.0/8 # the loopback lab' in r, r[:160])
+    r = ctl_cmd('unset acl write', 15540)
+    check('unset acl write restores the default none', r.startswith('ok acl/write=none'), r[:80])
+    # the system forms spell the chain they implement
+    r = ctl_cmd('show acl connect table', 15540)
+    check('acl connect table: the file gate still renders (unset write untouched)',
+          r.startswith('ok acl-connect-table') and 'allow 127.0.0.0/8' in r, r[:120])
+    r = ctl_cmd('set acl connect any', 15540)
+    r = ctl_cmd('show acl connect table', 15540)
+    check('acl connect table: any spells allow 0.0.0.0/0',
+          r == 'ok acl-connect-table\nallow 0.0.0.0/0', repr(r[:80]))
+    r = ctl_cmd('set acl connect 127.0.0.0/8,10.48.0.0/16', 15540)
+    check('acl connect: the network list sets', r.startswith('ok acl/connect=127.0.0.0/8,10.48.0.0/16'), r[:120])
+    r = ctl_cmd('show acl connect table', 15540)
+    check('acl connect table: the whitelist spells deny any + the allows',
+          r == 'ok acl-connect-table\ndeny 0.0.0.0/0\nallow 127.0.0.0/8\nallow 10.48.0.0/16', repr(r[:120]))
+    r = ctl_cmd('unset acl connect', 15540)
+    check('acl connect: unset restores the configured default (none here)',
+          r.startswith('ok acl/connect=none'), r[:120])
+    ctl_cmd('set acl connect any', 15540)
+    r = ctl_cmd('set acl connect none', 15540)
+    r = ctl_cmd('show acl connect table', 15540)
+    check('acl connect table: none spells deny 0.0.0.0/0',
+          r == 'ok acl-connect-table\ndeny 0.0.0.0/0', repr(r[:80]))
+    r = ctl_cmd('set acl connect table', 15540)
+    check('acl connect: the show word table is not a value (the pointer to the report)',
+          r.startswith('fail') and '"table" is not an acl/connect value' in r
+          and 'show acl connect table' in r, r[:160])
+    r = ctl_cmd('set acl write table', 15540)
+    check('acl write: the show word table is not a value (the pointer to the report)',
+          r.startswith('fail') and 'show acl write table' in r, r[:160])
+    ctl_cmd('set acl connect any', 15540)
+
+    # the write-registers file: reader checks the gate schema: an
+    # ip-prefix gate refuses (this reader takes the write-registers gate)
+    badk = '/tmp/reg_acl_wrong_kind.json'
+    with open(badk, 'w') as fh:
+        _json.dump({'type': 'ip-prefix', 'rules': [{'type': 'allow', 'prefix': '10.0.0.0/8'}]}, fh)
+    p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15584',
+                        '--listen', '127.0.0.1:15600', '--profile', R,
+                        '--write-registers', 'file:' + badk, '--dry-run'],
+                       capture_output=True, text=True, timeout=60)
+    check('acl file: an ip-prefix gate refuses the write-registers reader (the schema check)',
+          p.returncode == 1 and 'this reader takes the write-registers gate' in p.stderr,
+          '%s %r' % (p.returncode, p.stderr[-160:]))
+    # and the ip-prefix reader takes it: the connect acl file the example ships
+    p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15584',
+                        '--listen', '127.0.0.1:15600', '--profile', R,
+                        '--connect-acl', 'file:' + os.path.join(CACHE_DIR, 'examples', 'acl-ip-prefix.json'),
+                        '--dry-run'],
+                       capture_output=True, text=True, timeout=60)
+    check('acl connect: the shipped ip-prefix example loads (dry-run)',
+          p.returncode == 0 and 'dry-run: configuration and register map are valid' in (p.stdout + p.stderr),
+          '%s %r' % (p.returncode, (p.stdout + p.stderr)[-120:]))
+
     # a write frame too short to carry an address fails CLOSED (the
     # allow-list cannot vet what it cannot parse)
     b = txn(b'\x06', port=15521)          # FC6 with no address: forwarded before the fix

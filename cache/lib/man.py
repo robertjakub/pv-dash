@@ -75,6 +75,7 @@ The control server speaks JSON lines: one request
 the reports
 .BR inspect ", " "show status" ", " "show connections" ,
 .BR "show cache" " [all]" ", " "show write registers profile" ", " "show uplink" ", " "show version" ,
+.BR "show acl connect table" ", " "show acl write table" ,
 the ops
 .BR "request dump" ", " "request restore" ", " "request clear cache" ,
 .BR "request reload" ", " "request restart" ", " shutdown ", " quit .
@@ -116,6 +117,14 @@ renders the write gate as its acl chain (show-only): \\fBallow any\\fR /
 line per range), and in profile or file mode the gate's own rules \\(em
 the gate's desc as the % line, then one allow/deny line per range with
 its desc, the comments aligned.
+.IP \\(bu 2
+.B show acl connect table
+/ \\fBshow acl write table\\fR render either IP ACL as its chain, one
+entry per line (show-only): \\fBallow 0.0.0.0/0\\fR (any), \\fBdeny
+0.0.0.0/0\\fR (none), \\fBdeny 0.0.0.0/0\\fR then one \\fBallow\\fR line
+per network (the whitelist) \\(em and in file mode the ip-prefix gate's
+own rules, the gate desc as the % line, the rule descs as aligned
+comments.
 .IP \\(bu 2
 .B request dump
 / \\fBrequest restore\\fR: the write-behind state (the cached words + stamps,

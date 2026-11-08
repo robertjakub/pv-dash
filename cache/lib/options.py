@@ -171,10 +171,10 @@ describe_setting, describe_value = make_describe(SETTING_BY_NAME)
 
 
 def cfg_acl_text(v):
-    """The connect/write ACL as its set-grammar text (any, none, or the
-    ip[/mask] list)."""
-    from .config import acl_text
-    return acl_text(v)
+    """The connect/write ACL as its set-grammar text (any, none, the
+    ip[/mask] list, or the file: reference)."""
+    from .config import acl_value_text
+    return acl_value_text(v)
 
 
 def cfg_write_registers(v):

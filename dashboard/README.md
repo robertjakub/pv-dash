@@ -27,7 +27,7 @@ and packaging overview live in the [suite root](../README.md).
 | `lib/config.py` | settings resolution (CLI > env > the `server.conf` set grammar > defaults) and the control-target resolution |
 | `lib/options.json` + `lib/options.py` | the knob registry (the flags, the env twins, the live settings + their control vocabulary — one source for the wire, the completions and the docs) and its loader |
 | `lib/control.py` | the JSON-lines control server (the signed wire, the peer-cred shortcut) |
-| `config.js` | user settings (`SOLAR_CONFIG`) — at the subproject root, served at `/config.js` |
+| `examples/config.js` | user settings (`SOLAR_CONFIG`) — shipped example, served at `/config.js` |
 | `man/*.1` | the man pages — **generated** (`scripts/gen_man.py` / the tools' `--man`), installed by the Nix package under `share/man/man1/` |
 | `package.nix` / `module.nix` | Nix packaging and service module (the flake entry point lives at the [suite root](../README.md)) |
 
@@ -77,7 +77,7 @@ and packaging overview live in the [suite root](../README.md).
 
 ## Configuration
 
-All settings live in `config.js` at the subproject root (served at `/config.js`; relocate with `--config-js`, `$CONFIG_JS` or `set config-js <file>` in `server.conf` — if the override file is missing, `/config.js` 404s and the page boots with built-in defaults):
+All settings live in `config.js` (the shipped example is `examples/config.js`, served at `/config.js`; relocate with `--config-js`, `$CONFIG_JS` or `set config-js <file>` in `server.conf` — if the override file is missing, `/config.js` 404s and the page boots with built-in defaults):
 
 ```js
 const SOLAR_CONFIG = {

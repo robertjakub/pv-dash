@@ -30,8 +30,8 @@ stdenv.mkDerivation (finalAttrs: {
     install -dm755 $out/share/dashboard/common/modbus
     install -m644 ${../common}/modbus/*.py $out/share/dashboard/common/modbus/
     cp -r static $out/share/dashboard/static
-    install -Dm644 config.js $out/share/dashboard/config.js
-    install -Dm644 server.conf $out/share/dashboard/server.conf
+    install -Dm644 examples/config.js $out/share/dashboard/config.js
+    install -Dm644 examples/server.conf $out/share/dashboard/server.conf
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/
 

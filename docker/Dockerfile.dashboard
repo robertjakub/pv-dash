@@ -36,8 +36,8 @@ COPY --from=common modbus/*.py common/modbus/
 COPY --chown=pvsuite bin/ dashboard/bin/
 COPY --chown=pvsuite lib/ dashboard/lib/
 COPY --chown=pvsuite static/ dashboard/static/
-COPY --chown=pvsuite server.conf dashboard/
-COPY --chown=pvsuite config.js config-defaults/
+COPY --chown=pvsuite examples/server.conf dashboard/
+COPY --chown=pvsuite examples/config.js config-defaults/
 RUN chmod +x dashboard/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/dashboard/bin/dashboard.py /usr/local/bin/dashboard \
     && ln -s /pv-suite/dashboard/bin/dashboard-ctl.py /usr/local/bin/dashboard-ctl \

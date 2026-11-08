@@ -18,8 +18,9 @@ NixOS `metricsAcl`/`metricsAclFile`, live `set metrics acl` /
 `unset metrics acl`) takes the cache's acl/connect value grammar (`any`
 the default, `none`, the comma-separated IP/prefix whitelist,
 `file:<path>` — the standalone ip-prefix acl file) and checks it at
-accept beside the connection caps (caps first, then the ACL): a client
-off the ACL is closed without a reply (nothing was parsed to answer) and
+accept ahead of the connection caps (the ACL first, then the caps): a
+client off the ACL is closed without a reply (nothing was parsed to
+answer) and
 logged `connection rejected: … not on the metrics ACL`. The gate
 re-resolves on every set/unset and SIGHUP (a bad file keeps the old gate
 standing), a group/world-readable acl file warns (the log, the audit

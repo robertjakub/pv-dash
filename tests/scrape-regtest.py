@@ -801,12 +801,12 @@ try:
     ins = ctl('inspect', 15583)
     tz = ctl('show timezone', 15583)
     check('timezone: the state machines default to UTC', tz.startswith('ok timezone=utc')
-          and int(ins.split('now ', 1)[1][:2]) == time.gmtime().tm_hour % 24, ins)
+          and int(ins.split('\nnow', 1)[1].lstrip()[:2]) == time.gmtime().tm_hour % 24, ins)
     ctl('set timezone local', 15583)
     ins = ctl('inspect', 15583)
     tz = ctl('show timezone', 15583)
     check('timezone: local = the wall clock', tz.startswith('ok timezone=local')
-          and int(ins.split('now ', 1)[1][:2]) == time.localtime().tm_hour % 24, ins)
+          and int(ins.split('\nnow', 1)[1].lstrip()[:2]) == time.localtime().tm_hour % 24, ins)
     r = subprocess.run([sys.executable, C, '--control-port', '15583', 'unset', 'timezone'],
                        capture_output=True, text=True)
     check('timezone: unset restores UTC', 'ok timezone=utc' in r.stdout, r.stdout.strip())
@@ -2352,6 +2352,26 @@ try:
     r = acl_ctl('unset metrics acl')
     check('metrics acl: unset restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
     check('metrics acl: any serves again', acl_raw().startswith(b'HTTP/1.1 200'))
+
+    # the accept ladder's order: the ACL first, then the caps — the cap
+    # refusal is only ever answered to a peer the ACL admitted
+    r = acl_ctl('set metrics limits max-clients 1')
+    check('metrics acl order: the cap sets live', r.startswith('ok'), r[:80])
+    hold = socket.create_connection(('127.0.0.1', 19465), timeout=5)
+    hold.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\n')   # the partial request parks the handler thread (the exposition handler has no timeout)
+    time.sleep(0.5)
+    check('metrics acl order: the admitted peer past the cap gets the 503',
+          acl_raw().startswith(b'HTTP/1.1 503'), repr(acl_raw()[:24]))
+    r = acl_ctl('set metrics acl none')
+    check('metrics acl order: none sets past the full cap', r.startswith('ok metrics/acl=none'), r[:80])
+    check('metrics acl order: the off-ACL peer closes silently past the cap (the ACL first, then the caps)',
+          acl_raw() == b'', repr(acl_raw()[:40]))
+    hold.close()
+    time.sleep(0.3)
+    acl_ctl('unset metrics acl')
+    r = acl_ctl('unset metrics limits max-clients')
+    check('metrics acl order: the cap unsets back', r.startswith('ok'), r[:80])
+    check('metrics acl order: any serves after the ladder', acl_raw().startswith(b'HTTP/1.1 200'))
     os.remove(ACLGATE)
 
     for tool, title in ((P, 'MODBUS-SCRAPER'), (CTLB, 'MODBUS-SCRAPER-CTL'), (CLIB, 'MODBUS-SCRAPER-CLI')):

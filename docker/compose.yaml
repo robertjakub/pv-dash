@@ -8,11 +8,11 @@
 #
 # All three share the external `config` volume mounted at /config: on start
 # the entrypoint seeds it with the REQUIRED file artifacts (the generated
-# metrics token, the JSON specs, the dashboard's config.js — never the
-# bundled conf scripts: each tool loads the image's own conf and the
-# per-tool env file overrides it). Edits to /config survive container
-# recreation. `docker compose exec` sessions bypass the entrypoint and run
-# as root; add --user pvsuite to land as pvsuite.
+# metrics token, the generated page token, the JSON specs, the dashboard's
+# config.js — never the bundled conf scripts: each tool loads the image's
+# own conf and the per-tool env file overrides it). Edits to /config
+# survive container recreation. `docker compose exec` sessions bypass the
+# entrypoint and run as root; add --user pvsuite to land as pvsuite.
 #
 # Nothing else is published on the host (the audit's F7): the services talk
 # over one `internal: true` network — no host ports, no outbound route. The
@@ -27,6 +27,8 @@
 # value the entrypoint generates on the first seed, 0600, owner pvsuite) and
 # the Prometheus service reads its copy of the same file from the config
 # volume. Read the token: docker compose exec modbus-scraper cat /config/metrics.token
+# The dashboard's page ships token'd the same way (F21):
+# docker compose exec dashboard cat /config/page.token
 #
 # The overrides: per-tool env files — cp env/<tool>.env.example
 # env/<tool>.env and edit (bare env-twin names; required: false, so no
@@ -127,6 +129,13 @@ services:
       # compose-level concern, see env/dashboard.env.example for the
       # plain-docker spelling)
       PROM_URL: http://prometheus:9090
+      # the page's auth (the audit's F21): the container binds every
+      # interface so the published port reaches it — beyond loopback a
+      # token is mandatory, the refusal is the F13 shape. The entrypoint
+      # materializes a random 0600 token into /config/page.token on the
+      # first seed; read it: docker compose exec dashboard cat /config/page.token
+      BIND: 0.0.0.0
+      AUTH_TOKEN: file:/config/page.token
     volumes:
       - config:/config
     networks:

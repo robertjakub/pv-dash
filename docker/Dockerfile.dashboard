@@ -37,7 +37,7 @@ COPY --chown=pvsuite bin/ dashboard/bin/
 COPY --chown=pvsuite lib/ dashboard/lib/
 COPY --chown=pvsuite static/ dashboard/static/
 COPY --chown=pvsuite examples/server.conf dashboard/
-COPY --chown=pvsuite examples/config.js config-defaults/
+COPY --chown=pvsuite examples/config.js examples/page.token config-defaults/
 RUN chmod +x dashboard/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/dashboard/bin/dashboard.py /usr/local/bin/dashboard \
     && ln -s /pv-suite/dashboard/bin/dashboard-ctl.py /usr/local/bin/dashboard-ctl \
@@ -53,7 +53,10 @@ VOLUME /config
 ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 8080
-CMD ["dashboard"]
+# the container binds every interface (a published port needs it) — beyond
+# loopback the page's bearer token is mandatory (F21): the compose rides
+# the generated /config/page.token, a plain run passes AUTH_TOKEN
+CMD ["dashboard", "--bind", "0.0.0.0"]
 
 # Liveness: the ctl answers over the server's unix control socket (the
 # default socket follows the bundled conf's port; the check runs as root —

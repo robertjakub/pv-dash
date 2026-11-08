@@ -369,17 +369,22 @@ or `-e` on a plain `docker run`):
 
 The static single-page app with its stdlib Prometheus proxy — see the
 [dashboard](../dashboard/README.md). The bundled `server.conf`
-(`/pv-suite/dashboard/server.conf`, the default `--config` target: bind
-`0.0.0.0`, port 8080) loads from the image; the volume carries
-`/config/config.js` (`CONFIG_JS`) — edit it there, it survives recreation:
+(`/pv-suite/dashboard/server.conf`, the default `--config` target: port
+8080) loads from the image; the CMD binds `0.0.0.0` (a published port
+needs it) and **the page's bearer token is mandatory beyond loopback
+(F21)** — the compose carries the generated `page.token` (the entrypoint
+seeds it 0600 into the config volume); a plain run passes `AUTH_TOKEN`.
+The volume carries `/config/config.js` (`CONFIG_JS`) — edit it there, it
+survives recreation:
 
 ```bash
 cd docker
 docker build -f ../docker/Dockerfile.dashboard -t dashboard \
     --build-context scripts=../docker --build-context common=../common ../dashboard
-docker run --rm -p 127.0.0.1:8080:8080 dashboard    # loopback-published, serves 0.0.0.0:8080 in the container
+docker run --rm -p 127.0.0.1:8080:8080 -e AUTH_TOKEN=dev-token dashboard
+    # then open http://localhost:8080/?auth=dev-token (the bootstrap sets the cookie)
 docker run --rm -it dashboard bash                  # poke around as pvsuite
-docker run --rm -p 127.0.0.1:8080:8080 -e PROM_URL=http://prometheus:9090 \
+docker run --rm -p 127.0.0.1:8080:8080 -e AUTH_TOKEN=dev-token -e PROM_URL=http://prometheus:9090 \
     dashboard                                       # the upstream via env (env beats server.conf)
 ```
 

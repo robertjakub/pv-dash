@@ -122,6 +122,7 @@ class AuditLog:
         self._day = time.strftime('%Y-%m-%d', time.gmtime())
         self._lock = threading.Lock()
         self._last = GENESIS             # this prefix's last entry hash (the chain)
+        self.disabled = False            # the kill switch: the writer object survives, the trail stops
         if self.path == '-':    # the stdout sink: no rotation by definition
             self._f = sys.stdout
         else:
@@ -161,6 +162,8 @@ class AuditLog:
             self._rotate()
 
     def event(self, event, detail=''):
+        if self.disabled:
+            return
         with self._lock:
             self._maybe_rotate()
             stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())

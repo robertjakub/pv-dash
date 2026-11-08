@@ -10,6 +10,20 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **everywhere** — **the control wire's reply status speaks `ok` | `fail` |
+  `bye`** (breaking): the servers' internal `err` verdicts map to `fail` at
+  the frame and the reply mac signs the wire form; the console prints the
+  ok replies' messages **bare** (quiet success — the `% ` marker rides the
+  non-ok faces only) and the failures as **`% error: <message>`** (was
+  `% err …`); the `set`/`unset` pair confirms **`% changed`** (the one ok
+  face keeping the marker), the other silent confirms (`request clear
+  cache`, `request restart`, `poll now`, `request reload-config`) went
+  fully silent, the local `ping` answers bare `pong`; **the wire's help
+  branch speaks the commands** — `help unset` describes the registry's
+  command row, `help request` lists the namespace (the `?` shape),
+  `help request reload` describes the deep path, and the unknown topic
+  answers `unknown command or setting <words> (try ?)` (was
+  `err unknown setting <words> (try help)`).
 - **everywhere** — **the node listing mimics the `?` output byte for
   byte — the console's listing is the golden master**: a hierarchy
   node's wire help (`show audit`, `show audit rotate`) renders the

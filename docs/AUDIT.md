@@ -1,8 +1,18 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 15)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 16)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
 tree after `2db6cfa` (absorbing the former per-subproject `secaudit.md`s);
+**rev. 16** re-audited the control wire's reply vocabulary: the frame's
+status speaks **`ok` | `fail` | `bye`** — the servers' internal 'err'
+verdicts map to `fail` at the frame and the reply mac is computed over
+the **wire form** (`"<status> <text>"`, not the internal string — the
+clients verify the raw frame fields and fold it back below their
+`exchange`); the trust posture does not move (same HMAC, same mandatory
+over TCP, same peer-cred shortcut); the console prints the ok messages
+bare and the failures as `% error: <message>` (the set/unset pair
+confirms `% changed`); the wire's help branch speaks the commands (the
+registry's command rows) — the describes answer at the same RBAC gate;
 **rev. 15** re-audited at main after the common-split — the family's shared
 surfaces gather into `common/` (the ctl/cli clients, the metrics endpoint
 skeleton, the resolver pieces, the control-server base); the trust posture

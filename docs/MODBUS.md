@@ -426,7 +426,8 @@ the ordered `rules` list (one `{"type": "allow"|"deny", "range": ...}`
 object per rule; a whitelist: the last matching rule decides, a register
 no rule decides refuses) — which the cache's write gate compiles to
 register ranges, and its `show write registers profile` answers back as
-the chain.
+the chain; `--write-registers file:<path>` reads the same gate object
+from a standalone acl file instead.
 
 The cache merges adjacent ranges up to `merge-gap` addresses and 125
 registers (2000 bits) per block, caches the four spaces in **separate
@@ -481,7 +482,7 @@ path as words normalize to the canonical key.
 | `timeout` | `--timeout` | `TIMEOUT` | `modbus/timeout` | cache, scraper |
 | `offset` | `--modbus-offset` | `MODBUS_OFFSET` | `modbus/offset` | scraper |
 | `allow-write` | `--allow-write` | `ALLOW_WRITE` | `write/allow` | cache, fake |
-| `write-registers` | `--write-registers` | `WRITE_REGISTERS` | `write/registers` | cache |
+| `write-registers` | `--write-registers` | `WRITE_REGISTERS` | `write/registers` (`…/profile` answers the acl-chain report) | cache |
 | `connect-acl` | `--connect-acl` | `CONNECT_ACL` | `acl/connect` | cache, fake |
 | `write-acl` | `--write-acl` | `WRITE_ACL` | `acl/write` | cache |
 

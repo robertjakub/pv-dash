@@ -9,6 +9,17 @@ before the repo restructured into one suite.
 ## Unreleased
 ### Added
 
+- **cache** — the write gate reads from a **standalone acl file**:
+  `--write-registers file:<path>` (env `WRITE_REGISTERS`, config and the
+  live `set write registers file:<path>` the same) — the file IS the gate
+  object a device profile carries under `acl`/`write` (`{"desc": ...,
+  "rules": [{"type": "allow"|"deny", "range": "START:COUNT"}]}`), resolved
+  and compiled exactly like the `profile` value: a missing or bad file
+  refuses the start, the wire answers `err` with the old gate standing,
+  the spelling is the re-appliable dump form, and the
+  `show write registers profile` report renders the file's rules like the
+  profile's.
+
 - **cache** — the **`show write registers profile`** report (show-only —
   nothing to set): the write gate answered as its acl chain — `allow any`
   / `deny any`, a range list as its whitelist (`deny any`, then one

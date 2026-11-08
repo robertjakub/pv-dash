@@ -10,16 +10,23 @@ permissions:
 
 jobs:
   test:
-    name: the eight suites
+    name: the suites
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - cache-regtest.py
+          - scrape-regtest.py
+          - cache-stress.py
+          - cache-control-fuzz.py
+          - control-fuzz.py
+          - dashboard-control-fuzz.py
+          - cache-fuzz.py 300
+          - scrape-fuzz.py 300
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          for s in cache-regtest scrape-regtest cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz; do
-            python3 tests/$s.py
-          done
-          python3 tests/cache-fuzz.py 300
-          python3 tests/scrape-fuzz.py 300
+      - run: python3 tests/${{ matrix.suite }}
 
   build:
     name: nix build (all four packages)

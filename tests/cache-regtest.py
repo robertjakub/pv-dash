@@ -1167,23 +1167,24 @@ try:
     check('metrics token: the new token serves', st == 200, str(st))
     r = ctl_cmd('show metrics token', 15530)
     check('metrics token: the secret never renders back', r.startswith('fail metrics/token is a secret'), r)
-    # the live rebind: the endpoint moves to the new address
+    # the startup-only listen: the set records the pending value and answers
+    # the note; the running endpoint keeps the old address until the restart
     r = ctl_cmd('set metrics listen 127.0.0.1:15535', 15530)
-    check('metrics listen: rebound live', r.startswith('ok metrics/listen=127.0.0.1:15535'), r[:90])
-    old_closed = False
-    try:
-        socket.create_connection(('127.0.0.1', 15529), timeout=1).close()
-    except OSError:
-        old_closed = True
-    check('metrics listen: the old address is closed', old_closed)
-    try:
-        req = urllib.request.Request('http://127.0.0.1:15535/metrics')
-        req.add_header('Authorization', 'Bearer sekrit2')
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            st = resp.status
-    except urllib.error.HTTPError as e:
-        st = e.code
-    check('metrics listen: the new address serves the gauges', st == 200, str(st))
+    check('metrics listen: the set answers the restart note',
+          r.startswith('note restart required (startup-only knob)'), r[:90])
+    r = ctl_cmd('show metrics listen', 15530)
+    check('metrics listen: show renders the recorded pending value',
+          r.startswith('ok metrics/listen=127.0.0.1:15535'), r[:90])
+    st, _ = get_metrics('sekrit2')
+    check('metrics listen: the running endpoint kept the old address (the restart applies it)', st == 200, str(st))
+    r = ctl_cmd('set metrics listen bogus', 15530)
+    check('metrics listen: a bad value still fails the set', r.startswith('fail'), r[:90])
+    r = ctl_cmd('unset metrics listen', 15530)
+    check('metrics listen: the unset answers the note too',
+          r.startswith('note restart required (startup-only knob)'), r[:90])
+    r = ctl_cmd('show metrics listen', 15530)
+    check('metrics listen: the unset restored the configured value',
+          r.startswith('ok metrics/listen=127.0.0.1:15529'), r[:90])
 
     # the control plane, audit trail and dump lives (the same metrics pattern:
     # set/show/unset on the wire, the secrets never render, the rebind moves it)
@@ -1556,6 +1557,27 @@ try:
     check('reload: the daemon came back with the override re-applied (above the flag)',
           back is not None and 'interval=7.00s' in back and 'overridden=modbus/interval' in back, repr((back or '')[-200:]))
     check('reload: the state file is consumed', not os.path.exists(ini_r + '.reload'), ini_r + '.reload')
+    # the startup-only override rides the reload: the set records the pending
+    # value (the note), the fold lands it in the fresh process before the binds
+    r = ctl_cmd('set system listen 127.0.0.1:15583', 15582)
+    check('reload fold: the startup-only set answers the note',
+          r.startswith('note restart required (startup-only knob)'), r[:90])
+    r = ctl_cmd('show system listen', 15582)
+    check('reload fold: show renders the recorded pending value',
+          r.startswith('ok system/listen=127.0.0.1:15583'), r[:90])
+    r = ctl_cmd('request reload', 15582)
+    check('reload fold: the reload saves both overrides', r.startswith('ok reload: 2 override(s) saved'), r[:120])
+    back = None
+    for _ in range(100):
+        try:
+            back = ctl_cmd('show system listen', 15582)
+            break
+        except Exception:
+            time.sleep(0.1)
+    check('reload fold: the fresh daemon kept the folded listen (the control port stayed)',
+          back is not None and back.startswith('ok system/listen=127.0.0.1:15583'), repr(back))
+    mod = socket.create_connection(('127.0.0.1', 15583), timeout=5)   # the modbus socket moved with the fold
+    mod.close()
     # F23: the reload state file is config-equivalent trust at rest — it is
     # created 0600 explicitly, never the umask's (white-box: the round above
     # consumes the file before a stat could land)
@@ -1791,7 +1813,7 @@ print('mode 0600 ok')
     # the audit trail folds control characters: a \n inside a command cannot
     # forge a second, attacker-crafted trail line
     r = ctl_cmd('show status\n2026-01-01T00:00:00Z AUDIT CACHE WRITE forged line', 15522)
-    check('control: the injection attempt is a clean err', r.startswith('fail status: unexpected'), r[:100])
+    check('control: the injection attempt is a clean err', r.startswith('fail unknown command'), r[:100])
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     forged = [line for line in fc4_audit.splitlines() if 'AUDIT CACHE WRITE forged' in line]
     check('audit: the trail injection folds to one physical line',

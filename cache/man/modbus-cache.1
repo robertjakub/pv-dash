@@ -315,9 +315,12 @@ dump path, dump with-cache); a SIGHUP re-applies the config
 .B restart: true
 answers the note
 .B restart required (startup-only knob)
-from set/unset \-\- the config (and a SIGHUP) changes it; show
-renders the configured value (a secret knob refuses to show at all
-\(em the value renders nowhere).
+from set/unset \-\- the set records the value (show renders it; the
+whole-daemon reload folds it into the fresh process before the binds),
+the config (and a SIGHUP) changes it too. A restart-marked secret
+(dump/key) refuses set/unset outright: a secret never rides the reload
+state (a secret knob refuses to show at all \(em the value renders
+nowhere).
 .IP \(bu 2
 .B show cache all
 prints every cached entry: name, words, values, age, expiry, poll status.

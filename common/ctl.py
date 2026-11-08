@@ -115,7 +115,12 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
             if st == 'bye' and tx.startswith('daemon-exit'):
                 print('%% %s — done' % tx.replace('daemon-exit', 'daemon exit', 1))
                 break
-            print(('%% error: %s' % tx) if st == 'fail' else ('%s %s' % (st, tx)).rstrip())
+            if st == 'fail':
+                print('%% error: %s' % tx)
+            elif st == 'note':
+                print('%% %s' % tx)   # a note, not a verdict: the startup-only set landed as the configured value
+            else:
+                print(('%s %s' % (st, tx)).rstrip())
     except OSError as e:
         print('control error: %s' % e, file=sys.stderr)
         raise SystemExit(1)

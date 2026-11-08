@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common.audit import AuditLog, default_path as default_audit_path
-from common.config import default_profile_path, parse_listen, parse_secret
+from common.config import default_profile_path, parse_listen, parse_secret, parse_upstream
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.modbus import exception_frame
@@ -191,6 +191,19 @@ def main():
             ranges, range_names, range_ttls = load_selection(cfg['selection'], range_names, range_ttls)
 
     setup_logging(cfg)
+
+    for name, pending in ControlServer.fold_restart_state(args.config, cfg['dump_key']).items():
+        # the restart-marked overrides fold into the startup config BEFORE
+        # the binds — the piece that makes the restart note true (the
+        # execv'd reload applies what the sets recorded)
+        if name == 'system/listen':
+            cfg['listen'] = pending
+        elif name == 'metrics/listen':
+            cfg['metrics_listen'] = pending
+        elif name == 'modbus/upstream':
+            fold_host, fold_port = parse_upstream(pending, label='modbus/upstream')
+            cfg['upstream'], cfg['host'], cfg['port'] = '%s:%d' % (fold_host, fold_port), fold_host, fold_port
+        logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
 
     listen_host, listen_port = parse_listen(cfg['listen'])
     control_target = parse_control_target(cfg['control_port'], listen_port)

@@ -6,13 +6,16 @@ when a control token is configured, every command and every reply carries a
 short form) keyed by the token —
 
   request: {"cmd": "<command>", "mac": <hmac-sha256(token, cmd)>}
-  reply:   {"status": "ok" | "fail" | "bye", "text": "<reply text>",
+  reply:   {"status": "ok" | "fail" | "note" | "bye", "text": "<reply text>",
             "mac": <hmac-sha256(token, "<status> <text>">)}
 
 the status speaks the verdict vocabulary — ok (the command ran; text is
-its output), fail (the command refused; text IS the error message), bye
-(the unsolicited daemon-exit notice) — and the mac is computed over the
-WIRE form ("<status> <text>"), not the servers' internal 'ok …'/'err …'
+its output), fail (the command refused; text IS the error message), note
+(the command ran AND the effect waits: a startup-only knob's set landed
+as the configured value; text is the advice — the consoles render it
+with the % face, a note, not a verdict), bye (the unsolicited
+daemon-exit notice) — and the mac is computed over the WIRE form
+("<status> <text>"), not the servers' internal 'ok …'/'err …'/'note …'
 reply strings (the internal 'err' maps to 'fail' at the frame; the
 clients fold it back for their render hooks).
 

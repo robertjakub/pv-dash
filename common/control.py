@@ -90,7 +90,8 @@ class ControlServer:
         self.trust_uids = trust_uids or frozenset()   # extra peer uids the unix socket trusts without the token
         self.stopper = stopper
         self.shutdown_pending = False
-        self.defaults = defaults or {}   # setting -> configured startup value (what `unset` restores)
+        self.defaults = defaults or {}   # setting -> configured value (the restart-marked knobs' pending writes land here)
+        self.baseline = dict(self.defaults)   # the startup-resolved values — what `unset` restores
         self.overridden = set()          # settings changed live (`show status` carries the overridden= row)
         self.clients = set()             # the live control sockets (announce_exit)
         self.clients_lock = threading.Lock()
@@ -282,7 +283,7 @@ class ControlServer:
         if reply is None:              # quit: no reply, just close
             return cmd, None, 'bye', role
         status, _, text = reply.partition(' ')
-        wstatus = 'fail' if status == 'err' else status   # the wire speaks ok|fail|bye; the internal err maps here
+        wstatus = 'fail' if status == 'err' else status   # the wire speaks ok|fail|note|bye; the internal err maps here
         reply_obj = {'status': wstatus, 'text': text}
         if key:
             reply_obj['mac'] = sign_reply(key, '%s %s' % (wstatus, text))   # over the wire form, not the internal
@@ -415,6 +416,40 @@ class ControlServer:
             base = os.environ.get('XDG_STATE_HOME') or os.path.expanduser('~/.local/state')
             return os.path.join(base, self.XDG_STATE_NAME, 'reload.json')
         return None
+
+    @classmethod
+    def fold_restart_state(cls, config_path, dump_key=None):
+        """The reload state's startup-only overrides, folded into the
+        startup config BEFORE the sockets bind — the piece that makes the
+        restart note true: a `set` of a restart-marked knob records the
+        pending value (the dump/reload state carries it), and the execv'd
+        restart applies it only if the fresh process reads it before the
+        binds. Returns the {live-name: value} of the fresh state's
+        non-secret restart knobs (a secret never rides the state — the
+        placeholder rule). Read-only: the file is left for
+        _restore_reload_state to consume; unreadable or stale, {} (the
+        restore at start() reports it)."""
+        if config_path:
+            path = config_path + '.reload'
+        elif cls.XDG_STATE_NAME:
+            base = os.environ.get('XDG_STATE_HOME') or os.path.expanduser('~/.local/state')
+            path = os.path.join(base, cls.XDG_STATE_NAME, 'reload.json')
+        else:
+            return {}
+        if not os.path.exists(path):
+            return {}
+        try:
+            state_obj = state.read_dump_state(path, key=dump_key)
+            if time.time() - state_obj.get('saved', 0) > 120:
+                return {}   # stale: the restore at start() discards it and logs
+        except (OSError, ValueError):
+            return {}
+        out = {}
+        for name, value in (state_obj.get('settings') or {}).items():
+            opt = cls.SETTINGS.get(name)
+            if opt is not None and opt.restart and not opt.secret:
+                out[name] = value
+        return out
 
     def _save_reload_state(self):
         """The overrides in their wire-parsable form (dump_settings) to the

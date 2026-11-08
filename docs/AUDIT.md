@@ -1,9 +1,21 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 16)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 17)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
 tree after `2db6cfa` (absorbing the former per-subproject `secaudit.md`s);
-**rev. 16** re-audited the control wire's reply vocabulary: the frame's
+**rev. 17** re-audited the wire vocabulary's fourth face and the
+startup-only set: the frame's status speaks **`ok` | `fail` | `note` |
+`bye`** — a `note` is the verdict of a command that RAN and whose effect
+waits (the restart-marked knob's `set`/`unset`: the value is validated
+and recorded as the configured value, the running daemon does not move —
+the reply mac signs `note <text>` like any other face); a restart-marked
+SECRET (`dump/key`) still refuses outright (`fail`) because a secret
+never rides the reload state, so the note can never lie; the recorded
+values cross the whole-daemon reload by the pre-bind fold (the fresh
+process reads the reload state's restart-marked overrides into the
+startup config before any socket binds — the trust posture is the
+reload state's own: same 0600 sealed file, same key the re-exec
+re-resolves); **rev. 16** re-audited the control wire's reply vocabulary: the frame's
 status speaks **`ok` | `fail` | `bye`** — the servers' internal 'err'
 verdicts map to `fail` at the frame and the reply mac is computed over
 the **wire form** (`"<status> <text>"`, not the internal string — the

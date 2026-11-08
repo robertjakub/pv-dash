@@ -14,7 +14,7 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (18): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-token`, `control-trust-uids`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `no-audit-log`, `restore-on-start`. The control-plane block is
+Common to **all four** tools (19): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `no-audit-log`, `restore-on-start`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `status`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
@@ -28,6 +28,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** | **✓** | **✓** |
 | k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** | **✓** | **✓** |
 | k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** | **✓** | **✓** |
+| c | `audit/rotate` |  | *(startup-only)* | ✓ |  |  |  |
 | k | `auth` | `modbus` | `set modbus auth` | ✓ live | ✓ live | ✓ live |  |
 | k | `auth-key` | `modbus` | `set modbus auth key` | ✓ live+secret | ✓ live+secret | ✓ live+secret |  |
 | k | `auth-token` |  | `set auth token` |  | ✓ live+secret |  |  |
@@ -56,6 +57,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `control-socket-group` |  | `set control socket-group` | ✓ live |  | ✓ |  |
 | k | `control-token` |  | `set control token` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
 | k | `control-trust-uids` |  | `set control trust-uids` | **✓** live | **✓** | **✓** | **✓** |
+| c | `control/ops` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | c | `dump` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `dump-interval` |  | `set dump-interval` | ✓ live |  |  |  |
 | k | `dump-key` |  | `set dump key` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
@@ -70,10 +72,10 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `interval` |  | `set interval`, `set modbus interval` | ✓ live | ✓ live |  |  |
 | s | `knobs` |  | `show knobs` | **✓** | **✓** | **✓** hidden | **✓** hidden |
 | c | `limits` |  | *(startup-only)* | ✓ | ✓ |  |  |
-| k | `listen` |  | *(startup-only)* | ✓ | ✓ |  |  |
+| k | `listen` |  | `set system listen` | ✓ live | ✓ |  |  |
 | c | `load` |  | `set load` |  |  | ✓ live |  |
 | k | `local-time` |  | `set local-time` | ✓ live | ✓ |  | ✓ |
-| k | `log-access` |  | `set log-access` | ✓ | ✓ live |  | ✓ live |
+| k | `log-access` |  | `set log-access`, `set system log-access` | ✓ live | ✓ live |  | ✓ live |
 | k | `log-level` |  | `set log-level` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `log-queries` |  | `set log-queries` |  |  |  | ✓ live |
 | k | `max-clients` | `limits` | `set limits max-clients`, `set max-clients` | **✓** live | **✓** live | **✓** live | **✓** live |
@@ -82,6 +84,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `max-kwp` |  | `set max-kwp` |  | ✓ | ✓ live |  |
 | k | `merge-gap` |  | `set modbus merge-gap` | ✓ live |  |  |  |
 | k | `metric-prefix` |  | *(startup-only)* |  | ✓ |  |  |
+| c | `metrics` |  | *(startup-only)* | ✓ |  | ✓ | ✓ |
 | k | `metrics-client-timeout` |  | `set metrics limits timeout` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-listen` |  | `set metrics listen` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-max-clients` |  | `set metrics limits max-clients` | ✓ live |  | ✓ | ✓ |
@@ -89,6 +92,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `metrics-server` |  | `set metrics-server`, `set metrics enable` | ✓ live |  | ✓ live | ✓ live |
 | k | `metrics-spec` |  | *(startup-only)* |  | ✓ |  |  |
 | k | `metrics-token` |  | `set metrics token` | ✓ live+secret |  | ✓ live+secret | ✓ live+secret |
+| c | `metrics/limits` |  | *(startup-only)* | ✓ |  |  |  |
 | c | `modbus` |  | *(startup-only)* | ✓ | ✓ | ✓ |  |
 | k | `modbus-offset` |  | `set modbus offset` |  | ✓ live |  |  |
 | k | `modbus-unit` | `modbus` | `set modbus unit` |  | ✓ live |  |  |
@@ -111,6 +115,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `static-dir` |  | *(startup-only)* |  |  |  | ✓ |
 | s | `status` |  | `show status` | **✓** hidden | **✓** | **✓** | **✓** |
 | k | `strict` |  | `set strict` |  |  | ✓ live |  |
+| c | `system` |  | *(startup-only)* | ✓ |  |  |  |
 | k | `time` |  | `set time` |  |  | ✓ live |  |
 | k | `time-scale` |  | `set time-scale` |  |  | ✓ live |  |
 | k | `timeout` |  | `set modbus timeout`, `set timeout` | ✓ live | ✓ live |  |  |

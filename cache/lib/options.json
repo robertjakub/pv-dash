@@ -154,7 +154,7 @@
                       "off": "no metrics endpoint (the default)" }, "help": "serve the cache's own Prometheus /metrics endpoint (the live `set metrics enable` toggle exists too)" },
     { "name": "metrics-listen", "flag": "--metrics-listen", "env": "METRICS_LISTEN", "conv": "str",
       "live": "metrics/listen",
-      "setting-help": "the metrics bind address HOST:PORT — rebinds live (the endpoint restarts on the new address)",
+      "setting-help": "the metrics bind address HOST:PORT — the set records the value, the restart (request reload) applies it",
       "hint": "HOST:PORT",
       "help": "the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every interface, a token is mandatory regardless",
       "restart": true },

@@ -188,8 +188,14 @@ class ControlServer(_ControlServer):
             if not args:
                 return 'err unset needs a setting (try help)'
             key, rest = match_setting_path(args, SETTING_BY_NAME)
-            if key is not None and not rest and getattr(SETTING_BY_NAME.get(key), 'restart', False):
-                return 'err restart required (startup-only knob)'
+            s = SETTING_BY_NAME.get(key) if key is not None else None
+            if s is not None and not rest and s.restart:
+                if s.secret:   # a secret never rides the reload state — the wire refuses it
+                    return 'err restart required (startup-only knob)'
+                self.defaults[key] = self.baseline.get(key, self.defaults.get(key))
+                self.overridden.discard(key)
+                logger.info('control: unset %s (the restart re-applies the configured value)', key)
+                return 'note restart required (startup-only knob)'
             if key is None or rest or key not in self.defaults:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             try:
@@ -208,10 +214,11 @@ class ControlServer(_ControlServer):
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             if not rest:
                 return 'err set needs a setting and a value (try help)'
-            if getattr(SETTING_BY_NAME.get(key), 'restart', False):
-                return 'err restart required (startup-only knob)'
+            s = SETTING_BY_NAME.get(key)
+            if s is not None and s.restart and s.secret:
+                return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
             value = ' '.join(rest)
-            if value == SECRET_REMOVED and getattr(SETTING_BY_NAME.get(key), 'secret', False):
+            if value == SECRET_REMOVED and getattr(s, 'secret', False):
                 return 'err *** SECRET REMOVED *** is not a value — pass the secret by flag/env, or as file:<path>'
             try:
                 shown = self._apply(key, value)
@@ -219,6 +226,8 @@ class ControlServer(_ControlServer):
                 return 'err %s' % e
             self.overridden.add(key)
             logger.info('control: set %s=%s', key, shown)
+            if s is not None and s.restart:   # the value is recorded; the restart applies it — a note, not a verdict
+                return 'note restart required (startup-only knob)'
             return 'ok %s=%s %s' % (key, shown, self.summary())
         if low == 'show status':
             return self.status_report()
@@ -290,9 +299,43 @@ class ControlServer(_ControlServer):
 
     def _apply(self, key, value):
         """Apply a live setting; returns the display string or raises
-        ValueError (the message becomes the err reply)."""
+        ValueError (the message becomes the err reply). A restart-marked
+        knob records only: the value lands in the configured-value table
+        (show renders it, the dump/reload state carries it) — the restart
+        (the reload's execv, whose fold reads the state before the binds)
+        applies it. A restart-marked secret refuses: it can never ride the
+        reload state."""
         p = self.proxy
         val = str(value).strip()
+
+        s = SETTING_BY_NAME.get(key)
+        if s is not None and s.restart:   # a startup-only knob: validate + record the pending value
+            if s.secret:
+                raise ValueError('restart required (startup-only knob)')
+            if key == 'modbus/upstream':
+                try:
+                    host, port = parse_upstream(val, label='modbus/upstream')
+                except SystemExit as e:
+                    raise ValueError(str(e))
+                self.defaults[key] = '%s:%d' % (host, port)
+                return self.defaults[key]
+            if key in ('system/listen', 'metrics/listen'):
+                try:
+                    t = parse_listen(val)
+                except SystemExit as e:
+                    raise ValueError(str(e))
+                if key == 'metrics/listen':   # fail fast: the bind at restart is too late to complain
+                    probe = socket.socket()
+                    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    try:
+                        probe.bind(t)
+                    except OSError as e:
+                        raise ValueError('cannot bind %s:%d: %s' % (t[0], t[1], e))
+                    finally:
+                        probe.close()
+                self.defaults[key] = '%s:%d' % t
+                return self.defaults[key]
+            raise ValueError('unknown setting %s' % key)
 
         if key == 'modbus/interval':
             v = num(val, 'interval', 'seconds')
@@ -321,16 +364,6 @@ class ControlServer(_ControlServer):
             p.blocks = build_blocks(p.cache.ranges, v)
             p.poll_wake.set()
             return '%d' % v
-        if key == 'modbus/upstream':
-            try:
-                host, port = parse_upstream(val, label='modbus/upstream')
-            except SystemExit as e:
-                raise ValueError(str(e))
-            p.upstream.host, p.upstream.port = host, port
-            p.upstream.close()   # the session drops; the next exchange dials the new endpoint
-            p.config['upstream'] = '%s:%d' % (host, port)
-            p.config['host'], p.config['port'] = host, port
-            return '%s:%d' % (host, port)
         if key == 'modbus/unit':
             v = numi(val, 'unit', 'unit id')
             self._gate_range(key, v)
@@ -502,26 +535,6 @@ class ControlServer(_ControlServer):
                     p.metrics_desc = 'off'
                 return 'off'
             raise ValueError('metrics enable must be on or off')
-        if key == 'metrics/listen':
-            try:
-                t = parse_listen(val)
-            except SystemExit as e:
-                raise ValueError(str(e))
-            probe = socket.socket()
-            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            try:
-                probe.bind(t)
-            except OSError as e:
-                raise ValueError('cannot bind %s:%d: %s' % (t[0], t[1], e))
-            finally:
-                probe.close()
-            p.metrics_listen = t
-            if p.metrics_srv:
-                p.metrics_srv.stop()
-                p.metrics_srv.listen = t
-                p.metrics_srv.start()
-            p.metrics_desc = describe_metrics(t, p.metrics_token, p.metrics_caps[0], p.metrics_caps[2])
-            return '%s:%d' % t
         if key == 'metrics/token':
             if not val or val in ('off', 'none', '0'):
                 raise ValueError('metrics/token is mandatory while the endpoint serves (F6 in docs/AUDIT.md) — set the new token')
@@ -859,8 +872,6 @@ class ControlServer(_ControlServer):
             return 'on' if self.socket_group else 'off'
         if key == 'metrics/enable':
             return 'on' if p.metrics_srv else 'off'
-        if key == 'metrics/listen':
-            return '%s:%d' % p.metrics_listen
         if key == 'metrics/token':
             return '<set>' if p.metrics_token else 'off'   # the secret never renders
         if key == 'metrics/limits/max-clients':
@@ -1133,13 +1144,17 @@ class ControlServer(_ControlServer):
             'dump/with-cache': 'on' if p.dump_with_cache else 'off',
             'dump/restore-on-start': 'on' if getattr(p, 'restore_on_start', False) else 'off',
         }
+        for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
+            if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:
+                raw[opt.live] = self.defaults[opt.live]
         return dump_filter(self.overridden, raw, SETTING_BY_NAME)
 
     # --- the dump/reload family: the reload state file and the whole-daemon
     # reload (`reload`) ride the base (_save/_restore/_reload_state_path/
     # apply_dump_settings/reload_daemon — the seal key reads the dump_key
-    # property below: the proxy is the one home, `set dump/key` mutates it
-    # live). The cache's own dump/restore OVERRIDES the base's — the words
+    # property below: the proxy is the one home, startup-only — the re-exec
+    # re-resolves the same argv, so the key is identical on both sides).
+    # The cache's own dump/restore OVERRIDES the base's — the words
     # (+ stamps) ride along beside the settings (the write-behind that lets
     # a restart serve last-known values). ---
 

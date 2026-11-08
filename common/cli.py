@@ -400,9 +400,11 @@ def display(text):
     """console-style: the face decides on the FIRST line's verdict head —
     an ok reply prints its message bare (quiet success; a bare `ok` with
     no message prints nothing), a failure prints '% error: <message>', a
-    bye notice keeps '% ' — and the continuation lines always stay raw
-    (the multi-line tables keep their padding; no line-sniffing, so a
-    table row starting with the words ok/err/bye never wears a marker)."""
+    note prints '% <message>' (advice, not a verdict — the startup-only
+    set's restart note), a bye notice keeps '% ' — and the continuation
+    lines always stay raw (the multi-line tables keep their padding; no
+    line-sniffing, so a table row starting with the words ok/err/note/bye
+    never wears a marker)."""
     lines = text.splitlines()
     if not lines:
         return
@@ -413,6 +415,8 @@ def display(text):
         print('\n'.join([first.split(' ', 1)[1]] + rest))
     elif first.startswith('err '):
         print('\n'.join(['%% error: %s' % first.split(' ', 1)[1]] + rest))
+    elif first.startswith('note '):
+        print('\n'.join(['%% %s' % first.split(' ', 1)[1]] + rest))
     elif first.startswith('bye'):
         print('\n'.join(['%% %s' % first] + rest))
     else:
@@ -470,8 +474,8 @@ def typed_loop(sock, prompt, audit=None):
         if reply is None:
             raise ConnectionLost('the control connection closed without a bye')
         if low.startswith(('set ', 'unset ')):
-            if 'restart required' in reply:
-                print('% ' + reply.split(' ', 1)[1])   # the startup-only note: a note, not a verdict
+            if reply.startswith('note ') or 'restart required' in reply:
+                print('% ' + reply.split(' ', 1)[1])   # the startup-only knob: the note type, or the refused secret's fail — a note face, not a verdict
             elif reply.startswith('ok'):
                 print('% changed')   # the one ok face keeping the marker
             else:

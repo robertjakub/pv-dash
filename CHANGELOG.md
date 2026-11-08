@@ -6,6 +6,25 @@ tagged commits'. The early tags (before 0.1.0) carried per-tool versions —
 the dashboard, the scraper and the cache each numbered their own releases
 before the repo restructured into one suite.
 
+## Unreleased
+### Added
+
+- **everywhere** — **the control wire's reply status gains `note`** (besides
+  `ok` | `fail` | `bye`): the verdict of a command that ran and whose effect
+  waits. A `set`/`unset` of a restart-marked knob no longer refuses — the
+  value is validated and **recorded as the configured value** (`show` renders
+  it, the state dump and the reload state carry it) and the daemon answers
+  **`note restart required (startup-only knob)`**; the consoles and the ctl
+  one-shot render it with the **`% <message>`** face (a note, not a verdict).
+  The whole-daemon reload makes the note true: the fresh process folds the
+  reload state's restart-marked overrides into the startup config **before
+  any socket binds** (the cache's `system/listen`, `metrics/listen`,
+  `modbus/upstream`). A restart-marked *secret* (`dump/key`) still refuses
+  outright — a secret never rides the reload state, so a recorded one could
+  not survive the restart it promises. The restart-marked rows speak the
+  CONFIGURED value now (was: the live rebind on `metrics/listen` — the row
+  marked restart again in `dda97b9`); the audit rev. 17 entry follows.
+
 ## 0.4.2 — 2026-11-08
 ### Changed
 

@@ -393,7 +393,7 @@ def control_command(opt):
     `set inverter profile <value>`; an aliased row names its second spelling
     too), or the note that the knob is startup-only (restart to apply). A
     knob the registry marks restart carries ', restart' on its recipe — the
-    set lands in the config, the restart applies it."""
+    set records the value, the restart applies it."""
     if opt.live:
         cmd = 'set %s <value>' % opt.live.replace('/', ' ')
         if opt.alias:

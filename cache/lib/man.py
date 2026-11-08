@@ -23,8 +23,9 @@ FC3/FC4 reads from the cache, reads outside the map and other function
 codes are forwarded live, and writes (FC05/06/15/16/22/23) are forwarded
 when explicitly enabled and audited \\(em gated by a register allow-list
 (\\fB--write-registers\\fR) that spells its ranges directly or takes the
-device profile's \\fBacl\\fR/\\fBwrite\\fR tree (an allow/deny object or
-an ordered rule chain \\(em the last matching rule decides, the word
+device profile's \\fBacl\\fR/\\fBwrite\\fR gate (the ordered rule chain:
+one \\fBtype\\fR allow/deny and a \\fBrange\\fR per rule \\(em the last
+matching rule decides, a register no rule decides refuses, the word
 \\fBany\\fR = all registers). Every function code crossing the
 wire is named in the log and the audit trail (all standard FCs, FC1
 through FC43). A synthesized diagnostics block at registers
@@ -71,7 +72,7 @@ The control server speaks JSON lines: one request
 .BR set ", " unset ", " show ", " help ,
 the reports
 .BR inspect ", " "show status" ", " "show connections" ,
-.BR "show cache" " [all]" ", " "show uplink" ", " "show version" ,
+.BR "show cache" " [all]" ", " "show write registers profile" ", " "show uplink" ", " "show version" ,
 the ops
 .BR "request dump" ", " "request restore" ", " "request clear cache" ,
 .BR "request reload" ", " "request restart" ", " shutdown ", " quit .
@@ -106,6 +107,13 @@ prints every cached entry: name, words, values, age, expiry, poll status.
 analyses the inverter link: session counters (connects, exchanges, bytes,
 errors) and one row per poll block with its status, latency (last/mean/max)
 and last error.
+.IP \\(bu 2
+.B show write registers profile
+renders the write gate as its acl chain (show-only): \\fBallow any\\fR /
+\\fBdeny any\\fR, a range list as its whitelist (deny any, then one allow
+line per range), and in profile mode the device profile's own rules \\(em
+the gate's desc as the % line, then one allow/deny line per range with
+its desc.
 .IP \\(bu 2
 .B request dump
 / \\fBrequest restore\\fR: the write-behind state (the cached words + stamps,
@@ -194,7 +202,8 @@ stdout, one per line. Every invocation lands in the audit trail (prefix
 .PP
 The command grammar is the daemon's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
 \\fBhelp\\fR (the settings registry), \\fBinspect\\fR, \\fBshow status\\fR,
-\\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR], \\fBshow uplink\\fR,
+\\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR],
+\\fBshow write registers profile\\fR, \\fBshow uplink\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
 \\fBrequest clear cache\\fR, \\fBrequest reload\\fR, \\fBrequest restart\\fR,
 \\fBshutdown\\fR,

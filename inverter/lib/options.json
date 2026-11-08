@@ -235,7 +235,6 @@
       "restart": true }
   ],
   "show": [
-    { "name": "status", "setting-help": "the effective state report (key=value lines)" },
     { "name": "connections", "setting-help": "connected clients: peer, age, requests served" },
     { "name": "registers", "setting-help": "the loaded profile's register map with the current values" },
     { "name": "version", "setting-help": "the fake-inverter version" },

@@ -150,9 +150,6 @@ def main():
         tx = ctl(A_CTL, 'show connections')
         check('show connections lists the peer', tx.startswith('ok connections 127.0.0.1:')
               and 'requests' in tx, tx)
-        st = dict(line.split('=', 1) for line in ctl(A_CTL, 'show status').splitlines()[1:])
-        check('show status carries clients=', st.get('clients') == '1', str(st.get('clients')))
-        check('show status carries metrics=off (no endpoint)', st.get('metrics') == 'off', str(st.get('metrics')))
         ins = ctl(A_CTL, 'inspect')
         check('inspect carries the modbus row', 'modbus    127.0.0.1:%d, clients 1 (limit 1, timeout 5.00m, per-ip none, connect-acl any, auth none)' % A_MODBUS in ins,
               [l for l in ins.splitlines() if l.startswith('modbus')])
@@ -350,16 +347,17 @@ def main():
         except OSError:
             srv_down = True
         check('metrics-server: the port is closed after set off', srv_down)
-        stb = dict(line.split('=', 1) for line in ctl(B_CTL, 'show status').splitlines()[1:])
-        check('metrics-server: show status says off', stb.get('metrics') == 'off', str(stb.get('metrics')))
+        insb = ctl(B_CTL, 'inspect')
+        check('metrics-server: inspect says off', '\nmetrics   off' in '\n' + insb,
+              [l for l in insb.splitlines() if l.startswith('metrics')])
         tx = ctl(B_CTL, 'set metrics-server on')
         check('metrics-server: set on serves again', tx.startswith('ok metrics-server=on'), tx)
         st, _ = http_get(B_METRICS, token='tok')
         check('metrics-server: the gauges are back', st.split()[1] == '200', st)
-        stb = dict(line.split('=', 1) for line in ctl(B_CTL, 'show status').splitlines()[1:])
-        check('metrics-server: show status carries the endpoint line',
-              stb.get('metrics') == '127.0.0.1:%d (bearer token), clients 1, per-ip none' % B_METRICS,
-              str(stb.get('metrics')))
+        insb = ctl(B_CTL, 'inspect')
+        check('metrics-server: inspect carries the endpoint line',
+              'metrics   127.0.0.1:%d (bearer token), clients 1, per-ip none' % B_METRICS in insb,
+              [l for l in insb.splitlines() if l.startswith('metrics')])
 
         # ---- the control-server parity round (the cache's shape)
         check('control: the default unix socket mode is 0600 (not the umask)',
@@ -393,9 +391,9 @@ def main():
         check('connect-acl: the foreign-network-only ACL refuses the peer', eof_soon(c10))
         txn, unit, body = exchange(c9, read_req(10, 3, 32064, 2), 10)
         check('connect-acl: the admitted client keeps serving', txn == 10 and body[0] == 3, body.hex())
-        st = dict(line.split('=', 1) for line in ctl(A_CTL, 'show status').splitlines()[1:])
-        check('connect-acl: show status carries connect_acl=', st.get('connect_acl') == '1 network(s)',
-              str(st.get('connect_acl')))
+        ins = ctl(A_CTL, 'inspect')
+        check('connect-acl: inspect carries connect-acl=', 'connect-acl 1 network(s)' in ins,
+              [l for l in ins.splitlines() if l.startswith('modbus')])
         tx = ctl(A_CTL, 'unset connect-acl')
         check('connect-acl: unset restores any', 'ok connect-acl=any' in tx, tx)
         c9.close()
@@ -879,7 +877,7 @@ def main():
                         'connect-acl', 'connections', 'dump', 'grid', 'grid-frequency', 'grid-outage',
                         'grid-voltage', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
                         'metrics-server', 'modbus', 'mppt', 'profile', 'pv', 'registers', 'scenario', 'seed',
-                        'soc', 'static', 'status', 'strict', 'time', 'time-scale', 'timezone', 'version',
+                        'soc', 'static', 'strict', 'time', 'time-scale', 'timezone', 'version',
                         'write'], tx[:220])
         tx = ctl(L_CTL, 'show control ops')
         check('node walk: the intermediate node answers', tx.startswith('ok control/ops - '), tx[:80])

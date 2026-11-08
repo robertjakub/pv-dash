@@ -206,7 +206,7 @@ line, one reply object per line. The request is `{"cmd": "<command>"}`, the
 reply is `{"status": "ok" | "fail" | "bye", "text": "<reply text>"}` — `ok`
 (the command ran, `text` is its output), `fail` (the command refused,
 `text` is the error message), `bye` (the unsolicited daemon-exit notice). A
-multi-line reply (`show status`, `show registers`) keeps its newlines inside
+multi-line reply (`inspect`, `show registers`) keeps its newlines inside
 `text`, no framing terminator needed. `{"cmd": "ping"}` answers
 `{"status": "ok", "text": "pong"}` (the keepalive). **Connections need a
 token when `--control-token <secret>` is set**: the first request must be
@@ -249,7 +249,6 @@ read-only ops token the same way):
 | `unset <setting>` | restore the **configured startup value** of any setting (`unset pv` = auto, `unset time` = the `--time` flag, `unset chaos` = the `--chaos` probability, `unset seed` = back to a random RNG, `unset profile` = the configured map) |
 | `show <setting>` | the setting's current value |
 | `show knobs` | the dictionary of all knobs: every registry knob — its flag, its env twin(s) when it has one, the command that changes it live (or the restart note) |
-| `show status` | the **effective state report**: one stable `key=value` line per field (`pv`, `load`, `grid`, `mppt`, `grid_voltage`, `grid_outage`, `battery`, `soc`, `battery_state`, `cloud`, `clock`, `time_scale`, `uptime`, `clients`, `chaos`, `chaos_hits`, `pinned`, `profile`, `metrics`, `timezone`) — scriptable |
 | `show connections` | the fake's live **Modbus** clients: peer, connection age, requests served (`none` when idle) — the cache's `show connections`, pointed at the simulator |
 | `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins, the metrics endpoint state — the baton for a bug report |
 | `show registers` | the loaded profile's register map, one register per line: `name \| register \| type \| value`, columns aligned; the value = what the registers serve right now, `NaN` = not calculated (e.g. the battery block with the battery off) |
@@ -315,7 +314,7 @@ the same rows — no flag, just the live name).
 
 ```bash
 python3 inverter/bin/modbus-fake-ctl.py set pv 2500
-printf 'set pv 2500\nset soc 30\nshow status\n' | python3 inverter/bin/modbus-fake-ctl.py --control-port 15599
+printf 'set pv 2500\nset soc 30\nshow pv\n' | python3 inverter/bin/modbus-fake-ctl.py --control-port 15599
 ```
 
 Same `--control-port` flag / `CTL` env as the fake itself; several
@@ -419,7 +418,7 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 | `--max-clients` | `64` | refuse further Modbus connections past this many simultaneous clients (`0` = no limit) |
 | `--client-timeout` | `300` | disconnect Modbus clients silent for this many seconds (`0` = never) — sheds connections from clients that died without closing |
 | `--max-conn-per-ip` | `0` | refuse further Modbus connections from one peer IP past this many simultaneous connections (`0` = no per-IP limit) |
-| `--connect-acl` | any | the Modbus clients allowed to connect (the cache's `connect-acl`, mirrored): `"any"` (the default — the trusted-LAN posture), `"none"`, or a comma-separated list of IPs and CIDR prefixes, e.g. `127.0.0.1,10.48.0.0/16` (env `CONNECT_ACL`; live-settable, `show status` carries `connect_acl=`) — the family-wide ACL map lives in [docs/ACL.md](../docs/ACL.md) |
+| `--connect-acl` | any | the Modbus clients allowed to connect (the cache's `connect-acl`, mirrored): `"any"` (the default — the trusted-LAN posture), `"none"`, or a comma-separated list of IPs and CIDR prefixes, e.g. `127.0.0.1,10.48.0.0/16` (env `CONNECT_ACL`; live-settable, `inspect` carries `connect-acl=`) — the family-wide ACL map lives in [docs/ACL.md](../docs/ACL.md) |
 | `--allow-write` | off | accept Modbus writes (FC05/06/15/16) from the fake's clients: a write lands in the write overlay, logged and audited `WRITE` like the cache's forwarded ones; off (the default) = every write is refused with exception 01 and audited `WRITE-REFUSED` — the cache's write gate, mirrored (env `ALLOW_WRITE`; live-settable, `set write allow`) |
 | `--auth` | `none` | the auth scheme the fake's Modbus clients must speak: `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect — the fake answers `OK` and the session speaks plain Modbus, or `ERR` and the client is dropped before it ever sees a register; `none`/empty = no auth at all (env `AUTH`; live-settable, `set modbus auth`) — see the fake's settings table |
 | `--auth-key` | none | the shared key the fake's clients prove with the suite handshake, **min 16 characters**; the value may be `file:<path>` — the first line of an owner-only `0600` file (env `AUTH_KEY`); the scraper takes the matching `--auth suite --auth-key …` |
@@ -480,7 +479,7 @@ cannot be opened, the trail falls back to stdout rather than vanishing. **Rotati
 ```
 2026-11-03T20:10:06Z INV START 3f9a21c04de7 version=0.4.2 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
 2026-11-03T20:10:07Z AUDIT INV COMMAND 9c41e2b7a058 peer=127.0.0.1:54425 'set soc 40' -> ok
-2026-11-03T20:10:07Z AUDIT INV COMMAND 3d82f6c05e19 peer=127.0.0.1:54426 role=ops 'show status' wire=h4b91de207a86 -> ok
+2026-11-03T20:10:07Z AUDIT INV COMMAND 3d82f6c05e19 peer=127.0.0.1:54426 role=ops 'show connections' wire=h4b91de207a86 -> ok
 2026-11-03T20:10:08Z INV RESET 77b0c4e19d23 SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
 2026-11-03T20:10:08Z INV SHUTDOWN 5e2af8c30b61 SIGTERM: uptime=2s conns=0 requests=0 chaos_hits=0
 2026-11-03T18:44:10Z CLI CONNECT a01f65c3924b target=127.0.0.1:15731 user=oom

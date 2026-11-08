@@ -17,7 +17,7 @@ replies on stdout, one per line. Every invocation lands in the audit trail
 (prefix \fBCTL\fR).
 .PP
 The command grammar is the fake's: \fBset\fR/\fBunset\fR/\fBshow\fR/
-\fBhelp\fR (the settings registry), \fBshow status\fR,
+\fBhelp\fR (the settings registry),
 \fBshow connections\fR (the live Modbus clients: peer, age, requests),
 \fBshow registers\fR, \fBshow version\fR,
 \fBshow knobs\fR (the dictionary of the registry),
@@ -33,7 +33,7 @@ control server target: unix socket path or TCP port on 127.0.0.1,
 auto\-detected (env CTL when unset) — same flag as the fake itself
 .TP
 .B command
-control command, e.g. set pv 2500, set scenario noon, show status,
+control command, e.g. set pv 2500, set scenario noon, show registers,
 reset, shutdown
 .TP
 .BI \-\-timeout " N"
@@ -61,7 +61,7 @@ disable the audit trail
 .IP \(bu 2
 .B modbus-fake-ctl set pv 2500
 .IP \(bu 2
-.B printf 'set pv 2500\\nset soc 30\\nshow status\\n' | modbus-fake-ctl
+.B printf 'set pv 2500\\nset soc 30\\nshow pv\\n' | modbus-fake-ctl
 .RE
 
 .SH EXIT STATUS

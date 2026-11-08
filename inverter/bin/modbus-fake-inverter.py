@@ -172,7 +172,7 @@ def startup_values(args, secrets):
         if v is True:
             out[name] = 'true'
         elif name == 'connect-acl':
-            continue          # the parsed ACL renders in show status
+            continue          # the parsed ACL renders in inspect
         else:
             out[name] = str(v)
     return out

@@ -52,25 +52,15 @@ def setting_pool():
 
 
 def welcome(sock):
-    """The first-connect greeting: probe the status and introduce the device —
-    the profile, how long the fake has been running, the grid/clock/battery
-    state, and the one-line navigation hint."""
-    reply = cli.exchange(sock, cli.wire('show status'))
-    if not reply or not reply.startswith('ok status'):
-        return
-    st = cli.status_map(reply)
+    """The first-connect greeting: the console's two fixed lines — the
+    daemon's name and the one-line navigation hint."""
     print('%   Welcome to the fake-inverter console')
-    print('%%   %s' % st.get('profile', 'unknown profile'))
-    print('%%   running for %s | %s clock | %s V grid | battery %s'
-          % (st.get('uptime', '?'), st.get('timezone', 'utc'), st.get('grid_voltage', '230'),
-             ('on (%s W, %s %%SoC)' % (st.get('battery', '?'), st.get('soc', '?')))
-             if 'soc' in st else 'off'))
     print('%   TAB completes, ? lists the commands, quit leaves')
 
 
 SPEC = dict(label='the fake inverter', daemon_label='fake inverter control server',
             cli_name='modbus-fake-cli', app='fake-inverter', self_note='the fake itself',
-            command_help='e.g. set pv 2500, set scenario noon, show status, reset, shutdown',
+            command_help='e.g. set pv 2500, set scenario noon, show registers, reset, shutdown',
             prompt_word='fake-inverter', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,

@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The show-status removal: **`show status` is gone** (nothing replaces it) —
+the registry row, the dispatch branch and the key=value report body die;
+the per-setting `show <setting>`, `show config`, `inspect` (the machines'
+readings, the pins, the modbus row) and the set/unset replies' state
+summary carry the same truths. The cli console greets with the two fixed
+lines (the banner's status line rode the report).
+
 The welcome-alignment wave: the four consoles' greetings wear one shape —
 the three lines' texts start at one column (the welcome line indents into
 its own block), the fake greets as **`Welcome to the fake-inverter

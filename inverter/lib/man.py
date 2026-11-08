@@ -74,7 +74,7 @@ scheme; the key
 and the token lives: control token, the ops token, metrics token, each
 rotating live, the value never rendering \\(em \\fBshow <secret>\\fR
 refuses),
-\\fBshow status\\fR, \\fBshow connections\\fR (the live Modbus clients: peer,
+\\fBshow connections\\fR (the live Modbus clients: peer,
 age, requests), \\fBshow registers\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
 \\fBinspect\\fR, \\fBreset\\fR, \\fBrequest reload\\fR (the whole-daemon restart
@@ -146,7 +146,7 @@ replies on stdout, one per line. Every invocation lands in the audit trail
 (prefix \\fBCTL\\fR).
 .PP
 The command grammar is the fake's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
-\\fBhelp\\fR (the settings registry), \\fBshow status\\fR,
+\\fBhelp\\fR (the settings registry),
 \\fBshow connections\\fR (the live Modbus clients: peer, age, requests),
 \\fBshow registers\\fR, \\fBshow version\\fR,
 \\fBshow knobs\\fR (the dictionary of the registry),
@@ -159,7 +159,7 @@ CONTROL."""
 .IP \\(bu 2
 .B modbus-fake-ctl set pv 2500
 .IP \\(bu 2
-.B printf 'set pv 2500\\\\nset soc 30\\\\nshow status\\\\n' | modbus-fake-ctl
+.B printf 'set pv 2500\\\\nset soc 30\\\\nshow pv\\\\n' | modbus-fake-ctl
 .RE"""
     exit_status = """.SH EXIT STATUS
 .TP

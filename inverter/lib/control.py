@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """JSON-lines control server: set/show the fake's settings at runtime
 (value pins, the grid setpoint, the battery state force, cloud machines,
-clock freeze, chaos), scenario presets, and the status report / registers
+clock freeze, chaos), scenario presets, and the inspect dump / registers
 table / version / reset / shutdown. Speaks one command per line, one reply
 line. Every request and reply is one JSON object per line (the stdlib
 json module): the request = {"cmd": "<command>"}, the reply =
@@ -21,7 +21,7 @@ import socket
 import threading
 import time
 
-from common.config import acl_summary, acl_text, parse_acl, parse_auth_type, parse_secret
+from common.config import acl_text, parse_acl, parse_auth_type, parse_secret
 from common.human import secs
 from common.modbus import AUTH_MIN_KEY
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
@@ -374,7 +374,11 @@ class ControlServer(_ControlServer):
                 srv = MetricsServer(sim, chaos, fake, self, fake.metrics_listen, token=fake.metrics_token,
                                     max_clients=fake.metrics_caps[0], client_timeout=fake.metrics_caps[1],
                                     max_per_ip=fake.metrics_caps[2])
-                srv.start()
+                try:
+                    srv.start()
+                except SystemExit:
+                    host, port = fake.metrics_listen
+                    raise ValueError('cannot bind %s:%d: %s' % (host, port, srv.bind_error))
                 fake.metrics_srv = srv
                 fake.metrics_desc = describe_metrics(fake.metrics_listen, fake.metrics_token,
                                                      fake.metrics_caps[0], fake.metrics_caps[2])
@@ -641,8 +645,6 @@ class ControlServer(_ControlServer):
             if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
                 return 'ok %s' % describe_root(OPTIONS, SHOW_OPTIONS)
             what = args[0].lower()
-            if what == 'status':
-                return self.status_report()
             if what == 'connections':
                 return 'ok connections ' + self.connections_line()
             if what == 'version':
@@ -802,36 +804,6 @@ class ControlServer(_ControlServer):
                            else ('none' if not self.fake.connect_acl else '%d network(s)' % len(self.fake.connect_acl)),
                            self.fake.auth or 'none'))
         return 'ok inspect\n' + '\n'.join(rows)
-
-    def status_report(self):
-        """The status as a compact multi-field report: one stable key=value
-        per line (scriptable)."""
-        sim = self.simulator
-        pv_w, load_w, batt_w, soc, cloud, ov = sim.effective()
-        grid_w = 0.0 if sim.outage_active() else pv_w - batt_w - load_w
-        t = sim.clock()
-        pinned = ','.join('%s=%s' % (k, ov[k]) for k in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud')
-                          if ov[k] is not None) or 'none'
-        rows = ['pv=%d' % round(pv_w), 'load=%d' % round(load_w), 'grid=%d' % round(grid_w),
-                'mppt=%s' % sim.mppt, 'grid_voltage=%g' % sim.grid_voltage,
-                'grid_outage=%s' % sim.outage_display(),
-                'timezone=%s' % ('utc' if sim.utc else 'local')]
-        if sim.battery:
-            rows += ['battery=%d' % round(batt_w),
-                     'soc=%s' % ('%.1f' % soc if soc is not None else 'n/a'),
-                     'battery_state=%s' % (sim.batt_state or 'auto')]
-        rows += ['cloud=%s' % sim.cloud_display(),
-                 'clock=%s' % format_clock(t), 'time_scale=x%g' % sim.time_scale,
-                 'uptime=%s' % secs(time.monotonic() - self.started),
-                 'chaos=%.2f' % self.chaos.p, 'chaos_hits=%d' % self.chaos.hits,
-                 'pinned=%s' % pinned, 'profile=%s' % sim.profile.description,
-                 'metrics=%s' % getattr(self.fake, 'metrics_desc', 'off'),
-                 'overridden=%s' % (','.join(sorted(self.overridden)) or 'none')]
-        if self.fake:
-            rows.append('clients=%d' % self.fake.client_count)
-            rows.append('connect_acl=%s' % acl_summary(self.fake.connect_acl))
-            rows.append('write=%s' % ('on' if self.fake.allow_write else 'off'))
-        return 'ok status\n' + '\n'.join(rows)
 
     def status(self):
         sim = self.simulator

@@ -205,8 +205,9 @@ def resolve_config(args, script_dir=None):
     profile = load_device_profile(profile_path)
     metric_prefix = (resolve(getattr(args, 'metric_prefix', None), 'METRIC_PREFIX',
                              'metric_prefix', 'huawei', str) or 'huawei').strip() or 'huawei'
-    spec = Metrics(resolve(getattr(args, 'metrics_spec', None), 'METRICS_SPEC',
-                           'metrics_spec', None, str), prefix=metric_prefix)
+    metrics_spec = resolve(getattr(args, 'metrics_spec', None), 'METRICS_SPEC',
+                           'metrics_spec', None, str)
+    spec = Metrics(metrics_spec, prefix=metric_prefix)
 
     # the metrics spec's "profile" fields pick the device registers feeding
     # the register-backed metrics; each source carries register/type/gain
@@ -222,6 +223,7 @@ def resolve_config(args, script_dir=None):
     host, modbus_port = parse_upstream(upstream or DEFAULTS['upstream'])
     cfg = {
         'profile': profile_path,
+        'metrics_spec': metrics_spec,
         'upstream': '%s:%d' % (host, modbus_port),
         'host': host,
         'modbus_port': modbus_port,
@@ -265,6 +267,15 @@ def resolve_config(args, script_dir=None):
                                         'control_ops_verbs', 'show,clear', str) or 'show,clear').strip() or 'show,clear'
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'CONTROL_TRUST_UIDS',
                                         'control_trust_uids', None, str)
+    cfg['control_socket_group'] = resolve(getattr(args, 'control_socket_group', False) or None,
+                                          'CONTROL_SOCKET_GROUP', 'control_socket_group', False, str_to_bool)
+    cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', None, str)
+    cfg['audit_max_mb'] = resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
+                                  'audit_max_mb', 10.0, float)
+    cfg['audit_files'] = resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
+                                 'audit_files', 3, int)
+    cfg['no_audit_log'] = resolve(getattr(args, 'no_audit_log', False) or None,
+                                  None, 'no_audit_log', False, str_to_bool)
     check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
     check_token_chars(cfg['control_token'], 'control_token')
     check_token_chars(cfg['auth_token'], 'auth_token')

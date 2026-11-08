@@ -66,10 +66,11 @@ graceful shutdown."""
 The control server speaks JSON lines ({"cmd": "..."} ->
 {"status": "ok|fail|bye", "text": "..."}; TCP requires the token when
 configured and refuses to start without one). Commands:
-\\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: interval,
-timeout, max-clients, client-timeout, max-conn-per-ip, log-access,
-log-level \\(em and the token lives: control token, the ops token,
-auth token, each rotating live, the value never rendering \\(em
+\\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: metrics
+interval, modbus timeout, the metrics limits caps, caps max-pv/max-grid,
+log-access, log-level, control socket-group (re-modes the live unix socket
+0600/0660) \\(em and the token lives: control token, the ops token,
+metrics auth token, each rotating live, the value never rendering \\(em
 \\fBshow <secret>\\fR refuses), \\fBshow status\\fR, \\fBshow connections\\fR
 (the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
 (the dictionary of the registry), \\fBpoll now\\fR,

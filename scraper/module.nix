@@ -57,6 +57,7 @@ let
     ])
     (lib.optionals (cfg.controlOpsVerbs != null) [ (setLine "control-ops-verbs" cfg.controlOpsVerbs) ])
     (lib.optionals (cfg.controlTrustUids != null) [ (setLine "control-trust-uids" cfg.controlTrustUids) ])
+    (setLine "control-socket-group" (lib.boolToString cfg.controlSocketGroup))
     (lib.optionals (cfg.profile != null) [ (setLine "profile" (toString cfg.profile)) ])
     (lib.optionals (cfg.metricsSpec != null) [ (setLine "metrics-spec" cfg.metricsSpec) ])
     (lib.optionals (cfg.metricPrefix != null) [ (setLine "metric-prefix" cfg.metricPrefix) ])
@@ -335,6 +336,16 @@ in
         (SO_PEERCRED): a comma-separated uid list — a local systemd unit
         speaks without the secret. Root and the daemon's own user are
         always trusted. null = the defaults only.
+      '';
+    };
+
+    controlSocketGroup = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Leave the unix control socket group-accessible (chmod 0660 instead
+        of the default 0600): a local group may speak to the control
+        without being the service user.
       '';
     };
 

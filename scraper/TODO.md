@@ -5,6 +5,23 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The re-namespace completion: the wire settings speak the family's path
+shapes (`set metrics interval`, `set modbus timeout`, `set metrics limits …`,
+`set caps max-pv`, `set audit …`, `set metrics auth token`) — the flat
+dashed names still read in config files — and the deadwood the re-spell
+exposed got wired: the bool knobs (`modbus battery`, `modbus
+grid-positive-import`, `local-time`) answer set/show/dump, the audit
+family is live the cache's way (`audit/log-file` moves the trail and the
+fresh writer re-chains from the file's tail, the rotation rows re-render,
+`audit/disable` kills the trail on the shared AuditLog), the dump carries
+every live row, and the display groups hand their filing to the node walk.
+
+The control-socket-group mirror: the scraper gains the cache's
+`--control-socket-group` (env `CONTROL_SOCKET_GROUP`, config `set control
+socket-group`) — the unix control socket opts into `0660` so a local group
+may speak to the control without being the service user, and the live set
+re-modes the socket.
+
 The welcome-alignment wave: the console's greeting runs the cache's
 segment order — the `error(s)` count moves behind `running for` (the
 status line reads upstream, poll health, `running for`, the trailing

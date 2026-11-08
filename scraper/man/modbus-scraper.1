@@ -143,6 +143,10 @@ extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
 the daemon's own user are always trusted
 .TP
+.B \-\-control\-socket\-group
+leave the unix control socket group\-accessible (chmod 0660 instead of
+the plain 0600) ($CONTROL_SOCKET_GROUP)
+.TP
 .B \-\-auth\-token
 require Authorization: Bearer <token> on all requests; the value may be
 `file:<path>` — the first line of an owner\-only 0600 file (a systemd
@@ -219,10 +223,11 @@ graceful shutdown.
 The control server speaks JSON lines ({"cmd": "..."} ->
 {"status": "ok|fail|bye", "text": "..."}; TCP requires the token when
 configured and refuses to start without one). Commands:
-\fBset\fR/\fBunset\fR/\fBshow\fR/\fBhelp\fR (the settings: interval,
-timeout, max-clients, client-timeout, max-conn-per-ip, log-access,
-log-level \(em and the token lives: control token, the ops token,
-auth token, each rotating live, the value never rendering \(em
+\fBset\fR/\fBunset\fR/\fBshow\fR/\fBhelp\fR (the settings: metrics
+interval, modbus timeout, the metrics limits caps, caps max-pv/max-grid,
+log-access, log-level, control socket-group (re-modes the live unix socket
+0600/0660) \(em and the token lives: control token, the ops token,
+metrics auth token, each rotating live, the value never rendering \(em
 \fBshow <secret>\fR refuses), \fBshow status\fR, \fBshow connections\fR
 (the live HTTP clients), \fBshow version\fR, \fBshow knobs\fR
 (the dictionary of the registry), \fBpoll now\fR,

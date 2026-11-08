@@ -146,11 +146,11 @@ profile-bound metric (the phase rows, a bit flag, a float) is read once per
 poll, softly: a rejected read keeps its metric absent instead of failing
 the poll. A `profile` field pointing at a register the device profile
 does not define leaves the metric absent (logged at startup). Profile resolution: `--profile`
-flag, env `PROFILE`, config script `set profile`, then the bundled copy;
+flag, env `PROFILE`, config script `set modbus profile`, then the bundled copy;
 re-read on `SIGHUP`. The register map itself — addresses, types, gains,
 function codes — comes from the device profile **alone**: there are no
 register override knobs. The live control surface swaps it at runtime:
-`set profile <file-or-name>` (a bare name resolves in `profiles/profiles/`,
+`set modbus profile <file-or-name>` (a bare name resolves in `profiles/profiles/`,
 `default` = the bundled sun2000 profile) loads the new map, rebuilds the
 metric sources and rolls back cleanly when the profile lacks the registers
 the power math depends on.
@@ -212,16 +212,16 @@ the value never does, and the parser refuses the placeholder):
 set modbus upstream 127.0.0.1:5502
 set modbus unit 1
 set modbus offset 0
-set timeout 3
-set max-kwp 6
-set max-grid-kw 12
-set battery false
-set grid-positive-import false
-set listen 127.0.0.1:9350
-set interval 10
-set max-clients 64
-set client-timeout 300
-set limits max-conn-per-ip 0
+set modbus timeout 3
+set caps max-pv 6
+set caps max-grid 12
+set modbus battery false
+set modbus grid-positive-import false
+set metrics listen 127.0.0.1:9350
+set metrics interval 10
+set metrics limits max-clients 64
+set metrics limits timeout 300
+set metrics limits max-conn-per-ip 0
 set log-level INFO
 ```
 
@@ -246,22 +246,23 @@ is just a path). Talk to it with **`modbus-scraper-ctl`** (one-shot / batch) or
 
 ```bash
 python3 scraper/bin/modbus-scraper-ctl.py show status
-printf 'set interval 5\npoll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
+printf 'set metrics interval 5\npoll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
 python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
 ```
 
-Commands: `set`/`unset` over the live settings (**`profile`** (the device
-profile: the register map swaps live, `default` restores the bundled
-sun2000 profile), **`interval`**,
-**`timeout`**, **`max-clients`**, **`client-timeout`**,
-**`max-conn-per-ip`**, **`log-access`**, **`log-level`**, **`modbus
+Commands: `set`/`unset` over the live settings (**`modbus profile`** (the
+device profile: the register map swaps live, `default` restores the bundled
+sun2000 profile), **`metrics interval`**,
+**`modbus timeout`**, **`metrics limits max-clients`**, **`metrics limits timeout`**,
+**`metrics limits max-conn-per-ip`**, **`caps max-pv`**/`caps max-grid`, **`log-access`**, **`log-level`**, **`modbus
 auth`**/`modbus auth key` (the suite scheme + key toward the inverter; a
 change drops the Modbus session — the next poll reconnects and handshakes)
 — and the
 **token lives**: `control token` and `control ops token` rotate the
-control tokens live (the sessions re-auth), `auth token` rotates the
+control tokens live (the sessions re-auth), `metrics auth token` rotates the
 /metrics bearer live; a token value never renders back — **`show <secret>`
 refuses** (it is a secret: pass it by flag/env, or as `file:<path>`)),
+`control socket-group` (re-modes the live unix socket `0600`/`0660`),
 `show status` (the key=value report), `show connections` (the live HTTP
 clients of /metrics), `poll now` (the loop wakes immediately), `request
 reload-config` (the SIGHUP path — the token file re-reads, so the bearer
@@ -282,8 +283,8 @@ the state rides encrypted, a restore refuses a wrong or missing key;
 a dump path without a key warns unsealed at start and on `set`),
 `inspect`,
 `show version`, `show knobs` (the dictionary of
-the registry: every knob with its flag, its env twin, how it changes,
-under its display group — ungrouped rows bare), `shutdown`.
+the registry: every knob with its flag, its env twin, how it changes),
+`shutdown`.
 
 A **TCP control port refuses to start without a token** (the audit's F5 —
 the same rule as the cache): `--control-token`
@@ -350,7 +351,7 @@ journald adds one.
 | `--modbus-offset` | `0` | added to register addresses (set `-1` for gateways that need 0-based addressing) |
 | `--auth` | `none` | the inverter's Modbus auth scheme the session must speak: `suite` proves the shared key with a crypt handshake (magic + nonce + HMAC proof, the peer answers `OK`, or `ERR` and the connection fails — the poller keeps retrying) right after every connect; `none`/empty = no auth at all (config `set modbus auth`, env `AUTH`) |
 | `--auth-key` | none | the shared key the suite handshake proves, **min 16 characters**; the value may be `file:<path>` — the first line of an owner-only `0600` file (config `set modbus auth key`, env `AUTH_KEY`) — the peer's key must match: the fake inverter serves its side with `--auth suite --auth-key …` |
-| `--profile` | the bundled `sun2000` profile | device profile JSON (the shared profiles/ schema): the whole register map — addresses, types, gains, function codes; a bare name resolves in `profiles/profiles/`; live-swappable with `set profile` |
+| `--profile` | the bundled `sun2000` profile | device profile JSON (the shared profiles/ schema): the whole register map — addresses, types, gains, function codes; a bare name resolves in `profiles/profiles/`; live-swappable with `set modbus profile` |
 | `--max-kwp` | `6` | PV input power check against the array size: above `max-kwp × 1000` W → HTTP 503 + error log; `0` = off. Negative PV and export above the PV cap always error |
 | `--max-grid-kw` | `12` | power line grid exchange check: \|grid power\| above `max-grid-kw × 1000` W (either direction) → HTTP 503 + error log; `0` = off |
 | `--battery` | off | enable battery support: battery term in the home derivation + battery metrics |
@@ -367,6 +368,7 @@ journald adds one.
 | `--control-ops-token` | off | a second, **read-only** control token: its sessions run the `show`/`clear` verbs only (no `set`/`unset`, no `poll now`, no `request reload`, no `restart`, no `shutdown`) — needs `--control-token`, must differ from it; both roles audited (`CONTROL_OPS_TOKEN`) |
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (`CONTROL_OPS_VERBS`) |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `CONTROL_TRUST_UIDS`) |
+| `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user (config `set control socket-group`, env `CONTROL_SOCKET_GROUP`) |
 | `--dump-path` | off | the state dump (write-behind): the live setting overrides — the tokens apart — as one JSON, created `0600` with an integrity hash, written on the `request dump` command and the graceful shutdown; loaded on start only with `--restore-on-start`, on demand with the `request restore` command (config `set dump path`, env `DUMP_PATH`) |
 | `--dump-key` | off | the key that **seals** the state dumps and the reload's state file: the state rides encrypted (an HMAC-SHA256 counter-mode keystream, authenticated — a restore refuses a wrong or missing key, and a configured key refuses an unsealed dump); startup-only — the reload re-exec re-resolves the same key (config `set dump key`, env `DUMP_KEY`); the value may be `file:<path>` — the first line of an owner-only 0600 file, so the config carries the reference, never the material; a dump path without a key warns unsealed at start and on `set dump path` |
 | `--restore-on-start` | off | load the state dump when the daemon starts (needs `--dump-path`) — the live overrides ride again instead of a cold start (config `set restore-on-start`, env `RESTORE_ON_START`) |
@@ -409,7 +411,7 @@ The fake inverter lives in its own subproject: [inverter/](../inverter/README.md
 mock Prometheus), not against real hardware.
 
 When a battery is present, enable support with `--battery` (env
-`BATTERY`, config script `set battery true`). The energy balance gains a battery
+`BATTERY`, config script `set modbus battery true`). The energy balance gains a battery
 term and the home load derivation becomes:
 
 ```

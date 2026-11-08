@@ -20,7 +20,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.audit import AuditLog
+from common.audit import AuditLog, default_path
 from common.config import parse_listen
 from common.cred import parse_trust_uids
 from common.logutil import UtcFormatter
@@ -173,8 +173,11 @@ def main():
                      ', '.join(unknown) if unknown else 'empty', ', '.join(sorted(KNOWN_VERBS)))
         raise SystemExit(2)
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
-    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'SCR', app='modbus-scraper',
-                                                    max_mb=args.audit_max_mb, files=args.audit_files)
+    audit_params = {'path': None if cfg['no_audit_log'] else cfg['audit_log'],
+                    'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],
+                    'disabled': bool(cfg['no_audit_log'])}
+    audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'], 'SCR', app='modbus-scraper',
+                                                      max_mb=cfg['audit_max_mb'], files=cfg['audit_files'])
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target) \
         + (', read-only ops token accepted' if control_ops_token else '')
@@ -209,9 +212,12 @@ def main():
         # knobs stay hand-rendered (their convs do not round-trip a string)
         defaults = {'log-access': 'on' if cfg['log_access'] else 'off',
                     'log-level': cfg['level'],
+                    'control/socket-group': 'on' if cfg['control_socket_group'] else 'off',
                     'dump/path': cfg['dump_path'] or 'off',
                     'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
-                    'modbus/auth': cfg['auth'] or 'none'}
+                    'modbus/auth': cfg['auth'] or 'none',
+                    'audit/log-file': 'off' if cfg['no_audit_log']
+                                      else (cfg['audit_log'] or default_path('modbus-scraper'))}
         for o in OPTIONS:
             if o.live and o.conv in (int, float, str) and not o.secret:
                 key = o.name.replace('-', '_')
@@ -220,30 +226,37 @@ def main():
             if o.restart and not o.secret:   # the startup-only knobs: what `show <knob>` answers
                 key = o.name.replace('-', '_')
                 v = cfg.get(key, getattr(args, key, None))
+                wire = o.live or o.name      # the defaults speak the wire name (the live path when the row carries one)
                 if o.name == 'audit-log':
-                    defaults[o.name] = ('off' if args.no_audit_log
-                                        else 'stdout' if args.audit_log == '-'
-                                        else (args.audit_log or 'the XDG state home'))
+                    defaults[wire] = ('off' if args.no_audit_log
+                                      else 'stdout' if args.audit_log == '-'
+                                      else (args.audit_log or 'the XDG state home'))
                 elif o.name == 'control-port':
-                    defaults[o.name] = 'off' if control_target == '0' else control_target
+                    defaults[wire] = 'off' if control_target == '0' else control_target
                 elif o.conv is bool:
-                    defaults[o.name] = 'on' if v else 'off'
+                    defaults[wire] = 'on' if v else 'off'
                 elif o.name == 'control-trust-uids':
-                    defaults[o.name] = ','.join(str(u) for u in sorted(trust_uids or [])) or 'off'
+                    defaults[wire] = ','.join(str(u) for u in sorted(trust_uids or [])) or 'off'
                 else:
-                    defaults[o.name] = str(v) if v not in (None, '') else 'off'
+                    defaults[wire] = str(v) if v not in (None, '') else 'off'
         # the secret rows (control/token, control/ops/token, auth/token,
         # auth-key, dump-key) carry NO
         # defaults entry: `unset` refuses them (the metrics/token treatment) — a
         # secret never renders, never re-applies
         control = ControlServer(scraper, httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
+                                socket_group=cfg['control_socket_group'],
                                 ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
                                 dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'],
-                                dump_key=cfg['dump_key'])
+                                dump_key=cfg['dump_key'], audit_params=audit_params)
         control.start()
         if control.dump_path and cfg['restore_on_start']:
             logger.info('restore-on-start: %s', control.restore_state())
+
+    def the_audit():
+        """The live trail: the control server's own (the audit family's
+        live moves swap it), else the startup writer."""
+        return control.audit if control else audit
 
     def apply_reload():
         """The SIGHUP and the `request reload` command share this: re-resolve
@@ -258,10 +271,11 @@ def main():
         httpd.gate.max_per_ip = new_cfg['max_conn_per_ip']
         if control:
             control.clear_overrides()   # the config won: nothing is live-overridden
-        if audit:
-            audit.event('RELOAD', 'upstream %s:%d unit %d, interval %gs, auth %s'
-                        % (new_cfg['host'], new_cfg['modbus_port'], new_cfg['modbus_unit'], new_cfg['interval'],
-                           'bearer' if new_cfg['auth_token'] else 'none'))
+        a = the_audit()
+        if a:
+            a.event('RELOAD', 'upstream %s:%d unit %d, interval %gs, auth %s'
+                    % (new_cfg['host'], new_cfg['modbus_port'], new_cfg['modbus_unit'], new_cfg['interval'],
+                       'bearer' if new_cfg['auth_token'] else 'none'))
         return 'upstream %s:%d unit %d, interval %gs' % (new_cfg['host'], new_cfg['modbus_port'],
                                                          new_cfg['modbus_unit'], new_cfg['interval'])
 
@@ -271,9 +285,10 @@ def main():
     def graceful_stop(reason):
         logger.info('shutdown: %s received after %ds (%d poll errors), stopping the web server',
                     reason, time.monotonic() - started, scraper.errors)
-        if audit:
-            audit.event('SHUTDOWN', '%s: uptime=%ds errors=%d'
-                        % (reason, int(time.monotonic() - started), scraper.errors))
+        a = the_audit()
+        if a:
+            a.event('SHUTDOWN', '%s: uptime=%ds errors=%d'
+                    % (reason, int(time.monotonic() - started), scraper.errors))
         if control:
             control.shutdown_dump()   # the write-behind: the overrides ride the next start
             control.announce_exit(reason)   # the consoles print the notice and exit

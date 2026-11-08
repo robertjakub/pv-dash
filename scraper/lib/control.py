@@ -19,6 +19,8 @@ TCP the signed commands are mandatory. A second, read-only token
 ops shift against the admin key, both audited."""
 import hmac
 import logging
+import os
+import socket
 import time
 
 from common.human import secs
@@ -31,6 +33,8 @@ from common.config import default_profile_path, is_loopback_host, parse_auth_typ
     parse_secret, parse_upstream, resolve_profile_file
 from common.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
+from common.audit import AuditLog
+from common.logutil import UtcFormatter
 from .config import build_sources, load_device_profile
 from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
     KNOWN_VERBS, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
@@ -90,14 +94,16 @@ class ControlServer(_ControlServer):
     RELOAD_TEXT = 'the modbus-scraper is reloading — the daemon restarts with the saved configuration'
 
     def __init__(self, scraper, httpd, target, reloader=None, stopper=None, audit=None, token=None,
-                 defaults=None, trust_uids=None, ops_token=None, ops_verbs=None, config_path=None,
-                 dump_path=None, restore_on_start=False, dump_key=None):
+                 defaults=None, trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None,
+                 config_path=None, dump_path=None, restore_on_start=False, dump_key=None,
+                 audit_params=None):
         self.scraper = scraper
         self.httpd = httpd
+        self.audit_params = dict(audit_params or {})   # the audit family's live swaps rebuild from these
         super().__init__(target, reloader=reloader, stopper=stopper, audit=audit, token=token,
-                         defaults=defaults, trust_uids=trust_uids, ops_token=ops_token,
-                         ops_verbs=ops_verbs, config_path=config_path, dump_path=dump_path,
-                         restore_on_start=restore_on_start, dump_key=dump_key)
+                         defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
+                         ops_token=ops_token, ops_verbs=ops_verbs, config_path=config_path,
+                         dump_path=dump_path, restore_on_start=restore_on_start, dump_key=dump_key)
 
     def _after_restore(self):
         self.scraper.wake.set()   # the poll loop re-reads the config-driven knobs now
@@ -270,6 +276,21 @@ class ControlServer(_ControlServer):
         if rs is not None and rs.restart:   # a startup-only knob: validate + record the pending value
             if rs.secret:
                 raise ValueError('restart required (startup-only knob)')
+            if key == 'metrics/listen':
+                try:
+                    t = parse_listen(val)
+                except SystemExit as e:
+                    raise ValueError(str(e))
+                probe = socket.socket()   # fail fast: the bind at restart is too late to complain
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                try:
+                    probe.bind(t)
+                except OSError as e:
+                    raise ValueError('cannot bind %s:%d: %s' % (t[0], t[1], e))
+                finally:
+                    probe.close()
+                self.defaults[key] = '%s:%d' % t
+                return self.defaults[key]
             if key == 'dump/restore-on-start':
                 if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
                     raise ValueError('dump/restore-on-start must be on or off')
@@ -277,7 +298,7 @@ class ControlServer(_ControlServer):
                 return self.defaults[key]
             raise ValueError('unknown setting %s' % key)
 
-        if key == 'interval':
+        if key == 'metrics/interval':
             v = num(val, 'interval', 'seconds')
             if not 0 < v <= 86400:
                 raise ValueError('interval must be 0 < N <= 86400 seconds')
@@ -285,7 +306,7 @@ class ControlServer(_ControlServer):
                 s.cfg['interval'] = v
             s.wake.set()
             return secs(v)
-        if key == 'timeout':
+        if key == 'modbus/timeout':
             v = num(val, 'timeout', 'seconds')
             if not 0 < v <= 60:
                 raise ValueError('timeout must be 0 < N <= 60 seconds')
@@ -322,14 +343,14 @@ class ControlServer(_ControlServer):
             s.client.auth_key = v
             s.client.close()   # the session re-proves the new key on the next connect
             return '<set>'
-        if key == 'max-clients':
+        if key == 'metrics/limits/max-clients':
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
             if not self.httpd:
                 raise ValueError('no http server attached')
             self.httpd.gate.max_total = v
             return '%d' % v
-        if key == 'client-timeout':
+        if key == 'metrics/limits/timeout':
             v = num(val, 'client-timeout', 'seconds')
             self._gate_range(key, v, 'seconds')
             if not self.httpd:
@@ -338,7 +359,7 @@ class ControlServer(_ControlServer):
                 s.cfg['client_timeout'] = v
             self.httpd.RequestHandlerClass.timeout = v or None
             return secs(v)
-        if key == 'limits/max-conn-per-ip':
+        if key == 'metrics/limits/max-conn-per-ip':
             v = numi(val, 'max-conn-per-ip', 'connections')
             self._gate_range(key, v)
             if not self.httpd:
@@ -360,7 +381,7 @@ class ControlServer(_ControlServer):
                 raise ValueError('log-level must be one of %s' % ', '.join(LOG_LEVELS))
             logging.getLogger().setLevel(getattr(logging, lvl))
             return lvl
-        if key == 'profile':
+        if key == 'modbus/profile':
             # the register map swaps to the new profile: load it, rebuild the
             # sources, then swap atomically (a bad file rolls everything back)
             path = default_profile_path() if val in ('default', 'auto') else resolve_profile_file(val)
@@ -402,22 +423,33 @@ class ControlServer(_ControlServer):
                                  'every holder the role the server picks first)')
             self.ops_token = val
             return '<set>'
-        if key == 'auth/token':
+        if key == 'control/socket-group':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('control/socket-group must be on or off')
+            self.socket_group = on
+            if self.is_unix and os.path.exists(self.sockpath):
+                os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
+            return 'on' if on else 'off'
+        if key == 'metrics/auth/token':
             if val in ('off', 'none', ''):
                 host, _port = parse_listen(s.cfg['listen'])
                 if not is_loopback_host(host):
-                    raise ValueError('auth/token is mandatory while the listen is non-loopback '
+                    raise ValueError('metrics/auth/token is mandatory while the listen is non-loopback '
                                      '(F13 in docs/AUDIT.md) — set the new token')
                 self.httpd.RequestHandlerClass.auth_token = None
                 with s.lock:
                     s.cfg['auth_token'] = None
                 return 'off'
             try:
-                val = parse_secret(val, 'auth/token')   # file: reads the first line of an owner-only file
+                val = parse_secret(val, 'metrics/auth/token')   # file: reads the first line of an owner-only file
             except SystemExit as e:
                 raise ValueError(str(e))
             if any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in val):
-                raise ValueError('auth/token must not contain whitespace or control characters')
+                raise ValueError('metrics/auth/token must not contain whitespace or control characters')
             self.httpd.RequestHandlerClass.auth_token = val   # the handler reads it per request — the swap is live
             with s.lock:
                 s.cfg['auth_token'] = val
@@ -429,11 +461,65 @@ class ControlServer(_ControlServer):
             self.dump_path = val   # request dump and the graceful shutdown write it from here on
             # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
             return val if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
+        if key == 'audit/log-file':
+            if val in ('off', 'none'):
+                self.audit_params['disabled'] = True
+                return self._rebuild_audit()
+            self.audit_params['path'] = val   # the raw spelling: a path, '-' (= stdout) or empty (the XDG state home)
+            self.audit_params['disabled'] = False
+            return self._rebuild_audit()
+        if key == 'audit/rotate/max-size':
+            v = num(val, 'max-size', 'MB')
+            self._gate_range(key, v, 'MB')
+            self.audit_params['max_mb'] = v
+            self._rebuild_audit()
+            return '%g' % v
+        if key == 'audit/rotate/files':
+            v = numi(val, 'files', 'backups')
+            self._gate_range(key, v, 'backups')
+            self.audit_params['files'] = v
+            self._rebuild_audit()
+            return '%d' % v
+        if key == 'audit/disable':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('audit/disable must be on or off')
+            self.audit_params['disabled'] = on
+            self._rebuild_audit()
+            return 'on' if on else 'off'
+        if key == 'local-time':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('local-time must be on|off')
+            swapped = 0
+            for h in logging.getLogger().handlers:
+                f = h.formatter
+                if f is None or not getattr(f, '_fmt', None):
+                    continue
+                h.setFormatter(logging.Formatter(f._fmt) if on else UtcFormatter(f._fmt))
+                swapped += 1
+            if not swapped:
+                raise ValueError('no log handler to re-format')
+            with s.lock:
+                s.cfg['local_time'] = on
+            return 'on' if on else 'off'
         # the generic path: a typed row (int/float/str conv) needs no branch
         # — the row's conv parses, the row's min/max gate, the config key
         # takes the value; the value takes effect wherever the config is
         # next consumed (a client rebuild, a reload)
         opt = OPTION_BY_LIVE.get(key)
+        if opt is not None and opt.conv is bool:
+            if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
+                raise ValueError('%s must be on or off' % key)
+            with s.lock:
+                s.cfg[opt.name.replace('-', '_')] = val in ('on', 'true', '1', 'yes')
+            return 'on' if val in ('on', 'true', '1', 'yes') else 'off'
         if opt is not None and opt.conv in TYPED_CONVS:
             return str(self._typed(key, val))
         raise ValueError('unknown setting %s' % key)
@@ -465,44 +551,72 @@ class ControlServer(_ControlServer):
         s = self.scraper
         with s.lock:
             cfg = dict(s.cfg)
-        if key == 'interval':
+        if key == 'metrics/interval':
             return secs(cfg['interval'])
-        if key == 'timeout':
+        if key == 'modbus/timeout':
             return secs(cfg['timeout'])
-        if key == 'max-clients':
+        if key == 'metrics/limits/max-clients':
             return '%d' % (self.httpd.gate.max_total if self.httpd else cfg['max_clients'])
-        if key == 'client-timeout':
+        if key == 'metrics/limits/timeout':
             ct = self.httpd.RequestHandlerClass.timeout if self.httpd else cfg['client_timeout'] or None
             return 'off' if not ct else secs(ct)
-        if key == 'limits/max-conn-per-ip':
+        if key == 'metrics/limits/max-conn-per-ip':
             return '%d' % (self.httpd.gate.max_per_ip if self.httpd else cfg['max_conn_per_ip'])
         if key == 'log-access':
             return 'on' if (self.httpd.RequestHandlerClass.log_access if self.httpd else cfg['log_access']) else 'off'
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
-        if key == 'profile':
+        if key == 'modbus/profile':
             return cfg['profile']
         if key == 'control/token':
             return '<set>' if self.token else 'off'   # the secret never renders
         if key == 'control/ops/token':
             return '<set>' if self.ops_token else 'off'   # the secret never renders
-        if key == 'auth/token':
+        if key == 'control/socket-group':
+            return 'on' if self.socket_group else 'off'
+        if key == 'metrics/auth/token':
             return '<set>' if cfg['auth_token'] else 'off'   # the secret never renders
+        if key == 'audit/log-file':
+            return self.audit.path if self.audit else 'off'
+        if key == 'audit/rotate/max-size':
+            return '%g' % self.audit_params['max_mb']
+        if key == 'audit/rotate/files':
+            return '%d' % self.audit_params['files']
+        if key == 'audit/disable':
+            return 'on' if self.audit_params['disabled'] else 'off'
         if key == 'modbus/auth':
             return cfg.get('auth') or 'none'
+        if key == 'metrics/filter':
+            return cfg['metrics_spec'] or 'off'
         if key == 'modbus/auth/key':
             return '<set>' if cfg.get('auth_key') else 'none'   # the secret never renders
         if key == 'dump/path':
             return self.dump_path or 'off'
         # the generic path: a registry row with a typed conv reads its
-        # config key with no branch at all
+        # config key with no branch at all; a bool row renders on/off
         opt = OPTION_BY_LIVE.get(key)
+        if opt is not None and opt.conv is bool and opt.name.replace('-', '_') in cfg:
+            return 'on' if cfg[opt.name.replace('-', '_')] else 'off'
         if opt is not None and opt.conv in TYPED_CONVS and opt.name.replace('-', '_') in cfg:
             return str(cfg[opt.name.replace('-', '_')])
         s = SETTING_BY_NAME.get(key)
         if s is not None and s.restart:   # a startup-only knob: the configured value
             return self.defaults.get(key, '?')   # renders (the secrets answer '<set>'/'off')
         return '?'
+
+    def _rebuild_audit(self):
+        """Swap the SCR audit trail for one rebuilt from the params (the
+        live path/rotation/kill-switch changes): the fresh writer re-chains
+        from the file's own tail (common/audit.py tail_hash), so the chain
+        stays verifiable across the swap. The old trail is NOT closed — a
+        session still holding it writes its last commands there."""
+        p = self.audit_params
+        if p['disabled']:
+            self.audit = None
+        else:
+            self.audit = AuditLog(p['path'], 'SCR', app='modbus-scraper',
+                                  max_mb=p['max_mb'], files=p['files'])
+        return self.audit.path if self.audit else 'off'
 
     def clear_overrides(self):
         """The config was re-applied (SIGHUP/request reload): nothing is
@@ -523,14 +637,26 @@ class ControlServer(_ControlServer):
             'modbus/unit': cfg['modbus_unit'],
             'modbus/offset': cfg['modbus_offset'],
             'modbus/auth': cfg.get('auth') or 'none',
-            'interval': cfg['interval'],
-            'timeout': cfg['timeout'],
-            'profile': cfg['profile'],
-            'max-clients': cfg['max_clients'],
-            'client-timeout': cfg['client_timeout'],
-            'limits/max-conn-per-ip': cfg['max_conn_per_ip'],
+            'modbus/timeout': cfg['timeout'],
+            'modbus/profile': cfg['profile'],
+            'modbus/battery': 'on' if cfg['battery'] else 'off',
+            'modbus/grid-positive-import': 'on' if cfg['grid_positive_import'] else 'off',
+            'metrics/interval': cfg['interval'],
+            'metrics/filter': cfg['metrics_spec'],
+            'metrics/prefix': cfg['metric_prefix'],
+            'caps/max-pv': cfg['max_kwp'],
+            'caps/max-grid': cfg['max_grid_kw'],
+            'metrics/limits/max-clients': cfg['max_clients'],
+            'metrics/limits/timeout': cfg['client_timeout'],
+            'metrics/limits/max-conn-per-ip': cfg['max_conn_per_ip'],
             'log-access': 'on' if cfg['log_access'] else 'off',
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
+            'local-time': self._get('local-time'),
+            'control/socket-group': 'on' if self.socket_group else 'off',
+            'audit/log-file': self.audit.path if self.audit else 'off',
+            'audit/rotate/max-size': '%g' % self.audit_params['max_mb'],
+            'audit/rotate/files': '%d' % self.audit_params['files'],
+            'audit/disable': 'on' if self.audit_params['disabled'] else 'off',
             'dump/path': self.dump_path or 'off',
             'dump/restore-on-start': 'on' if self.dump_restore else 'off',
         }

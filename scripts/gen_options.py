@@ -62,12 +62,15 @@ def live_cell(rows_by_tool):
     daemon — `set <name>` from the registry's live field (the wire name,
     which can differ from the flag: the cache's --cache-ttl sets ttl; a
     '/'-path spells as its words: `set inverter profile`), the tools' names
-    joined when they diverge. No live name = *(startup-only)*: a restart
-    applies it."""
+    joined when they diverge, the `, restart` suffix when every tool holds
+    the knob restart-marked (the set records the value, the restart applies
+    it). No live name = *(startup-only)*: a restart applies it."""
     names = sorted({opt.live for opt in rows_by_tool.values() if opt.live})
     if not names:
         return '*(startup-only)*'
-    return ', '.join('`set %s`' % n.replace('/', ' ') for n in names)
+    lives = [opt for opt in rows_by_tool.values() if opt.live]
+    suffix = ', restart' if lives and all(opt.restart for opt in lives) else ''
+    return ', '.join('`set %s%s`' % (n.replace('/', ' '), suffix) for n in names)
 
 
 def group_cell(rows_by_tool):
@@ -148,7 +151,9 @@ def main():
                'the control plane, the wire name the registry gives the knob (it can '
                'differ from the flag: the cache\'s `cache-ttl` sets `ttl`) — '
                'a show row spells `show <name>`; '
-               '*(startup-only)* = no live form, a restart applies the knob; a cell\'s '
+               '*(startup-only)* = no live form, a restart applies the knob; a trailing '
+               '`, restart` = the knob is startup-only too — the set records the value '
+               '(the wire answers the restart note), the restart applies it; a cell\'s '
                '`live` mark says the tool takes the knob live (a cell without one = '
                'that tool applies the knob at startup only); '
                '`group` = the row\'s display bucket — the tool\'s '

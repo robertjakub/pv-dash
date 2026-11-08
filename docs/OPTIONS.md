@@ -60,7 +60,7 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `control/ops` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | c | `dump` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `dump-interval` |  | `set dump-interval` | ✓ live |  |  |  |
-| k | `dump-key` |  | `set dump key` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
+| k | `dump-key` |  | `set dump key, restart` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
 | k | `dump-path` |  | `set dump path` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `dump-with-cache` |  | `set dump with-cache` | ✓ live |  |  |  |
 | c | `grid` |  | `set grid` |  |  | ✓ live |  |
@@ -72,7 +72,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `interval` |  | `set interval`, `set modbus interval` | ✓ live | ✓ live |  |  |
 | s | `knobs` |  | `show knobs` | **✓** | **✓** | **✓** hidden | **✓** hidden |
 | c | `limits` |  | *(startup-only)* | ✓ | ✓ |  |  |
-| k | `listen` |  | `set system listen` | ✓ live | ✓ |  |  |
+| k | `listen` |  | `set system listen, restart` | ✓ live | ✓ |  |  |
 | c | `load` |  | `set load` |  |  | ✓ live |  |
 | k | `local-time` |  | `set local-time` | ✓ live | ✓ |  | ✓ |
 | k | `log-access` |  | `set log-access`, `set system log-access` | ✓ live | ✓ live |  | ✓ live |
@@ -86,7 +86,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `metric-prefix` |  | *(startup-only)* |  | ✓ |  |  |
 | c | `metrics` |  | *(startup-only)* | ✓ |  | ✓ | ✓ |
 | k | `metrics-client-timeout` |  | `set metrics limits timeout` | ✓ live |  | ✓ | ✓ |
-| k | `metrics-listen` |  | `set metrics listen` | ✓ live |  | ✓ | ✓ |
+| k | `metrics-listen` |  | `set metrics listen, restart` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-max-clients` |  | `set metrics limits max-clients` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-max-conn-per-ip` |  | `set metrics limits max-conn-per-ip` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-server` |  | `set metrics-server`, `set metrics enable` | ✓ live |  | ✓ live | ✓ live |
@@ -128,4 +128,4 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `write-acl` |  | `set acl write` | ✓ live |  |  |  |
 | k | `write-registers` |  | `set write registers` | ✓ live |  |  |  |
 
-Legend: `k` = a knob — the flag/env/config-file rows; `c` = control-only — a setting that lives on the control wire alone (the fake's pins and machines — no flag, no env, no config-file row); `s` = a show command — a report the wire answers with (`show <name>`; not a knob, nothing to set, the registry's `show` section); ✓ = the tool has the row (**bold** = all four do); the `live` column is the control command itself — `set <name>` over the control plane, the wire name the registry gives the knob (it can differ from the flag: the cache's `cache-ttl` sets `ttl`) — a show row spells `show <name>`; *(startup-only)* = no live form, a restart applies the knob; a cell's `live` mark says the tool takes the knob live (a cell without one = that tool applies the knob at startup only); `group` = the row's display bucket — the tool's surfaces file the knob under it (blank = ungrouped, rendered bare); `hidden` = the command stays out of the wire's listings (it still answers); `secret` = a token — `show config` and the dumps render the knob as `*** SECRET REMOVED ***` (the value never does; the `-file` form renders the same placeholder when the row is set). The knob descriptions stay in the registries — `--help`, the man pages, `show knobs` and `help config` render them per tool.
+Legend: `k` = a knob — the flag/env/config-file rows; `c` = control-only — a setting that lives on the control wire alone (the fake's pins and machines — no flag, no env, no config-file row); `s` = a show command — a report the wire answers with (`show <name>`; not a knob, nothing to set, the registry's `show` section); ✓ = the tool has the row (**bold** = all four do); the `live` column is the control command itself — `set <name>` over the control plane, the wire name the registry gives the knob (it can differ from the flag: the cache's `cache-ttl` sets `ttl`) — a show row spells `show <name>`; *(startup-only)* = no live form, a restart applies the knob; a trailing `, restart` = the knob is startup-only too — the set records the value (the wire answers the restart note), the restart applies it; a cell's `live` mark says the tool takes the knob live (a cell without one = that tool applies the knob at startup only); `group` = the row's display bucket — the tool's surfaces file the knob under it (blank = ungrouped, rendered bare); `hidden` = the command stays out of the wire's listings (it still answers); `secret` = a token — `show config` and the dumps render the knob as `*** SECRET REMOVED ***` (the value never does; the `-file` form renders the same placeholder when the row is set). The knob descriptions stay in the registries — `--help`, the man pages, `show knobs` and `help config` render them per tool.

@@ -22,6 +22,23 @@ logger = logging.getLogger('scraper')
 HOST_RE = re.compile(r'[A-Za-z0-9._:\[\]-]+')
 
 
+def parse_control_target(text, listen_port=DEFAULT_LISTEN_PORT):
+    """'' → the default unix socket for the listen port (/tmp is cleared on
+    reboot, nothing lands in a working directory); '0' → None (off); digits
+    → TCP port on 127.0.0.1; anything else → unix socket path."""
+    t = (text or '').strip()
+    if t == '0':
+        return None
+    if t.isdigit():
+        p = int(t)
+        if not 1 <= p <= 65535:
+            raise SystemExit('invalid control-port %d: use 1..65535, a unix socket path, or 0 to disable' % p)
+        return p
+    if t:
+        return t
+    return '/tmp/modbus-scraper-%d.socket' % listen_port
+
+
 def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
     """The control server target for the daemon and the clients: the flag
     wins, then CTL, then the default unix socket named after the

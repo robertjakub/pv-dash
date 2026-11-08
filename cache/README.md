@@ -87,8 +87,8 @@ entries without their own, never a floor.
 
 Which registers are actually **fetched** comes from a selection file —
 `{"registers": ["pv-power", "grid-power", ...]}`, profile names only —
-resolved as `--selection` flag, env `SELECTION`, ini
-`selection`; the default fetches **every** profile entry (`all`), and
+resolved as `--selection` flag, env `SELECTION`, config
+`set modbus selection`; the default fetches **every** profile entry (`all`), and
 **`none`** empties the map: every read forwards to the inverter and nothing
 is stored (a pass-through proxy, the cache gauges go quiet). The shipped
 **`selection.json`** (in `examples/`) is an example — the essential
@@ -141,20 +141,19 @@ Settings are resolved in this order (first hit wins), mirroring
 
 1. CLI flags (`--upstream`, `--listen`, …)
 2. Environment variables — the same names, bare (no tool prefix): `UPSTREAM`,
-   `UNIT`, `TIMEOUT`,
-   `LISTEN`, `INTERVAL`, `READ_DELAY`,
-   `MERGE_GAP`, `PROFILE`,
-   `TTL`, `ALLOW_WRITE`, `LOCAL_TIME`,
-   `LOG_ACCESS`, `MAX_CLIENTS`,
-   `CLIENT_TIMEOUT`, `CONNECT_ACL`,
-   `WRITE_ACL`, `WRITE_REGISTERS`,
-   `LOG_LEVEL`, `CONTROL_TOKEN`,
-   `CONTROL_TRUST_UIDS`,
-   `DUMP_PATH`, `DUMP_INTERVAL`,
-   `AUDIT_LOG`,
-   `AUDIT_MAX_MB`, `AUDIT_DAILY`,
-   `AUDIT_FILES`, `NO_AUDIT_LOG`,
-   `REQUESTS_AUDIT`
+   `UNIT`, `TIMEOUT`, `LISTEN`, `INTERVAL`, `READ_DELAY`, `MERGE_GAP`,
+   `PROFILE`, `SELECTION`, `TTL`, `ALLOW_WRITE`, `CONNECT_ACL`,
+   `WRITE_ACL`, `WRITE_REGISTERS`, `AUTH`, `AUTH_KEY`, `AUTH_UPSTREAM`,
+   `AUTH_UPSTREAM_KEY`, `MAX_CLIENTS`, `CLIENT_TIMEOUT`,
+   `MAX_CONN_PER_IP`, `METRICS_SERVER`, `METRICS_LISTEN`, `METRICS_TOKEN`,
+   `METRICS_MAX_CLIENTS`, `METRICS_CLIENT_TIMEOUT`,
+   `METRICS_MAX_CONN_PER_IP`, `LOG_LEVEL`, `LOG_ACCESS`, `LOCAL_TIME`,
+   `CONTROL_TOKEN`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`,
+   `CONTROL_SOCKET_GROUP`, `CONTROL_TRUST_UIDS`, `DUMP_PATH`,
+   `DUMP_KEY`, `DUMP_INTERVAL`, `DUMP_WITH_CACHE`, `RESTORE_ON_START`,
+   `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUDIT_DAILY`, `AUDIT_FILES`,
+   `NO_AUDIT_LOG`, `REQUESTS_AUDIT` — `show knobs` prints every knob with
+   its env twin
 3. Config file (the set grammar: every line a `set <name> <value>` in the
     CLI spelling) — `--config` picks the
    file (default: `modbus_cache.conf` next to `modbus-cache.py` — the
@@ -249,7 +248,7 @@ every forwarded request before anything is cached.
 
 | Signal | Effect |
 |---|---|
-| `SIGHUP` | **Reload the configuration and the register map** without dropping client connections: the map is swapped atomically (added ranges are polled, removed ones pruned), poll interval, read delay, merge gap, cache TTL, ACLs, client limits and the upstream address/unit/timeout take effect immediately (the upstream socket reconnects on the next read). A broken file or an invalid value keeps the previous settings — the error is logged and the next `SIGHUP` retries. The listen address and log level need a restart. |
+| `SIGHUP` | **Reload the configuration and the register map** without dropping client connections: the map is swapped atomically (added ranges are polled, removed ones pruned), poll interval, read delay, merge gap, cache TTL, the ACLs (the `file:` gates re-read), client limits and the upstream address/unit/timeout take effect immediately (the upstream socket reconnects on the next read). A broken file or an invalid value keeps the previous settings — the error is logged and the next `SIGHUP` retries. The listen address needs a restart (the registry's `restart: true` knobs — the listen, the metrics bind, the upstream, restore-on-start — record a live `set` and fold into the restarted process before it binds). |
 | `SIGUSR1` | **Clean the cache**: all cached values, on-demand entries and poll-status errors are dropped atomically (client connections stay up), the next reads go to the inverter live and the poller repopulates immediately. |
 | `SIGTERM` / `SIGINT` | **Graceful shutdown**: the listener is closed and the shutdown is logged. |
 
@@ -265,8 +264,7 @@ A JSON-lines control server runs **by default on the unix socket
 files replaced, nothing ever lands in the working directory. Pass a TCP port
 number to bind `127.0.0.1:PORT` instead, or `0` to switch the control server
 off. Both the proxy and the CLI tool resolve the target the same way: flag >
-**`CTL`** (or the short **`CTL`**, like the fake
-inverter's `CTL`) environment variable > default socket.
+the **`CTL`** environment variable > the default socket.
 
 One command per line, one reply per line. Every request and reply is one
 JSON object: the request = `{"cmd": "<command>"}`, the reply =
@@ -309,15 +307,16 @@ token, an admin client against the admin token. The peer-cred trusted peers
 > `--control-ops-token` / `--metrics-token <secret>` are visible on the
 > process command line — every
 > local user can read them in `ps` output or `/proc/*/cmdline` (the audit's
-> F9; the same applies to the ctl/cli clients). Prefer the **`-file`**
-> variants — the file must be **owner-only (`0600`)**: group/world-accessible
+> F9; the same applies to the ctl/cli clients). Prefer the **`file:<path>`**
+> form — the first line of an owner-only file; the file must be
+> **owner-only (`0600`)**: group/world-accessible
 > token files refuse to start (F12) — or the `CONTROL_TOKEN` /
 > `METRICS_TOKEN` env vars. The flag form is for quick tests.
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token` (rotate live; the value never renders back), `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write` (the IP ACLs: `any`/`none`/the networks/`file:<path>` — a file gate re-reads on every set), `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the auth schemes and keys, both legs — the upstream leg speaks suite or waveshare), `control port` (rebinds the listener live), `control token` and `control ops token` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
-| `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/ini said at start) |
+| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile`/`file:<path>` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token` (rotate live; the value never renders back), `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write` (the IP ACLs: `any`/`none`/the networks/`file:<path>` — a file gate re-reads on every set), `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the auth schemes and keys, both legs — the upstream leg speaks suite or waveshare), `control port` (rebinds the listener live), `control token` and `control ops token` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
+| `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/config said at start) |
 | `set`/`unset` a startup-only knob | the registry's `restart: true` rows answer the note: `% restart required (startup-only knob)` — the config (and a SIGHUP, or a restart) changes them; `show <knob>` renders the configured value (a **secret knob refuses to show** — the value renders nowhere) |
 | `show <setting>` | the bare live value of one tunable |
 | `help <setting>` | the registry description of one setting |
@@ -344,7 +343,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 ### Live settings
 
 Every `set` applies immediately and keeps working until the daemon stops —
-**or** the next `SIGHUP`, which re-resolves the config (flags, env, ini) and
+**or** the next `SIGHUP`, which re-resolves the config (flags, env, the config file) and
 re-applies it wholesale: the file always wins on reload. A setting changed
 live is listed in `show status`'s `overridden=` row; `unset <setting>`
 restores the configured value and clears the entry. This makes the policy
@@ -629,7 +628,7 @@ canonical content, and a restore **fails closed**: an edited, truncated or
 unsigned dump refuses with a one-liner (`fails its integrity hash` /
 `predates the integrity hash`), and a group/world-writable dump refuses
 outright — whoever can write the dump holds config trust, so own the file
-like the ini (`chmod 0600`). The honest boundary, same as the audit
+like the config file (`chmod 0600`). The honest boundary, same as the audit
 trail's: the hash catches corruption and casual tampering, not a local
 admin who rechashes.
 
@@ -656,8 +655,7 @@ carries the reference, never the material (and a reference that cannot be
 read fails the start — a key that silently vanishes is a misconfiguration,
 not a fallback to plaintext). The same `file:` reference form works on
 every secret value: `--control-token file:/path`, `set metrics token
-file:/path` (the `-file` sibling knobs stay — same loader, same 0600
-discipline). Without a key a dump path stays plaintext **by design** — and
+file:/path` — one spelling, the same loader and 0600 discipline everywhere. Without a key a dump path stays plaintext **by design** — and
 says so: a `WARNING` at start and a `(not sealed — set dump/key to encrypt
 at rest)` note on the `set dump path` reply.
 
@@ -680,7 +678,7 @@ secret; `unset` refuses too: set the new one). The gauges:
 `modbus_cache_misses_total`, `modbus_cache_poll_up` +
 `modbus_cache_last_poll_age_seconds`, `modbus_cache_age_seconds` (the
 oldest cached word), `modbus_cache_words` / `modbus_cache_ranges` (the
-`fc` labels), `modbus_modbus-cache-clients`, the uptime and the poll-cycle
+`fc` labels), `modbus_cache_clients`, the uptime and the poll-cycle
 durations (`modbus_cache_poll_duration_seconds{,_mean,_max}`). The
 uplink exports the session state — `modbus_cache_uplink_up`,
 `modbus_cache_uplink_{connects,exchanges,errors}_total`,
@@ -693,7 +691,7 @@ the block fails) and `modbus_cache_uplink_block_fails_total` (see
 `--metrics-token` set, requests need
 `Authorization: Bearer <token>` — the same scheme the scraper's exporter
 speaks; anything but `/metrics` answers 404, an unauthenticated read 401.
-The endpoint is **loopback-only** and capped: `--metrics-max-clients`
+The endpoint is capped on every bind (the token stays mandatory regardless): `--metrics-max-clients`
 (default 64; extras get an immediate `503 # rate limited`),
 `--metrics-client-timeout` (default 5 s; 0 = the same built-in cap) and
 `--metrics-max-conn-per-ip` (default 0 = no per-IP limit). A scrape job
@@ -784,7 +782,7 @@ who-when-what evidence trail. **Every wire command is audited once, by the
 server** (`AUDIT CACHE COMMAND`, with the client peer — it knows the who,
 and the role — the ops shift against the admin key — plus the frame's mac
 when the wire is signed); the denied ops attempts are in the trail too.
-the CLI audits its session (CONNECT/DISCONNECT, the local-only events like
+The CLI audits its session (CONNECT/DISCONNECT, the local-only events like
 an aborted `shutdown`, RECONNECT attempts). The proxy audits its lifecycle
 (`START`, `RELOAD`, `RESET`, `SHUTDOWN`), every forwarded/refused/rejected
 write, the per-client REQUESTS
@@ -855,9 +853,12 @@ Options: `upstream` (`HOST:PORT`, `:PORT` = loopback), `unitId`, `timeout`,
 `readDelay`, `mergeGap`, `profile` (device-profile JSON path; null = the
 bundled `sun2000` profile), `cacheTtl` (unset = 3× `interval`),
 `listenHost`, `listenPort`, `allowWrite`, `writeRegisters` (the
-START:COUNT allow-list, `any` or `none`; null = the proxy default
-`none`), `connectAcl` (`any`/`none`/prefixes; null = `any`),
-`writeAcl` (`any`/`none`/prefixes; null = the proxy default `none`),
+START:COUNT allow-list, `any`, `none`, `profile` (the device profile's
+acl gate) or `file:<path>` (the standalone acl file); null = the proxy
+default `none`), `connectAcl` (`any`/`none`/prefixes or `file:<path>`;
+null = `any`),
+`writeAcl` (`any`/`none`/prefixes or `file:<path>`; null = the proxy
+default `none`),
 `auth`/`authKey` (the suite scheme + key the cache's clients must speak;
 null = no auth), `authUpstream`/`authUpstreamKey` (the scheme + key toward
 the inverter — suite or waveshare; null = no auth),
@@ -867,13 +868,13 @@ the inverter — suite or waveshare; null = no auth),
 the XDG state home), `auditMaxMb`, `auditDaily`, `auditFiles`, `requestsAudit`
 (null = 300 s), `controlPort` (a TCP port on 127.0.0.1 or a unix socket
 path — use one under `/run/modbus-cache/`, `/tmp` is private to the
-service), `controlToken` (**world-readable in the store ini** — prefer the
+service), `controlToken` (**world-readable in the store config** — prefer the
 file), `controlTokenFile` (mounted via systemd `LoadCredential`). Unset
 options keep the proxy defaults. The service runs with a dynamic user and
 systemd hardening.
 
-The module renders the **config INI and the register map into the store**
-and runs the service with `--config`. A `nixos-rebuild switch` applies
+The module renders the **config script (the set grammar) and the register
+map into the store** and runs the service with `--config`. A `nixos-rebuild switch` applies
 changes with `systemctl reload` (SIGHUP): register map, poll interval, cache
 TTL, ACLs, limits and the upstream address are picked up live, client
 connections stay up. Changes to `listenHost`/`listenPort`/`logLevel` need a
@@ -911,18 +912,29 @@ cache/
 ├── examples/
 │   ├── modbus_cache.conf    # sample config in the set grammar (installed beside the script)
 │   ├── selection.json       # example selection: the essential monitoring set
-│   └── acl-write-registers.json  # example acl file: the deye write policy, worked out (--write-registers file:...)
+│   ├── acl-write-registers.json  # example acl file: the deye write policy, worked out (--write-registers file:...)
+│   └── acl-ip-prefix.json   # example acl file: the connect/write IP policy (--connect-acl file:... / --write-acl file:...)
+├── man/                     # the generated man pages (scripts/gen_man.py)
+├── module.nix               # the NixOS service module
+├── package.nix              # the package (the bins, the libs, the examples, the man pages)
 └── lib/
     ├── static.json      # the static constants: protocol limits, diagnostics block, defaults
     ├── statics.py       # its loader (the STATIC dict + the named aliases)
-    ├── config.py        # settings resolution + device-profile loading
+    ├── options.json     # the registry: one row per knob (the flags, the env twins, the help)
+    ├── options.py       # its loader + the control-grammar wiring
+    ├── config.py        # settings resolution + device-profile/acl-gate loading
     ├── upstream.py      # the shared inverter connection
     ├── cache.py         # register cache + block planner
     ├── proxy.py         # poller + client handling
+    ├── metrics.py       # the Prometheus /metrics endpoint (the cache's gauges)
+    ├── persist.py       # the state dump writer/reader (the seal, the integrity hash)
     ├── control.py       # JSON-lines control server (inspect/show/clear/restart/shutdown, token auth + the read-only ops role)
-    ├── audit.py         # the append-only audit trail (AUDIT CACHE/CLI/CTL lines)
-    └── version.py       # the suite version
+    └── man.py           # the man-page builder (the prose sections)
 ```
+
+The shared pieces — the audit trail, the signed wire, the config/token
+plumbing, the Modbus core, the version — live in the suite-root
+[`common/`](../common/) package.
 
 ## License
 

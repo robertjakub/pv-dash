@@ -372,10 +372,12 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = ''
-        Clients allowed to connect: "any", "none" (refuse every peer) or a
+        Clients allowed to connect: "any", "none" (refuse every peer), a
         comma-separated list of IPs and CIDR prefixes (e.g.
-        "10.0.0.7,10.48.0.0/16", IPv4 or IPv6). null = the tool's default
-        ("any").
+        "10.0.0.7,10.48.0.0/16", IPv4 or IPv6), or "file:<path>" — the
+        standalone ip-prefix acl file (the chain's last matching rule
+        decides, a client no rule decides refuses). null = the tool's
+        default ("any").
       '';
     };
 
@@ -384,8 +386,10 @@ in
       default = null;
       description = ''
         Clients allowed to write (also needs allowWrite): "any", "none"
-        (refuse every peer) or a comma-separated list of IPs and CIDR
-        prefixes. null = the tool's default ("none" — no client writes).
+        (refuse every peer), a comma-separated list of IPs and CIDR
+        prefixes, or "file:<path>" — the standalone ip-prefix acl file
+        (the same gate acl/connect reads). null = the tool's default
+        ("none" — no client writes).
       '';
     };
 
@@ -394,10 +398,11 @@ in
       default = null;
       description = ''
         Register ranges a forwarded write may touch: a comma-separated
-        START:COUNT list (e.g. "47400:100,47600:100"), "any", or "none".
-        Writes outside the ranges are refused with a Modbus illegal-function
-        exception. null = the tool's default ("none" — no register
-        writable).
+        START:COUNT list (e.g. "47400:100,47600:100"), "any", "none",
+        "profile" (the device profile's acl/write gate) or "file:<path>"
+        (the standalone acl file). Writes outside the ranges are refused
+        with a Modbus illegal-function exception. null = the tool's
+        default ("none" — no register writable).
       '';
     };
 
@@ -418,7 +423,8 @@ in
       default = null;
       description = ''
         Require a token on TCP control connections. WARNING: it is rendered
-        into the world-readable ini in the nix store — prefer controlTokenFile.
+        into the world-readable config script in the nix store — prefer
+        controlTokenFile.
       '';
     };
 
@@ -441,7 +447,7 @@ in
         run the show/clear verbs only (no set/unset, no request
         dump/restore, no restart, no shutdown) — the ops shift against the
         admin key. Needs controlToken/controlTokenFile. WARNING: it is
-        rendered into the world-readable ini in the nix store — prefer
+        rendered into the world-readable config script in the nix store — prefer
         controlOpsTokenFile.
       '';
     };
@@ -462,7 +468,7 @@ in
       description = ''
         The /metrics bearer token (a token is mandatory when
         metricsServer is on). WARNING: rendered into the world-readable
-        ini in the nix store — prefer metricsTokenFile.
+        config script in the nix store — prefer metricsTokenFile.
       '';
     };
 
@@ -619,9 +625,9 @@ in
       lib.optional (cfg.openFirewall && cfg.listenHost == "127.0.0.1")
         "services.modbus-cache: openFirewall is set but the proxy binds to 127.0.0.1 — the firewall hole is unreachable; set listenHost to 0.0.0.0 (or the external IP) if Modbus clients live on other hosts."
       ++ lib.optional (cfg.controlToken != null)
-        "services.modbus-cache: controlToken is rendered into the world-readable ini in the nix store — prefer controlTokenFile."
+        "services.modbus-cache: controlToken is rendered into the world-readable config script in the nix store — prefer controlTokenFile."
       ++ lib.optional (cfg.controlOpsToken != null)
-        "services.modbus-cache: controlOpsToken is rendered into the world-readable ini in the nix store — prefer controlOpsTokenFile."
+        "services.modbus-cache: controlOpsToken is rendered into the world-readable config script in the nix store — prefer controlOpsTokenFile."
       ++ lib.optionals (cfg.controlPort != null
           && lib.isString cfg.controlPort
           && lib.hasPrefix "/tmp/" cfg.controlPort)

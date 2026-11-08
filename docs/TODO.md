@@ -90,6 +90,31 @@ the **Done/history** records for their tool.
   loopback — a remote control bind on the fake takes the same companions.
   Re-run the audit when this lands (the remote-control surface is new
   F-item territory).
+- **IPv6 on the serving surfaces (and the ACL boundary)** `[common]`
+  `[cache]` `[scraper]` `[inverter]` `[docker]` — SKETCH (Nov 8): the
+  ACL machinery already speaks both families (the ip-prefix matchers
+  validate v6 strict-CIDR, `any` matches every address of either family,
+  `is_loopback_host` knows `::1`/`[::1]`, and the CLIENT side is done —
+  `socket.create_connection` dials whatever the name resolves, so
+  `--upstream '[2001:db8::10]:502'` and a DNS-named v6 inverter work
+  today). What does not: every LISTENING socket is hard
+  `socket.AF_INET` (the Modbus listen, the control TCP, the metrics
+  HTTP — a `[::1]:PORT` bind dies in the address-family error), and on a
+  dual-stack socket the peers arrive v4-MAPPED (`::ffff:10.0.0.5`) —
+  the ACL boundary would double-book the same client unless normalized.
+  The wave: one shared `serve(host, port)`-shaped opener (AF_INET6 when
+  the host parses v6, `V6ONLY` off for the dual-stack every-address
+  bind, `on` for `::1`), the v4-mapped peer normalization at ONE shared
+  helper (the connect/write ACL checks, the caps' per-IP keying, the
+  logs/audit peer spellings — a v4 client on a dual-stack socket must
+  stay `10.0.0.5` to the ACL, not `::ffff:10.0.0.5`), `parse_listen`'s
+  bracketed grammar verified end to end, the regtest coverage on the
+  `::1` pair (the v6 loopback works on Linux and macOS alike; the
+  v4-mapped carve proof), and the doc pass (docs/ACL.md's family notes,
+  the AUDIT posture rows, the NixOS `listenHost`'s v6 spelling + the
+  dual-stack note — `openFirewall`'s v6 half is the deployment's
+  ip6tables business). The docker compose network stays v4 (the demo's
+  story); a v6 flag there is optional polish.
 - **native TLS on the HTTP surfaces** `[scraper]` `[cache]` `[inverter]` —
   F14 says "terminate at a proxy"; an opt-in native path
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a

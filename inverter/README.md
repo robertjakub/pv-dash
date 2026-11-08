@@ -253,7 +253,7 @@ read-only ops token the same way):
 | `show connections` | the fake's live **Modbus** clients: peer, connection age, requests served (`none` when idle) — the cache's `show connections`, pointed at the simulator |
 | `inspect` | one pretty dump of everything: the version, the profile, the overlay, the machines' live readings, the pins, the metrics endpoint state — the baton for a bug report |
 | `show registers` | the loaded profile's register map, one register per line: `name \| register \| type \| value`, columns aligned; the value = what the registers serve right now, `NaN` = not calculated (e.g. the battery block with the battery off) |
-| `show version` | the fake-inverter version (`0.4.0`, or `0.4.0-<short git>` from a checkout) |
+| `show version` | the fake-inverter version (`0.4.2`, or `0.4.2-<short git>` from a checkout) |
 | `set scenario <name>` | apply a scenario preset (below) |
 | `reset` | clear **all** pinned settings, the Modbus write overlay and the pinned coils/discrete inputs at once (like SIGUSR1, per-connection) |
 | `request reload` | **restart the whole fake with the pins kept**: the live overrides save to a state file (the XDG state home — the fake has no config file), the process re-execs with the same argv, the fresh fake re-applies the saved overrides once, then consumes the state file. Overridden secrets save as `*** SECRET REMOVED ***` (the value never lands in the file) — the reply names them |
@@ -456,8 +456,8 @@ the unprivileged `pvsuite` user with the tools on `PATH`. Build + run
 [`profiles/`](../profiles/README.md) directory is copied in):
 [`docker/README.md`](../docker/README.md).
 
-The version reports as `0.4.0` inside the image (no git metadata; a
-checkout shows `0.4.0-<short git>`).
+The version reports as `0.4.2` inside the image (no git metadata; a
+checkout shows `0.4.2-<short git>`).
 
 ### Audit trail
 
@@ -478,7 +478,7 @@ cannot be opened, the trail falls back to stdout rather than vanishing. **Rotati
 (the fake), `CLI` (modbus-fake-cli), `CTL` (modbus-fake-ctl):
 
 ```
-2026-11-03T20:10:06Z INV START 3f9a21c04de7 version=0.4.0 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
+2026-11-03T20:10:06Z INV START 3f9a21c04de7 version=0.4.2 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
 2026-11-03T20:10:07Z AUDIT INV COMMAND 9c41e2b7a058 peer=127.0.0.1:54425 'set soc 40' -> ok
 2026-11-03T20:10:07Z AUDIT INV COMMAND 3d82f6c05e19 peer=127.0.0.1:54426 role=ops 'show status' wire=h4b91de207a86 -> ok
 2026-11-03T20:10:08Z INV RESET 77b0c4e19d23 SIGUSR1: 1 pin(s), 0 overlay register(s) cleared

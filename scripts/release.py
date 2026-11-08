@@ -9,11 +9,11 @@ always used) and push. The GitHub release is the tag-triggered workflow's
 job (it gates on the suites + the nix build first — docs/AUDIT.md F19);
 pass --release to cut it locally and skip that gate.
 
-    python3 scripts/release.py 0.4.0               # the full flight
-    python3 scripts/release.py 0.4.0 --dry-run     # everything but the landing
-    python3 scripts/release.py 0.4.0 --tests quick # the two regtests only
-    python3 scripts/release.py 0.4.0 --keep-lock   # keep the nixpkgs pin
-    python3 scripts/release.py 0.4.0 --release     # cut the GH release locally
+    python3 scripts/release.py 0.4.2               # the full flight
+    python3 scripts/release.py 0.4.2 --dry-run     # everything but the landing
+    python3 scripts/release.py 0.4.2 --tests quick # the two regtests only
+    python3 scripts/release.py 0.4.2 --keep-lock   # keep the nixpkgs pin
+    python3 scripts/release.py 0.4.2 --release     # cut the GH release locally
 
 Re-releasing an already-bumped tree works (idempotent): the bump is a
 no-op, the commit only happens if something changed, the tag/release

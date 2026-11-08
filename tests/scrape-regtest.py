@@ -723,7 +723,7 @@ try:
                        capture_output=True, text=True)
     check('inspect: the version, the profile, the machines, the overlay, the pins',
           r.returncode == 0 and r.stdout.startswith('ok inspect')
-          and '\nversion   0.4.0' in r.stdout and '\nprofile   SUN2000' in r.stdout
+          and '\nversion   0.4.2' in r.stdout and '\nprofile   SUN2000' in r.stdout
           and '\nmppt      both' in r.stdout and '\npinned    ' in r.stdout
           and 'V nominal, 50 Hz nominal' in r.stdout, r.stdout.strip()[:120])
 
@@ -849,7 +849,7 @@ try:
           r.returncode == 0
           and any(l == 'soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' for l in lines)
           and any(l == 'registers (49)' for l in lines) and 'pv-power' in ''.join(lines)
-          and any('0.4.0' in l and 'version' in l for l in lines)
+          and any('0.4.2' in l and 'version' in l for l in lines)
           and not any(l.startswith('% ok inspect') for l in lines), repr(r.stdout[:120]))
 
     # 2g3. the audit trail: the UTC stamp, the CLI/CTL prefix, the who-when-what,
@@ -1121,12 +1121,12 @@ try:
           and max(len(l) for l in rows) <= 60, r.stdout.strip()[:80])
 
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'version'], capture_output=True, text=True)
-    check('show version: ok fake-inverter 0.4.0-<git>', r.returncode == 0
-          and r.stdout.strip().startswith('ok fake-inverter 0.4.0-'), r.stdout.strip())
+    check('show version: ok fake-inverter 0.4.2-<git>', r.returncode == 0
+          and r.stdout.strip().startswith('ok fake-inverter 0.4.2-'), r.stdout.strip())
     r = subprocess.run([sys.executable, F, '--version'], capture_output=True, text=True)
-    check('fake_inverter: --version reports 0.4.0-<short git>', r.returncode == 0
-          and r.stdout.strip().startswith('0.4.0-') and len(r.stdout.strip()) > 10
-          and r.stdout.strip() == '0.4.0-' + r.stdout.strip().split('-', 1)[1], r.stdout.strip())
+    check('fake_inverter: --version reports 0.4.2-<short git>', r.returncode == 0
+          and r.stdout.strip().startswith('0.4.2-') and len(r.stdout.strip()) > 10
+          and r.stdout.strip() == '0.4.2-' + r.stdout.strip().split('-', 1)[1], r.stdout.strip())
     check('fake_ctl/fake_cli carry no exec bit (python runs the family)',
           not (os.stat(C).st_mode & 0o111) and not (os.stat(K).st_mode & 0o111))
 

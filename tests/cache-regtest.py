@@ -617,7 +617,7 @@ try:
           os.stat(gsock).st_mode & 0o777 == 0o660, oct(os.stat(gsock).st_mode))
     r = cli('show version\nquit\n', 15516, {'CTL': gsock}, use_flag=False)
     check('control: the group socket speaks (the owner, us)', r.returncode == 0
-          and 'modbus-cache 0.4.0' in r.stdout, repr(r.stdout[-120:]))
+          and 'modbus-cache 0.4.2' in r.stdout, repr(r.stdout[-120:]))
 
     # 5c. cache_ctl: the one-shot client (args, piped batches, token)
     ctl = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-ctl.py')

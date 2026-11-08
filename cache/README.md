@@ -712,7 +712,7 @@ The prefix names the writer — `CACHE` (the proxy), `CLI` (modbus-cache-cli) an
 `CTL` (modbus-cache-ctl):
 
 ```
-2026-11-04T07:16:40Z AUDIT CACHE START 4e1b92f0c7a3 version=0.4.0 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
+2026-11-04T07:16:40Z AUDIT CACHE START 4e1b92f0c7a3 version=0.4.2 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
 2026-11-04T07:16:43Z AUDIT CACHE WRITE b2c4e17f90d8 register 47415 = 5 (single register, unit 1)
 2026-11-04T07:17:02Z AUDIT CACHE AUTH-FAIL 6f3d84a1e2c9 peer=127.0.0.1:54425
 2026-11-04T07:17:12Z AUDIT CACHE COMMAND 09ab57d3f4e1 peer=127.0.0.1:54426 'clear cache' -> ok

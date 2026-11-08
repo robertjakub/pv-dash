@@ -391,8 +391,8 @@ stack's one published surface (`127.0.0.1:8080:8080`).
 
 ## The version inside the image
 
-The version reports as `0.4.0` inside the image (no git metadata; a checkout
-shows `0.4.0-<short git>`).
+The version reports as `0.4.2` inside the image (no git metadata; a checkout
+shows `0.4.2-<short git>`).
 
 ## License
 

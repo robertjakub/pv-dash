@@ -99,6 +99,7 @@ def _load_options():
             w = r.get('live') or r['name']
             if as_bool(r.get('node')):   # a tree row: its descr carries the namespace's word-help
                 cmd_help[w] = r.get('help', '')   # (the walk-on borrows it); it is no command word itself
+                cmd_groups[w] = r.get('group', '')   # the namespace word's group in the wire's node listing
                 continue
             commands.append(w)
             cmd_help[w] = r.get('help', '')

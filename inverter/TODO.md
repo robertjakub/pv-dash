@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The status-face wave: the wire's reply status speaks **`ok` | `fail` |
+`bye`** (the internal 'err' maps at the frame, the mac signs the wire
+form; the bare help return's 'commands:' pseudo-status died — the
+vocabulary holds), the console prints the ok messages bare and the
+failures as **`% error: <message>`**, the set/unset pair confirms
+**`% changed`**, and the wire's help branch speaks the commands.
+
 The request-namespace wave: the control grammar's commands are `/`-paths
 spelled as words on the wire — `reload` renamed to `request reload` (the
 bare spelling answers `err unknown command`; the dump/restore requests

@@ -203,7 +203,9 @@ default socket.
 
 The wire is **JSON lines** (stdlib `json` only): one request object per
 line, one reply object per line. The request is `{"cmd": "<command>"}`, the
-reply is `{"status": "ok" | "err" | "bye", "text": "<reply text>"}` — a
+reply is `{"status": "ok" | "fail" | "bye", "text": "<reply text>"}` — `ok`
+(the command ran, `text` is its output), `fail` (the command refused,
+`text` is the error message), `bye` (the unsolicited daemon-exit notice). A
 multi-line reply (`show status`, `show registers`) keeps its newlines inside
 `text`, no framing terminator needed. `{"cmd": "ping"}` answers
 `{"status": "ok", "text": "pong"}` (the keepalive). **Connections need a
@@ -333,7 +335,7 @@ the first connect it probes the status and greets you —
 %   TAB completes, ? lists the commands, help <setting> explains one, quit leaves
 ```
 
-The prompt shows the connected port, `set`/`unset` print only the `% ok`
+The prompt shows the connected port, `set`/`unset` print only the `% changed`
 confirmation, `show <setting>` prints the bare value, and `shutdown` asks
 `Proceed with shutdown? [confirm]`
 first — RETURN or `y` proceeds, anything else aborts with `% Aborted.`.
@@ -356,7 +358,7 @@ completing; `help <setting>` shows the description on the wire, too.
 $ python3 inverter/bin/modbus-fake-cli.py
 
 fake-inverter:5502 > set pv 2500
-% ok
+% changed
 
 fake-inverter:5502 > show soc
 auto

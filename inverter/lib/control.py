@@ -26,14 +26,15 @@ from common.human import secs
 from common.modbus import AUTH_MIN_KEY
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.control import ControlServer as _ControlServer
-from common.options import control_command, describe_node, describe_root, grouped_rows, match_setting_path
+from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
+    match_setting_path
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
 from .signals import parse_time
 from common.version import version_string
 from common.dump import SECRET_REMOVED, dump_filter
 from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, \
-    NODE_BY_NAME
+    NODE_BY_NAME, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
 
@@ -563,20 +564,25 @@ class ControlServer(_ControlServer):
                     return self.config_mapping()
                 if args[0].lower() == 'knobs':
                     return self.knobs_dictionary()
+                path = '/'.join(w.lower() for w in args)   # the command paths spell as words too — the golden ladder: the commands before the settings
+                listing = describe_command_node(COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, path)
+                if listing is not None:
+                    return 'ok %s' % listing
+                if path in COMMAND_HELP:   # a command word — or a childless command node — describes itself
+                    return 'ok %s' % COMMAND_HELP[path]
                 key, rest = match_setting_path(args, SETTING_BY_NAME)
                 if key is not None and not rest:
                     return 'ok %s' % describe_setting(key)
-                node_path = '/'.join(w.lower() for w in args)   # a node path spells as words too — the walk the ? offers
-                if node_path in NODE_BY_NAME:
-                    return 'ok %s' % describe_node(OPTIONS, node_path)
-                return 'err unknown setting %s (try help)' % ' '.join(args)
+                if path in NODE_BY_NAME:
+                    return 'ok %s' % describe_node(OPTIONS, path)
+                return 'err unknown command or setting %s (try ?)' % ' '.join(args)
             cmds = ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|connections|config|knobs>, '
                     'reset' % '|'.join(self.SETTING_KEYS))
             if self.dump_path:
                 cmds += ', request dump, request restore'
             cmds += ', request reload, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
             cmds += 'show knobs prints the full dictionary'
-            return cmds
+            return 'ok ' + cmds   # the wire speaks ok|fail|bye — the bare 'commands:' status dies here
         if cmd == 'show' and args and args[0].lower() == 'config' \
                 and len(args) in (1, 2) and (len(args) == 1 or args[1].lower() == 'all'):
             # 'all' rides along: the script IS the full config

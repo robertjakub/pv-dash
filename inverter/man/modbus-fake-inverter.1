@@ -266,7 +266,7 @@ graceful shutdown with a session summary.
 
 .SH CONTROL
 The control server speaks JSON lines
-(\fB{"cmd": "..."}\fR -> \fB{"status": "ok|err|bye", "text": "..."}\fR;
+(\fB{"cmd": "..."}\fR -> \fB{"status": "ok|fail|bye", "text": "..."}\fR;
 TCP requires the token when configured). Commands: \fBset\fR/\fBunset\fR/
 \fBshow\fR/\fBhelp\fR (the settings: pv, load, batt, grid, grid-voltage,
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,

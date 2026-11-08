@@ -32,9 +32,9 @@
       "node": true },
     { "name": "metrics-spec", "flag": "--metrics-spec", "env": "METRICS_SPEC", "conv": "str",
       "live": "metrics/filter",
-      "setting-help": "metrics spec JSON, sectioned: {profile: {key: {help, profile?}}, compute:..., scraper:...} — merged in memory over the built-in lib/metrics.json scraper_* block",
+      "setting-help": "metrics spec JSON, sectioned: {inputs: {name: {help}}, metrics: {key: {profile?, expr?, when?, help, type?}}, scraper:...} — the metrics entries are register- (profile) or expression-fed (expr/when) over the declared inputs (show inputs), merged in memory over the built-in lib/metrics.json scraper_* block",
       "hint": "PATH|-",
-      "help": "metrics spec JSON, sectioned: {profile: {key: {help, profile?}}, compute:..., scraper:...} — merged in memory over the built-in lib/metrics.json scraper_* block" },
+      "help": "metrics spec JSON, sectioned: {inputs: {name: {help}}, metrics: {key: {profile?, expr?, when?, help, type?}}, scraper:...} — the metrics entries are register- (profile) or expression-fed (expr/when) over the declared inputs (show inputs), merged in memory over the built-in lib/metrics.json scraper_* block" },
     { "name": "metric-prefix", "flag": "--metric-prefix", "env": "METRIC_PREFIX", "conv": "str",
       "live": "metrics/prefix", "setting-help": "the prefix on the profile- and compute-fed metric names",
       "hint": "PREFIX",
@@ -167,7 +167,11 @@
     { "name": "config",
       "setting-help": "the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***)" },
     { "name": "knobs",
-      "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes" }
+      "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes" },
+    { "name": "inputs",
+      "setting-help": "the declared compute expression inputs (the reserved five and the spec's declared entries), each bracketed with the metric whose value it carries" },
+    { "name": "inputs-metrics", "live": "inputs/metrics",
+      "setting-help": "the exported metrics: one [section]-bracketed line per metric the exposition serves (the built-in scraper_* block included), sorted by name" }
   ],
   "commands": [
     { "name": "help", "help": "describe a word (help <setting>) or map every knob (help config)", "internal": true },

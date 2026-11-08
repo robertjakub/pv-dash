@@ -130,13 +130,17 @@ shared schema the [fake inverter](../inverter/README.md) serves and the
 [cache](../cache/README.md) polls; the shipped profiles live in the suite's
 [`profiles/`](../profiles/) subproject (`sun2000.json` by default); the JSON
 format is documented in [profiles/README.md](../profiles/README.md). WHICH entries feed the
-register-backed metrics comes from **`metrics.json`** (the subproject root)
-itself: an entry
+register-backed metrics comes from **`metrics.json`** itself: an entry
 carries a `profile` field naming the device-profile register it is read
 from (`"huawei_pv_generation_watts": {"profile": "pv-power", ...}`); the
 file is keyed by the exported metric name directly — no separate key layer.
-Entries without a `profile` field are derived by the poller (home,
-export/import split, ...). Each bound entry's `type`/`scale` drive the
+The four **canonical** entries — the power math's inputs
+(`pv_generation_watts`, `grid_net_watts`, `battery_net_watts`,
+`battery_soc_percent`) — are built-in (**`lib/metrics.json`**): always
+declared, always bound, always fetched (the compute inputs' sources); a
+spec binding one of their registers a second time refuses at startup.
+Entries without a `profile` field are expression-fed (an `expr` — below).
+Each bound entry's `type`/`scale` drive the
 decode — a `scale: 1` SoC is read as plain percent, a `scale: 10` one as
 percent×10. The types: `i16`/`u16` (one word), `i32`/`u32` and the
 lo-word-first `i32swap`/`u32swap`, the IEEE 754 `f32`/`f32swap` (two words
@@ -155,15 +159,57 @@ register override knobs. The live control surface swaps it at runtime:
 metric sources and rolls back cleanly when the profile lacks the registers
 the power math depends on.
 
-Metric names, help texts and types live in **`scraper/metrics.json`**
-next to the script and are loaded at startup — edit it to rename metrics or
-reword `# HELP` lines without touching the code. The exporter's own
-observability specs (the `scraper_*` gauges, the `scraper` section) ship
-separately in **`scraper/lib/metrics.json`** and are merged in over the
-configured spec in memory at startup: a custom `--metrics-spec` only needs
-the `profile`/`compute` entries it cares about, and its `scraper` entries —
-when it has any — override the built-ins by name. A missing or corrupt spec
-fails cleanly at startup (one-line error, exit 1), never a traceback.
+Metric names, help texts and types live in **`scraper/examples/metrics.json`**
+(bundled next to the script in the package) and are loaded at startup — edit it to rename metrics or
+reword `# HELP` lines without touching the code. The spec is **sectioned**:
+
+- **`inputs`** — the declared expression vocabulary: `{name: {help}}` for
+  every name a compute `expr`/`when` may reference. The reserved five —
+  `pv`, `grid`, `batt` (0 while the battery flag is off), `soc` (absent
+  while the battery flag is off) and `battery` (the 0/1 flag) — are
+  declared in **`lib/metrics.json`** (merged into every spec; every
+  reserved input must be declared there) and a spec's own "inputs"
+  entries may reword them (never the wiring); the spec's own profile-fed
+  keys stay referenceable without declaring them. `show inputs` (ctl/cli)
+  lists the declared inputs only, each bracketed with the spec's own
+  metric whose value it carries; **`show inputs metrics`** lists the
+  exported metrics — one `[section]`-bracketed line per metric the
+  exposition serves (the built-in `scraper_*` block included), sorted by
+  name. Both reports share the aligned `name  [bracket]  help` shape and
+  cap the help at a word-boundary 40 for display — the full text lives
+  in the exposition (`# HELP`) and the docs.
+
+  ```
+  ok inputs
+  batt     [battery_net_watts]    Net battery power in watts (positive …
+  battery  [scraper_battery]      The battery flag (1 on, 0 off).
+  pv       [pv_generation_watts]  PV input power in watts (the …
+
+  ok inputs metrics
+  huawei_battery_charge_watts  [compute]  Battery charging power in watts (0 when …
+  huawei_battery_net_watts     [profile]  Battery net power in watts (positive …
+  ```
+- **`metrics`** — the metric tree, one entry per metric; the entry's own
+  field says what feeds it. A **`profile`** field binds the device-profile
+  register (above). An **`expr`** field derives the metric per poll —
+  `{expr, when?, help, type?}`; `expr` (and `when`) are compiled once at
+  startup and evaluated over the declared inputs — an unavailable input
+  (`soc` with the battery off, a failed read), a division by zero or a
+  non-finite result keeps the metric absent for that poll. The grammar is
+  a strict whitelist: numbers, the inputs, `+ - * / // % **`, comparisons,
+  `and`/`or`/`not`, the ternary and `abs`/`min`/`max`/`round` — one
+  compute metric cannot feed another. The five classic compute metrics
+  (the export/import split, home consumption, the charge/discharge split)
+  are the built-in defaults under every spec that doesn't define them.
+  The `section` the dashboards group by (`profile`/`compute`) derives
+  from the field.
+- **`scraper`** — the exporter's own observability specs, shipped
+  separately in **`scraper/lib/metrics.json`** and merged in over the
+  configured spec in memory at startup: a custom `--metrics-spec` only needs
+  the sections it cares about, and its `scraper` entries —
+  when it has any — override the built-ins by name. A missing or corrupt
+  spec — or an expression/declaration that does not check out — fails
+  cleanly at startup (one-line error, exit 1), never a traceback.
 
 ## Configuration
 
@@ -201,7 +247,7 @@ one-line error instead of failing later at runtime. The only soft spot is
 `timeout > interval`: that logs a warning (polls run back-to-back) instead
 of failing.
 
-`scraper/scraper.conf` is a sample in the set grammar (every line a
+`scraper/examples/scraper.conf` is a sample in the set grammar (every line a
 `set <name> <value>`, `#` comments stay comments — the file pipes through
 `modbus-scraper-ctl` unchanged, and `show config` regenerates it from the running
 scraper — the secret knobs render as `set <name> *** SECRET REMOVED ***`,
@@ -345,7 +391,7 @@ journald adds one.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--config` | `$CONFIG`, then `scraper.conf` next to the script, then the subproject root's | config file path (the set grammar) |
-| `--metrics-spec` | `$METRICS_SPEC` or the bundled `metrics.json` | metrics spec JSON: metric name → {help, type, profile?} — merged in memory over the built-in `lib/metrics.json` scraper_* block |
+| `--metrics-spec` | `$METRICS_SPEC` or the bundled `metrics.json` | metrics spec JSON, sectioned: {inputs?, metrics (profile?/expr?/when?), scraper} — merged in memory over the built-in `lib/metrics.json` (the inputs declaration + the scraper_* block) |
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--modbus-unit` | `1` | Modbus unit id |
 | `--modbus-offset` | `0` | added to register addresses (set `-1` for gateways that need 0-based addressing) |
@@ -506,11 +552,12 @@ scraper/
 │   ├── modbus-scraper.py  # CLI, logging setup, signal handling, the control wiring
 │   ├── modbus-scraper-ctl.py     # one-shot / batch control client
 │   └── modbus-scraper-cli.py     # console-style control session
-├── scraper.conf           # sample config in the set grammar (the default --config target)
-├── metrics.json           # the profile/compute metric names / HELP / TYPE specs
+├── examples/
+│   ├── scraper.conf         # sample config in the set grammar (installed beside the script)
+│   └── metrics.json         # the phase rows' + the compute expressions' specs (the canonical four are built-in)
 └── lib/
     ├── static.json        # the static constants: protocol limits, diagnostics block, defaults
-    ├── metrics.json       # the built-in scraper_* specs — always merged in over the configured spec
+    ├── metrics.json       # the built-in inputs declaration + the four canonical metrics + the scraper_* specs — always merged in over the configured spec
     ├── statics.py         # its loader (the STATIC dict + the named aliases)
     ├── protocol.py        # Modbus TCP client (hardened framing)
     ├── config.py          # settings resolution + validation

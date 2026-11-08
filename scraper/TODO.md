@@ -197,7 +197,9 @@ scraper.conf is the sample); the metrics spec is sectioned ([profile] /
 profile- and compute-fed names and the bundled `scraper_*` gauges — the
 cache-diag block included (`huawei_cache_*` -> `scraper_cache_*`) — plus
 the poll-latency gauges (`scraper_poll_duration_seconds`, mean/max) and
-the per-phase metrics. The RBAC verb set is live too (`--control-ops-verbs`).
+the per-phase metrics (the `profile`/`compute` sections since merged into
+the one `metrics` tree — the compute-expression wave below). The RBAC
+verb set is live too (`--control-ops-verbs`).
 The scraper section of the spec moved to `lib/metrics.json` (next to the
 loader, installed with it) and the loader merges it in memory over the
 configured spec — a custom `--metrics-spec` carries the profile/compute
@@ -248,6 +250,31 @@ regtest proves both directions (an `fc: 4` source works against the
 dual-code fake and fails against the FC3-only evil server). A shipped
 profile with real input-register data still waits for a hardware capture
 (the fake serves both codes, so nothing honest to ship there yet).
+
+The compute-expression wave: the spec's one merged `metrics` tree carries
+one entry per metric — the entry's own field says what feeds it (a
+`profile` binding, or `expr` + the optional `when` presence gate over the
+declared inputs) — compiled once at startup by the stdlib-safe whitelist
+evaluator (`lib/expr.py`) and evaluated per poll; an unavailable input
+(`soc` with the battery flag off, a failed read), a division by zero or a
+non-finite result keeps the metric absent for that poll (the former
+`profile`/`compute` sections refuse at startup). The "inputs" declaration
+AND the four canonical metrics (the power math's inputs) ship in the
+built-in `lib/metrics.json` — merged into every spec, always bound and
+fetched; a spec's own "inputs" section rewords the wording, a register
+bound twice refuses; an unknown name
+(referenced or declared) is a clean startup error. `show inputs` lists
+the declared inputs and `show inputs metrics` the exported metrics
+(normal registry rows, the aligned `name  [bracket]  help` shape, the
+help capped at 40 for display). The five
+classic compute metrics (the export/import split, home consumption, the
+charge/discharge split) ride as the built-in eval-table defaults under
+every spec that doesn't define them, and the default spec is the packaged
+root's `metrics.json` only — the loader never reaches into `examples/`
+itself (a dev checkout symlinks the root file — gitignored — or passes
+`--metrics-spec`) — the
+double-`Metrics()` wart in the bin (the daemon exported the default spec
+over `--metrics-spec`) fell out of the same wave.
 
 The Prometheus exporter: the profile-driven selection with the metrics
 registry (the unit scaling, the string/phase splits), the static JSON

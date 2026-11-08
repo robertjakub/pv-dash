@@ -20,6 +20,7 @@ ops shift against the admin key, both audited."""
 import hmac
 import logging
 import os
+import re
 import socket
 import time
 
@@ -36,11 +37,28 @@ from common.modbus import AUTH_MIN_KEY
 from common.audit import AuditLog
 from common.logutil import UtcFormatter
 from .config import build_sources, load_device_profile
+from .metrics import Metrics
 from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
     KNOWN_VERBS, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 
 logger = logging.getLogger('scraper')
+
+SHORT_HELP = 40   # the reports' help column: a display cap, the full text lives in the exposition and the docs
+
+
+def _short_help(text):
+    """One display line: word-boundary-truncated to SHORT_HELP with an
+    ellipsis (a dangling open paren trimmed) — never applied to the
+    exposition's # HELP lines."""
+    if len(text) <= SHORT_HELP:
+        return text
+    out = ''
+    for word in text.split():
+        if out and len(out) + 1 + len(word) > SHORT_HELP - 1:
+            break
+        out = word if not out else '%s %s' % (out, word)
+    return out.rstrip(' (=;') + ' …'
 
 MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
 
@@ -212,6 +230,10 @@ class ControlServer(_ControlServer):
             return self.show_config()
         if low == 'show knobs':
             return self.knobs_dictionary()
+        if low == 'show inputs-metrics':   # `show inputs metrics` (the live path's words) forwards here
+            return self.inputs_metrics_report()
+        if low == 'show inputs':
+            return self.inputs_report()
         if low.startswith('show'):
             args = cmd.split()[1:]
             if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
@@ -394,6 +416,25 @@ class ControlServer(_ControlServer):
                 s.cfg['profile'], s.cfg['sources'] = path, sources
             logger.info('control: profile set to %s (the next poll reads the new register map)', path)
             return path
+        if key == 'metrics/prefix':
+            # the exported names carry the prefix: the spec re-builds (the
+            # same files re-read, re-compiled) and swaps atomically — the
+            # rename lands with the next poll (woken); a bad spec file
+            # rolls back to the old spec
+            val = val.strip() or 'huawei'
+            if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', val):
+                raise ValueError('invalid metric_prefix = %r: must be a valid metric-name start '
+                                 '(letters/digits/underscore, not starting with a digit)' % val)
+            try:
+                new_spec = Metrics(s.cfg['metrics_spec'], prefix=val)
+                profile = load_device_profile(s.cfg['profile'])
+                sources = build_sources(profile, new_spec, s.cfg['profile'])
+            except (ValueError, SystemExit) as e:
+                raise ValueError(str(e))
+            with s.lock:
+                s.spec, s.cfg['metric_prefix'], s.cfg['sources'] = new_spec, val, sources
+            s.wake.set()
+            return val
         if key == 'control/token':
             if val in ('off', 'none', ''):
                 if not self.is_unix:
@@ -723,6 +764,46 @@ class ControlServer(_ControlServer):
             'overridden=%s' % (','.join(sorted(self.overridden)) or 'none'),
         ]
         return 'ok status\n' + '\n'.join(rows)
+
+    def _aligned(self, rows):
+        """[(name, bracket, help)] -> the aligned `name  [bracket]  help`
+        lines: the name and bracket columns pad to their widest member, the
+        help caps at a word-boundary 40 with an ellipsis (the full text
+        lives in the exposition and the docs)."""
+        name_w = max(len(name) for name, _bracket, _help in rows)
+        brackets = ['[%s]' % bracket if bracket else '' for _name, bracket, _help in rows]
+        bracket_w = max(len(bracket) for bracket in brackets)
+        return ['%-*s  %-*s  %s' % (name_w, name, bracket_w, bracket, _short_help(help))
+                for (name, _bracket, help), bracket in zip(rows, brackets)]
+
+    def inputs_report(self):
+        """The declared compute inputs: one aligned `name  [metric]  help`
+        line per input the spec's "inputs" section declares (the reserved
+        five included) — the bracket names the spec's own metric whose
+        value the input carries (pv == the pv-power-bound metric, battery
+        == scraper_battery); a profile-fed input's bracket would name
+        itself, so it ships bare."""
+        mirrors = self.scraper.spec.profile_inputs     # the canonical register -> the spec key it feeds
+        rows = []
+        for name, decl in sorted(self.scraper.spec.inputs.items()):
+            register = decl['register']
+            if register is None:
+                mirror = 'scraper_battery' if name == 'battery' else None
+            else:
+                mirror = mirrors.get(register)
+            rows.append((name, mirror if mirror and mirror != name else None, decl['help']))
+        return 'ok inputs\n' + '\n'.join(self._aligned(rows))
+
+    def inputs_metrics_report(self):
+        """The exported metrics: one aligned `name  [section]  help` line
+        per metric the exposition serves (the merged spec — the built-in
+        scraper_* block included), sorted by name; the bracket is the
+        section group the dashboards know (the legacy flat specs' entries
+        ship bare)."""
+        spec = self.scraper.spec
+        rows = [(name, spec.section_of(name) or '', spec.help.get(name, name))
+                for name in sorted(spec.specs)]
+        return 'ok inputs-metrics\n' + '\n'.join(self._aligned(rows))
 
     def inspect(self):
         """One pretty dump of everything — the state, the counters, the caps,

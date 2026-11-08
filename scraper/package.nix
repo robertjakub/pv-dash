@@ -29,8 +29,8 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../common}/*.py $out/share/modbus-scraper/common/
     install -dm755 $out/share/modbus-scraper/common/modbus
     install -m644 ${../common}/modbus/*.py $out/share/modbus-scraper/common/modbus/
-    install -Dm644 metrics.json $out/share/modbus-scraper/metrics.json
-    install -Dm644 scraper.conf $out/share/modbus-scraper/scraper.conf
+    install -Dm644 examples/metrics.json $out/share/modbus-scraper/metrics.json
+    install -Dm644 examples/scraper.conf $out/share/modbus-scraper/scraper.conf
     install -dm755 $out/share/modbus-scraper/profiles
     install -m644 ${../profiles/profiles}/*.json $out/share/modbus-scraper/profiles/
     install -dm755 $out/share/man/man1

@@ -5,6 +5,7 @@ import struct
 import threading
 import time
 
+from .expr import evaluate
 from .statics import DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX
 
 logger = logging.getLogger('scraper')
@@ -103,14 +104,20 @@ class Scraper:
         # each, soft — a rejected read keeps its metric absent instead of
         # failing the whole poll (the four power sources above stay hard)
         extras = {}
+        raws = {}                       # the expression input name (the spec key) -> the read
         for pn, src in cfg['sources'].items():
             if pn in ('pv-power', 'grid-power', 'battery-power', 'battery-soc'):
                 continue
             try:
-                extras[src['metric']] = self._read(pn)
+                value = self._read(pn)
             except Exception as e:
                 logger.warning('read of %s (%s) failed, the metric stays absent (%s)',
                                pn, src['metric'], e)
+                continue
+            extras[src['metric']] = value
+            key = self.spec.profile_inputs.get(pn)
+            if key is not None:
+                raws[key] = value
         self._account_cycle(started)
         pv, grid = pv_raw, grid_raw
         if cfg['grid_positive_import']:
@@ -146,21 +153,29 @@ class Scraper:
             self.error = err
             if err is None:
                 metric = {pn: src['metric'] for pn, src in cfg['sources'].items()}
-                prefix = cfg.get('metric_prefix') or 'huawei'
                 self.values = {
                     metric['pv-power']: pv,
                     metric['grid-power']: grid,
-                    '%s_grid_export_watts' % prefix: max(grid, 0.0),
-                    '%s_grid_import_watts' % prefix: max(-grid, 0.0),
-                    '%s_home_consumption_watts' % prefix: home,
                     'scraper_battery': 1 if battery else 0,
                 }
                 if battery and 'battery-power' in metric:
                     self.values[metric['battery-power']] = batt
-                    self.values['%s_battery_charge_watts' % prefix] = max(batt, 0.0)
-                    self.values['%s_battery_discharge_watts' % prefix] = max(-batt, 0.0)
                     self.values[metric['battery-soc']] = soc
                 self.values.update(extras)
+                # the compute metrics: the spec's expressions over the poll's
+                # reads — an unavailable input (soc with the battery off, a
+                # failed extras read) or a failed eval keeps the metric absent
+                inputs = {'pv': pv, 'grid': grid, 'batt': batt, 'battery': 1.0 if battery else 0.0}
+                if battery:
+                    inputs['soc'] = soc
+                inputs.update(raws)
+                for name, (fn, when) in self.spec.compute.items():
+                    try:
+                        if when is not None and not evaluate(when, inputs):
+                            continue
+                        self.values[name] = evaluate(fn, inputs)
+                    except Exception as e:
+                        logger.warning('compute %s stays absent (%s)', name, e)
                 if diag is not None:
                     self.values['scraper_cache_device_up'] = diag[1]
                     self.values['scraper_cache_age_seconds'] = min(diag[2], DIAG_MAX)

@@ -77,8 +77,10 @@ device profile JSON (the shared profiles/ schema; scrape\-marked entries
 feed the metric registers)
 .TP
 .B \-\-metrics\-spec
-metrics spec JSON, sectioned: {profile: {key: {help, profile?}},
-compute:..., scraper:...} — merged in memory over the built\-in
+metrics spec JSON, sectioned: {inputs: {name: {help}}, metrics: {key:
+{profile?, expr?, when?, help, type?}}, scraper:...} — the metrics
+entries are register\- (profile) or expression\-fed (expr/when) over the
+declared inputs (show inputs), merged in memory over the built\-in
 lib/metrics.json scraper_* block
 .TP
 .B \-\-metric\-prefix

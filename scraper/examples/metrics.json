@@ -1,0 +1,19 @@
+{
+  "metrics": {
+    "phase_a_voltage_volts":  {"profile": "meter-voltage-a", "help": "Phase A to-neutral grid voltage in volts."},
+    "phase_b_voltage_volts":  {"profile": "meter-voltage-b", "help": "Phase B to-neutral grid voltage in volts."},
+    "phase_c_voltage_volts":  {"profile": "meter-voltage-c", "help": "Phase C to-neutral grid voltage in volts."},
+    "phase_a_current_amps":   {"profile": "meter-current-a", "help": "Phase A current in amperes."},
+    "phase_b_current_amps":   {"profile": "meter-current-b", "help": "Phase B current in amperes."},
+    "phase_c_current_amps":   {"profile": "meter-current-c", "help": "Phase C current in amperes."},
+    "phase_a_power_watts":    {"profile": "meter-power-a", "help": "Phase A active power in watts."},
+    "phase_b_power_watts":    {"profile": "meter-power-b", "help": "Phase B active power in watts."},
+    "phase_c_power_watts":    {"profile": "meter-power-c", "help": "Phase C active power in watts."},
+
+    "grid_export_watts":      {"expr": "max(grid, 0.0)",    "help": "Current power exported to the grid in watts (>= 0)."},
+    "grid_import_watts":      {"expr": "max(-grid, 0.0)",   "help": "Current power imported from the grid in watts (>= 0)."},
+    "home_consumption_watts": {"expr": "pv - batt - grid",  "help": "Home consumption in watts (PV input minus battery power minus net grid power)."},
+    "battery_charge_watts":   {"expr": "max(batt, 0.0)",    "when": "battery", "help": "Battery charging power in watts (0 when not charging)."},
+    "battery_discharge_watts": {"expr": "max(-batt, 0.0)",  "when": "battery", "help": "Battery discharging power in watts (0 when not discharging)."}
+  }
+}

@@ -146,7 +146,10 @@ def main():
         raise SystemExit(0)
     args = parse_args()
     cfg = resolve_config(args, SCRIPT_DIR)
-    spec = Metrics()
+    # the spec the daemon exports: the CONFIGURED one (resolve_config binds
+    # the sources from the same file) — a plain Metrics() here would silently
+    # swap the default spec back in over --metrics-spec
+    spec = Metrics(cfg['metrics_spec'], prefix=cfg['metric_prefix'])
 
     setup_logging(cfg)
 

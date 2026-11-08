@@ -139,11 +139,15 @@ PROM_URL=http://pi:9090 python3 bin/dashboard.py  # via env
 # open http://localhost:8080
 ```
 
-By default the server **binds to `0.0.0.0:8080`** (all interfaces) — pass
-`--bind 127.0.0.1` for loopback-only (e.g. behind a reverse proxy, below).
-The page and the proxy carry no authentication; keep the bind loopback or
-put an authenticating proxy in front (see [Behind a reverse
-proxy](#behind-a-reverse-proxy) and the dashboard TODO's auth story).
+By default the server **binds to `127.0.0.1:8080`** (loopback only) — pass
+`--bind 0.0.0.0` to serve the LAN. The page and the proxy speak the
+family's F13 shape (F21): a **bearer token is mandatory beyond loopback**
+— a token-less non-loopback bind refuses to start. Set `--auth-token`
+(or `file:<path>`); the browser opens `http://host:8080/?auth=<token>`
+once — the exchange sets an HttpOnly session cookie — and scripts send
+`Authorization: Bearer <token>`. On the loopback bind the token is
+optional. Beyond localhost, still terminate TLS at an authenticating
+proxy (see [Behind a reverse proxy](#behind-a-reverse-proxy)).
 
 Logging uses the `logging` module. Proxied Prometheus queries are logged at
 DEBUG level only (or at INFO when `--log-queries` is passed / set in
@@ -162,6 +166,7 @@ DEBUG level only (or at INFO when `--log-queries` is passed / set in
    tool prefix) —
    `PORT`, `BIND`, `PROM_URL`, `PROM_PREFIX` (the
    docker-documented set), `STATIC_DIR`, `CONFIG_JS`, `BATTERY`,
+   `AUTH_TOKEN`,
    `MAX_CLIENTS`, `CLIENT_TIMEOUT`,
    `MAX_CONN_PER_IP`, `LOG_ACCESS`, `CTL`,
    `CONTROL_TOKEN`,
@@ -175,7 +180,8 @@ DEBUG level only (or at INFO when `--log-queries` is passed / set in
 ```conf
 # the dashboard's server.conf — every line is a set command
 set port 8080
-set bind 0.0.0.0
+set bind 127.0.0.1
+# set auth-token file:/path/to/page.token   (mandatory beyond loopback, F21)
 set upstream http://localhost:9090
 set static-dir /var/www/dashboard
 set prom-prefix /prom

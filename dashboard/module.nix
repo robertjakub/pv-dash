@@ -65,6 +65,8 @@ let
       "--metrics-max-conn-per-ip ${toString cfg.metricsMaxConnPerIp}"
     ]
     ++ lib.optionals (cfg.metricsToken != null) [ "--metrics-token ${cfg.metricsToken}" ]
+    ++ lib.optionals (cfg.authTokenFile != null) [ "--auth-token file:/run/credentials/dashboard/auth-token" ]
+    ++ lib.optionals (cfg.authToken != null) [ "--auth-token ${cfg.authToken}" ]
     ++ lib.optionals (cfg.dumpPath != null) [ "--dump-path ${cfg.dumpPath}" ]
     ++ lib.optionals (cfg.dumpPath != null && cfg.dumpKey != null) [ "--dump-key ${cfg.dumpKey}" ]
     ++ lib.optional cfg.restoreOnStart "--restore-on-start"
@@ -299,6 +301,26 @@ in
       '';
     };
 
+    authToken = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The page's bearer token (F21): mandatory when host is beyond the
+        loopback. WARNING: rendered into the world-readable systemd unit
+        in the nix store — prefer authTokenFile.
+      '';
+    };
+
+    authTokenFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        The page's bearer token from a file (the first line is the
+        token), mounted via systemd LoadCredential. Mandatory when host
+        is beyond the loopback (F21).
+      '';
+    };
+
     dumpPath = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -445,10 +467,11 @@ in
         SystemCallArchitectures = "native";
         SystemCallFilter = [ "@system-service" ];
       } // lib.optionalAttrs (cfg.controlTokenFile != null || cfg.controlOpsTokenFile != null
-          || cfg.metricsTokenFile != null) {
+          || cfg.metricsTokenFile != null || cfg.authTokenFile != null) {
         LoadCredential = lib.optionals (cfg.controlTokenFile != null) [ "control-token:${toString cfg.controlTokenFile}" ]
           ++ lib.optionals (cfg.controlOpsTokenFile != null) [ "control-ops-token:${toString cfg.controlOpsTokenFile}" ]
-          ++ lib.optionals (cfg.metricsTokenFile != null) [ "metrics-token:${toString cfg.metricsTokenFile}" ];
+          ++ lib.optionals (cfg.metricsTokenFile != null) [ "metrics-token:${toString cfg.metricsTokenFile}" ]
+          ++ lib.optionals (cfg.authTokenFile != null) [ "auth-token:${toString cfg.authTokenFile}" ];
       } // lib.optionalAttrs (cfg.controlPort != null
           && lib.isString cfg.controlPort
           && lib.hasPrefix "/run/dashboard/" cfg.controlPort) {

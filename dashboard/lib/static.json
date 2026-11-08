@@ -4,7 +4,7 @@
 },
   "defaults": {
     "port": 8080,
-    "bind": "0.0.0.0",
+    "bind": "127.0.0.1",
     "upstream": "http://localhost:9090",
     "prom_prefix": "/prom",
     "proxy_timeout_s": 30,

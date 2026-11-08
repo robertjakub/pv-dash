@@ -24,10 +24,10 @@ panels).
 .PP
 The HTTP surface is the tool's serving surface: the connection caps
 (\\fB--max-clients\\fR total, \\fB--max-conn-per-ip\\fR per peer, extras
-get an immediate 503), the idle keep-alive kick (\\fB--client-timeout\\fR).
-The README documents the loopback/reverse-proxy paths \\(em the server
-speaks plain HTTP with no authentication on page or proxy yet (the auth
-story in docs/TODO.md): bind the loopback or put a proxy in front.
+get an immediate 503), the idle keep-alive kick (\\fB--client-timeout\\fR),
+the bearer token (\\fB--auth-token\\fR \\(em mandatory beyond loopback:
+a token-less non-loopback bind refuses to start, F21; the `?auth=` query
+bootstraps the session cookie). The default bind is the loopback.
 .PP
 The JSON-lines control server (\\fB--control-port\\fR, talked to with
 \\fBdashboard-ctl\\fR(1) and \\fBdashboard-cli\\fR(1)) inspects and steers
@@ -75,10 +75,13 @@ encrypted, a restore refuses a wrong or missing key;
 and
 .BR dashboard-cli (1)."""
     security = """.SH SECURITY
-The server speaks plain HTTP and has no authentication on the page or the
-proxy yet (the auth story in docs/TODO.md): bind the loopback (the NixOS
-module ships that bind) or publish the port loopback-only and put an
-authenticating reverse proxy in front for anything beyond localhost. The
+The page and the proxy speak the F13 shape (F21 closed): the bearer token
+(\\fB--auth-token\\fR, constant-time) is mandatory beyond loopback \\(em a
+token-less non-loopback bind refuses to start \\(em and the loopback bind
+serves tokenless; the `?auth=<token>` query exchanges for an HttpOnly
+session cookie, the raw Bearer header stays for scripts. Terminate TLS at
+an authenticating reverse proxy for anything beyond localhost (plain HTTP
+carries the token in the clear \\(em the F14 answer). The
 control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
 control port without a token refuses to start (F5); with a token the wire
 is signed and the commands/replies verify end to end; a second, read-only

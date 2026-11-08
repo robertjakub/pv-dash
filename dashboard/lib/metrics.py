@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The dashboard's own Prometheus endpoint: a small /metrics on its own
-port, gated (off by default, and the bearer token is mandatory when on —
-the F6 posture the cache's endpoint set). Serves the dashboard's
+port, gated (off by default, the bearer token mandatory beyond loopback —
+the F13 posture, the scraper's refusal the family's golden shape). Serves
+the dashboard's
 self-observability in the Prometheus text format: the uptime, the request
 counters by status, the proxied Prometheus query total, the active clients
 from the family gate and the configured upstream — not the PV values (the

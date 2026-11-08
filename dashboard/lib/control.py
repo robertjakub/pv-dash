@@ -26,7 +26,7 @@ from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN
 from common.control import ControlServer as _ControlServer, num, numi
 from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
     match_setting_path
-from common.config import parse_secret
+from common.config import is_loopback_host, parse_secret
 from common.dump import SECRET_REMOVED, dump_filter
 from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
     COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
@@ -286,8 +286,11 @@ class ControlServer(_ControlServer):
                 if self.metrics_srv:
                     return 'on'
                 if not self.metrics_token:
-                    raise ValueError('the metrics endpoint serves the request counters: '
-                                     'set --metrics-token first (or file:<path>) (F6 in docs/AUDIT.md)')
+                    host, _port = self.metrics_listen
+                    if not is_loopback_host(host):
+                        raise ValueError('the metrics endpoint serves the request counters: refusing to expose '
+                                         '/metrics beyond loopback without a token (F13 in docs/AUDIT.md) — '
+                                         'set metrics/token first or bind metrics/listen on 127.0.0.1')
                 from .metrics import MetricsServer, describe_metrics
                 listen = self.metrics_listen
                 caps = DEFAULT_METRICS_CAPS
@@ -344,8 +347,17 @@ class ControlServer(_ControlServer):
             return '<set>'
         if key == 'metrics/token':
             if not val or val in ('off', 'none', '0'):
-                raise ValueError('metrics/token is mandatory while the endpoint serves (F6 in docs/AUDIT.md) '
-                                 '— set the new token')
+                host, _port = self.metrics_listen
+                if not is_loopback_host(host):
+                    raise ValueError('metrics/token is mandatory while the listen is non-loopback '
+                                     '(F13 in docs/AUDIT.md) — set the new token')
+                self.metrics_token = None
+                if self.metrics_srv:
+                    self.metrics_srv.token = None   # the handler reads it per request — the swap is live
+                from .metrics import describe_metrics
+                caps = self._metrics_caps()
+                self.metrics_desc = describe_metrics(self.metrics_listen, None, caps[0], caps[2])
+                return 'off'
             try:
                 val = parse_secret(val, 'metrics/token')   # file: reads the first line of an owner-only file
             except SystemExit as e:
@@ -356,6 +368,19 @@ class ControlServer(_ControlServer):
             from .metrics import describe_metrics
             caps = self._metrics_caps()
             self.metrics_desc = describe_metrics(self.metrics_listen, val, caps[0], caps[2])
+            return '<set>'
+        if key == 'auth/token':
+            if not val or val in ('off', 'none', '0'):
+                if not is_loopback_host(self.httpd.server_address[0]):
+                    raise ValueError('auth/token is mandatory while the bind is non-loopback '
+                                     '(F21 in docs/AUDIT.md) — set the new token')
+                self.httpd.RequestHandlerClass.auth_token = None
+                return 'off'   # the loopback bind is the auth (the F13 shape)
+            try:
+                val = parse_secret(val, 'auth/token')   # file: reads the first line of an owner-only file
+            except SystemExit as e:
+                raise ValueError(str(e))
+            self.httpd.RequestHandlerClass.auth_token = val   # the handler reads it per request — the swap is live
             return '<set>'
         if key == 'dump/path':
             if val in ('off', 'none', ''):
@@ -396,6 +421,8 @@ class ControlServer(_ControlServer):
             return '<set>' if self.ops_token else 'off'   # the secret never renders
         if key == 'metrics/token':
             return '<set>' if self.metrics_token else 'off'   # the secret never renders
+        if key == 'auth/token':
+            return '<set>' if self.httpd.RequestHandlerClass.auth_token else 'off'   # the secret never renders
         if key == 'dump/path':
             return self.dump_path or 'off'
         if key == 'log-level':
@@ -475,8 +502,10 @@ class ControlServer(_ControlServer):
             % (total, self.httpd.gate.max_total or 'none',
                secs(h.timeout) if h.timeout else 'off',
                self.httpd.gate.max_per_ip or 'none'),
-            'auth      none, log access %s, log queries %s' % ('on' if h.log_access else 'off',
-                                                               'on' if h.log_queries else 'off'),
+            'auth      %s, log access %s, log queries %s'
+            % ('bearer token' if h.auth_token else 'none (the loopback bind is the auth)',
+               'on' if h.log_access else 'off',
+               'on' if h.log_queries else 'off'),
             'audit     %s' % ('off' if self.audit is None
                               else (self.audit.path if self.audit.path != '-' else 'stdout')),
             'uptime    %s' % secs(time.monotonic() - self.started),

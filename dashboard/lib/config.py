@@ -118,7 +118,10 @@ def resolve_config(args, script_dir=None):
     cfg['metrics_listen'] = resolve(getattr(args, 'metrics_listen', None), 'METRICS_LISTEN',
                                     'metrics_listen', DEFAULTS['metrics_listen'], str)
     cfg['metrics_token'] = parse_secret((resolve(getattr(args, 'metrics_token', None), 'METRICS_TOKEN',
-                                                 'metrics_token', None, str) or '').strip() or None, 'metrics/token')
+                                                  'metrics_token', None, str) or '').strip() or None, 'metrics/token')
+    cfg['auth_token'] = parse_secret((resolve(getattr(args, 'auth_token', None), 'AUTH_TOKEN',
+                                              'auth_token', None, str) or '').strip() or None, 'auth/token')
+    check_token_chars(cfg['auth_token'], 'auth_token')
     cfg['metrics_max_clients'] = resolve(getattr(args, 'metrics_max_clients', None), 'METRICS_MAX_CLIENTS',
                                          'metrics_max_clients', DEFAULTS['metrics_max_clients'], int)
     cfg['metrics_client_timeout'] = resolve(getattr(args, 'metrics_client_timeout', None),

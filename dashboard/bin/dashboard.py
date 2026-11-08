@@ -9,6 +9,7 @@ Layout: lib/config (settings resolution), lib/options (the knob registry and
 the control grammar's vocabulary), lib/control (the control server),
 lib/man (the man pages), lib/statics, this file (CLI, logging, signals).
 """
+import hmac
 import logging
 import mimetypes
 import os
@@ -19,8 +20,9 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the image symlinks the entry onto PATH)
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
@@ -79,6 +81,8 @@ RATE_LIMIT_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
 class Handler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
     upstream = None
+    auth_token = None   # the F21 page token (the bin/the control set it) — None = the loopback bind is the story
+    UNAUTH_401_BODY = b'the dashboard needs its bearer token: open /?auth=<token> (or send Authorization: Bearer <token>)\n'
     log_queries = False
     log_access = False
     static_dir = next_to_script('static')
@@ -99,8 +103,56 @@ class Handler(BaseHTTPRequestHandler):
     def send_response(self, code, message=None):
         Handler.count('2xx' if code < 400 else '4xx' if code < 500 else '5xx')
         super().send_response(code, message)
+        if getattr(self, '_auth_bootstrap', False):   # the ?auth= exchange rides the first response
+            self.send_header('Set-Cookie', 'auth=%s; Path=/; HttpOnly; SameSite=Strict' % Handler.auth_token)
+            self._auth_bootstrap = False
+
+    def _admits(self):
+        """The F21 gate: the bearer token on every route when one is
+        configured — the Authorization: Bearer header, the auth session
+        cookie, or the ?auth=<token> bootstrap (the exchange sets the
+        cookie; the token is stripped from the path before anything logs
+        or forwards). A token-less config serves on the loopback bind
+        only: the start refuses beyond loopback."""
+        token = Handler.auth_token
+        if not token:
+            return True
+        cand = self.headers.get('Authorization') or ''
+        if cand.startswith('Bearer ') and hmac.compare_digest(cand[7:].strip(), token):
+            return True
+        jar = SimpleCookie()
+        for hdr in (self.headers.get_all('Cookie') or []):
+            try:
+                jar.load(hdr)
+            except CookieError:
+                pass
+        if jar.get('auth') and hmac.compare_digest(jar['auth'].value, token):
+            return True
+        parts = urlsplit(self.path)
+        supplied = (parse_qs(parts.query, keep_blank_values=True).get('auth') or [''])[0]
+        if supplied:
+            rest = [(k, v) for k, vs in parse_qs(parts.query, keep_blank_values=True).items()
+                    if k != 'auth' for v in vs]
+            self.path = urlunsplit(parts._replace(query=urlencode(rest)))
+            if hmac.compare_digest(supplied, token):
+                self._auth_bootstrap = True
+                return True
+        try:
+            self.send_response(401)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('WWW-Authenticate', 'Bearer realm="dashboard"')
+            self.send_header('Content-Length', str(len(self.UNAUTH_401_BODY)))
+            self.end_headers()
+            self.wfile.write(self.UNAUTH_401_BODY)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        logger.debug('unauthorized request from %s', self.address_string())
+        return False
 
     def do_GET(self):
+        if not self._admits():
+            return
         parts = urlsplit(self.path)
         prefix = self.prom_prefix.rstrip('/')
         if prefix and (parts.path == prefix or parts.path.startswith(prefix + '/')):
@@ -248,10 +300,12 @@ def describe(cfg, args, control_desc):
     limits = (['max-clients %d' % cfg['max_clients']] if cfg['max_clients'] else []) + \
              (['client-timeout %gs' % cfg['client_timeout']] if cfg['client_timeout'] else []) + \
              (['max-conn-per-ip %d' % cfg['max_conn_per_ip']] if cfg['max_conn_per_ip'] else [])
-    return ('serving %s on http://%s:%d (proxy: %s/* -> %s, config.js: %s, log level: %s, log time: %s, '
+    return ('serving %s on http://%s:%d (proxy: %s/* -> %s, config.js: %s, page auth: %s, log level: %s, log time: %s, '
             'log access: %s, log queries: %s%s, limits: %s, control server: %s, %s, version: %s)' % (
                 cfg['static_dir'], cfg['bind'], cfg['port'], cfg['prom_prefix'] or '/', cfg['upstream'],
-                cfg['config_js'], cfg['level'],
+                cfg['config_js'],
+                'bearer token' if cfg['auth_token'] else 'none (the loopback bind is the auth)',
+                cfg['level'],
                 'local' if cfg['local_time'] else 'UTC',
                 'on' if cfg['log_access'] else 'off',
                 'on' if cfg['log_queries'] else 'off',
@@ -343,6 +397,10 @@ def main():
                      'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
                      % (cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9452')))
         raise SystemExit(2)
+    if not cfg['auth_token'] and not is_loopback_host(cfg['bind']):
+        logger.error('refusing to expose the page beyond loopback without a token (F21 in docs/AUDIT.md): '
+                     'bind = %r — set --auth-token (or file:<path>) or bind 127.0.0.1' % cfg['bind'])
+        raise SystemExit(2)
     metrics_desc = 'off'
     if cfg['metrics_server']:
         metrics_desc = describe_metrics(metrics_listen, metrics_token, cfg.get('metrics_max_clients', 16),
@@ -358,6 +416,7 @@ def main():
     Handler.config_js = cfg['config_js']
     Handler.prom_prefix = cfg['prom_prefix']
     Handler.battery = cfg['battery']
+    Handler.auth_token = cfg['auth_token']
     Handler.timeout = cfg['client_timeout'] or None
     args.metrics_desc = metrics_desc
     logger.info('%s', describe(cfg, args, control_desc))
@@ -414,9 +473,9 @@ def main():
             'no-audit-log': 'on' if args.no_audit_log else 'off',
             'local-time': 'on' if cfg['local_time'] else 'off',
         }
-        # the secret rows (control/token, control/ops/token, metrics/token)
-        # carry NO defaults entry: `unset` refuses them (the metrics/token
-        # treatment) — a secret never renders, never re-applies
+        # the secret rows (control/token, control/ops/token, metrics/token,
+        # auth/token) carry NO defaults entry: `unset` refuses them (the
+        # metrics/token treatment) — a secret never renders, never re-applies
         control = ControlServer(httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
                                 ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
@@ -427,6 +486,7 @@ def main():
                                 startup_values={'control_token': control_token,
                                                 'control_ops_token': control_ops_token,
                                                 'metrics_token': metrics_token,
+                                                'auth_token': cfg['auth_token'],
                                                 'dump_key': cfg.get('dump_key')})
         control.start()
         if control.dump_path and cfg['restore_on_start']:

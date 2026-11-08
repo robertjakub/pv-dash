@@ -30,6 +30,8 @@ AUTH_PORT = CTRL_PORT
 OPS_TOKEN = 'opssecret'
 OPS_HTTP_PORT = 15973   # the ops-token'd dashboard (the read-only role, §6c)
 OPS_CTRL_PORT = 15974
+PAGES_PORT = 15975    # the token'd page (the F21 auth round)
+PAGES_CTL = 15977
 
 
 class PromStub(BaseHTTPRequestHandler):
@@ -111,7 +113,7 @@ def roundtrip(port, wire_bytes, timeout=5.0):
     control port refuses to start without a token)."""
     try:
         s = connect(port, timeout)
-        if port == AUTH_PORT:
+        if port in (AUTH_PORT, PAGES_CTL):
             s.sendall(_json.dumps({'cmd': 'auth', 'token': TOKEN}).encode() + b'\n')
             buf = b''
             while not buf.endswith(b'\n'):
@@ -374,6 +376,68 @@ def main():
         except OSError as e:
             check('fuzz: the page surface still answers after the fuzzing', False, str(e))
 
+        # 8b. the page's auth (F21): the bearer token on every route, the
+        #     ?auth= bootstrap exchanging for the session cookie
+        def page_get(port, path, headers=b''):
+            try:
+                s = connect(port, timeout=5)
+                s.sendall(b'GET ' + path + b' HTTP/1.1\r\nHost: localhost\r\n' + headers +
+                          b'Connection: close\r\n\r\n')
+                r = b''
+                while True:
+                    chunk = s.recv(65536)
+                    if not chunk:
+                        break
+                    r += chunk
+                s.close()
+                return r
+            except OSError as e:
+                return ('boom: %s' % e).encode()
+
+        r = subprocess.run([sys.executable, P, '--port', str(PAGES_PORT), '--bind', '0.0.0.0', '--dry-run',
+                            '--upstream', 'http://127.0.0.1:%d' % PROM_PORT], capture_output=True, text=True, timeout=15)
+        check('page auth: a token-less non-loopback bind refuses to start (F21)',
+              r.returncode != 0 and 'refusing to expose the page beyond loopback' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
+        r = subprocess.run([sys.executable, P, '--port', str(PAGES_PORT), '--bind', '0.0.0.0', '--dry-run',
+                            '--auth-token', 'ptok',
+                            '--upstream', 'http://127.0.0.1:%d' % PROM_PORT], capture_output=True, text=True, timeout=15)
+        check('page auth: a non-loopback bind with a token starts', r.returncode == 0, repr((r.stderr + r.stdout)[-140:]))
+        r = subprocess.run([sys.executable, P, '--port', str(PAGES_PORT), '--dry-run',
+                            '--upstream', 'http://127.0.0.1:%d' % PROM_PORT], capture_output=True, text=True, timeout=15)
+        check('page auth: the loopback default needs no token', r.returncode == 0, repr((r.stderr + r.stdout)[-140:]))
+
+        procs.append(subprocess.Popen([sys.executable, P, '--port', str(PAGES_PORT), '--bind', '127.0.0.1',
+                                       '--auth-token', 'ptok',
+                                       '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
+                                       '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js'),
+                                       '--control-port', str(PAGES_CTL), '--control-token', TOKEN,
+                                       '--audit-log', '-'],
+                                      stdout=open('/tmp/dash_ctl_fuzz_pages.log', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(1.2)
+        r = page_get(PAGES_PORT, b'/config.js')
+        check('page auth: the token-less read is a 401', r.startswith(b'HTTP/1.1 401')
+              and b'WWW-Authenticate: Bearer' in r, r[:60])
+        r = page_get(PAGES_PORT, b'/config.js?auth=ptok')
+        check('page auth: the ?auth= bootstrap serves and sets the cookie',
+              r.startswith(b'HTTP/1.1 200') and b'Set-Cookie: auth=ptok' in r, r[:80])
+        r = page_get(PAGES_PORT, b'/config.js', b'Cookie: auth=ptok\r\n')
+        check('page auth: the session cookie reads', r.startswith(b'HTTP/1.1 200'), r[:40])
+        r = page_get(PAGES_PORT, b'/config.js', b'Authorization: Bearer ptok\r\n')
+        check('page auth: the bearer header reads', r.startswith(b'HTTP/1.1 200'), r[:40])
+        r = page_get(PAGES_PORT, b'/config.js', b'Authorization: Bearer wrong\r\n')
+        check('page auth: a wrong bearer is a 401', r.startswith(b'HTTP/1.1 401'), r[:40])
+        st, tx = roundtrip(PAGES_CTL, signed('set auth token off'))
+        check('page auth: the live off on the loopback bind', st == 'ok' and 'auth/token=off' in tx, '%s %s' % (st, tx))
+        r = page_get(PAGES_PORT, b'/config.js')
+        check('page auth: the loopback endpoint serves tokenless after the off', r.startswith(b'HTTP/1.1 200'), r[:40])
+        st, tx = roundtrip(PAGES_CTL, signed('set auth token ptok2'))
+        check('page auth: the token rotates live', st == 'ok' and 'auth/token=<set>' in tx, '%s %s' % (st, tx))
+        r = page_get(PAGES_PORT, b'/config.js', b'Authorization: Bearer ptok2\r\n')
+        check('page auth: the rotated token reads', r.startswith(b'HTTP/1.1 200'), r[:40])
+        r = page_get(PAGES_PORT, b'/config.js', b'Authorization: Bearer ptok\r\n')
+        check('page auth: the old token is a 401', r.startswith(b'HTTP/1.1 401'), r[:40])
+
         # 9. clean shutdown
         st, tx = roundtrip(CTRL_PORT, signed('shutdown'))
         check('fuzz: shutdown still works', st == 'bye', '%s %s' % (st, tx))
@@ -384,7 +448,8 @@ def main():
         for p in procs:
             if p.poll() is None:
                 p.kill()
-    log = open('/tmp/dash_ctl_fuzz.log').read() + open('/tmp/dash_ctl_fuzz_ops.log').read()
+    log = open('/tmp/dash_ctl_fuzz.log').read() + open('/tmp/dash_ctl_fuzz_ops.log').read() \
+        + open('/tmp/dash_ctl_fuzz_pages.log').read()
     check('fuzz: no tracebacks in the logs', 'Traceback' not in log, log[-200:])
 
     print()

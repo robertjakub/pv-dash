@@ -178,9 +178,14 @@ def cfg_acl_text(v):
 
 
 def cfg_write_registers(v):
-    """The write-register map as its set-grammar text (any, none, or the
-    addr:count list)."""
-    return 'any' if v is None else ('none' if not v else ','.join('%d:%d' % r for r in v))
+    """The write-register map as its set-grammar text (any, none, the
+    addr:count list, or the 'profile'/'file:<path>' markers — both
+    re-resolve on the way back in)."""
+    if v is None:
+        return 'any'
+    if isinstance(v, str):   # the 'profile' marker / the file reference — never a range list
+        return v
+    return 'none' if not v else ','.join('%d:%d' % r for r in v)
 
 
 def cfg_trust_uids(v):

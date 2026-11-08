@@ -85,7 +85,7 @@ the ops
 changes a setting live (modbus interval, cache ttl, modbus read-delay,
 modbus merge-gap, write allow, write registers, limits max-clients,
 limits client-timeout, modbus upstream, modbus unit, metrics enable,
-metrics listen, the metrics limits caps, metrics token, requests-audit,
+metrics listen, the metrics limits caps, metrics token, audit requests,
 dump-interval, log-level, local-time, modbus profile, modbus selection,
 acl connect, acl write, modbus timeout, modbus auth, modbus auth key,
 modbus auth-upstream, modbus auth-upstream-key, control port, control token,

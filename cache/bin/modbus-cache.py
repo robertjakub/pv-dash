@@ -259,6 +259,7 @@ def main():
                                       started=time.monotonic()) if cfg['metrics_server'] else None
     proxy.metrics_listen = metrics_listen
     proxy.metrics_token = metrics_token
+    proxy.config['metrics_token'] = metrics_token   # the secret row renders in show config (the placeholder rule)
     proxy.metrics_caps = (cfg['metrics_max_clients'], cfg['metrics_client_timeout'],
                           cfg['metrics_max_conn_per_ip'])
     proxy.dump_path = cfg['dump_path'] or None
@@ -336,7 +337,7 @@ def main():
                     'metrics/limits/max-clients': '%d' % cfg['metrics_max_clients'],
                     'metrics/limits/timeout': '%g' % cfg['metrics_client_timeout'],
                     'metrics/limits/max-conn-per-ip': '%d' % cfg['metrics_max_conn_per_ip'],
-                    'requests-audit': 'off' if not cfg['requests_audit_s'] else '%g' % cfg['requests_audit_s'],
+                    'audit/requests': 'off' if not cfg['requests_audit_s'] else '%g' % cfg['requests_audit_s'],
                     'dump-interval': 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval'],
                     'log-level': cfg['level'],
                     'local-time': 'on' if cfg['local_time'] else 'off',

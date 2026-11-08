@@ -899,6 +899,9 @@ try:
     r = ctl_cmd('set dump key other', 15539)
     check('sealed dump: set dump/key answers the restart note (the key cannot drift mid-life)',
           r.startswith('fail restart required (startup-only knob)'), r[:100])
+    r = ctl_cmd('show config', 15539)
+    check('sealed dump: show config renders the key row as *** SECRET REMOVED ***',
+          'set dump key *** SECRET REMOVED ***' in r and 'seal-key-1' not in r, r[:200])
     time.sleep(1.6)   # the poller fills the cache (interval 1 s)
     r = ctl_cmd('request dump with-cache', 15539)
     check('sealed dump: the with-cache dump reports sealed',
@@ -909,9 +912,18 @@ try:
           d.get('format') == 'modbus-cache-dump' and d.get('version') == 2
           and d.get('cipher') == 'sha256-ctr' and 'registers' not in d and 'settings' not in d
           and d.get('box') and d.get('mac') and 'modbus/interval' not in raw, raw[:120])
+    check('sealed dump: the payload is opaque — the sealed file is one flat envelope, no nested plaintext JSON',
+          raw.count('{') == 1, raw[:120])
     r = ctl_cmd('request restore', 15539)
     check('sealed dump: the restore re-applies under the configured key',
           r.startswith('ok restored 91 word(s)'), r[:120])
+    plain = open(dumpfile).read()   # the keyless block's good plaintext dump — the symmetric gate's fixture
+    open(kdumpfile, 'w').write(plain)
+    r = ctl_cmd('request restore', 15539)
+    check('sealed dump: the configured key refuses an unsealed dump (the symmetric gate, live)',
+          r.startswith('fail restore failed') and 'not sealed but dump/key is configured' in r, r[:160])
+    r = ctl_cmd('request dump with-cache', 15539)   # re-seal: the next legs read the sealed file
+    check('sealed dump: the file is sealed again for the next legs', '(sealed)' in r, r[:120])
     p_kdump.kill()
     time.sleep(0.4)
     # the wrong key: the sealed dump refuses at start (the mac reads it as tampered content)
@@ -934,6 +946,26 @@ try:
     r = ctl_cmd('show version', 15539)
     check('sealed dump: the daemon is up despite the refused dump', r.startswith('ok modbus-cache'), r[:80])
     p_wrong.kill()
+    time.sleep(0.4)
+    # the missing-key half of the symmetric gate: a keyless daemon refuses the sealed dump
+    p_nokey = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
+                                '--listen', '127.0.0.1:15538', '--interval', '1', '--cache-ttl', '30',
+                                '--profile', R, '--control-port', '15539',
+                                '--dump-path', kdumpfile, '--restore-on-start'],
+                               stdout=open('/tmp/reg_cache_knokey.log', 'w'), stderr=subprocess.STDOUT,
+                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
+    procs.append(p_nokey)
+    line = ''
+    for _ in range(80):
+        line = open('/tmp/reg_cache_knokey.log').read()
+        if 'pass the key' in line:
+            break
+        time.sleep(0.1)
+    check('sealed dump: a keyless daemon refuses the sealed dump at start (fail closed)',
+          'pass the key' in line, line[-220:])
+    r = ctl_cmd('show version', 15539)
+    check('sealed dump: the daemon is up despite the refused sealed dump', r.startswith('ok modbus-cache'), r[:80])
+    p_nokey.kill()
     time.sleep(0.4)
     # the right key: the sealed dump restores (the words are back without the device)
     p_right = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
@@ -1134,6 +1166,40 @@ try:
     check('metrics enable: set on serves again', r.startswith('ok metrics/enable=on'), r[:80])
     st, _ = get_metrics('sekrit')
     check('metrics enable: the gauges are back', st == 200, str(st))
+    # show config speaks the live overrides (the _apply write-backs): the
+    # toggle's row follows the endpoint, not the startup flag
+    r = ctl_cmd('show config', 15530)
+    check('show config: the live metrics enable rides (true after set on)',
+          'set metrics enable true' in r, r[:160])
+    check('show config: the metrics token renders as *** SECRET REMOVED ***',
+          'set metrics token *** SECRET REMOVED ***' in r and 'sekrit' not in r, r[:200])
+    ctl_cmd('set metrics enable off', 15530)
+    r = ctl_cmd('show config', 15530)
+    check('show config: the live metrics enable rides (false after set off)',
+          'set metrics enable false' in r, r[:160])
+    ctl_cmd('set metrics enable on', 15530)
+    # the live ttl rides too, and the write-register file marker renders
+    # without crashing the handler (the string markers are not range lists)
+    with open('/tmp/reg_acl_write.json', 'w') as f:
+        _json.dump({'type': 'write-registers', 'rules': [{'type': 'allow', 'range': '127:2'}]}, f)
+    r = ctl_cmd('set write registers file:/tmp/reg_acl_write.json', 15530)
+    check('write registers: the file marker sets', r.startswith('ok write/registers=file:'), r[:90])
+    r = ctl_cmd('set cache ttl 55', 15530)
+    check('cache ttl: the live set answers', r.startswith('ok cache/ttl='), r[:90])
+    r = ctl_cmd('show config', 15530)
+    check('show config: the live cache ttl and the file marker ride',
+          'set cache ttl 55.0' in r and 'set write registers file:/tmp/reg_acl_write.json' in r, r[:220])
+    ctl_cmd('unset cache ttl', 15530)
+    r = ctl_cmd('show config', 15530)
+    check('show config: the unset ttl returns the configured value',
+          'set cache ttl 3.0' in r, r[:160])   # the default rides factor x interval = 3 x 1 s
+    ctl_cmd('set write registers any', 15530)
+    # audit/requests: the live name is the wire spelling (the branch keys it)
+    r = ctl_cmd('set audit requests 120', 15530)
+    check('audit requests: the live set answers the path name', r.startswith('ok audit/requests='), r[:90])
+    r = ctl_cmd('show audit requests', 15530)
+    check('audit requests: the show answers the tally seconds', r == 'ok audit/requests=2.00m', r)
+    ctl_cmd('unset audit requests', 15530)
     # the live caps: raising the cap serves the second concurrent client, lowering 503s it again
     r = ctl_cmd('set metrics limits max-clients 2', 15530)
     check('metrics limits: the live cap set', r.startswith('ok metrics/limits/max-clients=2'), r[:90])
@@ -1590,22 +1656,31 @@ sys.path.insert(0, %r)
 sys.path.insert(0, %r)
 import lib.control as C
 class Stub(C.ControlServer):
-    def __init__(self):
+    def __init__(self, key):
         self.config_path = '/tmp/reg_reload_mode.conf'
         self.overridden = {'modbus/interval'}
         class _Proxy:
-            dump_key = None   # the reload state file seals only under dump/key
+            dump_key = key   # the reload state file seals only under dump/key
         self.proxy = _Proxy()
     def dump_settings(self):
         return {'modbus/interval': '7'}
-Stub()._save_reload_state()
+Stub(None)._save_reload_state()
 st = os.stat('/tmp/reg_reload_mode.conf.reload')
 assert st.st_mode & 0o777 == 0o600, oct(st.st_mode)
+plain = open('/tmp/reg_reload_mode.conf.reload').read()
 os.unlink('/tmp/reg_reload_mode.conf.reload')
-print('mode 0600 ok')
+Stub('seal-key-9')._save_reload_state()
+sealed = open('/tmp/reg_reload_mode.conf.reload').read()
+os.unlink('/tmp/reg_reload_mode.conf.reload')
+import json as _js
+d = _js.loads(sealed)
+assert d.get('version') == 2 and d.get('cipher') == 'sha256-ctr' and d.get('box') and d.get('mac'), d.keys()
+assert 'modbus/interval' not in sealed and sealed.count('{') == 1, sealed[:120]
+print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
 ''' % (REPO, CACHE_DIR)], capture_output=True, text=True, timeout=15)
-    check('reload: the state file saves 0600 (F23, the F18 posture)',
-          r.returncode == 0 and 'mode 0600 ok' in r.stdout, repr((r.stderr or r.stdout)[-160:]))
+    check('reload: the state file saves 0600 (F23, the F18 posture) and seals under dump/key',
+          r.returncode == 0 and 'mode 0600 ok' in r.stdout and 'state file seals' in r.stdout,
+          repr((r.stderr or r.stdout)[-200:]))
     open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset unit 7\n')   # rewrite: a name set twice fails the start
     r = ctl_cmd('request reload', 15582)
     back = None

@@ -220,13 +220,25 @@ with a clean one-line error instead of failing later at runtime.
 `cache/examples/modbus_cache.conf` is a sample in the set grammar (every line a
 `set <name> <value>` in the CLI spelling, `#` comments stay comments — the
 config file pipes through `modbus-cache-ctl` unchanged, and `show config`
-regenerates it from the running daemon — the secret knobs render as
+regenerates it from the running daemon — the live `set`/`unset` overrides
+ride in, so the render is the daemon's current state, ready to paste back;
+the secret knobs render as
 `set <name> *** SECRET REMOVED ***`, the value never does, and the parser
 refuses the placeholder (pass the secret by flag/env, or as `file:<path>`);
 `show knobs` prints the whole
 registry — every knob with its flag, its env twin and how it changes,
 `help config` maps them to their control commands). Boolean config/env
 values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
+
+> **The six secret knobs** — `--auth-key`, `--auth-upstream-key`,
+> `--control-token`, `--control-ops-token`, `--metrics-token`,
+> `--dump-key` — are secrets and are not dumped: the values never render
+> back, and the config file, the state dumps and the reload state file
+> carry the `*** SECRET REMOVED ***` placeholder where a value would sit.
+> Pass them on every start by flag (`--auth-key <secret>`) or by env
+> (`AUTH_KEY`, `AUTH_UPSTREAM_KEY`, `CONTROL_TOKEN`, `CONTROL_OPS_TOKEN`,
+> `METRICS_TOKEN`, `DUMP_KEY` — `show knobs` names each knob's twin), or
+> as `file:<path>` — the first line of an owner-only `0600` file.
 
 ## Diagnostics registers
 
@@ -315,7 +327,7 @@ token, an admin client against the admin token. The peer-cred trusted peers
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile`/`file:<path>` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token` (rotate live; the value never renders back), `requests-audit`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write` (the IP ACLs: `any`/`none`/the networks/`file:<path>` — a file gate re-reads on every set), `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the auth schemes and keys, both legs — the upstream leg speaks suite or waveshare), `control port` (rebinds the listener live), `control token` and `control ops token` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
+| `set <setting> <value>` | configure a setting **live**: `modbus interval`, `cache ttl`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), `write allow`, `write registers` (`any`/`none`/the ranges/`profile`/`file:<path>` — the device profile's acl, re-resolved when the profile swaps), `limits max-clients`, `limits client-timeout`, `limits max-conn-per-ip`, `modbus upstream`, `modbus unit`, `metrics enable`, `metrics listen` (rebinds live), `metrics limits max-clients`/`metrics limits timeout`/`metrics limits max-conn-per-ip`, `metrics token` (rotate live; the value never renders back), `audit requests`, `dump-interval`, `log-level`, `local-time`, `modbus profile`/`modbus selection` (the register map swaps atomically), `acl connect`, `acl write` (the IP ACLs: `any`/`none`/the networks/`file:<path>` — a file gate re-reads on every set), `modbus timeout`, `modbus auth`/`modbus auth key` and `modbus auth-upstream`/`modbus auth-upstream-key` (the auth schemes and keys, both legs — the upstream leg speaks suite or waveshare), `control port` (rebinds the listener live), `control token` and `control ops token` (rotate live; the value never renders back), `control ops-verbs`, `control trust-uids`, `control socket-group` (re-modes the live socket), `audit log-file` (the trail moves, the chain continues from the file's tail), `audit rotate max-size`/`audit rotate daily`/`audit rotate files`, `audit disable`, `dump path` (arms `request dump` without a restart), `dump with-cache`, `dump restore-on-start` — the reply carries the compact state summary |
 | `unset <setting>` | restore a setting to its **configured** startup value (what the flag/env/config said at start) |
 | `set`/`unset` a startup-only knob | the registry's `restart: true` rows answer the note: `% restart required (startup-only knob)` — the config (and a SIGHUP, or a restart) changes them; `show <knob>` renders the configured value (a **secret knob refuses to show** — the value renders nowhere) |
 | `show <setting>` | the bare live value of one tunable |

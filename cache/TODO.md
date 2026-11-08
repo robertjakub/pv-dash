@@ -5,6 +5,25 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The show-config write-back wave: **`show config` speaks the live
+overrides** — the `_apply` branches changed the running values but never
+wrote back into the resolved config dict the render reads (only
+unit/auth/timeout and the ACLs honoured the `show_config_cfg` contract),
+so a live `set metrics enable on` rendered `set metrics enable false` in
+the script while `show metrics enable` answered `on`. Every live branch
+writes back now and `unset` restores the configured value through the
+same branches; the metrics token resolves into the dict at start, so its
+`*** SECRET REMOVED ***` row renders like the control token's. Two more
+faces of the same drift: the `write-registers` `profile`/`file:<path>`
+markers crashed `show config` (the renderer formatted the marker string
+as a range list — the handler died mid-reply), and **`audit/requests`
+was dead on the wire** (the live-rename wave rekeyed every branch to the
+live names but missed this one: `set audit requests 120` answered
+`err unknown setting`, `show audit requests` answered `?`, the unset
+table and the dump key kept the dashed spelling) — the branches, the
+unset default, the dump key and the README/man spellings take the live
+name now.
+
 The ip-prefix acl wave: **`acl/connect` and `acl/write` read
 `file:<path>`** — the standalone ip-prefix acl gate (the shipped
 `examples/acl-ip-prefix.json` shape: `"type": "ip-prefix"`, `prefix`

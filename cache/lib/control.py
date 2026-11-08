@@ -354,25 +354,30 @@ class ControlServer(_ControlServer):
             if not 0 < v <= 86400:
                 raise ValueError('interval must be 0 < N <= 86400 seconds')
             p.interval = v
+            p.config['interval'] = v   # the live overrides ride show config (show_config_cfg's contract)
             p.poll_wake.set()
             return secs(v)
         if key == 'cache/ttl':
             if val in ('off', 'none', '0'):
                 p.cache.cache_ttl = 0
+                p.config['cache_ttl'] = 0
                 return 'off'
             v = num(val, 'ttl', 'seconds or off')
             self._gate_range(key, v, 'seconds')
             p.cache.cache_ttl = v
+            p.config['cache_ttl'] = v
             return secs(v)
         if key == 'modbus/read-delay':
             v = num(val, 'read-delay', 'seconds')
             self._gate_range(key, v, 'seconds')
             p.read_delay = v
+            p.config['read_delay'] = v
             return secs(v)
         if key == 'modbus/merge-gap':
             v = numi(val, 'merge-gap', 'registers')
             self._gate_range(key, v, 'registers')
             p.merge_gap = v
+            p.config['merge_gap'] = v
             p.blocks = build_blocks(p.cache.ranges, v)
             p.poll_wake.set()
             return '%d' % v
@@ -434,15 +439,21 @@ class ControlServer(_ControlServer):
             p.upstream.close()   # the session re-proves the new key on the next exchange
             return '<set>'
         if key == 'write/allow':
-            if val not in ('on', 'off'):
-                raise ValueError('allow-write must be on|off')
-            p.allow_write = val == 'on'
-            return val
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('allow-write must be on or off')
+            p.allow_write = on
+            p.config['allow_write'] = on
+            return 'on' if on else 'off'
         if key == 'write/registers':
             try:
                 p.set_write_registers(parse_write_registers(val, 'write-registers'))
             except SystemExit as e:
                 raise ValueError(str(e))
+            p.config['write_registers'] = p.write_registers
             shown = p.describe_write_ranges()
             if p.write_gate_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % p.write_gate_warn
@@ -451,16 +462,19 @@ class ControlServer(_ControlServer):
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
             p.max_clients = v
+            p.config['max_clients'] = v
             return '%d' % v
         if key == 'limits/client-timeout':
             v = num(val, 'client-timeout', 'seconds')
             self._gate_range(key, v, 'seconds')
             p.client_timeout = v
+            p.config['client_timeout'] = v
             return secs(v)
         if key == 'limits/max-conn-per-ip':
             v = numi(val, 'max-conn-per-ip', 'connections')
             self._gate_range(key, v)
             p.conn_gate.max_per_ip = v
+            p.config['max_conn_per_ip'] = v
             return '%d' % v
         if key == 'control/port':
             try:
@@ -474,13 +488,16 @@ class ControlServer(_ControlServer):
             if isinstance(target, int) and self.token is None:
                 raise ValueError('control/port cannot serve TCP without a token (F5 in docs/AUDIT.md): '
                                  'set control/token first')
-            return self._rebind_control(target)
+            shown = self._rebind_control(target)
+            p.config['control_port'] = '0' if target is None else str(target)
+            return shown
         if key == 'control/token':
             if val in ('off', 'none', ''):
                 if not self.is_unix and not self.stopped:
                     raise ValueError('the TCP control port needs its token (F5 in docs/AUDIT.md) — '
                                      'only the unix socket (the filesystem is the auth) may run tokenless')
                 self.token = None
+                p.config['control_token'] = ''
                 return 'off'
             try:
                 val = parse_secret(val, 'control/token')   # file: reads the first line of an owner-only file
@@ -490,10 +507,12 @@ class ControlServer(_ControlServer):
                 raise ValueError('the ops token must differ from the admin token (the same secret would hand '
                                  'every holder the role the server picks first)')
             self.token = val   # the rotation is live: the sessions re-auth, the macs verify against the new key
+            p.config['control_token'] = val   # the value never renders — the secret row shows the removal placeholder
             return '<set>'
         if key == 'control/ops/token':
             if val in ('off', 'none', ''):
                 self.ops_token = None   # the ops shift signs off; the admin role is untouched
+                p.config['control_ops_token'] = ''
                 return 'off'
             try:
                 val = parse_secret(val, 'control-ops-token')   # file: reads the first line of an owner-only file
@@ -503,6 +522,7 @@ class ControlServer(_ControlServer):
                 raise ValueError('the ops token must differ from the admin token (the same secret would hand '
                                  'every holder the role the server picks first)')
             self.ops_token = val
+            p.config['control_ops_token'] = val
             return '<set>'
         if key == 'control/ops-verbs':
             verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
@@ -512,6 +532,7 @@ class ControlServer(_ControlServer):
                                  % ('' if not unknown else ' (unknown: %s)' % ', '.join(unknown),
                                     ', '.join(sorted(KNOWN_VERBS))))
             self.ops_verbs = verbs
+            p.config['control_ops_verbs'] = ','.join(sorted(verbs))
             return ','.join(sorted(verbs))
         if key == 'control/trust-uids':
             try:
@@ -519,6 +540,7 @@ class ControlServer(_ControlServer):
             except SystemExit as e:
                 raise ValueError(str(e))
             self.trust_uids = uids or frozenset()
+            p.config['control_trust_uids'] = self.trust_uids
             return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
         if key == 'control/socket-group':
             if val in ('on', 'true', '1', 'yes'):
@@ -528,6 +550,7 @@ class ControlServer(_ControlServer):
             else:
                 raise ValueError('control/socket-group must be on or off')
             self.socket_group = on
+            p.config['control_socket_group'] = on
             if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
                 os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
             return 'on' if on else 'off'
@@ -543,6 +566,7 @@ class ControlServer(_ControlServer):
                                     max_per_ip=p.metrics_caps[2])
                 srv.start()
                 p.metrics_srv = srv
+                p.config['metrics_server'] = True
                 p.metrics_desc = describe_metrics(p.metrics_listen, p.metrics_token,
                                                   p.metrics_caps[0], p.metrics_caps[2])
                 return 'on'
@@ -551,6 +575,7 @@ class ControlServer(_ControlServer):
                     p.metrics_srv.stop()
                     p.metrics_srv = None
                     p.metrics_desc = 'off'
+                p.config['metrics_server'] = False
                 return 'off'
             raise ValueError('metrics enable must be on or off')
         if key == 'metrics/token':
@@ -561,6 +586,7 @@ class ControlServer(_ControlServer):
             except SystemExit as e:
                 raise ValueError(str(e))
             p.metrics_token = val
+            p.config['metrics_token'] = val   # the value never renders — the secret row shows the removal placeholder
             if p.metrics_srv:
                 p.metrics_srv.token = val   # the handler reads it per request — the swap is live
             p.metrics_desc = describe_metrics(p.metrics_listen, val, p.metrics_caps[0], p.metrics_caps[2])
@@ -569,6 +595,7 @@ class ControlServer(_ControlServer):
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
             p.metrics_caps = (v, p.metrics_caps[1], p.metrics_caps[2])
+            p.config['metrics_max_clients'] = v
             if p.metrics_srv:
                 p.metrics_srv.max_clients = v
                 p.metrics_srv._http.gate.max_total = v   # the gate reads its caps per admit
@@ -577,6 +604,7 @@ class ControlServer(_ControlServer):
             v = num(val, 'client-timeout', 'seconds')
             self._gate_range(key, v, 'seconds')
             p.metrics_caps = (p.metrics_caps[0], v, p.metrics_caps[2])
+            p.config['metrics_client_timeout'] = v
             if p.metrics_srv:
                 p.metrics_srv.client_timeout = v
                 p.metrics_srv._Handler.timeout = v or 5   # 0 = the built-in slowloris cap
@@ -585,6 +613,7 @@ class ControlServer(_ControlServer):
             v = numi(val, 'max-conn-per-ip', 'connections')
             self._gate_range(key, v)
             p.metrics_caps = (p.metrics_caps[0], p.metrics_caps[1], v)
+            p.config['metrics_max_conn_per_ip'] = v
             if p.metrics_srv:
                 p.metrics_srv.max_per_ip = v
                 p.metrics_srv._http.gate.max_per_ip = v
@@ -592,16 +621,21 @@ class ControlServer(_ControlServer):
         if key == 'audit/log-file':
             if val in ('off', 'none'):
                 p.audit_params['disabled'] = True
+                p.config['audit_log'] = ''
+                p.config['no_audit_log'] = True
                 self._rebuild_audit()
                 return 'off'
             p.audit_params['path'] = None if val in ('-', 'stdout') else val
             p.audit_params['disabled'] = False
+            p.config['audit_log'] = '' if p.audit_params['path'] is None else val
+            p.config['no_audit_log'] = False
             self._rebuild_audit()
             return p.audit.path if p.audit else 'off'
         if key == 'audit/rotate/max-size':
             v = num(val, 'max-size', 'MB')
             self._gate_range(key, v, 'MB')
             p.audit_params['max_mb'] = v
+            p.config['audit_max_mb'] = v
             self._rebuild_audit()
             return '%g' % v
         if key == 'audit/rotate/daily':
@@ -612,12 +646,14 @@ class ControlServer(_ControlServer):
             else:
                 raise ValueError('audit/rotate/daily must be on or off')
             p.audit_params['daily'] = on
+            p.config['audit_daily'] = on
             self._rebuild_audit()
             return 'on' if on else 'off'
         if key == 'audit/rotate/files':
             v = numi(val, 'files', 'backups')
             self._gate_range(key, v, 'backups')
             p.audit_params['files'] = v
+            p.config['audit_files'] = v
             self._rebuild_audit()
             return '%d' % v
         if key == 'audit/disable':
@@ -628,33 +664,40 @@ class ControlServer(_ControlServer):
             else:
                 raise ValueError('audit/disable must be on or off')
             p.audit_params['disabled'] = on
+            p.config['no_audit_log'] = on
             self._rebuild_audit()
             return 'on' if on else 'off'
-        if key == 'requests-audit':
+        if key == 'audit/requests':
             if val in ('off', 'none', '0'):
                 p.requests_audit_s = 0
+                p.config['requests_audit_s'] = 0
                 return 'off'
             v = num(val, 'requests-audit', 'seconds or off')
             self._gate_range(key, v, 'seconds')
             p.requests_audit_s = v
+            p.config['requests_audit_s'] = v
             return secs(v)
         if key == 'dump-interval':
             if not p.dump_path:
                 raise ValueError('dump-interval needs a dump path (set dump/path or --dump-path)')
             if val in ('off', 'none', '0'):
                 p.dump_interval = 0
+                p.config['dump_interval'] = 0
                 p.dump_wake.set()
                 return 'off'
             v = num(val, 'dump-interval', 'seconds or off')
             self._gate_range(key, v, 'seconds')
             p.dump_interval = v
+            p.config['dump_interval'] = v
             p.dump_wake.set()
             return secs(v)
         if key == 'dump/path':
             if val in ('off', 'none', ''):
                 p.dump_path = None
+                p.config['dump_path'] = ''
                 return 'off'
             p.dump_path = val   # the dump loop, request dump and the shutdown write it from here on
+            p.config['dump_path'] = val
             # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
             return val if p.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
         if key == 'dump/with-cache':
@@ -665,6 +708,7 @@ class ControlServer(_ControlServer):
             else:
                 raise ValueError('dump/with-cache must be on or off')
             p.dump_with_cache = on
+            p.config['dump_with_cache'] = on
             return 'on' if on else 'off'
         if key == 'local-time':
             if val in ('on', 'true', '1', 'yes'):
@@ -682,6 +726,7 @@ class ControlServer(_ControlServer):
                 swapped += 1
             if not swapped:
                 raise ValueError('no log handler to re-format')
+            p.config['local_time'] = on
             return 'on' if on else 'off'
         if key == 'system/log-access':
             if val in ('on', 'true', '1', 'yes'):
@@ -691,12 +736,14 @@ class ControlServer(_ControlServer):
             else:
                 raise ValueError('system/log-access must be on or off')
             p.log_access = on   # the next connect/disconnect log line picks it up
+            p.config['log_access'] = on
             return 'on' if on else 'off'
         if key == 'log-level':
             lvl = val.upper()
             if lvl not in LOG_LEVELS:
                 raise ValueError('log-level must be one of %s' % ', '.join(LOG_LEVELS))
             logging.getLogger().setLevel(getattr(logging, lvl))
+            p.config['level'] = lvl
             return lvl
         if key == 'modbus/timeout':
             v = num(val, 'timeout', 'seconds')
@@ -902,7 +949,7 @@ class ControlServer(_ControlServer):
             return p.dump_path or 'off'
         if key == 'dump/with-cache':
             return 'on' if p.dump_with_cache else 'off'
-        if key == 'requests-audit':
+        if key == 'audit/requests':
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
         if key == 'dump-interval':
             return 'off' if not p.dump_interval else secs(p.dump_interval)
@@ -1164,7 +1211,7 @@ class ControlServer(_ControlServer):
             'metrics/limits/max-clients': p.metrics_caps[0],
             'metrics/limits/timeout': p.metrics_caps[1],
             'metrics/limits/max-conn-per-ip': p.metrics_caps[2],
-            'requests-audit': p.requests_audit_s,
+            'audit/requests': p.requests_audit_s,
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'modbus/profile': p.config.get('profile'), 'modbus/selection': p.config.get('selection') or 'all',
             'acl/connect': self._acl_text(p.connect_acl), 'acl/write': self._acl_text(p.write_acl),

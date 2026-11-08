@@ -142,6 +142,7 @@ def main():
     try:
         procs.append(subprocess.Popen([sys.executable, P, '--port', str(HTTP_PORT), '--bind', '127.0.0.1',
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
+                                       '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js'),
                                        '--control-port', str(CTRL_PORT), '--control-token', TOKEN,
                                        '--audit-log', '-'],
                                       stdout=open('/tmp/dash_ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))

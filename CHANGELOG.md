@@ -281,6 +281,35 @@ before the repo restructured into one suite.
   `--release` cut speaks the same pointer (the 0.4.0 body — 97 KB of
   pasted section — re-cut by hand).
 
+### Fixed
+
+- **cache** — **`show config` speaks the live overrides**: the `_apply`
+  branches wrote their values into the live objects but never back into
+  the resolved config dict the render reads (the `show_config_cfg`
+  contract only some branches honoured — unit/auth/timeout and the ACLs),
+  so a live `set metrics enable on` rendered `set metrics enable false`
+  in the script while `show metrics enable` answered `on`. Every live
+  branch writes back now (metrics enable/token/limits, cache ttl, modbus
+  interval/read-delay/merge-gap, the limits caps, write allow/registers,
+  control port/token/ops/verbs/trust-uids/socket-group, the audit
+  path/rotation/disable pair, requests audit, the dump trio, local-time,
+  log-access, log-level) and `unset` restores the configured startup
+  value through the same branches. The metrics token resolves into the
+  config dict at start now too — its `*** SECRET REMOVED ***` row renders
+  (the control token's did, the metrics token's never did).
+
+- **cache** — **the `write-registers` `profile`/`file:<path>` markers
+  crashed `show config`** (the handler died mid-reply: the renderer
+  formatted the marker string as a range list) — the markers render as
+  themselves now, the same way `show write registers` spells them.
+
+- **cache** — **`audit/requests` was dead on the wire**: the
+  live-rename wave rekeyed the `_apply`/`_get`/dump branches to the live
+  names but missed this one (still keyed the dashed `requests-audit`) —
+  `set audit requests 120` answered `err unknown setting` and
+  `show audit requests` answered `?`; the branches, the dump key and the
+  README/man spellings take the live name now.
+
 ## 0.4.2 — 2026-11-08
 ### Changed
 

@@ -73,21 +73,6 @@ the **Done/history** records for their tool.
   without one (a test tool, trusted LAN); an opt-in `--connect-acl`
   mirroring the cache's would let the paranoid demo the ACL story end to
   end without touching the fake's soft-edge posture.
-- **the connect kind in the standalone acl file** `[cache]` — the acl
-  file (`--write-registers file:<path>`, the shipped
-  `cache/examples/acl-write-registers.json`) carries the **write** gate alone; the
-  plan is two acl's per file (write + connect): the file grows the keyed
-  `"acl"` tree the device profiles already speak
-  (`{"acl": {"write": ..., "connect": ...}}` — the connect gate
-  compiling to the `acl/connect` client set; the exact shape is the
-  wave's to settle), and `scripts/lint_acl.py` + `scripts/edit_acl.py`
-  follow the second kind.
-- **the connect acl (ip whitelists)** `[cache]` — the connect gate next
-  to the write gate: an allowed-peers whitelist deciding who may open
-  the Modbus connection at all (the `acl/connect` chain the
-  standalone-acl-file item above plans — the same typed rules, the
-  matched value the peer address), so the connect/write gates ship as
-  one acl story.
 - **the audit trail forwarding** `[common]` — F10's strong answer as an
   option: `--audit-forward syslog` (stdlib `SysLogHandler`, journald picks
   it up sealed) next to the file/stdout sinks; the hash chains + the

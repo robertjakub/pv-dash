@@ -49,6 +49,7 @@ on all four too (the per-tool extras carry their own rows below).
 | s | `config` |  | `show config` | **✓** | **✓** | **✓** hidden | **✓** hidden |
 | k | `config-js` |  | *(startup-only)* |  |  |  | ✓ |
 | k | `connect-acl` |  | `set acl connect`, `set connect-acl` | ✓ live |  | ✓ live |  |
+| s | `connect-acl-table` |  | `show connect-acl-table` | ✓ |  |  |  |
 | s | `connections` |  | `show connections` | **✓** | **✓** | **✓** | **✓** |
 | c | `control` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `control-log-replies` |  | *(startup-only)* |  |  | ✓ |  |
@@ -70,6 +71,8 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `grid-positive-import` |  | `set modbus grid-positive-import` |  | ✓ live |  |  |
 | k | `grid-voltage` |  | `set grid-voltage` |  |  | ✓ live |  |
 | k | `host` |  | *(startup-only)* |  |  | ✓ |  |
+| s | `inputs` |  | `show inputs` |  | ✓ |  |  |
+| s | `inputs-metrics` |  | `show inputs-metrics` |  | ✓ |  |  |
 | k | `interval` |  | `set metrics interval`, `set modbus interval` | ✓ live | ✓ live |  |  |
 | s | `knobs` |  | `show knobs` | **✓** | **✓** | **✓** hidden | **✓** hidden |
 | c | `limits` |  | *(startup-only)* | ✓ |  |  |  |
@@ -128,6 +131,7 @@ on all four too (the per-tool extras carry their own rows below).
 | s | `version` |  | `show version` | **✓** | **✓** | **✓** | **✓** |
 | c | `write` |  | *(startup-only)* | ✓ |  | ✓ |  |
 | k | `write-acl` |  | `set acl write` | ✓ live |  |  |  |
+| s | `write-acl-table` |  | `show write-acl-table` | ✓ |  |  |  |
 | k | `write-registers` |  | `set write registers` | ✓ live |  |  |  |
 | s | `write-registers-profile` |  | `show write-registers-profile` | ✓ |  |  |  |
 

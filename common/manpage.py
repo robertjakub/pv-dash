@@ -18,8 +18,16 @@ def esc(text):
 
 def wrap(text, width=72):
     """The roff body re-flows, so a hard wrap is pure formatting: keep the
-    generated pages under the 80-column lint the hand-written pages hold."""
-    return '\n'.join(textwrap.wrap(text, width=width, break_long_words=False, break_on_hyphens=False))
+    generated pages under the 80-column lint the hand-written pages hold.
+    A wrapped line that would start with the roff control character (a
+    leading '.' or ''') takes the \\& no-control prefix — a wrapped
+    sentence must not grow a macro."""
+    out = []
+    for line in textwrap.wrap(text, width=width, break_long_words=False, break_on_hyphens=False):
+        if line[0] in ('.', "'"):
+            line = '\\&' + line
+        out.append(line)
+    return '\n'.join(out)
 
 
 def _flag_str(action):

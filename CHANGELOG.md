@@ -9,6 +9,28 @@ before the repo restructured into one suite.
 ## Unreleased
 ### Added
 
+- **cache** — the connect and write ACLs read the **ip-prefix acl file**:
+  `--connect-acl file:<path>` / `--write-acl file:<path>` (env, config
+  and the live `set` the same) load the standalone gate whose root is
+  `{"type": "ip-prefix", "rules": [{"type": "allow"|"deny", "prefix":
+  "any"|IP|IP/prefix}]}` (the shipped `examples/acl-ip-prefix.json`
+  shape) — the chain evaluates in the connect/write logic with the last
+  matching rule deciding and a client no rule deciding refused (the
+  default deny any; the matcher word `any` is the whole space,
+  `0.0.0.0/0`). A missing or bad file refuses the start and answers
+  `err` on the wire with the old gate standing, the spelling
+  round-trips through the dumps and `unset`, and a group/world-readable
+  acl file warns (the log, the audit trail's `ACL-FILE` event, the
+  set/unset reply's suffix). The **`show acl connect table` /
+  `show acl write table`** reports (show-only) render either ACL as its
+  chain, one entry per line: the system forms spell the chain they
+  implement — `allow 0.0.0.0/0` (any), `deny 0.0.0.0/0` (none), `deny
+  0.0.0.0/0` then one `allow` line per network (the whitelist) — and a
+  file gate renders its own rules (the gate desc as the `% ` line, the
+  rule descs as aligned `# ` comments). A `set acl connect table` /
+  `set acl write table` (the show word typed into the set verb) answers
+  the pointer to the report instead of the network-parser error.
+
 - **profiles** — the **`sun2000_full`** profile: the Huawei SUN2000 full
   register map — 645 numeric registers from the newest official Modbus
   documentation (the SUN2000MA V200R024 Modbus Interface Definitions

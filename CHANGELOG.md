@@ -14,7 +14,7 @@ before the repo restructured into one suite.
   / `deny any`, a range list as its whitelist (`deny any`, then one
   `allow START:COUNT` line per range), and in profile mode the device
   profile's own rules (the gate's `desc` as the `% ` line, then one
-  `allow|deny <range> # desc` line per range). The set/unset verbs match
+  `allow|deny <range> # desc` line per range, the comments aligned). The set/unset verbs match
   the knob rows only, so the report's live path never shadows the knob
   value `profile` — `set write registers profile` keeps setting the knob.
 

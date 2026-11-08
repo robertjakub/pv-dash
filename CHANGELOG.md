@@ -29,13 +29,14 @@ before the repo restructured into one suite.
 
 - **scraper** — **`metrics/acl`** (`--metrics-acl`, env `METRICS_ACL`,
   config `metrics_acl`, NixOS `metricsAcl`/`metricsAclFile`, live `set
-  metrics acl` / `unset metrics acl`): the cache's `acl/connect` reading
-  on the /metrics listener — one value grammar (`any` the default, `none`,
+  metrics acl` / `unset metrics acl`): one IP-kind gate on the /metrics
+  listener doing what the cache's `acl/connect` does on the Modbus
+  listener — the value grammar (`any` the default, `none`,
   a comma-separated `IP,IP/prefix, ...` whitelist, `file:<path>` the
   standalone ip-prefix acl file, the shipped
-  `examples/acl-ip-prefix.json` shape). The check runs at **accept**,
-  beside the connection caps (caps first, then the ACL): a client off the
-  ACL is closed without a reply — nothing was parsed to answer — and
+`examples/acl-ip-prefix.json` shape). The check runs at **accept**,
+ahead of the connection caps (the ACL first, then the caps): a client
+off the ACL is closed without a reply — nothing was parsed to answer — and
   logged `connection rejected: … not on the metrics ACL`. The acl file
   re-resolves on every `set`/`unset` and on SIGHUP (a bad file keeps the
   old gate standing), a group/world-readable file warns (the log, the

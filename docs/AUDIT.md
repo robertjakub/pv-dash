@@ -12,9 +12,9 @@ listener (`--metrics-acl`, env `METRICS_ACL`, live `set metrics acl
 `metricsAcl`/`metricsAclFile` on the scraper, one `metricsAcl` on the
 cache) taking the family's one value grammar — `any` (the default) |
 `none` | the comma-separated IP/prefix whitelist | `file:<path>` (the
-standalone ip-prefix acl file). Enforcement is **accept-time, beside
-the connection caps** (caps first, then the ACL — the refusal releases
-the cap slot and is never counted): a client off the ACL is closed
+standalone ip-prefix acl file). Enforcement is **accept-time, ahead of
+the connection caps** (the ACL first, then the caps — the refusal never
+touches the cap counters): a client off the ACL is closed
 without a reply (nothing was parsed to answer) and logged
 `connection rejected: … not on the metrics ACL`. The gate re-resolves
 on every set/unset and SIGHUP (a bad file keeps the old gate standing),
@@ -364,7 +364,7 @@ but hold no runtime trust of their own.
 | Surface | cache/ | scrape/ | inverter/ | dashboard/ | Auth |
 |---|---|---|---|---|---|
 | Modbus TCP listener | `--listen`, default `127.0.0.1:15502`; the connect ACL on top (`acl/connect`: any/none/the inline list, or the ip-prefix acl file) | n/a (outbound only) | `--host/--port`, default `127.0.0.1:5502` (Docker: `0.0.0.0`); the connect-acl on top (the cache's mirrored, inline grammar only) | n/a | none (the Modbus protocol has none) |
-| HTTP surface | the `/metrics` endpoint: `--metrics-server` (live-settable), off; binds `--metrics-listen` (default `127.0.0.1:9252`; `0.0.0.0` allowed, **the token is mandatory regardless**); the `metrics/acl` IP gate at accept (`any`/`none`/the inline list/`file:<path>` — an off-ACL peer closed without a reply) | the exporter itself: `--listen`, default `127.0.0.1:9350` — two GET routes (`/`, `/metrics`), everything else a 404, `Cache-Control: no-store`, the `metrics/acl` IP gate at accept (`--metrics-acl`, the same grammar — caps first, then the ACL) | the `/metrics` endpoint: `--metrics-server`, off; binds `--metrics-listen` (default `127.0.0.1:9452`) | the page + the Prometheus proxy: `--bind`, default **`0.0.0.0`:8080** — GET-only, the static tree realpath-guarded (403 on escape), the proxy under `--prom-prefix` | bearer token (`hmac.compare_digest`): mandatory on the cache, mandatory beyond loopback on the scraper (F13's refusal), optional on the fake (test tool — a non-loopback bind without one logs a warning); **none on the dashboard (F21)**; the metrics endpoints' IP gate (`metrics/acl`) sits at accept beside the caps — never instead of the token (F13's refusal stands, rev. 19) |
+| HTTP surface | the `/metrics` endpoint: `--metrics-server` (live-settable), off; binds `--metrics-listen` (default `127.0.0.1:9252`; `0.0.0.0` allowed, **the token is mandatory regardless**); the `metrics/acl` IP gate at accept (`any`/`none`/the inline list/`file:<path>` — an off-ACL peer closed without a reply) | the exporter itself: `--listen`, default `127.0.0.1:9350` — two GET routes (`/`, `/metrics`), everything else a 404, `Cache-Control: no-store`, the `metrics/acl` IP gate at accept (`--metrics-acl`, the same grammar — the ACL first, then the caps) | the `/metrics` endpoint: `--metrics-server`, off; binds `--metrics-listen` (default `127.0.0.1:9452`) | the page + the Prometheus proxy: `--bind`, default **`0.0.0.0`:8080** — GET-only, the static tree realpath-guarded (403 on escape), the proxy under `--prom-prefix` | bearer token (`hmac.compare_digest`): mandatory on the cache, mandatory beyond loopback on the scraper (F13's refusal), optional on the fake (test tool — a non-loopback bind without one logs a warning); **none on the dashboard (F21)**; the metrics endpoints' IP gate (`metrics/acl`) sits at accept beside the caps — never instead of the token (F13's refusal stands, rev. 19) |
 | control server (JSON lines) | unix socket `/tmp/modbus-cache-<port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket `/tmp/modbus-scraper-<listen-port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1 (exempt from the refusal — the F11 test-tool posture) | unix socket `/tmp/dashboard-<port>.socket`, `chmod 0600` after bind; `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | token on TCP (`hmac.compare_digest`), refused without; on unix a kernel-vouched peer (peer-cred: root, the daemon's own user, `--control-trust-uids`) skips the handshake; the signed wire (the full HMAC per frame) wherever a token is held |
 | state dump | `--dump-path`: the live setting overrides and — with `--dump-with-cache`/`request dump with-cache` — the cached words (+ stamps), as one atomic JSON — see F18 | n/a | n/a | n/a | **created `0600` explicitly** (never the umask) + a sha256 integrity hash checked at restore (F18) |
 | token files | the token knobs take `file:` references — `--control-token file:/path` / `--metrics-token file:/path` | `--auth-token file:/path` / `--control-token file:/path` | `--control-token file:/path` / `--metrics-token file:/path` | `--control-token file:/path` | **owner-only (0600) enforced** — a group/world-accessible token file refuses the reference (F12); the bare `*_FILE` env/flag spellings were REMOVED rev. 13 (the reference rides the token knob's own flag/env/config/live paths) |
@@ -427,7 +427,7 @@ control-server access only.
   `cache/lib/metrics.py:161-175`); both the cache's and the scraper's
   `/metrics` take the `metrics/acl` IP gate at accept
   (`common/connlimit.py`'s `acl_allows`/`acl_refused` hooks,
-  `common/config.py` `acl_admits` — caps first, then the ACL, the
+  `common/config.py` `acl_admits` — the ACL first, then the caps, the
   off-ACL peer closed without a reply, rev. 19); all non-Modbus
   listeners bind 127.0.0.1
   hard-coded — the dashboard is the documented exception (F21).
@@ -491,9 +491,9 @@ control-server access only.
   answers 401 with `WWW-Authenticate: Bearer realm="metrics"`, compared in
   constant time (`scrape/lib/server.py:32,90`), and unauthorized attempts
   are logged at WARNING with the peer; the accept ladder takes the
-  `metrics/acl` IP gate beside the caps (caps first, then the ACL — an
-  off-ACL peer is closed without a reply, nothing parsed to answer;
-  rev. 19); exactly two GET routes (`/`,
+`metrics/acl` IP gate ahead of the caps (the ACL first, then the caps —
+an off-ACL peer is closed without a reply, nothing parsed to answer;
+rev. 19); exactly two GET routes (`/`,
   `/metrics`), everything else a 404; responses carry
   `Cache-Control: no-store`; the bearer token takes a `file:` reference
   (LoadCredential-style,

@@ -149,9 +149,9 @@ Modbus write refused), with no IP write-acl and no register allow-list.
 ## modbus-scraper — the metrics listener, IP kind
 
 The scraper's exposure is the /metrics exposition, and it takes the
-connect-ACL half of the story — the cache's `acl/connect` reading on the
-HTTP listener (the cache's own /metrics endpoint speaks the same
-`metrics/acl` gate now):
+connect-ACL half of the story — one IP-kind gate on the HTTP listener
+doing what the cache's `acl/connect` does on the Modbus listener (the
+cache's own /metrics endpoint speaks the same `metrics/acl` gate):
 
 | knob | the gate | the check |
 |---|---|---|
@@ -162,9 +162,10 @@ HTTP listener (the cache's own /metrics endpoint speaks the same
 `metricsAcl`/`metricsAclFile`) takes the same one value grammar as the
 cache's IP knobs — `any` (the default), `none`, a comma-separated
 `IP,IP/prefix, ...` list, or `file:<path>` (the ip-prefix acl file). The
-check runs at **accept**, beside the connection caps (caps first, then
-the ACL — the cache's order): a client off the ACL is closed **without a
-reply** — nothing was parsed to answer. The acl file re-resolves on
+check runs at **accept**, ahead of the connection caps (the ACL first,
+then the caps — a cap refusal is only ever answered to a peer the ACL
+admitted): a client off the ACL is closed **without a reply** — nothing
+was parsed to answer. The acl file re-resolves on
 every `set`/`unset` and on SIGHUP, a bad file keeps the old gate
 standing, and a group/world-readable file warns (the log, the audit
 trail's `ACL-FILE` event, the `set` reply's suffix). The chain renders as

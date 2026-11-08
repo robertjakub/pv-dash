@@ -304,7 +304,11 @@ sun2000 profile), **`metrics interval`**,
 auth`**/`modbus auth key` (the suite scheme + key toward the inverter; a
 change drops the Modbus session — the next poll reconnects and handshakes)
 — and the
-**token lives**: `control token` and `control ops token` rotate the
+**`control port` rebinds the listener live** (bind-first: a failed bind
+leaves the old listener untouched; the old loop retires by identity, the
+connected sessions keep serving; `off` stops accepting while the sessions
+keep serving, a later set re-enables) — and the **token lives**: `control
+token` and `control ops token` rotate the
 control tokens live (the sessions re-auth), `metrics auth token` rotates the
 /metrics bearer live; a token value never renders back — **`show <secret>`
 refuses** (it is a secret: pass it by flag/env, or as `file:<path>`)),
@@ -333,7 +337,8 @@ the registry: every knob with its flag, its env twin, how it changes),
 `shutdown`.
 
 A **TCP control port refuses to start without a token** (the audit's F5 —
-the same rule as the cache): `--control-token`
+the same rule as the cache; a live `set control port` to a TCP port refuses
+the same way): `--control-token`
 requires the token handshake (`{"cmd": "auth", "token": ...}`) on the first
 frame; over the unix socket a kernel-vouched peer (root, the daemon's own
 user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake.

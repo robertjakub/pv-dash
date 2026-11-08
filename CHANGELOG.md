@@ -165,6 +165,33 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   `0660` — a local group may speak to the control without being the service
   user; `set control socket-group` re-modes the live socket.
 
+- **scraper** — **`control/port` rebinds the listener live** (`set control
+  port` / `unset control port`): the cache's control listener logic ports
+  over. The live set swaps the unix/TCP listener by identity — bind-first
+  (a failed bind leaves the old listener untouched, the attrs roll back),
+  the old accept loop retires, the connected sessions keep serving their
+  replies; `off` stops accepting while the sessions keep serving (a later
+  set re-enables); a re-set of the running target answers without bouncing
+  the socket. The F5 rule holds on the live wire: a TCP rebind without the
+  admin token refuses, and `control/token` only drops from a TCP listener
+  that is already retired. `show control port` renders the live state
+  (`off` when retired — previously the raw configured string), the
+  dump/reload state carries an overridden target, and the socket-group
+  re-mode only touches a live listener's socket.
+
+- **everywhere** — **the gate's refusal closes with a FIN, not an RST**:
+  the cap-503 and the metrics-acl refusals answer before any handler read
+  the request — the peer's bytes sat unread in the kernel buffer and the
+  close() fired a TCP RST that could overtake the refusal reply in the
+  client's receive buffer (the client read the reset, the reply lost —
+  the scraper regtest's `metrics acl order` check flaked 3 runs of 4).
+  The shared GatedHTTPServer gains `_refuse_close`: half-close so the
+  reply drains, then a bounded drain of what the peer sent (a 0.5s wall
+  clock, a 0.2s quiet-gap recv timeout, a 1 MiB byte cap — a hostile
+  peer must not pin the accept loop), then close. The scraper's
+  exposition, the cache's /metrics, the dashboard's server and the
+  common metrics skeleton's refusal paths all ride it.
+
 - **scraper** — **the compute metrics are expression-fed**: the spec's
   `metrics` tree (one merged section — the entry's own field says what
   feeds it) carries compute entries with an **`expr`** (and an optional

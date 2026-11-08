@@ -30,6 +30,32 @@ section below maps the boundary.
 | modbus-scraper | `metrics/acl` | IP | `any` | `any\|none\|IP,...\|file:` | accept on the /metrics port |
 | dashboard | — | — | — | — | no ACL surface — the page carries no auth (the bind/proxy posture, docs/AUDIT.md F7); its /metrics is token-mandatory when on (F6) |
 
+## The listeners (the serving surfaces)
+
+Eleven listeners across the four tools: four carry an IP-kind ACL, every
+serving surface carries the connection caps, the control sockets are
+loopback + token by decision, and the dashboard's page is the one
+deliberately-open surface (F21).
+
+| tool | listener | the default bind | the stack at it |
+|---|---|---|---|
+| cache | the Modbus mirror | `127.0.0.1:15502` | `acl/connect` (accept, ahead of the caps) → the caps → the suite auth; the write path then adds `--allow-write` + `acl/write` + `write-registers` |
+| cache | /metrics | `127.0.0.1:9252`, off | the token mandatory whenever on (F6) → `metrics/acl` → the caps |
+| cache | control | unix \| TCP `127.0.0.1` | the TCP bind refuses without the admin token (F5); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660` |
+| fake | the Modbus listener | `:5502` | `connect-acl` (the system grammar, no `file:`) → the caps → the suite auth; `--allow-write` |
+| fake | /metrics | `127.0.0.1:9452`, off | no ACL; the token optional — a non-loopback bind without one warns (the test-tool posture) → the caps |
+| fake | control | unix \| TCP `127.0.0.1` | the F11 tokenless-TCP exemption |
+| scraper | /metrics | `127.0.0.1:9350`, always on | the token mandatory beyond loopback (F13's refusal) → `metrics/acl` → the caps |
+| scraper | control | unix \| TCP `127.0.0.1` | the token refusal on TCP, like the cache's |
+| dashboard | the page + the config proxy | `0.0.0.0:8080` | no auth (F21, the recorded exception) — the bind/reverse-proxy posture (F7 publishes nothing), GET-only, the realpath guard, the cap gate |
+| dashboard | /metrics | `127.0.0.1:9452`, off | the token mandatory when on; the shared hooks' admit-all base — no IP gate |
+| dashboard | control | unix \| TCP `127.0.0.1` | the token refusal on TCP, like the cache's |
+
+The defaults come from each tool's `statics.py`; the authoritative
+per-surface detail is docs/AUDIT.md's surfaces table (rev. 19). The fake
+and the dashboard share the `9452` metrics default — harmless while both
+stay off.
+
 ## The rule chain (the one semantics)
 
 The gate object: an optional terse-ASCII `desc`, the optional gate-level

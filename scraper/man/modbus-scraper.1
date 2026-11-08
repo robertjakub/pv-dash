@@ -217,7 +217,7 @@ graceful shutdown.
 
 .SH CONTROL
 The control server speaks JSON lines ({"cmd": "..."} ->
-{"status": "ok|err|bye", "text": "..."}; TCP requires the token when
+{"status": "ok|fail|bye", "text": "..."}; TCP requires the token when
 configured and refuses to start without one). Commands:
 \fBset\fR/\fBunset\fR/\fBshow\fR/\fBhelp\fR (the settings: interval,
 timeout, max-clients, client-timeout, max-conn-per-ip, log-access,

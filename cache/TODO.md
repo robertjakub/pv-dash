@@ -25,7 +25,13 @@ knob rows only (`SET_BY_NAME`), so the report's live path never shadows a
 knob value — `set write registers profile` keeps handing the knob the
 word — and a bad `set write registers <value>` answers `err` now instead
 of dropping the control session (the parser's SystemExit is a ValueError
-on the wire).
+on the wire). The wave's follow-up: the gate also reads from a
+**standalone acl file** — `--write-registers file:<path>` (env, config
+and the live `set` the same) — the file IS the gate object a profile
+carries under `acl`/`write`, read and compiled at start and on every
+`set` (a bad file refuses the start, answers `err` with the old gate
+standing; the spelling round-trips through the dumps and `unset`, and
+the show report renders the file's rules like the profile's).
 
 The status-face wave: the wire's reply status speaks **`ok` | `fail` |
 `bye`** — the internal 'err' verdicts map to `fail` at the frame (the mac

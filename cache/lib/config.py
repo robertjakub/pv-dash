@@ -44,9 +44,11 @@ def parse_write_registers(text, label='write-registers'):
     """'any'/'*'/empty/None -> None (any register writable); 'none' -> ()
     (no register writable); 'profile' -> 'profile' (the device profile's
     write acl — the proxy resolves it against the configured profile);
-    'START:COUNT,...' (comma-separated) -> tuple of (start, count) ranges.
-    A write is allowed only when every register it touches lands inside one
-    of the ranges."""
+    'file:<path>' -> 'file:<path>' (the standalone acl file — the same
+    gate object a profile carries under "acl"/"write"; the proxy reads and
+    compiles it); 'START:COUNT,...' (comma-separated) -> tuple of (start,
+    count) ranges. A write is allowed only when every register it touches
+    lands inside one of the ranges."""
     if text is None:
         return None
     t = str(text).strip()
@@ -56,6 +58,8 @@ def parse_write_registers(text, label='write-registers'):
         return ()
     if t.lower() == 'profile':
         return 'profile'
+    if t.startswith('file:'):
+        return t
     ranges = []
     for part in t.split(','):
         part = part.strip()
@@ -142,46 +146,32 @@ def _ranges_from_bits(bits):
     return out
 
 
-def load_profile_write_gate(path, label=None):
-    """The device profile's write acl, parsed but not compiled: the optional
-    top-level "acl" object keyed by access kind — "write" is the one the
-    cache speaks; its gate is one object, an optional terse-ASCII "desc"
-    and the ordered "rules" list. One {"type": "allow"|"deny", "range":
-    matcher} object per rule (+ an optional "desc" each); a matcher is a
-    "START:COUNT" range or a list of them, or a {"START:COUNT": "desc"} map
-    describing each entry, or the bare word "any" (all registers) /
-    "none". The chain is a whitelist: it reads top to bottom and the LAST
-    matching rule decides, and a register no rule decides refuses — the
-    default deny any. Returns (desc, rules), the rules as (verb, matcher,
-    desc, where) tuples in chain order. A profile without acl/write
-    refuses: the caller asked for the profile's gating, silence would look
-    like a gate that is not there."""
-    label = label or 'device profile %s' % path
-    try:
-        with open(path, encoding='utf-8') as fh:
-            data = json.load(fh)
-    except (OSError, ValueError) as e:
-        raise SystemExit('cannot read device profile %s: %s' % (path, e))
-    acl = data.get('acl') if isinstance(data, dict) else None
-    gate = acl.get('write') if isinstance(acl, dict) else None
-    if not isinstance(gate, dict):
-        raise SystemExit('%s carries no "acl"/"write" gate for write-registers profile '
-                         '(add "acl": {"write": {"rules": '
-                         '[{"type": "allow", "range": "START:COUNT"}]}})' % label)
+def _write_gate_object(gate, base):
+    """The acl gate OBJECT (what a device profile carries under
+    "acl"/"write", what a standalone acl file is): an optional terse-ASCII
+    "desc" and the ordered "rules" list — one {"type": "allow"|"deny",
+    "range": matcher} object per rule (+ an optional "desc" each); a
+    matcher is a "START:COUNT" range or a list of them, or a
+    {"START:COUNT": "desc"} map describing each entry, or the bare word
+    "any" (all registers) / "none". The chain is a whitelist: it reads top
+    to bottom and the LAST matching rule decides, and a register no rule
+    decides refuses — the default deny any. Returns (desc, rules), the
+    rules as (verb, matcher, desc, where) tuples in chain order; `base`
+    names the gate in the errors ('<profile> acl/write', 'acl file <path>')."""
     unknown = sorted(k for k in gate if k not in ('desc', 'rules'))
     if unknown:
-        raise SystemExit('%s: unknown acl/write key(s) %s ("desc" and the "rules" list — one '
+        raise SystemExit('%s: unknown key(s) %s ("desc" and the "rules" list — one '
                          '{"type": "allow"|"deny", "range": ...} object per rule)'
-                         % (label, ', '.join(unknown)))
-    _acl_desc(gate.get('desc'), '%s acl/write' % label)
+                         % (base, ', '.join(unknown)))
+    _acl_desc(gate.get('desc'), base)
     gate_rules = gate.get('rules')
     if not isinstance(gate_rules, list) or not gate_rules:
-        raise SystemExit('%s: the acl/write "rules" list is missing or empty (a gate that '
+        raise SystemExit('%s: the "rules" list is missing or empty (a gate that '
                          'gates nothing is a config error — spell the whole-space deny as '
-                         '[{"type": "deny", "range": "any"}])' % label)
+                         '[{"type": "deny", "range": "any"}])' % base)
     rules = []   # (verb, matcher-value, desc, where) in chain order
     for i, rule in enumerate(gate_rules):
-        where = '%s acl/write rule %d' % (label, i + 1)
+        where = '%s rule %d' % (base, i + 1)
         if not isinstance(rule, dict) or not rule:
             raise SystemExit('%s must be an object with a "type" (allow/deny) and a "range"' % where)
         unknown = sorted(k for k in rule if k not in ('type', 'range', 'desc'))
@@ -195,6 +185,45 @@ def load_profile_write_gate(path, label=None):
         _acl_desc(rule.get('desc'), where)
         rules.append((verb, rule['range'], rule.get('desc'), where))
     return gate.get('desc'), rules
+
+
+def load_profile_write_gate(path, label=None):
+    """The device profile's write acl, parsed but not compiled: the
+    optional top-level "acl" object keyed by access kind — "write" is the
+    one the cache speaks; its gate is the acl gate object (see
+    _write_gate_object). A profile without acl/write refuses: the caller
+    asked for the profile's gating, silence would look like a gate that is
+    not there."""
+    label = label or 'device profile %s' % path
+    try:
+        with open(path, encoding='utf-8') as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as e:
+        raise SystemExit('cannot read device profile %s: %s' % (path, e))
+    acl = data.get('acl') if isinstance(data, dict) else None
+    gate = acl.get('write') if isinstance(acl, dict) else None
+    if not isinstance(gate, dict):
+        raise SystemExit('%s carries no "acl"/"write" gate for write-registers profile '
+                         '(add "acl": {"write": {"rules": '
+                         '[{"type": "allow", "range": "START:COUNT"}]}})' % label)
+    return _write_gate_object(gate, '%s acl/write' % label)
+
+
+def load_write_gate_file(path, label=None):
+    """The standalone acl file for write-registers file:<path>: the root
+    object IS the gate — the same acl gate object a device profile carries
+    under "acl"/"write" (see _write_gate_object). Returns (desc, rules)."""
+    label = label or 'acl file %s' % path
+    try:
+        with open(path, encoding='utf-8') as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as e:
+        raise SystemExit('cannot read acl file %s: %s' % (path, e))
+    if not isinstance(data, dict):
+        raise SystemExit('%s must be the acl gate object: {"desc": ..., "rules": '
+                         '[{"type": "allow"|"deny", "range": "START:COUNT"}]} — the same '
+                         'object a device profile carries under "acl"/"write"' % label)
+    return _write_gate_object(data, label)
 
 
 def compile_write_acl(rules):

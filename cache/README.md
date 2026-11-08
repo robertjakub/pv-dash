@@ -184,7 +184,7 @@ with a clean one-line error instead of failing later at runtime.
 | `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Behaviour toggles** | | |
 | `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter; disabled, they are refused with a Modbus illegal-function exception (config `set write allow`, env `ALLOW_WRITE` accepts `true`/`false`) |
-| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default), `profile` = the device profile's `acl`/`write` gate (the ordered rule chain — one `type` allow/deny and a `range` per rule, a whitelist: the last matching rule decides, a register no rule decides refuses; `any` = all registers) (config `set write registers`, env `WRITE_REGISTERS`) |
+| `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, e.g. `47400:100,47600:100` — every touched register must land inside a range, anything else is refused with a Modbus illegal-function exception; `any` = every register writable, `none` = no register writable (the default), `profile` = the device profile's `acl`/`write` gate (the ordered rule chain — one `type` allow/deny and a `range` per rule, a whitelist: the last matching rule decides, a register no rule decides refuses; `any` = all registers), `file:<path>` = the standalone acl file — the same gate object a profile carries under `acl`/`write`, read and compiled at start and on every set (config `set write registers`, env `WRITE_REGISTERS`) |
 | `--connect-acl` | `any` | clients allowed to connect: `any`, `none` (refuse everyone) or comma-separated IPs/CIDR prefixes, IPv4 or IPv6 — see [Access control](#access-control) |
 | `--write-acl` | `none` | clients allowed to write — still requires `--allow-write`; `none` = no client writes (the default) — see [Access control](#access-control) |
 | `--control-token` | none | require a token on **control** connections: the client authenticates with `{"cmd": "auth", "token": "..."}` before anything else; over the unix socket a trusted peer (root, the daemon's own user or `--control-trust-uids` — `SO_PEERCRED`) skips the handshake; a **TCP** control port refuses to start without a token — see [Runtime control](#runtime-control---control-port) (config `set control token`, env `CONTROL_TOKEN`) |
@@ -461,12 +461,18 @@ restrict all); the config-file/env/NixOS forms are
   `desc` (per gate, per rule, or per entry in the range map). The chain
   is a whitelist: it reads top to bottom, **the last matching rule
   decides**, and a register no rule decides refuses (the default deny
-  any). `deye-sg05lp3`, for example, allows only the TOU schedule slots
+  any).   `deye-sg05lp3`, for example, allows only the TOU schedule slots
   (148–177) and the grid-start registers (127–128). A profile without an
   `acl`/`write` section refuses the `profile` value (a gate that is not
-  there would be silent). `show write registers profile` answers the gate
+  there would be silent). **`file:<path>`** takes the gate from a
+  standalone acl file instead — the file IS the gate object a profile
+  carries under `acl`/`write` (the same `desc` + `rules` shape, the same
+  whitelist semantics), read and compiled at start and on every `set`; a
+  missing or bad file refuses the start and answers `err` on the wire
+  with the old gate standing, and the spelling round-trips through the
+  dumps and `unset`. `show write registers profile` answers the gate
   back as its chain — one `allow`/`deny` line per range, the profile's
-  descs included.
+  descs included (the file's rules render the same way).
 
 Writing is therefore gated four times: `--allow-write` **and** the client
 on the write ACL **and** every touched register inside the allow-list

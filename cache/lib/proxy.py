@@ -13,7 +13,7 @@ from common.modbus import (DeviceError, ModbusError, auth_handshake_server,
                            frame, pack_bits, read_frame, unpack_bits,
                            write_shape_error, write_target)
 from common.connlimit import ConnGate
-from .config import load_profile_write_gate, compile_write_acl, load_registers_file, load_selection
+from .config import load_profile_write_gate, load_write_gate_file, compile_write_acl, load_registers_file, load_selection
 from .cache import build_blocks, span
 from .statics import (MAX_COUNT, MAX_PDU, MAX_BITS, READ_FUNCS, BIT_READ_FUNCS, WRITE_FUNCS,
                       GATEWAY_FAILED, ILLEGAL_FUNCTION,
@@ -59,7 +59,7 @@ class Proxy:
         self.config = config or {}
         self.audit = audit   # the CACHE audit trail (common.audit), None = off
         self.allow_write = bool(self.config.get('allow_write', False))
-        self.write_registers = self.config.get('write_registers')   # the knob: None = any, () = none, 'profile' = the profile's acl
+        self.write_registers = self.config.get('write_registers')   # the knob: None = any, () = none, 'profile' = the profile's acl, 'file:<path>' = the standalone acl file
         self.write_gate_rules = None   # the profile gate's parsed rules (the write/registers/profile show report), None = not in profile mode
         try:
             self.write_ranges = self._resolve_write_ranges(self.write_registers)   # the effective gate
@@ -314,16 +314,21 @@ class Proxy:
 
     def _resolve_write_ranges(self, val):
         """The knob value -> the effective ranges. 'profile' loads the
-        device profile's write acl against the CURRENT config (ValueError
-        on a missing or bad acl — the start re-raises as SystemExit, the
-        wire answers err) and keeps the parsed gate for the
-        write/registers/profile show report — the stash swaps only on a
-        successful resolve, so a bad acl leaves the old gate AND its
-        report standing; everything else passes through unchanged."""
-        if val != 'profile':
-            return val
+        device profile's write acl against the CURRENT config, 'file:<path>'
+        the standalone acl file (the same gate object a profile carries
+        under "acl"/"write") — both ValueError on a missing or bad gate
+        (the start re-raises as SystemExit, the wire answers err) and keep
+        the parsed rules for the write/registers/profile show report, the
+        stash swapping only on a successful resolve so a bad gate leaves
+        the old one AND its report standing; everything else passes
+        through unchanged."""
         try:
-            desc, rules = load_profile_write_gate(self.config.get('profile'))
+            if val == 'profile':
+                desc, rules = load_profile_write_gate(self.config.get('profile'))
+            elif isinstance(val, str) and val.startswith('file:'):
+                desc, rules = load_write_gate_file(val[5:])
+            else:
+                return val
             ranges = compile_write_acl(rules)
         except SystemExit as e:
             raise ValueError(str(e))
@@ -331,8 +336,9 @@ class Proxy:
         return ranges
 
     def set_write_registers(self, val):
-        """Swap the write-registers knob (None/()/(ranges)/'profile'):
-        resolve first — a bad profile acl leaves the old gate standing."""
+        """Swap the write-registers knob (None/()/(ranges)/'profile'/
+        'file:<path>'): resolve first — a bad profile acl or acl file
+        leaves the old gate standing."""
         ranges = self._resolve_write_ranges(val)
         self.write_registers = val
         self.write_ranges = ranges
@@ -347,17 +353,18 @@ class Proxy:
 
     def describe_write_ranges(self):
         """The knob value for the wire and the dumps (re-appliable): 'any',
-        'none', 'profile' or the configured ranges."""
-        if self.write_registers == 'profile':
-            return 'profile'
+        'none', 'profile', the 'file:<path>' acl reference or the
+        configured ranges."""
+        if isinstance(self.write_registers, str):
+            return self.write_registers   # 'profile' / the file reference — both re-resolve
         return self._ranges_text()
 
     def describe_write_gate(self):
         """The gate for humans (the logs, show status, inspect): like
-        describe_write_ranges, but a profile-mode gate names the effective
-        ranges it resolved to."""
-        if self.write_registers == 'profile':
-            return 'profile (%s)' % self._ranges_text()
+        describe_write_ranges, but a profile- or file-mode gate names the
+        effective ranges it resolved to."""
+        if isinstance(self.write_registers, str):
+            return '%s (%s)' % (self.write_registers, self._ranges_text())
         return self._ranges_text()
 
     def serve(self, host, port):

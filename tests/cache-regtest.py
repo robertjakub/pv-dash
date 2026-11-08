@@ -1821,6 +1821,55 @@ print('mode 0600 ok')
     check('profile acl: a profile without the section fails the start',
           p.returncode == 1 and 'carries no "acl"/"write" gate' in p.stderr, '%s %r' % (p.returncode, p.stderr[-120:]))
 
+    # the standalone acl file: --write-registers file:<path> — the file IS
+    # the gate object (what a profile carries under acl/write), read and
+    # compiled at start and on every set, the whitelist semantics the same
+    aclf = '/tmp/reg_acl_file.json'
+    with open(aclf, 'w') as fh:
+        _json.dump({'desc': 'the regtest gate',
+                    'rules': [{'type': 'allow', 'range': '148:30', 'desc': 'the TOU slots'},
+                              {'type': 'deny', 'range': '148:1', 'desc': 'carved back'}]}, fh)
+    start([sys.executable, P, '--upstream', '127.0.0.1:15584',
+           '--listen', '127.0.0.1:15600', '--interval', '1',
+           '--allow-write', '--write-acl', 'any', '--write-registers', 'file:' + aclf,
+           '--control-port', '15601', '--control-token', 'sekrit'],
+          log='/tmp/reg_acl_file.log')
+    time.sleep(2)
+    b = wr6(149, 1, port=15600)
+    check('acl file: 149 passes (the allow 148:30)', b[0] == 6, b.hex())
+    b = wr6(148, 1, port=15600)
+    check('acl file: 148 refused by the deny carve', b[0] == 0x86 and b[1] == 1, b.hex())
+    b = wr6(200, 1, port=15600)
+    check('acl file: 200 refused (the whitelist default deny)', b[0] == 0x86 and b[1] == 1, b.hex())
+    r = ctl_cmd('show write registers', 15601)
+    check('acl file: show answers the file spelling (re-appliable)',
+          r == 'ok write/registers=file:%s' % aclf, r[:120])
+    r = ctl_cmd('show write registers profile', 15601)
+    check('acl file: the show report renders the file rules (the comments aligned)',
+          r == 'ok write-registers-profile\n'
+               '% the regtest gate\n'
+               'allow 148:30 # the TOU slots\n'
+               'deny 148:1   # carved back', repr(r[:160]))
+    r = ctl_cmd('show status', 15601)
+    check('acl file: status renders the resolved gate',
+          'write_allow_list=file:%s (149:29)' % aclf in r, r[:200])
+    r = ctl_cmd('set write registers file:/nonexistent/acl.json', 15601)
+    check('acl file: a bad file is a clean err, the old gate stands',
+          r.startswith('fail cannot read acl file /nonexistent/acl.json')
+          and ctl_cmd('show write registers', 15601) == 'ok write/registers=file:%s' % aclf, r[:120])
+    r = ctl_cmd('set write registers 100:1', 15601)
+    check('acl file: the explicit ranges take over', r.startswith('ok write/registers=100:1'), r[:80])
+    r = ctl_cmd('unset write registers', 15601)
+    check('acl file: unset restores the configured file gate',
+          r.startswith('ok write/registers=file:%s' % aclf), r[:100])
+    p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15584',
+                        '--listen', '127.0.0.1:15600', '--profile', R,
+                        '--write-registers', 'file:/nonexistent/acl.json', '--dry-run'],
+                       capture_output=True, text=True, timeout=60)
+    check('acl file: a bad file fails the start',
+          p.returncode == 1 and 'cannot read acl file /nonexistent/acl.json' in p.stderr,
+          '%s %r' % (p.returncode, p.stderr[-120:]))
+
 
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
            '--listen', '127.0.0.1:15539', '--interval', '1', '--profile', R,

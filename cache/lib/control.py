@@ -1062,18 +1062,19 @@ class ControlServer(_ControlServer):
         """The write/registers/profile show report (the show-only view of
         the write gate): 'allow any' when the knob is any, 'deny any' when
         it is none; a range list renders as its whitelist — 'deny any' and
-        one allow line per range; in profile mode the device profile's own
-        rules render — the gate's desc as the '% ' line, then one
-        '<verb> <range> # <desc>' line per range (the live gate: the rules
-        the running gate resolved from, not the file's current state)."""
+        one allow line per range; a string knob ('profile' or the
+        'file:<path>' acl) renders the gate's own rules — the gate's desc
+        as the '% ' line, then one '<verb> <range> # <desc>' line per
+        range, the comments aligned (the live gate: the rules the running
+        gate resolved from, not the file's current state)."""
         p = self.proxy
         lines = ['ok write-registers-profile']
         wr = p.write_registers
         if wr is None:
             lines.append('allow any')
-        elif wr == 'profile':
+        elif isinstance(wr, str):   # 'profile' or the file:<path> acl reference
             if p.write_gate_rules is None:
-                return 'err write/registers/profile: the profile gate is not resolved'
+                return 'err write/registers/profile: the gate is not resolved'
             lines.extend(render_write_acl(*p.write_gate_rules))
         elif not wr:
             lines.append('deny any')

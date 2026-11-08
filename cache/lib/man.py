@@ -66,7 +66,7 @@ graceful shutdown."""
     control = """.SH CONTROL
 The control server speaks JSON lines: one request
 \\fB{"cmd": "..."}\\fR per line, one reply
-\\fB{"status": "ok|err|bye", "text": "..."}\\fR per line. Commands
+\\fB{"status": "ok|fail|bye", "text": "..."}\\fR per line. Commands
 (the settings registry drives the grammar):
 .BR set ", " unset ", " show ", " help ,
 the reports
@@ -236,9 +236,12 @@ the poll health and the uptime; the prompt shows the connected port
 their descriptions (the listings group the settings under the registry's
 own groups \\(em ungrouped rows render bare, no header \\(em, with
 [values] beside);
-\\fB?\\fR prints the same in any position; \\fBrequest clear cache\\fR/
-\\fBrequest restart\\fR
-confirm; \\fBshutdown\\fR asks \\fBProceed with shutdown? [confirm]\\fR first.
+\\fB?\\fR prints the same in any position; \\fBset\\fR/\\fBunset\\fR confirm
+\\fB% changed\\fR (the errors print \\fB% error: <message>\\fR, the ok
+replies' messages print bare);
+\\fBrequest clear cache\\fR/\\fBrequest restart\\fR
+confirm silently; \\fBshutdown\\fR asks
+\\fBProceed with shutdown? [confirm]\\fR first.
 .PP
 While idle the session sends wire pings so the server's idle
 timeout never drops it; when the connection dies anyway, the console

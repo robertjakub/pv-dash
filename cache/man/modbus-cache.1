@@ -289,7 +289,7 @@ graceful shutdown.
 .SH CONTROL
 The control server speaks JSON lines: one request
 \fB{"cmd": "..."}\fR per line, one reply
-\fB{"status": "ok|err|bye", "text": "..."}\fR per line. Commands
+\fB{"status": "ok|fail|bye", "text": "..."}\fR per line. Commands
 (the settings registry drives the grammar):
 .BR set ", " unset ", " show ", " help ,
 the reports

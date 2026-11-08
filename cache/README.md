@@ -270,7 +270,9 @@ inverter's `CTL`) environment variable > default socket.
 
 One command per line, one reply per line. Every request and reply is one
 JSON object: the request = `{"cmd": "<command>"}`, the reply =
-`{"status": "ok|err|bye", "text": "…"}`. **With `--control-token` set,
+`{"status": "ok|fail|bye", "text": "…"}` — `ok` (the command ran, `text`
+is its output), `fail` (the command refused, `text` is the error message),
+`bye` (the unsolicited daemon-exit notice). **With `--control-token` set,
 connections must authenticate first** — `{"cmd": "auth", "token": "..."}` —
 on both transports. Over the unix socket the kernel vouches for the peer
 (`SO_PEERCRED`): root, the daemon's own user and the extra
@@ -398,7 +400,6 @@ write_allow_list=any
 requests_audit=5.00m
 
 cache:15502 > clear cache
-% ok
 
 cache:15502 > shutdown
 Proceed with shutdown? [confirm] y
@@ -408,11 +409,13 @@ Proceed with shutdown? [confirm] y
 The prompt shows the connected port, TAB completes commands with their
 descriptions (`show <TAB>` lists the tunables plus status/connections/cache/
 version, `?` does the same in any position), `request clear cache` and
-`request restart` confirm with
-`% ok`, and `shutdown` asks `Proceed with shutdown? [confirm]` first — RETURN
-or `y` proceeds, anything else aborts with `% Aborted.`. Every non-value
-line the console prints — the verdicts, the notes, the errors — carries the
-`% ` prefix; the `show` reports and the tables are the values and print
+`request restart` confirm silently (the prompt returning is the
+confirmation), `set`/`unset` confirm `% changed`, and `shutdown` asks
+`Proceed with shutdown? [confirm]` first — RETURN
+or `y` proceeds, anything else aborts with `% Aborted.`. The errors print
+`% error: <message>`, the notes and the bye notices keep the `% ` prefix;
+the ok replies print their message bare (quiet success) — the `show`
+reports and the tables are the values and print
 bare. While it idles the
 CLI sends wire pings (every 55 s, `CLI_KEEPALIVE` to tune, `0` = off)
 so the control server's idle timeout never drops a live session. When the

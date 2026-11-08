@@ -5,6 +5,21 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The status-face wave: the wire's reply status speaks **`ok` | `fail` |
+`bye`** — the internal 'err' verdicts map to `fail` at the frame (the mac
+signs the wire form), the console prints the ok replies' messages **bare**
+(quiet success — the `show`/`inspect` bodies already were) and the
+failures as **`% error: <message>`** (was `% err …`); the set/unset pair
+confirms **`% changed`** (the one ok face keeping the marker; the echo and
+the status-summary tail stay discarded), the startup-only note keeps
+`% restart required …`, the local `ping` answers bare `pong`, and the
+`request clear cache`/`request restart` confirms went fully silent. The
+wire's help branch speaks the commands now: `help unset` describes the
+row, `help request` lists the namespace (the ? shape), the unknown topic
+answers `unknown command or setting <words> (try ?)` — the registry's
+command rows drive it (the `request/dump` node's placeholder prose landed
+with it).
+
 The request-namespace wave: the control grammar's commands are `/`-paths
 spelled as words on the wire — `clear cache`/`reload`/`restart` renamed to
 `request clear cache`/`request reload`/`request restart` (the bare

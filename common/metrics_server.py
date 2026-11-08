@@ -81,7 +81,7 @@ class MetricsServer:
         raise NotImplementedError
 
     def acl_allows(self, ip):
-        """The accept-time ACL hook beside the caps: the default admits
+        """The accept-time ACL hook, ahead of the caps: the default admits
         every peer — the tool subclass with an IP knob overrides (the
         cache's metrics/acl, common/config.py acl_admits on its gate)."""
         return True

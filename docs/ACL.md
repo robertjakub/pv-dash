@@ -106,7 +106,7 @@ loader-refused (the strict-CIDR host-bit spellings, the range bounds), so
 the loader stays the strict word; wire them into an editor by `$schema`
 pattern-matching for live feedback while editing.
 
-## modbus-cache — the full story
+## modbus-cache — both planes, both spellings
 
 The cache consumes both planes, both matcher kinds, both spellings
 (embedded and file) — four gates on one forwarded write:
@@ -169,25 +169,24 @@ Modbus write refused), with no IP write-acl and no register allow-list.
 
 ## modbus-scraper — the metrics listener, IP kind
 
-The scraper's acl story maps its two legs exactly. The outgoing leg is
-the Modbus client — it dials the inverter or the cache's mirror
-(`--upstream`, live `modbus/upstream`) and carries no gate of its own: an
-acl gates a listener, and on this leg the scraper is the peer the
-SERVER's connect gate decides about (the cache's `acl/connect`; the fake
-speaks the same). What the client carries instead is the suite-auth key
-(`modbus/auth` + `modbus/auth/key`, the PVA1 handshake — docs/MODBUS.md),
-and the family has no read-side register gate (the register plane is
-write-only), so the poll's reads need no acl anywhere. The incoming leg
-is the /metrics exposition, and one IP-kind gate covers all of it —
-`metrics/acl` on the HTTP listener, doing what the cache's `acl/connect`
-does on the Modbus listener (the cache's own /metrics endpoint speaks the
-same gate). This is the scraper's WHOLE acl story, not half of one: the
-write/register plane has nothing to gate here, by posture and not by
-omission — the poller speaks `read_registers`/`read_bits` and sends no
-write, forwards none, so no write-acl and no register gate exist on it,
-and nothing is pending behind this one. The check is the shared accept
-ladder: ahead of the connection caps, an off-ACL client closed without a
-reply (`connection rejected: … not on the metrics ACL`).
+The scraper serves one listener beyond the control socket — the /metrics
+exposition — and one IP-kind gate covers it: `metrics/acl` on the HTTP
+listener, the same gate the cache's `acl/connect` runs on its Modbus
+listener (the cache's own /metrics endpoint speaks it too). The check is
+the shared accept ladder: ahead of the connection caps, an off-ACL
+client is closed without a reply (`connection rejected: … not on the
+metrics ACL`).
+
+The Modbus leg is outgoing and needs no gate. The scraper is a client:
+it dials the inverter or the cache's mirror (`--upstream`, live
+`modbus/upstream`), and an acl gates listeners, not clients — on that
+leg the scraper is the peer the server's connect gate decides about (the
+cache's `acl/connect`, the fake's mirror of it), and what it presents is
+the suite-auth key (`modbus/auth` + `modbus/auth/key`, the PVA1
+handshake — docs/MODBUS.md). The poll's reads need no register gate:
+the register plane is write-only, and the poller sends no write (it
+speaks `read_registers`/`read_bits`), so there is nothing read-side for
+an acl to decide.
 
 `--metrics-acl` (env `METRICS_ACL`, live `set metrics acl <value>` /
 `unset metrics acl`, config `metrics_acl`, NixOS `metricsAcl` +

@@ -132,6 +132,7 @@ One JSON object per device:
 | Profile | Device | Entries |
 |---|---|---|
 | `sun2000` | Huawei SUN2000 with meter and optional battery | 49 |
+| `sun2000_full` | Huawei SUN2000 full map: inverter + LUNA2000 + meter | 645 |
 | `deye-sg03lp1` | Deye SUN single-phase hybrid (SG01/03LP1) | 14 |
 | `deye-sg04lp3` | Deye SUN three-phase hybrid (SG04LP3) | 19 |
 | `deye-sg05lp3` | Deye SUN three-phase hybrid (SUN-12K-SG05LP3-EU) | 88 |
@@ -140,6 +141,50 @@ All shipped entries read on FC3 (holding registers) — the `fc: 4` input
 space is supported end to end (the schema, the linter, the cache and the
 scraper; the regtest exercises it), but no shipped profile carries real
 input-register data yet — that waits for a hardware capture.
+
+## The sun2000 drift (the small profile vs the full map)
+
+`sun2000` (49 rows) predates the newest Huawei documentation;
+`sun2000_full` is built from it — the SUN2000MA Modbus Interface
+Definitions (V3.0) Issue 06 (2025) for the inverter and battery blocks,
+the Solar Inverter (L1) definitions Issue 04 for the meter block and the
+optimizer rows, cross-checked against the wlcrs/huawei-solar-lib register
+map. Every `sun2000` address survives in the full map (22 of the 49 rows
+byte-identical), but 27 rows drift:
+
+**Reinterpreted** — the shipped row names the wrong signal:
+
+| Registers | shipped `sun2000` | `sun2000_full` | what the docs say |
+|---|---|---|---|
+| 32066-32068 | `output-power-a/b/c` (W, x1) | `grid-voltage-ab/bc/ca` (V, x10) | grid line voltages; the phase powers live at 32133-32137 |
+| 32078 | `pv-dc-total` | `peak-power-today` | today's peak active power (W) |
+| 32080 | `pv-limit` | `active-power` | the measured AC active power; the limits live at 42023/42405 |
+| 32086 | `device-insulation` (x1) | `inverter-efficiency` (% x100) | efficiency — the insulation resistance is 32088 (kohm), which the shipped profile lacked |
+| 37003 | `battery-efficiency` (x1) | `battery-bus-voltage` (V x10) | battery bus voltage |
+| 37760 | `battery-soc-reserve` | `battery-soc-system` | the system SOC; the reserve knob is 47102 `battery-backup-soc` |
+
+**Renamed only** — the same wire, the docs' words: 32069-32071
+`output-voltage-a/b/c` → `grid-voltage-a/b/c`, 32072/32074/32076
+`output-current-a/b/c` → `grid-current-a/b/c`.
+
+**Retyped** — the docs say signed where the shipped profile reads
+unsigned: 32016-32019 (the PV words), 32084 and 37117 (the power
+factors), 37118 (the frequency), 37119 and 37121 (the meter energy
+registers). The wire bytes are unchanged; only the decode of the high
+bit moves.
+
+**Re-coded** — `meter-mode` (37125) maps `{0: single-phase,
+1: three-phase}` per both docs; the shipped `{1: CT, 2: direct
+connection}` matches no doc issue.
+
+**Reworded** — four descs: the temperature register's doc name (internal
+temperature), the battery-power sign convention (+ = charging), the
+meter type, and 37786's missing `x100` marker.
+
+The rest of the full map — the nameplate words, the inspection block,
+the alarm words, the battery packs, the parallel-system rows and the
+42000-48219 config knobs — is coverage the small profile never
+attempted.
 
 ## License
 

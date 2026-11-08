@@ -9,6 +9,32 @@ before the repo restructured into one suite.
 ## Unreleased
 ### Added
 
+- **profiles** — the **`sun2000_full`** profile: the Huawei SUN2000 full
+  register map — 645 numeric registers from the newest official Modbus
+  documentation (the SUN2000MA V200R024 Modbus Interface Definitions
+  (V3.0) Issue 06, 2025, for the inverter + battery sections, cross-checked
+  against the Solar Inverter (SUN2000-L1) Modbus Interface Definitions
+  Issue 04 for the meter block 37100-37138 and the optimizer rows): the
+  30000 nameplate block, the 32000 realtime block (per-string voltages and
+  currents, powers, temperatures, alarms), the 35000 inspection block, the
+  37000-38900 LUNA2000 battery blocks (both storage units, the per-pack
+  SOC/power/temperature rows, the parallel-system rows), the 37100 smart
+  meter block, the optimizer counters, and the 40000-48219 grid-code,
+  scheduling and battery-config knobs. The string and multidata rows
+  (model name, SN, versions, the curve/TOU period blobs) have no profile
+  type and stay out. Fixes against the small `sun2000` (the drift is
+  tabulated in `profiles/README.md`): 32066-32068 are the grid line
+  voltages (x10), not phase powers; 32080 is the measured AC active
+  power, 32078 today's peak; 32086 is the inverter efficiency (the
+  shipped insulation row sat on it — the resistance lives at 32088,
+  kohm); 37003 is the battery bus voltage (x10), not an efficiency;
+  37760 is the system SOC (the reserve knob is 47102); the 37125
+  meter-mode mapping re-codes to the docs' `{0: single-phase,
+  1: three-phase}`; the PV words, the power factors, the meter frequency
+  and the meter energy registers retype to the docs' signed forms. The
+  four canonical names (`pv-power`, `grid-power`, `battery-power`,
+  `battery-soc`) keep their addresses and scales.
+
 - **cache** — the write gate reads from a **standalone acl file**:
   `--write-registers file:<path>` (env `WRITE_REGISTERS`, config and the
   live `set write registers file:<path>` the same) — the file IS the gate

@@ -121,14 +121,14 @@ def main():
         expect_ok = {'deeply nested'}   # a valid command with the extra fields = honored
         for wire, label in garbage:
             st, tx = roundtrip(15961, wire)
-            check('fuzz: %s answered with a JSON frame' % label, st in ('ok', 'err'), '%s %s' % (st, tx))
-            want = 'ok' if label in expect_ok else 'err'
+            check('fuzz: %s answered with a JSON frame' % label, st in ('ok', 'fail'), '%s %s' % (st, tx))
+            want = 'ok' if label in expect_ok else 'fail'
             check('fuzz: %s %s' % (label, 'honored' if label in expect_ok else 'rejected cleanly'),
                   st == want, '%s %s' % (st, tx))
 
         # 2. the overlong request (1 MB): answered or closed, never a crash
         st, tx = roundtrip(15961, b'{"cmd": "show status", "pad": "' + b'a' * (1024 * 1024) + b'"}\n', timeout=10)
-        check('fuzz: 1 MB request handled', st in ('ok', 'err', 'dead'), '%s %s' % (st, tx[:80]))
+        check('fuzz: 1 MB request handled', st in ('ok', 'fail', 'dead'), '%s %s' % (st, tx[:80]))
 
         # 3. split packets: one byte at a time, the server assembles the frame
         try:
@@ -171,12 +171,12 @@ def main():
                                       stdout=open('/tmp/ctl_fuzz2.log', 'w'), stderr=subprocess.STDOUT))
         time.sleep(0.9)
         st, tx = roundtrip(15963, b'{"cmd": "show version"}\n')
-        check('fuzz: token server rejects the unauthenticated', st == 'err' and 'authenticate' in tx,
+        check('fuzz: token server rejects the unauthenticated', st == 'fail' and 'authenticate' in tx,
               '%s %s' % (st, tx))
         bad = True
         for _ in range(30):
             st, tx = roundtrip(15963, b'{"cmd": "auth", "token": "guess-%d"}\n' % _)
-            bad = bad and st == 'err' and 'bad token' in tx
+            bad = bad and st == 'fail' and 'bad token' in tx
         check('fuzz: 30 wrong tokens all rejected', bad)
         try:
             s = connect(15963)
@@ -201,7 +201,7 @@ def main():
             while not buf.endswith(b'\n'):
                 buf += s.recv(4096)
             reply = _json.loads(buf.decode())
-            check('fuzz: an unsigned command over TCP is refused', reply.get('status') == 'err'
+            check('fuzz: an unsigned command over TCP is refused', reply.get('status') == 'fail'
                   and 'unsigned command' in reply.get('text', ''), str(reply))
             s.close()
         except (OSError, ValueError) as e:
@@ -217,7 +217,7 @@ def main():
                                       stdout=open('/tmp/ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
         time.sleep(0.9)
         st, tx = roundtrip(15964, b'{"cmd": "show version"}\n')
-        check('fuzz: token reference server rejects the unauthenticated', st == 'err' and 'authenticate' in tx,
+        check('fuzz: token reference server rejects the unauthenticated', st == 'fail' and 'authenticate' in tx,
               '%s %s' % (st, tx))
         try:
             c = connect(15964)
@@ -280,19 +280,19 @@ def main():
         r = authed_roundtrip(15982, 'opstok', 'show status')
         check('ops: show status honored', r.get('status') == 'ok' and r.get('_mac_ok'), str(r)[:120])
         r = authed_roundtrip(15982, 'opstok', 'set pv 100')
-        check('ops: set is forbidden', r.get('status') == 'err' and 'forbidden' in r.get('text', '')
+        check('ops: set is forbidden', r.get('status') == 'fail' and 'forbidden' in r.get('text', '')
               and 'admin' in r.get('text', '') and r.get('_mac_ok'), str(r))
         r = authed_roundtrip(15982, 'opstok', 'shutdown')
-        check('ops: shutdown is forbidden', r.get('status') == 'err' and 'forbidden' in r.get('text', ''), str(r))
+        check('ops: shutdown is forbidden', r.get('status') == 'fail' and 'forbidden' in r.get('text', ''), str(r))
         r = authed_roundtrip(15982, 'opstok', 'reset')
-        check('ops: reset is forbidden (no set, no shutdown)', r.get('status') == 'err'
+        check('ops: reset is forbidden (no set, no shutdown)', r.get('status') == 'fail'
               and 'forbidden' in r.get('text', ''), str(r))
         r = authed_roundtrip(15982, 'opstok', 'request reload')
-        check('ops: the whole-daemon request reload is forbidden', r.get('status') == 'err'
+        check('ops: the whole-daemon request reload is forbidden', r.get('status') == 'fail'
               and 'forbidden' in r.get('text', ''), str(r))
         r = authed_roundtrip(15982, 'admintok', 'show control token')
         check('secrets: the show verb refuses the control token (the admin sees the refusal too)',
-              r.get('status') == 'err' and 'is a secret' in r.get('text', '') and r.get('_mac_ok'), str(r))
+              r.get('status') == 'fail' and 'is a secret' in r.get('text', '') and r.get('_mac_ok'), str(r))
         try:
             s = connect(15982)
             s.sendall(_json.dumps({'cmd': 'auth', 'token': 'opstok'}).encode() + b'\n')
@@ -305,7 +305,7 @@ def main():
                 buf += s.recv(4096)
             reply = _json.loads(buf.decode())
             s.close()
-            check('ops: an unsigned command is still refused on TCP', reply.get('status') == 'err'
+            check('ops: an unsigned command is still refused on TCP', reply.get('status') == 'fail'
                   and 'unsigned command' in reply.get('text', ''), str(reply))
         except (OSError, ValueError) as e:
             check('ops: an unsigned command is still refused on TCP', False, str(e))
@@ -313,7 +313,7 @@ def main():
         check('ops: the admin token still steers the same server',
               r.get('status') == 'ok' and r.get('_mac_ok'), str(r))
         r = authed_roundtrip(15982, 'opstok', 'wrong-tokens')
-        check('ops: a bogus token is refused', r.get('status') in ('auth-fail', 'err'), str(r))
+        check('ops: a bogus token is refused', r.get('status') in ('auth-fail', 'fail'), str(r))
         aud = open(OPS_AUDIT).read()
         check('ops: both roles audited (role=ops show, role=admin set, the denials included)',
               "role=ops 'show version'" in aud and "role=admin 'set pv 100'" in aud
@@ -362,7 +362,7 @@ def main():
         for t in threads:
             t.join(20)
         check('fuzz: 20 parallel clients all answered', len(results) == 20
-              and all(st in ('ok', 'err') for _, st in results), str(results[:6]))
+              and all(st in ('ok', 'fail') for _, st in results), str(results[:6]))
 
         # 8. the fake is still alive and serving Modbus
         s = connect(15960, timeout=5)

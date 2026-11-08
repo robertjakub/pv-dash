@@ -154,14 +154,14 @@ def main():
         expect_ok = {'deeply nested'}   # a valid command with the extra fields = honored
         for wire, label in garbage:
             st, tx = roundtrip(15965, wire)
-            check('fuzz: %s answered with a JSON frame' % label, st in ('ok', 'err'), '%s %s' % (st, tx))
-            want = 'ok' if label in expect_ok else 'err'
+            check('fuzz: %s answered with a JSON frame' % label, st in ('ok', 'fail'), '%s %s' % (st, tx))
+            want = 'ok' if label in expect_ok else 'fail'
             check('fuzz: %s %s' % (label, 'honored' if label in expect_ok else 'rejected cleanly'),
                   st == want, '%s %s' % (st, tx))
 
         # 2. the overlong request (1 MB): answered or closed, never a crash
         st, tx = roundtrip(15965, b'{"cmd": "show status", "pad": "' + b'a' * (1024 * 1024) + b'"}\n', timeout=10)
-        check('fuzz: 1 MB request handled', st in ('ok', 'err', 'dead'), '%s %s' % (st, tx[:80]))
+        check('fuzz: 1 MB request handled', st in ('ok', 'fail', 'dead'), '%s %s' % (st, tx[:80]))
 
         # 3. split packets: one byte at a time, the server assembles the frame
         try:
@@ -209,12 +209,12 @@ def main():
                                       stdout=open('/tmp/cache_ctl_fuzz2.log', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.5)
         st, tx = roundtrip(15967, b'{"cmd": "show version"}\n')
-        check('fuzz: token server rejects the unauthenticated', st == 'err' and 'authenticate' in tx,
+        check('fuzz: token server rejects the unauthenticated', st == 'fail' and 'authenticate' in tx,
               '%s %s' % (st, tx))
         bad = True
         for _ in range(30):
             st, tx = roundtrip(15967, b'{"cmd": "auth", "token": "guess-%d"}\n' % _)
-            bad = bad and st == 'err' and 'bad token' in tx
+            bad = bad and st == 'fail' and 'bad token' in tx
         check('fuzz: 30 wrong tokens all rejected', bad)
         try:
             s = connect(15967)
@@ -254,20 +254,20 @@ def main():
         check('ops: request clear cache honored (the read-only shift may flush)',
               st == 'ok' and 'cache cleared' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('set modbus interval 5')
-        check('ops: set is forbidden', st == 'err' and 'forbidden' in tx and 'admin' in tx and macok,
+        check('ops: set is forbidden', st == 'fail' and 'forbidden' in tx and 'admin' in tx and macok,
               '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('unset modbus interval')
-        check('ops: unset is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        check('ops: unset is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request restore')
-        check('ops: request restore is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        check('ops: request restore is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request restart')
-        check('ops: request restart is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        check('ops: request restart is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request reload')
-        check('ops: request reload is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        check('ops: request reload is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('shutdown')
-        check('ops: shutdown is forbidden', st == 'err' and 'forbidden' in tx and macok, '%s %s' % (st, tx))
+        check('ops: shutdown is forbidden', st == 'fail' and 'forbidden' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show status', unsigned=True)
-        check('ops: an unsigned command is still refused first', st == 'err' and 'unsigned command' in tx,
+        check('ops: an unsigned command is still refused first', st == 'fail' and 'unsigned command' in tx,
               '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('set modbus interval 5', token='admintok2')
         check('ops: the admin token still steers the same server, mac\'d with the admin key',
@@ -313,7 +313,7 @@ def main():
         for t in threads:
             t.join(20)
         check('fuzz: 20 parallel clients all answered', len(results) == 20
-              and all(st in ('ok', 'err') for _, st in results), str(results[:6]))
+              and all(st in ('ok', 'fail') for _, st in results), str(results[:6]))
 
         # 8. the proxy is still alive and serving Modbus (the device answers)
         s = connect(15964, timeout=5)

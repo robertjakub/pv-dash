@@ -422,7 +422,7 @@ try:
         # the first frame only: the daemon-exit bye can ride the same
         # segment on a shutdown (announce_exit)
         obj = _json.loads(buf.split(b'\n', 1)[0].decode('utf-8', 'replace'))
-        return '%s %s' % (obj.get('status', 'err'), str(obj.get('text', '')))
+        return '%s %s' % (obj.get('status', 'fail'), str(obj.get('text', '')))
 
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15570',
                                    '--control-port', '15571', '--allow-write'],
@@ -466,7 +466,7 @@ try:
 
     # 2e. fake audit-logging + malformed-input defense (no tracebacks, no bricking)
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'pv', 'nan'], capture_output=True, text=True)
-    check('control: non-finite pin rejected', r.stdout.startswith('err value must be finite'), r.stdout.strip())
+    check('control: non-finite pin rejected', r.stdout.startswith('% error: value must be finite'), r.stdout.strip())
     time.sleep(1)
     m = metrics_dict(get('/metrics', 19455)[1])
     check('control: register truth intact after rejected pin (pv pin 2700 survives)',
@@ -502,7 +502,7 @@ try:
           and r.stdout.startswith('ok reset (0 pin(s)') and 'pinned' not in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'help'], capture_output=True, text=True)
     check('control: help lists the commands', r.returncode == 0
-          and r.stdout.startswith('commands: set <pv|load|batt|grid|soc') and 'chaos' in r.stdout, r.stdout.strip())
+          and r.stdout.startswith('ok commands: set <pv|load|batt|grid|soc') and 'chaos' in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'knobs'], capture_output=True, text=True)
     check('control: show knobs, the dictionary of the registry', r.returncode == 0
           and '--chaos' in r.stdout and '$CHAOS' in r.stdout and ', secret' in r.stdout,
@@ -510,7 +510,7 @@ try:
 
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'settings'], capture_output=True, text=True)
     check('control: show settings is retired (err)', r.returncode == 0
-          and r.stdout.startswith('err'), r.stdout.strip()[:120])
+          and r.stdout.startswith('% error:'), r.stdout.strip()[:120])
     subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'battery', 'off'], capture_output=True)
     time.sleep(1)
     m = metrics_dict(get('/metrics', 19455)[1])
@@ -797,7 +797,7 @@ try:
     check('scenario: preset releases the value pins', 'pinned' not in st, st)
     st = ctl('set scenario tea', 15583)
     check('scenario: unknown name rejected with the valid list',
-          st.startswith('err unknown scenario tea') and 'morning' in st, st)
+          st.startswith('fail unknown scenario tea') and 'morning' in st, st)
     ctl('set pv 2200', 15583)
     st = ctl('show scenario', 15583)
     check('scenario: manual pin turns the state custom', st == 'ok scenario=custom', st)
@@ -826,7 +826,7 @@ try:
 
     r = cli('set pv 3000\n')
     check('fake_cli: set prints only the confirmation', r.returncode == 0
-          and r.stdout.rstrip() == '\nfake-inverter:15571 > % ok\n\nfake-inverter:15571 >', repr(r.stdout))
+          and r.stdout.rstrip() == '\nfake-inverter:15571 > % changed\n\nfake-inverter:15571 >', repr(r.stdout))
     check('fake_cli: set reply really carried no status tail',
           'load=' not in r.stdout and 'pinned' not in r.stdout, repr(r.stdout))
     time.sleep(1.5)
@@ -845,9 +845,9 @@ try:
           and not any(l.startswith('% ok status') for l in lines), repr(r.stdout))
     r = cli('help soc\nshow registers\ninspect\nquit\n')
     lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
-    check('fake_cli: the help rides under % ok, the registers table prints bare, inspect dumps',
+    check('fake_cli: the help rides bare, the registers table prints bare, inspect dumps',
           r.returncode == 0
-          and any(l == '% ok soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' for l in lines)
+          and any(l == 'soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' for l in lines)
           and any(l == 'registers (49)' for l in lines) and 'pv-power' in ''.join(lines)
           and any('0.4.0' in l and 'version' in l for l in lines)
           and not any(l.startswith('% ok inspect') for l in lines), repr(r.stdout[:120]))
@@ -989,7 +989,7 @@ try:
           and r.stdout.startswith('ok seed=random '), r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'bogus'], capture_output=True, text=True)
     check('control: unset of an unknown setting is rejected', r.returncode == 0
-          and r.stdout.startswith('err unknown setting bogus'), r.stdout.strip())
+          and r.stdout.startswith('% error: unknown setting bogus'), r.stdout.strip())
 
     # 2f. register-map profiles: the fake serves the SUN2000 layout from
     # profiles/profiles/sun2000.json by default; a custom profile remaps names onto
@@ -1061,7 +1061,7 @@ try:
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'profile', '/tmp/scr_nope.json'],
                        capture_output=True, text=True)
     check('control: set profile of a bad file is rejected', r.returncode == 0
-          and r.stdout.startswith('err '), r.stdout.strip())
+          and r.stdout.startswith('% error: '), r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'profile'],
                        capture_output=True, text=True)
     check('control: unset profile restores the configured map (its description shows)', r.returncode == 0
@@ -1142,7 +1142,7 @@ try:
     subprocess.run([sys.executable, C, '--control-port', '15639', 'set', 'battery', 'off'], capture_output=True)
     r = subprocess.run([sys.executable, C, '--control-port', '15639', 'set', 'battery-state', 'charging'], capture_output=True, text=True)
     check('battery-state: refuses with the battery off',
-          'err battery-state needs the battery on' in r.stdout, r.stdout.strip())
+          '% error: battery-state needs the battery on' in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15639', 'show', 'registers'], capture_output=True, text=True)
     rows = [l for l in r.stdout.splitlines() if ' | ' in l]
     check('show registers: NaN when the value is not calculated (the battery off)',
@@ -1649,7 +1649,7 @@ try:
         if token and not unsigned and not badmac and obj.get('mac') is not None:
             want = wiremac('%s %s' % (obj.get('status'), obj.get('text', '')), token)
             assert obj.get('mac') == want, 'the reply mac does not verify: %r' % obj
-        return '%s %s' % (obj.get('status', 'err'), str(obj.get('text', '')))
+        return '%s %s' % (obj.get('status', 'fail'), str(obj.get('text', '')))
 
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:19457', '--interval', '1',
@@ -1665,19 +1665,30 @@ try:
           r[:120])
     r = sctl('show status', 15597, auth=False, unsigned=True)
     check('scraper control: the token server rejects the unauthenticated',
-          r.startswith('err authenticate first'), r[:80])
+          r.startswith('fail authenticate first'), r[:80])
     r = sctl('show status', 15597, auth=True, unsigned=True)
     check('scraper control: an unsigned command over TCP is refused',
-          r.startswith('err unsigned command'), r[:80])
+          r.startswith('fail unsigned command'), r[:80])
     r = sctl('show status', 15597, badmac=True)
     check('scraper control: a bad command mac is refused',
-          r.startswith('err the command mac does not verify'), r[:80])
+          r.startswith('fail the command mac does not verify'), r[:80])
     r = sctl('set interval 5', 15597)
     check('scraper control: set interval', r.startswith('ok interval=5.00s'), r[:80])
     r = sctl('show interval', 15597)
     check('scraper control: show interval', r.startswith('ok interval=5.00s'), r[:80])
     r = sctl('set interval 0', 15597)
-    check('scraper control: a bad value refused', r.startswith('err interval must be'), r[:80])
+    check('scraper control: a bad value refused', r.startswith('fail interval must be'), r[:80])
+    r = sctl('help unset', 15597)
+    check('scraper control: help <command> describes the row',
+          r == 'ok restore a setting to its configured value (unset interval, unset log-level)', r)
+    r = sctl('help request', 15597)
+    check('scraper control: help <command node> lists the namespace (the ? shape)',
+          r.startswith('ok ') and all(w in r for w in ('dump', 'reload', 'reload-config', 'restart', 'restore')), r[:200])
+    r = sctl('help request reload', 15597)
+    check('scraper control: help <deep command path> describes the row', r.startswith('ok save the live overrides'), r[:110])
+    r = sctl('help bogus', 15597)
+    check('scraper control: help <unknown topic> is the reworded two-space error',
+          r == 'fail unknown command or setting bogus (try ?)', r)
     r = sctl('unset interval', 15597)
     check('scraper control: unset restores the configured value', r.startswith('ok interval='), r[:80])
     r = sctl('set log-access on', 15597)
@@ -1686,7 +1697,7 @@ try:
     check('scraper control: the per-IP cap live (the path form)', r.startswith('ok limits/max-conn-per-ip=2'), r[:80])
     r = sctl('set limits max-conn-per-ip 9999', 15597)
     check('scraper control: the row bounds gate (min/max off the registry row)',
-          r.startswith('err limits/max-conn-per-ip must be 0..4096'), r[:80])
+          r.startswith('fail limits/max-conn-per-ip must be 0..4096'), r[:80])
     r = sctl('help modbus', 15597)
     words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
@@ -1706,14 +1717,14 @@ try:
                open(badprof, 'w'))
     r = sctl('set profile %s' % badprof, 15597)
     check('scraper control: a profile without the power registers is refused (rollback)',
-          r.startswith('err ') and 'pv_generation_watts' in r, r[:160])
+          r.startswith('fail ') and 'pv_generation_watts' in r, r[:160])
     r = sctl('set profile /tmp/scr_no_such_profile.json', 15597)
-    check('scraper control: a missing profile file is refused', r.startswith('err cannot read'), r[:120])
+    check('scraper control: a missing profile file is refused', r.startswith('fail cannot read'), r[:120])
     r = sctl('unset profile', 15597)
     check('scraper control: unset profile restores the configured profile',
           r.startswith('ok profile=') and 'sun2000.json' in r, r[:120])
     r = sctl('show settings', 15597)
-    check('scraper control: show settings is retired (err)', r.startswith('err'), r[:80])
+    check('scraper control: show settings is retired (fail)', r.startswith('fail'), r[:80])
     r = sctl('show knobs', 15597)
     check('scraper control: show knobs, the dictionary of the registry — flag, env twin, how it changes',
           r.startswith('ok knobs') and '--metric-prefix' in r and '$METRIC_PREFIX' in r
@@ -1726,11 +1737,11 @@ try:
     #       treatment) and the show verb refuses them — a secret never renders
     r = sctl('show auth token', 15597)
     check('scraper control: the auth token is a secret that never shows',
-          r.startswith('err auth/token is a secret'), r[:90])
+          r.startswith('fail auth/token is a secret'), r[:90])
     r = sctl('unset auth token', 15597)
-    check('scraper control: unset refuses a secret (no defaults entry)', r.startswith('err unknown setting'), r[:80])
+    check('scraper control: unset refuses a secret (no defaults entry)', r.startswith('fail unknown setting'), r[:80])
     r = sctl('show control token', 15597)
-    check('scraper control: the control token never shows', r.startswith('err control/token is a secret'), r[:90])
+    check('scraper control: the control token never shows', r.startswith('fail control/token is a secret'), r[:90])
     r = sctl('set auth token bearer9', 15597)
     check('scraper control: the auth token rotates live', r.startswith('ok auth/token=<set>'), r[:80])
     st, _ = get('/metrics', 19457)
@@ -1740,12 +1751,12 @@ try:
     r = sctl('set control token ctok9', 15597)
     check('scraper control: the control token rotates live', r.startswith('ok control/token=<set>'), r[:80])
     r = sctl('show version', 15597, token=STOK)
-    check('scraper control: the old control token is refused', r.startswith('err authenticate first'), r[:80])
+    check('scraper control: the old control token is refused', r.startswith('fail authenticate first'), r[:80])
     r = sctl('show version', 15597, token='ctok9')
     check('scraper control: the rotated control token speaks', r.startswith('ok modbus-scraper'), r[:80])
     r = sctl('show control token', 15597, token='ctok9')
     check('scraper control: the rotated control token never renders back',
-          r.startswith('err control/token is a secret'), r[:90])
+          r.startswith('fail control/token is a secret'), r[:90])
     # 6b-4. the state dump (settings by default — there are no cache words
     #       here): request dump writes 0600 + the integrity hash, the restore
     #       re-applies, the whole-daemon reload keeps the sets across the exec
@@ -1776,7 +1787,7 @@ try:
     tampered = open('/tmp/scr_regtest_state.json').read().replace('9.0', '3.0')
     open('/tmp/scr_regtest_state.json', 'w').write(tampered)
     r = sctl('request restore', 15597, token='ctok9')
-    check('scraper control: a tampered dump fails closed', r.startswith('err restore failed')
+    check('scraper control: a tampered dump fails closed', r.startswith('fail restore failed')
           and 'integrity' in r, r[:120])
     r = sctl('unset dump/path', 15597, token='ctok9')
     check('scraper control: the dump path unset back to off', r.startswith('ok dump/path=off'), r[:80])
@@ -1792,10 +1803,10 @@ try:
     time.sleep(1.5)
     r = sctl('show dump key', 15601, token=STOK)
     check('scraper sealed dump: show dump/key is a secret — it never shows',
-          r.startswith('err dump/key is a secret'), r[:100])
+          r.startswith('fail dump/key is a secret'), r[:100])
     r = sctl('set dump key other', 15601, token=STOK)
     check('scraper sealed dump: set dump/key answers the restart note',
-          r.startswith('err restart required (startup-only knob)'), r[:100])
+          r.startswith('fail restart required (startup-only knob)'), r[:100])
     r = sctl('set interval 7', 15601, token=STOK)
     r = sctl('request dump', 15601, token=STOK)
     check('scraper sealed dump: request dump reports sealed (the DUMP_KEY env twin)',
@@ -1891,15 +1902,15 @@ try:
     r = sctl('show knobs', 15598, token='opssecret')
     check('scraper control: the ops token reads (show knobs, a show verb)', r.startswith('ok knobs'), r[:80])
     r = sctl('set interval 5', 15598, token='opssecret')
-    check('scraper control: the ops token cannot set', r.startswith('err forbidden:') and 'admin' in r, r[:80])
+    check('scraper control: the ops token cannot set', r.startswith('fail forbidden:') and 'admin' in r, r[:80])
     r = sctl('poll now', 15598, token='opssecret')
-    check('scraper control: the ops token cannot poll now', r.startswith('err forbidden:'), r[:80])
+    check('scraper control: the ops token cannot poll now', r.startswith('fail forbidden:'), r[:80])
     r = sctl('request restart', 15598, token='opssecret')
-    check('scraper control: the ops token cannot request restart', r.startswith('err forbidden:'), r[:80])
+    check('scraper control: the ops token cannot request restart', r.startswith('fail forbidden:'), r[:80])
     r = sctl('shutdown', 15598, token='opssecret')
-    check('scraper control: the ops token cannot shutdown', r.startswith('err forbidden:'), r[:80])
+    check('scraper control: the ops token cannot shutdown', r.startswith('fail forbidden:'), r[:80])
     r = sctl('request reload', 15598, token='opssecret')
-    check('scraper control: the ops token cannot request reload', r.startswith('err forbidden:'), r[:80])
+    check('scraper control: the ops token cannot request reload', r.startswith('fail forbidden:'), r[:80])
     r = sctl('show version', 15598, token=STOK)
     check('scraper control: the admin token still steers the same server', r.startswith('ok modbus-scraper'),
           r[:80])

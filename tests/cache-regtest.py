@@ -450,7 +450,7 @@ try:
     b = rd(32064, 2, port=15513)
     check('control: upstream reconnects after restart', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
     r = ctl_cmd('bogus', 15514)
-    check('control: unknown command', r.startswith('err unknown command'), r)
+    check('control: unknown command', r.startswith('fail unknown command'), r)
     r = ctl_cmd('ping', 15514)
     check('control: ping answers pong', r == 'ok pong', r)
     c1.close()
@@ -477,7 +477,7 @@ try:
         return _json.loads(buf.decode())
 
     r = ctl_raw(b'not json at all\n', 15514, token='sekrit')
-    check('control: malformed frame rejected cleanly', r.get('status') == 'err'
+    check('control: malformed frame rejected cleanly', r.get('status') == 'fail'
           and 'malformed request' in r.get('text', ''), str(r))
 
     start([sys.executable, P, '--upstream', '127.0.0.1:15512',
@@ -486,12 +486,12 @@ try:
            '--audit-log', '/tmp/reg_audit_ctl.log'], log='/tmp/reg_ctl_tok.log')
     time.sleep(1.5)
     r = ctl_raw(b'{"cmd": "show status"}\n', 15520)
-    check('control: token server rejects the unauthenticated', r.get('status') == 'err'
+    check('control: token server rejects the unauthenticated', r.get('status') == 'fail'
           and 'authenticate first' in r.get('text', ''), str(r))
     ok = True
     for i in range(3):
         r = ctl_raw(_json.dumps({'cmd': 'auth', 'token': 'guess-%d' % i}).encode() + b'\n', 15520)
-        ok = ok and r.get('status') == 'err' and 'bad token' in r.get('text', '')
+        ok = ok and r.get('status') == 'fail' and 'bad token' in r.get('text', '')
     check('control: wrong tokens rejected', ok)
     s = socket.create_connection(('127.0.0.1', 15520), timeout=5)
     s.sendall(_json.dumps({'cmd': 'auth', 'token': 'sekrit'}).encode() + b'\n')
@@ -512,10 +512,10 @@ try:
           and 'upstream=127.0.0.1:15512' in st.get('text', ''), '%s %s' % (auth, st))
     r = ctl_raw(b'{"cmd": "show status"}\n', 15520, token='sekrit')
     check('control: an unsigned command over TCP is refused (the signed wire)',
-          r.get('status') == 'err' and 'unsigned command' in r.get('text', ''), str(r))
+          r.get('status') == 'fail' and 'unsigned command' in r.get('text', ''), str(r))
     r = ctl_raw(_json.dumps({'cmd': 'show status', 'mac': 'ab' * 32}).encode() + b'\n', 15520, token='sekrit')
     check('control: a bad command mac is refused',
-          r.get('status') == 'err' and 'mac does not verify' in r.get('text', ''), str(r))
+          r.get('status') == 'fail' and 'mac does not verify' in r.get('text', ''), str(r))
     tok_audit = open('/tmp/reg_audit_ctl.log').read()
     check('audit: AUTH-FAIL + COMMAND events with the peer and the wire mac',
           'AUTH-FAIL' in tok_audit and 'AUDIT CACHE COMMAND ' in tok_audit
@@ -558,7 +558,7 @@ try:
           and '\ncache:15514 > upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-160:]))
     r = cli('request clear cache\nquit\n')
     check('cache_cli: request clear cache confirms silently', r.returncode == 0
-          and '\ncache:15514 > % ok\n' in r.stdout, repr(r.stdout[-120:]))
+          and '\ncache:15514 > \ncache:15514 > ' in r.stdout, repr(r.stdout[-120:]))
     r = cli('show control token ?\nshow control ops ?\nset connections ?\nrequest?\nquit\n')
     check("cache_cli: ? at a hidden leaf describes it (the wire's help answer)",
           'control/token - require a token on control connections' in r.stdout, repr(r.stdout[-300:]))
@@ -603,7 +603,7 @@ try:
           and 'upstream=127.0.0.1:15512' in r.stdout, repr(r.stdout[-120:]))
     r = cli('show status\nquit\n', 15520, {'CONTROL_TOKEN': ''})
     check('cache_cli: token server refuses the token-less CLI', r.returncode == 0
-          and 'err authenticate first' in r.stdout, repr(r.stdout[-160:]))
+          and '% error: authenticate first' in r.stdout, repr(r.stdout[-160:]))
 
     # the group-accessible unix socket (--control-socket-group): 0660
     p_unix_g = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
@@ -641,17 +641,30 @@ try:
     r = ctl_cmd('show status', 15514)
     check('set: the overridden row lists the setting', 'overridden=modbus/interval' in r, r[-160:])
     r = ctl_cmd('set modbus interval bogus', 15514)
-    check('set: a bogus value is a clean err', r.startswith('err interval must be seconds'), r[:100])
+    check('set: a bogus value is a clean err', r.startswith('fail interval must be seconds'), r[:100])
     r = ctl_cmd('set bogus 1', 15514)
-    check('set: unknown setting', r.startswith('err unknown setting'), r[:100])
+    check('set: unknown setting', r.startswith('fail unknown setting'), r[:100])
     r = ctl_cmd('show settings', 15514)
-    check('show settings: retired answers err', r.startswith('err'), r[:80])
+    check('show settings: retired answers the fail verdict', r.startswith('fail'), r[:80])
     r = ctl_cmd('show modbus interval', 15514)
     check('show <setting>: the bare value', r == 'ok modbus/interval=2.00s', r)
     r = ctl_cmd('show cache ttl', 15514)
     check('show <setting>: the path spelling answers the live', r == 'ok cache/ttl=3.00s', r)
     r = ctl_cmd('help cache ttl', 15514)
     check('help <setting>: the registry description', r.startswith('ok cache/ttl - per-register cache TTL'), r[:110])
+    r = ctl_cmd('help unset', 15514)
+    check('help <command>: the row describes itself',
+          r == 'ok restore a setting to its configured value: unset <setting>', r)
+    r = ctl_cmd('help request', 15514)
+    check('help <command node>: the namespace lists its children (the ? shape)',
+          r == 'ok     clear  drop the cached registers and repoll now\n'
+               '    reload save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)', r)
+    r = ctl_cmd('help request reload', 15514)
+    check('help <deep command path>: the row describes itself',
+          r == 'ok save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)', r)
+    r = ctl_cmd('help bogus', 15514)
+    check('help <unknown topic>: the reworded two-space error',
+          r == 'fail unknown command or setting bogus (try ?)', r)
     r = ctl_cmd('unset modbus interval', 15514)
     check('unset: restores the configured value', r.startswith('ok modbus/interval=1.00s'), r[:110])
     r = ctl_cmd('show status', 15514)
@@ -661,19 +674,19 @@ try:
     r = ctl_cmd('show modbus timeout', 15514)
     check('show: modbus timeout answers the bare value', r == 'ok modbus/timeout=5.00s', r)
     r = ctl_cmd('set modbus timeout 99', 15514)
-    check('set: modbus timeout range-gated', r.startswith('err timeout must be 0 < N <= 60'), r[:100])
+    check('set: modbus timeout range-gated', r.startswith('fail timeout must be 0 < N <= 60'), r[:100])
     r = ctl_cmd('unset modbus timeout', 15514)
     check('unset: modbus timeout restores the configured value', r.startswith('ok modbus/timeout=3.00s'), r[:110])
     r = ctl_cmd('set config 5', 15514)
-    check('set: a show report is not a setting', r.startswith('err unknown setting config'), r[:100])
+    check('set: a show report is not a setting', r.startswith('fail unknown setting config'), r[:100])
     r = ctl_cmd('set connections 5', 15514)
-    check('set: connections is not a setting', r.startswith('err unknown setting connections'), r[:100])
+    check('set: connections is not a setting', r.startswith('fail unknown setting connections'), r[:100])
     r = ctl_cmd('set local-time on', 15514)
     check('set: local-time toggles live', r.startswith('ok local-time=on'), r[:110])
     r = ctl_cmd('show local-time', 15514)
     check('show: local-time answers the bare value', r == 'ok local-time=on', r)
     r = ctl_cmd('set local-time bogus', 15514)
-    check('set: local-time validates on|off', r.startswith('err local-time must be on|off'), r[:100])
+    check('set: local-time validates on|off', r.startswith('fail local-time must be on|off'), r[:100])
     r = ctl_cmd('unset local-time', 15514)
     check('unset: local-time restores the configured value', r.startswith('ok local-time=off'), r[:110])
     r = ctl_cmd('show cache-all', 15514)
@@ -686,9 +699,9 @@ try:
     r = ctl_cmd('show cache', 15514)
     check('show cache: the summary still works beside the dump', r.startswith('ok cache '), r[:80])
     r = ctl_cmd('request dump', 15514)
-    check('request dump: no dump path configured is a clean err', r.startswith('err no dump path configured'), r[:80])
+    check('request dump: no dump path configured is a clean err', r.startswith('fail no dump path configured'), r[:80])
     r = ctl_cmd('show dump-interval', 15514)
-    check('dump: show dump-interval without a path is a clean err', r.startswith('err dump-interval needs a dump path'), r[:80])
+    check('dump: show dump-interval without a path is a clean err', r.startswith('fail dump-interval needs a dump path'), r[:80])
     r = ctl_cmd('help', 15514)
     check('dump: the help hides the dump commands without a path', 'request dump' not in r, r[:160])
     r = ctl_cmd('show knobs', 15514)
@@ -853,18 +866,18 @@ try:
     open(dumpfile, 'w').write(_json.dumps(d))
     r = ctl_cmd('request restore', 15537)
     check('dump: a tampered dump refuses to restore (integrity hash)',
-          r.startswith('err restore failed: the dump') and 'integrity hash' in r, r[:140])
+          r.startswith('fail restore failed: the dump') and 'integrity hash' in r, r[:140])
     open(dumpfile, 'w').write(good)
     d = _json.loads(good); d.pop('hash')
     open(dumpfile, 'w').write(_json.dumps(d))
     r = ctl_cmd('request restore', 15537)
     check('dump: an unsigned (pre-hash) dump refuses to restore',
-          r.startswith('err restore failed: the dump') and 'predates the integrity hash' in r, r[:140])
+          r.startswith('fail restore failed: the dump') and 'predates the integrity hash' in r, r[:140])
     open(dumpfile, 'w').write(good)
     os.chmod(dumpfile, 0o646)
     r = ctl_cmd('request restore', 15537)
     check('dump: a group/world-writable dump refuses to restore',
-          r.startswith('err restore failed: the dump') and 'chmod 0600' in r, r[:140])
+          r.startswith('fail restore failed: the dump') and 'chmod 0600' in r, r[:140])
     os.chmod(dumpfile, 0o600)
     r = ctl_cmd('request restore', 15537)
     check('dump: the restored dump still loads after the refused attempts',
@@ -883,10 +896,10 @@ try:
     time.sleep(1.5)
     r = ctl_cmd('show dump key', 15539)
     check('sealed dump: show dump/key is a secret — it never shows',
-          r.startswith('err dump/key is a secret'), r[:100])
+          r.startswith('fail dump/key is a secret'), r[:100])
     r = ctl_cmd('set dump key other', 15539)
     check('sealed dump: set dump/key answers the restart note (the key cannot drift mid-life)',
-          r.startswith('err restart required (startup-only knob)'), r[:100])
+          r.startswith('fail restart required (startup-only knob)'), r[:100])
     time.sleep(1.6)   # the poller fills the cache (interval 1 s)
     r = ctl_cmd('request dump with-cache', 15539)
     check('sealed dump: the with-cache dump reports sealed',
@@ -1153,7 +1166,7 @@ try:
     st, _ = get_metrics('sekrit2')
     check('metrics token: the new token serves', st == 200, str(st))
     r = ctl_cmd('show metrics token', 15530)
-    check('metrics token: the secret never renders back', r.startswith('err metrics/token is a secret'), r)
+    check('metrics token: the secret never renders back', r.startswith('fail metrics/token is a secret'), r)
     # the live rebind: the endpoint moves to the new address
     r = ctl_cmd('set metrics listen 127.0.0.1:15535', 15530)
     check('metrics listen: rebound live', r.startswith('ok metrics/listen=127.0.0.1:15535'), r[:90])
@@ -1202,13 +1215,13 @@ try:
     r = ctl_cmd('set control ops-verbs show, ping', 15530)
     check('control ops-verbs: set takes the comma list', r.startswith('ok control/ops-verbs=ping,show'), r[:90])
     r = ctl_cmd('set control ops-verbs bogus', 15530)
-    check('control ops-verbs: an unknown verb is a clean err', r.startswith('err the ops policy needs at least one'),
+    check('control ops-verbs: an unknown verb is a clean err', r.startswith('fail the ops policy needs at least one'),
           r[:80])
     ctl_cmd('unset control ops-verbs', 15530)
     r = ctl_cmd('show control token', 15530)
-    check('control token: the secret never renders back', r.startswith('err control/token is a secret'), r)
+    check('control token: the secret never renders back', r.startswith('fail control/token is a secret'), r)
     r = ctl_cmd('unset control token', 15530)
-    check('control token: unset refuses (a secret has no defaults)', r.startswith('err unknown setting'), r[:80])
+    check('control token: unset refuses (a secret has no defaults)', r.startswith('fail unknown setting'), r[:80])
     r = ctl_cmd('set control trust-uids 1000, 1001', 15530)
     check('control trust-uids: set takes the uid list', r.startswith('ok control/trust-uids=1000,1001'), r[:90])
     r = ctl_cmd('unset control trust-uids', 15530)
@@ -1300,7 +1313,7 @@ try:
              if line.strip() and not line.strip().startswith('[')]
     check('bare show: the dump off again, the gated word hides', 'dump-interval' not in words, r[:160])
     r = ctl_cmd('request dump', 15530)
-    check('dump path: request dump without a path is a clean err', r.startswith('err no dump path configured'),
+    check('dump path: request dump without a path is a clean err', r.startswith('fail no dump path configured'),
           r[:80])
     r = ctl_cmd('set control port 15536', 15530)
     check('control port: the control rebinds live', r.startswith('ok control/port=127.0.0.1:15536'), r[:90])
@@ -1324,12 +1337,12 @@ try:
     while not buf.endswith(b'\n'):
         buf += s.recv(4096)
     s.close()
-    check('control token: the old token is refused', _json.loads(buf.decode()).get('status') == 'err',
+    check('control token: the old token is refused', _json.loads(buf.decode()).get('status') == 'fail',
           buf.decode()[:80])
     r = ctl_tok('show version', 15530, 'sekrit2')
     check('control token: the new token speaks', r.startswith('ok modbus-cache'), r[:60])
     r = ctl_tok('show control token', 15530, 'sekrit2')
-    check('control token: the rotated secret never renders back', r.startswith('err control/token is a secret'), r)
+    check('control token: the rotated secret never renders back', r.startswith('fail control/token is a secret'), r)
 
     p_metrics.send_signal(signal.SIGTERM)
     p_metrics.wait(timeout=10)
@@ -1778,7 +1791,7 @@ print('mode 0600 ok')
     # the audit trail folds control characters: a \n inside a command cannot
     # forge a second, attacker-crafted trail line
     r = ctl_cmd('show status\n2026-01-01T00:00:00Z AUDIT CACHE WRITE forged line', 15522)
-    check('control: the injection attempt is a clean err', r.startswith('err status: unexpected'), r[:100])
+    check('control: the injection attempt is a clean err', r.startswith('fail status: unexpected'), r[:100])
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     forged = [line for line in fc4_audit.splitlines() if 'AUDIT CACHE WRITE forged' in line]
     check('audit: the trail injection folds to one physical line',
@@ -1822,7 +1835,7 @@ print('mode 0600 ok')
     r = subprocess.run([sys.executable, ctl, '--control-port', '15524', 'show', 'version'],
                        capture_output=True, text=True, timeout=15)
     check('token file: token-less ctl refused', r.returncode == 0
-          and 'err authenticate first' in r.stdout, repr(r.stdout[:80]))
+          and '% error: authenticate first' in r.stdout, repr(r.stdout[:80]))
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15512', '--listen', '127.0.0.1:15525',
                         '--control-token', 'file:/tmp/reg_no_such_token_file', '--dry-run'],
                        capture_output=True, text=True, timeout=15)
@@ -1930,12 +1943,12 @@ print('mode 0600 ok')
     r = ctl_auth('show', 'modbus', 'auth-upstream')
     check('suite auth: show modbus auth-upstream reads suite', r == 'ok modbus/auth-upstream=suite', r[:80])
     r = ctl_auth('show', 'modbus', 'auth', 'key')
-    check('suite auth: the client key never shows', r.startswith('err modbus/auth/key is a secret'), r[:80])
+    check('suite auth: the client key never shows', r.startswith('% error: modbus/auth/key is a secret'), r[:80])
     r = ctl_auth('unset', 'modbus', 'auth-upstream-key')
-    check('suite auth: unset refuses the upstream key', r.startswith('err unknown setting'), r[:80])
+    check('suite auth: unset refuses the upstream key', r.startswith('% error: unknown setting'), r[:80])
     r = ctl_auth('set', 'modbus', 'auth', 'key', 'short')
     check('suite auth: a short key refuses on the wire',
-          r.startswith('err modbus/auth/key must be at least 16'), r[:100])
+          r.startswith('% error: modbus/auth/key must be at least 16'), r[:100])
     # the live legs: disabling the client auth serves plain clients again,
     # disabling the upstream auth drops the poll (the fake still demands
     # the handshake), re-enabling restores it
@@ -2141,7 +2154,7 @@ print('mode 0600 ok')
           r.startswith('ok modbus/auth-upstream-key=<set>'), r[:100])
     r = ctl_ws('set', 'modbus', 'auth-upstream', 'suite')
     check('waveshare auth: going suite over a short standing key refuses',
-          r.startswith('err the suite auth rejects the standing key'), r[:120])
+          r.startswith('% error: the suite auth rejects the standing key'), r[:120])
     r = ctl_ws('set', 'modbus', 'auth-upstream', 'waveshare')
     check('waveshare auth: the dormant key wakes with the scheme',
           r.startswith('ok modbus/auth-upstream=waveshare'), r[:100])

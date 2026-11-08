@@ -164,13 +164,13 @@ def main():
         ]
         for wire, label in garbage:
             st, tx = roundtrip(CTRL_PORT, wire)
-            check('fuzz: %s answered with a JSON frame' % label, st in ('ok', 'err'), '%s %s' % (st, tx))
-            check('fuzz: %s rejected cleanly' % label, st == 'err', '%s %s' % (st, tx))
+            check('fuzz: %s answered with a JSON frame' % label, st in ('ok', 'fail'), '%s %s' % (st, tx))
+            check('fuzz: %s rejected cleanly' % label, st == 'fail', '%s %s' % (st, tx))
 
         # 2. the overlong request (1 MB): answered or closed, never a crash
         st, tx = roundtrip(CTRL_PORT, signed('show status')[:-2] + b', "pad": "' + b'a' * (1024 * 1024) + b'"}\n',
                            timeout=10)
-        check('fuzz: 1 MB request handled', st in ('ok', 'err', 'dead'), '%s %s' % (st, tx[:80]))
+        check('fuzz: 1 MB request handled', st in ('ok', 'fail', 'dead'), '%s %s' % (st, tx[:80]))
 
         # 3. split packets: one byte at a time, the server assembles the frame
         try:
@@ -211,11 +211,22 @@ def main():
         st, tx = roundtrip(CTRL_PORT, signed('show status'))
         check('fuzz: real command after the flood', st == 'ok', '%s %s' % (st, tx))
 
+        # 5b. the wire's help branch speaks the commands (the rider)
+        st, tx = roundtrip(CTRL_PORT, signed('help unset'))
+        check('rider: the wire help describes a command row',
+              st == 'ok' and 'restore a setting' in tx, '%s %s' % (st, tx))
+        st, tx = roundtrip(CTRL_PORT, signed('help request'))
+        check('rider: the wire help lists a command namespace',
+              st == 'ok' and 'reload' in tx and 'restore' in tx, '%s %s' % (st, tx))
+        st, tx = roundtrip(CTRL_PORT, signed('help bogus'))
+        check('rider: the unknown topic is the reworded two-space error',
+              st == 'fail' and tx == 'unknown command or setting bogus (try ?)', '%s %s' % (st, tx))
+
         # 6. the auth abuse is rejected, the real token works, the unsigned refused
         bad = True
         for _ in range(30):
             st, tx = roundtrip(CTRL_PORT, b'{"cmd": "auth", "token": "guess-%d"}\n' % _)
-            bad = bad and st == 'err' and 'bad token' in tx
+            bad = bad and st == 'fail' and 'bad token' in tx
         check('fuzz: 30 wrong tokens all rejected', bad)
         try:
             s = connect(CTRL_PORT)
@@ -231,7 +242,7 @@ def main():
             while not buf.endswith(b'\n'):
                 buf += s.recv(4096)
             reply = _json.loads(buf.decode())
-            check('fuzz: the unsigned command is refused on TCP', reply.get('status') == 'err'
+            check('fuzz: the unsigned command is refused on TCP', reply.get('status') == 'fail'
                   and 'unsigned' in reply.get('text', ''), str(reply))
             s.sendall(signed('show version'))
             buf = b''
@@ -272,19 +283,19 @@ def main():
         check('ops: show knobs honored (the dictionary of the registry, a show verb)',
               st == 'ok' and macok and '--port' in tx, '%s %s' % (st, tx[:160]))
         st, tx, macok = ops_roundtrip('set log-level DEBUG')
-        check('ops: set is forbidden', st == 'err' and 'forbidden' in tx and 'admin' in tx and macok,
+        check('ops: set is forbidden', st == 'fail' and 'forbidden' in tx and 'admin' in tx and macok,
               '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request reload-config')
-        check('ops: request reload-config is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        check('ops: request reload-config is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request reload')
-        check('ops: the whole-daemon request reload is forbidden', st == 'err' and 'forbidden' in tx, '%s %s' % (st, tx))
+        check('ops: the whole-daemon request reload is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show control token', token='admintok2')
         check('secrets: the show verb refuses the control token (the admin sees the refusal too)',
-              st == 'err' and 'is a secret' in tx and macok, '%s %s' % (st, tx))
+              st == 'fail' and 'is a secret' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('shutdown')
-        check('ops: shutdown is forbidden', st == 'err' and 'forbidden' in tx and macok, '%s %s' % (st, tx))
+        check('ops: shutdown is forbidden', st == 'fail' and 'forbidden' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show version', unsigned=True)
-        check('ops: an unsigned command is still refused first', st == 'err' and 'unsigned command' in tx,
+        check('ops: an unsigned command is still refused first', st == 'fail' and 'unsigned command' in tx,
               '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('set log-level DEBUG', token='admintok2')
         check('ops: the admin token still steers the same server, mac\'d with the admin key',
@@ -337,7 +348,7 @@ def main():
         for t in threads:
             t.join(20)
         check('fuzz: 20 parallel clients all answered', len(results) == 20
-              and all(st in ('ok', 'err') for _, st in results), str(results[:6]))
+              and all(st in ('ok', 'fail') for _, st in results), str(results[:6]))
 
         # 8. the page surface is still alive and serving after the fuzzing
         try:

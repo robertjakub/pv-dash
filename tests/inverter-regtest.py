@@ -181,6 +181,20 @@ def main():
         tx = ctl(A_CTL, 'show connections')
         check('show connections -> none after the exits', tx == 'ok connections none', tx)
 
+        # ---- the wire's help branch speaks the commands (the rider)
+        tx = ctl(A_CTL, 'help unset')
+        check('help <command>: the row describes itself',
+              tx == 'ok restore a setting to its configured value (unset pv, unset seed)', tx)
+        tx = ctl(A_CTL, 'help request')
+        check('help <command node>: the namespace lists its visible children',
+              tx == 'ok     reload save the live overrides and restart the whole daemon (the flags and the env are re-resolved)', tx)
+        tx = ctl(A_CTL, 'help request reload')
+        check('help <deep command path>: the row describes itself',
+              tx == 'ok save the live overrides and restart the whole daemon (the flags and the env are re-resolved)', tx)
+        tx = ctl(A_CTL, 'help bogus')
+        check('help <unknown topic>: the reworded two-space error',
+              tx == '% error: unknown command or setting bogus (try ?)', tx)
+
         # ---- instance A: the bit spaces (FC1/FC2) and the coil writes (FC5/FC15)
         cb = connect(A_MODBUS)
         tx = ctl(A_CTL, 'set coil 10 1')
@@ -417,7 +431,7 @@ def main():
         obj = json.loads(buf.decode())
         s.close()
         check('signed wire: an unsigned command over TCP is refused',
-              obj.get('status') == 'err' and 'unsigned command' in obj.get('text', ''), str(obj))
+              obj.get('status') == 'fail' and 'unsigned command' in obj.get('text', ''), str(obj))
         s = connect(H_CTL)
         s.sendall(json.dumps({'cmd': 'auth', 'token': 'tok'}).encode() + b'\n')
         buf = b''
@@ -447,16 +461,16 @@ def main():
         obj = json.loads(buf.decode())
         s.close()
         check('signed wire: a bad command mac is refused',
-              obj.get('status') == 'err' and 'mac does not verify' in obj.get('text', ''), str(obj))
+              obj.get('status') == 'fail' and 'mac does not verify' in obj.get('text', ''), str(obj))
         aud = open('/tmp/inv_regtest_audit.log').read()
         check('signed wire: the audit COMMAND line carries the wire mac', "'show version' wire=h" in aud, aud[-200:])
 
         # ---- the secret lives: the token lives rotate (the cache's
         #      treatment) and the show verb refuses them — a secret never renders
         tx = ctl(H_CTL, 'show control token', token='tok')
-        check('secrets: the control token never shows', tx.startswith('err control/token is a secret'), tx)
+        check('secrets: the control token never shows', tx.startswith('% error: control/token is a secret'), tx)
         tx = ctl(H_CTL, 'unset control token', token='tok')
-        check('secrets: unset refuses a secret (no defaults entry)', tx.startswith('err unknown setting'), tx)
+        check('secrets: unset refuses a secret (no defaults entry)', tx.startswith('% error: unknown setting'), tx)
         tx = ctl(H_CTL, 'set control token tok2', token='tok')
         check('secrets: the control token rotates live', tx.startswith('ok control/token=<set>'), tx)
         tx = ctl(H_CTL, 'show version', token='tok')
@@ -465,13 +479,13 @@ def main():
         check('secrets: the rotated control token speaks', tx.startswith('ok fake-inverter'), tx)
         tx = ctl(H_CTL, 'show control token', token='tok2')
         check('secrets: the rotated control token never renders back',
-              tx.startswith('err control/token is a secret'), tx)
+              tx.startswith('% error: control/token is a secret'), tx)
         tx = ctl(H_CTL, 'set metrics token mtok2', token='tok2')
         check('secrets: the metrics token rotates live', tx.startswith('ok metrics/token=<set>'), tx)
         tx = ctl(H_CTL, 'show metrics token', token='tok2')
-        check('secrets: the metrics token never shows', tx.startswith('err metrics/token is a secret'), tx)
+        check('secrets: the metrics token never shows', tx.startswith('% error: metrics/token is a secret'), tx)
         tx = ctl(H_CTL, 'unset metrics token', token='tok2')
-        check('secrets: unset refuses the metrics token too', tx.startswith('err unknown setting'), tx)
+        check('secrets: unset refuses the metrics token too', tx.startswith('% error: unknown setting'), tx)
         tx = ctl(H_CTL, 'show config', token='tok2')
         check('secrets: show config renders the secret knob as the placeholder',
               'set control token *** SECRET REMOVED ***' in tx
@@ -555,10 +569,10 @@ def main():
         time.sleep(1.5)
         tx = ctl(J_CTL, 'show dump key')
         check('sealed dump: show dump/key is a secret — it never shows',
-              tx.startswith('err dump/key is a secret'), tx[:100])
+              tx.startswith('% error: dump/key is a secret'), tx[:100])
         tx = ctl(J_CTL, 'set dump key other')
         check('sealed dump: set dump/key answers the restart note (the key cannot drift mid-life)',
-              tx.startswith('err restart required (startup-only knob)'), tx[:100])
+              tx.startswith('% error: restart required (startup-only knob)'), tx[:100])
         tx = ctl(J_CTL, 'set pv 120')
         check('sealed dump: the pin lands', 'ok pv=120' in tx, tx)
         tx = ctl(J_CTL, 'request dump')
@@ -770,7 +784,7 @@ def main():
               'ok control/token=<set>' in tx, tx[:120])
         tx = ctl(K_CTL, 'show pv')
         check('file-key: the unauthenticated session is refused after the token set',
-              tx.startswith('err authenticate first'), tx[:100])
+              tx.startswith('% error: authenticate first'), tx[:100])
         tx = ctl(K_CTL, 'show pv', token='tok-from-file-77')
         check('file-key: the file material authenticates', tx == 'ok pv=78', repr(tx))
         procs[-1].kill()
@@ -851,7 +865,7 @@ def main():
         tx = ctl(L_CTL, 'show modbus auth')
         check('suite auth: show modbus auth reads suite', tx == 'ok modbus/auth=suite', tx)
         tx = ctl(L_CTL, 'show modbus auth key')
-        check('suite auth: the key never shows', tx.startswith('err modbus/auth/key is a secret'), tx[:80])
+        check('suite auth: the key never shows', tx.startswith('% error: modbus/auth/key is a secret'), tx[:80])
         tx = ctl(L_CTL, 'show modbus')
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
@@ -870,9 +884,9 @@ def main():
         tx = ctl(L_CTL, 'show control ops')
         check('node walk: the intermediate node answers', tx.startswith('ok control/ops - '), tx[:80])
         tx = ctl(L_CTL, 'unset modbus auth key')
-        check('suite auth: unset refuses the key (no defaults entry)', tx.startswith('err unknown setting'), tx[:80])
+        check('suite auth: unset refuses the key (no defaults entry)', tx.startswith('% error: unknown setting'), tx[:80])
         tx = ctl(L_CTL, 'set modbus auth key short')
-        check('suite auth: a short key refuses on the wire', tx.startswith('err modbus/auth/key must be at least 16'), tx[:100])
+        check('suite auth: a short key refuses on the wire', tx.startswith('% error: modbus/auth/key must be at least 16'), tx[:100])
         tx = ctl(L_CTL, 'set modbus auth key %s' % ('x' * 16))
         check('suite auth: the key rotates live', tx.startswith('ok modbus/auth/key=<set>'), tx[:80])
         c = connect(L_MODBUS)

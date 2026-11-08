@@ -281,6 +281,12 @@ the **Done/history** records for their tool.
   mdBook form: the READMEs/audit/TODO/changelog included via
   `{{#include}}`); what remains is the publishing: build + deploy the book
   on GH Pages in the CI item's workflow.
+- **the REST API** — an HTTP/JSON face beside the ctl/cli, mostly
+  control-plane and statistics: the control verbs over REST (GET a value,
+  POST a set — the same `/`-path names, token + RBAC and audit story as
+  the wire), the statistics read-only (the registry values, the tables,
+  the audit summary); the Prometheus `/metrics` endpoints stay the one
+  metrics format.
 
 
 ## Done (the highlights; the git history has the details)

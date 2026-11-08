@@ -127,7 +127,8 @@
     { "name": "restore-on-start", "flag": "--restore-on-start", "env": "RESTORE_ON_START", "conv": "bool",
       "live": "dump/restore-on-start",
       "setting-help": "the dump loads on start (off: on demand with request restore)", "values": [ "on", "off" ],
-      "help": "load the state dump when the server starts (needs --dump-path) — the live overrides ride again instead of a cold start; without it the dump loads on demand" }
+      "help": "load the state dump when the server starts (needs --dump-path) — the live overrides ride again instead of a cold start; without it the dump loads on demand",
+      "restart": true }
   ],
   "show": [
     { "name": "status", "setting-help": "multi-line effective state report: one key=value per field" },

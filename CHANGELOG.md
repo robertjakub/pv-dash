@@ -46,6 +46,15 @@ before the repo restructured into one suite.
   `--release` cut speaks the same pointer (the 0.4.0 body — 97 KB of
   pasted section — re-cut by hand).
 
+- **scraper, dashboard, inverter** — **`dump/restore-on-start` wears the
+  restart mark** (the cache's flip rides `59689b0`): the knob was
+  prospective-only (the branch's own comment — the START behaviour this
+  session already chose stands), so the set records the pending value and
+  answers **`note restart required (startup-only knob)`**; the three
+  control planes port the cache's record flow (the gate narrows to the
+  secrets, the `_apply` record branch, the `_get` configured-value shadow
+  out, the dump overlay, and the mains' pre-decision fold).
+
 ## 0.4.2 — 2026-11-08
 ### Changed
 

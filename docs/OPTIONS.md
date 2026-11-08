@@ -106,7 +106,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `read-delay` |  | `set modbus read-delay` | ✓ live |  |  |  |
 | s | `registers` |  | `show registers` |  |  | ✓ |  |
 | k | `requests-audit` |  | `set audit requests` | ✓ live |  |  |  |
-| k | `restore-on-start` |  | `set dump restore-on-start` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `restore-on-start` |  | `set dump restore-on-start, restart` | **✓** live | **✓** live | **✓** live | **✓** live |
 | c | `scenario` |  | `set scenario` |  |  | ✓ live |  |
 | k | `seed` |  | `set seed` |  |  | ✓ live |  |
 | k | `selection` |  | `set modbus selection` | ✓ live |  |  |  |

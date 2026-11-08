@@ -189,6 +189,16 @@ class ControlServer(_ControlServer):
     def _apply(self, key, value):
         sim, chaos, fake = self.simulator, self.chaos, self.fake
         val = value.lower()
+        rs = SETTING_BY_NAME.get(key)
+        if rs is not None and rs.restart:   # a startup-only knob: validate + record the pending value (the restart applies it)
+            if rs.secret:
+                raise ValueError('restart required (startup-only knob)')
+            if key == 'dump/restore-on-start':
+                if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
+                    raise ValueError('dump/restore-on-start must be on or off')
+                self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
+                return self.defaults[key]
+            raise ValueError('unknown setting %s' % key)
         auto = val in ('auto', 'off', 'none', 'clear', 'live')
         if key in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud'):
             if key == 'cloud' and val in CLOUD_MACHINES:
@@ -459,15 +469,6 @@ class ControlServer(_ControlServer):
             self.dump_path = value   # request dump and the graceful shutdown write it from here on
             # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
             return value if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % value
-        if key == 'dump/restore-on-start':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('dump/restore-on-start must be on or off')
-            self.dump_restore = on   # prospective: the START behaviour this session already chose stands
-            return 'on' if on else 'off'
         raise ValueError('unknown setting %s' % key)
 
     def _parse_hour(self, text):
@@ -542,8 +543,6 @@ class ControlServer(_ControlServer):
             return '<set>' if (fake and fake.metrics_token) else 'off'   # the secret never renders
         if key == 'dump/path':
             return self.dump_path or 'off'
-        if key == 'dump/restore-on-start':
-            return 'on' if self.dump_restore else 'off'
         if key == 'scenario':
             return self.scenario or 'custom'
         s = SETTING_BY_NAME.get(key)
@@ -593,8 +592,14 @@ class ControlServer(_ControlServer):
             if not args:
                 return 'err unset needs a setting (try help)'
             key, rest = match_setting_path(args, SETTING_BY_NAME)
-            if key is not None and not rest and getattr(SETTING_BY_NAME.get(key), 'restart', False):
-                return 'err restart required (startup-only knob)'
+            s = SETTING_BY_NAME.get(key) if key is not None else None
+            if s is not None and not rest and s.restart:
+                if s.secret:   # a secret never rides the reload state — the wire refuses it
+                    return 'err restart required (startup-only knob)'
+                self.defaults[key] = self.baseline.get(key, self.defaults.get(key))
+                self.overridden.discard(key)
+                logger.info('control: unset %s (the restart re-applies the configured value)', key)
+                return 'note restart required (startup-only knob)'
             if key is None or rest or key not in self.defaults:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             shown = self._apply(key, self.defaults[key])
@@ -719,10 +724,11 @@ class ControlServer(_ControlServer):
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             if not rest:
                 return 'err set needs a setting and a value (try help)'
-            if getattr(SETTING_BY_NAME.get(key), 'restart', False):
-                return 'err restart required (startup-only knob)'
+            s = SETTING_BY_NAME.get(key)
+            if s is not None and s.restart and s.secret:
+                return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
             value = ' '.join(rest)
-            if value == SECRET_REMOVED and getattr(SETTING_BY_NAME.get(key), 'secret', False):
+            if value == SECRET_REMOVED and getattr(s, 'secret', False):
                 return 'err *** SECRET REMOVED *** is not a value — pass the secret by flag/env, or as file:<path>'
             try:
                 shown = self._apply(key, value)
@@ -731,6 +737,9 @@ class ControlServer(_ControlServer):
             if key != 'scenario':
                 self.scenario = None   # a manual pin turns the state 'custom'
             self.overridden.add(key)
+            logger.info('control: set %s=%s', key, shown)
+            if s is not None and s.restart:   # the value is recorded; the restart applies it — a note, not a verdict
+                return 'note restart required (startup-only knob)'
             return 'ok %s=%s %s' % (key, shown, self.status())
         return 'err unknown command %s (try help)' % cmd
 
@@ -885,6 +894,9 @@ class ControlServer(_ControlServer):
             'dump/path': self.dump_path or 'off',
             'dump/restore-on-start': 'on' if self.dump_restore else 'off',
         }
+        for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
+            if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:
+                raw[opt.live] = self.defaults[opt.live]
         return dump_filter(self.overridden, raw, SETTING_BY_NAME)
 
     # --- the whole-daemon reload (`reload`) and the dump family ride the

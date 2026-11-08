@@ -221,6 +221,13 @@ def main():
     chaos = Chaos(args.chaos, seed=args.seed)
     target = resolve_control_target(args.control_port, args.port)
     dump_key = parse_secret((args.dump_key or os.environ.get('DUMP_KEY') or '').strip() or None, 'dump/key')
+    for name, pending in ControlServer.fold_restart_state(None, dump_key).items():
+        # the restart-marked overrides fold into the startup args BEFORE the
+        # start's dump-restore decision — the piece that makes the restart
+        # note true (the execv'd reload applies what the sets recorded)
+        if name == 'dump/restore-on-start':
+            args.restore_on_start = str(pending).strip() in ('on', 'true', '1', 'yes')
+        logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
     control_token = parse_secret(args.control_token or os.environ.get('CONTROL_TOKEN'), 'control/token')
     control_ops_token = parse_secret(args.control_ops_token or os.environ.get('CONTROL_OPS_TOKEN'),
                                      'control-ops-token')

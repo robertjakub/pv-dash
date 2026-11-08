@@ -150,6 +150,14 @@ def main():
 
     setup_logging(cfg)
 
+    for name, pending in ControlServer.fold_restart_state(args.config, cfg['dump_key']).items():
+        # the restart-marked overrides fold into the startup config BEFORE
+        # the start's dump-restore decision — the piece that makes the
+        # restart note true (the execv'd reload applies what the sets recorded)
+        if name == 'dump/restore-on-start':
+            cfg['restore_on_start'] = str(pending).strip() in ('on', 'true', '1', 'yes')
+        logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
+
     if cfg['max_kwp'] > 0 and cfg['max_grid_kw'] > 0 and cfg['max_kwp'] > cfg['max_grid_kw']:
         logger.warning('max_kwp (%g) is greater than max_grid_kw (%g): the grid line cannot be '
                        'smaller than the inverter capacity, check the caps', cfg['max_kwp'], cfg['max_grid_kw'])

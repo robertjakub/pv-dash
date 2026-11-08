@@ -155,8 +155,14 @@ class ControlServer(_ControlServer):
             if not args:
                 return 'err unset needs a setting (try help)'
             key, rest = match_setting_path(args, SETTING_BY_NAME)
-            if key is not None and not rest and getattr(SETTING_BY_NAME.get(key), 'restart', False):
-                return 'err restart required (startup-only knob)'
+            s = SETTING_BY_NAME.get(key) if key is not None else None
+            if s is not None and not rest and s.restart:
+                if s.secret:   # a secret never rides the reload state — the wire refuses it
+                    return 'err restart required (startup-only knob)'
+                self.defaults[key] = self.baseline.get(key, self.defaults.get(key))
+                self.overridden.discard(key)
+                logger.info('control: unset %s (the restart re-applies the configured value)', key)
+                return 'note restart required (startup-only knob)'
             if key is None or rest or key not in self.defaults:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             try:
@@ -175,10 +181,11 @@ class ControlServer(_ControlServer):
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             if not rest:
                 return 'err set needs a setting and a value (try help)'
-            if getattr(SETTING_BY_NAME.get(key), 'restart', False):
-                return 'err restart required (startup-only knob)'
+            s = SETTING_BY_NAME.get(key)
+            if s is not None and s.restart and s.secret:
+                return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
             value = ' '.join(rest)
-            if value == SECRET_REMOVED and getattr(SETTING_BY_NAME.get(key), 'secret', False):
+            if value == SECRET_REMOVED and getattr(s, 'secret', False):
                 return 'err *** SECRET REMOVED *** is not a value — pass the secret by flag/env, or as file:<path>'
             try:
                 shown = self._apply(key, value)
@@ -186,6 +193,8 @@ class ControlServer(_ControlServer):
                 return 'err %s' % e
             self.overridden.add(key)
             logger.info('control: set %s=%s', key, shown)
+            if s is not None and s.restart:   # the value is recorded; the restart applies it — a note, not a verdict
+                return 'note restart required (startup-only knob)'
             return 'ok %s=%s %s' % (key, shown, self.summary())
         if low == 'show status':
             return self.status_report()
@@ -248,9 +257,25 @@ class ControlServer(_ControlServer):
 
     def _apply(self, key, value):
         """Apply a live setting; returns the display string or raises
-        ValueError (the message becomes the err reply)."""
+        ValueError (the message becomes the err reply). A restart-marked
+        knob records only: the value lands in the configured-value table
+        (show renders it, the dump/reload state carries it) — the restart
+        (the reload's execv, whose fold reads the state before the start's
+        dump-restore decision) applies it. A restart-marked secret refuses:
+        it can never ride the reload state."""
         s = self.scraper
         val = str(value).strip()
+
+        rs = SETTING_BY_NAME.get(key)
+        if rs is not None and rs.restart:   # a startup-only knob: validate + record the pending value
+            if rs.secret:
+                raise ValueError('restart required (startup-only knob)')
+            if key == 'dump/restore-on-start':
+                if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
+                    raise ValueError('dump/restore-on-start must be on or off')
+                self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
+                return self.defaults[key]
+            raise ValueError('unknown setting %s' % key)
 
         if key == 'interval':
             v = num(val, 'interval', 'seconds')
@@ -404,15 +429,6 @@ class ControlServer(_ControlServer):
             self.dump_path = val   # request dump and the graceful shutdown write it from here on
             # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
             return val if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
-        if key == 'dump/restore-on-start':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('dump/restore-on-start must be on or off')
-            self.dump_restore = on   # prospective: the START behaviour this session already chose stands
-            return 'on' if on else 'off'
         # the generic path: a typed row (int/float/str conv) needs no branch
         # — the row's conv parses, the row's min/max gate, the config key
         # takes the value; the value takes effect wherever the config is
@@ -478,8 +494,6 @@ class ControlServer(_ControlServer):
             return '<set>' if cfg.get('auth_key') else 'none'   # the secret never renders
         if key == 'dump/path':
             return self.dump_path or 'off'
-        if key == 'dump/restore-on-start':
-            return 'on' if self.dump_restore else 'off'
         # the generic path: a registry row with a typed conv reads its
         # config key with no branch at all
         opt = OPTION_BY_LIVE.get(key)
@@ -520,6 +534,9 @@ class ControlServer(_ControlServer):
             'dump/path': self.dump_path or 'off',
             'dump/restore-on-start': 'on' if self.dump_restore else 'off',
         }
+        for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
+            if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:
+                raw[opt.live] = self.defaults[opt.live]
         return dump_filter(self.overridden, raw, SETTING_BY_NAME)
 
     # --- the whole-daemon reload (`reload`) and the dump family ride the

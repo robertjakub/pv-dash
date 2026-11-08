@@ -318,6 +318,14 @@ def main():
     args = parse_args()
     cfg = resolve_config(args, SCRIPT_DIR)
     setup_logging(cfg)
+
+    for name, pending in ControlServer.fold_restart_state(args.config, cfg['dump_key']).items():
+        # the restart-marked overrides fold into the startup config BEFORE
+        # the start's dump-restore decision — the piece that makes the
+        # restart note true (the execv'd reload applies what the sets recorded)
+        if name == 'dump/restore-on-start':
+            cfg['restore_on_start'] = str(pending).strip() in ('on', 'true', '1', 'yes')
+        logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
     control_target = resolve_control_target(cfg['control_port'], cfg['port'])
     control_token = cfg['control_token'] or None
     control_ops_token = cfg['control_ops_token'] or None

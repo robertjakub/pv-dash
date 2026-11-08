@@ -836,8 +836,6 @@ class ControlServer(_ControlServer):
             return secs(p.read_delay)
         if key == 'modbus/merge-gap':
             return '%d' % p.merge_gap
-        if key == 'modbus/upstream':
-            return '%s:%d' % (p.upstream.host, p.upstream.port)
         if key == 'modbus/unit':
             return '%d' % p.upstream.unit
         if key == 'modbus/auth':

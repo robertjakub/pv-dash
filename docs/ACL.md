@@ -40,21 +40,15 @@ token shape beyond the loopback (the page's F21 closed it — rev. 21).
 | tool | listener | the default bind | the stack at it |
 |---|---|---|---|
 | cache | the Modbus mirror | `127.0.0.1:15502` | `acl/connect` (accept, ahead of the caps) → the caps → the suite auth; the write path then adds `--allow-write` + `acl/write` + `write-registers` |
-| cache | /metrics | `127.0.0.1:9252`, off | the token mandatory beyond loopback (F13's refusal) → `metrics/acl` → the caps |
-| cache | control | unix \| TCP `127.0.0.1` | the TCP bind refuses without the admin token (F5); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660` |
+| cache + scraper | /metrics | `127.0.0.1:9252`, off / `127.0.0.1:9350`, always on | the token mandatory beyond loopback (F13's refusal) → `metrics/acl` → the caps |
+| cache + scraper + dashboard | control | unix \| TCP `127.0.0.1` | the TCP bind refuses without the admin token (F5); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660` |
 | fake | the Modbus listener | `:5502` | `connect-acl` (the system grammar, no `file:`) → the caps → the suite auth; `--allow-write` |
-| fake | /metrics | `127.0.0.1:9452`, off | no ACL; the token mandatory beyond loopback (F13's refusal — the warn retired, rev. 21) → the caps |
 | fake | control | unix \| TCP `127.0.0.1` | the F11 tokenless-TCP exemption |
-| scraper | /metrics | `127.0.0.1:9350`, always on | the token mandatory beyond loopback (F13's refusal) → `metrics/acl` → the caps |
-| scraper | control | unix \| TCP `127.0.0.1` | the token refusal on TCP, like the cache's |
+| fake + dashboard | /metrics | the shared `127.0.0.1:9452`, off | no IP gate (the shared hooks' admit-all base); the token mandatory beyond loopback (F13's refusal) → the caps — harmless while both stay off |
 | dashboard | the page + the config proxy | `127.0.0.1:8080` | the bearer token (`auth/token`, F21 closed — the `?auth=` bootstrap sets the session cookie, the header for scripts; a token-less non-loopback bind refuses to start) — GET-only, the realpath guard, the cap gate |
-| dashboard | /metrics | `127.0.0.1:9452`, off | the token mandatory beyond loopback (F13's refusal); the shared hooks' admit-all base — no IP gate |
-| dashboard | control | unix \| TCP `127.0.0.1` | the token refusal on TCP, like the cache's |
 
 The defaults come from each tool's `statics.py`; the authoritative
-per-surface detail is docs/AUDIT.md's surfaces table (rev. 19). The fake
-and the dashboard share the `9452` metrics default — harmless while both
-stay off.
+per-surface detail is docs/AUDIT.md's surfaces table (rev. 19).
 
 ## The rule chain (the one semantics)
 

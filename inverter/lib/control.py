@@ -18,6 +18,7 @@ import logging
 import math
 import os
 import socket
+import sys
 import threading
 import time
 
@@ -58,6 +59,10 @@ class ControlServer(_ControlServer):
     second, read-only token (ops_token) may be configured beside the admin
     token: it authenticates into the show/clear verbs only — no set/unset,
     no reset, no reload, no shutdown (common/wiresec.py's roles)."""
+
+    def start(self):
+        self._restore_reload_state()   # a reload exec: the saved overrides re-apply once, the state file is consumed
+        threading.Thread(target=self.serve, daemon=True).start()
 
     def serve(self):
         srv = socket.socket(socket.AF_UNIX if self.is_unix else socket.AF_INET, socket.SOCK_STREAM)

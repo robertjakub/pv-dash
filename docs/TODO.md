@@ -64,6 +64,32 @@ the **Done/history** records for their tool.
   policies (`request/clear` in the ops set, `request/reload` out) —
   instead of patching the head-word verb; the audit `role=` entries and
   the `--control-ops-verbs` validation follow the same units.
+- **a connect ACL for the control plane** `[common]` `[cache]`
+  `[scraper]` `[inverter]` `[dashboard]` — SKETCH (Nov 8, decided against
+  for today): the control TCP bind is hardcoded `127.0.0.1`
+  (`common/control.py`'s `_open_sock`), so an IP gate would decide only
+  on the one address that always matches — the local-user threat the
+  plane actually has is answered by peer-cred (the unix socket) and the
+  token + the signed wire + the ops RBAC (TCP). The item earns its place
+  the moment the control port learns to bind beyond loopback: the control
+  target grows the `HOST:PORT` spelling (the unix path stays; the default
+  stays loopback; `parse_control_target` parses the host part on the
+  daemon AND the ctl clients), and a beyond-loopback bind then ships with
+  TWO hard companions, the same refusal shape the tokenless TCP already
+  speaks: the admin token mandatory (it is today), and an explicit
+  **`acl/control`** gate — the ip-prefix system grammar
+  (`any|none|IP,...`) or `file:<path>` (the standalone acl file) — with
+  `none` NOT the default but a REFUSAL to start until spelled (a remote
+  control port without a spelled gate is a misprint, not a posture). The
+  machinery is all built (parse_acl_value, IPGate, the acl-file warning
+  parity, the `show acl/control/table` row, the connect-time check in the
+  accept ladder beside the peer-cred/token checks, the refusals logged +
+  audited like the Modbus ones); the unix sockets are untouched (peer-cred
+  answers the uid question addresses cannot). The fake included: its
+  tokenless-loopback TCP exemption (F11) rides on the bind staying
+  loopback — a remote control bind on the fake takes the same companions.
+  Re-run the audit when this lands (the remote-control surface is new
+  F-item territory).
 - **native TLS on the HTTP surfaces** `[scraper]` `[cache]` `[inverter]` —
   F14 says "terminate at a proxy"; an opt-in native path
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a

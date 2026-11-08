@@ -9,7 +9,9 @@ GatedHTTPServer is the HTTP shape: gate at process_request, release when
 the handler thread is done, a gate_refused hook for the 503 + the log line.
 Stdlib only."""
 import http.server
+import socket
 import threading
+import time
 
 
 class ConnGate:
@@ -74,8 +76,38 @@ class GatedHTTPServer(http.server.ThreadingHTTPServer):
     def setup_gate(self, max_total=0, max_per_ip=0):
         self.gate = ConnGate(max_total, max_per_ip)
 
+    def _refuse_close(self, request):
+        """The refused connection's close: the refusal answers before any
+        handler read the request — the peer's bytes sit unread in the
+        kernel buffer, and a close() over unread data fires a TCP RST that
+        can overtake the refusal reply in the client's receive buffer (the
+        client reads the reset, the reply lost — the suite's 503-order
+        check flaked exactly so). Half-close first so the reply drains,
+        then drain what the peer sent (bounded: a short quiet-gap timeout
+        and a byte cap — a hostile peer must not pin the accept loop),
+        then close: FIN, not RST."""
+        try:
+            request.shutdown(socket.SHUT_WR)
+        except OSError:
+            pass
+        try:
+            request.settimeout(0.2)
+            deadline = time.monotonic() + 0.5
+            drained = 0
+            while drained < 1048576 and time.monotonic() < deadline:
+                chunk = request.recv(65536)
+                if not chunk:
+                    break
+                drained += len(chunk)
+        except OSError:
+            pass   # the quiet-gap timeout (the peer sent nothing more)
+        try:
+            request.close()
+        except OSError:
+            pass
+
     def gate_refused(self, request, client_address, why):
-        self.shutdown_request(request)
+        self._refuse_close(request)
 
     def acl_allows(self, ip):
         """The connection-ACL hook: the default admits every peer (no
@@ -85,8 +117,10 @@ class GatedHTTPServer(http.server.ThreadingHTTPServer):
 
     def acl_refused(self, request, client_address):
         """The ACL-rejected peer: the default closes without a reply (the
-        accept-check reading — nothing was parsed to answer)."""
-        self.shutdown_request(request)
+        accept-check reading — nothing was parsed to answer). The close is
+        the refusal discipline (_refuse_close) — no reply, but a clean FIN:
+        the unread request bytes must not RST the peer mid-read."""
+        self._refuse_close(request)
 
     def process_request(self, request, client_address):
         if not self.acl_allows(client_address[0]):

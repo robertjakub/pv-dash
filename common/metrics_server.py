@@ -34,7 +34,7 @@ class _GatedMetricsHTTPServer(GatedHTTPServer):
             request.sendall(METRICS_503)
         except OSError:
             pass
-        httpd.shutdown_request(request)
+        httpd._refuse_close(request)
 
     def acl_allows(httpd, ip):
         return httpd.metrics_server.acl_allows(ip)
@@ -88,8 +88,10 @@ class MetricsServer:
 
     def acl_refused(self, request, client_address):
         """The ACL-rejected peer: the default closes without a reply (the
-        accept-check reading — nothing was parsed to answer)."""
-        self._http.shutdown_request(request)
+        accept-check reading — nothing was parsed to answer). The close is
+        the gate's refusal discipline (_refuse_close) — no reply, but a
+        clean FIN: the unread request bytes must not RST the peer mid-read."""
+        self._http._refuse_close(request)
 
     class _Handler(http.server.BaseHTTPRequestHandler):
         timeout = 5   # a silent peer cannot pin a handler thread (slowloris)

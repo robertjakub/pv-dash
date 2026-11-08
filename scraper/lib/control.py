@@ -30,16 +30,16 @@ from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN
 from common.control import ControlServer as _ControlServer, num, numi
 from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
     match_setting_path
-from common.config import default_profile_path, is_loopback_host, parse_auth_type, parse_listen, \
-    parse_secret, parse_upstream, resolve_profile_file
+from common.config import acl_table, acl_value_text, default_profile_path, is_loopback_host, parse_auth_type, \
+    parse_listen, parse_secret, parse_upstream, resolve_profile_file
 from common.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
 from common.audit import AuditLog
 from common.logutil import UtcFormatter
-from .config import build_sources, load_device_profile
+from .config import build_sources, load_device_profile, resolve_metrics_acl
 from .metrics import Metrics
-from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
-    KNOWN_VERBS, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
+from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, \
+    NODE_BY_NAME, KNOWN_VERBS, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
 
 logger = logging.getLogger('scraper')
@@ -117,6 +117,7 @@ class ControlServer(_ControlServer):
                  audit_params=None):
         self.scraper = scraper
         self.httpd = httpd
+        self.metrics_acl_warn = None   # the metrics/acl file's permission warning (the stash, None = no warning standing)
         self.audit_params = dict(audit_params or {})   # the audit family's live swaps rebuild from these
         super().__init__(target, reloader=reloader, stopper=stopper, audit=audit, token=token,
                          defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
@@ -178,8 +179,8 @@ class ControlServer(_ControlServer):
             args = cmd.split()[1:]
             if not args:
                 return 'err unset needs a setting (try help)'
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
-            s = SETTING_BY_NAME.get(key) if key is not None else None
+            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports have nothing to unset
+            s = SET_BY_NAME.get(key) if key is not None else None
             if s is not None and not rest and s.restart:
                 if s.secret:   # a secret never rides the reload state — the wire refuses it
                     return 'err restart required (startup-only knob)'
@@ -200,12 +201,12 @@ class ControlServer(_ControlServer):
             args = cmd.split()[1:]
             if len(args) < 2:
                 return 'err set needs a setting and a value (try help)'
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports are not settable (and a show path never shadows a knob value)
             if key is None:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             if not rest:
                 return 'err set needs a setting and a value (try help)'
-            s = SETTING_BY_NAME.get(key)
+            s = SET_BY_NAME.get(key)
             if s is not None and s.restart and s.secret:
                 return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
             value = ' '.join(rest)
@@ -234,6 +235,8 @@ class ControlServer(_ControlServer):
             return self.inputs_metrics_report()
         if low == 'show inputs':
             return self.inputs_report()
+        if low == 'show metrics-acl-table':
+            return self.acl_table_report()
         if low.startswith('show'):
             args = cmd.split()[1:]
             if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
@@ -388,6 +391,28 @@ class ControlServer(_ControlServer):
                 raise ValueError('no http server attached')
             self.httpd.gate.max_per_ip = v
             return '%d' % v
+        if key == 'metrics/acl':
+            if val.lower() == 'table':   # the show word is never a value — point at the report
+                raise ValueError('"table" is not a metrics/acl value — the table is the show: '
+                                 'show metrics acl table')
+            if not self.httpd:
+                raise ValueError('no http server attached')
+            try:
+                gate, warn = resolve_metrics_acl(val)
+            except SystemExit as e:
+                raise ValueError(str(e))
+            self.metrics_acl_warn = warn   # the fresh state: an inline set clears a standing file warning
+            if warn is not None:   # the acl file's permission warning: the log, the audit trail, the reply's suffix
+                logger.warning('acl file: %s', warn)
+                if self.audit:
+                    self.audit.event('ACL-FILE', warn)
+            self.httpd.metrics_acl = gate   # the swap is live: the accept check reads it per connection
+            with s.lock:
+                s.cfg['metrics_acl'] = acl_value_text(gate)
+            shown = acl_value_text(gate)
+            if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
+                shown += ' (%s)' % warn
+            return shown
         if key == 'log-access':
             if val not in ('on', 'off', 'true', 'false', '1', '0', 'yes', 'no'):
                 raise ValueError('log-access must be on or off')
@@ -603,6 +628,8 @@ class ControlServer(_ControlServer):
             return 'off' if not ct else secs(ct)
         if key == 'metrics/limits/max-conn-per-ip':
             return '%d' % (self.httpd.gate.max_per_ip if self.httpd else cfg['max_conn_per_ip'])
+        if key == 'metrics/acl':
+            return acl_value_text(self.httpd.metrics_acl) if self.httpd else (cfg['metrics_acl'] or 'any')
         if key == 'log-access':
             return 'on' if (self.httpd.RequestHandlerClass.log_access if self.httpd else cfg['log_access']) else 'off'
         if key == 'log-level':
@@ -690,6 +717,7 @@ class ControlServer(_ControlServer):
             'metrics/limits/max-clients': cfg['max_clients'],
             'metrics/limits/timeout': cfg['client_timeout'],
             'metrics/limits/max-conn-per-ip': cfg['max_conn_per_ip'],
+            'metrics/acl': acl_value_text(self.httpd.metrics_acl) if self.httpd else (cfg['metrics_acl'] or 'any'),
             'log-access': 'on' if cfg['log_access'] else 'off',
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'local-time': self._get('local-time'),
@@ -804,6 +832,22 @@ class ControlServer(_ControlServer):
         rows = [(name, spec.section_of(name) or '', spec.help.get(name, name))
                 for name in sorted(spec.specs)]
         return 'ok inputs-metrics\n' + '\n'.join(self._aligned(rows))
+
+    def acl_table_report(self):
+        """The metrics/acl/table show report (the show-only view of the
+        metrics ACL, one entry per line): the system forms spell the chain
+        they implement — 'allow 0.0.0.0/0' (any), 'deny 0.0.0.0/0' (none),
+        'deny 0.0.0.0/0' + one allow line per network (the whitelist); a
+        file gate renders its own rules — the gate desc as the '% ' line,
+        the rule descs as aligned '# ' comments, the matcher 'any' spelled
+        0.0.0.0/0 (common/config.py acl_table, the family's one renderer)."""
+        if self.httpd:
+            acl = self.httpd.metrics_acl
+        else:
+            with self.scraper.lock:
+                text = self.scraper.cfg.get('metrics_acl')
+            acl, _warn = resolve_metrics_acl(text or 'any')
+        return 'ok metrics-acl-table\n%s' % '\n'.join(acl_table(acl))
 
     def inspect(self):
         """One pretty dump of everything — the state, the counters, the caps,

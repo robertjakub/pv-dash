@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """The proxy itself: poller thread, client handling, forwarding and reload (stdlib only)."""
-import ipaddress
 import logging
 import os
 import socket
@@ -14,9 +13,9 @@ from common.modbus import (DeviceError, ModbusError, auth_handshake_server,
                            frame, pack_bits, read_frame, unpack_bits,
                            write_shape_error, write_target)
 from common.connlimit import ConnGate
-from .config import (IPGate, acl_gate_summary, acl_value_text, load_profile_write_gate,
-                     load_write_gate_file, compile_write_acl, load_registers_file, load_selection,
-                     parse_acl)
+from .config import (IPGate, acl_admits, acl_file_warn, acl_gate_summary, acl_value_text,
+                     load_profile_write_gate, load_write_gate_file, compile_write_acl,
+                     load_registers_file, load_selection, parse_acl)
 from .cache import build_blocks, span
 from .statics import (MAX_COUNT, MAX_PDU, MAX_BITS, READ_FUNCS, BIT_READ_FUNCS, WRITE_FUNCS,
                       GATEWAY_FAILED, ILLEGAL_FUNCTION,
@@ -48,20 +47,6 @@ def _read_shape(fc, count):
     if fc in BIT_READ_FUNCS:
         return (count + 7) // 8
     return count * 2
-
-
-def acl_file_warn(path):
-    """The acl file's permission posture: group/world-READABLE is warned
-    about, not refused (the file is config trust like the profile — but
-    whoever can read it can also loosen the write gate before the daemon
-    reads it) — returns the one-line warning or None."""
-    try:
-        mode = os.stat(path).st_mode & 0o777
-    except OSError:
-        return None
-    if mode & 0o044:
-        return 'the acl file %s is group/world-readable, mode %03o — chmod 0600' % (path, mode)
-    return None
 
 
 class Proxy:
@@ -317,19 +302,9 @@ class Proxy:
                                  % (key, entry['requests'], int(self.requests_audit_s), delta))
 
     def _allowed(self, acl, ip):
-        """The IP ACL on one peer: None = the ACL is off (everybody
-        allowed); () = nobody allowed (the 'none' mode); the networks =
-        the whitelist (the ip must land in one network); an IPGate (the
-        file's chain) = the last matching rule decides, no match denies."""
-        if isinstance(acl, IPGate):
-            return acl.allows(ip)
-        if acl is None:
-            return True
-        try:
-            a = ipaddress.ip_address(ip)
-        except ValueError:
-            return False
-        return any(a.version == n.version and a in n for n in acl)
+        """The IP ACL on one peer (common/config.py acl_admits — one
+        implementation for the family's IP gates)."""
+        return acl_admits(acl, ip)
 
     def _resolve_ip_acl(self, val, knob):
         """The acl/connect + acl/write knob value -> the effective gate:

@@ -409,6 +409,7 @@ journald adds one.
 | `--log-level` | `INFO` | `DEBUG` logs every poll |
 | `--log-access` | off | audit log: every HTTP request at INFO (client, path, status, size) |
 | `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; token compared timing-safe); the value may be `file:<path>` — the first line of an owner-only `0600` file (**re-read on every SIGHUP** — rotate by rewriting the file and reloading), F12 |
+| `--metrics-acl` | `any` | the clients allowed to **connect** to /metrics: `any`, `none` (refuse everyone), comma-separated IPs/prefixes (`10.0.0.7,10.48.0.0/16`), or `file:<path>` — the standalone ip-prefix acl file (allow/deny rule chain, the **last matching rule decides**, a client no rule decides refuses; `any` = 0.0.0.0/0). Checked at accept — a client off the ACL is closed without a reply and logged (`connection rejected: … not on the metrics ACL`); live-settable (`set metrics acl`, `unset metrics acl`) and re-read on SIGHUP; a group/world-readable acl file warns (`chmod 0600` silences it) — the shipped example is `examples/acl-ip-prefix.json`, its JSON Schema `schema/acl-ip-prefix.schema.json` |
 | `--control-port` | `/tmp/modbus-scraper-<listen-port>.socket` | the JSON-lines control server target (unix socket path or TCP port on 127.0.0.1), `0` = off |
 | `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `CONTROL_TOKEN`); a TCP control port refuses to start without one (F5); the value may be `file:<path>` — the first line of an owner-only `0600` file, F12 |
 | `--control-ops-token` | off | a second, **read-only** control token: its sessions run the `show`/`clear` verbs only (no `set`/`unset`, no `poll now`, no `request reload`, no `restart`, no `shutdown`) — needs `--control-token`, must differ from it; both roles audited (`CONTROL_OPS_TOKEN`) |
@@ -554,9 +555,11 @@ scraper/
 │   └── modbus-scraper-cli.py     # console-style control session
 ├── examples/
 │   ├── scraper.conf         # sample config in the set grammar (installed beside the script)
-│   └── metrics.json         # the phase rows' + the compute expressions' specs (the canonical four are built-in)
+│   ├── metrics.json         # the phase rows' + the compute expressions' specs (the canonical four are built-in)
+│   └── acl-ip-prefix.json   # example acl file: the /metrics connect policy (--metrics-acl file:...)
 ├── schema/
-│   └── metrics.schema.json  # the metrics spec's JSON Schema (draft 2020-12 — the loader stays the strict word)
+│   ├── metrics.schema.json  # the metrics spec's JSON Schema (draft 2020-12 — the loader stays the strict word)
+│   └── acl-ip-prefix.schema.json  # the ip-prefix acl file's JSON Schema (draft 2020-12)
 └── lib/
     ├── static.json        # the static constants: protocol limits, diagnostics block, defaults
     ├── metrics.json       # the built-in inputs declaration + the four canonical metrics + the scraper_* specs — always merged in over the configured spec

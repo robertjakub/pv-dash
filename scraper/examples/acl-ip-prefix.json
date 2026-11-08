@@ -1,0 +1,10 @@
+{
+  "desc": "the /metrics connect policy, worked out - a whitelist: the chain reads top to bottom, the LAST matching rule decides, and a client no rule decides refuses (the default deny any); a prefix is an IP or an IP/prefix length, several comma-separated",
+  "type": "ip-prefix",
+  "rules": [
+    {"type": "deny", "prefix": "any", "desc": "the clean slate: nobody connects yet"},
+    {"type": "allow", "prefix": "10.0.0.0/8,127.0.0.1", "desc": "the lab net plus the scraper host itself (several prefixes comma-separated)"},
+    {"type": "deny", "prefix": "10.99.0.0/16", "desc": "the guest VLAN stays out: the deny carves it out of the allowed span"},
+    {"type": "allow", "prefix": "192.168.7.21,192.168.7.22", "desc": "the two dashboard hosts re-open"}
+  ]
+}

@@ -43,6 +43,10 @@ let
     (lib.optionals (cfg.authToken != null) [ (setLine "auth-token" cfg.authToken) ])
     (lib.optionals (cfg.authTokenFile != null) [ (setLine "auth-token" "file:${toString cfg.authTokenFile}") ])
     ""
+    "# --- the /metrics connect ACL ---"
+    (lib.optionals (cfg.metricsAcl != null) [ (setLine "metrics-acl" cfg.metricsAcl) ])
+    (lib.optionals (cfg.metricsAclFile != null) [ (setLine "metrics-acl" "file:${toString cfg.metricsAclFile}") ])
+    ""
     "# --- the control plane ---"
     (lib.optionals (cfg.controlPort != null) [ (setLine "control-port" (toString cfg.controlPort)) ])
     (lib.optionals (cfg.controlToken != null) [ (setLine "control-token" cfg.controlToken) ])
@@ -247,6 +251,31 @@ in
         token rotates with `systemctl reload` after rewriting the file. The service user
         must be able to read the path (note: `ProtectHome = true` blocks `/root` — put the
         file under `/etc` or use systemd `LoadCredential`).
+      '';
+    };
+
+    metricsAcl = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The clients allowed to connect to /metrics: "any" (the default), "none"
+        (refuse everyone), or comma-separated IPs/prefixes (10.0.0.7,10.48.0.0/16)
+        spelling the whitelist inline. Checked at accept — a client off the ACL is
+        closed without a reply. For the standalone rule-chain gate file (the
+        ip-prefix acl file: allow/deny rules, the last match decides) use
+        `metricsAclFile`.
+      '';
+    };
+
+    metricsAclFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Path to the standalone ip-prefix acl file the metrics/acl gate reads
+        (scraper/examples/acl-ip-prefix.json is the shipped example of the shape;
+        scraper/schema/acl-ip-prefix.schema.json is its JSON Schema). Re-read at
+        startup and on every SIGHUP reload; a group/world-readable file warns —
+        chmod 0600 silences it.
       '';
     };
 

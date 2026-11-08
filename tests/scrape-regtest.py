@@ -2257,6 +2257,104 @@ try:
     check('suite auth: the plain-server failures pile up too', m.get('scraper_modbus_errors_total', 0) > 0,
           str(m.get('scraper_modbus_errors_total')))
 
+    # 9. the metrics ACL: the cache's acl/connect reading on the /metrics
+    # listener — the accept-time IP gate (the inline grammar + the file: chain)
+    r = subprocess.run([sys.executable, P, '--dry-run',
+                        '--metrics-acl', 'file:' + os.path.join(SCRAPER_DIR, 'examples', 'acl-ip-prefix.json')],
+                       capture_output=True, text=True, timeout=15)
+    check('metrics acl: the shipped ip-prefix example loads (dry-run rc 0)',
+          r.returncode == 0 and 'dry-run: configuration is valid' in r.stderr, r.stderr[-100:])
+    r = subprocess.run([sys.executable, P, '--dry-run', '--metrics-acl', 'file:/nonexistent/acl.json'],
+                       capture_output=True, text=True, timeout=15)
+    check('metrics acl: a missing acl file refuses the start (rc 1, clean)',
+          r.returncode == 1 and 'cannot read acl file' in r.stderr, r.stderr[-100:])
+    r = subprocess.run([sys.executable, P, '--dry-run', '--metrics-acl', '10.0.0.0/999'],
+                       capture_output=True, text=True, timeout=15)
+    check('metrics acl: a bad inline entry refuses the start (rc 1, clean)',
+          r.returncode == 1 and 'bad ACL entry' in r.stderr, r.stderr[-100:])
+
+    ACLGATE = '/tmp/scr_acl_gate.json'
+    with open(ACLGATE, 'w') as f:
+        _json.dump({'desc': 'the lab gate', 'type': 'ip-prefix', 'rules': [
+            {'type': 'deny', 'prefix': 'any'},
+            {'type': 'allow', 'prefix': '127.0.0.1', 'desc': 'the loopback lab'},
+        ]}, f)
+    write_ini('/tmp/scr_acl.ini', 'set control-port /tmp/scr_acl_ctl.socket')
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_acl.ini',
+                                   '--upstream', '127.0.0.1:%d' % PORT,
+                                   '--listen', '127.0.0.1:19465'],
+                                  stdout=open('/tmp/scr_acl.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(2)
+
+    def acl_ctl(cmd):
+        # the unix-socket control transport (no token: the filesystem is the auth)
+        s = socket.socket(socket.AF_UNIX)
+        s.settimeout(5)
+        s.connect('/tmp/scr_acl_ctl.socket')
+        s.sendall((_json.dumps({'cmd': cmd}) + '\n').encode())
+        buf = b''
+        while not buf.endswith(b'\n'):
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            buf += chunk
+        s.close()
+        obj = _json.loads(buf.split(b'\n', 1)[0].decode('utf-8', 'replace'))
+        return '%s %s' % (obj.get('status', 'fail'), str(obj.get('text', '')))
+
+    def acl_raw():
+        # one GET over a raw socket, the full reply or the close: the
+        # accept-check refusal closes without a reply — a reset on some stacks
+        try:
+            s = socket.create_connection(('127.0.0.1', 19465), timeout=5)
+            s.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\nConnection: close\r\n\r\n')
+            buf = b''
+            while True:
+                chunk = s.recv(4096)
+                if not chunk:
+                    break
+                buf += chunk
+            s.close()
+            return buf
+        except (ConnectionResetError, BrokenPipeError):
+            return b''
+
+    check('metrics acl: any serves (the default)', acl_raw().startswith(b'HTTP/1.1 200'),
+          acl_raw().split(b'\r\n')[0].decode()[:60])
+    r = acl_ctl('set metrics acl none')
+    check('metrics acl: set none answers ok', r.startswith('ok metrics/acl=none'), r[:80])
+    check('metrics acl: none closes the client without a reply', acl_raw() == b'',
+          repr(acl_raw()[:40]))
+    r = acl_ctl('show metrics acl')
+    check('metrics acl: the none show', r == 'ok metrics/acl=none', r[:60])
+    r = acl_ctl('show metrics acl table')
+    check('metrics acl: none spells the deny-any chain', r == 'ok metrics-acl-table\ndeny 0.0.0.0/0', r[:80])
+    r = acl_ctl('set metrics acl table')
+    check('metrics acl: the show word is not a value (the pointer to the report)',
+          r.startswith('fail') and 'show metrics acl table' in r, r[:120])
+    r = acl_ctl('set metrics acl 127.0.0.1')
+    check('metrics acl: the whitelist set canonicalizes', r.startswith('ok metrics/acl=127.0.0.1/32'), r[:80])
+    check('metrics acl: the whitelist serves the lab', acl_raw().startswith(b'HTTP/1.1 200'))
+    r = acl_ctl('show metrics acl table')
+    check('metrics acl: the whitelist table', r == 'ok metrics-acl-table\ndeny 0.0.0.0/0\nallow 127.0.0.1/32', r[:80])
+    r = acl_ctl('set metrics acl file:' + ACLGATE)
+    check('metrics acl: the file gate loads', r.startswith('ok metrics/acl=file:%s' % ACLGATE), r[:100])
+    r = acl_ctl('show metrics acl')
+    check('metrics acl: the file spelling shows', r == 'ok metrics/acl=file:%s' % ACLGATE, r[:80])
+    r = acl_ctl('show metrics acl table')
+    check('metrics acl: the file gate renders its own rules',
+          r == 'ok metrics-acl-table\n% the lab gate\ndeny 0.0.0.0/0\nallow 127.0.0.1 # the loopback lab', r[:160])
+    check('metrics acl: the file gate serves the lab', acl_raw().startswith(b'HTTP/1.1 200'))
+    with open(ACLGATE, 'w') as f:
+        _json.dump({'type': 'ip-prefix', 'rules': [{'type': 'allow', 'prefix': '127.0.0.1/8'}]}, f)
+    r = acl_ctl('set metrics acl file:' + ACLGATE)
+    check('metrics acl: a bad file answers err with the old gate standing',
+          r.startswith('fail') and 'spell the network' in r and acl_raw().startswith(b'HTTP/1.1 200'), r[:140])
+    r = acl_ctl('unset metrics acl')
+    check('metrics acl: unset restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
+    check('metrics acl: any serves again', acl_raw().startswith(b'HTTP/1.1 200'))
+    os.remove(ACLGATE)
+
     for tool, title in ((P, 'MODBUS-SCRAPER'), (CTLB, 'MODBUS-SCRAPER-CTL'), (CLIB, 'MODBUS-SCRAPER-CLI')):
         r = subprocess.run([sys.executable, tool, '--man'], capture_output=True, text=True, timeout=30)
         check('--man: %s prints the page' % os.path.basename(tool),

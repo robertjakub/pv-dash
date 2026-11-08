@@ -2,9 +2,10 @@
 
 This is the reference for the ACL support across the family: what the rule
 chain says, where it is enforced, and which surfaces speak it. The story
-has two planes. The **IP plane** decides who may reach a Modbus listener at
-all and whose write frames forward — the `acl/connect` and `acl/write`
-knobs. The **register plane** decides which registers a forwarded write may
+has two planes. The **IP plane** decides who may reach a listener at all —
+the Modbus listeners' `acl/connect` (and the cache's `acl/write` for the
+write frames), the scraper's `metrics/acl` for the /metrics exposition. The
+**register plane** decides which registers a forwarded write may
 touch — the `write-registers` knob and the device profiles' embedded
 `acl`/`write` gate. Both planes speak ONE gate-object schema with TWO
 matcher kinds (registers, IP prefixes), one loader validates both, and the
@@ -41,7 +42,8 @@ with the rules' key when spelled: a typeless register gate reads as
 `write-registers` (the legacy shape — every existing profile and file keeps
 working), a typeless prefix gate refuses (say the type), and a gate whose
 rules mix `range` and `prefix` refuses (one grammar per gate). One loader
-validates the object — `cache/lib/config.py`'s `_write_gate_object` — and
+validates the object — `common/config.py`'s `_write_gate_object`, one gate
+validator for the family — and
 each consumer pins the kind it takes (`allow=('write-registers',)` or
 `allow=('ip-prefix',)`): a file of the wrong kind is a clean, named refusal,
 not a mis-compiled gate.
@@ -70,10 +72,12 @@ fresh gate and migrates a typeless one). Both speak both kinds; the
 embedded profile gates belong to `profiles/bin/profile-lint.py`. The
 shipped examples: `cache/examples/acl-write-registers.json` (the deye
 register policy: the clean-slate deny, the allows, the deny carves, the
-re-opens) and `cache/examples/acl-ip-prefix.json` (the same shape for
-IPs). Both acl files' **JSON Schemas** ship under `cache/schema/`
-(`acl-write-registers.schema.json` / `acl-ip-prefix.schema.json`, draft
-2020-12) — schema-valid can still be loader-refused (the strict-CIDR
+re-opens) and the ip-prefix example — `cache/examples/acl-ip-prefix.json`
+for the cache's connect policy, `scraper/examples/acl-ip-prefix.json` for
+the scraper's (the same shape, each tool's tree self-contained). The
+**JSON Schemas** ship beside them (`acl-write-registers.schema.json` under
+`cache/schema/`; `acl-ip-prefix.schema.json` under both tools' `schema/`,
+draft 2020-12) — schema-valid can still be loader-refused (the strict-CIDR
 host-bit spellings, the range bounds), so the loader stays the strict
 word; wire them into an editor by `"$schema"` pattern-matching for live
 feedback while editing.
@@ -137,15 +141,36 @@ chains — a test instrument on a trusted LAN keeps its soft-edge posture
 (F11 in docs/AUDIT.md); its write gate is `--allow-write` alone (off = every
 Modbus write refused), with no IP write-acl and no register allow-list.
 
-## modbus-scraper and the dashboard — no ACL surface
+## modbus-scraper — the metrics listener, IP kind
 
-The scraper is a client, not a listener: it owns the one connection
-upstream and exposes no Modbus surface to gate. Its exposure is the metrics
-endpoint and the control socket — the token, the caps and the bind are that
-story (docs/AUDIT.md, F5/F6). The dashboard consumes the scraper's metrics
-and carries no ACL surface either. If a deployment needs the metrics
-endpoint IP-gated, terminate at a reverse proxy (F14's answer) — the family
-deliberately does not grow a per-request IP ACL on the HTTP surfaces.
+The scraper's exposure is the /metrics exposition, and it takes the
+connect-ACL half of the story as **`metrics/acl`** — the cache's
+`acl/connect` reading on the HTTP listener: `--metrics-acl` (env
+`METRICS_ACL`, live `set metrics acl <value>` / `unset metrics acl`,
+config `metrics_acl`, NixOS `metricsAcl`/`metricsAclFile`) takes the same
+one value grammar as the cache's IP knobs — `any` (the default), `none`,
+a comma-separated `IP,IP/prefix, ...` list, or `file:<path>` (the
+ip-prefix acl file). The check runs at **accept**, beside the connection
+caps (caps first, then the ACL — the cache's order): a client off the ACL
+is closed **without a reply** — nothing was parsed to answer — and logged
+`connection rejected: … not on the metrics ACL`. The acl file re-resolves
+on every `set`/`unset` and on SIGHUP, a bad file keeps the old gate
+standing, and a group/world-readable file warns (the log, the audit
+trail's `ACL-FILE` event, the `set` reply's suffix). The chain renders as
+`show metrics acl table` — the same three fixed chains for the inline
+forms, the file gate's own rules behind the `% ` desc header — and a `set
+metrics acl table` (the show word typed into the set verb) answers the
+pointer to the report.
+
+The control socket is NOT this gate: the tokens, the RBAC ops role and the
+`trust-uids` list are that socket's own admission story (docs/AUDIT.md,
+F5). The dashboard consumes the scraper's metrics and carries no ACL
+surface.
+
+## the dashboard — no ACL surface
+
+The dashboard's own HTTP surface keeps the token + bind posture
+(docs/AUDIT.md, F6) — no IP gate.
 
 ## Related — the neighbouring gates that are not ACLs
 

@@ -154,6 +154,14 @@ require Authorization: Bearer <token> on all requests; the value may be
 `file:<path>` — the first line of an owner\-only 0600 file (a systemd
 LoadCredential rides as file:/run/credentials/...)
 .TP
+.B \-\-metrics\-acl
+clients allowed to connect to /metrics: "any", "none" (refuse everyone),
+comma\-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or
+"file:<path>" — the standalone ip\-prefix acl file (the gate object
+{"type": "ip\-prefix", "rules": [{"type": "allow"|"deny", "prefix":
+\&...}]}: the last matching rule decides, a client no rule decides
+refuses; "any" = 0.0.0.0/0, the whole space)
+.TP
 .B \-\-audit\-log
 SCR audit trail: a file path or \- for stdout (the docker/journald way);
 the XDG state home (~/.local/state/modbus\-scraper/audit.log) when unset

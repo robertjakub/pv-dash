@@ -5,6 +5,7 @@ import logging
 import sys
 from http.server import BaseHTTPRequestHandler
 
+from common.config import acl_admits
 from common.connlimit import GatedHTTPServer
 
 logger = logging.getLogger('scraper')
@@ -119,7 +120,19 @@ class Handler(BaseHTTPRequestHandler):
 class Server(GatedHTTPServer):
     """The exposition server behind the connection caps (F13 round):
     --max-clients (total) and --max-conn-per-ip — past either, an immediate
-    503; 0 = unlimited. setup_gate() runs before bind."""
+    503; 0 = unlimited. setup_gate() runs before bind. Beside the caps the
+    metrics/acl gate checks the peer IP at accept (the modbus-cache
+    connect-ACL reading): a client off the ACL is closed without a reply
+    — nothing was parsed to answer."""
+
+    metrics_acl = None   # the live gate: None = any, () = none, the networks tuple, IPGate (the file chain)
+
+    def acl_allows(self, ip):
+        return acl_admits(self.metrics_acl, ip)
+
+    def acl_refused(self, request, client_address):
+        logger.info('connection rejected: %s:%d not on the metrics ACL', *client_address[:2])
+        self.shutdown_request(request)
 
     def gate_refused(self, request, client_address, why):
         logger.info('rejected %s: too many concurrent clients (%s, max %d/%d)',

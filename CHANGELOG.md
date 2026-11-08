@@ -9,6 +9,30 @@ before the repo restructured into one suite.
 ## Unreleased
 ### Added
 
+- **scraper** — **`metrics/acl`** (`--metrics-acl`, env `METRICS_ACL`,
+  config `metrics_acl`, NixOS `metricsAcl`/`metricsAclFile`, live `set
+  metrics acl` / `unset metrics acl`): the cache's `acl/connect` reading
+  on the /metrics listener — one value grammar (`any` the default, `none`,
+  a comma-separated `IP,IP/prefix, ...` whitelist, `file:<path>` the
+  standalone ip-prefix acl file, the shipped
+  `examples/acl-ip-prefix.json` shape). The check runs at **accept**,
+  beside the connection caps (caps first, then the ACL): a client off the
+  ACL is closed without a reply — nothing was parsed to answer — and
+  logged `connection rejected: … not on the metrics ACL`. The acl file
+  re-resolves on every `set`/`unset` and on SIGHUP (a bad file keeps the
+  old gate standing), a group/world-readable file warns (the log, the
+  audit trail's `ACL-FILE` event, the `set` reply's suffix), and the
+  **`show metrics acl table`** report (show-only) renders the gate as its
+  chain — the inline forms as the three fixed chains (`allow 0.0.0.0/0` /
+  `deny 0.0.0.0/0` / the whitelist spelled out), a file gate as its own
+  rules behind the `% ` desc header with the aligned `# ` comments; `set
+  metrics acl table` answers the pointer to the report. The gate
+  machinery (`IPGate`, the gate-object validator, the table renderer) is
+  one implementation for the family now — `common/config.py` — and the
+  ip-prefix example + its JSON Schema ship in the scraper's tree
+  (`scraper/examples/acl-ip-prefix.json`,
+  `scraper/schema/acl-ip-prefix.schema.json`).
+
 - **scripts** — **`scripts/validate_json.py`**: a stdlib-only JSON Schema
   validator for the shipped spec files (`scraper/schema/`, `cache/schema/`)
   — the draft-2020-12 keyword set the schemas speak (`type`/`enum`/`const`,

@@ -62,7 +62,10 @@ class GatedHTTPServer(http.server.ThreadingHTTPServer):
     refused peer gets gate_refused — reply 503 and log, the default closes
     silently), release when the handler thread is done. Subclasses call
     setup_gate() on the instance after construction (before serve_forever)
-    and may override gate_refused."""
+    and may override gate_refused. Beside the caps an acl_allows hook
+    runs at the same point: a subclass overrides it with the live IP gate
+    (the scraper's metrics/acl) and the refused peer is handed to
+    acl_refused — the cap slot released, the refusal never counted."""
     daemon_threads = True
     allow_reuse_address = True
     gate = None
@@ -73,10 +76,25 @@ class GatedHTTPServer(http.server.ThreadingHTTPServer):
     def gate_refused(self, request, client_address, why):
         self.shutdown_request(request)
 
+    def acl_allows(self, ip):
+        """The connection-ACL hook: the default admits every peer (no
+        ACL); the subclasses with an IP knob override with the live gate
+        (common/config.py acl_admits on the resolved value)."""
+        return True
+
+    def acl_refused(self, request, client_address):
+        """The ACL-rejected peer: the default closes without a reply (the
+        accept-check reading — nothing was parsed to answer)."""
+        self.shutdown_request(request)
+
     def process_request(self, request, client_address):
         ok, why = self.gate.admit(client_address[0])
         if not ok:
             self.gate_refused(request, client_address, why)
+            return
+        if not self.acl_allows(client_address[0]):
+            self.gate.release(client_address[0])   # the refusal never counts
+            self.acl_refused(request, client_address)
             return
         try:
             super().process_request(request, client_address)

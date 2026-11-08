@@ -26,7 +26,7 @@ from common.cred import parse_trust_uids
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.version import version_string
-from lib.config import resolve_config, resolve_control_target
+from lib.config import resolve_config, resolve_control_target, resolve_metrics_acl
 from lib.control import ControlServer
 from lib.metrics import Metrics
 from lib.options import KNOWN_VERBS, OPTIONS
@@ -83,7 +83,8 @@ def describe(cfg, args, control_desc):
            (['grid cap %gW' % (cfg['max_grid_kw'] * 1000.0)] if cfg['max_grid_kw'] > 0 else [])
     limits = (['max-clients %d' % cfg['max_clients']] if cfg['max_clients'] else []) + \
              (['client-timeout %gs' % cfg['client_timeout']] if cfg['client_timeout'] else []) + \
-             (['max-conn-per-ip %d' % cfg['max_conn_per_ip']] if cfg['max_conn_per_ip'] else [])
+             (['max-conn-per-ip %d' % cfg['max_conn_per_ip']] if cfg['max_conn_per_ip'] else []) + \
+             (['metrics-acl %s' % cfg['metrics_acl']] if cfg['metrics_acl'] not in ('any', '') else [])
     listen_host, listen_port = parse_listen(cfg['listen'])
     return ('polling %s:%d unit %d (profile %s, %d registers, positive=%s%s, modbus auth %s) every %gs; '
             '%s /metrics on %s:%d (config: %s, log level: %s, log time: %s, log access: %s, auth: %s, '
@@ -206,6 +207,10 @@ def main():
         return
     httpd = Server((listen_host, listen_port), Handler)
     httpd.setup_gate(cfg['max_clients'], cfg['max_conn_per_ip'])
+    metrics_acl, metrics_acl_warn = resolve_metrics_acl(cfg['metrics_acl'])   # the accept-time gate (validated at resolve_config)
+    httpd.metrics_acl = metrics_acl
+    if metrics_acl_warn:
+        logger.warning('acl file: %s', metrics_acl_warn)
     started = time.monotonic()
 
     control = None
@@ -272,13 +277,20 @@ def main():
         Handler.timeout = new_cfg['client_timeout'] or None
         httpd.gate.max_total = new_cfg['max_clients']
         httpd.gate.max_per_ip = new_cfg['max_conn_per_ip']
+        metrics_acl, metrics_acl_warn = resolve_metrics_acl(new_cfg['metrics_acl'])   # a bad value or file keeps the previous gate
+        httpd.metrics_acl = metrics_acl
+        if metrics_acl_warn:
+            logger.warning('acl file: %s', metrics_acl_warn)
         if control:
             control.clear_overrides()   # the config won: nothing is live-overridden
+            control.metrics_acl_warn = metrics_acl_warn
         a = the_audit()
         if a:
             a.event('RELOAD', 'upstream %s:%d unit %d, interval %gs, auth %s'
                     % (new_cfg['host'], new_cfg['modbus_port'], new_cfg['modbus_unit'], new_cfg['interval'],
                        'bearer' if new_cfg['auth_token'] else 'none'))
+            if metrics_acl_warn:
+                a.event('ACL-FILE', metrics_acl_warn)
         return 'upstream %s:%d unit %d, interval %gs' % (new_cfg['host'], new_cfg['modbus_port'],
                                                          new_cfg['modbus_unit'], new_cfg['interval'])
 
@@ -305,6 +317,8 @@ def main():
         audit.event('START', 'version=%s upstream=%s:%d unit %d listen=%s control=%s'
                     % (version_string(), cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['listen'],
                        control_desc))
+        if metrics_acl_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
+            audit.event('ACL-FILE', metrics_acl_warn)
     try:
         threading.Thread(target=scraper.poll_loop, daemon=True).start()
         httpd.serve_forever()

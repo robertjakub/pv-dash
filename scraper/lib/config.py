@@ -10,9 +10,10 @@ import math
 import re
 
 from .options import OPTIONS
-from common.config import check_auth_key, check_token_chars, check_control_tokens, default_profile_path, \
-    is_loopback_host, load_config_script, parse_auth_type, parse_listen, parse_secret, parse_upstream, \
-    resolve_profile_file, resolve_target, Resolver, str_to_bool
+from common.config import (IPGate, acl_file_warn, check_auth_key, check_token_chars, check_control_tokens,
+                           default_profile_path, is_loopback_host, load_config_script, load_write_gate_file,
+                           parse_acl, parse_auth_type, parse_listen, parse_secret, parse_upstream,
+                           resolve_profile_file, resolve_target, Resolver, str_to_bool)
 from .metrics import Metrics
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
@@ -26,6 +27,22 @@ def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
     wins, then CTL, then the default unix socket named after the
     listen port (/tmp/modbus-scraper-9350.socket)."""
     return resolve_target(explicit, '/tmp/modbus-scraper-%d.socket' % int(listen_port))
+
+
+def resolve_metrics_acl(val, label='metrics/acl'):
+    """The metrics/acl knob value -> (gate, warn): the system words and
+    the network lists ride parse_acl; 'file:<path>' loads the standalone
+    ip-prefix acl file (the gate object scraper/schema/acl-ip-prefix.schema.json
+    describes — the chain reads top to bottom, the LAST matching rule
+    decides, a client no rule decides refuses). The gate: None = any,
+    () = none, the networks tuple, IPGate = the file chain. SystemExit on
+    a bad value or file; a group/world-readable acl file warns (the
+    (gate, warn) pair — chmod 0600 silences it)."""
+    t = (val or '').strip()
+    if t.startswith('file:'):
+        desc, rules = load_write_gate_file(t[5:], allow=('ip-prefix',))
+        return IPGate(t, desc, rules), acl_file_warn(t[5:])
+    return parse_acl(t, label), None
 
 
 def check_register(value, label):
@@ -248,6 +265,8 @@ def resolve_config(args, script_dir=None):
                                   DEFAULTS['client_timeout_s'], float),
         'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MAX_CONN_PER_IP',
                                    'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
+        'metrics_acl': (resolve(getattr(args, 'metrics_acl', None), 'METRICS_ACL',
+                                'metrics_acl', DEFAULTS['metrics_acl'], str) or '').strip() or 'any',
         'local_time': resolve(args.local_time, 'LOCAL_TIME', 'local_time', False, str_to_bool),
         'log_access': resolve(args.log_access, 'LOG_ACCESS', 'log_access', False, str_to_bool),
         'metric_prefix': metric_prefix,
@@ -279,6 +298,7 @@ def resolve_config(args, script_dir=None):
     check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
     check_token_chars(cfg['control_token'], 'control_token')
     check_token_chars(cfg['auth_token'], 'auth_token')
+    resolve_metrics_acl(cfg['metrics_acl'])   # a bad acl value or gate file refuses the start
     if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', cfg['metric_prefix']):
         raise SystemExit('invalid metric_prefix = %r: must be a valid metric-name start '
                          '(letters/digits/underscore, not starting with a digit)' % cfg['metric_prefix'])

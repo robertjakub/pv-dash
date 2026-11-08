@@ -318,25 +318,28 @@ def connect_once(addr, is_unix, timeout):
 
 
 def reconnect(addr, is_unix, args, audit=None):
-    """The wire died mid-session: retry up to --reconnect times with
-    --reconnect-wait seconds between the attempts; every attempt is
-    audited. Returns the new socket, or None when the tries run out."""
+    """The wire died mid-session: up to --reconnect tries — the first one
+    immediately, --reconnect-wait seconds between the tries — every
+    attempt audited. Returns the new socket, or None when the tries run
+    out."""
+    print('%% connection lost, reconnecting (attempt 1 of %d)' % args.reconnect)
     for attempt in range(1, args.reconnect + 1):
-        print('%% connection lost, reconnecting in %s (attempt %d of %d)'
-              % (secs(args.reconnect_wait), attempt, args.reconnect))
         try:
-            time.sleep(args.reconnect_wait)
             s = connect_once(addr, is_unix, args.timeout)
         except OSError as e:
             print('%% reconnect attempt %d failed: %s' % (attempt, e))
             if audit:
                 audit.event('RECONNECT', 'attempt %d of %d failed: %s' % (attempt, args.reconnect, e))
+            if attempt < args.reconnect:
+                print('%% reconnecting in %s (attempt %d of %d)'
+                      % (secs(args.reconnect_wait), attempt + 1, args.reconnect))
+                time.sleep(args.reconnect_wait)
             continue
         if audit:
             audit.event('RECONNECT', 'attempt %d of %d ok' % (attempt, args.reconnect))
         print('%% reconnected to %s' % _SPEC['label'])
         return s
-    print('control server unreachable after %d reconnect attempts' % args.reconnect, file=sys.stderr)
+    print('% error: reconnect failed, exiting')
     if audit:
         audit.event('RECONNECT', 'gave up after %d attempts' % args.reconnect)
     return None
@@ -383,10 +386,11 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
                     return 1
     finally:
         _stop_ping.set()
-        try:
-            sock.close()
-        except OSError:
-            pass
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
 
 
 def wire(cmd):

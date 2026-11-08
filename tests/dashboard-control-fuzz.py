@@ -158,7 +158,7 @@ def main():
             (b'{"cmd": 42}\n', 'non-string cmd'),
             (b'{"cmd": null}\n', 'null cmd'),
             (b'\xff\xfe\x00binary\n', 'binary bytes'),
-            (b'{"cmd": "show stat\xc3\xbc\u007f"}\n', 'unicode cmd'),
+            (b'{"cmd": "show stat\xc3\xbc\x7f"}\n', 'unicode cmd'),
             (b'\n', 'empty line'),
             (b'   \n', 'whitespace line'),
         ]
@@ -250,6 +250,13 @@ def main():
                 buf += s.recv(4096)
             reply = _json.loads(buf.decode())
             check('fuzz: the signed command verifies and answers', reply.get('status') == 'ok'
+                  and 'dashboard' in reply.get('text', ''), str(reply))
+            s.sendall(signed('sh\u00f6w versi\u00f6n'))   # the mac covers the client's utf-8 bytes
+            buf = b''
+            while not buf.endswith(b'\n'):
+                buf += s.recv(4096)
+            reply = _json.loads(buf.decode())
+            check('fuzz: the utf-8 command folds to the 8-bit grammar and answers', reply.get('status') == 'ok'
                   and 'dashboard' in reply.get('text', ''), str(reply))
             s.close()
         except (OSError, ValueError) as e:

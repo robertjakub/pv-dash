@@ -23,7 +23,7 @@ from common.dump import SECRET_REMOVED
 from common.options import config_value, control_command, grouped_rows, knob_dictionary, \
     render_config_script
 from common.wiresec import ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, proof_tag, role_allows, \
-    role_tag, sign_reply, verify_request_mac
+    role_tag, sanitize_command, sign_reply, verify_request_mac
 
 
 def num(text, label, what):
@@ -238,7 +238,8 @@ class ControlServer:
     def framed(self, line, who, role):
         """One wire frame in, one out: parse {"cmd": ...}, gate the TCP auth,
         gate the ops role (show/clear only), verify the frame mac keyed by
-        the session's token, run the command. Returns (cmd, reply-obj,
+        the session's token, fold the client's utf-8 to the grammar's
+        printable 8-bit, run the command. Returns (cmd, reply-obj,
         internal-reply, role) — the role so the auth reply can promote the
         session. The text of a multi-line reply keeps its embedded newlines;
         the '.' terminator of the internal form is stripped (the JSON frame
@@ -269,8 +270,9 @@ class ControlServer:
         if key and obj.get('mac') is not None and not verify_request_mac(key, cmd, obj.get('mac')):
             return cmd, {'status': 'fail',
                          'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac', role
-        if not role_allows(role, cmd, self.ops_verbs):
-            verb = command_verb(cmd) or cmd
+        folded = sanitize_command(cmd)   # the mac spoke the client's bytes; the grammar is printable 8-bit
+        if not role_allows(role, folded, self.ops_verbs):
+            verb = command_verb(folded) or folded
             text = ('forbidden: the ops token runs the %s verbs only (%s needs the admin token)'
                     % ('/'.join(sorted(self.ops_verbs)), verb))
             reply = 'err ' + text
@@ -279,7 +281,7 @@ class ControlServer:
                 reply_obj['mac'] = sign_reply(key, 'fail ' + text)   # the mac is over the wire form
             self.LOG.warning('control: ops session from %s denied %r (read-only role)', who, cmd)
             return cmd, reply_obj, reply, role
-        reply = self.command(cmd)
+        reply = self.command(folded)
         if reply is None:              # quit: no reply, just close
             return cmd, None, 'bye', role
         status, _, text = reply.partition(' ')

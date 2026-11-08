@@ -25,6 +25,20 @@ before the repo restructured into one suite.
   CONFIGURED value now (was: the live rebind on `metrics/listen` — the row
   marked restart again in `dda97b9`); the audit rev. 17 entry follows.
 
+### Changed
+
+- **everywhere** — **the control wire folds the command to the grammar's
+  printable 8-bit before it decides** (common/wiresec.py
+  `sanitize_command`, in the shared base's frame ladder after the mac
+  gate): NFKD so an accented letter loses its mark (`shöw` runs as
+  `show`, `m³` as `m3`), then the printable-ascii range only — control
+  bytes, DEL and the scripts that do not decompose go. The frame mac
+  still certifies the client's exact bytes; the fold is what the role
+  gate and the command run. A command that folds away entirely answers
+  like the unknown command it is. The dashboard fuzz suite pins the fold
+  with a signed utf-8 command on the authenticated session; the
+  dashboard man page's control-wire paragraph follows.
+
 ## 0.4.2 — 2026-11-08
 ### Changed
 

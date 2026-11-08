@@ -36,7 +36,10 @@ battery flag), the config reload, the graceful shutdown. With a control
 token configured the wire is HMAC-signed: every command and reply carries
 the full sha256 of its payload, keyed by the token (common/wiresec.py)
 \\(em a token-holding client verifies both directions, and over TCP the
-signed commands are mandatory. A second, read-only token
+signed commands are mandatory. The command string folds to the grammar's
+printable 8-bit before the server decides on it (NFKD, then the
+printable-ascii range only \\(em \\fBshöw\\fR runs as \\fBshow\\fR); the mac
+still certifies the client's exact bytes. A second, read-only token
 (\\fB--control-ops-token\\fR) authenticates into the show/clear verbs only
 \\(em the ops shift against the admin key, both roles audited."""
     signals = """.SH SIGNALS

@@ -27,7 +27,10 @@ frames are refused. Over the unix socket it is verify-if-present — a
 peer-cred trusted peer speaks without holding the token (SO_PEERCRED is the
 boundary there), and a tamper attempt still fails the check. Without a
 token there is nothing to key: the wire stays unsigned (the filesystem
-permissions are the boundary).
+permissions are the boundary). The command string itself is folded to the
+grammar's printable 8-bit before the server decides on it (sanitize_command):
+the mac still certifies the client's exact bytes, the fold is what the
+role gate and the command run.
 
 A daemon may carry a **second token, the read-only ops role**
 (ROLE_ADMIN / ROLE_OPS): the admin key keeps every verb, the ops key
@@ -41,6 +44,7 @@ authenticated with, and the audit trail names the role on every COMMAND
 entry (role_tag) — both keys audited, the denials included. Stdlib only."""
 import hashlib
 import hmac
+import unicodedata
 
 # The control roles — the RBAC table: a role is a policy over the wire
 # verbs. ROLE_ADMIN is the full-access key (None = every verb the server's
@@ -70,6 +74,20 @@ def command_verb(cmd):
     if parts and parts[0].lower() == 'request':
         parts = parts[1:]
     return parts[0].lower() if parts else ''
+
+
+def sanitize_command(text):
+    """The client may speak utf-8, the grammar is printable 8-bit: fold the
+    command string down before the server decides on it — NFKD so an
+    accented letter loses its combining mark (ü -> u, the full-width and
+    the superscript forms fold to their ascii twins), then keep the
+    printable-ascii range only (control bytes, DEL and the scripts that do
+    not decompose go). Runs after the frame mac: the mac certifies the
+    bytes the client sent, the fold is what the role gate and the command
+    run. A command line that folds away entirely answers like the unknown
+    command it is."""
+    folded = unicodedata.normalize('NFKD', text)
+    return ''.join(c for c in folded if ' ' <= c <= '~')
 
 
 def role_allows(role, cmd, ops_verbs=None):

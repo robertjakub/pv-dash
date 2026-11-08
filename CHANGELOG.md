@@ -6,8 +6,7 @@ tagged commits'. The early tags (before 0.1.0) carried per-tool versions —
 the dashboard, the scraper and the cache each numbered their own releases
 before the repo restructured into one suite.
 
-## Unreleased
-
+## 0.4.2 — 2026-11-08
 ### Changed
 
 - **everywhere** — **the control wire's reply status speaks `ok` | `fail` |
@@ -58,6 +57,12 @@ before the repo restructured into one suite.
   the wire's `describe_node`.
 
 ### Fixed
+
+- **cache** — **the metrics listen rebinds live again**: the system/
+  namespace wave dropped a stray `restart` mark on the metrics-listen
+  row, so `set metrics listen …` answered restart-required and the
+  regtest's live-rebind check died — the row's own setting-help, the
+  `_apply` rebind branch and the regtest all speak live.
 
 - **fake** — **the wire keeps a path's case**: `set dump path /srv/State/…`
   stored and echoed the lowercased value (the simulator pins' `_apply`

@@ -149,24 +149,35 @@ Modbus write refused), with no IP write-acl and no register allow-list.
 ## modbus-scraper — the metrics listener, IP kind
 
 The scraper's exposure is the /metrics exposition, and it takes the
-connect-ACL half of the story as **`metrics/acl`** — the cache's
-`acl/connect` reading on the HTTP listener (the cache's own /metrics
-endpoint speaks the same `metrics/acl` gate now): `--metrics-acl` (env
-`METRICS_ACL`, live `set metrics acl <value>` / `unset metrics acl`,
-config `metrics_acl`, NixOS `metricsAcl`/`metricsAclFile`) takes the same
-one value grammar as the cache's IP knobs — `any` (the default), `none`,
-a comma-separated `IP,IP/prefix, ...` list, or `file:<path>` (the
-ip-prefix acl file). The check runs at **accept**, beside the connection
-caps (caps first, then the ACL — the cache's order): a client off the ACL
-is closed **without a reply** — nothing was parsed to answer — and logged
-`connection rejected: … not on the metrics ACL`. The acl file re-resolves
-on every `set`/`unset` and on SIGHUP, a bad file keeps the old gate
+connect-ACL half of the story — the cache's `acl/connect` reading on the
+HTTP listener (the cache's own /metrics endpoint speaks the same
+`metrics/acl` gate now):
+
+| knob | the gate | the check |
+|---|---|---|
+| `metrics/acl` | the IP kind | who may reach the /metrics exposition — the accept check on the metrics port (`connection rejected: … not on the metrics ACL`, closed without a reply) |
+
+`--metrics-acl` (env `METRICS_ACL`, live `set metrics acl <value>` /
+`unset metrics acl`, config `metrics_acl`, NixOS
+`metricsAcl`/`metricsAclFile`) takes the same one value grammar as the
+cache's IP knobs — `any` (the default), `none`, a comma-separated
+`IP,IP/prefix, ...` list, or `file:<path>` (the ip-prefix acl file). The
+check runs at **accept**, beside the connection caps (caps first, then
+the ACL — the cache's order): a client off the ACL is closed **without a
+reply** — nothing was parsed to answer. The acl file re-resolves on
+every `set`/`unset` and on SIGHUP, a bad file keeps the old gate
 standing, and a group/world-readable file warns (the log, the audit
 trail's `ACL-FILE` event, the `set` reply's suffix). The chain renders as
 `show metrics acl table` — the same three fixed chains for the inline
 forms, the file gate's own rules behind the `% ` desc header — and a `set
 metrics acl table` (the show word typed into the set verb) answers the
 pointer to the report.
+
+The gate never replaces the bearer: `--auth-token`'s request-time check
+and F13's non-loopback refusal stand on top of it — the ACL decides who
+may connect, the token decides whether the scrape authenticates (an
+ACL'd but tokenless non-loopback listen still refuses to start;
+docs/AUDIT.md rev. 19).
 
 The control socket is NOT this gate: the tokens, the RBAC ops role and the
 `trust-uids` list are that socket's own admission story (docs/AUDIT.md,
@@ -186,6 +197,11 @@ The dashboard's own HTTP surface keeps the token + bind posture
 - **the control-plane auth** — the admin token, the read-only ops token and
   its verb set (the RBAC roles), the `trust-uids` peer-cred path, the
   signed wire. docs/AUDIT.md.
+- **the bearer token** — the request-time auth on the token'd HTTP
+  surfaces (the cache's and the scraper's /metrics): the accept-time ACL
+  decides who may connect, the bearer decides whether the request
+  authenticates — both stack, neither replaces the other (F13's
+  non-loopback refusal stands; docs/AUDIT.md rev. 19).
 - **the connection caps** — `max-clients`, `client-timeout`,
   `max-conn-per-ip` (and the metrics triple): the DoS posture, applied
   beside the connect ACL, never instead of it.

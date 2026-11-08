@@ -16,7 +16,7 @@ here. The ctl/cli clients speak the control plane only
 
 Common to **all four** tools (20): `audit-files`, `audit-log`, `audit-max-mb`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `no-audit-log`, `restore-on-start`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
-family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `status`, `version` ride
+family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
 
 | kind | name | group | live | cache | scraper | inverter | dashboard |
@@ -89,6 +89,8 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `merge-gap` |  | `set modbus merge-gap` | ✓ live |  |  |  |
 | k | `metric-prefix` |  | `set metrics prefix` |  | ✓ live |  |  |
 | c | `metrics` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
+| k | `metrics-acl` |  | `set metrics acl` | ✓ live | ✓ live |  |  |
+| s | `metrics-acl-table` |  | `show metrics-acl-table` | ✓ | ✓ |  |  |
 | k | `metrics-client-timeout` |  | `set metrics limits timeout` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-listen` |  | `set metrics listen, restart` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-max-clients` |  | `set metrics limits max-clients` | ✓ live |  | ✓ | ✓ |
@@ -118,7 +120,6 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `soc` |  | `set soc` |  |  | ✓ live |  |
 | k | `static` |  | `set static` |  |  | ✓ live |  |
 | k | `static-dir` |  | *(startup-only)* |  |  |  | ✓ |
-| s | `status` |  | `show status` | **✓** hidden | **✓** | **✓** | **✓** |
 | k | `strict` |  | `set strict` |  |  | ✓ live |  |
 | c | `system` |  | *(startup-only)* | ✓ |  |  |  |
 | k | `time` |  | `set time` |  |  | ✓ live |  |

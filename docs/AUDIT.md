@@ -1,8 +1,53 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 18)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 19)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
 tree after `2db6cfa` (absorbing the former per-subproject `secaudit.md`s);
+**rev. 19**
+re-audited the metrics exposure plane — the scraper's `metrics/acl`
+wave and its cache migration (both `/metrics` endpoints speak the same
+gate now): the knob is the Modbus connect-ACL's reading on the HTTP
+listener (`--metrics-acl`, env `METRICS_ACL`, live `set metrics acl
+<value>` / `unset`, config `metrics_acl`; NixOS
+`metricsAcl`/`metricsAclFile` on the scraper, one `metricsAcl` on the
+cache) taking the family's one value grammar — `any` (the default) |
+`none` | the comma-separated IP/prefix whitelist | `file:<path>` (the
+standalone ip-prefix acl file). Enforcement is **accept-time, beside
+the connection caps** (caps first, then the ACL — the refusal releases
+the cap slot and is never counted): a client off the ACL is closed
+without a reply (nothing was parsed to answer) and logged
+`connection rejected: … not on the metrics ACL`. The gate re-resolves
+on every set/unset and SIGHUP (a bad file keeps the old gate standing),
+a group/world-readable acl file warns (the log, the audit trail's
+`ACL-FILE` event, the set reply's suffix). The trust posture MOVES
+favorably and narrowly: an explicit IP-plane gate on HTTP surfaces that
+already carried the token/cap layers — **the F13 refusal stands** (a
+non-loopback listen still refuses without a token even with the ACL
+set; the gate layers the who over the what, it does not replace the
+token) and the cache's endpoint stays token-mandatory when on. Scope:
+the control socket is NOT this gate (the tokens, the RBAC ops role and
+the trust-uids list are F5's own admission story, unchanged); the
+dashboard consumes the scraper's metrics and carries no ACL surface
+(its self-observability endpoint rides the shared base defaults
+byte-identical). The gate machinery is ONE implementation family-wide
+now: the IP-gate half (`IPGate`, `parse_acl_value`, `acl_admits`,
+`acl_file_warn`, the chain renderer) moved to `common/config.py` and
+`common/connlimit.py`'s `GatedHTTPServer` grew the
+`acl_allows`/`acl_refused` accept hooks — the tools override them (the
+scraper on its server, the cache on its MetricsServer reading the
+proxy-owned `p.metrics_acl` per accept). Two cache-side hygiene fixes
+rode along: an inline set clears a standing file warning
+(`acl/connect` and `acl/write` lose their stale-warn wart) and a bad
+acl file at start refuses clean (`SystemExit` rc 1, `cannot read acl
+file` on stderr — was an uncaught ValueError traceback on all three
+cache IP knobs). Verified: the new scrape- and cache-regtest blocks
+(the dry-run refusals, the `none` close via raw socket, the whitelist
+set + serve + table, the file gate load/warn/render/re-set/
+bad-file-keeps-standing, the unset restore, the table pointer, the
+show-config render-back), all ten suites, `nix flake check`, the
+option/ACL lints, `mandoc -Tlint`; no new findings — the open set is
+unchanged (F1 accepted, F14/F15/F16/F17, F21).
+
 **rev. 18** re-audited the ACL wave on the cache's Modbus plane: the two
 IP knobs (`acl/connect`, `acl/write`) now also read the **standalone
 ip-prefix acl file** (`file:<path>` — the gate object, `type`:
@@ -303,13 +348,13 @@ historical finding records keep their period env names.
 
 | Directory | What | Trust boundary / controls | Findings |
 |---|---|---|---|
-| `/cache` | the Modbus caching proxy: bin/ (the daemon + the ctl/cli clients), lib/ (proxy, cache, upstream, control, metrics, persist, config), man/, the set-grammar sample conf, the NixOS module | the production-relevant surface: two listeners (Modbus TCP + control), the metrics endpoint, the state dump, the audit trail; the write path quadruple-gated (the parse gate, `allow-write`, `write-acl` none, `write-registers` none); the Modbus connect/write clients IP-gated (`acl/connect`, `acl/write` — the inline system grammar or the standalone ip-prefix acl file, the chain's last matching rule deciding; the table shows render the effective chain); the dump is config-equivalent trust at rest | F2–F5, F8, F18, F23 closed here; F1 accepted |
-| `/common` | the shared package every tool imports: `audit.py` (the append-only trail + the chained per-writer hashes), `config.py` (parse_listen, is_loopback_host, the profile resolution, the token loading + the 0600 enforcement), `connlimit.py` (the connection gates), `cred.py` (peer-cred), `protocol.py` (recv_exact, exception frames), `human.py`, `logutil.py`, `version.py` | trust amplifier: every tool inherits its guarantees (the fail-closed token modes, the wire discipline, the fold at the audit writer, the admit/release symmetry); a regression here is family-wide — the regtests + the audit-chain suite watch it | F10, F12 closed here |
+| `/cache` | the Modbus caching proxy: bin/ (the daemon + the ctl/cli clients), lib/ (proxy, cache, upstream, control, metrics, persist, config), man/, the set-grammar sample conf, the NixOS module | the production-relevant surface: two listeners (Modbus TCP + control), the metrics endpoint, the state dump, the audit trail; the write path quadruple-gated (the parse gate, `allow-write`, `write-acl` none, `write-registers` none); the Modbus connect/write clients and the `/metrics` endpoint IP-gated (`acl/connect`, `acl/write`, `metrics/acl` — the inline system grammar or the standalone ip-prefix acl file, the chain's last matching rule deciding; the table shows render the effective chain); the dump is config-equivalent trust at rest | F2–F5, F8, F18, F23 closed here; F1 accepted |
+| `/common` | the shared package every tool imports: `audit.py` (the append-only trail + the chained per-writer hashes), `config.py` (parse_listen, is_loopback_host, the profile resolution, the token loading + the 0600 enforcement, the shared IP-gate half — `IPGate`/`parse_acl_value`/`acl_admits`/`acl_file_warn`), `connlimit.py` (the connection gates + the `acl_allows`/`acl_refused` accept hooks), `cred.py` (peer-cred), `protocol.py` (recv_exact, exception frames), `human.py`, `logutil.py`, `version.py` | trust amplifier: every tool inherits its guarantees (the fail-closed token modes, the wire discipline, the fold at the audit writer, the admit/release symmetry); a regression here is family-wide — the regtests + the audit-chain suite watch it | F10, F12 closed here |
 | `/dashboard` | the web front: bin/ (the server + the ctl/cli clients), lib/ (the HTTP handler + the Prometheus proxy, the control server, config, settings, the static constants), static/, man/ | the viewer surface: GET-only HTTP — the static page (a realpath-guarded tree, 403 on escape) and the Prometheus proxy under `--prom-prefix` — with the family connection gate (`--max-clients`/`--client-timeout`/`--max-conn-per-ip`, extras 503); the JSON-lines control server in the family shape (the F5 refusal, peer-cred, the signed wire, the DSH trail, the socket `0600` after bind); **no HTTP authentication yet — F21** (binds `0.0.0.0` by default; the loopback/reverse-proxy deployment is documented) | F20 closed (the clients); F21 open |
 | `/docker` | one alpine image per Modbus tool, the Prometheus image, the two entrypoints (the `/config` seeding + the token handoff), the compose demo | the network is the boundary: one `internal: true` network, nothing published on the host; the images run unprivileged (`pvsuite`, the `prometheus` user); root exists only for the volume seeding and drops before exec; the bundled `*.token` defaults materialize as random 0600 values | F7 closed; F17 open (the volume trust) |
 | `/inverter` | the fake: bin/ (the daemon + the ctl/cli clients), lib/ (the simulator, the machines, control, metrics, inverter, profile), man/ | a test instrument on a trusted LAN: the Modbus surface capped (`max-clients`/`client-timeout`/`max-conn-per-ip`, live-settable) and connect-ACL'd (`--connect-acl`/`$CONNECT_ACL`, the cache's mirrored — `any` (the default)/`none`/the inline IP/CIDR list only, no `file:` gates), the read-count gate, the metrics endpoint optional (warns beyond loopback without a token); deliberately not security-first — documented as such | F11 closed; F1 accepted |
 | `/profiles` | the device profiles (JSON data: sun2000 + three Deye variants) + the linter and the formatter bins | data, not code: the profiles decide what the tools read (and what the cache's write allow-list may touch); the loader validates every entry (the type/width/scale, the address bounds, clean `SystemExit` one-liners), the search path is closed (three fixed candidates, no CWD or `PATH` dependence), the linter checks the schema shape, the overlaps and the bounds — treat a profile file like config: the operator picks it | none (rev. 4 review: the loader, the linter, the formatter) |
-| `/scraper` | the exporter: bin/ (the daemon + the ctl/cli clients), lib/ (server, scraper, poller, control, config, statics), man/, the set-grammar sample conf + the sample rules | the read-only consumer: one HTTP GET route set (bearer-gated, capped, the non-loopback refusal) + one outbound Modbus client (FC3/FC4 reads only); the family JSON-lines control server (rev. 6: the unix socket `0600` after bind, the token'd TCP with the F5 refusal, peer-cred, the signed wire, the SCR trail); the SIGHUP reload re-validates everything (the token-file modes too) | F13 closed; F14/F15/F16 open; F20 closed (the clients) |
+| `/scraper` | the exporter: bin/ (the daemon + the ctl/cli clients), lib/ (server, scraper, poller, control, config, statics), man/, the set-grammar sample conf + the sample rules | the read-only consumer: one HTTP GET route set (bearer-gated, capped, IP-gated — `metrics/acl`, the non-loopback refusal) + one outbound Modbus client (FC3/FC4 reads only); the family JSON-lines control server (rev. 6: the unix socket `0600` after bind, the token'd TCP with the F5 refusal, peer-cred, the signed wire, the SCR trail); the SIGHUP reload re-validates everything (the token-file modes too) | F13 closed; F14/F15/F16 open; F20 closed (the clients) |
 | `/scripts` | `release.py` (the release orchestrator: the version sweep, the changelog rename, the verify, the tag, the push; the GH release is the workflow's job, the local cut is the opt-in `--release`) + `audit_verify.py` (the F10 chain verifier) | maintainer-local trust: the orchestrator guards the dirty tree and the main-only rule, verifies (the full suite + the nix build by default), then commits/tags/pushes; the verifier is offline and read-only; no runtime surface; the tag is the release's trust root, signed when a key exists — see F19 | F19 closed (rev. 5: the workflow cuts the release after the gate) |
 
 `flake.nix` (the packaging: the packages, the overlay, the NixOS modules)
@@ -319,7 +364,7 @@ but hold no runtime trust of their own.
 | Surface | cache/ | scrape/ | inverter/ | dashboard/ | Auth |
 |---|---|---|---|---|---|
 | Modbus TCP listener | `--listen`, default `127.0.0.1:15502`; the connect ACL on top (`acl/connect`: any/none/the inline list, or the ip-prefix acl file) | n/a (outbound only) | `--host/--port`, default `127.0.0.1:5502` (Docker: `0.0.0.0`); the connect-acl on top (the cache's mirrored, inline grammar only) | n/a | none (the Modbus protocol has none) |
-| HTTP surface | the `/metrics` endpoint: `--metrics-server` (live-settable), off; binds `--metrics-listen` (default `127.0.0.1:9252`; `0.0.0.0` allowed, **the token is mandatory regardless**) | the exporter itself: `--listen`, default `127.0.0.1:9350` — two GET routes (`/`, `/metrics`), everything else a 404, `Cache-Control: no-store` | the `/metrics` endpoint: `--metrics-server`, off; binds `--metrics-listen` (default `127.0.0.1:9452`) | the page + the Prometheus proxy: `--bind`, default **`0.0.0.0`:8080** — GET-only, the static tree realpath-guarded (403 on escape), the proxy under `--prom-prefix` | bearer token (`hmac.compare_digest`): mandatory on the cache, mandatory beyond loopback on the scraper (F13's refusal), optional on the fake (test tool — a non-loopback bind without one logs a warning); **none on the dashboard (F21)** |
+| HTTP surface | the `/metrics` endpoint: `--metrics-server` (live-settable), off; binds `--metrics-listen` (default `127.0.0.1:9252`; `0.0.0.0` allowed, **the token is mandatory regardless**); the `metrics/acl` IP gate at accept (`any`/`none`/the inline list/`file:<path>` — an off-ACL peer closed without a reply) | the exporter itself: `--listen`, default `127.0.0.1:9350` — two GET routes (`/`, `/metrics`), everything else a 404, `Cache-Control: no-store`, the `metrics/acl` IP gate at accept (`--metrics-acl`, the same grammar — caps first, then the ACL) | the `/metrics` endpoint: `--metrics-server`, off; binds `--metrics-listen` (default `127.0.0.1:9452`) | the page + the Prometheus proxy: `--bind`, default **`0.0.0.0`:8080** — GET-only, the static tree realpath-guarded (403 on escape), the proxy under `--prom-prefix` | bearer token (`hmac.compare_digest`): mandatory on the cache, mandatory beyond loopback on the scraper (F13's refusal), optional on the fake (test tool — a non-loopback bind without one logs a warning); **none on the dashboard (F21)**; the metrics endpoints' IP gate (`metrics/acl`) sits at accept beside the caps — never instead of the token (F13's refusal stands, rev. 19) |
 | control server (JSON lines) | unix socket `/tmp/modbus-cache-<port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket `/tmp/modbus-scraper-<listen-port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1 (exempt from the refusal — the F11 test-tool posture) | unix socket `/tmp/dashboard-<port>.socket`, `chmod 0600` after bind; `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | token on TCP (`hmac.compare_digest`), refused without; on unix a kernel-vouched peer (peer-cred: root, the daemon's own user, `--control-trust-uids`) skips the handshake; the signed wire (the full HMAC per frame) wherever a token is held |
 | state dump | `--dump-path`: the live setting overrides and — with `--dump-with-cache`/`request dump with-cache` — the cached words (+ stamps), as one atomic JSON — see F18 | n/a | n/a | n/a | **created `0600` explicitly** (never the umask) + a sha256 integrity hash checked at restore (F18) |
 | token files | the token knobs take `file:` references — `--control-token file:/path` / `--metrics-token file:/path` | `--auth-token file:/path` / `--control-token file:/path` | `--control-token file:/path` / `--metrics-token file:/path` | `--control-token file:/path` | **owner-only (0600) enforced** — a group/world-accessible token file refuses the reference (F12); the bare `*_FILE` env/flag spellings were REMOVED rev. 13 (the reference rides the token knob's own flag/env/config/live paths) |
@@ -379,7 +424,12 @@ control-server access only.
    the key it authenticated with; the cache's metrics endpoint is
    token-mandatory when enabled
   (`cache/bin/modbus-cache.py:252-256`, the gate at
-  `cache/lib/metrics.py:161-175`); all non-Modbus listeners bind 127.0.0.1
+  `cache/lib/metrics.py:161-175`); both the cache's and the scraper's
+  `/metrics` take the `metrics/acl` IP gate at accept
+  (`common/connlimit.py`'s `acl_allows`/`acl_refused` hooks,
+  `common/config.py` `acl_admits` — caps first, then the ACL, the
+  off-ACL peer closed without a reply, rev. 19); all non-Modbus
+  listeners bind 127.0.0.1
   hard-coded — the dashboard is the documented exception (F21).
 - **Input validation (DORA art. 9)** — MBAP length capped (`2 <= length <=
   MAX_PDU + 2`) in every reader; read counts capped (`1 <= count <= 125`,
@@ -440,7 +490,10 @@ control-server access only.
   the whole route set is gated before dispatch: a missing/invalid bearer
   answers 401 with `WWW-Authenticate: Bearer realm="metrics"`, compared in
   constant time (`scrape/lib/server.py:32,90`), and unauthorized attempts
-  are logged at WARNING with the peer; exactly two GET routes (`/`,
+  are logged at WARNING with the peer; the accept ladder takes the
+  `metrics/acl` IP gate beside the caps (caps first, then the ACL — an
+  off-ACL peer is closed without a reply, nothing parsed to answer;
+  rev. 19); exactly two GET routes (`/`,
   `/metrics`), everything else a 404; responses carry
   `Cache-Control: no-store`; the bearer token takes a `file:` reference
   (LoadCredential-style,
@@ -512,7 +565,7 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
 
 - **F2 (injection → fold)** — rev. 1 reproduced the forged second line;
   rev. 2 verified the fix: the same command
-  (`{"cmd": "show status\n2026-01-01T00:00:00Z AUDIT CACHE WRITE forged line"}`)
+  (`{"cmd": "show version\n2026-01-01T00:00:00Z AUDIT CACHE WRITE forged line"}`)
   now produces exactly one physical line, the forged text folded inside the
   quoted command of the `COMMAND` event — asserted by the cache regtest
   (the injected command answers a clean `err unknown command`, and every
@@ -890,9 +943,9 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
 | NIS2 21.2(d) supply chain | yes | stdlib-only, no third-party code, pinned Nix builds; the demo Prometheus from the pinned alpine package; the shared `common/` core |
 | NIS2 21.2(f) effectiveness | partial | fuzz/stress/regression suites (self-contained); no CI enforcement yet |
 | NIS2 21.2(g) cyber hygiene / crypto | partial | constant-time token compares, LoadCredential, owner-only token files enforced, no secrets in logs; no TLS (F1 — protocol-inherent, F14 — proxy) |
-| NIS2 21.2(h) access control / MFA | yes (scoped) | the four write gates (two defaulting to none), ACLs with a restrict-all mode, token-mandatory control/metrics, the refusal of a non-loopback metrics listen without a token (F13), the token'd TCP control refusing to start without a token on all four control servers (the fake exempt — F11), per-IP + total connection caps on every serving surface, peer-cred on the unix sockets, the signed wire wherever a token is held, the read-only ops role on the control plane (least privilege: the show/clear verbs versus the admin key, F22); MFA not applicable to a machine protocol |
+| NIS2 21.2(h) access control / MFA | yes (scoped) | the four write gates (two defaulting to none), ACLs with a restrict-all mode, token-mandatory control/metrics, the IP-plane gate on the two `/metrics` endpoints (`metrics/acl` — accept-time beside the caps, rev. 19), the refusal of a non-loopback metrics listen without a token (F13), the token'd TCP control refusing to start without a token on all four control servers (the fake exempt — F11), per-IP + total connection caps on every serving surface, peer-cred on the unix sockets, the signed wire wherever a token is held, the read-only ops role on the control plane (least privilege: the show/clear verbs versus the admin key, F22); MFA not applicable to a machine protocol |
 | DORA art. 8 ICT asset identification | yes | every option logged at start; `inspect` dumps the full state; the demo topology is documented (docker/README.md) |
-| DORA art. 9-10 protection/prevention | yes | write gates, ACLs, capped framing, capped buffers, fail-closed writes, token-mandatory surfaces, the non-loopback refusal (F13), the per-IP + total connection caps, explicit socket + token-file modes, fail-fast validation; the dashboard's GET-only route set with the traversal guard (the auth gap aside — F21) |
+| DORA art. 9-10 protection/prevention | yes | write gates, ACLs, capped framing, capped buffers, fail-closed writes, token-mandatory surfaces, the metrics `metrics/acl` IP gate at accept (rev. 19), the non-loopback refusal (F13), the per-IP + total connection caps, explicit socket + token-file modes, fail-fast validation; the dashboard's GET-only route set with the traversal guard (the auth gap aside — F21) |
 | DORA art. 11 detection | yes (integrity restored, now evidenced); wiring pending | the audit trail's integrity is defensible again (F2 closed, fold at the writer) and evident per entry (the hash chain, F10 closed); auth-fail/refusal events; the alert rules pack is the remaining gap (F16) |
 | DORA art. 12 BCP | partial | restart/reload/clear verbs, the dump/restore write-behind; no automated failover (single-device by design) |
 
@@ -903,8 +956,8 @@ Scraper deltas against the table above (rows where scrape matches are omitted):
 | NIS2 21.2(b) incident handling | yes (scoped) | audit trail + unauthorized-request logging at WARNING; the alert pack is pending (F16) |
 | NIS2 21.2(f) effectiveness | partial | the fuzz suite is the technical check; no CI enforcement yet |
 | NIS2 21.2(g) crypto / hygiene | partial | constant-time bearer compare, owner-only token files, no secrets in logs; no TLS (F14 — terminate at a proxy) |
-| NIS2 21.2(h) access control | yes (scoped) | bearer gate on the only route set + the non-loopback refusal without one (F13 closed), the per-IP + total connection caps; MFA not applicable to a machine protocol |
-| DORA art. 9-10 protection/prevention | yes | default localhost bind (refusing to leave it without a token, F13), token gate, two-route whitelist, DoS caps on both the HTTP and the poll side |
+| NIS2 21.2(h) access control | yes (scoped) | bearer gate on the only route set + the non-loopback refusal without one (F13 closed), the `metrics/acl` IP gate at accept (any/none/whitelist/acl-file, rev. 19), the per-IP + total connection caps; MFA not applicable to a machine protocol |
+| DORA art. 9-10 protection/prevention | yes | default localhost bind (refusing to leave it without a token, F13), token gate, the `metrics/acl` accept-time IP gate (rev. 19), two-route whitelist, DoS caps on both the HTTP and the poll side |
 | DORA art. 11 detection | partial | audit trail + WARNING-level unauthorized logs + the error-state 503 |
 | DORA art. 12 BCP | yes | read-only, stateless, restart-clean; the data plane (Prometheus) holds the history |
 
@@ -928,7 +981,10 @@ closed by default even beyond `--allow-write`, since `write-acl` and
 `write-registers` default to `none` — localhost binds by default
 (the dashboard's HTTP surface is the recorded exception — F21),
 token-mandatory control and metrics surfaces on the cache, the scraper
-refusing a non-loopback metrics listen without a token, the token'd TCP
+refusing a non-loopback metrics listen without a token, the two
+`/metrics` endpoints IP-gated at accept (`metrics/acl` — the family's
+one gate implementation; F13's refusal standing on top of it), the
+token'd TCP
 control refusing to start without a token on every server that serves one
 (the fake exempt by documented posture), per-IP and total
 connection caps on every serving surface, constant-time

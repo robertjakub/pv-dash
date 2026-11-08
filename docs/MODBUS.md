@@ -511,8 +511,8 @@ scheme change does **not** drop standing sessions; they keep theirs).
 
 Useful verbs (`modbus-*-ctl` / `modbus-*-cli`): `set modbus auth suite`,
 `set modbus auth key <KEY|file:path>`, `set modbus auth-upstream …`,
-`show modbus auth`, `show status` (reports `auth=` / `upstream_auth=` /
-`modbus_auth=`), plus the ordinary `set modbus upstream/unit/timeout/
+`show modbus auth`, `show modbus auth-upstream` (the two legs' schemes),
+plus the ordinary `set modbus upstream/unit/timeout/
 interval/...` rows. Startup logs name the schemes
 (`client auth: suite, upstream auth: suite`).
 

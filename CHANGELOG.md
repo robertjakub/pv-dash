@@ -229,6 +229,17 @@ before the repo restructured into one suite.
 
 ### Changed
 
+- **cache, scraper, inverter, dashboard** — **`show status` is removed**
+  (breaking): the key=value state report dies family-wide — the registry
+  rows, the dispatch branches and the `status_report()` bodies are gone.
+  Nothing replaces it: the per-setting `show <setting>` reads each value
+  back, `show config` renders the effective script, `inspect` is the
+  one-page dump (the machines' readings, the pins, the counters included),
+  and the set/unset replies carry the compact state summary. The cli
+  consoles greet with the two fixed lines now (the banner's status line
+  rode the report; the cache's dump-gated completion pools probe
+  `show dump path` instead).
+
 - **cache, scraper, dashboard** — **the shipped examples move into
   `examples/` subdirs** (the sample confs, the JSON specs, the token
   placeholder — `cache/examples/`, `scraper/examples/`,
@@ -300,6 +311,16 @@ before the repo restructured into one suite.
   pasted section — re-cut by hand).
 
 ### Fixed
+
+- **cache, scraper, inverter, dashboard** — **a busy bind answers with one
+  line, not a traceback**: a listener dying on `EADDRINUSE` exits with one
+  `cannot bind <host>:<port>: <why>` ERROR line, exit 1 — the scraper's
+  /metrics bind was unguarded (an OSError traceback) and takes the fold,
+  and the shared MetricsServer binds in the caller's context now
+  (`start()` = bind, then the serving thread; the failure stashes in
+  `bind_error`), so the live `set metrics-server on` on the cache, the
+  fake and the dashboard answers the busy port as the err reply instead
+  of unrolling a traceback from the serving thread.
 
 - **cache** — **`show config` speaks the live overrides**: the `_apply`
   branches wrote their values into the live objects but never back into

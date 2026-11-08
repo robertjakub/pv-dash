@@ -374,8 +374,9 @@ class ControlServer(_ControlServer):
                 if not fake.metrics_token:
                     from common.config import is_loopback_host
                     if not is_loopback_host(fake.metrics_listen[0]):
-                        logger.warning('serving /metrics on %s:%d without a token: the values are production-shaped '
-                                       'even though this is a test tool — set --metrics-token', *fake.metrics_listen)
+                        raise ValueError('refusing to expose /metrics beyond loopback without a token '
+                                         '(F13 in docs/AUDIT.md) — set metrics/token first or bind '
+                                         '127.0.0.1:PORT')
                 srv = MetricsServer(sim, chaos, fake, self, fake.metrics_listen, token=fake.metrics_token,
                                     max_clients=fake.metrics_caps[0], client_timeout=fake.metrics_caps[1],
                                     max_per_ip=fake.metrics_caps[2])
@@ -455,12 +456,16 @@ class ControlServer(_ControlServer):
             if not fake:
                 raise ValueError('no modbus device attached')
             if not val or val in ('off', 'none', '0'):
+                from common.config import is_loopback_host
+                if not is_loopback_host(fake.metrics_listen[0]):
+                    raise ValueError('metrics/token is mandatory while the listen is non-loopback '
+                                     '(F13 in docs/AUDIT.md) — set the new token')
                 fake.metrics_token = None
                 if fake.metrics_srv:
                     fake.metrics_srv.token = None   # the handler reads it per request — the swap is live
                 fake.metrics_desc = describe_metrics(fake.metrics_listen, None,
                                                      fake.metrics_caps[0], fake.metrics_caps[2])
-                return 'off'   # the trusted-LAN posture (F11): the fake may serve tokenless
+                return 'off'   # the loopback bind is the auth (the F13 shape)
             try:
                 val = parse_secret(val, 'metrics/token')   # file: reads the first line of an owner-only file
             except SystemExit as e:

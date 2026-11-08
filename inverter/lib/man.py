@@ -101,7 +101,8 @@ IP/CIDR list, live-settable) filters who may connect at all, and the
 optional \\fB--auth suite\\fR
 shared-key handshake authenticates clients when a demo wants it \\(em and
 the metrics endpoint
-serves without a token unless one is configured. Run it on a trusted,
+speaks the family's F13 shape: it refuses to start beyond loopback
+without a token (the loopback bind serves tokenless). Run it on a trusted,
 LAN-isolated network, next to the tools it is meant to serve.
 \\fB--max-clients\\fR/\\fB--client-timeout\\fR cap runaway connections and
 the read-count gate keeps a malformed frame from assembling an oversized

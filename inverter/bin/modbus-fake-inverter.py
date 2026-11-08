@@ -253,8 +253,9 @@ def main():
     if args.metrics_server and metrics_token is None:
         from common.config import is_loopback_host
         if not is_loopback_host(metrics_listen[0]):
-            logger.warning('serving /metrics on %s without a token: the values are production-shaped '
-                           'even though this is a test tool — set --metrics-token (or file:<path>)', args.metrics_listen)
+            raise SystemExit('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
+                             'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
+                             % args.metrics_listen)
     if args.dump_path and not dump_key:
         logger.warning('the state dump %s is not sealed (the integrity hash only — plaintext at rest): '
                        'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '

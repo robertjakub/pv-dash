@@ -293,10 +293,10 @@ read-only ops token the same way):
 | `connect-acl` | `any` \| `none` \| IP/CIDR list | the Modbus connect ACL (`--connect-acl` startup value, tunable live): who may connect to the Modbus surface at all |
 | `write/allow` | `on` \| `off` | the write gate (`--allow-write` startup value, tunable live): whether the fake accepts Modbus writes (FC05/06/15/16) from its clients — off refuses every write with exception 01 |
 | `modbus auth` / `modbus auth key` | `suite` \| `none` / key | the auth scheme the fake's Modbus clients must speak (`--auth` startup value, tunable live): `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect and drops the client on `ERR`/anything else; `none`/empty = no auth at all — the key is a secret: **`show` refuses it**, `unset` refuses it |
-| `metrics-server` | `on`/`off` | the fake's own `/metrics` endpoint (default off; the address is `--metrics-listen`, tunable live); a token-less listen beyond loopback logs a warning |
+| `metrics-server` | `on`/`off` | the fake's own `/metrics` endpoint (default off; the address is `--metrics-listen`, tunable live); a token-less listen beyond loopback **refuses to start** (the F13 shape, the family's golden master) |
 | `control token` | `<token>` \| `off` | rotate the **admin control token** live (the sessions re-auth); `off` drops the token entirely (the trusted-LAN posture, F11). A secret: **`show` refuses it**, `unset` refuses it — pass it by flag/env, or as `file:<path>` |
 | `control ops token` | `<token>` \| `off` | rotate the **read-only ops token** live (must differ from the admin token); `off` signs the ops shift out |
-| `metrics token` | `<token>` \| `off` | rotate the **/metrics bearer token** live; `off` serves tokenless (F11) |
+| `metrics token` | `<token>` \| `off` | rotate the **/metrics bearer token** live; `off` serves tokenless on the loopback listen (beyond loopback it refuses — the F13 shape) |
 | `dump path` / `dump restore-on-start` | `<file>` / `on`\|`off` | the state dump's file (the pins, the machines — the tokens apart) and the restore-on-start mark (prospective: the running session's start already chose) |
 | `register` | `addr value` | `set register <addr> <value>` — write a raw register into the **write overlay** (the same store the FC06/FC16 writes use, so the scrapers read it); `reset` clears it, `show registers` marks the rows with `*` |
 | `coil` | `addr 0\|1` | `set coil <addr> <0|1>` — pin a coil in the coil space (what FC1 reads and FC5/FC15 write); `reset` clears the pins |
@@ -405,8 +405,8 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 | `--unit` | `1` | Modbus unit id served |
 | `--grid-voltage` | `230` | nominal grid phase voltage (V, 120 or 230); the per-phase machine wanders ±10 % around it |
 | `--grid-frequency` | `50` | nominal grid frequency (Hz); the machine wanders ±0.2 Hz around it |
-| `--metrics-server` | off | serve the fake's own Prometheus `/metrics` endpoint — **live-settable** (`set metrics-server on/off`; the token-less-beyond-loopback warning holds on both paths) |
-| `--metrics-listen` | `127.0.0.1:9452` | the metrics bind address `HOST:PORT` (`0.0.0.0:PORT` serves every interface — mind the values) |
+| `--metrics-server` | off | serve the fake's own Prometheus `/metrics` endpoint — **live-settable** (`set metrics-server on/off`; refuses to start beyond loopback without `--metrics-token` on both paths — the F13 shape, the family's golden master) |
+| `--metrics-listen` | `127.0.0.1:9452` | the metrics bind address `HOST:PORT` (`0.0.0.0:PORT` serves every interface — a token is mandatory beyond loopback, F13) |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); the value may be `file:<path>` — the first line of an owner-only `0600` file, F12 |
 | `--metrics-max-clients` | `64` | cap concurrent HTTP clients on the metrics endpoint; extras get an immediate `503 # rate limited` (`0` = unlimited) |
 | `--metrics-client-timeout` | `5` | seconds an idle metrics client is kept before the socket times out (`0` = the same built-in 5 s cap) |

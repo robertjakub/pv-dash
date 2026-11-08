@@ -5,6 +5,14 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The F13 conformance: **the metrics token is mandatory beyond loopback,
+not warn-and-serve** — the startup check, the live `metrics-server on`
+and the live `metrics/token` off all refuse a non-loopback bind without
+a token; the loopback default serves tokenless (the scraper's F13
+refusal is the family's golden master; the F11 softness stays on the
+Modbus surface — the client caps, the count gate, the tokenless TCP
+exemption).
+
 The show-status removal: **`show status` is gone** (nothing replaces it) —
 the registry row, the dispatch branch and the key=value report body die;
 the per-setting `show <setting>`, `show config`, `inspect` (the machines'

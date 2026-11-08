@@ -365,13 +365,40 @@ def main():
               oct(os.stat('/tmp/fake-inverter-%d.socket' % D_MODBUS).st_mode & 0o777))
         check('control: --control-socket-group chmods the socket 0660',
               os.stat(E_SOCK).st_mode & 0o777 == 0o660, oct(os.stat(E_SOCK).st_mode & 0o777))
+        tx = ctl(F_CTL, 'set metrics token off')
+        check('metrics token: the off beyond loopback refuses (the F13 shape)',
+              '% error:' in tx and 'F13' in tx, tx)
         tx = ctl(F_CTL, 'set metrics-server on')
-        check('metrics-server: the token-less live start on 0.0.0.0 accepted', tx.startswith('ok metrics-server=on'), tx)
-        ctl(F_CTL, 'set metrics-server off')
+        check('metrics-server: the token-less live start on 0.0.0.0 refuses (the F13 shape)',
+              '% error:' in tx and 'refusing to expose /metrics beyond loopback' in tx, tx)
         logf = open(LOG + '.f').read()
-        check('metrics-server: the live token-less start beyond loopback warns',
-              'serving /metrics on 0.0.0.0:%d without a token' % F_METRICS in logf,
-              [l for l in logf.splitlines() if 'token' in l])
+        check('metrics-server: the refusal is a clean err (no traceback)', 'Traceback' not in logf,
+              [l for l in logf.splitlines() if 'Trace' in l])
+        tx = ctl(F_CTL, 'set metrics token t')
+        check('metrics token: the token sets', tx.startswith('ok metrics/token=<set>'), tx)
+        tx = ctl(F_CTL, 'set metrics-server on')
+        check('metrics-server: with a token the live start on 0.0.0.0 serves',
+              tx.startswith('ok metrics-server=on'), tx)
+        ctl(F_CTL, 'set metrics-server off')
+        tx = ctl(F_CTL, 'set metrics token off')
+        check('metrics token: the off refuses while the listen stays non-loopback',
+              '% error:' in tx and 'F13' in tx, tx)
+        tx = ctl(F_CTL, 'set metrics token t')
+        check('metrics token: the token stands again', tx.startswith('ok metrics/token=<set>'), tx)
+        # the F13 matrix at the start: the loopback default needs no token
+        r = subprocess.run([sys.executable, F, '--dry-run', '--metrics-server',
+                            '--metrics-listen', '0.0.0.0:%d' % (F_METRICS + 1)], capture_output=True, text=True, timeout=15)
+        check('F13: the non-loopback metrics listen without a token refuses',
+              r.returncode == 1 and 'refusing to expose /metrics beyond loopback' in (r.stderr + r.stdout)
+              and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
+        r = subprocess.run([sys.executable, F, '--dry-run', '--metrics-server', '--metrics-token', 't',
+                            '--metrics-listen', '0.0.0.0:%d' % (F_METRICS + 1)], capture_output=True, text=True, timeout=15)
+        check('F13: the non-loopback metrics listen with a token starts',
+              r.returncode == 0, repr((r.stderr + r.stdout)[-140:]))
+        r = subprocess.run([sys.executable, F, '--dry-run', '--metrics-server',
+                            '--metrics-listen', '127.0.0.1:%d' % (F_METRICS + 1)], capture_output=True, text=True, timeout=15)
+        check('F13: the loopback metrics listen needs no token',
+              r.returncode == 0, repr((r.stderr + r.stdout)[-140:]))
         g = connect(G_MODBUS)
         txn, unit, body = exchange(g, read_req(1, 3, 32064, 2), 1)
         check('control: the fake serves Modbus despite the failed control bind', txn == 1 and body[0] == 3, body.hex())

@@ -184,7 +184,9 @@ serve the fake's own Prometheus /metrics endpoint (the live `set
 metrics\-server` toggle exists too)
 .TP
 .B \-\-metrics\-listen
-the metrics bind address HOST:PORTs)
+the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every
+interface, a token is mandatory beyond loopback (a token\-less
+non\-loopback bind refuses to start, F13)
 .TP
 .B \-\-metrics\-token
 require Authorization: Bearer <token> on the /metrics endpoint (the same
@@ -306,7 +308,8 @@ IP/CIDR list, live-settable) filters who may connect at all, and the
 optional \fB--auth suite\fR
 shared-key handshake authenticates clients when a demo wants it \(em and
 the metrics endpoint
-serves without a token unless one is configured. Run it on a trusted,
+speaks the family's F13 shape: it refuses to start beyond loopback
+without a token (the loopback bind serves tokenless). Run it on a trusted,
 LAN-isolated network, next to the tools it is meant to serve.
 \fB--max-clients\fR/\fB--client-timeout\fR cap runaway connections and
 the read-count gate keeps a malformed frame from assembling an oversized

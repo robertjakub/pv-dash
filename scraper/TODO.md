@@ -5,6 +5,36 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The show-status removal: **`show status` is gone** (nothing replaces it) —
+the registry row, the dispatch branch and the key=value report body die;
+the per-setting `show <setting>`, `show config`, `inspect` and the
+set/unset replies' state summary carry the same truths. The cli console
+greets with the two fixed lines (the banner's status line rode the
+report).
+
+The metrics/acl wave: the /metrics listener takes the connect-ACL half
+of the story — `--metrics-acl` (env `METRICS_ACL`, config `metrics_acl`,
+NixOS `metricsAcl`/`metricsAclFile`, live `set metrics acl` /
+`unset metrics acl`) takes the cache's acl/connect value grammar (`any`
+the default, `none`, the comma-separated IP/prefix whitelist,
+`file:<path>` — the standalone ip-prefix acl file) and checks it at
+accept beside the connection caps (caps first, then the ACL): a client
+off the ACL is closed without a reply (nothing was parsed to answer) and
+logged `connection rejected: … not on the metrics ACL`. The gate
+re-resolves on every set/unset and SIGHUP (a bad file keeps the old gate
+standing), a group/world-readable acl file warns (the log, the audit
+trail's `ACL-FILE` event, the `set` reply's suffix), `show metrics acl
+table` renders the chain (the three fixed chains inline, a file gate's
+own rules behind the `% ` desc header) and `set metrics acl table`
+answers the pointer to the report. The gate machinery is the family's
+one implementation (common/config.py's IP-gate half, common/connlimit.py's
+`acl_allows`/`acl_refused` accept hooks — the cache migrated onto both
+the same day); the shipped example is `examples/acl-ip-prefix.json`, its
+JSON Schema `schema/acl-ip-prefix.schema.json` (`scripts/lint_acl.py`'s
+bare run globs the scraper's acl files too), and F13's non-loopback
+refusal stands on top of the gate (the ACL layers the who over the what,
+docs/AUDIT.md rev. 19).
+
 The re-namespace completion: the wire settings speak the family's path
 shapes (`set metrics interval`, `set modbus timeout`, `set metrics limits …`,
 `set caps max-pv`, `set audit …`, `set metrics auth token`) — the flat

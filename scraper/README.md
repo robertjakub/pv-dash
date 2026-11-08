@@ -291,7 +291,7 @@ is just a path). Talk to it with **`modbus-scraper-ctl`** (one-shot / batch) or
 **`modbus-scraper-cli`** (the console session):
 
 ```bash
-python3 scraper/bin/modbus-scraper-ctl.py show status
+python3 scraper/bin/modbus-scraper-ctl.py show modbus upstream
 printf 'set metrics interval 5\npoll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
 python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
 ```
@@ -309,7 +309,7 @@ control tokens live (the sessions re-auth), `metrics auth token` rotates the
 /metrics bearer live; a token value never renders back — **`show <secret>`
 refuses** (it is a secret: pass it by flag/env, or as `file:<path>`)),
 `control socket-group` (re-modes the live unix socket `0600`/`0660`),
-`show status` (the key=value report), `show connections` (the live HTTP
+`show connections` (the live HTTP
 clients of /metrics), `poll now` (the loop wakes immediately), `request
 reload-config` (the SIGHUP path — the token file re-reads, so the bearer
 token rotates too), `request restart` (the Modbus session drops; the next

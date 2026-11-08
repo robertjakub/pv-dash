@@ -51,23 +51,15 @@ def setting_pool():
 
 
 def welcome(sock):
-    """The first-connect greeting: probe the status and introduce the scraper —
-    the upstream, the poll health, how long it has been running, the errors —
-    and the one-line navigation hint."""
-    reply = cli.exchange(sock, cli.wire('show status'))
-    if not reply or not reply.startswith('ok status'):
-        return
-    st = cli.status_map(reply)
+    """The first-connect greeting: the console's two fixed lines — the
+    daemon's name and the one-line navigation hint."""
     print('%   Welcome to the modbus-scraper console')
-    print('%%   %s upstream | poll %s, last poll %s | running for %s | %s error(s)'
-          % (st.get('upstream', '?'), st.get('poll', '?'), st.get('last_poll', '?'),
-             st.get('uptime', '?'), st.get('errors', '?')))
     print('%   TAB completes, ? lists the commands, quit leaves')
 
 
 SPEC = dict(label='the scraper', daemon_label='modbus-scraper control server',
             cli_name='modbus-scraper-cli', app='modbus-scraper', self_note='the scraper itself',
-            command_help='e.g. inspect, show status, set interval 5, poll now, request reload, request restart, shutdown',
+            command_help='e.g. inspect, show config, set interval 5, poll now, request reload, request restart, shutdown',
             prompt_word='scraper', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,

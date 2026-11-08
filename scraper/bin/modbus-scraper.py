@@ -205,7 +205,11 @@ def main():
     if args.dry_run:
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
-    httpd = Server((listen_host, listen_port), Handler)
+    try:
+        httpd = Server((listen_host, listen_port), Handler)
+    except OSError as e:
+        logger.error('cannot bind %s:%d: %s', listen_host, listen_port, e)
+        raise SystemExit(1)
     httpd.setup_gate(cfg['max_clients'], cfg['max_conn_per_ip'])
     metrics_acl, metrics_acl_warn = resolve_metrics_acl(cfg['metrics_acl'])   # the accept-time gate (validated at resolve_config)
     httpd.metrics_acl = metrics_acl

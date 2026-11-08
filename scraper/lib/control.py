@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """JSON-lines control server for modbus-scraper: inspect and steer the
-running exporter — show status/connections/version, the live
+running exporter — show connections/version/config, the live
 settings (interval, timeout, the connection caps, the log surface), an
 immediate poll, the config reload (the SIGHUP path), the Modbus session
 restart, graceful shutdown. One command per line, one reply line. Every
@@ -221,8 +221,6 @@ class ControlServer(_ControlServer):
             if s is not None and s.restart:   # the value is recorded; the restart applies it — a note, not a verdict
                 return 'note restart required (startup-only knob)'
             return 'ok %s=%s %s' % (key, shown, self.summary())
-        if low == 'show status':
-            return self.status_report()
         if low == 'show connections':
             return 'ok connections ' + self.connections_line()
         if low == 'show version':
@@ -759,39 +757,6 @@ class ControlServer(_ControlServer):
         rows = ['%d active' % total]
         rows += ['%s: %d' % (ip, n) for ip, n in sorted(per_ip.items())]
         return '; '.join(rows)
-
-    def status_report(self):
-        """The status as a compact multi-field report: one stable key=value
-        per line (scriptable)."""
-        s = self.scraper
-        now = time.time()
-        cfg = s.cfg
-        gate = self.httpd.gate if self.httpd else None
-        rows = [
-            'upstream=%s:%d' % (cfg['host'], cfg['modbus_port']),
-            'unit=%d' % cfg['modbus_unit'],
-            'offset=%d' % cfg['modbus_offset'],
-            'modbus_auth=%s' % (cfg.get('auth') or 'none'),
-            'timeout=%s' % secs(cfg['timeout']),
-            'listen=%s' % cfg['listen'],
-            'control=%s' % self.describe(),
-            'uptime=%s' % secs(time.monotonic() - self.started),
-            'poll=%s' % ('ok' if s.up else 'down'),
-            'last_poll=%s' % ('never' if not s.last_poll else secs(now - s.last_poll)),
-            'interval=%s' % secs(cfg['interval']),
-            'errors=%d' % s.errors,
-            'sanity=%s' % ('ok' if not s.error_state() else 'failed'),
-            'battery=%s' % ('on' if cfg['battery'] else 'off'),
-            'auth=%s' % ('bearer' if cfg['auth_token'] else 'none'),
-            'clients=%d' % (gate.total() if gate else 0),
-            'max_clients=%s' % ((gate.max_total if gate else cfg['max_clients']) or 'none'),
-            'client_timeout=%s' % (secs(cfg['client_timeout']) if cfg['client_timeout'] else 'off'),
-            'max_conn_per_ip=%s' % ((gate.max_per_ip if gate else cfg['max_conn_per_ip']) or 'none'),
-            'log_access=%s' % ('on' if cfg['log_access'] else 'off'),
-            'profile=%s' % cfg['profile'],
-            'overridden=%s' % (','.join(sorted(self.overridden)) or 'none'),
-        ]
-        return 'ok status\n' + '\n'.join(rows)
 
     def _aligned(self, rows):
         """[(name, bracket, help)] -> the aligned `name  [bracket]  help`

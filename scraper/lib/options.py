@@ -178,7 +178,7 @@ describe_setting, describe_value = make_describe(SETTING_BY_NAME)
 
 
 # The custom show words: the non-knob, non-control-grammar views the show
-# verb answers (`show status`, `show connections`, ...) — the word, the
+# verb answers (`show connections`, ...) — the word, the
 # short description the ?/TAB listing renders, and the hidden mark (the
 # word answers on the wire but never lists in the ?/TAB pool — the
 # power-user views; `help config`/`help knobs` map them).

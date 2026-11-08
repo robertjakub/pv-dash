@@ -20,7 +20,7 @@ profile`** report (show-only — nothing to set) answers the write gate as
 its chain: `allow any` / `deny any`, a range list as its whitelist (deny
 any, then one `allow START:COUNT` line per range), and in profile mode
 the profile's own rules — the gate's desc as the `% ` line, one
-`allow|deny <range> # desc` line per range. The set/unset verbs match the
+`allow|deny <range> # desc` line per range, the comments aligned. The set/unset verbs match the
 knob rows only (`SET_BY_NAME`), so the report's live path never shadows a
 knob value — `set write registers profile` keeps handing the knob the
 word — and a bad `set write registers <value>` answers `err` now instead

@@ -1714,10 +1714,10 @@ print('mode 0600 ok')
     r = ctl_cmd('show write registers', 15586)
     check('profile acl: show answers the profile spelling', r == 'ok write/registers=profile', r[:80])
     r = ctl_cmd('show write registers profile', 15586)
-    check('profile acl: the show report renders the profile rules',
+    check('profile acl: the show report renders the profile rules (the comments aligned)',
           r == 'ok write-registers-profile\n'
                '% Time-of-Use schedule slots (148-177) and operational mode registers (127-128)\n'
-               'allow 127:2 # operational mode registers\n'
+               'allow 127:2  # operational mode registers\n'
                'allow 148:30 # Time-of-Use schedule slots', repr(r[:220]))
     r = ctl_cmd('show write-registers-profile', 15586)
     check('profile acl: the word spelling answers the same report',
@@ -1778,10 +1778,10 @@ print('mode 0600 ok')
     check('profile acl deny: the refusal names the carved gate',
           'outside the write allow-list profile (0:127,129:19,178:65358)' in pdl_log, pdl_log[-200:])
     r = ctl_cmd('show write registers profile', 15588)
-    check('profile acl deny: the show report renders the deny chain',
+    check('profile acl deny: the show report renders the deny chain (the comments aligned)',
           r == 'ok write-registers-profile\n'
                'allow any\n'
-               'deny 127:2 # the deye write spans\n'
+               'deny 127:2  # the deye write spans\n'
                'deny 148:30 # the deye write spans', repr(r[:160]))
 
     # the rule-chain form: the last matching rule decides, an undecided

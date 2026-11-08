@@ -113,7 +113,7 @@ renders the write gate as its acl chain (show-only): \\fBallow any\\fR /
 \\fBdeny any\\fR, a range list as its whitelist (deny any, then one allow
 line per range), and in profile mode the device profile's own rules \\(em
 the gate's desc as the % line, then one allow/deny line per range with
-its desc.
+its desc, the comments aligned.
 .IP \\(bu 2
 .B request dump
 / \\fBrequest restore\\fR: the write-behind state (the cached words + stamps,

@@ -234,9 +234,12 @@ def render_write_acl(desc, rules):
     the gate-level desc first as the '% ' line, then one
     '<verb> <range>[ # desc]' line per range — a list or map matcher fans
     out (the map's per-entry desc wins, a list repeats the rule's desc),
-    the bare words 'any'/'none' stand alone. A chain with no deciding rule
+    the bare words 'any'/'none' stand alone, and the lines that carry a
+    desc ALIGN: the '<verb> <range>' prefixes pad to one width so the
+    '# <desc>' comments start at one column. A chain with no deciding rule
     renders as the default it is: 'deny any'."""
     lines = ['%% %s' % desc] if desc else []
+    rows = []   # ('<verb> <range>', desc-or-None) in chain order
     for verb, matcher, rdesc, _where in rules:
         if isinstance(matcher, dict):
             entries = [(str(k).strip().lower(), d) for k, d in matcher.items()]
@@ -245,9 +248,12 @@ def render_write_acl(desc, rules):
         else:
             entries = [(str(matcher).strip().lower(), rdesc)]
         for rng, d in entries:
-            lines.append('%s %s%s' % (verb, rng, (' # %s' % d) if d else ''))
-    if not lines:
-        lines.append('deny any')
+            rows.append(('%s %s' % (verb, rng), (d or '').strip() or None))
+    if not rows:
+        rows.append(('deny any', None))
+    width = max((len(prefix) for prefix, d in rows if d), default=0)
+    for prefix, d in rows:
+        lines.append(('%s # %s' % (prefix.ljust(width), d)) if d else prefix.rstrip())
     return lines
 
 

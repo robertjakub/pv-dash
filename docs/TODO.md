@@ -69,10 +69,6 @@ the **Done/history** records for their tool.
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a
   proxy-less LAN install defensible: the bearer token stops travelling in
   clear text. The Modbus side stays F1 (accepted, protocol-inherent).
-- **a connect ACL for the fake's Modbus** `[inverter]` — F11 closed
-  without one (a test tool, trusted LAN); an opt-in `--connect-acl`
-  mirroring the cache's would let the paranoid demo the ACL story end to
-  end without touching the fake's soft-edge posture.
 - **the audit trail forwarding** `[common]` — F10's strong answer as an
   option: `--audit-forward syslog` (stdlib `SysLogHandler`, journald picks
   it up sealed) next to the file/stdout sinks; the hash chains + the

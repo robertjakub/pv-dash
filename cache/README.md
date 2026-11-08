@@ -434,6 +434,10 @@ token the proxy was started with.
 
 ## Access control
 
+The family-wide ACL map — the rule-chain semantics, the standalone acl
+file, the tools and where every tool's support stops — lives in
+[docs/ACL.md](../docs/ACL.md).
+
 **`connect-acl` defaults to `any`** (who may connect is the listen bind's
 job — the default bind is loopback); **`write-acl` and `write-registers`
 default to `none`** — the write path is closed even before `--allow-write`

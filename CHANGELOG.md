@@ -9,6 +9,17 @@ before the repo restructured into one suite.
 ## Unreleased
 ### Added
 
+- **docs** — **`docs/ACL.md`**: the family-wide ACL map — the one
+  rule-chain semantics (the typed gate object, the two matcher kinds, the
+  last matching rule deciding, the default deny any), the standalone acl
+  file and its tools, the per-tool support (the cache's full story — the
+  connect/write IP ACLs and the register gate, the fake's connect-ACL
+  mirror in the system grammar, the scraper and the dashboard's deliberate
+  no-ACL posture), the system forms spelled as the chains they implement,
+  and the boundary to the neighbouring gates that are not ACLs (the suite
+  auth, the control-plane RBAC, the connection caps). The book gains the
+  `acl.md` page.
+
 - **cache** — the connect and write ACLs read the **ip-prefix acl file**:
   `--connect-acl file:<path>` / `--write-acl file:<path>` (env, config
   and the live `set` the same) load the standalone gate whose root is

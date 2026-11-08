@@ -22,11 +22,13 @@ register ranges into an in-memory cache, any number of clients are served
 FC3/FC4 reads from the cache, reads outside the map and other function
 codes are forwarded live, and writes (FC05/06/15/16/22/23) are forwarded
 when explicitly enabled and audited \\(em gated by a register allow-list
-(\\fB--write-registers\\fR) that spells its ranges directly or takes the
+(\\fB--write-registers\\fR) that spells its ranges directly, takes the
 device profile's \\fBacl\\fR/\\fBwrite\\fR gate (the ordered rule chain:
 one \\fBtype\\fR allow/deny and a \\fBrange\\fR per rule \\(em the last
 matching rule decides, a register no rule decides refuses, the word
-\\fBany\\fR = all registers). Every function code crossing the
+\\fBany\\fR = all registers), or reads a standalone acl file
+(\\fBfile:<path>\\fR \\(em the same gate object a profile carries under
+acl/write, compiled at start and on every set). Every function code crossing the
 wire is named in the log and the audit trail (all standard FCs, FC1
 through FC43). A synthesized diagnostics block at registers
 65000\\(en65003 lets clients tell cached data from live data.
@@ -111,7 +113,7 @@ and last error.
 .B show write registers profile
 renders the write gate as its acl chain (show-only): \\fBallow any\\fR /
 \\fBdeny any\\fR, a range list as its whitelist (deny any, then one allow
-line per range), and in profile mode the device profile's own rules \\(em
+line per range), and in profile or file mode the gate's own rules \\(em
 the gate's desc as the % line, then one allow/deny line per range with
 its desc, the comments aligned.
 .IP \\(bu 2

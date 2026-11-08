@@ -378,8 +378,9 @@ def main():
     write = not check and not diff
     paths = [a for a in args if not a.startswith('--')]
     if not paths:
-        paths = sorted(glob.glob(os.path.join(REPO, 'cache', '**', 'acl-*.json'),
-                                 recursive=True))
+        paths = sorted(p for p in glob.glob(os.path.join(REPO, 'cache', '**', 'acl-*.json'),
+                                            recursive=True)
+                       if not p.endswith('.schema.json'))   # the JSON Schemas OF the acl files lint nothing
         if not paths:
             print('no acl-*.json file under cache/ — pass the path(s)')
             return 1

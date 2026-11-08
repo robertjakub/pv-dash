@@ -45,7 +45,10 @@ before the repo restructured into one suite.
   file gate renders its own rules (the gate desc as the `% ` line, the
   rule descs as aligned `# ` comments). A `set acl connect table` /
   `set acl write table` (the show word typed into the set verb) answers
-  the pointer to the report instead of the network-parser error.
+  the pointer to the report instead of the network-parser error. The
+  ip-prefix acl file ships a **JSON Schema** beside the example
+  (`examples/acl-ip-prefix.schema.json`, draft 2020-12 — the loader
+  stays the strict word).
 
 - **profiles** — the **`sun2000_full`** profile: the Huawei SUN2000 full
   register map — 645 numeric registers from the newest official Modbus

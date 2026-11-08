@@ -25,11 +25,12 @@ class MetricsServer(_MetricsServer):
     address is --metrics-listen HOST:PORT. Caps (F13 round):
     --metrics-max-clients (immediate 503 past it), --metrics-client-timeout
     (0 = the built-in 5 s slowloris cap), --metrics-max-conn-per-ip; 0 = no
-    per-IP limit. Beside the caps the metrics/acl gate checks the peer IP
-    at accept (the acl/connect reading, the scraper's metrics/acl shape):
-    a client off the ACL is closed without a reply — nothing was parsed to
-    answer. The gate reads through the proxy per connection: one live
-    state, the set/unset swap needs no push here."""
+    per-IP limit. Ahead of the caps the metrics/acl gate checks the peer
+    IP at accept (the acl/connect reading, the scraper's metrics/acl
+    shape): a client off the ACL is closed without a reply — nothing was
+    parsed to answer, the caps never see the peer. The gate reads through
+    the proxy per connection: one live state, the set/unset swap needs no
+    push here."""
 
     REALM = 'modbus-cache'
     LOG_NAME = 'modbus-cache'

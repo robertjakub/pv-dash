@@ -508,7 +508,7 @@ try:
     s.close()
     check('control: the right token authenticates, signed commands work after it',
           auth.get('status') == 'ok' and st.get('status') == 'ok'
-          and 'ok modbus-cache' in st.get('text', ''), '%s %s' % (auth, st))
+          and st.get('text', '').startswith('modbus-cache'), '%s %s' % (auth, st))
     r = ctl_raw(b'{"cmd": "show version"}\n', 15520, token='sekrit')
     check('control: an unsigned command over TCP is refused (the signed wire)',
           r.get('status') == 'fail' and 'unsigned command' in r.get('text', ''), str(r))

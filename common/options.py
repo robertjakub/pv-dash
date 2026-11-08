@@ -296,6 +296,35 @@ def describe_node(options, name):
     return _listing(name, options, node)
 
 
+def describe_command_node(commands, help_map, groups, hidden, name):
+    """The command namespace's wire help (`help request`, `help request
+    clear`): the next command words under the prefix, as the console's ?
+    renders the setting namespaces — the node-first descriptions (a word
+    that is itself a namespace describes by its node row, whose help and
+    group COMMAND_HELP/COMMAND_GROUPS carry beside the commands), the
+    display groups' sections, the hidden rows never listing (the pools'
+    rule; the typed path still answers). None when nothing lists (the
+    name is no command node)."""
+    prefix = name + '/'
+    words = {}
+    for w in commands:
+        if w in hidden:
+            continue   # the pools' rule: the hidden rows never list (the typed path still answers)
+        if w.startswith(prefix):
+            word = w[len(prefix):].split('/')[0]
+            if word and word not in words:
+                words[word] = help_map.get(prefix + word, '')
+    if not words:
+        return None
+    buckets = {}
+    for word, text in words.items():   # registry order = the sections' first-appearance order
+        buckets.setdefault(groups.get(prefix + word, ''), []).append((word, text))
+    bare = buckets.pop('', None)
+    sections = ([('', sorted(bare, key=lambda p: p[0].lower()))] if bare else []) \
+        + [(label, sorted(ws, key=lambda p: p[0].lower())) for label, ws in buckets.items()]
+    return '\n'.join(render_word_sections(sections))
+
+
 def describe_root(options, show_options=(), hidden_words=()):
     """The bare `show` answer — the walk's first position as the console's
     ? renders it: every visible top-level word (the namespaces, the

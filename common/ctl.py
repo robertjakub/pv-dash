@@ -83,7 +83,7 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         while b'\n' not in buf:
             chunk = sock.recv(65536)
             if not chunk:
-                return 'err', 'connection closed'
+                return 'fail', 'connection closed'
             buf += chunk
         # the first complete frame only: the daemon-exit bye can ride the
         # same segment as a shutdown reply (announce_exit) — it is not
@@ -92,8 +92,8 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         try:
             obj = json.loads(line.decode('utf-8', 'replace'))
         except ValueError:
-            return 'err', 'malformed reply'
-        st, tx = obj.get('status', 'err'), str(obj.get('text', ''))
+            return 'fail', 'malformed reply'
+        st, tx = obj.get('status', 'fail'), str(obj.get('text', ''))
         mac = obj.get('mac')
         if token and mac is not None and not verify_reply(token, st, tx, mac):
             print('the reply mac does not verify (tampered or corrupted frame)', file=sys.stderr)
@@ -115,7 +115,7 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
             if st == 'bye' and tx.startswith('daemon-exit'):
                 print('%% %s — done' % tx.replace('daemon-exit', 'daemon exit', 1))
                 break
-            print(('%s %s' % (st, tx)).rstrip())
+            print(('%% error: %s' % tx) if st == 'fail' else ('%s %s' % (st, tx)).rstrip())
     except OSError as e:
         print('control error: %s' % e, file=sys.stderr)
         raise SystemExit(1)

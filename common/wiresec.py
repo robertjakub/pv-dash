@@ -6,7 +6,15 @@ when a control token is configured, every command and every reply carries a
 short form) keyed by the token —
 
   request: {"cmd": "<command>", "mac": <hmac-sha256(token, cmd)>}
-  reply:   {"status": "...", "text": "<reply text>", "mac": <hmac-sha256(token, "<status> <text>">)}
+  reply:   {"status": "ok" | "fail" | "bye", "text": "<reply text>",
+            "mac": <hmac-sha256(token, "<status> <text>">)}
+
+the status speaks the verdict vocabulary — ok (the command ran; text is
+its output), fail (the command refused; text IS the error message), bye
+(the unsolicited daemon-exit notice) — and the mac is computed over the
+WIRE form ("<status> <text>"), not the servers' internal 'ok …'/'err …'
+reply strings (the internal 'err' maps to 'fail' at the frame; the
+clients fold it back for their render hooks).
 
 so a token-holding client verifies nothing was injected or altered in
 flight (the token auth proves who is speaking once; the mac proves it for

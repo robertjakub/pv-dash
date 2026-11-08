@@ -397,13 +397,26 @@ def wire(cmd):
 
 
 def display(text):
-    """console-style: every non-value reply line gets the '% ' prefix — the
-    ok/err verdicts and the bye notices (the multi-line tables keep their
-    raw continuation lines: only the reply's status line is prefixed)."""
-    out = []
-    for line in text.splitlines():
-        out.append(('% ' + line) if line.startswith(('ok', 'err', 'bye')) else line)
-    print('\n'.join(out))
+    """console-style: the face decides on the FIRST line's verdict head —
+    an ok reply prints its message bare (quiet success; a bare `ok` with
+    no message prints nothing), a failure prints '% error: <message>', a
+    bye notice keeps '% ' — and the continuation lines always stay raw
+    (the multi-line tables keep their padding; no line-sniffing, so a
+    table row starting with the words ok/err/bye never wears a marker)."""
+    lines = text.splitlines()
+    if not lines:
+        return
+    first, rest = lines[0], lines[1:]
+    if first == 'ok':
+        return                      # quiet success: no message, no marker
+    if first.startswith('ok '):
+        print('\n'.join([first.split(' ', 1)[1]] + rest))
+    elif first.startswith('err '):
+        print('\n'.join(['%% error: %s' % first.split(' ', 1)[1]] + rest))
+    elif first.startswith('bye'):
+        print('\n'.join(['%% %s' % first] + rest))
+    else:
+        print(text)                 # an unheaded reply (the fake's own shapes) prints as-is
 
 
 def typed_loop(sock, prompt, audit=None):
@@ -430,7 +443,7 @@ def typed_loop(sock, prompt, audit=None):
                 audit.command(cmd, 'local')
             return
         if low == 'ping':               # local: the wire pings belong to the keepalive thread
-            print('% ok pong')
+            print('pong')
             continue
         if low in ('?', 'help'):
             if audit:
@@ -459,10 +472,12 @@ def typed_loop(sock, prompt, audit=None):
         if low.startswith(('set ', 'unset ')):
             if 'restart required' in reply:
                 print('% ' + reply.split(' ', 1)[1])   # the startup-only note: a note, not a verdict
+            elif reply.startswith('ok'):
+                print('% changed')   # the one ok face keeping the marker
             else:
-                print('% ok' if reply.startswith('ok') else '% ' + reply)
+                display(reply)
         elif _SPEC['silent_ok'] and _SPEC['silent_ok'](low) and reply.startswith('ok'):
-            print('% ok')               # confirm silently
+            pass                        # fully silent: the prompt returning is the confirm
         elif _SPEC['render'] and _SPEC['render'](low, reply):
             pass                        # the tool's special render answered
         elif (low.startswith('show ') or low == 'show') and reply.startswith('ok '):
@@ -522,9 +537,10 @@ def exchange(sock, wire_text):
                 obj = json.loads(line.decode('utf-8', 'replace'))
             except ValueError:
                 continue
-            text = '%s %s' % (obj.get('status', 'err'), str(obj.get('text', '')))
+            st = obj.get('status', 'fail')
+            text = '%s %s' % ('err' if st == 'fail' else st, str(obj.get('text', '')))   # fail folds back: the internal string is the render hooks' currency
             mac = obj.get('mac')
-            if _token and mac is not None and not verify_reply(_token, obj.get('status', 'err'),
+            if _token and mac is not None and not verify_reply(_token, st,
                                                                str(obj.get('text', '')), mac):
                 raise ConnectionLost('the reply mac does not verify — the wire was tampered with')
             if _token and mac is None and _require_reply_mac:

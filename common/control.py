@@ -247,11 +247,11 @@ class ControlServer:
         except ValueError:
             obj = None
         if not isinstance(obj, dict) or not isinstance(obj.get('cmd'), str):
-            return '', {'status': 'err',
+            return '', {'status': 'fail',
                         'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request', role
         cmd = obj['cmd']
         if self.token and cmd.lower() != 'auth' and role is None:
-            return cmd, {'status': 'err', 'text': 'authenticate first: {"cmd": "auth", "token": "..."}'}, \
+            return cmd, {'status': 'fail', 'text': 'authenticate first: {"cmd": "auth", "token": "..."}'}, \
                 'err authenticate first', role
         if cmd.lower() == 'auth':
             granted = self.auth_role(obj.get('token'))
@@ -259,32 +259,33 @@ class ControlServer:
                 key = self.session_key(granted)
                 reply = 'ok authenticated'
                 return 'auth', {'status': 'ok', 'text': 'authenticated', 'mac': sign_reply(key, reply)}, reply, granted
-            return 'auth', {'status': 'err', 'text': 'bad token'}, 'err bad token', role
+            return 'auth', {'status': 'fail', 'text': 'bad token'}, 'err bad token', role
         key = self.session_key(role)
         if key and obj.get('mac') is None and not self.is_unix:
-            return cmd, {'status': 'err',
+            return cmd, {'status': 'fail',
                          'text': 'unsigned command rejected: TCP commands carry the hmac-sha256 of the command, keyed by the token'}, \
                 'err unsigned command', role
         if key and obj.get('mac') is not None and not verify_request_mac(key, cmd, obj.get('mac')):
-            return cmd, {'status': 'err',
+            return cmd, {'status': 'fail',
                          'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac', role
         if not role_allows(role, cmd, self.ops_verbs):
             verb = command_verb(cmd) or cmd
             text = ('forbidden: the ops token runs the %s verbs only (%s needs the admin token)'
                     % ('/'.join(sorted(self.ops_verbs)), verb))
             reply = 'err ' + text
-            reply_obj = {'status': 'err', 'text': text}
+            reply_obj = {'status': 'fail', 'text': text}
             if key:
-                reply_obj['mac'] = sign_reply(key, reply)
+                reply_obj['mac'] = sign_reply(key, 'fail ' + text)   # the mac is over the wire form
             self.LOG.warning('control: ops session from %s denied %r (read-only role)', who, cmd)
             return cmd, reply_obj, reply, role
         reply = self.command(cmd)
         if reply is None:              # quit: no reply, just close
             return cmd, None, 'bye', role
         status, _, text = reply.partition(' ')
-        reply_obj = {'status': status, 'text': text}
+        wstatus = 'fail' if status == 'err' else status   # the wire speaks ok|fail|bye; the internal err maps here
+        reply_obj = {'status': wstatus, 'text': text}
         if key:
-            reply_obj['mac'] = sign_reply(key, reply)
+            reply_obj['mac'] = sign_reply(key, '%s %s' % (wstatus, text))   # over the wire form, not the internal
         return cmd, reply_obj, reply, role
 
     def announce_exit(self, reason, text=None):

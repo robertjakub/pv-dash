@@ -248,7 +248,7 @@ command, settable (`set`/`unset`) or show-only — is tabled in
 
 | Command | Effect |
 |---|---|
-| `set` / `unset` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `modbus auth`/`modbus auth key` (a change drops the Modbus session), `metrics acl`, the control tokens/verbs/socket-group (rotate live), `control port` (rebinds the listener live) |
+| `set` / `unset` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `modbus auth` (the scheme swaps live), `metrics acl`, the control verbs/socket-group, `control port` (rebinds the listener live) — the tokens and the auth keys are startup-only: the wire refuses set/unset, pass them by flag/env/config |
 | `poll now` | the loop wakes immediately |
 | `show connections` | the live HTTP clients of /metrics |
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |

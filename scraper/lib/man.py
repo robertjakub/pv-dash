@@ -69,9 +69,9 @@ configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: metrics
 interval, modbus timeout, the metrics limits caps, caps max-pv/max-grid,
 log-access, log-level, control socket-group (re-modes the live unix socket
-0600/0660) \\(em and the token lives: control token, the ops token,
-metrics auth token, each rotating live, the value never rendering \\(em
-\\fBshow <secret>\\fR refuses), \\fBshow connections\\fR
+0600/0660) \\(em and the startup-only secrets: control token, the ops
+token, metrics auth token \\(em the wire refuses set/unset, the value
+never rendering \\(em \\fBshow <secret>\\fR refuses), \\fBshow connections\\fR
 (the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
 (the dictionary of the registry), \\fBpoll now\\fR,
 \\fBinspect\\fR, \\fBrequest reload-config\\fR (the SIGHUP path),

@@ -5,6 +5,14 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The secrets-startup-only wave: every secret row (auth-key, control-token,
+control-ops-token, auth-token, dump-key) is `restart`-marked and the wire
+refuses set/unset on it with the dump-key answer — the live rotation
+branches die, the SIGHUP/`request reload-config` path still re-reads the
+`file:` references, and the regtest's §6b speaks one control token per
+daemon (spawned `ctok9`, no live rotation); `help config` and OPTIONS.md
+render the startup-only recipe.
+
 The man-ladder wave: the page runs the family's one daemon ladder — it
 gains ENVIRONMENT (the bare-twin catch-all beside the clients' CTL) and
 EXIT STATUS (the unified three-code block, the failed-bind rc 1 named),

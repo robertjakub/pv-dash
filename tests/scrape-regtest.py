@@ -1822,63 +1822,63 @@ try:
     check('scraper control: poll now', r.startswith('ok poll now'), r[:80])
     r = sctl('request reload-config', 15597)
     check('scraper control: request reload-config', r.startswith('ok reloaded'), r[:80])
-    # 6b-3. the secrets on the wire: the token lives rotate (the cache's
-    #       treatment) and the show verb refuses them — a secret never renders
+    # 6b-3. the secrets on the wire: startup-only (the dump/key treatment) —
+    #       set/unset refuse on the wire, the show verb refuses them — a
+    #       secret never renders
     r = sctl('show metrics auth token', 15597)
     check('scraper control: the auth token is a secret that never shows',
           r.startswith('fail metrics/auth/token is a secret'), r[:90])
     r = sctl('unset metrics auth token', 15597)
-    check('scraper control: unset refuses a secret (no defaults entry)', r.startswith('fail unknown setting'), r[:80])
+    check('scraper control: unset refuses a secret (startup-only)',
+          r.startswith('fail restart required (startup-only knob)'), r[:90])
     r = sctl('show control token', 15597)
     check('scraper control: the control token never shows', r.startswith('fail control/token is a secret'), r[:90])
     r = sctl('set metrics auth token bearer9', 15597)
-    check('scraper control: the auth token rotates live', r.startswith('ok metrics/auth/token=<set>'), r[:80])
+    check('scraper control: the auth token is startup-only — the set refuses',
+          r.startswith('fail restart required (startup-only knob)'), r[:90])
     st, _ = get('/metrics', 19457)
-    check('scraper control: the endpoint demands the rotated bearer', st == 401, str(st))
-    st, _ = get('/metrics', 19457, headers={'Authorization': 'Bearer bearer9'})
-    check('scraper control: the rotated bearer serves', st == 200, str(st))
+    check('scraper control: the tokenless loopback endpoint keeps serving (the bind is the auth)',
+          st == 200, str(st))
     r = sctl('set control token ctok9', 15597)
-    check('scraper control: the control token rotates live', r.startswith('ok control/token=<set>'), r[:80])
-    r = sctl('show version', 15597, token=STOK)
-    check('scraper control: the old control token is refused', r.startswith('fail authenticate first'), r[:80])
-    r = sctl('show version', 15597, token='ctok9')
-    check('scraper control: the rotated control token speaks', r.startswith('ok modbus-scraper'), r[:80])
-    r = sctl('show control token', 15597, token='ctok9')
-    check('scraper control: the rotated control token never renders back',
+    check('scraper control: the control token is startup-only — the set refuses',
+          r.startswith('fail restart required (startup-only knob)'), r[:90])
+    r = sctl('show version', 15597)
+    check('scraper control: the configured control token still speaks (no live rotation)',
+          r.startswith('ok modbus-scraper'), r[:80])
+    r = sctl('show control token', 15597)
+    check('scraper control: the control token never renders back',
           r.startswith('fail control/token is a secret'), r[:90])
     # 6b-4. the state dump (settings by default — there are no cache words
     #       here): request dump writes 0600 + the integrity hash, the restore
     #       re-applies, the whole-daemon reload keeps the sets across the exec
-    r = sctl('set dump/path /tmp/scr_regtest_state.json', 15597, token='ctok9')
+    r = sctl('set dump/path /tmp/scr_regtest_state.json', 15597)
     check('scraper control: the dump path set live', r.startswith('ok dump/path=/tmp/scr_regtest_state.json'), r[:90])
     check('scraper control: the set dump path reply notes the unsealed dump (no key configured)',
           '(not sealed' in r and 'set dump/key' in r, r[:160])
-    r = sctl('set metrics interval 9', 15597, token='ctok9')
+    r = sctl('set metrics interval 9', 15597)
     check('scraper control: the override before the dump', r.startswith('ok metrics/interval=9.00s'), r[:80])
-    r = sctl('request dump', 15597, token='ctok9')
-    check('scraper control: request dump writes the live path', r.startswith('ok dumped 4 setting(s)'), r[:80])
+    r = sctl('request dump', 15597)
+    check('scraper control: request dump writes the live path', r.startswith('ok dumped 2 setting(s)'), r[:80])
     dumpst = os.stat('/tmp/scr_regtest_state.json')
     check('scraper control: the state dump is 0600 (the F18 posture)', dumpst.st_mode & 0o777 == 0o600,
           oct(dumpst.st_mode & 0o777))
     raw = open('/tmp/scr_regtest_state.json').read()
     check('scraper control: the dump carries the settings, never the secrets',
           '"metrics/interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw
-          and '"metrics/auth/token": "*** SECRET REMOVED ***"' in raw
-          and '"control/token": "*** SECRET REMOVED ***"' in raw, raw[:240])
-    r = sctl('set metrics interval 1', 15597, token='ctok9')
-    r = sctl('request restore', 15597, token='ctok9')
-    check('scraper control: the restore re-applies the dump, the secret placeholders skip',
-          r.startswith('ok restored 2 setting(s)') and 'secret, not restored' in r
-          and 'metrics/auth/token' in r and 'control/token' in r, r[:160])
-    r = sctl('show metrics interval', 15597, token='ctok9')
+          and 'metrics/auth/token' not in raw and 'control/token' not in raw, raw[:240])
+    r = sctl('set metrics interval 1', 15597)
+    r = sctl('request restore', 15597)
+    check('scraper control: the restore re-applies the dump (the secrets never ride it)',
+          r.startswith('ok restored 2 setting(s)'), r[:80])
+    r = sctl('show metrics interval', 15597)
     check('scraper control: the restored override reads back', r == 'ok metrics/interval=9.00s', r[:80])
-    r = sctl('request dump', 15597, token='ctok9')   # a tamper check: edit the dump, the restore refuses
+    r = sctl('request dump', 15597)   # a tamper check: edit the dump, the restore refuses
     tampered = open('/tmp/scr_regtest_state.json').read().replace('9.0', '3.0')
     open('/tmp/scr_regtest_state.json', 'w').write(tampered)
-    r = sctl('request restore', 15597, token='ctok9')
+    r = sctl('request restore', 15597)
     check('scraper control: a tampered dump fails closed', r.startswith('fail restore failed')
           and 'integrity' in r, r[:120])
-    r = sctl('unset dump/path', 15597, token='ctok9')
+    r = sctl('unset dump/path', 15597)
     check('scraper control: the dump path unset back to off', r.startswith('ok dump/path=off'), r[:80])
     # 6b-4b. the sealed dump (the DUMP_KEY env twin): the state rides encrypted,
     #        the restore fails closed without the key (the restart matrix lives
@@ -1966,9 +1966,9 @@ try:
           'is not sealed' in line and 'set dump/key' in line, line[-220:])
     procs[-1].kill()
     time.sleep(0.4)
-    r = sctl('request restart', 15597, token='ctok9')
+    r = sctl('request restart', 15597)
     check('scraper control: the modbus session restart', r.startswith('ok modbus session dropped'), r[:80])
-    r = sctl('inspect', 15597, token='ctok9')
+    r = sctl('inspect', 15597)
     check('scraper control: inspect', r.startswith('ok inspect\n') and 'version   modbus-scraper' in r, r[:120])
     aud = open('/tmp/scr_regtest_audit.log').read()
     check('scraper control: the SCR audit trail with the wire mac',
@@ -2066,7 +2066,7 @@ try:
     check('scraper reload: the re-execed daemon still shuts down clean',
           down is not None and down.startswith('bye shutdown'), repr(down))
 
-    r = sctl('shutdown', 15597, token='ctok9')
+    r = sctl('shutdown', 15597)
     check('scraper control: shutdown', r.startswith('bye shutdown'), r[:80])
     time.sleep(0.6)
 
@@ -2216,19 +2216,27 @@ try:
           m.get('scraper_up') == 0, str({k: m.get(k) for k in ('scraper_up', 'scraper_modbus_errors_total')}))
     check('suite auth: the refusals pile up as poll errors', m.get('scraper_modbus_errors_total', 0) > 0,
           str(m.get('scraper_modbus_errors_total')))
-    # the live key rotation: the failing wrong-key scraper with a control
-    # port — `set modbus auth key` to the right one and the poll comes up
+    # the right key: a spawned instance (the key is startup-only) — the set
+    # refuses on the wire, a fresh start applies the configured key
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15910',
                                    '--listen', '127.0.0.1:19468', '--interval', '1',
                                    '--control-port', '19469', '--control-token', 'ctok-a',
                                    '--auth', 'suite', '--auth-key', 'wrong-key-16chars00'],
                                   stdout=open('/tmp/scr_auth_rot.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2.0)
-    status, m = wait_metrics(19468, want='scraper_up')
-    check('suite auth: the wrong-key scraper starts down', m.get('scraper_up') == 0, str(m.get('scraper_up')))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '19469', '--control-token', 'ctok-a',
                         'set', 'modbus', 'auth', 'key', SKEY], capture_output=True, text=True, timeout=15)
-    check('suite auth: the key rotates live', r.stdout.startswith('ok modbus/auth/key=<set>'), r.stdout[:120])
+    check('suite auth: startup-only — the key set refuses',
+          r.stdout.startswith('% error: restart required (startup-only knob)'), r.stdout[:120])
+    procs[-1].terminate()
+    procs[-1].wait(timeout=10)
+    time.sleep(0.5)
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15910',
+                                   '--listen', '127.0.0.1:19468', '--interval', '1',
+                                   '--control-port', '19469', '--control-token', 'ctok-a',
+                                   '--auth', 'suite', '--auth-key', SKEY],
+                                  stdout=open('/tmp/scr_auth_rot.log', 'w'), stderr=subprocess.STDOUT))
+    time.sleep(2.0)
     for _ in range(30):
         try:
             status, m = wait_metrics(19468, want='scraper_up')
@@ -2238,7 +2246,8 @@ try:
             pass
         time.sleep(0.3)
     status, m = wait_metrics(19468, want='scraper_up')
-    check('suite auth: the rotated key polls (no restart)', m.get('scraper_up') == 1, str(m.get('scraper_up')))
+    check('suite auth: the configured key polls (a fresh start applies it)', m.get('scraper_up') == 1,
+          str(m.get('scraper_up')))
     r = subprocess.run([sys.executable, P, '--dry-run', '--auth', 'bogus'], capture_output=True,
                        text=True, timeout=15)
     check('suite auth: a bogus scheme fails the config fast',

@@ -17,7 +17,6 @@ and reply carries the full sha256 HMAC of its payload, keyed by the token
 TCP the signed commands are mandatory. A second, read-only token
 (--control-ops-token) authenticates into the show/clear verbs only — the
 ops shift against the admin key, both audited."""
-import hmac
 import logging
 import os
 import re
@@ -31,8 +30,8 @@ from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN
 from common.control import ControlServer as _ControlServer, num, numi
 from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
     match_setting_path
-from common.config import acl_table, acl_value_text, default_profile_path, is_loopback_host, parse_auth_type, \
-    parse_control_target, parse_listen, parse_secret, parse_upstream, resolve_profile_file
+from common.config import acl_table, acl_value_text, default_profile_path, parse_auth_type, \
+    parse_control_target, parse_listen, parse_upstream, resolve_profile_file
 from common.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
 from common.logutil import UtcFormatter
@@ -347,25 +346,13 @@ class ControlServer(_ControlServer):
             except SystemExit as e:
                 raise ValueError(str(e))
             if v and not s.client.auth_key:
-                raise ValueError('the suite auth needs a key: set modbus auth key <value> first '
-                                 '(min %d characters)' % AUTH_MIN_KEY)
+                raise ValueError('the suite auth needs a key: pass auth-key by flag/env/config '
+                                 '(min %d characters) and restart' % AUTH_MIN_KEY)
             with s.lock:
                 s.cfg['auth'] = v
             s.client.auth = v
             s.client.close()   # the next poll reconnects — and handshakes when suite is on
             return v or 'none'
-        if key == 'modbus/auth/key':
-            try:
-                v = parse_secret(val, 'modbus/auth/key')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if v is not None and len(v) < AUTH_MIN_KEY:
-                raise ValueError('modbus/auth/key must be at least %d characters, got %d' % (AUTH_MIN_KEY, len(v)))
-            with s.lock:
-                s.cfg['auth_key'] = v
-            s.client.auth_key = v
-            s.client.close()   # the session re-proves the new key on the next connect
-            return '<set>'
         if key == 'metrics/limits/max-clients':
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
@@ -472,33 +459,6 @@ class ControlServer(_ControlServer):
             with s.lock:
                 s.cfg['control_port'] = '0' if target is None else str(target)
             return shown
-        if key == 'control/token':
-            if val in ('off', 'none', ''):
-                self.refuse_token_drop()
-                self.token = None
-                return 'off'
-            try:
-                val = parse_secret(val, 'control/token')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if self.ops_token and hmac.compare_digest(val, self.ops_token):
-                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
-                                 'every holder the role the server picks first)')
-            self.token = val   # the rotation is live: the sessions re-auth, the macs verify against the new key
-            return '<set>'
-        if key == 'control/ops/token':
-            if val in ('off', 'none', ''):
-                self.ops_token = None   # the ops shift signs off; the admin role is untouched
-                return 'off'
-            try:
-                val = parse_secret(val, 'control-ops-token')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if self.token and hmac.compare_digest(val, self.token):
-                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
-                                 'every holder the role the server picks first)')
-            self.ops_token = val
-            return '<set>'
         if key == 'control/socket-group':
             if val in ('on', 'true', '1', 'yes'):
                 on = True
@@ -510,26 +470,6 @@ class ControlServer(_ControlServer):
             if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
                 os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
             return 'on' if on else 'off'
-        if key == 'metrics/auth/token':
-            if val in ('off', 'none', ''):
-                host, _port = parse_listen(s.cfg['listen'])
-                if not is_loopback_host(host):
-                    raise ValueError('metrics/auth/token is mandatory while the listen is non-loopback '
-                                     '(F13 in docs/AUDIT.md) — set the new token')
-                self.httpd.RequestHandlerClass.auth_token = None
-                with s.lock:
-                    s.cfg['auth_token'] = None
-                return 'off'
-            try:
-                val = parse_secret(val, 'metrics/auth/token')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if any(c.isspace() or ord(c) < 33 or ord(c) == 127 for c in val):
-                raise ValueError('metrics/auth/token must not contain whitespace or control characters')
-            self.httpd.RequestHandlerClass.auth_token = val   # the handler reads it per request — the swap is live
-            with s.lock:
-                s.cfg['auth_token'] = val
-            return '<set>'
         if key == 'dump/path':
             if val in ('off', 'none', ''):
                 self.dump_path = None
@@ -648,14 +588,8 @@ class ControlServer(_ControlServer):
             return cfg['profile']
         if key == 'control/port':
             return 'off' if self.stopped else self.describe()
-        if key == 'control/token':
-            return '<set>' if self.token else 'off'   # the secret never renders
-        if key == 'control/ops/token':
-            return '<set>' if self.ops_token else 'off'   # the secret never renders
         if key == 'control/socket-group':
             return 'on' if self.socket_group else 'off'
-        if key == 'metrics/auth/token':
-            return '<set>' if cfg['auth_token'] else 'off'   # the secret never renders
         if key == 'audit/log-file':
             return self.audit.path if self.audit else 'off'
         if key == 'audit/rotate/max-size':
@@ -668,8 +602,6 @@ class ControlServer(_ControlServer):
             return cfg.get('auth') or 'none'
         if key == 'metrics/filter':
             return cfg['metrics_spec'] or 'off'
-        if key == 'modbus/auth/key':
-            return '<set>' if cfg.get('auth_key') else 'none'   # the secret never renders
         if key == 'dump/path':
             return self.dump_path or 'off'
         # the generic path: a registry row with a typed conv reads its
@@ -700,11 +632,10 @@ class ControlServer(_ControlServer):
         self.overridden.clear()
 
     def dump_settings(self):
-        """The live-overridden settings as raw, re-appliable values. The
-        secrets (control/token, the ops token, auth/token) ride as
-        *** SECRET REMOVED ***: the knob renders, the value never lands in
-        the file — the restore skips the placeholder and keeps the
-        secret's current value."""
+        """The live-overridden settings as raw, re-appliable values. No
+        secret can be overridden (the wire refuses them — startup-only),
+        so no SECRET_REMOVED placeholder occurs; the dump filter's secret
+        branch stays as the class invariant's guard."""
         s = self.scraper
         with s.lock:
             cfg = dict(s.cfg)

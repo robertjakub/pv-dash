@@ -50,8 +50,10 @@ The kinds — every row of the tables below carries one:
   pass it by flag/env or as `file:<path>`. *(hidden)* — never lists in the
   ?/TAB pools; the wire still answers.
 - **startup-only** — flag/env/config at start, a restart applies a change; the
-  wire has no set/unset/show for it (it renders in `show config` only). The
-  restart-marked secret (the dump key) refuses set/unset/show outright.
+  wire has no set/unset/show for it (it renders in `show config` only). Every
+  secret is startup-only now (the tokens, the auth keys, the dump key): the
+  wire refuses set/unset outright, the value passes by flag/env/config or as
+  `file:<path>` and a restart applies it.
 - **show-only** — a runtime report: `show <report>` answers, nothing to set.
 
 ## Commands
@@ -99,7 +101,7 @@ the inverter Modbus settings
 | `modbus-unit` | `set modbus unit` | settable | `ID` | `--modbus-unit` / `MODBUS_UNIT` | Modbus unit ID |
 | `modbus-offset` | `set modbus offset` | settable | `N` | `--modbus-offset` / `MODBUS_OFFSET` | added to register addresses |
 | `auth` | `set modbus auth` | settable | `suite\|none` | `--auth` / `AUTH` | the auth settings: the Modbus scheme the poll session speaks (modbus auth — suite or none) and the bearer token the metrics endpoint requires (auth token) |
-| `auth-key` | `set modbus auth key` | settable (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
+| `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 | `timeout` | `set modbus timeout` | settable | `s` | `--timeout` / `TIMEOUT` | Modbus connect/read timeout |
 | `profile` | `set modbus profile` | settable | `\<file>` | `--profile` / `PROFILE` | device profile JSON: the registers the metrics read (a bare name resolves in profiles/profiles/) |
 | `grid-positive-import` | `set modbus grid-positive-import` | settable | `on\|off` | `--grid-positive-import` / `GRID_POSITIVE_IMPORT` | grid register positive when importing |
@@ -145,7 +147,7 @@ the control plane: the tokens, the ops role's RBAC policy, the trusted peers
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `control-port` | `set control port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | JSON-lines control server target: unix socket path |
-| `control-token` | `set control token` | settable (secret) | `TOKEN` | `--control-token` / `CONTROL_TOKEN` | require a token on control connections: the client authenticates with {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `control-token` | — | startup-only (secret) | `TOKEN` | `--control-token` / `CONTROL_TOKEN` | require a token on control connections: the client authenticates with {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `control-trust-uids` | `set control trust-uids` | settable | `UID,...` | `--control-trust-uids` / `CONTROL_TRUST_UIDS` | extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted |
 | `control-socket-group` | `set control socket-group` | settable | `on\|off` | `--control-socket-group` / `CONTROL_SOCKET_GROUP` | leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600) |
 
@@ -156,7 +158,7 @@ configured verbs (the default: show and clear)
 
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `control-ops-token` | `set control ops token` | settable (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run the show/clear verbs only (no set/unset, no poll now, no request reload, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run the show/clear verbs only (no set/unset, no poll now, no request reload, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `control-ops-verbs` | `set control ops verbs` | settable | `VERB,...` | `--control-ops-verbs` / `CONTROL_OPS_VERBS` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated |
 
 ### metrics/auth
@@ -165,7 +167,7 @@ the /metrics bearer auth: the token the exposition endpoint requires
 
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `auth-token` | `set metrics auth token` | settable (secret) | `TOKEN` | `--auth-token` / `AUTH_TOKEN` | require Authorization: Bearer \<token> on all requests — rotates live; the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `auth-token` | — | startup-only (secret) | `TOKEN` | `--auth-token` / `AUTH_TOKEN` | require Authorization: Bearer \<token> on all requests — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
 
 ### audit
 

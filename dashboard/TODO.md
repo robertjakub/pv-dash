@@ -5,6 +5,14 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The docs restructure wave: the README re-laid on the family's one skeleton
+and shortened (404 → ~300 lines) — the Files table folded into the Source
+layout, the Control wall became the command table; the NixOS section
+(the flake example + the stale option list — it predated the metrics
+endpoint, the dump knobs and the auth-token pair) moved to
+[docs/NIXOS.md](../docs/NIXOS.md); the Testing section ADDED (the
+control-fuzz suite + the /config.js fuzz pin).
+
 The metrics/acl family wave: the dashboard's own `/metrics` takes the
 cache's **`metrics/acl` gate** — `--metrics-acl`/`$METRICS_ACL`, live
 `set metrics acl` / `unset`, the table show `show metrics acl table`,

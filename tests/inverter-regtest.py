@@ -1144,7 +1144,7 @@ def main():
               and 'fake-inverter' in out, repr(out[-120:] if out else 'no output'))
 
         # ---- the audit family's one shape: the daily knob's live name, the
-        #      bounds (the one constants home: common/audit.py), the env twins
+        #      bounds (the one constants home: common/runtime/audit.py), the env twins
         tx = ctl(msock, 'set audit rotate daily on')
         check('fake audit-daily: the daily trigger switches on (the live name)',
               tx.startswith('ok audit/rotate/daily=on'), tx[:90])

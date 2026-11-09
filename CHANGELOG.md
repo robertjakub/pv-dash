@@ -12,6 +12,26 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Added
 
+- **common** — **the flat package organizes into functional subdirs**: the
+  17 flat modules split into five subpackages beside the existing
+  `modbus/` — `render/` (the static texts + JSON, the man-page builder,
+  the time formats), `runtime/` (the daemon-bin ladder, the audit trail,
+  the UTC log stamps, the version — whose repo-root walk gained one
+  dirname), `settings/` (the option registry, the config plumbing, the
+  state dumps + the seal), `wire/` (the ControlServer base + the family
+  `command()` walk, the HMAC frames, the peer-cred, both ctl/cli clients)
+  and `serve/` (the connection caps, the gated Prometheus skeleton). No
+  shim modules — the ~175 import lines spell the full submodule path
+  (`from common.wire.control import ControlServer`), the doc prose paths
+  swept, the four `package.nix` install every subdir (the modbus
+  pattern), `gen_sbom`'s module count walks the package recursively (21
+  modules now — `modbus/` was never counted before) and `lint_texts`
+  reads the JSON in `render/`. One commit, the common-split precedent
+  (ab387d4): a coupled move cannot bisect. Byte-identical `--help`/`--man`
+  for all twelve bins, the family chain smoke green (ctl ×4, the metrics
+  401→200 gate, the sealed dump round-trip, the cli pty connect), all
+  gates + ten suites green.
+
 - **inverter** — **the fake takes the family's config file**: `--config`
   (`$CONFIG`, then `inverter.conf` next to the script) reads the set
   grammar — every line a `set <name> <value>` in the CLI spelling — and
@@ -258,7 +278,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   pair at the repo root** (`examples/acl-ip-prefix.json` +
   `schema/acl-ip-prefix.schema.json`): the four per-tool copies die (the
   fake's `examples/`/`schema/` dirs held only the pair and empty out,
-  the dashboard's `schema/` with them), the four `package.nix` installs
+  the dashboard's `schema/` with them),   the four `package.nix` installs
   re-point (`${../examples}`, `${../schema}`) with the packaged
   `share/<tool>/` layout unchanged, `scripts/lint_acl.py`'s bare run
   globs the root `examples/` too, the regtests' `file:` rounds read

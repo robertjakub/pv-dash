@@ -31,7 +31,7 @@ import json
 import os
 import struct
 
-from common.config import resolve_profile_file
+from common.settings.config import resolve_profile_file
 
 # The suite's shared device profiles live in the profiles/profiles/ data dir
 # of the profiles/ subproject at the repository root; a packaged tool carries

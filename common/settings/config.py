@@ -65,7 +65,7 @@ def load_config_script(path, options):
     legacy ini file fails fast with the pointer to the new grammar. The
     tool's OPTIONS registry rows gate the grammar (the CLI spelling + the
     unknown-setting fail fast)."""
-    from common.options import parse_config_script   # lazy: options sits above config in the layering
+    from common.settings.options import parse_config_script   # lazy: options sits above config in the layering
     if not path or not os.path.isfile(path):
         return {}
     try:

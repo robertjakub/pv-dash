@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""The scraper's man pages, generated (common/manpage.py): the OPTIONS
+"""The scraper's man pages, generated (common/render/manpage.py): the OPTIONS
 sections render from the tools' argparse parsers, the prose sections live
 here as roff. scripts/gen_man.py writes the shipped man/*.1 from these;
 `modbus-scraper --man` (and the ctl/cli's --man) prints the same page."""
-from common.manpage import esc, options_section, page
+from common.render.manpage import esc, options_section, page
 
 DATE = '2026-11-05'
 VERSION = 'pv-suite 0.4.2'
@@ -49,7 +49,7 @@ and steers the running exporter: the live settings, an immediate poll, the
 config reload, the Modbus session restart, the graceful shutdown. With a
 control token configured the wire is HMAC-signed: every command and reply
 carries the full sha256 of its payload, keyed by the token
-(common/wiresec.py) \\(em a token-holding client verifies both directions,
+(common/wire/wiresec.py) \\(em a token-holding client verifies both directions,
 and over TCP the signed commands are mandatory. A second, read-only token
 (\\fB--control-ops-token\\fR) authenticates into the show/clear verbs only
 \\(em the ops shift against the admin key, both roles audited."""

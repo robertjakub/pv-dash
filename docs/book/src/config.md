@@ -1,7 +1,7 @@
 # Configuration — the set grammar
 
 Every tool's config file speaks the control grammar
-(`common/options.py`): every line a `set <name> <value>`, every comment a
+(`common/settings/options.py`): every line a `set <name> <value>`, every comment a
 `#` comment — a config file is a runnable script that pipes through the
 ctl clients unchanged, and the `show config` control command regenerates
 it from the running daemon (the secret knobs render as

@@ -172,7 +172,7 @@ def write_dump(path, settings, key=None):
 
 
 def open_dump(path, format_name, label, key=None):
-    """The shared dump read (common/dump.py and cache/lib/persist.py): the
+    """The shared dump read (common/settings/dump.py and cache/lib/persist.py): the
     stat + the group/world-writable refusal, the parse, the format check,
     and the unseal when the envelope is the version-2 sealed shape. Returns
     the state dict (sealed: the inner; plain: the file's). Raises ValueError

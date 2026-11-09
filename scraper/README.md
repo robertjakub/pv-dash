@@ -348,7 +348,7 @@ scraper/
     ├── control.py         # JSON-lines control server (the cache's shape, mirrored)
     ├── options.json       # the knob registry
     ├── options.py         # its loader: the Option rows, the control-grammar vocabulary
-    ├── man.py             # the generated man pages' prose (common/manpage.py renders)
+    ├── man.py             # the generated man pages' prose (common/render/manpage.py renders)
     └── version.py         # the suite version
 ```
 

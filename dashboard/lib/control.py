@@ -12,7 +12,7 @@ the unix socket relies on filesystem permissions plus the peer-cred
 shortcut (root, the daemon's own user or --control-trust-uids skips the
 handshake). With a token configured the wire is HMAC-signed: every command
 and reply carries the full sha256 HMAC of its payload, keyed by the token
-(common/wiresec.py) — a token-holding client verifies both directions; over
+(common/wire/wiresec.py) — a token-holding client verifies both directions; over
 TCP the signed commands are mandatory. A second, read-only token
 (--control-ops-token) authenticates into the show/clear verbs only — the
 ops shift against the admin key, both audited."""
@@ -20,14 +20,14 @@ import logging
 import os
 import time
 
-from common.human import secs
-from common.version import version_string
-from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.control import ControlServer as _ControlServer, num, numi
-from common.config import acl_table, acl_value_text, is_loopback_host, parse_control_target, parse_listen, \
+from common.render.human import secs
+from common.runtime.version import version_string
+from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.wire.control import ControlServer as _ControlServer, num, numi
+from common.settings.config import acl_table, acl_value_text, is_loopback_host, parse_control_target, parse_listen, \
     resolve_metrics_acl
-from common.cred import parse_trust_uids
-from common.dump import SECRET_REMOVED, dump_filter
+from common.wire.cred import parse_trust_uids
+from common.settings.dump import SECRET_REMOVED, dump_filter
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
     COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, KNOWN_VERBS
 from .statics import CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, LOG_LEVELS
@@ -51,7 +51,7 @@ class ControlServer(_ControlServer):
     configured beside the admin token: it authenticates into the show/clear
     verbs only — no set/unset, no request reload-config, no request reload,
     no request dump/restore, no shutdown
-    (common/wiresec.py's roles). `stopper` is the graceful-stop callback
+    (common/wire/wiresec.py's roles). `stopper` is the graceful-stop callback
     shared with the signal handlers; it runs after the shutdown reply left
     the wire."""
 
@@ -115,7 +115,7 @@ class ControlServer(_ControlServer):
         folded in (the dashboard's own endpoint runs on and off and its
         acl sets live — the rows render what runs, not what the startup
         flag said)."""
-        from common.config import acl_value_text
+        from common.settings.config import acl_value_text
         return dict(self.startup_values or {}, metrics_server=bool(self.metrics_srv),
                     metrics_acl=acl_value_text(self.metrics_acl))
 
@@ -425,7 +425,7 @@ class ControlServer(_ControlServer):
         'deny 0.0.0.0/0' + one allow line per network (the whitelist); a
         file gate renders its own rules — the gate desc as the '% ' line,
         the rule descs as aligned '# ' comments, the matcher 'any' spelled
-        0.0.0.0/0 (common/config.py acl_table, the family's one renderer)."""
+        0.0.0.0/0 (common/settings/config.py acl_table, the family's one renderer)."""
         return 'ok metrics-acl-table\n%s' % '\n'.join(acl_table(self.metrics_acl))
 
     def inspect(self):

@@ -20,7 +20,7 @@ import tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V = os.path.join(REPO, 'scripts', 'audit_verify.py')
 sys.path.insert(0, REPO)
-from common.audit import AuditLog   # noqa: E402
+from common.runtime.audit import AuditLog   # noqa: E402
 
 FAILURES = []
 

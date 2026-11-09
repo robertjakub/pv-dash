@@ -459,7 +459,7 @@ Pacing and caps, not rate limiting: one serialized upstream connection;
 `read-delay` sleeps between consecutive device reads in a healthy cycle
 (after a failure the sweep runs unpaced); pass-through reads wait for a
 free slot between poll reads; `max_clients` / per-IP caps gate the
-listeners (`common/connlimit.py`); the connect ACL (`acl/connect`,
+listeners (`common/serve/connlimit.py`); the connect ACL (`acl/connect`,
 default any, `none` refuses all — the inline grammar or the standalone
 ip-prefix acl file via `file:<path>`; see docs/ACL.md) filters before
 auth; audit `REQUESTS`
@@ -493,7 +493,7 @@ Validation: `parse_auth_type` accepts the leg's schemes — `suite`
 everywhere, the cache's upstream leg also `waveshare` — or `none`/empty
 for none; anything else exits with `use 'suite', or none/empty for no
 auth` (the upstream leg names both: `use 'suite' / 'waveshare', …`)
-(`common/config.py`). `check_auth_key` enforces the scheme's floor:
+(`common/settings/config.py`). `check_auth_key` enforces the scheme's floor:
 ≥ 16 characters for `suite`, non-empty ASCII for `waveshare` (the
 password travels as raw bytes), and a key set while no scheme is chosen
 yet is dormant material — the floor bites when the scheme names it.

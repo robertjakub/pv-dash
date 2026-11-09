@@ -7,7 +7,7 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 The audit-family wave: the cache is the audit family's golden master and
 stays it — the rotation bounds (`audit-files` 1..100, `audit-max-mb`
-0..1048576) now live once in `common/audit.py` with the startup
+0..1048576) now live once in `common/runtime/audit.py` with the startup
 fail-block reading them (was the hardcoded 0/1), and the Modbus accept
 ladder rides the shared `serve_modbus` (common/modbus/server.py) — the
 proxy keeps only its face hooks (the forwarding dispatch, the in-band
@@ -30,7 +30,7 @@ STATUS, SEE ALSO) — the posture prose carves out of DESCRIPTION/CONTROL
 into a new SECURITY (the F5 refusal, the signed wire, the ops token,
 the secret rule, the write gate's audits, the IP gates, the dump seal,
 the audit trail), the ctl page gains its ENVIRONMENT twins, the EXIT
-STATUS row names the failed-bind rc 1, and `common/manpage.py`'s
+STATUS row names the failed-bind rc 1, and `common/render/manpage.py`'s
 LADDERS gate (`page(kind=...)`) refuses a page that drifts. The ctl
 EXAMPLES' `printf` pipeline renders its `\n` for the first time.
 
@@ -59,7 +59,7 @@ schemas not installed).
 
 The control-listener family wave: the cache's listener tier — the live
 `control/port` rebind family, the socket-mode discipline, the live
-control knobs — lifts into `common/control.py` as the family's ONE
+control knobs — lifts into `common/wire/control.py` as the family's ONE
 implementation (the golden master gives the shape away; the private copy
 sheds), the F5 refusal parameterizes as `TOKENLESS_TCP` (the fake opts
 out — F11), and the ops-verbs live name re-spells to the family's
@@ -271,7 +271,7 @@ The seal wave: the state dumps **encrypt under `dump/key`** when it is set
 hidden: the key cannot drift between the writer and the re-exec'd reader):
 the cached words and the settings ride a version-2 envelope's `box` (an
 HMAC-SHA256 counter-mode keystream + the mac — the shared seal in
-common/dump.py, stdlib only), a restore fails closed on a wrong or missing
+common/settings/dump.py, stdlib only), a restore fails closed on a wrong or missing
 key — and on an unsealed dump under a configured key; the reload's state
 file rides the shared writer/reader and seals under the same key.
 
@@ -359,7 +359,7 @@ word help unchanged).
 
 The upstream-knob wave: the inverter endpoint is the one
 `--upstream HOST:PORT` knob now (`:5502` = 127.0.0.1:5502, the shared
-`common/config.py` `parse_upstream()`) — `--host`/`--port` and their
+`common/settings/config.py` `parse_upstream()`) — `--host`/`--port` and their
 `HOST`/`PORT` env twins retire (the flag, the env, the config key
 `set upstream`, the NixOS option `upstream`, the docker CMD, the bundled
 conf sample); the resolved config keeps the derived `host`/`port` keys,
@@ -381,7 +381,7 @@ twin, the section, the live/secret markers and the descriptions) moved to
 rows and keeps the Python-side wiring (the control-grammar verb list, the
 config-key renames, the log-level choices read from `static.json`) — and
 `--help`/the man pages render from the registry now
-(`common/options.py` `build_parser()`): the knob description lives exactly
+(`common/settings/options.py` `build_parser()`): the knob description lives exactly
 once. The flags in `--help` order by the registry's sections; the texts,
 types and defaults are unchanged; `scripts/check_options.py` gates as
 before and the package ships the JSON next to the loader.
@@ -399,7 +399,7 @@ The knob-dictionary wave: `show knobs` (the `help knobs` alias too) prints
 the dictionary of all knobs — every registry knob under its section with
 its flag, its env twin(s), its home section, the command that changes it
 live (or the restart note for the startup-only ones) and the secret marker
-on the tokens (`common/options.py` `knob_dictionary()`; the values stay in
+on the tokens (`common/settings/options.py` `knob_dictionary()`; the values stay in
 `show config`, the command mapping in `help config`). The cache_ctl/cli
 TAB completion and `show?` word-help offer the new `show` argument.
 
@@ -408,7 +408,7 @@ set-grammar script now (every line a `set <name> <value>`, `#` comments
 stay comments, the file pipes through cache_ctl unchanged), `show config`
 regenerates it from the running daemon (the secrets hidden), `help config`
 maps every knob to its control command, and the option registry
-(lib/options.py on common/options.py) files every knob under the shared
+(lib/options.py on common/settings/options.py) files every knob under the shared
 sections — scripts/check_options.py gates the flags/env/nix/README
 surfaces against it. The RBAC verb set is live too: `--control-ops-verbs`
 (default show,clear, validated at start; the wire spells it
@@ -435,13 +435,13 @@ token, both together the mutual-exclusion error).
 
 The **signed wire**: with a control token configured every command and
 reply on the control socket carries the full sha256 HMAC of its payload
-keyed by the token (`common/wiresec.py`) — over TCP the signed commands
+keyed by the token (`common/wire/wiresec.py`) — over TCP the signed commands
 are mandatory (an unsigned or bad-mac frame is refused), on the unix
 socket the mac is verify-if-present (the peer-cred trusted peers keep
 speaking without the secret); the cache_ctl/cache_cli clients sign and
 verify both directions, and the audit trail's COMMAND entries carry the
 frame's mac (`wire=h…`). The man pages are generated now
-(`common/manpage.py`: the OPTIONS section renders from the parser, the
+(`common/render/manpage.py`: the OPTIONS section renders from the parser, the
 prose lives in lib/man.py, `--man` prints the page, scripts/gen_man.py
 regenerates the shipped files) and the NixOS module's sandbox got the full
 hardening pass (tests/hardening.nix scores it with systemd-analyze

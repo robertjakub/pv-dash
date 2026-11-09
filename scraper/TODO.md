@@ -9,7 +9,7 @@ The audit-family wave (the bounds, the daily knob, the env twins, the
 shared accept ladder): the audit rotation bounds are family-wide —
 `audit-files` (min 1, max 100) and `audit-max-mb` (min 0, max 1048576)
 carry bounds in all four registries with the constants living once in
-`common/audit.py` (`AuditLog` validates, `check_options` cross-checks);
+`common/runtime/audit.py` (`AuditLog` validates, `check_options` cross-checks);
 `set audit rotate files 0` refuses identically everywhere (the scraper
 accepted it before). The `audit-daily` knob is one shape: this tool gains
 the row (`--audit-daily`/`$AUDIT_DAILY`, live `audit/rotate/daily` — the
@@ -54,7 +54,7 @@ The man-ladder wave: the page runs the family's one daemon ladder — it
 gains ENVIRONMENT (the bare-twin catch-all beside the clients' CTL) and
 EXIT STATUS (the unified three-code block, the failed-bind rc 1 named),
 the ctl page gains EXAMPLES / ENVIRONMENT / EXIT STATUS, the cli page
-EXIT STATUS; `common/manpage.py`'s LADDERS gate (`page(kind=...)`)
+EXIT STATUS; `common/render/manpage.py`'s LADDERS gate (`page(kind=...)`)
 refuses a page that drifts. The ctl EXAMPLES are new and their
 `printf` pipeline renders its `\n` for the first time.
 
@@ -83,7 +83,7 @@ with the wire story pointed at the family docs.
 
 The control-listener family wave: the scraper's private copy of the
 listener tier (the live rebind family its control-port wave carried)
-folds back into `common/control.py` — ONE implementation for the four
+folds back into `common/wire/control.py` — ONE implementation for the four
 tools, the cache's golden master lifted; nothing changes on the wire.
 
 The show-status removal: **`show status` is gone** (nothing replaces it) —
@@ -109,7 +109,7 @@ trail's `ACL-FILE` event, the `set` reply's suffix), `show metrics acl
 table` renders the chain (the three fixed chains inline, a file gate's
 own rules behind the `% ` desc header) and `set metrics acl table`
 answers the pointer to the report. The gate machinery is the family's
-one implementation (common/config.py's IP-gate half, common/connlimit.py's
+one implementation (common/settings/config.py's IP-gate half, common/serve/connlimit.py's
 `acl_allows`/`acl_refused` accept hooks — the cache migrated onto both
 the same day); the shipped example is `examples/acl-ip-prefix.json`, its
 JSON Schema `schema/acl-ip-prefix.schema.json` (`scripts/lint_acl.py`'s
@@ -203,7 +203,7 @@ The seal wave: the state dumps and the reload state file **encrypt under
 startup-only, restart-marked, hidden: the key cannot drift between the
 writer and the re-exec'd reader): the whole state rides a version-2
 envelope's `box` (an HMAC-SHA256 counter-mode keystream + the mac — the
-shared seal in common/dump.py, stdlib only), a restore fails closed on a
+shared seal in common/settings/dump.py, stdlib only), a restore fails closed on a
 wrong or missing key — and on an unsealed dump under a configured key.
 
 The secret-placeholder wave: the state dump and the reload state file
@@ -224,7 +224,7 @@ The state-machinery wave: `dump_settings`/`apply_dump_settings` land on
 the control server — the **state dump** (`dump/path`, `dump/restore-on-start`
 lives + the `--dump-path`/`--restore-on-start` flags/env/NixOS options;
 `request dump`/`request restore` write and re-apply the live overrides as
-one 0600 integrity-hashed JSON — common/dump.py; the graceful shutdown
+one 0600 integrity-hashed JSON — common/settings/dump.py; the graceful shutdown
 dumps too), the **whole-daemon `reload`** (the overrides save to
 `<config>.reload`, the process re-execs, the fresh daemon re-applies them
 once and consumes the file — the ops role may not reload), and the
@@ -248,7 +248,7 @@ The upstream-knob + directory wave: the subproject is `scraper/` now (was
 `scrape/` — the flake, the docker context, the book include and the
 cross-links follow; the suites keep their `tests/scrape-*.py` names), the
 inverter endpoint is the one `--upstream HOST:PORT` knob (`:5502` =
-127.0.0.1:5502, the shared `common/config.py` `parse_upstream()`) —
+127.0.0.1:5502, the shared `common/settings/config.py` `parse_upstream()`) —
 `--host`/`--modbus-port` and their `HOST`/`MODBUS_PORT` env twins retire —
 and `--unit` is `--modbus-unit` (env `MODBUS_UNIT`, config `set
 modbus-unit`, the NixOS option `modbusUnit`). The resolved config keeps
@@ -269,7 +269,7 @@ twin, the section, the live/secret markers and the descriptions) moved to
 rows and keeps the Python-side wiring (the control-grammar verb list, the
 audit defaults and the log-level choices read from `static.json`) — and
 `--help`/the man pages render from the registry now
-(`common/options.py` `build_parser()`): the knob description lives exactly
+(`common/settings/options.py` `build_parser()`): the knob description lives exactly
 once. The flags in `--help` order by the registry's sections; the texts,
 types and defaults are unchanged; `scripts/check_options.py` gates as
 before and the package ships the JSON next to the loader.
@@ -298,7 +298,7 @@ The knob-dictionary wave: `show knobs` (the `help knobs` alias too) prints
 the dictionary of all knobs — every registry knob under its section with
 its flag, its env twin(s), its home section, the command that changes it
 live (or the restart note for the startup-only ones) and the secret marker
-on the tokens (`common/options.py` `knob_dictionary()`; the values stay in
+on the tokens (`common/settings/options.py` `knob_dictionary()`; the values stay in
 `show config`, the command mapping in `help config`). The scraper_ctl/cli
 TAB completion and `show?` word-help offer the new `show` argument.
 
@@ -344,7 +344,7 @@ now`, `request reload` (the SIGHUP path), the Modbus session `restart`,
 `show status`/`connections`/`settings`, `inspect`, the SCR audit trail
 (the commands carry their wire macs) — and the **signed wire**: with a
 control token configured every command and reply carries the full sha256
-HMAC of its payload keyed by the token (`common/wiresec.py`), mandatory
+HMAC of its payload keyed by the token (`common/wire/wiresec.py`), mandatory
 over TCP, verified end-to-end by the token-holding clients.
 
 

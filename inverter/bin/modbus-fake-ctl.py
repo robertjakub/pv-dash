@@ -21,7 +21,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.ctl import run_ctl
+from common.wire.ctl import run_ctl
 from lib.man import ctl_page
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S, DEFAULT_CONTROL_SOCKET
 

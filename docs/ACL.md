@@ -43,7 +43,7 @@ token shape beyond the loopback (the page's F21 closed it — rev. 21).
 | tool | listener | the default bind | the stack at it |
 |---|---|---|---|
 | cache | the Modbus mirror | `127.0.0.1:15502` | `acl/connect` (accept, ahead of the caps) → the caps → the suite auth; the write path then adds `--allow-write` + `acl/write` + `write-registers` |
-| all four | control | unix \| TCP `127.0.0.1` | ONE listener for the family (`common/control.py`'s tier, lifted from the cache): the TCP bind refuses without the admin token (F5 — the fake exempt, F11's test-tool posture); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660`; the target rebinds live (`set control port` — bind-first, the sessions keep serving), the tokens, the ops policy, the trust uids and the socket-group all set live |
+| all four | control | unix \| TCP `127.0.0.1` | ONE listener for the family (`common/wire/control.py`'s tier, lifted from the cache): the TCP bind refuses without the admin token (F5 — the fake exempt, F11's test-tool posture); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660`; the target rebinds live (`set control port` — bind-first, the sessions keep serving), the tokens, the ops policy, the trust uids and the socket-group all set live |
 | all four | /metrics | the scraper always on at `127.0.0.1:9350`; the cache, fake and dashboard off at `9351`/`9352`/`9353` | ONE stack for the family: the token mandatory beyond loopback (F13's refusal) → `metrics/acl` (the inline grammar or `file:<path>`, checked at accept — a client off the ACL is closed without a reply) → the caps |
 | fake | the Modbus listener | `:5502` | `connect-acl` (the system grammar, no `file:`) → the caps → the suite auth; `--allow-write` |
 | dashboard | the page + the config proxy | `127.0.0.1:8080` | the bearer token (`auth/token`, F21 closed — the `?auth=` bootstrap sets the session cookie, the header for scripts; a token-less non-loopback bind refuses to start) — GET-only, the realpath guard, the cap gate |
@@ -75,7 +75,7 @@ with the rules' key when spelled: a typeless register gate reads as
 `write-registers` (the legacy shape — every existing profile and file keeps
 working), a typeless prefix gate refuses (say the type), and a gate whose
 rules mix `range` and `prefix` refuses (one grammar per gate). One loader
-validates the object — `_write_gate_object` in `common/config.py`, one
+validates the object — `_write_gate_object` in `common/settings/config.py`, one
 gate validator for the family — and each consumer pins the kind it takes
 (`allow=('write-registers',)` or `allow=('ip-prefix',)`): a file of the
 wrong kind is a clean, named refusal, not a mis-compiled gate.
@@ -235,9 +235,9 @@ The control socket is NOT this gate — see below.
 ## the control plane — loopback binds, no IP gate
 
 Every control TCP bind is hardcoded `127.0.0.1`
-(`common/control.py`'s `_open_sock` — the one listener tier all four
+(`common/wire/control.py`'s `_open_sock` — the one listener tier all four
 tools ride, live-rebindable via `set control/port`, the target parsers
-unified in `common/config.py`; the unix sockets are peer-cred), so
+unified in `common/settings/config.py`; the unix sockets are peer-cred), so
 no control surface carries an IP gate — an IP filter on loopback decides
 on the one address that always matches. The plane's admission story is
 the tokens + the signed wire + the RBAC roles (docs/AUDIT.md, F5). An

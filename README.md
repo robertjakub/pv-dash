@@ -17,7 +17,7 @@ the Deye hybrids — packaged together as one Nix flake:
 | [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; a linter and a formatter keep them in shape |
 | [`examples/`](examples/README.md) | — | The shared sample file the tools' `file:` acl gates point at — `acl-ip-prefix.json`, the ip-prefix connect policy every tool reads ([docs/ACL.md](docs/ACL.md)) |
 | [`schema/`](schema/README.md) | — | The shared JSON Schemas (draft 2020-12) — `acl-ip-prefix.schema.json`, the standalone acl file's schema (the loader stays the strict word) |
-| [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`): the option registry (one knob, one source), the signed wire + RBAC, the audit trail, the config plumbing, the Modbus wire core, the man-page builder |
+| [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`), six functional subpackages: `render/` (texts, man pages), `runtime/` (daemon ladder, audit, version), `settings/` (the option registry — one knob, one source — config plumbing, dumps), `wire/` (the signed wire + RBAC, both ctl/cli ends), `serve/` (the gates + metrics skeleton), `modbus/` (the wire core) |
 
 The tools speak one vocabulary: the fake inverter serves from a profile, the
 cache fetches its selection from it, the scraper binds its metrics to it —
@@ -53,7 +53,7 @@ pv-suite/
 ├── cache/        # modbus-cache proxy (package + NixOS module)
 ├── inverter/     # fake inverter + control clients (package, no service module)
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))
-├── common/       # the shared Python package (version, audit, config, wire core; [docs](common/README.md))
+├── common/       # the shared Python package — render/ runtime/ settings/ wire/ serve/ modbus/ ([docs](common/README.md))
 ├── tests/        # the test suites, one or more per Modbus tool
 ├── scripts/      # the registry gates + editors (check/lint/gen/edit_options, set_group/set_live), gen_man.py, gen_sbom.py, release.py, audit_verify.py
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:

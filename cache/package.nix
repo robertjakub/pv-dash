@@ -27,7 +27,17 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 lib/*.py lib/static.json lib/options.json $out/share/modbus-cache/lib/
     install -dm755 $out/share/modbus-cache/common
     install -m644 ${../common}/*.py $out/share/modbus-cache/common/
-    install -m644 ${../common}/texts.json $out/share/modbus-cache/common/
+    install -dm755 $out/share/modbus-cache/common/render
+    install -m644 ${../common}/render/*.py $out/share/modbus-cache/common/render/
+    install -dm755 $out/share/modbus-cache/common/runtime
+    install -m644 ${../common}/runtime/*.py $out/share/modbus-cache/common/runtime/
+    install -dm755 $out/share/modbus-cache/common/settings
+    install -m644 ${../common}/settings/*.py $out/share/modbus-cache/common/settings/
+    install -dm755 $out/share/modbus-cache/common/serve
+    install -m644 ${../common}/serve/*.py $out/share/modbus-cache/common/serve/
+    install -dm755 $out/share/modbus-cache/common/wire
+    install -m644 ${../common}/wire/*.py $out/share/modbus-cache/common/wire/
+    install -m644 ${../common}/render/texts.json $out/share/modbus-cache/common/render/
     install -dm755 $out/share/modbus-cache/common/modbus
     install -m644 ${../common}/modbus/*.py $out/share/modbus-cache/common/modbus/
     install -Dm644 examples/modbus_cache.conf $out/share/modbus-cache/modbus_cache.conf

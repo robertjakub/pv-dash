@@ -9,7 +9,8 @@ VERSION = '0.4.2'
 def version_string():
     v = VERSION
     try:
-        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # .../common -> the repo root
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.dirname(os.path.dirname(here))   # .../common/runtime -> the repo root
         rev = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=root,
                              capture_output=True, text=True, timeout=2).stdout.strip()
         if rev:

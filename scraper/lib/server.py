@@ -5,8 +5,8 @@ import logging
 import sys
 from http.server import BaseHTTPRequestHandler
 
-from common.config import acl_admits
-from common.connlimit import GatedHTTPServer, rate_limit_503
+from common.settings.config import acl_admits
+from common.serve.connlimit import GatedHTTPServer, rate_limit_503
 
 logger = logging.getLogger('scraper')
 

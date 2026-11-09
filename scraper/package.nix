@@ -27,7 +27,17 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 lib/*.py lib/static.json lib/metrics.json lib/options.json $out/share/modbus-scraper/lib/
     install -dm755 $out/share/modbus-scraper/common
     install -m644 ${../common}/*.py $out/share/modbus-scraper/common/
-    install -m644 ${../common}/texts.json $out/share/modbus-scraper/common/
+    install -dm755 $out/share/modbus-scraper/common/render
+    install -m644 ${../common}/render/*.py $out/share/modbus-scraper/common/render/
+    install -dm755 $out/share/modbus-scraper/common/runtime
+    install -m644 ${../common}/runtime/*.py $out/share/modbus-scraper/common/runtime/
+    install -dm755 $out/share/modbus-scraper/common/settings
+    install -m644 ${../common}/settings/*.py $out/share/modbus-scraper/common/settings/
+    install -dm755 $out/share/modbus-scraper/common/serve
+    install -m644 ${../common}/serve/*.py $out/share/modbus-scraper/common/serve/
+    install -dm755 $out/share/modbus-scraper/common/wire
+    install -m644 ${../common}/wire/*.py $out/share/modbus-scraper/common/wire/
+    install -m644 ${../common}/render/texts.json $out/share/modbus-scraper/common/render/
     install -dm755 $out/share/modbus-scraper/common/modbus
     install -m644 ${../common}/modbus/*.py $out/share/modbus-scraper/common/modbus/
     install -Dm644 examples/metrics.json $out/share/modbus-scraper/metrics.json

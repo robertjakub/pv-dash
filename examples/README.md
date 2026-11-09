@@ -26,6 +26,6 @@ python3 scripts/lint_acl.py --check                       # lints the whole dir 
 python3 scripts/edit_acl.py examples/acl-ip-prefix.json   # the terminal editor
 ```
 
-The loader (`common/config.py`'s `_write_gate_object` — one gate
+The loader (`common/settings/config.py`'s `_write_gate_object` — one gate
 validator for the family) stays the strict word;
-[schema/](schema/README.md) carries the JSON Schema.
+[shared/schema/](../schema/README.md) carries the JSON Schema.

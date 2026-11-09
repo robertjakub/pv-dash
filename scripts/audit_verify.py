@@ -24,7 +24,7 @@ import sys
 here = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.dirname(here))   # the repo root — the common/ package
 
-from common.audit import HASH_LEN, entry_body, entry_hash, parse_entry_hash, default_path
+from common.runtime.audit import HASH_LEN, entry_body, entry_hash, parse_entry_hash, default_path
 
 DEFAULT_TRAILS = ('modbus-cache', 'modbus-scraper', 'fake-inverter')
 

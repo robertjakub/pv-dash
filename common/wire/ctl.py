@@ -11,10 +11,10 @@ import os
 import socket
 import sys
 
-from common.audit import AuditLog
-from common.config import parse_secret, resolve_target
-from common.texts import T
-from common.wiresec import sign_request, verify_reply
+from common.runtime.audit import AuditLog
+from common.settings.config import parse_secret, resolve_target
+from common.render.texts import T
+from common.wire.wiresec import sign_request, verify_reply
 
 
 def run_ctl(daemon, bin_name, app, self_note, command_help,

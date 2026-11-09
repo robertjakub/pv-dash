@@ -6,7 +6,7 @@ The precedence is the family's: CLI flags > the env > the config
 script > the shipped defaults (lib/static.json). The env twins are the
 bare upper-snake names (PORT, BIND, PROM_URL, CONFIG_JS, BATTERY) the
 docker image documents. The config file speaks the control grammar
-(common/options.py):
+(common/settings/options.py):
 every line a `set <name> <value>`, every comment a `#` comment — the ini
 format is gone (the breaking wave in docs/TODO.md).
 """
@@ -14,8 +14,8 @@ import logging
 import os
 
 from .options import OPTIONS
-from common.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
-from common.config import check_control_tokens, check_token_chars, load_config_script, parse_listen, parse_secret, \
+from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
+from common.settings.config import check_control_tokens, check_token_chars, load_config_script, parse_listen, parse_secret, \
     resolve_metrics_acl, Resolver, str_to_bool
 from .statics import DEFAULTS, DEFAULT_LISTEN, DEFAULT_LISTEN_PORT, LOG_LEVELS
 

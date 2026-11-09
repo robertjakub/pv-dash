@@ -47,7 +47,7 @@ trust of their own.
 |---|---|---|---|---|---|
 | Modbus TCP listener | `--listen`, default `127.0.0.1:15502`; `acl/connect` on top | n/a (outbound only) | `--listen`, default `127.0.0.1:5502` (Docker `0.0.0.0:5502`); the connect-acl (inline grammar only) | n/a | none (protocol-inherent, F1) |
 | HTTP surface | `/metrics`: `--metrics-server` (live-settable), off; `--metrics-listen` default `127.0.0.1:9351`; `metrics/acl` at accept | the exporter: `--listen` default `127.0.0.1:9350`, two GET routes (`/`, `/metrics`), `Cache-Control: no-store`, `metrics/acl` at accept | `/metrics`: `--metrics-server`, off, default `127.0.0.1:9352`; `metrics/acl` at accept | page + proxy: `--listen` default `127.0.0.1:8080`, GET-only, the realpath-guarded static tree; own `/metrics` default `127.0.0.1:9353` | bearer token (`hmac.compare_digest`) mandatory beyond loopback on every HTTP surface (F13/F21); the loopback bind serves tokenless; `metrics/acl` sits at accept ahead of the caps — never instead of the token |
-| control server (JSON lines) | unix `/tmp/modbus-cache-<port>.socket`, `0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix `/tmp/modbus-scraper-<port>.socket`, same | unix socket, same; the TCP control exempt (F11 — a tokenless rebind succeeds live) | unix `/tmp/dashboard-<port>.socket`, same; **refuses tokenless TCP** | ONE listener tier for the family (`common/control.py`): token on TCP (refused without — at start AND on the live rebind), peer-cred on unix (root, the daemon's own user, `--control-trust-uids`), the signed wire wherever a token is held, the live `control/port` rebind (bind-first, the failed bind rolls back, the sessions keep serving) |
+| control server (JSON lines) | unix `/tmp/modbus-cache-<port>.socket`, `0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix `/tmp/modbus-scraper-<port>.socket`, same | unix socket, same; the TCP control exempt (F11 — a tokenless rebind succeeds live) | unix `/tmp/dashboard-<port>.socket`, same; **refuses tokenless TCP** | ONE listener tier for the family (`common/wire/control.py`): token on TCP (refused without — at start AND on the live rebind), peer-cred on unix (root, the daemon's own user, `--control-trust-uids`), the signed wire wherever a token is held, the live `control/port` rebind (bind-first, the failed bind rolls back, the sessions keep serving) |
 | state dump | `--dump-path`: the setting overrides (plus the cached words on `with-cache`) as one atomic JSON | n/a | n/a | n/a | created `0600` explicitly + a sha256 integrity hash, fail-closed restore (F18); sealed under `dump/key` when set (rev. 11) |
 | token files | every secret knob takes `file:<path>` | same | same | same | owner-only (0600) enforced at the shared loader (F12); the bare `-file` siblings removed rev. 13 |
 | upstream connection | outbound to the inverter/SDongle | outbound poll (the device or the cache), every 10 s by default | n/a (it *is* the device) | outbound HTTP to Prometheus (`--upstream`, default `http://localhost:9090`) | none (protocol-inherent) |
@@ -76,14 +76,14 @@ the intended demo feature, gated by control-server access only.
   (`proxy.py:287,366-395`); control TCP requires the token and a token-less
   TCP control refuses to start (F5) on every tool that serves one (the fake
   exempt on purpose, F11) — the ONE guard the family's live rebinds call
-  (`common/control.py` `refuse_tokenless_rebind`/`refuse_token_drop`); the
+  (`common/wire/control.py` `refuse_tokenless_rebind`/`refuse_token_drop`); the
   peer-cred path authenticates kernel-vouched peers without the secret
-  (`common/control.py:308`, `common/cred.py`); wherever a token is held the
-  wire is signed both directions (`common/wiresec.py`, constant-time
+  (`common/wire/control.py:308`, `common/wire/cred.py`); wherever a token is held the
+  wire is signed both directions (`common/wire/wiresec.py`, constant-time
   `hmac.compare_digest`); the read-only ops role scopes its sessions to the
   show/clear verbs, gated once in `role_allows`, audited
   `role=ops`/`role=admin` (F22); `metrics/acl` at accept ahead of the caps
-  (`common/connlimit.py` hooks, `common/config.py` `acl_admits`); all
+  (`common/serve/connlimit.py` hooks, `common/settings/config.py` `acl_admits`); all
   non-Modbus listeners default 127.0.0.1 and speak the F13 token shape
   beyond it.
 - **Input validation** — MBAP length capped in every reader; read counts
@@ -98,7 +98,7 @@ the intended demo feature, gated by control-server access only.
   would render into the world-readable store; all secrets are startup-only
   (rev. 24).
 - **Logging / audit** — append-only, flushed, thread-safe, size/daily
-  rotated (`common/audit.py` — one writer family-wide); writes, refusals,
+  rotated (`common/runtime/audit.py` — one writer family-wide); writes, refusals,
   auth-fails, control commands and lifecycle events recorded; control
   characters folded at the writer so one event is one physical line (F2);
   falls back to stdout (journald).

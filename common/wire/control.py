@@ -20,16 +20,16 @@ import sys
 import threading
 import time
 
-from common import dump as state
-from common.audit import AuditLog
-from common.cred import peer_uid
-from common.dump import SECRET_REMOVED
-from common.options import config_value, control_command, describe_command_node, describe_node, \
+from common.settings import dump as state
+from common.runtime.audit import AuditLog
+from common.wire.cred import peer_uid
+from common.settings.dump import SECRET_REMOVED
+from common.settings.options import config_value, control_command, describe_command_node, describe_node, \
     describe_root, grouped_rows, knob_dictionary, make_describe, match_setting_path, \
     render_config_script
-from common.texts import T
-from common.version import version_string
-from common.wiresec import ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, proof_tag, role_allows, \
+from common.render.texts import T
+from common.runtime.version import version_string
+from common.wire.wiresec import ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, proof_tag, role_allows, \
     role_tag, sanitize_command, sign_reply, verify_request_mac
 
 
@@ -879,7 +879,7 @@ class ControlServer:
     def rebuild_audit(self, prm, prefix, app):
         """Build the audit trail from its params dict (the live
         path/rotation changes rebuild from it): the fresh writer re-chains
-        from the file's own tail (common/audit.py tail_hash), so the chain
+        from the file's own tail (common/runtime/audit.py tail_hash), so the chain
         stays verifiable across the swap. The old trail is NOT closed — a
         session still holding it writes its last commands there, and an
         in-flight writer must never hit a closed file. Returns the writer

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Configuration for modbus-scraper: the set-grammar config script, the env
 layer and the CLI flags (stdlib only). The config file speaks the control
-grammar (common/options.py): every line a `set <name> <value>`, every
+grammar (common/settings/options.py): every line a `set <name> <value>`, every
 comment a `#` comment — the ini format is gone (the breaking wave in
 docs/TODO.md)."""
 import json
@@ -10,8 +10,8 @@ import math
 import re
 
 from .options import OPTIONS
-from common.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
-from common.config import (check_auth_key, check_token_chars, check_control_tokens, default_profile_path,
+from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
+from common.settings.config import (check_auth_key, check_token_chars, check_control_tokens, default_profile_path,
                            is_loopback_host, load_config_script, parse_acl, parse_auth_type, parse_listen,
                            parse_secret, parse_upstream, resolve_metrics_acl, resolve_profile_file, Resolver,
                            str_to_bool)

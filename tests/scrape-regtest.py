@@ -2237,7 +2237,7 @@ try:
           repr(r.stdout[:60]) + repr(r.stderr[-80:]))
 
     # 7b. the audit family's one shape on the SCR: the bounds, the daily knob,
-    #     the write-back, the env twins (the bounds' one home: common/audit.py)
+    #     the write-back, the env twins (the bounds' one home: common/runtime/audit.py)
     def sctl(*words, port=15597):
         return subprocess.run([sys.executable, CTLB, '--control-port', str(port), '--control-token', STOK]
                               + list(words), capture_output=True, text=True, timeout=15).stdout.strip()

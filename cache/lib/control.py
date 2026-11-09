@@ -16,17 +16,17 @@ import os
 import socket
 import time
 
-from common.version import version_string
-from common.config import auth_key_floor_error, default_profile_path, is_loopback_host, parse_auth_type, parse_control_target, \
+from common.runtime.version import version_string
+from common.settings.config import auth_key_floor_error, default_profile_path, is_loopback_host, parse_auth_type, parse_control_target, \
     parse_upstream, resolve_profile_file
-from common.dump import SECRET_REMOVED, dump_filter
+from common.settings.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
-from common.cred import parse_trust_uids
-from common.human import secs
-from common.logutil import UtcFormatter
-from common.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.control import ControlServer as _ControlServer, num, numi
-from common.options import control_command, grouped_rows
+from common.wire.cred import parse_trust_uids
+from common.render.human import secs
+from common.runtime.logutil import UtcFormatter
+from common.wire.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.wire.control import ControlServer as _ControlServer, num, numi
+from common.settings.options import control_command, grouped_rows
 from .statics import CONTROL_LINE_CAP, DEFAULT_LISTEN_PORT, LOG_LEVELS
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
     KNOWN_VERBS, CFG_KEYS, CFG_FORMATTERS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
@@ -54,7 +54,7 @@ class ControlServer(_ControlServer):
     filesystem permissions. A second, read-only token (ops_token) may be
     configured beside the admin token: it authenticates into the show/clear
     verbs only — no set/unset, no request dump/restore, no reload, no
-    restart, no shutdown (common/wiresec.py's roles). `stopper` is the graceful-stop
+    restart, no shutdown (common/wire/wiresec.py's roles). `stopper` is the graceful-stop
     callback shared with the signal handlers; it runs after the shutdown
     reply left the wire."""
 

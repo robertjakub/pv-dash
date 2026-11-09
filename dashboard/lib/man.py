@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""The dashboard's man pages, generated (common/manpage.py): the OPTIONS
+"""The dashboard's man pages, generated (common/render/manpage.py): the OPTIONS
 sections render from the tools' argparse parsers, the prose sections live
 here as roff. scripts/gen_man.py writes the shipped man/*.1 from these;
 `dashboard --man` (and the ctl/cli's --man) prints the same page."""
-from common.manpage import page, options_section
+from common.render.manpage import page, options_section
 
 DATE = '2026-11-05'
 VERSION = 'pv-suite 0.4.2'
@@ -34,7 +34,7 @@ The JSON-lines control server (\\fB--control-port\\fR, talked to with
 the running server: the live settings (the caps, the log surface), the
 config reload, the graceful shutdown. With a control
 token configured the wire is HMAC-signed: every command and reply carries
-the full sha256 of its payload, keyed by the token (common/wiresec.py)
+the full sha256 of its payload, keyed by the token (common/wire/wiresec.py)
 \\(em a token-holding client verifies both directions, and over TCP the
 signed commands are mandatory. The command string folds to the grammar's
 printable 8-bit before the server decides on it (NFKD, then the

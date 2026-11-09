@@ -27,7 +27,17 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 lib/*.py lib/static.json lib/options.json $out/share/dashboard/lib/
     install -dm755 $out/share/dashboard/common
     install -m644 ${../common}/*.py $out/share/dashboard/common/
-    install -m644 ${../common}/texts.json $out/share/dashboard/common/
+    install -dm755 $out/share/dashboard/common/render
+    install -m644 ${../common}/render/*.py $out/share/dashboard/common/render/
+    install -dm755 $out/share/dashboard/common/runtime
+    install -m644 ${../common}/runtime/*.py $out/share/dashboard/common/runtime/
+    install -dm755 $out/share/dashboard/common/settings
+    install -m644 ${../common}/settings/*.py $out/share/dashboard/common/settings/
+    install -dm755 $out/share/dashboard/common/serve
+    install -m644 ${../common}/serve/*.py $out/share/dashboard/common/serve/
+    install -dm755 $out/share/dashboard/common/wire
+    install -m644 ${../common}/wire/*.py $out/share/dashboard/common/wire/
+    install -m644 ${../common}/render/texts.json $out/share/dashboard/common/render/
     install -dm755 $out/share/dashboard/common/modbus
     install -m644 ${../common}/modbus/*.py $out/share/dashboard/common/modbus/
     cp -r static $out/share/dashboard/static

@@ -13,8 +13,8 @@ import logging
 import threading
 import time
 
-from common.connlimit import GatedHTTPServer
-from common.texts import T
+from common.serve.connlimit import GatedHTTPServer
+from common.render.texts import T
 
 METRICS_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
                b'Content-Type: text/plain; charset=utf-8\r\n'
@@ -84,7 +84,7 @@ class MetricsServer:
     def acl_allows(self, ip):
         """The accept-time ACL hook, ahead of the caps: the default admits
         every peer — the tool subclass with an IP knob overrides (the
-        cache's metrics/acl, common/config.py acl_admits on its gate)."""
+        cache's metrics/acl, common/settings/config.py acl_admits on its gate)."""
         return True
 
     def acl_refused(self, request, client_address):

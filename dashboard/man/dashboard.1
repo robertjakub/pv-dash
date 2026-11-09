@@ -27,7 +27,7 @@ The JSON-lines control server (\fB--control-port\fR, talked to with
 the running server: the live settings (the caps, the log surface), the
 config reload, the graceful shutdown. With a control
 token configured the wire is HMAC-signed: every command and reply carries
-the full sha256 of its payload, keyed by the token (common/wiresec.py)
+the full sha256 of its payload, keyed by the token (common/wire/wiresec.py)
 \(em a token-holding client verifies both directions, and over TCP the
 signed commands are mandatory. The command string folds to the grammar's
 printable 8-bit before the server decides on it (NFKD, then the

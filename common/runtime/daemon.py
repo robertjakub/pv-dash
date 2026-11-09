@@ -13,7 +13,7 @@ import signal
 import threading
 import time
 
-from common.logutil import UtcFormatter
+from common.runtime.logutil import UtcFormatter
 
 logger = logging.getLogger('daemon')
 

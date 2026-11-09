@@ -62,11 +62,11 @@ def read(path):
 
 
 def suite_version():
-    """The suite version from common/version.py (the one line every tool
-    and the tags share)."""
-    m = re.search(r"^VERSION = '([^']+)'", read(os.path.join(REPO, 'common', 'version.py')), re.M)
+    """The suite version from common/runtime/version.py (the one line every
+    tool and the tags share)."""
+    m = re.search(r"^VERSION = '([^']+)'", read(os.path.join(REPO, 'common', 'runtime', 'version.py')), re.M)
     if not m:
-        fail('common/version.py carries no VERSION line')
+        fail('common/runtime/version.py carries no VERSION line')
     return m.group(1)
 
 
@@ -175,7 +175,9 @@ def tool_facts():
         bin_ = [f for f in os.listdir(os.path.join(REPO, tool, 'bin'))
                 if f.endswith('.py') and f != main]
         facts[tool] = {'modules': len(lib), 'clients': len(bin_)}
-    facts['common'] = {'modules': len([f for f in os.listdir(os.path.join(REPO, 'common'))
+    facts['common'] = {'modules': len([f
+                                       for dirpath, dirs, files in os.walk(os.path.join(REPO, 'common'))
+                                       for f in files
                                        if f.endswith('.py') and f != '__init__.py'])}
     facts['profiles'] = {
         'jsons': len([f for f in os.listdir(os.path.join(REPO, 'profiles', 'profiles'))

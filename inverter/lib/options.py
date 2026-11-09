@@ -21,7 +21,7 @@ set-grammar form of the running fake's effective startup options), the knob
 import json
 import os
 
-from common.options import as_bool, load_registry, make_describe, settings_of
+from common.settings.options import as_bool, load_registry, make_describe, settings_of
 
 
 # The verbs the control grammar speaks (the RBAC vocabulary — an ops verb
@@ -34,7 +34,7 @@ KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'reset', 'clear', 'reload', 'd
 
 def _load_options():
     """The rows from lib/options.json (next to this loader): the shared
-    registry parser (common/options.py parse_registry_sections — the
+    registry parser (common/settings/options.py parse_registry_sections — the
     show/commands sections, the control-grammar vocabulary) and the
     shared row builder (option_rows). Control-only settings (the pins and
     the machines — a live `set` name, no flag) ride the same rows with

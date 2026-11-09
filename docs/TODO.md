@@ -58,7 +58,7 @@ only the **Done/history** records for their tool —
   the TLS story or the dashboard service (the dashboard is the next audit
   wave).
 - **the RBAC rewrite** `[common]` — the role gate decides on the head
-  verb (`command_verb` = the first word, `common/wiresec.py`) with the
+  verb (`command_verb` = the first word, `common/wire/wiresec.py`) with the
   flat verb-set policies (`ROLE_POLICIES`); the request-namespace grammar
   (`request clear cache` — the ctl/cli drift wave's rename) already needs
   the "skip the prefix" rule patched into the extraction, and the
@@ -71,7 +71,7 @@ only the **Done/history** records for their tool —
 - **a connect ACL for the control plane** `[common]` `[cache]`
   `[scraper]` `[inverter]` `[dashboard]` — SKETCH (Nov 8, decided against
   for today): the control TCP bind is hardcoded `127.0.0.1`
-  (`common/control.py`'s `_open_sock`), so an IP gate would decide only
+  (`common/wire/control.py`'s `_open_sock`), so an IP gate would decide only
   on the one address that always matches — the local-user threat the
   plane actually has is answered by peer-cred (the unix socket) and the
   token + the signed wire + the ops RBAC (TCP). The item earns its place
@@ -310,7 +310,7 @@ only the **Done/history** records for their tool —
   rev. 13.
 - **the state machinery, family-wide** — the three remaining control
   servers gained `dump_settings`/`apply_dump_settings`, the settings
-  state dump (common/dump.py: 0600, integrity-hashed, fail-closed
+  state dump (common/settings/dump.py: 0600, integrity-hashed, fail-closed
   restore) with the `dump` node (`dump/path`, `dump/restore-on-start`,
   `request dump`/`request restore`, the shutdown dump), the whole-daemon
   `reload` (the cache's exec dance; the fake's state home was the XDG
@@ -364,7 +364,7 @@ only the **Done/history** records for their tool —
   `help config` maps every knob to its control command, the bundled
   samples and the NixOS modules render the set grammar, and the
   **one-knob-one-source** registry (`lib/options.json` + its loader
-  `lib/options.py` per tool on `common/options.py`) +
+  `lib/options.py` per tool on `common/settings/options.py`) +
   `scripts/check_options.py` gate the four
   surfaces against drift. Also closed in the wave: the RBAC verb policy
   (`--control-ops-verbs`), the dashboard's own /metrics endpoint, the

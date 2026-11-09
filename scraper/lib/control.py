@@ -13,7 +13,7 @@ the unix socket relies on filesystem permissions plus the peer-cred
 shortcut (root, the daemon's own user or --control-trust-uids skips the
 handshake). With a token configured the wire is HMAC-signed: every command
 and reply carries the full sha256 HMAC of its payload, keyed by the token
-(common/wiresec.py) — a token-holding client verifies both directions; over
+(common/wire/wiresec.py) — a token-holding client verifies both directions; over
 TCP the signed commands are mandatory. A second, read-only token
 (--control-ops-token) authenticates into the show/clear verbs only — the
 ops shift against the admin key, both audited."""
@@ -24,15 +24,15 @@ import socket
 import threading
 import time
 
-from common.human import secs
-from common.version import version_string
-from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.control import ControlServer as _ControlServer, num, numi
-from common.config import acl_table, acl_value_text, default_profile_path, parse_auth_type, \
+from common.render.human import secs
+from common.runtime.version import version_string
+from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.wire.control import ControlServer as _ControlServer, num, numi
+from common.settings.config import acl_table, acl_value_text, default_profile_path, parse_auth_type, \
     parse_control_target, parse_listen, parse_upstream, resolve_profile_file
-from common.dump import SECRET_REMOVED, dump_filter
+from common.settings.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
-from common.logutil import UtcFormatter
+from common.runtime.logutil import UtcFormatter
 from .config import CONTROL_SOCKET_TEMPLATE, build_sources, load_device_profile, resolve_metrics_acl
 from .metrics import Metrics
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, \
@@ -96,7 +96,7 @@ class ControlServer(_ControlServer):
     filesystem permissions. A second, read-only token (ops_token) may be
     configured beside the admin token: it authenticates into the show/clear
     verbs only — no set/unset, no poll now, no request reload, no reload, no
-    restart, no shutdown (common/wiresec.py's roles). `stopper` is the
+    restart, no shutdown (common/wire/wiresec.py's roles). `stopper` is the
     graceful-stop callback shared with the signal handlers; it runs after the
     shutdown reply left the wire."""
 
@@ -671,7 +671,7 @@ class ControlServer(_ControlServer):
         'deny 0.0.0.0/0' + one allow line per network (the whitelist); a
         file gate renders its own rules — the gate desc as the '% ' line,
         the rule descs as aligned '# ' comments, the matcher 'any' spelled
-        0.0.0.0/0 (common/config.py acl_table, the family's one renderer)."""
+        0.0.0.0/0 (common/settings/config.py acl_table, the family's one renderer)."""
         if self.httpd:
             acl = self.httpd.metrics_acl
         else:

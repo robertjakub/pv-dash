@@ -10,12 +10,12 @@ import struct
 import threading
 import time
 
-from common.config import acl_admits
+from common.settings.config import acl_admits
 from common.modbus import (describe_fc, describe_write, exception_frame,
                            frame, pack_bits, serve_modbus, unpack_bits)
-from common.connlimit import ConnGate
+from common.serve.connlimit import ConnGate
 from .statics import MAX_BITS, MAX_COUNT, MAX_PDU
-from common.version import version_string
+from common.runtime.version import version_string
 
 logger = logging.getLogger('fake-inverter')
 

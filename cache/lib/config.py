@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """Configuration for modbus-cache: the set-grammar config script, the env
 layer and the CLI flags, plus the register map (stdlib only). The config
-file speaks the control grammar (common/options.py): every line a
+file speaks the control grammar (common/settings/options.py): every line a
 `set <name> <value>`, every comment a `#` comment — the ini format is gone
 (the breaking wave in docs/TODO.md)."""
 import json
 import logging
 
 from .options import OPTIONS
-from common.config import (ANY_NET, IPGate, _GATE_TYPES, _acl_desc, _prefix_matcher, _write_gate_object,
+from common.settings.config import (ANY_NET, IPGate, _GATE_TYPES, _acl_desc, _prefix_matcher, _write_gate_object,
                            acl_admits, acl_file_warn, acl_gate_summary, acl_summary, acl_table, acl_text,
                            acl_value_text, check_auth_key, default_profile_path, load_config_script,
                            load_write_gate_file, parse_acl, parse_acl_value, parse_auth_type, parse_listen,
                            parse_secret, parse_upstream, resolve_profile_file, Resolver)
-from common.cred import parse_trust_uids
-from common.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
+from common.wire.cred import parse_trust_uids
+from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_COUNT, MAX_REGISTERS, \
     REGISTER_TYPES, UNIT_ID_RANGE
 

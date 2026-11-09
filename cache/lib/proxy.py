@@ -10,7 +10,7 @@ from collections import deque
 from common.modbus import (DeviceError, ModbusError, describe_fc, describe_write,
                            exception_frame, frame, pack_bits, serve_modbus,
                            unpack_bits, write_shape_error, write_target)
-from common.connlimit import ConnGate
+from common.serve.connlimit import ConnGate
 from .config import (IPGate, acl_admits, acl_file_warn, acl_gate_summary, acl_value_text,
                      load_profile_write_gate, load_write_gate_file, compile_write_acl,
                      load_registers_file, load_selection, parse_acl)
@@ -307,7 +307,7 @@ class Proxy:
                                  % (key, entry['requests'], int(self.requests_audit_s), delta))
 
     def _allowed(self, acl, ip):
-        """The IP ACL on one peer (common/config.py acl_admits — one
+        """The IP ACL on one peer (common/settings/config.py acl_admits — one
         implementation for the family's IP gates)."""
         return acl_admits(acl, ip)
 

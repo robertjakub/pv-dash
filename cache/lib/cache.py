@@ -9,7 +9,7 @@ never merge across function codes (a read can only serve one)."""
 import threading
 import time
 
-from common.human import secs
+from common.render.human import secs
 
 from .statics import BIT_READ_FUNCS, MAX_BITS, MAX_COUNT, READ_FUNCS
 

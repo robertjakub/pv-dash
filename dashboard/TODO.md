@@ -9,7 +9,7 @@ The audit-family wave (the bounds, the daily knob, the env twins, the
 shared accept ladder): the audit rotation bounds are family-wide —
 `audit-files` (min 1, max 100) and `audit-max-mb` (min 0, max 1048576)
 carry bounds in all four registries with the constants living once in
-`common/audit.py` (`AuditLog` validates, `check_options` cross-checks);
+`common/runtime/audit.py` (`AuditLog` validates, `check_options` cross-checks);
 `set audit rotate files 0` refuses identically everywhere (the scraper
 accepted it before). The `audit-daily` knob is one shape: this tool gains
 the row (`--audit-daily`/`$AUDIT_DAILY`, live `audit/rotate/daily` — the
@@ -55,7 +55,7 @@ The man-ladder wave: the page runs the family's one daemon ladder — it
 gains ENVIRONMENT (the flags' twins, `PROM_URL` named as the upstream's)
 and EXIT STATUS (the unified three-code block, the failed-bind rc 1
 named), the ctl page gains EXAMPLES / ENVIRONMENT / EXIT STATUS, the
-cli page EXIT STATUS; `common/manpage.py`'s LADDERS gate
+cli page EXIT STATUS; `common/render/manpage.py`'s LADDERS gate
 (`page(kind=...)`) refuses a page that drifts. The ctl EXAMPLES are new
 and their `printf` pipeline renders its `\n` for the first time.
 
@@ -94,7 +94,7 @@ name and the flag stay flat), and the default metrics bind moves
 family's /metrics defaults now count from the scraper's 9350 up).
 
 The control-listener family wave: **the dashboard's control listener IS
-the cache's** — the listener tier lifted into `common/control.py` (one
+the cache's** — the listener tier lifted into `common/wire/control.py` (one
 implementation, four riders) and the control family goes live on the
 wire: `control/port` rebinds the listener live (bind-first, the old loop
 retires by identity, the sessions keep serving, `off` retires, `unset`
@@ -107,7 +107,7 @@ re-modes 0600/0660 — the dashboard could not share its control socket
 with a local group before); the dump/reload state carries the listener
 and `show config` renders the live values. The per-tool
 `resolve_control_target` wrapper died (the parsers unified in
-`common/config.py`, one signature — `listen_port` + the socket template).
+`common/settings/config.py`, one signature — `listen_port` + the socket template).
 
 The F21 closure: **the page takes a bearer token** — `--auth-token`
 (`auth/token` live, a secret) gates every GET on the main listener
@@ -181,7 +181,7 @@ The seal wave: the state dumps and the reload state file **encrypt under
 startup-only, restart-marked, hidden: the key cannot drift between the
 writer and the re-exec'd reader): the whole state rides a version-2
 envelope's `box` (an HMAC-SHA256 counter-mode keystream + the mac — the
-shared seal in common/dump.py, stdlib only), a restore fails closed on a
+shared seal in common/settings/dump.py, stdlib only), a restore fails closed on a
 wrong or missing key — and on an unsealed dump under a configured key.
 
 The secret-placeholder wave: an overridden secret rides the state dump /
@@ -196,7 +196,7 @@ the control server — the **state dump** (`dump/path`,
 `dump/restore-on-start` lives + the `--dump-path`/`--restore-on-start`
 flags/env/NixOS options; `request dump`/`request restore` write and
 re-apply the live overrides as one 0600 integrity-hashed JSON,
-common/dump.py; the graceful shutdown dumps too), the **whole-daemon
+common/settings/dump.py; the graceful shutdown dumps too), the **whole-daemon
 `reload`** (the overrides save to `<config>.reload`, the process re-execs,
 the fresh daemon re-applies them once and consumes the file — the ops
 role may not reload), and the **secret lives**: `control/token`(-file),
@@ -229,7 +229,7 @@ twin, the section, the live/secret markers and the descriptions) moved to
 rows and keeps the Python-side wiring (the control-grammar verb list, the
 audit defaults and the log-level choices read from `static.json`) — and
 `--help`/the man pages render from the registry now
-(`common/options.py` `build_parser()`): the knob description lives exactly
+(`common/settings/options.py` `build_parser()`): the knob description lives exactly
 once. The flags in `--help` order by the registry's sections; the texts,
 types and defaults are unchanged; `scripts/check_options.py` gates as
 before and the package ships the JSON next to the loader.
@@ -251,7 +251,7 @@ The knob-dictionary wave: `show knobs` (the `help knobs` alias too) prints
 the dictionary of all knobs — every registry knob under its section with
 its flag, its env twin(s), its home section, the command that changes it
 live (or the restart note for the startup-only ones) and the secret marker
-on the tokens (`common/options.py` `knob_dictionary()`; the values stay in
+on the tokens (`common/settings/options.py` `knob_dictionary()`; the values stay in
 `show config`, the command mapping in `help config`). The dashboard_ctl/cli
 TAB completion and `show?` word-help offer the new `show` argument.
 

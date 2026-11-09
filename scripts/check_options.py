@@ -21,7 +21,7 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, REPO)
 
-from common.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
+from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 
 # tool -> (bin script, registry module dir, module.nix, README, bundled config, flag-table headings)
 TOOLS = {
@@ -79,7 +79,7 @@ def bundled_config_names(config, options):
     CLI spelling (`set modbus upstream <value>`) via the same word-index
     parser the daemons load their configs with (a line no registry word
     answers raises ValueError)."""
-    from common.options import parse_config_script
+    from common.settings.options import parse_config_script
     text = open(os.path.join(REPO, config)).read()
     return {name for name, _ in parse_config_script(text, config, options)}
 

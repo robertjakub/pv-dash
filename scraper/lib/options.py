@@ -14,12 +14,12 @@ vocabulary, the static.json-wired defaults and choices, the resolved-config
 key renames and the set-grammar rendering of the effective values. The
 config script (the ini's replacement), `show config`, the knob ->
 control-command mapper, the argparse parser (--help, built from these rows —
-common/options.py build_parser) and scripts/check_options.py all read this
+common/settings/options.py build_parser) and scripts/check_options.py all read this
 table."""
 import json
 import os
 
-from common.options import as_bool, load_registry, make_describe, settings_of
+from common.settings.options import as_bool, load_registry, make_describe, settings_of
 
 
 # The verbs the control grammar speaks (the RBAC vocabulary — an ops verb
@@ -33,7 +33,7 @@ KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'poll', 'dump', 'restore', 're
 
 def _load_options():
     """The rows from lib/options.json (next to this loader): the shared
-    registry parser (common/options.py parse_registry_sections — the
+    registry parser (common/settings/options.py parse_registry_sections — the
     show/commands sections, the control-grammar vocabulary) and the
     shared row builder (option_rows). The static.json-wired bits ride
     here too (the audit log's rotation defaults, the log-level choices)

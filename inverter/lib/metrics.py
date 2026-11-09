@@ -15,9 +15,9 @@ skeleton (the 401/404/503, the caps, the thread start/stop) is the
 family's common/metrics_server."""
 import time
 
-from common.config import acl_admits
-from common.metrics_server import MetricsServer as _MetricsServer
-from common.metrics_server import describe_metrics
+from common.settings.config import acl_admits
+from common.serve.metrics_server import MetricsServer as _MetricsServer
+from common.serve.metrics_server import describe_metrics
 
 
 class MetricsServer(_MetricsServer):

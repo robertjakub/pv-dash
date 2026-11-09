@@ -26,11 +26,11 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.audit import AuditLog, default_path as default_audit_path
-from common.config import is_loopback_host, parse_control_target, parse_listen, parse_secret, parse_upstream
-from common.daemon import apply_restart_state, default_config_path, fold_listen, parse_ops_verbs, setup_logging
-from common.options import build_parser
-from common.version import version_string
+from common.runtime.audit import AuditLog, default_path as default_audit_path
+from common.settings.config import is_loopback_host, parse_control_target, parse_listen, parse_secret, parse_upstream
+from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, parse_ops_verbs, setup_logging
+from common.settings.options import build_parser
+from common.runtime.version import version_string
 from lib.config import CONTROL_SOCKET_TEMPLATE, load_registers_file, load_selection, resolve_config, acl_value_text, acl_gate_summary
 from lib.options import KNOWN_VERBS, OPTIONS
 from lib.metrics import MetricsServer, describe_metrics

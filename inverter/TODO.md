@@ -26,7 +26,7 @@ The audit-family wave (the bounds, the daily knob, the env twins, the
 shared accept ladder): the audit rotation bounds are family-wide —
 `audit-files` (min 1, max 100) and `audit-max-mb` (min 0, max 1048576)
 carry bounds in all four registries with the constants living once in
-`common/audit.py` (`AuditLog` validates, `check_options` cross-checks);
+`common/runtime/audit.py` (`AuditLog` validates, `check_options` cross-checks);
 `set audit rotate files 0` refuses identically everywhere (the scraper
 accepted it before). The `audit-daily` knob is one shape: this tool gains
 the row (`--audit-daily`/`$AUDIT_DAILY`, live `audit/rotate/daily` — the
@@ -70,7 +70,7 @@ the startup-only recipe.
 
 The man-ladder wave: the page runs the family's one daemon ladder — it
 gains EXIT STATUS (the unified three-code block, the failed-bind rc 1
-named) and the ctl page its ENVIRONMENT twins; `common/manpage.py`'s
+named) and the ctl page its ENVIRONMENT twins; `common/render/manpage.py`'s
 LADDERS gate (`page(kind=...)`) refuses a page that drifts. The ctl
 EXAMPLES' `printf` pipeline renders its `\n` for the first time.
 
@@ -106,7 +106,7 @@ name and the flag stay flat), and the default metrics bind moves
 family's /metrics defaults now count from the scraper's 9350 up).
 
 The control-listener family wave: **the fake's control listener IS the
-cache's** — the listener tier lifted into `common/control.py` (one
+cache's** — the listener tier lifted into `common/wire/control.py` (one
 implementation, four riders) and the control family goes live on the
 wire: `control/port` rebinds the listener live (bind-first, the old loop
 retires by identity, the sessions keep serving, `off` retires, `unset`
@@ -116,7 +116,7 @@ posture, the family's F5 refusal parameterized away as
 family spelling), `control/trust-uids`, `control/socket-group` (the live
 unix socket re-modes 0600/0660); the dump/reload state carries the
 listener. The old lib/paths.py wrapper died (the parsers unified in
-`common/config.py`, one signature — `listen_port` + the socket template).
+`common/settings/config.py`, one signature — `listen_port` + the socket template).
 
 The F13 conformance: **the metrics token is mandatory beyond loopback,
 not warn-and-serve** — the startup check, the live `metrics-server on`
@@ -222,7 +222,7 @@ The seal wave: the state dumps and the reload state file **encrypt under
 startup-only, restart-marked, hidden: the key cannot drift between the
 writer and the re-exec'd reader): the whole state rides a version-2
 envelope's `box` (an HMAC-SHA256 counter-mode keystream + the mac — the
-shared seal in common/dump.py, stdlib only), a restore fails closed on a
+shared seal in common/settings/dump.py, stdlib only), a restore fails closed on a
 wrong or missing key — and on an unsealed dump under a configured key.
 
 The secret-placeholder wave: an overridden secret rides the state dump /
@@ -237,7 +237,7 @@ the control server — the **state dump** (`dump/path`,
 `dump/restore-on-start` lives + the `--dump-path`/`--restore-on-start`
 flags/env; `request dump`/`request restore` write and re-apply the live
 overrides — the pins and the machines, the scenario applied first so the
-pins land on top — as one 0600 integrity-hashed JSON, common/dump.py; the
+pins land on top — as one 0600 integrity-hashed JSON, common/settings/dump.py; the
 graceful shutdown dumps too), the **whole-daemon `reload`** (the fake has
 no config file — its reload state lives in the XDG state home beside the
 audit trail; the overrides save, the process re-execs, the fresh fake
@@ -274,7 +274,7 @@ rows and keeps the Python-side wiring: the control-grammar verb list, the
 CLI defaults read from `static.json` (the fake parses straight off the
 argv — F11, no config file) and the choice vocabularies (the log-level
 ladder, the timezone), the `--no-battery` negation included. `--help`/the
-man pages render from the registry now (`common/options.py`
+man pages render from the registry now (`common/settings/options.py`
 `build_parser()`): the knob description lives exactly once. The flags in
 `--help` order by the registry's sections; the texts, types and defaults
 are unchanged; `scripts/check_options.py` gates as before and the package
@@ -291,7 +291,7 @@ the dictionary of all knobs — every registry knob under its section with
 its flag, its env twin(s) when it has one (the fake's INV_* layer), its
 home section, the command that changes it live (or the restart note for
 the startup-only ones) and the secret marker on the tokens
-(`common/options.py` `knob_dictionary()`; the values stay in `show config`,
+(`common/settings/options.py` `knob_dictionary()`; the values stay in `show config`,
 the command mapping in `help config`). The fake_ctl's TAB completion and
 `show?` word-help offer the new `show` argument.
 
@@ -320,14 +320,14 @@ familiar mutual-exclusion error; F12's 0600 gate applies either way).
 
 The **signed wire**: with a control token configured every command and
 reply on the control socket carries the full sha256 HMAC of its payload
-keyed by the token (`common/wiresec.py`) — over TCP the signed commands
+keyed by the token (`common/wire/wiresec.py`) — over TCP the signed commands
 are mandatory, on the unix socket the mac is verify-if-present; the
 fake_ctl/fake_cli clients sign and verify both directions, and the audit
 trail's COMMAND entries carry the frame's mac. The opt-in **connect ACL**
 for the Modbus surface (`--connect-acl`, the cache's mirrored: any/none/
 IP-CIDR list, the default stays `any` — the trusted-LAN posture; a live
 setting, `show status` carries `connect_acl=`). The man pages are
-generated now (`common/manpage.py`, `--man` prints the page,
+generated now (`common/render/manpage.py`, `--man` prints the page,
 scripts/gen_man.py regenerates the shipped files).
 
 

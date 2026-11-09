@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Configuration for modbus-fake-inverter: the set-grammar config script, the
 env layer and the CLI flags (stdlib only). The config file speaks the control
-grammar (common/options.py): every line a `set <name> <value>`, every comment
+grammar (common/settings/options.py): every line a `set <name> <value>`, every comment
 a `#` comment — the ini format is gone. The fake keeps its args-driven shape
 (the bins read args.* everywhere), so the resolver's job is to slot the two
 lower layers under the flags and write the effective values back onto the
 parsed args namespace: flag > env > config script > the static defaults
-(common/config.py Resolver, keep-last-good) — every flag row the same ladder,
+(common/settings/config.py Resolver, keep-last-good) — every flag row the same ladder,
 the demo twins included (they re-apply on SIGHUP, lib/signals.py). The pins
 and the machines (pv, load, batt, grid, soc, mppt, cloud, scenario,
 battery-state, grid-outage) are control-wire settings without flags: the
@@ -15,7 +15,7 @@ import logging
 
 from .options import OPTIONS
 from .statics import DEFAULTS, GRID
-from common.config import Resolver, load_config_script, str_to_bool
+from common.settings.config import Resolver, load_config_script, str_to_bool
 
 logger = logging.getLogger('fake-inverter')
 

@@ -41,13 +41,13 @@ import logging
 import math
 import threading
 
-from common.audit import AuditLog
-from common.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
+from common.runtime.audit import AuditLog
+from common.settings.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
     parse_secret, resolve_control_target, resolve_metrics_acl
-from common.cred import parse_trust_uids
-from common.daemon import apply_restart_state, default_config_path, parse_ops_verbs
-from common.options import build_parser
-from common.version import version_string
+from common.wire.cred import parse_trust_uids
+from common.runtime.daemon import apply_restart_state, default_config_path, parse_ops_verbs
+from common.settings.options import build_parser
+from common.runtime.version import version_string
 from lib.chaos import Chaos
 from lib.config import resolve_args
 from lib.control import ControlServer
@@ -173,7 +173,7 @@ def startup_values(args, secrets):
     *** (the knob is public, the value never is): `secrets` is the resolved
     {registry name: set-or-not} of the secret rows."""
     from lib.options import OPTION_BY_NAME
-    from common.dump import SECRET_REMOVED
+    from common.settings.dump import SECRET_REMOVED
     out = {}
     for name, opt in OPTION_BY_NAME.items():
         v = getattr(args, name.replace('-', '_'), None)
@@ -266,7 +266,7 @@ def main():
     metrics_acl, metrics_acl_warn = resolve_metrics_acl(args.metrics_acl,
                                                         'metrics/acl')   # a bad acl value or gate file refuses the start
     if args.metrics_server and metrics_token is None:
-        from common.config import is_loopback_host
+        from common.settings.config import is_loopback_host
         if not is_loopback_host(metrics_listen[0]):
             raise SystemExit('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
                              'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'

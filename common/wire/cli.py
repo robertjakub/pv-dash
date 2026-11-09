@@ -20,12 +20,12 @@ try:
 except ImportError:
     readline = None
 
-from common.audit import AuditLog
-from common.config import parse_secret, resolve_target
-from common.human import secs
-from common.options import command_path_pool, render_word_sections, setting_path_pool, word_groups
-from common.texts import T
-from common.wiresec import sign_request, verify_reply
+from common.runtime.audit import AuditLog
+from common.settings.config import parse_secret, resolve_target
+from common.render.human import secs
+from common.settings.options import command_path_pool, render_word_sections, setting_path_pool, word_groups
+from common.render.texts import T
+from common.wire.wiresec import sign_request, verify_reply
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
 
@@ -135,7 +135,7 @@ def sectioned_rows(sections, desc, hint):
     """The listing: a blank line, then each [section] header, its entries
     padded two spaces under it — the descriptions aligned to one column across all the sections.
     The render is the wire's describe_node's own (the ? output is the
-    golden master — common/options.py render_word_sections); the console
+    golden master — common/settings/options.py render_word_sections); the console
     adds the hint line."""
     rows = render_word_sections([(label, [(w, desc(w)) for w in ws]) for label, ws in sections])
     if hint:

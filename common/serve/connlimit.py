@@ -134,7 +134,7 @@ class GatedHTTPServer(http.server.ThreadingHTTPServer):
     def acl_allows(self, ip):
         """The connection-ACL hook: the default admits every peer (no
         ACL); the subclasses with an IP knob override with the live gate
-        (common/config.py acl_admits on the resolved value)."""
+        (common/settings/config.py acl_admits on the resolved value)."""
         return True
 
     def acl_refused(self, request, client_address):

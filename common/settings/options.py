@@ -33,8 +33,8 @@ import argparse
 import json
 import os
 
-from common.dump import SECRET_REMOVED
-from common.texts import T
+from common.settings.dump import SECRET_REMOVED
+from common.render.texts import T
 
 
 class Option:
@@ -100,7 +100,7 @@ class Option:
 def build_parser(options, prog=None, description=None, epilog=None, add_help=True):
     """The argparse parser for one tool, built from its registry: the one
     source renders --help (and the man pages render from the parser —
-    common/manpage.py). Boolean flags become store_true (a `negates` row
+    common/render/manpage.py). Boolean flags become store_true (a `negates` row
     becomes the matching store_false on the negated knob's dest), int/float
     convs type the value, `choices` constrains it; everything else takes a
     free string. The rows carry the defaults (None = unset). Control-only

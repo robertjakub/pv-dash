@@ -169,7 +169,7 @@ BOOL_KEYS = frozenset(('secret', 'internal', 'hidden', 'restart', 'node'))
 
 def normalize_bools(meta):
     """The row bools to the JSON booleans in place: 'on'/'off' load fine
-    (common/options.py as_bool) but the file's canonical form is
+    (common/settings/options.py as_bool) but the file's canonical form is
     true/false — the render coerces, so --check flags a string-bool row
     and the write mode fixes it."""
     for rows in meta.values():

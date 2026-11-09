@@ -75,13 +75,13 @@ design); the top non-man pairs:
 | 0.85 | `scraper/lib/options.py:34` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.83 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.82 | `cache/bin/modbus-cache.py:368` `watch_dump` <-> `common/control.py:905` `run_dump_interval` |
+| 0.82 | `cache/bin/modbus-cache.py:368` `watch_dump` <-> `common/wire/control.py:905` `run_dump_interval` |
 | 0.81 | `inverter/lib/control.py:151` `__init__` <-> `dashboard/lib/control.py:77` `__init__` |
 | 0.78 | `inverter/lib/signals.py:30` `__init__` <-> `common/modbus/client.py:20` `__init__` |
 | 0.78 | `inverter/lib/control.py:587` `acl_table_report` <-> `dashboard/lib/control.py:421` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `inverter/lib/control.py:66` `handle` <-> `common/control.py:262` `handle` |
-| 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/config.py:420` `load_write_gate_file` |
+| 0.75 | `inverter/lib/control.py:66` `handle` <-> `common/wire/control.py:262` `handle` |
+| 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:420` `load_write_gate_file` |
 | 0.73 | `inverter/lib/control.py:598` `command_help` <-> `dashboard/lib/control.py:100` `command_help` |
 | 0.73 | `scraper/lib/control.py:141` `command_help` <-> `inverter/lib/control.py:598` `command_help` |
 
@@ -97,12 +97,12 @@ The listener census (ten listeners):
 |---|---|---|---|---|
 | inverter | Modbus TCP (the device) | `serve_modbus` (common/modbus/server.py) under the fake's face object | backlog 128 | the shared ladder; the face's hooks carry the tool (the chaos injector, the counters) |
 | cache | Modbus TCP (the client face) | `serve_modbus` (common/modbus/server.py) under the proxy's face object | backlog 128 | the shared ladder; the write-gate layers in `respond()` (shape -> allow-write -> write ACL -> register gate); the requests audit rides `on_disconnect` |
-| inverter | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | `common/metrics_server` — the snapshot() hook is the tool's |
+| inverter | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | `common/serve/metrics_server` — the snapshot() hook is the tool's |
 | cache | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | the common server; the snapshot() hook |
 | dashboard | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | the common server; the snapshot() hook |
 | scraper | /metrics (the exposition) | `Server` + `Handler` (lib/server.py) | the caps + the metrics/acl | its own Handler — the family's exposition shape (bearer, the spec render, the upstream relay) |
 | dashboard | the page (static + proxy) | `Server` + `Handler` (bin/dashboard.py) | the caps | its own Handler — the cookies, the static tier, the /prom proxy, /config.js |
-| all four | the control socket (unix, opt TCP) | `ControlServer` (common/control.py) | 0600/0660 | the one shared wire: the token/RBAC roles, the HMAC frames, the caps live here |
+| all four | the control socket (unix, opt TCP) | `ControlServer` (common/wire/control.py) | 0600/0660 | the one shared wire: the token/RBAC roles, the HMAC frames, the caps live here |
 
 The findings:
 
@@ -222,7 +222,7 @@ four registries; 29 names carry in all four:
 The findings:
 
 - **The audit rotation bounds are family-wide (landed — the
-  audit-family wave).** `common/audit.py` holds the constants
+  audit-family wave).** `common/runtime/audit.py` holds the constants
   (`AUDIT_FILES` 1..100, `AUDIT_MAX_MB` 0..1048576), all four
   registries' rows repeat them, and `check_options` cross-checks the
   repetition — `set audit rotate files 0` refuses identically
@@ -670,7 +670,7 @@ refusals and the same env layer; the code behind them lives once in
 serves. Ordered by the user's exposure; the code plane rides along.
 
 Landed (the audit-family wave): the audit rotation bounds
-family-wide (the constants in `common/audit.py`, every registry
+family-wide (the constants in `common/runtime/audit.py`, every registry
 repeating them, `check_options` cross-checking); the `audit-daily`
 knob one shape (the live `audit/rotate/daily` + the `$AUDIT_DAILY`
 twin on all four); the env twins completed (the env-or-note rule —

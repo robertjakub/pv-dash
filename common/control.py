@@ -237,15 +237,7 @@ class ControlServer:
         F11 test-tool posture)."""
         if self.TOKENLESS_TCP != 'allow' and isinstance(target, int) and self.token is None:
             raise ValueError('control/port cannot serve TCP without a token (F5 in docs/AUDIT.md): '
-                             'set control/token first')
-
-    def refuse_token_drop(self):
-        """The F5 posture's other half: the admin token only drops from a
-        listener that is not a live TCP one (a retired listener or the unix
-        socket — the filesystem is the auth there)."""
-        if self.TOKENLESS_TCP != 'allow' and not self.is_unix and not self.stopped:
-            raise ValueError('the TCP control port needs its token (F5 in docs/AUDIT.md) — '
-                             'only the unix socket (the filesystem is the auth) may run tokenless')
+                             'pass the token by flag/env/config and restart')
 
     def handle(self, client, addr):
         who = self.peer(addr)
@@ -561,8 +553,10 @@ class ControlServer:
     def _save_reload_state(self):
         """The overrides in their wire-parsable form (dump_settings) to the
         state file — the shared dump writer (sealed when dump/key is
-        configured); the secrets ride as *** SECRET REMOVED *** (the value
-        never lands in the file). Returns (settings, lost-secret-names);
+        configured). No secret can be overridden (the wire refuses them —
+        startup-only), so the lost-secret list stays empty; the naming
+        below stays as the class invariant's guard (the value never lands
+        in the file either way). Returns (settings, lost-secret-names);
         raises OSError on an unwritable home."""
         settings = self.dump_settings()
         lost = sorted(k for k in self.overridden if settings.get(k) == SECRET_REMOVED)

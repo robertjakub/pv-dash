@@ -393,8 +393,13 @@ def control_command(opt):
     `set inverter profile <value>`; an aliased row names its second spelling
     too), or the note that the knob is startup-only (restart to apply). A
     knob the registry marks restart carries ', restart' on its recipe — the
-    set records the value, the restart applies it."""
+    set records the value, the restart applies it. A restart-marked SECRET
+    renders no recipe at all: the wire refuses set/unset on it (a secret can
+    never ride the reload state, so it has no pending form) — it passes by
+    flag/env/config and a restart."""
     if opt.live:
+        if opt.restart and opt.secret:
+            return 'startup-only — pass it by flag/env/config (set/unset refuse)'
         cmd = 'set %s <value>' % opt.live.replace('/', ' ')
         if opt.alias:
             cmd += ' (alias: %s)' % opt.alias.replace('/', ' ')
@@ -410,7 +415,8 @@ def knob_dictionary(options, who='the tool'):
     headerless when none), one row per knob with every surface — the
     config/set-grammar name, the argparse flag (control-only settings show
     the set command in their flag's place), the env twin(s), the control
-    command that changes it (or the restart note) and the secret marker.
+    command that changes it (or the restart note, or the startup-only
+    secret note) and the secret marker.
     Registry data only — no values render here (`show config` is the
     values view), so secrets are named, never shown."""
     lines = ['ok knobs — the registry of %s: every knob, its flag, its env twin, '

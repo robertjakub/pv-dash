@@ -35,7 +35,6 @@ from common.config import acl_table, acl_value_text, default_profile_path, is_lo
     parse_control_target, parse_listen, parse_secret, parse_upstream, resolve_profile_file
 from common.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
-from common.audit import AuditLog
 from common.logutil import UtcFormatter
 from .config import CONTROL_SOCKET_TEMPLATE, build_sources, load_device_profile, resolve_metrics_acl
 from .metrics import Metrics
@@ -687,16 +686,12 @@ class ControlServer(_ControlServer):
 
     def _rebuild_audit(self):
         """Swap the SCR audit trail for one rebuilt from the params (the
-        live path/rotation/kill-switch changes): the fresh writer re-chains
-        from the file's own tail (common/audit.py tail_hash), so the chain
-        stays verifiable across the swap. The old trail is NOT closed — a
-        session still holding it writes its last commands there."""
+        live path/rotation/kill-switch changes): the shared rebuild re-chains
+        from the file's own tail, the chain verifiable across the swap. The
+        old trail is NOT closed — a session still holding it writes its last
+        commands there."""
         p = self.audit_params
-        if p['disabled']:
-            self.audit = None
-        else:
-            self.audit = AuditLog(p['path'], 'SCR', app='modbus-scraper',
-                                  max_mb=p['max_mb'], files=p['files'])
+        self.audit = self.rebuild_audit(p, 'SCR', 'modbus-scraper')
         return self.audit.path if self.audit else 'off'
 
     def clear_overrides(self):

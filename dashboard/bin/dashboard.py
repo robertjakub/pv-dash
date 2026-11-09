@@ -13,7 +13,6 @@ import hmac
 import logging
 import mimetypes
 import os
-import signal
 import socket
 import sys
 import threading
@@ -30,8 +29,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 
 from common.audit import AuditLog
 from common.cred import parse_trust_uids
-from common.connlimit import GatedHTTPServer
-from common.logutil import UtcFormatter
+from common.connlimit import GatedHTTPServer, rate_limit_503
+from common.daemon import apply_restart_state, default_config_path, install_signal_handlers, log_state_dumps, \
+    next_to_script, parse_ops_verbs, setup_logging
 from common.options import build_parser
 from common.version import version_string
 from common.config import acl_value_text, is_loopback_host, parse_control_target, parse_listen, parse_secret, \
@@ -48,35 +48,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 logger = logging.getLogger('dashboard')
 
 
-def next_to_script(name):
-    """The flattened package layout first (the file next to the script),
-    then the dev checkout's subproject root (the parent of bin/)."""
-    for base in (SCRIPT_DIR, os.path.dirname(SCRIPT_DIR)):
-        cand = os.path.join(base, name)
-        if os.path.exists(cand):
-            return cand
-    return os.path.join(SCRIPT_DIR, name)
-
-
-def default_config_path():
-    """$CONFIG wins (the docker config volume); then a user's config
-    script next to the script (the flattened package layout); then the dev
-    checkout's sample at the subproject root."""
-    env = os.environ.get('CONFIG')
-    if env and env.strip():
-        return env.strip()
-    for candidate in (os.path.join(SCRIPT_DIR, 'server.conf'),
-                      os.path.join(os.path.dirname(SCRIPT_DIR), 'server.conf')):
-        if os.path.exists(candidate):
-            return candidate
-    return os.path.join(SCRIPT_DIR, 'server.conf')
-
-
-RATE_LIMIT_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
-                  b'Content-Type: text/plain; charset=utf-8\r\n'
-                  b'Cache-Control: no-store\r\n'
-                  b'Connection: close\r\n\r\n'
-                  b'too many concurrent clients\n')
+RATE_LIMIT_503 = rate_limit_503(b'too many concurrent clients\n')
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -86,8 +58,8 @@ class Handler(BaseHTTPRequestHandler):
     UNAUTH_401_BODY = b'the dashboard needs its bearer token: open /?auth=<token> (or send Authorization: Bearer <token>)\n'
     log_queries = False
     log_access = False
-    static_dir = next_to_script('static')
-    config_js = next_to_script('config.js')
+    static_dir = next_to_script(SCRIPT_DIR, 'static')
+    config_js = next_to_script(SCRIPT_DIR, 'config.js')
     prom_prefix = None
     upstream_ok = True
     _upstream_lock = threading.Lock()
@@ -272,14 +244,8 @@ class Server(GatedHTTPServer):
     --max-clients (total) and --max-conn-per-ip — past either, an immediate
     503; 0 = unlimited. setup_gate() runs before serve_forever."""
 
-    def gate_refused(self, request, client_address, why):
-        logger.info('rejected %s: too many concurrent clients (%s, max %d/%d)',
-                    client_address, why, self.gate.max_total, self.gate.max_per_ip)
-        try:
-            request.sendall(RATE_LIMIT_503)
-        except OSError:
-            pass
-        self._refuse_close(request)
+    RATE_LIMIT_503 = RATE_LIMIT_503
+    gate_log = logger
 
     def handle_error(self, request, client_address):
         exc = sys.exc_info()[1]
@@ -288,16 +254,6 @@ class Server(GatedHTTPServer):
         else:
             logger.error('request handling error: %s', exc)
             logger.debug('traceback:', exc_info=True)
-
-
-def setup_logging(cfg):
-    root = logging.getLogger()
-    root.setLevel(getattr(logging, cfg['level'], logging.INFO))
-    fmt = '%(levelname)-7s %(message)s' if os.environ.get('JOURNAL_STREAM') \
-        else '%(asctime)s %(levelname)-7s %(message)s'
-    handler = logging.StreamHandler()
-    handler.setFormatter(UtcFormatter(fmt) if not cfg['local_time'] else logging.Formatter(fmt))
-    root.addHandler(handler)
 
 
 def describe(cfg, args, control_desc):
@@ -319,45 +275,9 @@ def describe(cfg, args, control_desc):
                 version_string()))
 
 
-def install_signal_handlers(httpd, apply_reload=None, graceful_stop=None):
-    if hasattr(signal, 'SIGHUP'):
-        reload_requested = threading.Event()
-
-        def on_hup(signum, frame):
-            reload_requested.set()
-
-        def watch_reload():
-            while True:
-                reload_requested.wait()
-                reload_requested.clear()
-                logger.info('SIGHUP: reload requested')
-                try:
-                    summary = apply_reload()
-                    logger.info('SIGHUP: applied (%s)', summary)
-                except (Exception, SystemExit) as e:
-                    logger.error('SIGHUP: reload failed (%s), keeping the previous settings', e)
-
-        signal.signal(signal.SIGHUP, on_hup)
-        threading.Thread(target=watch_reload, daemon=True).start()
-    if hasattr(signal, 'SIGTERM'):
-        stop_signal = []
-
-        def on_stop(signum, frame):
-            stop_signal.append(signum)
-
-        def watch_stop():
-            while not stop_signal:
-                time.sleep(0.2)
-            graceful_stop(signal.Signals(stop_signal[0]).name)
-
-        signal.signal(signal.SIGTERM, on_stop)
-        signal.signal(signal.SIGINT, on_stop)
-        threading.Thread(target=watch_stop, daemon=True).start()
-
-
 def parse_args():
     ap = build_parser(OPTIONS, description='Static file server with a Prometheus proxy at /prom')
-    ap.add_argument('--config', default=default_config_path(),
+    ap.add_argument('--config', default=default_config_path(SCRIPT_DIR, 'server.conf'),
                     help='config file — the set grammar: every line a `set <name> <value>`, comments start with # ($CONFIG, then server.conf next to this script, then the subproject root)')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound)')
     ap.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (dashboard --man | man -l -)')
@@ -376,23 +296,12 @@ def main():
     cfg = resolve_config(args, SCRIPT_DIR)
     setup_logging(cfg)
 
-    for name, pending in ControlServer.fold_restart_state(args.config, cfg['dump_key']).items():
-        # the restart-marked overrides fold into the startup config BEFORE
-        # the start's dump-restore decision — the piece that makes the
-        # restart note true (the execv'd reload applies what the sets recorded)
-        if name == 'dump/restore-on-start':
-            cfg['restore_on_start'] = str(pending).strip() in ('on', 'true', '1', 'yes')
-        logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
+    apply_restart_state(cfg, args.config, cfg['dump_key'], ControlServer)
     control_target = resolve_control_target(cfg['control_port'], cfg['port'], CONTROL_SOCKET_TEMPLATE)
     control_token = cfg['control_token'] or None
     control_ops_token = cfg['control_ops_token'] or None
-    ops_verbs = frozenset(v.strip().lower() for v in (cfg['control_ops_verbs'] or 'show,clear').split(',') if v.strip())
-    unknown = sorted(v for v in ops_verbs if v not in KNOWN_VERBS)
-    if not ops_verbs or unknown:
-        logger.error('--control-ops-verbs: %s (the ops policy needs at least one verb the grammar speaks: %s)',
-                     ', '.join(unknown) if unknown else 'empty', ', '.join(sorted(KNOWN_VERBS)))
-        raise SystemExit(2)
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
+    ops_verbs = parse_ops_verbs(cfg['control_ops_verbs'], KNOWN_VERBS)
     metrics_token = parse_secret(args.metrics_token or cfg.get('metrics_token'), 'metrics/token')
     metrics_listen = parse_listen(cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9353'))
     metrics_acl, metrics_acl_warn = resolve_metrics_acl(cfg.get('metrics_acl') or 'any', 'metrics/acl')
@@ -423,15 +332,7 @@ def main():
     Handler.timeout = cfg['client_timeout'] or None
     args.metrics_desc = metrics_desc
     logger.info('%s', describe(cfg, args, control_desc))
-    logger.info('state dumps: %s',
-                'off' if not cfg['dump_path']
-                else '%s (request dump, the graceful shutdown%s%s)'
-                % (cfg['dump_path'], ', sealed' if cfg['dump_key'] else '',
-                   ', restore on start' if cfg['restore_on_start'] else ''))
-    if cfg['dump_path'] and not cfg['dump_key']:
-        logger.warning('the state dump %s is not sealed (the integrity hash only — plaintext at rest): '
-                       'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '
-                       'to encrypt it', cfg['dump_path'])
+    log_state_dumps(cfg['dump_path'], cfg['dump_key'], cfg['restore_on_start'])
     if args.dry_run:
         logger.info('dry-run: configuration is valid, nothing was bound')
         return
@@ -557,7 +458,7 @@ def main():
 
     if control:
         control.stopper = graceful_stop
-    install_signal_handlers(httpd, apply_reload=apply_reload, graceful_stop=graceful_stop)
+    install_signal_handlers(apply_reload=apply_reload, graceful_stop=graceful_stop)
     if audit:
         audit.event('START', 'version=%s upstream=%s listen=%s:%d control=%s'
                     % (version_string(), cfg['upstream'], cfg['bind'], cfg['port'], control_desc))

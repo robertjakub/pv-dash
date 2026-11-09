@@ -26,7 +26,6 @@ from common.modbus import AUTH_MIN_KEY
 from common.cred import parse_trust_uids
 from common.human import secs
 from common.logutil import UtcFormatter
-from common.audit import AuditLog
 from common.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.control import ControlServer as _ControlServer, num, numi
 from common.options import control_command, grouped_rows, match_setting_path, describe_node, describe_root, \
@@ -772,18 +771,12 @@ class ControlServer(_ControlServer):
 
     def _rebuild_audit(self):
         """Swap the CACHE audit trail for one rebuilt from the proxy's audit
-        params (the live path/rotation changes): the fresh writer re-chains
-        from the file's own tail (common/audit.py tail_hash), so the chain
-        stays verifiable across the swap. The old trail is NOT closed — a
-        session still holding it writes its last commands there, and an
-        in-flight writer must never hit a closed file."""
+        params (the live path/rotation changes): the shared rebuild re-chains
+        from the file's own tail, the chain verifiable across the swap. The
+        old trail is NOT closed — a session still holding it writes its last
+        commands there, and an in-flight writer must never hit a closed file."""
         p = self.proxy
-        prm = p.audit_params
-        if prm['disabled']:
-            p.audit = None
-        else:
-            p.audit = AuditLog(prm['path'], 'CACHE', app='modbus-cache',
-                               max_mb=prm['max_mb'], daily=prm['daily'], files=prm['files'])
+        p.audit = self.rebuild_audit(p.audit_params, 'CACHE', 'modbus-cache')
         self.audit = p.audit   # this server's new sessions (and this one) audit the new trail
 
     @staticmethod

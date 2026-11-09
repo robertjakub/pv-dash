@@ -31,6 +31,8 @@ import json
 import os
 import struct
 
+from common.config import resolve_profile_file
+
 # The suite's shared device profiles live in the profiles/profiles/ data dir
 # of the profiles/ subproject at the repository root; a packaged tool carries
 # the JSON files flat, as a profiles/ dir of its own. Every profile there is
@@ -47,15 +49,9 @@ def _profile_candidates(name):
 
 def resolve_profile(text):
     """A profile name (sun2000, deye-sg04lp3, ... -> the shared profiles/) or
-    a JSON path, passed through."""
-    t = (text or '').strip()
-    if os.path.exists(t):
-        return t
-    if '/' not in t and not t.endswith('.json'):
-        for candidate in _profile_candidates(t + '.json'):
-            if os.path.exists(candidate):
-                return candidate
-    return t
+    a JSON path, passed through. The fake's own candidate walk (the
+    embedded lib/profiles copy first) rides the shared resolver."""
+    return resolve_profile_file(text, _profile_candidates)
 
 
 def profile_label(path):

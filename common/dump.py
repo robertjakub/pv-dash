@@ -71,8 +71,9 @@ def dump_filter(overridden, raw, by_name):
     return out
 
 
-def _payload_hash(state):
-    """The canonical serialization's sha256 — the dump's integrity hash."""
+def payload_hash(state):
+    """The canonical serialization's sha256 — the dump's integrity hash
+    (the cache's richer dump shape rides the same hash, lib/persist.py)."""
     payload = json.dumps(state, sort_keys=True, separators=(',', ':'))
     return hashlib.sha256(payload.encode('utf-8')).hexdigest()
 
@@ -162,7 +163,7 @@ def write_dump(path, settings, key=None):
         'settings': settings or {},
     }
     n = len(state['settings'])
-    state['hash'] = _payload_hash(state)
+    state['hash'] = payload_hash(state)
     if key:
         state = dict({'format': FORMAT, 'version': SEALED_VERSION},
                      **seal(key, json.dumps(state, sort_keys=True, separators=(',', ':')).encode('utf-8')))
@@ -222,7 +223,7 @@ def _validate_state(state, path):
     if not isinstance(state.get('hash'), str):
         raise ValueError('the dump %s predates the integrity hash — dump again (nothing restored)' % path)
     want = state.pop('hash')
-    if not hmac.compare_digest(want, _payload_hash(state)):
+    if not hmac.compare_digest(want, payload_hash(state)):
         raise ValueError('the dump %s fails its integrity hash (edited, truncated or foreign content) '
                          '— nothing restored' % path)
     settings = state.get('settings') or {}

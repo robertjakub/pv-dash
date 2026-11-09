@@ -34,13 +34,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 
 import logging
 import math
-import os
-import threading
 
 from common.audit import AuditLog
 from common.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
     parse_secret, resolve_control_target, resolve_metrics_acl
 from common.cred import parse_trust_uids
+from common.daemon import apply_restart_state, parse_ops_verbs
 from common.options import build_parser
 from common.version import version_string
 from lib.chaos import Chaos
@@ -223,13 +222,7 @@ def main():
     chaos = Chaos(args.chaos, seed=args.seed)
     target = resolve_control_target(args.control_port, args.port, CONTROL_SOCKET_TEMPLATE)
     dump_key = parse_secret((args.dump_key or os.environ.get('DUMP_KEY') or '').strip() or None, 'dump/key')
-    for name, pending in ControlServer.fold_restart_state(None, dump_key).items():
-        # the restart-marked overrides fold into the startup args BEFORE the
-        # start's dump-restore decision — the piece that makes the restart
-        # note true (the execv'd reload applies what the sets recorded)
-        if name == 'dump/restore-on-start':
-            args.restore_on_start = str(pending).strip() in ('on', 'true', '1', 'yes')
-        logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
+    apply_restart_state(vars(args), None, dump_key, ControlServer)
     control_token = parse_secret(args.control_token or os.environ.get('CONTROL_TOKEN'), 'control/token')
     control_ops_token = parse_secret(args.control_ops_token or os.environ.get('CONTROL_OPS_TOKEN'),
                                      'control-ops-token')
@@ -241,13 +234,7 @@ def main():
         logger.error('the ops token must differ from the admin token (the same secret would hand '
                      'every holder the role the server picks first)')
         raise SystemExit(1)
-    ops_verbs = frozenset(v.strip().lower() for v in (args.control_ops_verbs
-                          or os.environ.get('CONTROL_OPS_VERBS') or 'show,clear').split(',') if v.strip())
-    unknown = sorted(v for v in ops_verbs if v not in KNOWN_VERBS)
-    if not ops_verbs or unknown:
-        logger.error('--control-ops-verbs: %s (the ops policy needs at least one verb the grammar speaks: %s)',
-                     ', '.join(unknown) if unknown else 'empty', ', '.join(sorted(KNOWN_VERBS)))
-        raise SystemExit(1)
+    ops_verbs = parse_ops_verbs(args.control_ops_verbs or os.environ.get('CONTROL_OPS_VERBS'), KNOWN_VERBS, rc=1)
     trust_uids = parse_trust_uids(args.control_trust_uids or os.environ.get('CONTROL_TRUST_UIDS'),
                                   'control-trust-uids')
     metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics/token')

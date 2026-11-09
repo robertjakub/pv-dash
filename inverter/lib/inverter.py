@@ -5,13 +5,13 @@ FC05/FC06/FC15/FC16 writes behind the write gate, every other function
 code named and refused, chaos injection. The wire lives in
 common.modbus — the framing, the bit packing and the write shapes are
 the family's one implementation."""
-import ipaddress
 import logging
 import socket
 import struct
 import threading
 import time
 
+from common.config import acl_admits
 from common.modbus import (ModbusError, auth_handshake_server, describe_fc,
                            describe_write, exception_frame, frame, pack_bits,
                            read_frame, unpack_bits)
@@ -51,16 +51,11 @@ class FakeInverter:
         self.clients = {}        # 'ip:port' -> {'since': monotonic, 'requests': n} (show connections)
 
     def allowed(self, ip):
-        """The connect ACL: None = off (everybody allowed — the default, the
-        trusted-LAN posture); () = nobody; otherwise the ip must land in one
-        network (the cache's _allowed, mirrored)."""
-        if self.connect_acl is None:
-            return True
-        try:
-            a = ipaddress.ip_address(ip)
-        except ValueError:
-            return False
-        return any(a.version == n.version and a in n for n in self.connect_acl)
+        """The connect ACL (the shared acl_admits — the fake's acl is the
+        plain networks shape; the IPGate branch never fires here): None =
+        off (everybody allowed — the default, the trusted-LAN posture);
+        () = nobody; otherwise the ip must land in one network."""
+        return acl_admits(self.connect_acl, ip)
 
     def serve(self, host, port):
         srv = socket.socket()

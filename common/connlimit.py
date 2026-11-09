@@ -14,6 +14,17 @@ import threading
 import time
 
 
+def rate_limit_503(body):
+    """The 503 refusal reply's header block around the tool's one-line
+    body (the byte string both serving tools send their rate-limited
+    peers; the scraper's and dashboard's bodies differ by the
+    '# rate limited: ' prefix — the regtests pin each)."""
+    return (b'HTTP/1.1 503 Service Unavailable\r\n'
+            b'Content-Type: text/plain; charset=utf-8\r\n'
+            b'Cache-Control: no-store\r\n'
+            b'Connection: close\r\n\r\n' + body)
+
+
 class ConnGate:
     """ admit(ip) -> (ok, reason): False with reason 'total' or 'per-ip' past
     the caps; release(ip) after serving (or after a refused admit that was
@@ -72,6 +83,9 @@ class GatedHTTPServer(http.server.ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
     gate = None
+    RATE_LIMIT_503 = None   # the refusal reply a subclass opts into (the header
+                            # block is rate_limit_503(); the body line is the tool's)
+    gate_log = None         # the logger the rejection line rides (None = silent)
 
     def setup_gate(self, max_total=0, max_per_ip=0):
         self.gate = ConnGate(max_total, max_per_ip)
@@ -107,6 +121,14 @@ class GatedHTTPServer(http.server.ThreadingHTTPServer):
             pass
 
     def gate_refused(self, request, client_address, why):
+        if self.gate_log:
+            self.gate_log.info('rejected %s: too many concurrent clients (%s, max %d/%d)',
+                               client_address, why, self.gate.max_total, self.gate.max_per_ip)
+        if self.RATE_LIMIT_503:
+            try:
+                request.sendall(self.RATE_LIMIT_503)
+            except OSError:
+                pass
         self._refuse_close(request)
 
     def acl_allows(self, ip):

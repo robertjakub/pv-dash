@@ -444,6 +444,100 @@ def as_bool(v):
     raise ValueError('a bool field is true/false (or on/off), got %r' % (v,))
 
 
+_CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
+
+
+def parse_registry_sections(meta):
+    """The registry's `show` and `commands` sections -> the control-grammar
+    vocabulary, one parse for the family's four loaders (the rows live in
+    each lib/options.json; the shape is the family's — the loaders assign
+    their globals from the returned dict). The show commands expand into
+    the live-path space: the row's own `live` when it spells the hierarchy,
+    else the word itself. The control commands key by the wire word (the
+    row's `live`, else the name — the name is the registry key, never
+    typed). A `node` row's descr carries the namespace's word-help (the
+    walk-on borrows it; it is no command word itself). An `internal` row
+    is the machinery's own word — the wire answers, the cli never offers
+    or lists it."""
+    show_rows = meta.get('show') or []
+    show_commands = tuple((r['name'], r.get('setting-help') or r.get('help', ''), as_bool(r.get('hidden')),
+                           r.get('group'))
+                          for r in show_rows)
+    show_options = tuple(Option(r['name'], None, None,
+                                help=r.get('setting-help') or r.get('help', ''),
+                                live=r.get('live') or r['name'],
+                                group=r.get('group'),
+                                setting_help=r.get('setting-help'),
+                                hidden=as_bool(r.get('hidden')))
+                         for r in show_rows)
+    commands, cmd_help, cmd_groups, cmd_hidden = [], {}, {}, set()
+    cmd_internal = set()
+    for r in meta.get('commands') or []:
+        w = r.get('live') or r['name']
+        if as_bool(r.get('node')):   # a tree row: its descr carries the namespace's word-help
+            cmd_help[w] = r.get('help', '')   # (the walk-on borrows it); it is no command word itself
+            cmd_groups[w] = r.get('group', '')   # the namespace word's group in the wire's node listing
+            continue
+        commands.append(w)
+        cmd_help[w] = r.get('help', '')
+        cmd_groups[w] = r.get('group', '')
+        if as_bool(r.get('hidden')):
+            cmd_hidden.add(w)
+        if as_bool(r.get('internal')):
+            cmd_internal.add(w)
+    return {
+        'SHOW_COMMANDS': show_commands,
+        'SHOW_WORDS': tuple(w for w, _, _, _ in show_commands),
+        'SHOW_HIDDEN': frozenset(w for w, _, hid, _ in show_commands if hid),
+        'SHOW_VALUES': tuple((w, d) for w, d, _, _ in show_commands),
+        'SHOW_GROUPS': {w: g for w, _, _, g in show_commands},
+        'SHOW_OPTIONS': show_options,
+        'SHOW_BY_LIVE': {o.live: o.name for o in show_options},   # the hierarchy live -> the report's word
+        'COMMANDS': tuple(commands),
+        'COMMAND_HELP': cmd_help,
+        'COMMAND_GROUPS': cmd_groups,
+        'COMMAND_HIDDEN': frozenset(cmd_hidden),
+        'COMMAND_INTERNAL': frozenset(cmd_internal),
+    }
+
+
+def option_rows(rows, static_defaults=None, choices=None):
+    """The registry's option rows -> the common Option tuples. The default
+    ladder: the static.json-wired default wins, then the row's explicit
+    `default`, then the bool native (False) — a negates row (the --no-x
+    form) stays None so the negating flag defaults off. `choices` is the
+    tool's name -> word-tuple map from static.json; the log-level's word
+    list doubles as the control grammar's completable values (the values
+    ride the choices)."""
+    static_defaults = static_defaults or {}
+    choices = choices or {}
+    out = []
+    for row in rows:
+        opt = Option(row['name'], row.get('flag'), row.get('env'),
+                     help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
+                     live=row.get('live'), alias=row.get('alias'),
+                     secret=as_bool(row.get('secret')),
+                     group=row.get('group'),
+                     negates=row.get('negates'),
+                     setting_help=row.get('setting-help'), values=row.get('values'),
+                     hint=row.get('hint'), value_help=row.get('value-help'),
+                     min=row.get('min'), max=row.get('max'), check=row.get('check'), hidden=as_bool(row.get('hidden')),
+                     restart=as_bool(row.get('restart')),
+                     node=as_bool(row.get('node')))
+        if opt.name in static_defaults:
+            opt.default = static_defaults[opt.name]
+        elif 'default' in row:
+            opt.default = row['default']
+        elif opt.conv is bool and not opt.negates:
+            opt.default = False
+        if opt.name in choices:
+            opt.choices = choices[opt.name]
+            if opt.name == 'log-level':
+                opt.values = opt.choices   # the control grammar's completable words
+        out.append(opt)
+    return tuple(out)
+
+
 class Setting:
     """One live control setting — the registry's control-grammar view: the
     `set <name>` name (a '/'-path: the wire spells its segments as words —

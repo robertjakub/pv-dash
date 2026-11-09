@@ -35,14 +35,13 @@ way.
 A restore puts the words back as they were (their ttl bounds any
 staleness); a later map swap prunes whatever the profile no longer names."""
 
-import hashlib
 import hmac
 import json
 import logging
 import os
 import time
 
-from common.dump import SEALED_VERSION, open_dump, seal
+from common.dump import SEALED_VERSION, open_dump, payload_hash, seal
 from common.dump import write_dump as _state_write_dump
 from common.dump import read_dump_state as _state_read_dump_state
 
@@ -50,12 +49,6 @@ logger = logging.getLogger('modbus-cache')
 
 FORMAT = 'modbus-cache-dump'
 VERSION = 1
-
-
-def _payload_hash(state):
-    """The canonical serialization's sha256 — the dump's integrity hash."""
-    payload = json.dumps(state, sort_keys=True, separators=(',', ':'))
-    return hashlib.sha256(payload.encode('utf-8')).hexdigest()
 
 
 def write_state_dump(path, settings, key=None):
@@ -93,7 +86,7 @@ def write_dump(path, cache, settings=None, with_cache=True, key=None):
     else:
         words = {}
     n = len(words)
-    state['hash'] = _payload_hash(state)
+    state['hash'] = payload_hash(state)
     if key:
         state = dict({'format': FORMAT, 'version': SEALED_VERSION},
                      **seal(key, json.dumps(state, sort_keys=True, separators=(',', ':')).encode('utf-8')))
@@ -126,7 +119,7 @@ def read_dump(path, key=None):
     if not isinstance(state.get('hash'), str):
         raise ValueError('the dump %s predates the integrity hash — dump again (nothing restored)' % path)
     want = state.pop('hash')
-    if not hmac.compare_digest(want, _payload_hash(state)):
+    if not hmac.compare_digest(want, payload_hash(state)):
         raise ValueError('the dump %s fails its integrity hash (edited, truncated or foreign content) '
                          '— nothing restored' % path)
     words, stamps = {}, {}

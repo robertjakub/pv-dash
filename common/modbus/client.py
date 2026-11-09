@@ -7,7 +7,48 @@ come from each tool's lib/static.json."""
 import socket
 
 from .protocol import (DeviceError, ModbusError, auth_handshake_client,
-                       waveshare_handshake_client)
+                       recv_exact, waveshare_handshake_client)
+
+
+class ClientBase:
+    """The client-leg plumbing both Modbus TCP clients share: the endpoint
+    fields, the close, the recv wrapper (OSError -> ModbusError) and the
+    reconnect-on-connect (the auth handshake armed). The subclass keeps
+    its own extras (the scraper's offset/apply, the cache's counters) and
+    its read ladders."""
+
+    def __init__(self, host, port, unit, timeout, auth=None, auth_key=None):
+        self.host = host
+        self.port = port
+        self.unit = unit
+        self.timeout = timeout
+        self.auth = auth          # None = no auth | 'suite' = the crypt handshake
+                                  # | 'waveshare' = the Waveshare gateway connection password
+        self.auth_key = auth_key  # the shared key the handshake proves
+        self.sock = None
+        self.txn = 0
+
+    def after_connect(self):
+        """The subclass's post-connect hook (the cache's session counters)."""
+
+    def close(self):
+        if self.sock:
+            try:
+                self.sock.close()
+            except OSError:
+                pass
+            self.sock = None
+
+    def _connect(self):
+        self.close()
+        self.sock = open_socket(self.host, self.port, self.timeout, self.auth, self.auth_key)
+        self.after_connect()
+
+    def _recv_exact(self, n):
+        try:
+            return recv_exact(self.sock, n)
+        except OSError as e:
+            raise ModbusError(str(e))
 
 
 def open_socket(host, port, timeout, auth=None, auth_key=None):

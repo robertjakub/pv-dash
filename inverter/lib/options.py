@@ -21,9 +21,8 @@ scripts/check_options.py."""
 import json
 import os
 
-from common.options import Option, as_bool, make_describe, settings_of
+from common.options import as_bool, make_describe, option_rows, parse_registry_sections, settings_of
 
-_CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 
 # The verbs the control grammar speaks (the RBAC vocabulary — an ops verb
 # set must name verbs this server knows). 'clear' rides along: the family's
@@ -34,15 +33,15 @@ KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'reset', 'clear', 'reload', 'd
 
 
 def _load_options():
-    """The rows from lib/options.json (next to this loader). A bool knob
-    without an explicit default parses as the argparse store_true native
-    (False); a value knob defaults to None. Control-only settings (the
-    pins and the machines — a live `set` name, no flag) ride the same
-    rows with their control
-    vocabulary. The CLI defaults come from static.json (the same defaults
-    block lib/statics.py serves the rest of the tool) — read directly here
-    so the module also imports flat (scripts/check_options.py walks lib/
-    on sys.path)."""
+    """The rows from lib/options.json (next to this loader): the shared
+    registry parser (common/options.py parse_registry_sections — the
+    show/commands sections, the control-grammar vocabulary) and the
+    shared row builder (option_rows). Control-only settings (the pins and
+    the machines — a live `set` name, no flag) ride the same rows with
+    their control vocabulary. The CLI defaults come from static.json (the
+    same defaults block lib/statics.py serves the rest of the tool) — read
+    directly here so the module also imports flat
+    (scripts/check_options.py walks lib/ on sys.path)."""
     here = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
@@ -66,76 +65,9 @@ def _load_options():
     with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
         meta = json.load(f)
         rows = meta['options']
-        global SHOW_COMMANDS, SHOW_WORDS, SHOW_HIDDEN, SHOW_VALUES, SHOW_GROUPS, SHOW_OPTIONS, SHOW_BY_LIVE
-        global COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, COMMAND_INTERNAL
-        SHOW_COMMANDS = tuple((r['name'], r.get('setting-help') or r.get('help', ''), as_bool(r.get('hidden')),
-                               r.get('group'))
-                              for r in meta.get('show') or [])
-        SHOW_WORDS = tuple(w for w, _, _, _ in SHOW_COMMANDS)
-        SHOW_HIDDEN = frozenset(w for w, _, hid, _ in SHOW_COMMANDS if hid)
-        SHOW_VALUES = tuple((w, d) for w, d, _, _ in SHOW_COMMANDS)
-        SHOW_GROUPS = {w: g for w, _, _, g in SHOW_COMMANDS}
-        # the show commands expand into the live-path space: the row's own
-        # `live` when it spells the hierarchy, else the word itself
-        SHOW_OPTIONS = tuple(Option(r['name'], None, None,
-                                    help=r.get('setting-help') or r.get('help', ''),
-                                    live=r.get('live') or r['name'],
-                                    group=r.get('group'),
-                                    setting_help=r.get('setting-help'),
-                                    hidden=as_bool(r.get('hidden')))
-                             for r in meta.get('show') or [])
-        SHOW_BY_LIVE = {o.live: o.name for o in SHOW_OPTIONS}   # the hierarchy live -> the report's word
-        # the control commands: the registries' `commands` rows (the wire's
-        # verb list — the console help, the completion pools and the editor
-        # read these). The wire spells the row's `live` — the show rows'
-        # fallback (the live when the row spells one, else the name); the
-        # name is the registry key, never typed. The maps key by the wire
-        # word. An `internal` row is the machinery's own word — the wire
-        # answers, the cli never offers or lists it.
-        cmd_rows = meta.get('commands') or []
-        commands, cmd_help, cmd_groups, cmd_hidden = [], {}, {}, set()
-        cmd_internal = set()
-        for r in cmd_rows:
-            w = r.get('live') or r['name']
-            if as_bool(r.get('node')):   # a tree row: its descr carries the namespace's word-help
-                cmd_help[w] = r.get('help', '')   # (the walk-on borrows it); it is no command word itself
-                cmd_groups[w] = r.get('group', '')   # the namespace word's group in the wire's node listing
-                continue
-            commands.append(w)
-            cmd_help[w] = r.get('help', '')
-            cmd_groups[w] = r.get('group', '')
-            if as_bool(r.get('hidden')):
-                cmd_hidden.add(w)
-            if as_bool(r.get('internal')):
-                cmd_internal.add(w)
-        COMMANDS = tuple(commands)
-        COMMAND_HELP = cmd_help
-        COMMAND_GROUPS = cmd_groups
-        COMMAND_HIDDEN = frozenset(cmd_hidden)
-        COMMAND_INTERNAL = frozenset(cmd_internal)   # the machinery's words: the wire answers, the cli never offers
-    out = []
-    for row in rows:
-        opt = Option(row['name'], row.get('flag'), row.get('env'),
-                     help=row.get('help', ''), conv=_CONV[row.get('conv', 'str')],
-                     live=row.get('live'), alias=row.get('alias'),
-                     secret=as_bool(row.get('secret')),
-                     group=row.get('group'),
-                     choices=choices.get(row['name']), negates=row.get('negates'),
-                     setting_help=row.get('setting-help'), values=row.get('values'),
-                     hint=row.get('hint'), value_help=row.get('value-help'),
-                     min=row.get('min'), max=row.get('max'), check=row.get('check'), hidden=as_bool(row.get('hidden')),
-                     restart=as_bool(row.get('restart')),
-                     node=as_bool(row.get('node')))
-        if opt.name in static_defaults:
-            opt.default = static_defaults[opt.name]
-        elif 'default' in row:
-            opt.default = row['default']
-        elif opt.conv is bool and not opt.negates:
-            opt.default = False
-        if opt.name == 'log-level':
-            opt.values = choices['log-level']   # the control grammar's completable words
-        out.append(opt)
-    return tuple(out)
+        for key, value in parse_registry_sections(meta).items():
+            globals()[key] = value
+    return option_rows(rows, static_defaults=static_defaults, choices=choices)
 
 
 # the control commands (the registries' `commands` rows — _load_options

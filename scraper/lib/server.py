@@ -6,15 +6,11 @@ import sys
 from http.server import BaseHTTPRequestHandler
 
 from common.config import acl_admits
-from common.connlimit import GatedHTTPServer
+from common.connlimit import GatedHTTPServer, rate_limit_503
 
 logger = logging.getLogger('scraper')
 
-RATE_LIMIT_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
-                  b'Content-Type: text/plain; charset=utf-8\r\n'
-                  b'Cache-Control: no-store\r\n'
-                  b'Connection: close\r\n\r\n'
-                  b'# rate limited: too many concurrent clients\n')
+RATE_LIMIT_503 = rate_limit_503(b'# rate limited: too many concurrent clients\n')
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -124,21 +120,14 @@ class Server(GatedHTTPServer):
     — nothing was parsed to answer, the caps never see the peer."""
 
     metrics_acl = None   # the live gate: None = any, () = none, the networks tuple, IPGate (the file chain)
+    RATE_LIMIT_503 = RATE_LIMIT_503
+    gate_log = logger
 
     def acl_allows(self, ip):
         return acl_admits(self.metrics_acl, ip)
 
     def acl_refused(self, request, client_address):
         logger.info('connection rejected: %s:%d not on the metrics ACL', *client_address[:2])
-        self._refuse_close(request)
-
-    def gate_refused(self, request, client_address, why):
-        logger.info('rejected %s: too many concurrent clients (%s, max %d/%d)',
-                    client_address, why, self.gate.max_total, self.gate.max_per_ip)
-        try:
-            request.sendall(RATE_LIMIT_503)
-        except OSError:
-            pass
         self._refuse_close(request)
 
     def handle_error(self, request, client_address):

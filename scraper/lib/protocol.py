@@ -4,39 +4,24 @@ The limits come from lib/static.json (see statics.py); the framing and the
 reply ladders are the shared common.modbus ones."""
 import struct
 
-from common.modbus import (ModbusError, check_data_bytes, check_head,
-                           check_reply, frame, open_socket, recv_exact,
+from common.modbus import (ClientBase, ModbusError, check_data_bytes,
+                           check_head, check_reply, frame, recv_exact,
                            unpack_bits)
 from .statics import MAX_BITS, MAX_PDU, MAX_COUNT
 
 
-class ModbusTCP:
+class ModbusTCP(ClientBase):
     """FC1-FC4 read client (word and bit spaces); connects lazily,
     reconnects on any error.
     The suite auth (auth='suite' + a >=16-char key) handshakes right after
     every connect: the peer answers OK and the session speaks plain Modbus,
     or ERR and the connection fails like any other."""
 
-    def __init__(self, host, port, unit, timeout, offset=0, auth=None, auth_key=None):
-        self.host = host
-        self.port = port
-        self.unit = unit
-        self.timeout = timeout
-        self.offset = offset
-        self.auth = auth          # None = no auth | 'suite' = the crypt handshake
-        self.auth_key = auth_key  # the shared key the handshake proves
-        self.sock = None
-        self.txn = 0
-
-    def close(self):
-        if self.sock:
-            try:
-                self.sock.close()
-            except OSError:
-                pass
-            self.sock = None
-
     _UNSET = object()
+
+    def __init__(self, host, port, unit, timeout, offset=0, auth=None, auth_key=None):
+        super().__init__(host, port, unit, timeout, auth=auth, auth_key=auth_key)
+        self.offset = offset
 
     def apply(self, host=None, port=None, unit=None, timeout=None, auth=_UNSET, auth_key=_UNSET):
         """Update the endpoint (and the auth material); the socket
@@ -55,16 +40,6 @@ class ModbusTCP:
             self.auth = auth
         if auth_key is not self._UNSET:
             self.auth_key = auth_key
-
-    def _recv_exact(self, n):
-        try:
-            return recv_exact(self.sock, n)
-        except OSError as e:
-            raise ModbusError(str(e))
-
-    def _connect(self):
-        self.close()
-        self.sock = open_socket(self.host, self.port, self.timeout, self.auth, self.auth_key)
 
     def read_registers(self, addr, count, fc=3):
         if not 1 <= count <= MAX_COUNT:

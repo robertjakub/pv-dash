@@ -27,10 +27,9 @@ sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common.audit import AuditLog, default_path as default_audit_path
-from common.config import default_profile_path, is_loopback_host, parse_control_target, parse_listen, parse_secret, parse_upstream
-from common.logutil import UtcFormatter
+from common.config import is_loopback_host, parse_control_target, parse_listen, parse_secret, parse_upstream
+from common.daemon import apply_restart_state, default_config_path, parse_ops_verbs, setup_logging
 from common.options import build_parser
-from common.modbus import exception_frame
 from common.version import version_string
 from lib.config import CONTROL_SOCKET_TEMPLATE, load_registers_file, load_selection, resolve_config, acl_value_text, acl_gate_summary
 from lib.options import KNOWN_VERBS, OPTIONS
@@ -40,23 +39,8 @@ from lib.upstream import Upstream
 from lib.cache import Cache
 from lib.proxy import Proxy
 from lib.control import ControlServer
-from lib.metrics import MetricsServer
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-def default_config_path():
-    """$CONFIG wins (the docker config volume); then a user's
-    config script next to the script (the flattened package layout); then
-    the dev checkout's sample at the subproject root."""
-    env = os.environ.get('CONFIG')
-    if env and env.strip():
-        return env.strip()
-    for candidate in (os.path.join(SCRIPT_DIR, 'modbus_cache.conf'),
-                      os.path.join(os.path.dirname(SCRIPT_DIR), 'modbus_cache.conf')):
-        if os.path.exists(candidate):
-            return candidate
-    return os.path.join(SCRIPT_DIR, 'modbus_cache.conf')
 
 logger = logging.getLogger('modbus-cache')
 
@@ -73,18 +57,21 @@ def parse_args():
         sys.stdout.write(daemon_page(ap))
         raise SystemExit(0)
     if args.config is None:
-        args.config = default_config_path()
+        args.config = default_config_path(SCRIPT_DIR, 'modbus_cache.conf')
     return args
 
 
-def setup_logging(cfg):
-    root = logging.getLogger()
-    root.setLevel(getattr(logging, cfg['level'], logging.INFO))
-    fmt = '%(levelname)-7s %(message)s' if os.environ.get('JOURNAL_STREAM') \
-        else '%(asctime)s %(levelname)-7s %(message)s'
-    handler = logging.StreamHandler()
-    handler.setFormatter(UtcFormatter(fmt) if not cfg['local_time'] else logging.Formatter(fmt))
-    root.addHandler(handler)
+def fold_listen(cfg, pending):
+    cfg['listen'] = pending
+
+
+def fold_metrics_listen(cfg, pending):
+    cfg['metrics_listen'] = pending
+
+
+def fold_upstream(cfg, pending):
+    fold_host, fold_port = parse_upstream(pending, label='modbus/upstream')
+    cfg['upstream'], cfg['host'], cfg['port'] = '%s:%d' % (fold_host, fold_port), fold_host, fold_port
 
 
 def install_signal_handlers(proxy, cache, args):
@@ -192,20 +179,9 @@ def main():
 
     setup_logging(cfg)
 
-    for name, pending in ControlServer.fold_restart_state(args.config, cfg['dump_key']).items():
-        # the restart-marked overrides fold into the startup config BEFORE
-        # the binds — the piece that makes the restart note true (the
-        # execv'd reload applies what the sets recorded)
-        if name == 'system/listen':
-            cfg['listen'] = pending
-        elif name == 'metrics/listen':
-            cfg['metrics_listen'] = pending
-        elif name == 'modbus/upstream':
-            fold_host, fold_port = parse_upstream(pending, label='modbus/upstream')
-            cfg['upstream'], cfg['host'], cfg['port'] = '%s:%d' % (fold_host, fold_port), fold_host, fold_port
-        elif name == 'dump/restore-on-start':
-            cfg['restore_on_start'] = str(pending).strip() in ('on', 'true', '1', 'yes')
-        logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
+    apply_restart_state(cfg, args.config, cfg['dump_key'], ControlServer,
+                        extra={'system/listen': fold_listen, 'metrics/listen': fold_metrics_listen,
+                               'modbus/upstream': fold_upstream})
 
     listen_host, listen_port = parse_listen(cfg['listen'])
     control_target = parse_control_target(cfg['control_port'], listen_port, CONTROL_SOCKET_TEMPLATE)
@@ -219,12 +195,7 @@ def main():
         logger.error('the ops token must differ from the admin token (the same secret would hand '
                      'every holder the role the server picks first)')
         raise SystemExit(2)
-    ops_verbs = frozenset(v.strip().lower() for v in (cfg['control_ops_verbs'] or 'show,clear').split(',') if v.strip())
-    unknown = sorted(v for v in ops_verbs if v not in KNOWN_VERBS)
-    if not ops_verbs or unknown:
-        logger.error('--control-ops-verbs: %s (the ops policy needs at least one verb the grammar speaks: %s)',
-                     ', '.join(unknown) if unknown else 'empty', ', '.join(sorted(KNOWN_VERBS)))
-        raise SystemExit(2)
+    ops_verbs = parse_ops_verbs(cfg['control_ops_verbs'], KNOWN_VERBS)
     if isinstance(control_target, int) and not control_token:
         logger.error('the TCP control port %d without a token is open to every local process; '
                      'set --control-token (the default unix socket needs none), '

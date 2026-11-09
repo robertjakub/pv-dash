@@ -20,6 +20,7 @@ import threading
 import time
 
 from common import dump as state
+from common.audit import AuditLog
 from common.cred import peer_uid
 from common.dump import SECRET_REMOVED
 from common.options import config_value, control_command, grouped_rows, knob_dictionary, \
@@ -669,6 +670,20 @@ class ControlServer:
 
     def _after_restore(self):
         """The tool's post-restore nudge (the scraper wakes its poll loop)."""
+
+    def rebuild_audit(self, prm, prefix, app):
+        """Build the audit trail from its params dict (the live
+        path/rotation changes rebuild from it): the fresh writer re-chains
+        from the file's own tail (common/audit.py tail_hash), so the chain
+        stays verifiable across the swap. The old trail is NOT closed — a
+        session still holding it writes its last commands there, and an
+        in-flight writer must never hit a closed file. Returns the writer
+        (None = off); the caller assigns where its live state reads. The
+        daily-rotation flag rides the params when the tool carries it."""
+        if prm['disabled']:
+            return None
+        return AuditLog(prm['path'], prefix, app=app, max_mb=prm['max_mb'],
+                        daily=prm.get('daily', False), files=prm['files'])
 
     def shutdown_dump(self):
         """The graceful stop's write-behind: the overrides to the dump path

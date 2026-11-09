@@ -499,6 +499,37 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   `--release` cut speaks the same pointer (the 0.4.0 body — 97 KB of
   pasted section — re-cut by hand).
 
+- **everywhere** — **the shared-code sweep folds the family's doubled
+  code back into `common/`**: the new `common/daemon.py` carries the
+  daemon-bin scaffolding the four entry scripts carried as near-copies
+  (the log setup, the default config path, the SIGHUP/SIGTERM watcher
+  threads, the restart-marked fold — the cache's three tool branches
+  ride an `extra` hook — the ops-verb policy check and the dump-posture
+  line; the cache keeps its `os._exit`-restart installer, the fake its
+  SignalBox); `common/modbus` gains `ClientBase` (the connect/close/recv
+  plumbing both client legs shared — the cache's session counters ride
+  `after_connect`); `GatedHTTPServer` learns the 503 refusal shape
+  (`rate_limit_503` + the opt-in `RATE_LIMIT_503`/`gate_log` attrs —
+  the metrics servers' silent close untouched); `common/control.py`
+  gains the shared `rebuild_audit` (the daily-rotation drift between
+  the cache's and the scraper's copies unifies on `prm.get('daily')`);
+  `common/options.py` gains `parse_registry_sections` + `option_rows`
+  (the four `lib/options.py` loaders shed their ~500 copied parse/build
+  lines; two latent drifts fix no-op: the bool-native default skips
+  `negates` rows family-wide, and `negates` passes through all four
+  loaders); `resolve_profile_file` takes the caller's candidate walk
+  (the fake's embedded-copy-first list rides the shared resolver); the
+  dump integrity hash is the public `payload_hash`; the fake's
+  connect-ACL check calls the shared `acl_admits`.
+  `scripts/family_drift.py` joins as the drift workflow — thirteen
+  sweep types (the code/surface/knobs passes plus the wire-text, the
+  exit/refusal, the rendered-surface, the NixOS-parity, the
+  docker/env, the suite-coverage, the F-ledger, the statics, the
+  schema/example and the secret-surface sweeps) regenerate the drift
+  working paper. Net −719/+318 across 23 files; every
+  `--help`/`--man` byte-identical, the option gates clean, the
+  ten-suite battery green.
+
 ### Fixed
 
 - **cache, scraper, inverter, dashboard** — **a busy bind answers with one

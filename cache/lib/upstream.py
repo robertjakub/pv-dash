@@ -4,24 +4,16 @@ import struct
 import threading
 import time
 
-from common.modbus import (ModbusError, check_data_bytes, check_head,
-                           check_reply, frame, open_socket, recv_exact,
+from common.modbus import (ClientBase, ModbusError, check_data_bytes,
+                           check_head, check_reply, frame, recv_exact,
                            unpack_bits)
 from .statics import BIT_READ_FUNCS, MAX_PDU
 
 
-class Upstream:
+class Upstream(ClientBase):
     def __init__(self, host, port, unit, timeout, auth=None, auth_key=None):
-        self.host = host
-        self.port = port
-        self.unit = unit
-        self.timeout = timeout
-        self.auth = auth          # None = no auth | 'suite' = the crypt handshake after every connect
-                                  # | 'waveshare' = the Waveshare gateway connection password after every connect
-        self.auth_key = auth_key  # the shared key the handshake proves
+        super().__init__(host, port, unit, timeout, auth=auth, auth_key=auth_key)
         self.lock = threading.Lock()
-        self.sock = None
-        self.txn = 0
         self.exchanges = 0         # completed request/reply exchanges
         self.connects = 0          # successful connects (2 = one reconnect)
         self.errors = 0            # failed exchanges (timeout, reset, bad frame)
@@ -31,25 +23,9 @@ class Upstream:
         self.bytes_in = 0
         self.bytes_out = 0
 
-    def close(self):
-        if self.sock:
-            try:
-                self.sock.close()
-            except OSError:
-                pass
-            self.sock = None
-
-    def _connect(self):
-        self.close()
-        self.sock = open_socket(self.host, self.port, self.timeout, self.auth, self.auth_key)
+    def after_connect(self):
         self.connects += 1
         self.connected_since = time.monotonic()
-
-    def _recv_exact(self, n):
-        try:
-            return recv_exact(self.sock, n)
-        except OSError as e:
-            raise ModbusError(str(e))
 
     def _exchange(self, out, want_txn):
         try:

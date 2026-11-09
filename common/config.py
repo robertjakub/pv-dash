@@ -658,14 +658,18 @@ def default_profile_path(name='sun2000.json'):
     return name
 
 
-def resolve_profile_file(text):
+def resolve_profile_file(text, candidates=None):
     """A profile name (sun2000, deye -> the shared profiles/ subproject) or
-    a JSON path, passed through."""
+    a JSON path, passed through. `candidates` swaps the name walk for the
+    caller's (the fake resolves its own embedded-copy-first list,
+    lib/profile.py _profile_candidates) — the default is the shared
+    _profile_candidates walk."""
+    walk = candidates or _profile_candidates
     t = (text or '').strip()
     if os.path.exists(t):
         return t
     if '/' not in t and not t.endswith('.json'):
-        for candidate in _profile_candidates(t + '.json'):
+        for candidate in walk(t + '.json'):
             if os.path.exists(candidate):
                 return candidate
     return t

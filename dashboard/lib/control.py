@@ -26,13 +26,13 @@ from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN
 from common.control import ControlServer as _ControlServer, num, numi
 from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
     match_setting_path
-from common.config import acl_table, acl_value_text, is_loopback_host, parse_control_target, \
+from common.config import acl_table, acl_value_text, is_loopback_host, parse_control_target, parse_listen, \
     resolve_metrics_acl
 from common.cred import parse_trust_uids
 from common.dump import SECRET_REMOVED, dump_filter
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
     COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, KNOWN_VERBS
-from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_PORT, LOG_LEVELS
+from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
 
@@ -261,6 +261,17 @@ class ControlServer(_ControlServer):
                     raise ValueError('dump/restore-on-start must be on or off')
                 self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
                 return self.defaults[key]
+            if key == 'system/listen':
+                try:
+                    t = parse_listen(val)
+                except SystemExit as e:
+                    raise ValueError(str(e))
+                if not self.httpd.RequestHandlerClass.auth_token and not is_loopback_host(t[0]):
+                    raise ValueError('system/listen cannot move beyond loopback while the page serves '
+                                     'without a token (F21 in docs/AUDIT.md) — pass auth-token by '
+                                     'flag/env/config and restart')
+                self.defaults[key] = '%s:%d' % t
+                return self.defaults[key]
             raise ValueError('unknown setting %s' % key)
 
         if key == 'max-clients':
@@ -330,7 +341,7 @@ class ControlServer(_ControlServer):
             return lvl
         if key == 'control/port':
             try:
-                target = parse_control_target(val, DEFAULT_PORT, CONTROL_SOCKET_TEMPLATE)
+                target = parse_control_target(val, DEFAULT_LISTEN_PORT, CONTROL_SOCKET_TEMPLATE)
             except SystemExit as e:
                 raise ValueError(str(e))
             if val in ('off', 'none', '0'):

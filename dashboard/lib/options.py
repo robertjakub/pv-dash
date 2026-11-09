@@ -44,7 +44,8 @@ def _load_options():
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
     defaults = static['defaults']
-    static_defaults = {'audit-max-mb': defaults['audit_max_mb'],
+    static_defaults = {'listen': defaults['listen'],
+                       'audit-max-mb': defaults['audit_max_mb'],
                        'audit-files': defaults['audit_files']}
     with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
         meta = json.load(f)

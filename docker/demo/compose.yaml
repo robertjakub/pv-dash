@@ -166,7 +166,7 @@ services:
       # token is mandatory, the refusal is the F13 shape. The entrypoint
       # materializes a random 0600 token into /config/page.token on the
       # first seed; read it: docker compose exec dashboard cat /config/page.token
-      BIND: 0.0.0.0
+      LISTEN: 0.0.0.0:8080
       AUTH_TOKEN: file:/config/page.token
     volumes:
       - config:/config

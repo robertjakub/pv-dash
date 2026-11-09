@@ -5,6 +5,15 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The serve-address wave (the family's one word): the dashboard trades its
+`--bind`/`--port` pair for the canon knob — `--listen HOST:PORT`
+(`$LISTEN`, live `system/listen`, hidden, restart-marked; the default
+address keeps `127.0.0.1:8080`), `show system listen` answers, the
+restart fold moves the pending value in before the binds, a `set` that
+would move a tokenless page beyond loopback refuses at set time (the F21
+shape), and the `system` node rows the namespace. The NixOS options are
+`listenHost`/`listenPort` (the cache's shape).
+
 The dump-interval wave (the family unification, the cache as the golden
 master): the dashboard gains the cache's `dump-interval` knob —
 `--dump-interval`/`$DUMP_INTERVAL`, live as `set dump-interval

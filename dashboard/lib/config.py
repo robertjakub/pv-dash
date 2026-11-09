@@ -14,9 +14,9 @@ import logging
 import os
 
 from .options import OPTIONS
-from common.config import check_control_tokens, check_token_chars, load_config_script, parse_secret, \
+from common.config import check_control_tokens, check_token_chars, load_config_script, parse_listen, parse_secret, \
     resolve_metrics_acl, Resolver, str_to_bool
-from .statics import DEFAULTS, DEFAULT_PORT, LOG_LEVELS
+from .statics import DEFAULTS, DEFAULT_LISTEN, DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
 
@@ -24,7 +24,7 @@ logger = logging.getLogger('dashboard')
 # take it as the argument), the clients' default (the template spelled with
 # the default page port)
 CONTROL_SOCKET_TEMPLATE = '/tmp/dashboard-%d.socket'
-DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_PORT
+DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_LISTEN_PORT
 
 
 def load_config(path):
@@ -68,8 +68,7 @@ def resolve_config(args, script_dir=None):
                           DEFAULTS['prom_prefix'], str).rstrip('/')
 
     cfg = {
-        'port': resolve(args.port, 'PORT', 'port', DEFAULT_PORT, int),
-        'bind': resolve(args.bind, 'BIND', 'bind', DEFAULTS['bind'], str),
+        'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULT_LISTEN, str),
         'upstream': resolve(args.upstream, 'PROM_URL', 'upstream', DEFAULTS['upstream'], str),
         'prom_prefix': prom_prefix,
         'static_dir': static_dir,
@@ -100,8 +99,7 @@ def resolve_config(args, script_dir=None):
                                           'control_socket_group', False, str_to_bool)
     check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
     check_token_chars(cfg['control_token'], 'control_token')
-    if cfg['port'] < 1 or cfg['port'] > 65535:
-        raise SystemExit('invalid port = %d: must be 1..65535' % cfg['port'])
+    parse_listen(cfg['listen'])   # the serve address validates: HOST:PORT, the port in range
     if cfg['max_clients'] < 0:
         raise SystemExit('invalid max_clients = %d: must be >= 0 (0 = unlimited)' % cfg['max_clients'])
     if cfg['client_timeout'] < 0:

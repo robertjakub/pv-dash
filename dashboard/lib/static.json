@@ -3,8 +3,7 @@
   "line_cap_bytes": 1048576
 },
   "defaults": {
-    "port": 8080,
-    "bind": "127.0.0.1",
+    "listen": "127.0.0.1:8080",
     "upstream": "http://localhost:9090",
     "prom_prefix": "/prom",
     "proxy_timeout_s": 30,

@@ -84,8 +84,6 @@ takes. The namespaces group them.
 
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `port` | — | startup-only | `N` | `--port` / `PORT` | listen port |
-| `bind` | — | startup-only | `HOST` | `--bind` / `BIND` | address to bind |
 | `upstream` | — | startup-only | `URL` | `--upstream` / `PROM_URL` | upstream Prometheus URL |
 | `prom-prefix` | — | startup-only | `PREFIX` | `--prom-prefix` / `PROM_PREFIX` | path under which Prometheus is proxied |
 | `static-dir` | — | startup-only | `PATH` | `--static-dir` / `STATIC_DIR` | directory to serve |
@@ -106,6 +104,14 @@ takes. The namespaces group them.
 | `log-access` | `set log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log every HTTP request at INFO |
 | `local-time` | — | startup-only | `on\|off` | `--local-time` / `LOCAL_TIME` | log timestamps in the system time zone instead of UTC |
 | `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
+
+### system
+
+the daemon's own serving socket: the page's listen address
+
+| knob | set / unset | kind | value | flag / env | description |
+|---|---|---|---|---|---|
+| `listen` | `set system listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
 
 ### auth
 

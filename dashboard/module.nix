@@ -18,8 +18,7 @@ let
 
   execArgs = lib.concatStringsSep " " (
     [
-      "--port ${toString cfg.port}"
-      "--bind ${cfg.host}"
+      "--listen ${cfg.listenHost}:${toString cfg.listenPort}"
       "--upstream ${cfg.prometheusUrl}"
       "--prom-prefix ${cfg.promPrefix}"
       "--config-js ${configFile}"
@@ -85,16 +84,16 @@ in
       description = "The dashboard package to run.";
     };
 
-    host = lib.mkOption {
+    listenHost = lib.mkOption {
       type = lib.types.str;
       default = "127.0.0.1";
-      description = "Address to bind.";
+      description = "Address to bind (the serve address's host part).";
     };
 
-    port = lib.mkOption {
+    listenPort = lib.mkOption {
       type = lib.types.port;
       default = 8080;
-      description = "Listen port.";
+      description = "Listen port (the serve address's port part).";
     };
 
     prometheusUrl = lib.mkOption {
@@ -313,8 +312,8 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = ''
-        The page's bearer token (F21): mandatory when host is beyond the
-        loopback. WARNING: rendered into the world-readable systemd unit
+        The page's bearer token (F21): mandatory when listenHost is beyond
+        the loopback. WARNING: rendered into the world-readable systemd unit
         in the nix store — prefer authTokenFile.
       '';
     };
@@ -324,8 +323,8 @@ in
       default = null;
       description = ''
         The page's bearer token from a file (the first line is the
-        token), mounted via systemd LoadCredential. Mandatory when host
-        is beyond the loopback (F21).
+        token), mounted via systemd LoadCredential. Mandatory when
+        listenHost is beyond the loopback (F21).
       '';
     };
 
@@ -450,7 +449,7 @@ in
         "services.dashboard: the control socket is under /tmp, which the service's PrivateTmp makes private — the CLI outside cannot reach it; use a path under /run/dashboard/ instead."
       ];
 
-    networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.port ];
+    networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.listenPort ];
 
     systemd.services.dashboard = {
       description = "PV dashboard server (static + Prometheus proxy)";

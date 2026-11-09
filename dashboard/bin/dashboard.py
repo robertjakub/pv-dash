@@ -260,9 +260,10 @@ def describe(cfg, args, control_desc):
     limits = (['max-clients %d' % cfg['max_clients']] if cfg['max_clients'] else []) + \
              (['client-timeout %gs' % cfg['client_timeout']] if cfg['client_timeout'] else []) + \
              (['max-conn-per-ip %d' % cfg['max_conn_per_ip']] if cfg['max_conn_per_ip'] else [])
+    listen_host, listen_port = parse_listen(cfg['listen'])
     return ('serving %s on http://%s:%d (proxy: %s/* -> %s, config.js: %s, page auth: %s, log level: %s, log time: %s, '
             'log access: %s, log queries: %s, limits: %s, control server: %s, %s, version: %s)' % (
-                cfg['static_dir'], cfg['bind'], cfg['port'], cfg['prom_prefix'] or '/', cfg['upstream'],
+                cfg['static_dir'], listen_host, listen_port, cfg['prom_prefix'] or '/', cfg['upstream'],
                 cfg['config_js'],
                 'bearer token' if cfg['auth_token'] else 'none (the loopback bind is the auth)',
                 cfg['level'],
@@ -288,6 +289,10 @@ def parse_args():
     return args
 
 
+def fold_listen(cfg, pending):
+    cfg['listen'] = pending
+
+
 def main():
     if '--version' in sys.argv:
         print(version_string())
@@ -296,8 +301,10 @@ def main():
     cfg = resolve_config(args, SCRIPT_DIR)
     setup_logging(cfg)
 
-    apply_restart_state(cfg, args.config, cfg['dump_key'], ControlServer)
-    control_target = resolve_control_target(cfg['control_port'], cfg['port'], CONTROL_SOCKET_TEMPLATE)
+    apply_restart_state(cfg, args.config, cfg['dump_key'], ControlServer,
+                        extra={'system/listen': fold_listen})
+    listen_host, listen_port = parse_listen(cfg['listen'])   # the fold may have moved it
+    control_target = resolve_control_target(cfg['control_port'], listen_port, CONTROL_SOCKET_TEMPLATE)
     control_token = cfg['control_token'] or None
     control_ops_token = cfg['control_ops_token'] or None
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
@@ -310,9 +317,9 @@ def main():
                      'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
                      % (cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9353')))
         raise SystemExit(2)
-    if not cfg['auth_token'] and not is_loopback_host(cfg['bind']):
+    if not cfg['auth_token'] and not is_loopback_host(listen_host):
         logger.error('refusing to expose the page beyond loopback without a token (F21 in docs/AUDIT.md): '
-                     'bind = %r — set --auth-token (or file:<path>) or bind 127.0.0.1' % cfg['bind'])
+                     'listen = %r — set --auth-token (or file:<path>) or bind 127.0.0.1' % cfg['listen'])
         raise SystemExit(2)
     metrics_desc = 'off'
     if cfg['metrics_server']:
@@ -337,9 +344,9 @@ def main():
         logger.info('dry-run: configuration is valid, nothing was bound')
         return
     try:
-        httpd = Server((cfg['bind'], cfg['port']), Handler)
+        httpd = Server((listen_host, listen_port), Handler)
     except OSError as e:
-        logger.error('cannot bind %s:%d: %s', cfg['bind'], cfg['port'], e)
+        logger.error('cannot bind %s:%d: %s', listen_host, listen_port, e)
         raise SystemExit(1)
     httpd.setup_gate(cfg['max_clients'], cfg['max_conn_per_ip'])
     started = time.monotonic()
@@ -354,8 +361,7 @@ def main():
             'log-queries': 'on' if cfg['log_queries'] else 'off',
             'log-level': cfg['level'],
             # the startup-only knobs (restart: true) — what `show <knob>` answers
-            'port': str(cfg['port']),
-            'bind': cfg['bind'],
+            'system/listen': cfg['listen'],
             'upstream': cfg['upstream'],
             'prom-prefix': cfg['prom_prefix'] or 'off',
             'static-dir': cfg['static_dir'] or 'off',
@@ -470,7 +476,7 @@ def main():
     install_signal_handlers(apply_reload=apply_reload, graceful_stop=graceful_stop)
     if audit:
         audit.event('START', 'version=%s upstream=%s listen=%s:%d control=%s'
-                    % (version_string(), cfg['upstream'], cfg['bind'], cfg['port'], control_desc))
+                    % (version_string(), cfg['upstream'], listen_host, listen_port, control_desc))
         if metrics_acl_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
             audit.event('ACL-FILE', metrics_acl_warn)
     try:

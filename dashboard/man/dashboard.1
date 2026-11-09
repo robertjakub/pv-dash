@@ -38,13 +38,8 @@ still certifies the client's exact bytes. A second, read-only token
 
 .SH OPTIONS
 .TP
-.BI \-\-port " N"
-listen port
-.TP
-.B \-\-bind
-address to bind (the default 127.0.0.1 serves tokenless; beyond loopback
-a token is mandatory — a token\-less non\-loopback bind refuses to
-start, F21)
+.B \-\-listen
+listen address HOST:PORT
 .TP
 .B \-\-upstream
 upstream Prometheus URL

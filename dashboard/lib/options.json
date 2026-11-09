@@ -1,10 +1,9 @@
 {
   "options": [
-    { "name": "port", "flag": "--port", "env": "PORT", "conv": "int", "setting-help": "listen port", "hint": "N",
-      "help": "listen port" },
-    { "name": "bind", "flag": "--bind", "env": "BIND", "conv": "str", "setting-help": "address to bind",
-      "hint": "HOST",
-      "help": "address to bind (the default 127.0.0.1 serves tokenless; beyond loopback a token is mandatory — a token-less non-loopback bind refuses to start, F21)" },
+    { "name": "system", "setting-help": "the daemon's own serving socket: the page's listen address", "node": true },
+    { "name": "listen", "flag": "--listen", "env": "LISTEN", "conv": "str", "live": "system/listen",
+      "setting-help": "listen address HOST:PORT", "hint": "HOST:PORT", "help": "listen address HOST:PORT",
+      "hidden": true, "restart": true },
     { "name": "upstream", "flag": "--upstream", "env": "PROM_URL", "conv": "str",
       "setting-help": "upstream Prometheus URL", "hint": "URL", "help": "upstream Prometheus URL" },
     { "name": "prom-prefix", "flag": "--prom-prefix", "env": "PROM_PREFIX", "conv": "str",

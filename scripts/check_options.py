@@ -35,7 +35,7 @@ TOOLS = {
 NIX_NAMES = {
     'cache': {'unit': 'unitId', 'listen': 'listenHost'},
     'scraper': {'modbus-unit': 'modbusUnit', 'listen': 'listenHost'},
-    'dashboard': {'bind': 'host', 'upstream': 'prometheusUrl', 'config-js': 'configFile'},
+    'dashboard': {'listen': 'listenHost', 'upstream': 'prometheusUrl', 'config-js': 'configFile'},
 }
 
 

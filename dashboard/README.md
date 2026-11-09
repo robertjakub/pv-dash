@@ -48,14 +48,13 @@ talks to Prometheus directly:
 
 ```bash
 python3 bin/dashboard.py                          # upstream http://localhost:9090
-python3 bin/dashboard.py --port 8080 --upstream http://192.168.1.50:9090
-python3 bin/dashboard.py --bind 127.0.0.1         # localhost only
+python3 bin/dashboard.py --listen 127.0.0.1:8080 --upstream http://192.168.1.50:9090
 PROM_URL=http://pi:9090 python3 bin/dashboard.py  # via env
 # open http://localhost:8080
 ```
 
 By default the server **binds to `127.0.0.1:8080`** (loopback only) — pass
-`--bind 0.0.0.0` to serve the LAN. The page and the proxy speak the
+`--listen 0.0.0.0:8080` to serve the LAN. The page and the proxy speak the
 family's F13 shape (the audit's F21): a **bearer token is mandatory beyond
 loopback** — a token-less non-loopback bind refuses to start. Set
 `--auth-token` (or `file:<path>`); the browser opens
@@ -140,7 +139,7 @@ control server.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--port` / `--bind` | `8080` / `127.0.0.1` | the HTTP bind (loopback by default; beyond loopback `--auth-token` is mandatory, F21) |
+| `--listen` | `127.0.0.1:8080` | the HTTP serve address `HOST:PORT` (loopback by default; beyond loopback `--auth-token` is mandatory, F21) |
 | `--upstream` | `http://localhost:9090` | the Prometheus URL the proxy forwards to |
 | `--prom-prefix` | `/prom` | the proxy path (empty = proxy everything) |
 | `--static-dir` | the packaged `static/` | override the served static directory |
@@ -182,7 +181,7 @@ python3 bin/dashboard-cli.py                        # the console: TAB completio
 
 | Command | Effect |
 |---|---|
-| `set` / `unset` | the live settings: the caps, `log-access`, `log-queries`, `log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — the tokens (`control token`, `control ops token`, `metrics token`, `auth token`) are startup-only: the wire refuses set/unset, pass them by flag/env/config |
+| `set` / `unset` | the live settings: the caps, `log-access`, `log-queries`, `log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — `system listen` (the serve address, `show system listen` answers it) is startup-only and answers the restart note like the tokens (`control token`, `control ops token`, `metrics token`, `auth token`): pass them by flag/env/config |
 | `show <setting>` / `show knobs` / `show connections` | the value / the registry / the live HTTP clients per peer IP |
 | `inspect` | the one-page dump for a bug report |
 | `request reload-config` | re-read `server.conf` (the SIGHUP path; the listen address and port are bound and stay) |
@@ -209,7 +208,7 @@ location / { proxy_pass http://127.0.0.1:8080; }   # nginx
 solar.example.com { reverse_proxy 127.0.0.1:8080 }  # Caddy
 ```
 
-Run `bin/dashboard.py --bind 127.0.0.1` so only the proxy reaches it.
+Run `bin/dashboard.py --listen 127.0.0.1:8080` so only the proxy reaches it.
 
 **B. Proxy serves static files and routes `/prom` to Prometheus itself:**
 

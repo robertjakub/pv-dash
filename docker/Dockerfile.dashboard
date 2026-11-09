@@ -57,7 +57,7 @@ EXPOSE 8080
 # the container binds every interface (a published port needs it) — beyond
 # loopback the page's bearer token is mandatory (F21): the compose rides
 # the generated /config/page.token, a plain run passes AUTH_TOKEN
-CMD ["dashboard", "--bind", "0.0.0.0"]
+CMD ["dashboard", "--listen", "0.0.0.0:8080"]
 
 # Liveness: the ctl answers over the server's unix control socket (the
 # default socket follows the bundled conf's port; the check runs as root —

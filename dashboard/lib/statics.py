@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The dashboard's static configuration: the shipped defaults for the static
-file server with the Prometheus proxy — the listen port, the bind address,
+file server with the Prometheus proxy — the listen address,
 the upstream Prometheus URL, the proxy path prefix and timeout, the log
 level and the battery flag — kept in one JSON file (lib/static.json)
 instead of being scattered over the modules. Loaded once at import;
@@ -15,14 +15,14 @@ with open(os.path.join(_here, 'static.json'), encoding='utf-8') as _f:
 LOG_LEVELS = tuple(STATIC['log_levels'])
 
 DEFAULTS = STATIC['defaults']
-DEFAULT_PORT = DEFAULTS['port']
+DEFAULT_LISTEN = DEFAULTS['listen']
+DEFAULT_LISTEN_PORT = int(DEFAULT_LISTEN.rsplit(':', 1)[1])
 
 # the control socket's name: the daemon's template (common.config's parsers
 # take it as the argument), the clients' default (the template spelled with
 # the default page port)
 CONTROL_SOCKET_TEMPLATE = '/tmp/dashboard-%d.socket'
-DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_PORT
-DEFAULT_BIND = DEFAULTS['bind']
+DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_LISTEN_PORT
 DEFAULT_UPSTREAM = DEFAULTS['upstream']
 DEFAULT_PROM_PREFIX = DEFAULTS['prom_prefix']
 PROXY_TIMEOUT_S = DEFAULTS['proxy_timeout_s']

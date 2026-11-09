@@ -179,11 +179,12 @@ the /metrics bearer auth: the token the exposition endpoint requires
 
 ### audit
 
-the SCR audit trail: the sink, the rotation, the kill switch
+the SCR audit trail: the sink, the forwarding, the rotation, the kill switch
 
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `audit-log` | `set audit log-file` | settable | `PATH\|-` | `--audit-log` / `AUDIT_LOG` | SCR audit trail: a file path or - for stdout (the docker/journald way); default: the XDG state home (~/.local/state/modbus-scraper/audit.log) |
+| `audit-forward` | `set audit forward` | settable | `syslog\|none` | `--audit-forward` / `AUDIT_FORWARD` | also mirror every audit line to the local syslog (journald picks them up, chain hash included) |
 | `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the SCR audit trail |
 
 ### audit/rotate

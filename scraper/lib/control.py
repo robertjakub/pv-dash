@@ -25,6 +25,7 @@ import threading
 import time
 
 from common.render.human import secs
+from common.runtime.audit import AUDIT_FORWARD_CHOICES
 from common.runtime.version import version_string
 from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.wire.control import ControlServer as _ControlServer, num, numi
@@ -401,6 +402,7 @@ class ControlServer(_ControlServer):
             self.audit_params['max_mb'] = v
             with s.lock:
                 s.cfg['audit_max_mb'] = v
+            self._rebuild_audit()
             return '%g' % v
         if key == 'audit/rotate/daily':
             if val in ('on', 'true', '1', 'yes'):
@@ -412,6 +414,7 @@ class ControlServer(_ControlServer):
             self.audit_params['daily'] = on
             with s.lock:
                 s.cfg['audit_daily'] = on
+            self._rebuild_audit()
             return 'on' if on else 'off'
         if key == 'audit/rotate/files':
             v = numi(val, 'files', 'backups')
@@ -419,7 +422,15 @@ class ControlServer(_ControlServer):
             self.audit_params['files'] = v
             with s.lock:
                 s.cfg['audit_files'] = v
+            self._rebuild_audit()
             return '%d' % v
+        if key == 'audit/forward':
+            if val not in ('none', 'syslog'):
+                raise ValueError('audit/forward must be one of %s' % ', '.join(AUDIT_FORWARD_CHOICES))
+            self.audit_params['forward'] = None if val == 'none' else val
+            with s.lock:
+                s.cfg['audit_forward'] = val
+            return self._rebuild_audit()
         if key == 'audit/disable':
             if val in ('on', 'true', '1', 'yes'):
                 on = True
@@ -517,6 +528,8 @@ class ControlServer(_ControlServer):
             return 'on' if self.socket_group else 'off'
         if key == 'audit/log-file':
             return self.audit.path if self.audit else 'off'
+        if key == 'audit/forward':
+            return self.audit_params.get('forward') or 'none'
         if key == 'audit/rotate/max-size':
             return '%g' % self.audit_params['max_mb']
         if key == 'audit/rotate/daily':
@@ -591,6 +604,7 @@ class ControlServer(_ControlServer):
             'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
             'control/socket-group': 'on' if self.socket_group else 'off',
             'audit/log-file': self.audit.path if self.audit else 'off',
+            'audit/forward': self.audit_params.get('forward') or 'none',
             'audit/rotate/max-size': '%g' % self.audit_params['max_mb'],
             'audit/rotate/files': '%d' % self.audit_params['files'],
             'audit/disable': 'on' if self.audit_params['disabled'] else 'off',

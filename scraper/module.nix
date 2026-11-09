@@ -78,6 +78,7 @@ let
       (setLine "audit-daily" (lib.boolToString cfg.auditDaily))
       (setLine "audit-files" (toString cfg.auditFiles))
     ])
+    (lib.optionals (cfg.auditForward != null) [ (setLine "audit-forward" cfg.auditForward) ])
     ""
     "# --- the log surface ---"
     (setLine "log-level" cfg.logLevel)
@@ -381,6 +382,17 @@ in
         reloads, shutdowns): a file path, or "-" for stdout (default —
         journald captures it; the hardened service cannot write the XDG
         state home). null = the tool's default (the XDG state home).
+      '';
+    };
+
+    auditForward = lib.mkOption {
+      type = lib.types.nullOr (lib.types.enum [ "syslog" ]);
+      default = null;
+      description = ''
+        Also forward the SCR audit trail to the local syslog socket
+        ("syslog"): journald picks every audit line up — the sealed external
+        copy beside the file/stdout sink, the per-writer hash chain included.
+        null = off.
       '';
     };
 

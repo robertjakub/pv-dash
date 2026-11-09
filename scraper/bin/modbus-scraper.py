@@ -111,10 +111,15 @@ def main():
     audit_params = {'path': None if cfg['no_audit_log'] else cfg['audit_log'],
                     'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],
                     'daily': cfg['audit_daily'],
+                    'forward': None if cfg['audit_forward'] in (None, '', 'none') else cfg['audit_forward'],
                     'disabled': bool(cfg['no_audit_log'])}
-    audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'], 'SCR', app='modbus-scraper',
-                                                      max_mb=cfg['audit_max_mb'], daily=cfg['audit_daily'],
-                                                      files=cfg['audit_files'])
+    try:
+        audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'], 'SCR', app='modbus-scraper',
+                                                          max_mb=cfg['audit_max_mb'], daily=cfg['audit_daily'],
+                                                          files=cfg['audit_files'], forward=cfg['audit_forward'])
+    except ValueError as e:
+        logger.error(str(e))
+        raise SystemExit(1)
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target) \
         + (', read-only ops token accepted' if control_ops_token else '')
@@ -207,7 +212,7 @@ def main():
         return control.audit if control else audit
 
     def apply_reload():
-        """The SIGHUP and the `request reload` command share this: re-resolve
+        """The SIGHUP and the `request reload-config` command share this: re-resolve
         the config, apply what is live (the gate, the handler, the poller),
         clear the override markers, audit."""
         new_cfg = resolve_config(args, SCRIPT_DIR)
@@ -221,13 +226,11 @@ def main():
         httpd.metrics_acl = metrics_acl
         if metrics_acl_warn:
             logger.warning('acl file: %s', metrics_acl_warn)
+        summary = 'upstream %s:%d unit %d, interval %gs' % (new_cfg['host'], new_cfg['modbus_port'],
+                                                            new_cfg['modbus_unit'], new_cfg['interval'])
         if control:
-            control.clear_overrides()   # the config won: nothing is live-overridden
             control.metrics_acl_warn = metrics_acl_warn
-            # the dump-interval loop re-reads the configured interval (the
-            # parked dumper wakes to see it)
-            control.dump_interval = new_cfg['dump_interval']
-            control.dump_wake.set()
+            control.reloaded(summary, dump_interval=new_cfg['dump_interval'])
         a = the_audit()
         if a:
             a.event('RELOAD', 'upstream %s:%d unit %d, interval %gs, auth %s'
@@ -235,11 +238,10 @@ def main():
                        'bearer' if new_cfg['auth_token'] else 'none'))
             if metrics_acl_warn:
                 a.event('ACL-FILE', metrics_acl_warn)
-        return 'upstream %s:%d unit %d, interval %gs' % (new_cfg['host'], new_cfg['modbus_port'],
-                                                         new_cfg['modbus_unit'], new_cfg['interval'])
+        return summary
 
     if control:
-        control.reloader = apply_reload   # the control server's `request reload` runs the same path
+        control.reloader = apply_reload   # the control server's `request reload-config` runs the same path
 
     def graceful_stop(reason):
         logger.info('shutdown: %s received after %ds (%d poll errors), stopping the web server',

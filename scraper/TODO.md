@@ -5,6 +5,15 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The docs restructure wave: the README re-laid on the family's one skeleton
+and shortened (587 → ~330 lines) — the Nix/NixOS section moved to
+[docs/NIXOS.md](../docs/NIXOS.md) (the README's option list still carried
+the RETIRED register/scale options — `pvRegister`, `gridRegister`,
+`scale`, `gridScale`, `batteryRegister`, `batterySocRegister` — and the
+stale "config INI" claim; both died with the move, the list is rebuilt
+from `module.nix`), and the control-server wall became the command table
+with the wire story pointed at the family docs.
+
 The control-listener family wave: the scraper's private copy of the
 listener tier (the live rebind family its control-port wave carried)
 folds back into `common/control.py` — ONE implementation for the four

@@ -2,8 +2,10 @@
 
 Every **open** item lives here — grouped by theme, each tagged
 `[cache]` `[scraper]` `[inverter]` `[dashboard]` `[common]` `[docker]`
-(untagged = the whole family). The per-subproject `TODO.md` files keep only
-the **Done/history** records for their tool.
+(untagged = the whole family). The per-subproject `TODO.md` files keep
+only the **Done/history** records for their tool —
+[cache](../cache/TODO.md), [scraper](../scraper/TODO.md),
+[inverter](../inverter/TODO.md), [dashboard](../dashboard/TODO.md).
 
 ## The control plane (the grammar follow-through)
 

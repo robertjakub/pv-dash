@@ -188,6 +188,15 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   `schema/*.schema.json` files too (the scraper's were the only ones
   shipped).
 
+### Fixed
+
+- **scraper** — **a live `modbus/offset` set reaches the client**: the
+  registry row said live, but the poller's `apply()` had no `offset=`
+  plumbing — a live set wrote the config and changed nothing (the poll
+  kept the start offset until a reload). `apply()` takes the offset and
+  the `_apply` branch mirrors `modbus/unit`; the row carries the
+  ±100000 bounds (the parity with the start-path check).
+
 ### Changed
 
 - **scraper** — **the legacy flat-spec wire-name fallback retires from

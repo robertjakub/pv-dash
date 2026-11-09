@@ -23,7 +23,7 @@ class ModbusTCP(ClientBase):
         super().__init__(host, port, unit, timeout, auth=auth, auth_key=auth_key)
         self.offset = offset
 
-    def apply(self, host=None, port=None, unit=None, timeout=None, auth=_UNSET, auth_key=_UNSET):
+    def apply(self, host=None, port=None, unit=None, timeout=None, offset=None, auth=_UNSET, auth_key=_UNSET):
         """Update the endpoint (and the auth material); the socket
         reconnects on the next read. The auth kwargs are positional-aware:
         pass them explicitly (None included — a reload that disables the
@@ -34,6 +34,8 @@ class ModbusTCP(ClientBase):
             self.port = port
         if unit is not None:
             self.unit = unit
+        if offset is not None:
+            self.offset = offset
         if timeout is not None:
             self.timeout = timeout
         if auth is not self._UNSET:

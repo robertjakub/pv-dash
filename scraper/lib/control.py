@@ -345,6 +345,10 @@ class ControlServer(_ControlServer):
             v = self._typed(key, val)
             s.client.apply(unit=v)
             return '%d' % v
+        if key == 'modbus/offset':
+            v = self._typed(key, val)
+            s.client.apply(offset=v)
+            return '%d' % v
         if key == 'modbus/auth':
             try:
                 v = parse_auth_type(val, 'modbus/auth')

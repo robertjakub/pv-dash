@@ -274,6 +274,57 @@ try:
           str({k: m.get(k) for k in ('huawei_up', 'huawei_modbus_errors_total')}))
     evil4.stop()
 
+    # 1a-bis-2. the modbus offset: the live set reaches the client and the
+    # next poll reads the shifted addresses — a large offset moves the whole
+    # window off the device map (the poll must fail loudly, not silently),
+    # unset reads the map true again. The shipped sun2000 map anchors the reads.
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--strict', '--listen', '127.0.0.1:15608',
+                                   '--control-port', '0'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(0.7)
+    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
+                                    '--upstream', '127.0.0.1:15608',
+                                   '--listen', '127.0.0.1:9368',
+                                   '--control-port', '15610', '--control-token', 'offstok'],
+                                  stdout=open('/tmp/scr_offset.log', 'w'), stderr=subprocess.STDOUT))
+    for _ in range(30):
+        status, m = wait_metrics(9368)
+        if 'huawei_pv_generation_watts' in m:
+            break
+        time.sleep(0.3)
+    check('modbus offset: the poll reads the map true (pv 4000, up)',
+          m.get('huawei_pv_generation_watts') == 4000 and m.get('scraper_up') == 1,
+          str({k: m.get(k) for k in ('huawei_pv_generation_watts', 'scraper_up')}))
+    r = subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py'),
+                        '--control-port', '15610', '--control-token', 'offstok',
+                        'set', 'modbus', 'offset', '20000'], capture_output=True, text=True, timeout=15)
+    check('modbus offset: the live set answers the typed value', r.stdout.startswith('ok modbus/offset=20000'),
+          repr(r.stdout[:90] + r.stderr[:90]))
+    for _ in range(30):
+        status, m = wait_metrics(9368, want='scraper_up')
+        if m.get('scraper_up') == 0 and m.get('scraper_modbus_errors_total', 0) >= 1:
+            break
+        time.sleep(0.3)
+    check('modbus offset: the shift moves the window off the map (the poll fails loudly)',
+          m.get('scraper_up') == 0 and m.get('scraper_modbus_errors_total', 0) >= 1,
+          str({k: m.get(k) for k in ('scraper_up', 'scraper_modbus_errors_total')}))
+    r = subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py'),
+                        '--control-port', '15610', '--control-token', 'offstok',
+                        'unset', 'modbus', 'offset'], capture_output=True, text=True, timeout=15)
+    check('modbus offset: unset restores the configured zero', r.stdout.startswith('ok modbus/offset=0'),
+          repr(r.stdout[:90]))
+    for _ in range(30):
+        status, m = wait_metrics(9368, want='scraper_up')
+        if m.get('scraper_up') == 1 and m.get('huawei_pv_generation_watts') == 4000:
+            break
+        time.sleep(0.3)
+    check('modbus offset: the restore reads the map true again',
+          m.get('huawei_pv_generation_watts') == 4000 and m.get('scraper_up') == 1,
+          str({k: m.get(k) for k in ('huawei_pv_generation_watts', 'scraper_up')}))
+    subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py'),
+                    '--control-port', '15610', '--control-token', 'offstok', 'shutdown'],
+                   capture_output=True, text=True, timeout=15)
+
     # 1a-ter. the bit and float types: a bit source reads over FC1, an f32
     # source decodes IEEE 754, an f32swap source the lo-hi word order — and
     # the profile-bound extras (beyond the power math) export soft.

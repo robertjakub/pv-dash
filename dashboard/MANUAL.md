@@ -156,7 +156,8 @@ scrape presents and the client ACL checked at accept
 
 ### audit/rotate
 
-TODO: need update
+the audit trail's rotation: the size trigger, the UTC-midnight trigger and
+the backup count
 
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|

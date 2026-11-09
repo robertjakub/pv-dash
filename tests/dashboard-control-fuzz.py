@@ -455,6 +455,25 @@ def main():
         r = page_get(15980, b'/config.js')
         check('page auth: the tokenless loopback page serves', r.startswith(b'HTTP/1.1 200'), r[:40])
 
+        # 8b2. the audit family's one shape on the DSH: the daily knob's live
+        #      name (the UTC-midnight trigger switches on the wire), the
+        #      bounds refuse at the resolve layer
+        st, tx = roundtrip(PAGES_CTL, signed('set audit rotate daily on'))
+        check('dash audit-daily: the daily trigger switches on',
+              st == 'ok' and tx.startswith('audit/rotate/daily=on'), '%s %s' % (st, tx))
+        st, tx = roundtrip(PAGES_CTL, signed('show audit rotate daily'))
+        check('dash audit-daily: show audit rotate daily answers on',
+              st == 'ok' and tx == 'audit/rotate/daily=on', '%s %s' % (st, tx))
+        st, tx = roundtrip(PAGES_CTL, signed('unset audit rotate daily'))
+        check('dash audit-daily: the daily trigger unsets to the configured off',
+              st == 'ok' and tx.startswith('audit/rotate/daily=off'), '%s %s' % (st, tx))
+        env = dict(os.environ, AUDIT_FILES='0')
+        r = subprocess.run([sys.executable, P, '--dry-run', '--control-port', '0'],
+                           capture_output=True, text=True, env=env)
+        check('dash audit: $AUDIT_FILES=0 refuses at start (the bound, no traceback)',
+              r.returncode == 1 and 'must be 1..100' in r.stdout + r.stderr
+              and 'Traceback' not in r.stdout + r.stderr, (r.stdout + r.stderr)[-160:])
+
         # 8c. the control listener family (the cache's, family-wide): the
         #     live rebind — the tokenless TCP rebind refuses on the live
         #     wire (F5), the token'd rebind swaps the socket, the old one

@@ -44,9 +44,11 @@ def _load_options():
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
     defaults = static['defaults']
-    static_defaults = {'listen': defaults['listen'],
-                       'audit-max-mb': defaults['audit_max_mb'],
-                       'audit-files': defaults['audit_files']}
+    # the audit rotation defaults do NOT ride the argparse parser: a
+    # static-wired default would shadow the env layer (the resolver never
+    # falls through a truthy flag value) — they ladder flag > env > config
+    # > static in lib/config.py like every other knob
+    static_defaults = {'listen': defaults['listen']}
     with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
         meta = json.load(f)
         rows = meta['options']

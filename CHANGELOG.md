@@ -12,6 +12,19 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Added
 
+- **common** — **the static texts are one JSON home** (`common/texts.json`,
+  loaded by the new `common/texts.py`): the console's faces and reconnect
+  ladder, the ctl's, the four welcome banners, the wire's fixed replies
+  (the auth/mac/forbidden family, the reload/dump/restore heads, the
+  restart note, the show-config comment) and the daemon bind/startup lines
+  resolve through the dotted `T(key)` — byte-identical renders, no text
+  changed. The gate `scripts/lint_texts.py --check` fails an unresolved
+  reference, an orphan key and a duplicated value (one text, one home);
+  the four `package.nix` and the four Dockerfiles ship the JSON beside the
+  common modules. The wire's status tokens (`ok`/`err`/`note`/`bye`,
+  `daemon-exit`, the `*** SECRET REMOVED ***` placeholder) keep their
+  grammar homes — the prose moved, the protocol did not.
+
 - **everywhere** — **the `audit-daily` knob is one shape, family-wide**:
   the UTC-midnight audit-rotation trigger is a live knob on all four —
   the scraper and the dashboard gain the row

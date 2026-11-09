@@ -1,4 +1,4 @@
-# Security-audit history — the pv-suite tree (rev. 1–24)
+# Security-audit history — the pv-suite tree (rev. 1–25)
 
 The per-revision record behind [AUDIT.md](AUDIT.md): the revision history,
 the closed findings with their fix and verification. Findings keep their
@@ -32,6 +32,7 @@ numbers across revisions; the current state lives in AUDIT.md.
 | 22 | the control-listener unification | ONE listener tier in `common/control.py`; the private copies shed |
 | 23 | the metrics-stack unification | one metrics stack on all four tools; the default binds renumbered 9350–9353 |
 | 24 | the secrets-startup-only wave | the live secret rotation retired family-wide (see AUDIT.md) |
+| 25 | the alert rules pack | F16 closed — the detection half of the audit vocabulary ships with the exporter (`scraper/alerts.yml`; the cache side on a new `modbus_cache_write_refused_total` counter) |
 
 ## 2. Closed findings (fix and verification)
 
@@ -49,6 +50,7 @@ numbers across revisions; the current state lives in AUDIT.md.
 | F11 | inverter | INFO — the fake's Modbus surface: no client limit/timeout/ACL, oversized replies on a declared count above the payload. | capped (`--max-clients`/`--client-timeout` live, `show connections`, the read-count gate) + the trusted-LAN posture documented, not a security redesign. |
 | F12 | cache, inverter, scrape | INFO — token files were not permission-checked. | fail closed: `check_token_file_mode` refuses any group/world-readable file, daemons and ctl/cli clients alike. |
 | F13 | scrape | MEDIUM — `/metrics` unauthenticated by default; the loopback bind the only control. | fail closed beyond loopback: a non-loopback listen without a token refuses to start; per-peer caps (`--max-conn-per-ip`). |
+| F16 | scrape | INFO — no automated alerting yet (freshness gap, poll down, exception spikes). | the shipped alert rules pack (`scraper/alerts.yml`, rev. 25): six alerts in two groups — the scraper's poll story and the cache's side (poll down, age spikes, the write-refusal bursts on a new `modbus_cache_write_refused_total` counter on the cache's /metrics); the annotations quote the audit vocabulary (a fired page names the WRITE-REFUSED events and the log lines to grep); the demo image bakes it (`rule_files:`), the Nix package installs it (`share/modbus-scraper/alerts.yml`), docs/NIXOS.md shows the `services.prometheus.ruleFiles` wiring; the cache group stays silent until the cache's own /metrics is scraped. |
 | F18 | cache | LOW — the state dump was config-equivalent trust at rest with an umask-derived mode. | created `0600` explicitly + a sha256 integrity hash, fail-closed restore; settings-only by default. |
 | F19 | scripts | LOW — the release landed before the CI gate reported (the local cut, `--tests quick`, unsigned tag). | the workflow cuts the GH release (`needs: [test, build]`); the local cut is the opt-in `--release`; `--tests full` default; signed tags. |
 | F20 | cache, scrape, inverter, dashboard (the ctl/cli clients) | LOW — the help promised token-file env vars the clients never read. | one resolution shape family-wide: `flag or env`, the mutual-exclusion error, the F12 gate on both paths. |

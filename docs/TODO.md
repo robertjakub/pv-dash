@@ -9,18 +9,6 @@ only the **Done/history** records for their tool —
 
 ## The control plane (the grammar follow-through)
 
-- **`request reload-config` on the remaining two** `[cache]` `[inverter]`
-  — the config re-read (the SIGHUP path, the wire face the
-  request-namespace wave named) speaks on the scraper and the dashboard
-  only. The fake grew its config story (the config-file wave: the
-  `request reload` re-exec re-reads the conf) but still has no
-  `request/reload-config` row — decide: a reloader of its own (the
-  scraper's non-restart re-apply over the fake's machines) or the
-  family row answering `err no reloader configured`; the cache has the
-  config script but no reloader wiring at all. The grammar should end
-  up family-shaped: `request/reload-config` listed beside
-  `request/reload` on all four, the ops policy unchanged (the verb
-  stays out of the ops default).
 - **row the fake's write-emulation words** `[inverter]` — `register`,
   `coil`, `discrete` are set-only pseudo-settings the wire answers (the
   write-overlay emulation, `set register <addr>=<val>`) with no registry
@@ -49,11 +37,11 @@ only the **Done/history** records for their tool —
 - **the remaining audit findings** `[cache]` `[scraper]` `[inverter]`
   `[docker]` — all documented trust decisions / deployment stories now
   (F19 closed rev. 5 — the workflow cuts the release after the CI gate,
-  see the release-discipline item): F16 (the alert-rules pack — the rules
-  item below), F17 (the volume secrets), F14 (TLS — the item below), F15
-  (closed — the README privacy note), F1 (accepted) — see
-  [AUDIT.md](AUDIT.md); F2–F10, F11–F13, F18 and F19 are closed and
-  verified ([AUDIT-history.md](AUDIT-history.md)); re-run the audit after
+  see the release-discipline item): F17 (the volume secrets), F14 (TLS —
+  the item below), F15 (closed — the README privacy note), F1 (accepted)
+  — see [AUDIT.md](AUDIT.md); F2–F10, F11–F13, F16, F18, F19, F21–F23
+  are closed and verified ([AUDIT-history.md](AUDIT-history.md)); re-run
+  the audit after
   the scraper control surface,
   the TLS story or the dashboard service (the dashboard is the next audit
   wave).
@@ -193,11 +181,6 @@ only the **Done/history** records for their tool —
   dashboard's `battery: true`), so `docker compose up` and the whole story
   runs — the write-through pokes land in the charts live, the outages
   banner themselves, the audit trail narrates.
-- **the alert rules pack** `[scraper]` `[cache]` — a shipped Prometheus
-  rules file next to the exporter: the freshness gap, the poll down, the
-  exception-code spikes, the write-refusal bursts (F16) — the cache
-  contributes its side (poll down, age spikes, write refusals); the pages
-  write themselves from the audit vocabulary.
 - **the multi-target scrape** `[scraper]` — one process polling several
   inverters (per-target metrics with a unit/host label) for the
   two-string-roof households; the metrics endpoint and the audit are

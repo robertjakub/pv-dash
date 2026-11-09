@@ -112,6 +112,22 @@ services.modbus-scraper = {
 | `logLevel` / `logAccess` / `localTime` | the log surface |
 | `openFirewall` | open `listenPort` |
 
+The package also ships the **alert rules pack**
+(`share/modbus-scraper/alerts.yml` — the F16 closure, the audit
+vocabulary's detection half): a Prometheus on the same host points its
+`ruleFiles` at it and the poll story alerts itself:
+
+```nix
+services.prometheus.ruleFiles =
+  [ "${inputs.pv-dash.packages.${pkgs.system}.modbus-scraper}/share/modbus-scraper/alerts.yml" ];
+```
+
+The pack's cache group (`CachePollDown`, `CacheAgeSpike`,
+`CacheWriteRefusalBurst`) stays silent until the cache's own `/metrics`
+endpoint is scraped — enable `services.modbus-cache.metricsServer` and
+add its scrape job to arm it. Thresholds assume the default 10 s poll
+interval.
+
 ## services.modbus-cache
 
 ```nix

@@ -1,4 +1,4 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 24)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 25)
 
 Scope: the `cache/`, `scraper/`, `inverter/` and `dashboard/` subprojects plus
 the shared `common/` package, `profiles/`, `docker/` and `scripts/`. Method:
@@ -13,18 +13,20 @@ findings there are weighted accordingly. Findings keep their numbers across
 revisions; open ones are in §3.1, closed ones in §3.2 with their fix and
 verification in [AUDIT-history.md](AUDIT-history.md) (next number: F24).
 
-**Rev. 24 — every secret knob is startup-only.** The registry marks restart
-on all secret rows (the dump-key shape: a live name + restart + hidden +
-secret) and the wire refuses set/unset before `_apply` (`restart required
-(startup-only knob)` — a secret never rides the reload state, so there is no
-pending form to record). The live-rotation branches died per tool (the
-control tokens, the metrics tokens, the auth keys, the dashboard's page
-token); their validations' start-time twins stood already; the wire's
-set-advice errors re-point at flag/env/config + a restart. The tradeoff is
-deliberate: zero-downtime rotation is gone — the wire never carries secret
-material and a secret's state can no longer fork between the running process
-and the config file. The SECRET_REMOVED placeholder can no longer occur at
-runtime; `dump_filter` keeps the branch as the class invariant's guard.
+**Rev. 25 — the alert rules pack (F16 closed).** The exporter ships
+`scraper/alerts.yml` next to itself: six alerts in two groups — the
+scraper's poll story (`ScraperPollDown`, the freshness gap
+`ScraperFreshnessGap`, `ScraperExceptionSpike`) and the cache's side
+(`CachePollDown`, `CacheAgeSpike`, `CacheWriteRefusalBurst` on a new
+`modbus_cache_write_refused_total` counter — every gate refusal is a
+WRITE-REFUSED audit event, now counted on the cache's own /metrics). The
+annotations quote the audit vocabulary: a fired page names the audit
+events and the log lines to grep, so detection is wired, not just logged
+(NIS2 21.2(b), DORA art. 11). The demo image bakes the pack
+(`prometheus.yml`'s `rule_files:`), the Nix package installs it
+(`share/modbus-scraper/alerts.yml`), docs/NIXOS.md shows the
+`services.prometheus.ruleFiles` wiring; the cache group stays silent
+until the cache's own /metrics is scraped.
 
 ## 1. Assets and trust boundaries
 
@@ -36,7 +38,7 @@ runtime; `dump_filter` keeps the branch as the class invariant's guard.
 | `/docker` | one alpine image per Modbus tool, the Prometheus image, the two entrypoints, the compose demo | the network is the boundary: one `internal: true` network, nothing published on the host; the images run unprivileged (`pvsuite`, `prometheus`); root exists only for the volume seeding and drops before exec; the bundled `*.token` defaults materialize as random 0600 values | F7 closed; F17 open |
 | `/inverter` | the fake: the daemon + the ctl/cli clients, the simulator/machines/control/metrics libs, man/ | a test instrument on a trusted LAN: the Modbus surface capped (`max-clients`/`client-timeout`/`max-conn-per-ip`, live-settable) and connect-ACL'd (inline grammar only), the read-count gate, `/metrics` optional on the family stack; the family control listener (tokenless TCP by posture — F11); deliberately not security-first, documented as such | F11 closed; F1 accepted |
 | `/profiles` | the device profiles (JSON data: sun2000 + three Deye variants) + the linter and formatter bins | data, not code: the loader validates every entry (type/width/scale, bounds), the search path is closed, the linter checks schema/overlaps/bounds — treat a profile file like config | none |
-| `/scraper` | the exporter: the daemon + the ctl/cli clients, the server/scraper/poller/control/config libs, man/, the sample conf + rules | the read-only consumer: one HTTP GET route set (bearer-gated, capped, `metrics/acl`, the non-loopback refusal) + one outbound Modbus client (FC3/FC4 reads only); the family control server; the SIGHUP reload re-validates everything | F13, F20 closed; F14–F16 open |
+| `/scraper` | the exporter: the daemon + the ctl/cli clients, the server/scraper/poller/control/config libs, man/, the sample conf + rules | the read-only consumer: one HTTP GET route set (bearer-gated, capped, `metrics/acl`, the non-loopback refusal) + one outbound Modbus client (FC3/FC4 reads only); the family control server; the SIGHUP reload re-validates everything | F13, F16, F20 closed; F14 open |
 | `/scripts` | `release.py` (the release orchestrator) + `audit_verify.py` (the F10 chain verifier) | maintainer-local trust: the dirty-tree and main-only guards, the full-suite verify, then commit/tag/push; the GH release is the workflow's job; the tag is the trust root, signed when a key exists | F19 closed |
 
 `flake.nix` (the packaging, the NixOS modules) and `tests/` (the
@@ -143,7 +145,6 @@ the intended demo feature, gated by control-server access only.
 | F1 | cache, scrape, inverter | HIGH (accepted, protocol-inherent) | Modbus TCP carries no authentication and no encryption — listener and upstream alike; a compromised inverter LAN segment can feed the scraper bogus register values (sanity-capped). | keep the listener off the WAN (the default binds 127.0.0.1), set the connect ACL on a LAN, keep `--allow-write` off (the write path defaults fully closed). |
 | F14 | scrape | LOW | No TLS on the HTTP endpoint (plain HTTP): the bearer token and the metrics travel in clear text. | terminate TLS in a reverse proxy when anything beyond localhost needs the endpoint. |
 | F15 | scrape | INFO | The metrics expose production values (generation, consumption, battery SoC) — a home-occupancy privacy consideration. | the bearer token (F13) + the localhost bind are the controls; treat the endpoint as internal. |
-| F16 | scrape | INFO | No automated alerting yet (freshness gap, poll down, exception spikes). | ship the alert rules pack with the NixOS module; NIS2 21.2(d) wants detection wired, not just logged. |
 | F17 | docker | INFO | The `/config` volume holds live config in plaintext; the entrypoint seeds copies once (existing files are never refreshed); the generated `metrics.token` lives in the same volume. | prefer token files outside the volume / `LoadCredential` / secret-backed mounts; document `docker compose down -v` as the re-sync. |
 
 ### 3.2 Closed (fix and verification per finding: [AUDIT-history.md](AUDIT-history.md))
@@ -162,6 +163,7 @@ the intended demo feature, gated by control-server access only.
 | F11 | inverter | INFO | the fake's Modbus surface: no client limit/timeout/ACL, oversized replies | rev. 4 |
 | F12 | cache, inverter, scrape | INFO | token files were not permission-checked | rev. 3 |
 | F13 | scrape | MEDIUM | `/metrics` unauthenticated by default; the loopback bind the only control | rev. 4 |
+| F16 | scrape | INFO | no automated alerting — the detection half of the audit vocabulary | rev. 25 |
 | F18 | cache | LOW | the state dump was config-equivalent trust at rest with an umask-derived mode | rev. 4 |
 | F19 | scripts | LOW | the release landed before the CI gate reported | rev. 5 |
 | F20 | cache, scrape, inverter, dashboard | LOW | the ctl/cli help promised token-file env vars the clients never read | rev. 6 |
@@ -181,7 +183,7 @@ and the per-revision walk-throughs: [AUDIT-history.md](AUDIT-history.md).
 | Requirement | Status | Where |
 |---|---|---|
 | NIS2 21.2(a) risk-management policies | yes (scoped) | defaults-as-security documented (the quadruple-gated writes, localhost binds, tokens mandatory on control/metrics, 0600 token files); this audit is the written analysis |
-| NIS2 21.2(b) incident handling | yes (scoped) | the audit trail + journald retention, tamper-evident (F10 closed); no automated alerting yet (F16) |
+| NIS2 21.2(b) incident handling | yes (scoped) | the audit trail + journald retention, tamper-evident (F10 closed); the alert rules pack rides the exporter — the detection is wired, not just logged (F16 closed) |
 | NIS2 21.2(c) business continuity | yes | reconnect/backoff, per-leaf isolation, restart/reload/reset verbs, the gated write-behind dump |
 | NIS2 21.2(d) supply chain | yes | stdlib-only, pinned Nix builds; the shared `common/` core |
 | NIS2 21.2(f) effectiveness | partial | fuzz/stress/regression suites; no CI enforcement yet |
@@ -189,7 +191,7 @@ and the per-revision walk-throughs: [AUDIT-history.md](AUDIT-history.md).
 | NIS2 21.2(h) access control / MFA | yes (scoped) | the four write gates (two defaulting to none), the ACLs with restrict-all modes, token-mandatory control (the fake exempt, F11), the metrics token mandatory beyond loopback (F13), the `metrics/acl` accept-time IP gate, per-IP + total caps on every serving surface, peer-cred, the signed wire, the read-only ops role (F22); MFA not applicable to a machine protocol |
 | DORA art. 8 ICT asset identification | yes | every option logged at start; `inspect` dumps the full state; the demo topology documented |
 | DORA art. 9–10 protection/prevention | yes | the write gates, ACLs, capped framing/buffers, fail-closed writes, token-mandatory surfaces, the caps, explicit socket + token-file modes, fail-fast validation; the dashboard's GET-only route set with the traversal guard and the bearer gate (F21) |
-| DORA art. 11 detection | yes (integrity restored, now evidenced); wiring pending | the trail's integrity defensible (F2) and evident per entry (F10); auth-fail/refusal events; the alert rules pack is the remaining gap (F16) |
+| DORA art. 11 detection | yes | the trail's integrity defensible (F2) and evident per entry (F10); auth-fail/refusal events; the alert rules pack wired (F16 closed) |
 | DORA art. 12 BCP | partial | restart/reload/clear verbs, the dump/restore write-behind; no automated failover (single-device by design) |
 
 Scraper deltas (rows where scrape matches are omitted): incident handling —
@@ -197,8 +199,8 @@ unauthorized-request logging at WARNING; effectiveness — the fuzz suite, no
 CI enforcement; crypto/hygiene — the constant-time bearer compare, no TLS
 (F14); access control — the bearer gate + the non-loopback refusal (F13),
 `metrics/acl`, the caps; DORA 9–10 — the localhost default, the two-route
-whitelist, DoS caps on both the HTTP and poll sides; DORA 11 — partial
-(trail + WARNING logs + the error-state 503); DORA 12 — yes (read-only,
+whitelist, DoS caps on both the HTTP and poll sides; DORA 11 — yes (the
+alert rules pack rides the exporter, F16 closed); DORA 12 — yes (read-only,
 stateless, restart-clean; Prometheus holds the history).
 
 Dashboard deltas (rows where the dashboard matches are omitted): incident
@@ -228,7 +230,7 @@ publishes nothing.
 
 The remaining open set is the documented trust decisions and deployment
 stories: F1 accepted (Modbus TCP itself — mitigate with segmentation and
-the write gates); F14/F16/F17 operational (TLS at a proxy, the alert
-rules pack, the volume story); F15 informational. Re-run this audit after
+the write gates); F14/F17 operational (TLS at a proxy, the volume
+story); F15 informational. Re-run this audit after
 the TLS story (F14) lands, after the multi-target / control-plane
 evolutions, or any new listener or file format; at least yearly otherwise.

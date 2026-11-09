@@ -643,7 +643,7 @@ def parse_secret(raw, label='secret'):
 
 
 def _profile_candidates(name):
-    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # .../common/settings -> the tree root
     return [os.path.join(here, 'profiles', name),                        # the bundled copy (the packaged share tree)
             os.path.join(here, 'profiles', 'profiles', name),            # the profiles/ subproject (the dev tree)
             os.path.join(os.path.dirname(here), 'profiles', name)]       # one up (an unpackaged suite tree)

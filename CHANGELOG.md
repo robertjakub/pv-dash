@@ -284,6 +284,16 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Fixed
 
+- **common** — **the device profiles resolve again from the settings
+  subdir**: the common/ subdir split left `_profile_candidates` climbing
+  one dirname short (`here` stayed `common/` where the module had moved
+  to `common/settings/`) — the bundled profiles fell through to the bare
+  name and every bare-name `--config` profile refused ("cannot read
+  device profile sun2000.json": the scrape-regtest "never came up", the
+  fuzz pairs' connection-refused aborts). The walk climbs to the tree
+  root; the packaged share-tree and the one-up suite-tree candidates
+  keep their order.
+
 - **scraper** — **a live `modbus/offset` set reaches the client**: the
   registry row said live, but the poller's `apply()` had no `offset=`
   plumbing — a live set wrote the config and changed nothing (the poll

@@ -172,6 +172,18 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Changed
 
+- **shared** — **the write-acl pair joins the shared homes**:
+  `examples/acl-write-registers.json` + `shared/schema/acl-write-registers.schema.json`
+  leave the cache tree — the standalone acl file format is family-wide
+  (one gate validator in `common/settings/config.py`, the two acl tools,
+  the connect kind TODO joins the same format), so the pair ships once,
+  beside the ip-prefix pair. The schema's `$id` + description re-point
+  and name the shared loader; every `package.nix` installs via the
+  `${../examples}`/`${../shared}` interpolations (the packaged `share/`
+  layout unchanged); the cache image COPYs the example from the new
+  `examples=` named build context (both compose stacks carry it); the
+  drift sweep's schema/example tables walk the shared homes.
+
 - **everywhere** — **the control wire's verb walk is one implementation**:
   the family's `command()` grammar (the help/topic ladder, the
   quit/ping keepalives, the set/unset pair, the show reports and the

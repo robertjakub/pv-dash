@@ -3,10 +3,11 @@
 Draft-2020-12 schemas for the suite-wide sample files — one copy each,
 under `shared/` (the family's shared-data home). The tool-local schemas
 stay in each tool's `schema/` dir
-(`cache/schema/` for the acl-write-registers + selection pair,
+(`cache/schema/` for the metrics selection schema,
 `scraper/schema/` for the metrics spec). A schema lives here when the
 file it describes is shared: today that is the standalone acl file's
-[ip-prefix gate](../examples/README.md), whose `$id` points here.
+two gates — the [ip-prefix](../examples/README.md) connect gate and the
+write-registers gate — whose `$id`s point here.
 
 ## The contract
 
@@ -20,6 +21,7 @@ feedback while editing.
 
 ```bash
 python3 scripts/validate_json.py shared/schema/acl-ip-prefix.schema.json examples/acl-ip-prefix.json
+python3 scripts/validate_json.py shared/schema/acl-write-registers.schema.json examples/acl-write-registers.json
 ```
 
 The repo's own stdlib-only checker speaks the draft-2020-12 core the

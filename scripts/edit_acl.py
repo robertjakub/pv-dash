@@ -22,7 +22,7 @@ starts from the seeded whole-space deny (write-registers unless --type
 says otherwise) and the file lands on the first save (0600); quitting
 first leaves nothing behind.
 
-Save is loader-gated: cache/lib/config.py's _write_gate_object (the
+Save is loader-gated: common/settings/config.py's _write_gate_object (the
 schema is the daemon's, not the editor's) refuses the write, and the
 landed file is always the canonical layout (scripts/lint_acl.py's
 renderer — content byte-for-byte as edited). The lint's no-op / dead

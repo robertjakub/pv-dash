@@ -4,6 +4,7 @@
   python3 scripts/validate_json.py SCHEMA [FILE|- ...]
   python3 scripts/validate_json.py cache/schema/selection.schema.json cache/examples/selection.json
   python3 scripts/validate_json.py scraper/schema/metrics.schema.json scraper/examples/metrics.json
+  python3 scripts/validate_json.py shared/schema/acl-write-registers.schema.json examples/acl-write-registers.json
   cat doc.json | python3 scripts/validate_json.py shared/schema/acl-ip-prefix.schema.json -
 
 The keyword set is the draft-2020-12 core the repo's schemas speak

@@ -116,13 +116,14 @@ everything it decides a later rule re-decides — and the canonical layout)
 and `scripts/edit_acl.py` (the dialog and the line mode, `--type` seeds a
 fresh gate and migrates a typeless one). Both speak both kinds; the
 embedded profile gates belong to `profiles/bin/profile-lint.py`. The
-shipped examples: `cache/examples/acl-write-registers.json` (the deye
-register policy: the clean-slate deny, the allows, the deny carves, the
-re-opens) and — one shared copy for every tool's ip-prefix gate —
-`examples/acl-ip-prefix.json` at the repo root. The
+shipped examples — one shared copy each at the repo root:
+`examples/acl-write-registers.json` (the deye register policy: the
+clean-slate deny, the allows, the deny carves, the re-opens) and
+`examples/acl-ip-prefix.json` (every tool's ip-prefix gate). The
 **JSON Schemas** ship beside them (`shared/schema/acl-ip-prefix.schema.json`
-at the root, `cache/schema/` for the write + selection pair,
-`scraper/schema/` for metrics — draft 2020-12) — schema-valid can still be
++ `shared/schema/acl-write-registers.schema.json` at the root,
+`cache/schema/` for selection, `scraper/schema/` for metrics —
+draft 2020-12) — schema-valid can still be
 loader-refused (the strict-CIDR host-bit spellings, the range bounds), so
 the loader stays the strict word; wire them into an editor by `$schema`
 pattern-matching for live feedback while editing.

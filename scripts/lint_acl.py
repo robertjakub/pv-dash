@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Lint and reformat the standalone acl files — the json a cache acl
-option's file:<path> points at (cache/examples/acl-write-registers.json is
+option's file:<path> points at (examples/acl-write-registers.json is
 the shipped write example, examples/acl-ip-prefix.json the shared IP-kind
-one; scripts/edit_acl.py edits one). A device profile's
+one — both at the root examples/; scripts/edit_acl.py edits one). A device profile's
 embedded acl/write gate belongs to profiles/bin/profile-lint.py +
 profile-format.py.
 
@@ -20,7 +20,8 @@ chain is a whitelist: it reads top to bottom, the LAST matching rule
 decides, and a client/register no rule decides refuses (the default deny
 any).
 
-The lint: the loader's schema (cache/lib/config.py's _write_gate_object —
+The lint: the loader's schema (common/settings/config.py's
+_write_gate_object —
 the old spellings refuse as unknown keys, a gate that gates nothing is a
 config error, the whole-space deny is [{"type": "deny", "range": "any"}]
 for registers, "prefix": "any" for IPs) plus what the loader cannot say:

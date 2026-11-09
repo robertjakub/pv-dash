@@ -316,7 +316,8 @@ file, the tools and where every tool's support stops — lives in
 - **`--write-registers`** defaults to `none` — the ranges a forwarded write
   may touch; `profile` takes the gate from the device profile's `acl`/
   `write` chain, `file:<path>` from a standalone acl file. An example ships
-  as `examples/acl-write-registers.json` (the deye policy, worked out).
+  as `examples/acl-write-registers.json` at the repo root (the deye
+  policy, worked out).
 - **`--metrics-acl`** defaults to `any` — who may connect to `/metrics`,
   the same grammar, checked at accept.
 - Every acl file (the ip-prefix gate and the write gate) must be
@@ -530,9 +531,8 @@ cache/
 │   └── modbus-cache-cli.py     # console-style interactive control session
 ├── examples/
 │   ├── modbus_cache.conf    # sample config in the set grammar
-│   ├── selection.json       # example selection: the essential monitoring set
-│   └── acl-write-registers.json  # example acl file: the deye write policy
-├── schema/                  # the JSON Schemas (draft 2020-12): the acl + selection files
+│   └── selection.json       # example selection: the essential monitoring set
+├── schema/                  # the JSON Schema (draft 2020-12): the selection file
 ├── man/                     # the generated man pages (scripts/gen_man.py)
 ├── module.nix               # the NixOS service module
 ├── package.nix              # the package (the bins, the libs, the examples, the man pages)

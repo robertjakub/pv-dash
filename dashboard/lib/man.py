@@ -71,7 +71,8 @@ re-applies them once), with a dump path configured (\\fB--dump-path\\fR):
 \\fBrequest dump\\fR / \\fBrequest restore\\fR (the overrides as one 0600
 integrity-hashed JSON; \\fB--dump-key\\fR seals it \\(em the state rides
 encrypted, a restore refuses a wrong or missing key;
-\\fB--restore-on-start\\fR loads it at start),
+\\fB--restore-on-start\\fR loads it at start, \\fB--dump-interval\\fR
+rewrites it on a timer),
 \\fBshutdown\\fR, \\fBquit\\fR. The control listener rides the family's
 live rebind: \\fBset control port\\fR (a unix path, a TCP port on
 127.0.0.1, or off) swaps the socket without dropping the connected

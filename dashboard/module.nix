@@ -70,6 +70,7 @@ let
     ++ lib.optionals (cfg.authToken != null) [ "--auth-token ${cfg.authToken}" ]
     ++ lib.optionals (cfg.dumpPath != null) [ "--dump-path ${cfg.dumpPath}" ]
     ++ lib.optionals (cfg.dumpPath != null && cfg.dumpKey != null) [ "--dump-key ${cfg.dumpKey}" ]
+    ++ lib.optionals (cfg.dumpPath != null && cfg.dumpInterval != null) [ "--dump-interval ${toString cfg.dumpInterval}" ]
     ++ lib.optional cfg.restoreOnStart "--restore-on-start"
   );
 in
@@ -334,8 +335,19 @@ in
       description = ''
         The state dump file: the live setting overrides (set through the
         control surface) as one JSON, written 0600 with an integrity hash on
-        `request dump` and the graceful shutdown, and re-applied on start
-        when restoreOnStart is set. null = the dumps are off.
+        `request dump`, the graceful shutdown and every dumpInterval
+        seconds, and re-applied on start when restoreOnStart is set. null =
+        the dumps are off.
+      '';
+    };
+
+    dumpInterval = lib.mkOption {
+      type = lib.types.nullOr lib.types.number;
+      default = null;
+      description = ''
+        Seconds between the automatic state dumps; 0 = on request (the
+        request dump command and the shutdown). Needs dumpPath. null = the
+        default (0).
       '';
     };
 

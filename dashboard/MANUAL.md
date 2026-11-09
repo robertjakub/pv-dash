@@ -105,6 +105,7 @@ takes. The namespaces group them.
 | `log-queries` | `set log-queries` | settable | `on\|off` | `--log-queries` / — | log the proxied Prometheus queries at INFO |
 | `log-access` | `set log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log every HTTP request at INFO |
 | `local-time` | — | startup-only | `on\|off` | `--local-time` / `LOCAL_TIME` | log timestamps in the system time zone instead of UTC |
+| `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 
 ### auth
 
@@ -153,7 +154,7 @@ the state dump: the live overrides' file, the restore-on-start
 
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `dump-path` | `set dump path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: the live overrides, written on request dump and the graceful shutdown |
+| `dump-path` | `set dump path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval |
 | `dump-key` | — | startup-only (secret) | `TEXT` | `--dump-key` / `DUMP_KEY` | the key that seals the state dumps (the reload's state file too) (`file:<path>` reads an owner-only file) *(hidden)* |
 | `restore-on-start` | `set dump restore-on-start` | settable (restart) | `on\|off` | `--restore-on-start` / `RESTORE_ON_START` | the dump loads on start (off: on demand with request restore) |
 

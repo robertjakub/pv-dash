@@ -176,9 +176,9 @@ log timestamps in the system time zone instead of UTC
 the state dump: the live setting overrides (the toggles, the caps, the
 log surface — the tokens apart) as one JSON, written 0600 with an
 integrity hash (a restore refuses a tampered, unsigned or
-group\-writable dump); dumped on the request dump command and the
-graceful shutdown; loaded on start only with \-\-restore\-on\-start, on
-demand with the request restore command
+group\-writable dump); dumped on the request dump command, the graceful
+shutdown and every \-\-dump\-interval seconds; loaded on start only with
+\-\-restore\-on\-start, on demand with the request restore command
 .TP
 .B \-\-dump\-key
 the key that seals the state dumps and the reload's state file: the
@@ -190,6 +190,10 @@ key = the dumps stay 0600 plaintext with the integrity hash; a dump path
 without a key warns at start and on set; the value may be `file:<path>`
 — the first line of an owner\-only 0600 file (a systemd LoadCredential
 rides as file:/run/credentials/...)
+.TP
+.BI \-\-dump\-interval " N"
+seconds between the automatic state dumps, 0 = on request (the request
+dump command and the shutdown)
 .TP
 .B \-\-restore\-on\-start
 load the state dump when the server starts (needs \-\-dump\-path) — the
@@ -236,7 +240,8 @@ re-applies them once), with a dump path configured (\fB--dump-path\fR):
 \fBrequest dump\fR / \fBrequest restore\fR (the overrides as one 0600
 integrity-hashed JSON; \fB--dump-key\fR seals it \(em the state rides
 encrypted, a restore refuses a wrong or missing key;
-\fB--restore-on-start\fR loads it at start),
+\fB--restore-on-start\fR loads it at start, \fB--dump-interval\fR
+rewrites it on a timer),
 \fBshutdown\fR, \fBquit\fR. The control listener rides the family's
 live rebind: \fBset control port\fR (a unix path, a TCP port on
 127.0.0.1, or off) swaps the socket without dropping the connected

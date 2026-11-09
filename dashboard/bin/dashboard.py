@@ -371,6 +371,7 @@ def main():
             'metrics-max-conn-per-ip': str(cfg['metrics_max_conn_per_ip']),
             'dump/path': cfg['dump_path'] or 'off',
             'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
+            'dump-interval': 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval'],
             'audit-log': 'off' if args.no_audit_log else ('stdout' if args.audit_log == '-'
                                                           else (args.audit_log or 'the XDG state home')),
             'audit-max-mb': '%g' % args.audit_max_mb,
@@ -386,7 +387,7 @@ def main():
                                 socket_group=cfg['control_socket_group'],
                                 ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
                                 dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'],
-                                dump_key=cfg['dump_key'],
+                                dump_key=cfg['dump_key'], dump_interval=cfg['dump_interval'],
                                 # the secret rows' configured-ness for `show config`
                                 # (the values never render — config_value refuses them)
                                 startup_values={'control_token': control_token,
@@ -402,6 +403,10 @@ def main():
         control.start()
         if control.dump_path and cfg['restore_on_start']:
             logger.info('restore-on-start: %s', control.restore_state())
+        # the dumper thread always runs (it parks while dump-interval is off):
+        # a live `set dump-interval` wakes it without a restart — and a live
+        # `set dump/path` (no path at start) finds the thread waiting too
+        threading.Thread(target=control.run_dump_interval, daemon=True, name='dump').start()
     metrics_srv = None
     if cfg['metrics_server']:
         metrics_srv = MetricsServer(httpd, control, metrics_listen, token=metrics_token, started=started,
@@ -438,6 +443,10 @@ def main():
         logging.getLogger().setLevel(getattr(logging, new_cfg['level'], logging.INFO))
         if control:
             control.clear_overrides()   # the config won: nothing is live-overridden
+            # the dump-interval loop re-reads the configured interval (the
+            # parked dumper wakes to see it)
+            control.dump_interval = new_cfg['dump_interval']
+            control.dump_wake.set()
         if audit:
             audit.event('RELOAD', 'upstream %s' % new_cfg['upstream'])
         return 'upstream %s' % new_cfg['upstream']

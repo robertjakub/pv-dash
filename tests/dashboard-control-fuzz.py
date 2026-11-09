@@ -227,6 +227,15 @@ def main():
         check('rider: the unknown topic is the reworded two-space error',
               st == 'fail' and tx == 'unknown command or setting bogus (try ?)', '%s %s' % (st, tx))
 
+        # 5c. the dump-interval knob (the family unification, the cache's
+        #     golden shape): no dump path configured here — the gate answers
+        st, tx = roundtrip(CTRL_PORT, signed('show dump-interval'))
+        check('rider: show dump-interval without a dump path is a clean err',
+              st == 'fail' and tx.startswith('dump-interval needs a dump path'), '%s %s' % (st, tx))
+        st, tx = roundtrip(CTRL_PORT, signed('set dump-interval 5'))
+        check('rider: set dump-interval without a dump path is a clean err',
+              st == 'fail' and tx.startswith('dump-interval needs a dump path'), '%s %s' % (st, tx))
+
         # 6. the auth abuse is rejected, the real token works, the unsigned refused
         bad = True
         for _ in range(30):

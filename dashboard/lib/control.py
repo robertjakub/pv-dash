@@ -67,12 +67,14 @@ class ControlServer(_ControlServer):
 
     def __init__(self, httpd, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None,
-                 startup_values=None, config_path=None, dump_path=None, restore_on_start=False, dump_key=None):
+                 startup_values=None, config_path=None, dump_path=None, restore_on_start=False,
+                 dump_key=None, dump_interval=0.0):
         self.httpd = httpd
         super().__init__(target, reloader=reloader, stopper=stopper, audit=audit, token=token,
                          defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
                          ops_token=ops_token, ops_verbs=ops_verbs, config_path=config_path,
-                         dump_path=dump_path, restore_on_start=restore_on_start, dump_key=dump_key)
+                         dump_path=dump_path, restore_on_start=restore_on_start, dump_key=dump_key,
+                         dump_interval=dump_interval)
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
         self.config_path = config_path   # the config script the daemon started from — the reload state lives beside it
         self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
@@ -104,6 +106,8 @@ class ControlServer(_ControlServer):
                 return 'ok %s' % COMMAND_HELP[path]
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
+                if key == 'dump-interval' and not self.dump_path:
+                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
                 return 'ok %s' % describe_setting(key)
             if path in NODE_BY_NAME:
                 return 'ok %s' % describe_node(OPTIONS, path)
@@ -185,6 +189,8 @@ class ControlServer(_ControlServer):
                 word = SHOW_BY_LIVE.get(key)
                 if word:
                     return self.command('show ' + word)   # a show command's report, by its word
+                if key == 'dump-interval' and not self.dump_path:
+                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
                 return 'ok %s=%s' % (key, self._get(key))
             if key is not None and rest:
                 return 'err %s: unexpected %s' % (key, ' '.join(rest))
@@ -383,6 +389,18 @@ class ControlServer(_ControlServer):
             if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % warn
             return shown
+        if key == 'dump-interval':
+            if not self.dump_path:
+                raise ValueError('dump-interval needs a dump path (set dump/path or --dump-path)')
+            if val in ('off', 'none', '0'):
+                self.dump_interval = 0
+                self.dump_wake.set()
+                return 'off'
+            v = num(val, 'dump-interval', 'seconds or off')
+            self._gate_range(key, v, 'seconds')
+            self.dump_interval = v
+            self.dump_wake.set()
+            return secs(v)
         if key == 'dump/path':
             if val in ('off', 'none', ''):
                 self.dump_path = None
@@ -426,6 +444,8 @@ class ControlServer(_ControlServer):
             return acl_value_text(self.metrics_acl)
         if key == 'dump/path':
             return self.dump_path or 'off'
+        if key == 'dump-interval':
+            return 'off' if not self.dump_interval else secs(self.dump_interval)
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         s = SETTING_BY_NAME.get(key)
@@ -455,6 +475,7 @@ class ControlServer(_ControlServer):
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'dump/path': self.dump_path or 'off',
             'dump/restore-on-start': 'on' if self.dump_restore else 'off',
+            'dump-interval': self.dump_interval,
             'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
             'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
             'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',

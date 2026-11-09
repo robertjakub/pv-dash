@@ -1,18 +1,19 @@
-# The demo Prometheus in the compose stack — alpine + the prometheus
-# package, stdlib-style (no pip, no python). The pattern of the Modbus
-# images: an unprivileged user, an entrypoint that runs as root only for
-# the token handoff, then su-exec drops before the exec.
+# The stacks' Prometheus — alpine + the prometheus package, stdlib-style
+# (no pip, no python). The pattern of the Modbus images: an unprivileged
+# user, an entrypoint that runs as root only for the token handoff, then
+# su-exec drops before the exec.
 #
-# Build (the context = the docker/ directory itself):
+# Build (the context = the docker/ directory itself; both compose stacks
+# — demo/ and prod/ — build this image):
 #   cd docker
 #   docker build -t prometheus -f Dockerfile.prometheus .
-#   # or: docker compose up -d prometheus
+#   # or: cd docker/demo (or docker/prod) && docker compose up -d prometheus
 #
 # The entrypoint waits for /config/metrics.token (the modbus-scraper's
 # entrypoint seeds it into the shared config volume — a random value,
 # 0600, owner pvsuite), copies it for the prometheus user, and execs.
-# The UI serves on the internal network only — the compose stack
-# publishes nothing on the host (docs/AUDIT.md F7).
+# The UI serves on the compose network only — the stacks publish no 9090
+# port; the dashboard's proxy is the way in.
 FROM alpine:3.20
 
 RUN apk add --no-cache prometheus su-exec
@@ -31,6 +32,6 @@ EXPOSE 9090
 ENTRYPOINT ["/usr/local/bin/pv-prometheus-entrypoint"]
 
 # Liveness: busybox wget against the /-/ready probe (the UI serves on the
-# internal network only — the loopback target works inside the container).
+# compose network only — the loopback target works inside the container).
 HEALTHCHECK --interval=5m --timeout=5s --start-period=30s --retries=3 \
     CMD ["wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]

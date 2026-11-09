@@ -56,7 +56,8 @@ pv-suite/
 ├── common/       # the shared Python package (version, audit, config, wire core; [docs](common/README.md))
 ├── tests/        # the test suites, one or more per Modbus tool
 ├── scripts/      # the registry gates + editors (check/lint/gen/edit_options, set_group/set_live), gen_man.py, gen_sbom.py, release.py, audit_verify.py
-├── docker/       # one alpine image per Modbus tool + the compose demo stack ([docs](docker/README.md))
+├── docker/       # one alpine image per Modbus tool; the compose stacks:
+│                 #   demo/ + prod/ ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
 ├── docs/         # the family-level docs: the [Nix reference](docs/NIXOS.md), the
 │                 #   [security audit](docs/AUDIT.md), the
@@ -93,10 +94,15 @@ tracebacks** in the logs.
 
 ## Docker
 
-The containers — one alpine image per Modbus tool, the Prometheus image,
-plus the compose demo stack (fake inverter → cache → scraper → Prometheus,
-internal-network only, nothing published on the host) — are documented in
-[`docker/README.md`](docker/README.md), topology diagram included. Every
+The containers — one alpine image per Modbus tool, plus the two compose
+stacks: `docker/demo` (the fake inverter end to end, internal-network
+only, nothing published on the host) and `docker/prod` (the production
+shape: the four services against real hardware, no fake) — are
+documented in [`docker/README.md`](docker/README.md), the demo's
+topology diagram included. Both stacks ship authenticated: the Modbus
+hops prove a shared suite key (the PVA1/HMAC handshake, generated into
+the config volume), the exporter's `/metrics` and the dashboard's page
+ride generated bearer tokens. Every
 `/metrics` surface ships with the caps (`--metrics-max-clients`,
 `--metrics-client-timeout`, `--metrics-max-conn-per-ip`; the scraper's own
 are `--max-clients`/`--client-timeout`/`--max-conn-per-ip`), every HTTP

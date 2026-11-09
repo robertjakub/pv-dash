@@ -25,11 +25,12 @@
 # image's /pv-suite/scraper/scraper.conf (the default --config target) and
 # the per-tool env file env/scraper.env overrides its knobs (see
 # ../docker/README.md; a flag beats the env: `docker run ... modbus-scraper
-# --upstream 10.0.0.2:15502` on top). The compose stack adds
-# AUTH_TOKEN=file:/config/metrics.token: a random token the entrypoint
-# generates on the first seed (0600, pvsuite — bundled metrics.token is a
-# placeholder that is never copied), shared with the demo Prometheus
-# (see README.md).
+# --upstream 10.0.0.2:15502` on top). The compose stacks add
+# AUTH_TOKEN=file:/config/metrics.token (a random token the entrypoint
+# generates on the first seed, 0600, pvsuite — bundled metrics.token is a
+# placeholder that is never copied, shared with the stack's Prometheus)
+# and AUTH/AUTH_KEY=file:/config/modbus-auth.token: the stack's Modbus
+# hops ship authenticated (see README.md).
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \
@@ -44,6 +45,11 @@ COPY --chown=pvsuite bin/ scraper/bin/
 COPY --chown=pvsuite lib/ scraper/lib/
 COPY --chown=pvsuite examples/scraper.conf examples/metrics.json scraper/
 COPY --chown=pvsuite examples/metrics.json examples/metrics.token config-defaults/
+# the suite key's placeholder: the entrypoint materializes any *.token in
+# config-defaults as a random value on the first seed (the bundled content
+# is never copied) — the compose stacks point the scraper's client-side
+# auth at /config/modbus-auth.token (the handshake it proves to the cache)
+RUN echo placeholder > config-defaults/modbus-auth.token
 RUN chmod +x scraper/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/scraper/bin/modbus-scraper.py /usr/local/bin/modbus-scraper \
     && ln -s /pv-suite/scraper/bin/modbus-scraper-ctl.py /usr/local/bin/modbus-scraper-ctl \

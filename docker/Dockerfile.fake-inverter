@@ -17,8 +17,8 @@
 #       fake-inverter --profile deye-sg04lp3 --timezone local    # any flags via the CMD override
 #
 # The config volume: the entrypoint seeds /config with the required file
-# artifacts (for the fake: none — no seeding happens). The volume is there
-# for symmetry with the other images and for future use.
+# artifacts (for the fake: the generated suite key only — the volume is
+# there for symmetry with the other images and for future use).
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \
@@ -31,6 +31,12 @@ COPY --from=common *.py common/
 COPY --from=common modbus/*.py common/modbus/
 COPY --chown=pvsuite bin/ inverter/bin/
 COPY --chown=pvsuite lib/ inverter/lib/
+# the suite key's placeholder: the entrypoint materializes any *.token in
+# config-defaults as a random value on the first seed (the bundled content
+# is never copied) — the compose stack points the fake's server-side auth
+# at /config/modbus-auth.token (every client proves it right after connect)
+RUN mkdir -p config-defaults \
+    && echo placeholder > config-defaults/modbus-auth.token
 RUN chmod +x inverter/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/inverter/bin/modbus-fake-inverter.py /usr/local/bin/fake-inverter \
     && ln -s /pv-suite/inverter/bin/modbus-fake-ctl.py /usr/local/bin/fake-ctl \

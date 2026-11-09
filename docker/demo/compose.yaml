@@ -1,14 +1,20 @@
-# The pv-suite Modbus tools as compose services. The build contexts are
-# ../inverter, ../cache, ../scraper and ../dashboard; the Dockerfiles are
-# this directory's Dockerfile.<daemon> files (dockerfile: ../docker/... —
-# the subproject contexts carry no Dockerfile of their own); the shared
-# profiles/ directory, the entrypoint and the common/ package ride in as
-# named contexts. Run one service: docker compose up -d fake-inverter
+# The pv-suite Modbus tools as compose services — the DEMO stack: the fake
+# inverter wired end to end on one internal network. The build contexts are
+# ../../inverter, ../../cache, ../../scraper and ../../dashboard; the
+# Dockerfiles are the parent directory's Dockerfile.<daemon> files
+# (dockerfile: ../docker/... from the subproject context — the subproject
+# contexts carry no Dockerfile of their own; compose resolves the
+# dockerfile relative to the context); the shared profiles/ directory, the entrypoint
+# and the common/ package ride in as named contexts. The production shape
+# (real device, the four services: cache + scraper + prometheus +
+# dashboard) is the sibling prod/ stack — see ../README.md.
+# Run one service: docker compose up -d fake-inverter
 # Run the stack:         docker compose up -d (inverter + cache + scraper + prometheus + dashboard)
 #
-# All three share the external `config` volume mounted at /config: on start
+# The services share the `config` volume mounted at /config: on start
 # the entrypoint seeds it with the REQUIRED file artifacts (the generated
-# metrics token, the generated page token, the JSON specs, the dashboard's
+# metrics token, the generated page token, the generated suite key, the
+# JSON specs, the dashboard's
 # config.js — never the bundled conf scripts: each tool loads the image's
 # own conf and the per-tool env file overrides it). Edits to /config
 # survive container recreation. `docker compose exec` sessions bypass the
@@ -30,22 +36,37 @@
 # The dashboard's page ships token'd the same way (F21):
 # docker compose exec dashboard cat /config/page.token
 #
-# The overrides: per-tool env files — cp env/<tool>.env.example
-# env/<tool>.env and edit (bare env-twin names; required: false, so no
+# The Modbus hops ship authenticated the same way: one shared suite key
+# (modbus-auth.token, generated into the volume on the first seed like the
+# tokens) proven by the PVA1/HMAC handshake on every connect —
+# fake-inverter demands it (its server side), the cache proves it
+# upstream and demands it from its own clients, the scraper proves it.
+# The environment: blocks pin the scheme + the file: reference;
+# environment beats env_file, so the per-tool env files cannot override
+# the stack's auth story — opening a hop is a compose edit (an explicit
+# operator act, the F7 shape).
+#
+# The overrides: per-tool env files — cp ../env/<tool>.env.example
+# ../env/<tool>.env and edit (bare env-twin names; required: false, so no
 # file = the image defaults). The SAME files serve plain
-# `docker run --env-file` runs. See README.md.
+# `docker run --env-file` runs. See ../README.md.
 services:
   fake-inverter:
     build:
-      context: ../inverter
+      context: ../../inverter
       dockerfile: ../docker/Dockerfile.fake-inverter
       additional_contexts:
-        profiles: ../profiles
-        scripts: ../docker
-        common: ../common
+        profiles: ../../profiles
+        scripts: ..
+        common: ../../common
     image: fake-inverter
+    environment:
+      # the server side: every client proves the stack's suite key right
+      # after connect — ERR and the client is dropped
+      AUTH: suite
+      AUTH_KEY: file:/config/modbus-auth.token
     env_file:
-      - path: env/fake.env
+      - path: ../env/fake.env
         required: false
     volumes:
       - config:/config
@@ -55,15 +76,22 @@ services:
 
   modbus-cache:
     build:
-      context: ../cache
+      context: ../../cache
       dockerfile: ../docker/Dockerfile.modbus-cache
       additional_contexts:
-        profiles: ../profiles
-        scripts: ../docker
-        common: ../common
+        profiles: ../../profiles
+        scripts: ..
+        common: ../../common
     image: modbus-cache
+    environment:
+      # the upstream side: the cache proves the same suite key to the fake
+      AUTH_UPSTREAM: suite
+      AUTH_UPSTREAM_KEY: file:/config/modbus-auth.token
+      # the server side: the scraper (any client) proves it to the cache
+      AUTH: suite
+      AUTH_KEY: file:/config/modbus-auth.token
     env_file:
-      - path: env/cache.env
+      - path: ../env/cache.env
         required: false
     volumes:
       - config:/config
@@ -75,21 +103,25 @@ services:
 
   modbus-scraper:
     build:
-      context: ../scraper
+      context: ../../scraper
       dockerfile: ../docker/Dockerfile.modbus-scraper
       additional_contexts:
-        profiles: ../profiles
-        scripts: ../docker
-        common: ../common
+        profiles: ../../profiles
+        scripts: ..
+        common: ../../common
     image: modbus-scraper
     environment:
+      # the client side: the scraper proves the stack's suite key to the
+      # cache on every connect (the poller keeps retrying on ERR)
+      AUTH: suite
+      AUTH_KEY: file:/config/modbus-auth.token
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the demo exporter never serves unauthenticated (the audit's F13) —
       # environment beats env_file, so scraper.env cannot override this;
       # the value is a file: reference (the first line of the 0600 file)
       AUTH_TOKEN: file:/config/metrics.token
     env_file:
-      - path: env/scraper.env
+      - path: ../env/scraper.env
         required: false
     networks:
       - modbus
@@ -99,11 +131,11 @@ services:
 
   prometheus:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile.prometheus
     image: prometheus
     env_file:
-      - path: env/prometheus.env
+      - path: ../env/prometheus.env
         required: false
     volumes:
       - config:/config:ro
@@ -116,17 +148,17 @@ services:
 
   dashboard:
     build:
-      context: ../dashboard
+      context: ../../dashboard
       dockerfile: ../docker/Dockerfile.dashboard
       additional_contexts:
-        scripts: ../docker
-        common: ../common
+        scripts: ..
+        common: ../../common
     image: dashboard
     environment:
       # the proxy target: the stack's internal Prometheus service (the
       # dashboard never needs the token — the scrape stays prometheus-side;
       # there is no dashboard env_file — the stack's PROM_URL is a
-      # compose-level concern, see env/dashboard.env.example for the
+      # compose-level concern, see ../env/dashboard.env.example for the
       # plain-docker spelling)
       PROM_URL: http://prometheus:9090
       # the page's auth (the audit's F21): the container binds every

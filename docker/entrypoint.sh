@@ -3,10 +3,11 @@
 # file artifacts, then run the tool as the unprivileged pvsuite user.
 #
 # The image carries only those artifacts in /pv-suite/config-defaults (the
-# generated bearer token, the JSON specs, the served config.js — never the
-# bundled conf scripts: the tool loads the image's own conf and the
-# per-tool env file overrides it, see docker/README.md); every file the
-# config volume (/config) does not have yet is copied in on start — edit
+# generated bearer tokens, the generated suite key, the JSON specs, the
+# served config.js — never the bundled conf scripts: the tool loads the
+# image's own conf and the per-tool env file overrides it, see
+# docker/README.md); every file the config volume (/config) does not have
+# yet is copied in on start — edit
 # them there, they survive container recreation. Runs as root only for the
 # seeding and drops to pvsuite via su-exec; the tool never runs as root.
 set -eu

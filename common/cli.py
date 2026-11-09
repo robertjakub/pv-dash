@@ -24,6 +24,7 @@ from common.audit import AuditLog
 from common.config import parse_secret, resolve_target
 from common.human import secs
 from common.options import command_path_pool, render_word_sections, setting_path_pool, word_groups
+from common.texts import T
 from common.wiresec import sign_request, verify_reply
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
@@ -74,7 +75,7 @@ def daemon_exit_notice(text):
     except (ValueError, IndexError, AttributeError):
         pass
     m = re.search(r'daemon-exit: (.*)', raw)
-    print('\n%% daemon exit: %s — console closing' % (m.group(1).strip() if m else 'the daemon is gone'))
+    print(T('cli.daemon_exit') % (m.group(1).strip() if m else T('cli.daemon_exit_fallback')))
     sys.stdout.flush()
 
 
@@ -86,8 +87,8 @@ def prompt_for(target, is_unix):
         if base.endswith('.socket'):
             base = base[:-len('.socket')]
         m = re.search(r'(\d+)$', base)
-        return '%s:%s > ' % (_SPEC['prompt_word'], m.group(1) if m else base)
-    return '%s:%s > ' % (_SPEC['prompt_word'], target)
+        return T('cli.prompt') % (_SPEC['prompt_word'], m.group(1) if m else base)
+    return T('cli.prompt') % (_SPEC['prompt_word'], target)
 
 
 def _sections(head, done_len, matches, values=False, base=''):
@@ -292,7 +293,7 @@ def print_options(buf):
     matches, hint, desc, sections = candidates(buf)
     rows = sectioned_rows(sections, desc, hint)
     if not rows:
-        print('% Invalid input.')
+        print(T('cli.invalid_input'))
         return
     for row in rows:
         print(row)
@@ -311,24 +312,24 @@ def reconnect(addr, is_unix, args, audit=None):
     immediately, --reconnect-wait seconds between the tries — every
     attempt audited. Returns the new socket, or None when the tries run
     out."""
-    print('%% connection lost, reconnecting (attempt 1 of %d)' % args.reconnect)
+    print(T('cli.reconnecting') % args.reconnect)
     for attempt in range(1, args.reconnect + 1):
         try:
             s = connect_once(addr, is_unix, args.timeout)
         except OSError as e:
-            print('%% reconnect attempt %d failed: %s' % (attempt, e))
+            print(T('cli.reconnect_attempt_failed') % (attempt, e))
             if audit:
                 audit.event('RECONNECT', 'attempt %d of %d failed: %s' % (attempt, args.reconnect, e))
             if attempt < args.reconnect:
-                print('%% reconnecting in %s (attempt %d of %d)'
+                print(T('cli.reconnecting_in')
                       % (secs(args.reconnect_wait), attempt + 1, args.reconnect))
                 time.sleep(args.reconnect_wait)
             continue
         if audit:
             audit.event('RECONNECT', 'attempt %d of %d ok' % (attempt, args.reconnect))
-        print('%% reconnected to %s' % _SPEC['label'])
+        print(T('cli.reconnected') % _SPEC['label'])
         return s
-    print('% error: reconnect failed, exiting')
+    print(T('cli.reconnect_failed'))
     if audit:
         audit.event('RECONNECT', 'gave up after %d attempts' % args.reconnect)
     return None
@@ -347,7 +348,7 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
                 if token and not is_unix:
                     reply = exchange(sock, json.dumps({'cmd': 'auth', 'token': token}, ensure_ascii=False))
                     if not reply or not reply.startswith('ok'):
-                        print('control auth failed: %s' % (reply or 'no reply'), file=sys.stderr)
+                        print(T('shared.auth_failed') % (reply or 'no reply'), file=sys.stderr)
                         return 1
                     _require_reply_mac = True   # the handshake holds: unsigned replies are fatal
                 if sys.stdin.isatty():
@@ -368,7 +369,7 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
                 except OSError:
                     pass
                 if not args.reconnect:
-                    print('connection lost', file=sys.stderr)
+                    print(T('cli.connection_lost'), file=sys.stderr)
                     return 1
                 sock = reconnect(addr, is_unix, args, audit)
                 if sock is None:
@@ -407,11 +408,11 @@ def display(text):
     if first.startswith('ok '):
         print('\n'.join([first.split(' ', 1)[1]] + rest))
     elif first.startswith('err '):
-        print('\n'.join(['%% error: %s' % first.split(' ', 1)[1]] + rest))
+        print('\n'.join([T('shared.error_face') % first.split(' ', 1)[1]] + rest))
     elif first.startswith('note '):
-        print('\n'.join(['%% %s' % first.split(' ', 1)[1]] + rest))
+        print('\n'.join([T('shared.plain_face') % first.split(' ', 1)[1]] + rest))
     elif first.startswith('bye'):
-        print('\n'.join(['%% %s' % first] + rest))
+        print('\n'.join([T('shared.plain_face') % first] + rest))
     else:
         print(text)                 # an unheaded reply (the fake's own shapes) prints as-is
 
@@ -440,7 +441,7 @@ def typed_loop(sock, prompt, audit=None):
                 audit.command(cmd, 'local')
             return
         if low == 'ping':               # local: the wire pings belong to the keepalive thread
-            print('pong')
+            print(T('cli.pong'))
             continue
         if low in ('?', 'help'):
             if audit:
@@ -465,12 +466,12 @@ def typed_loop(sock, prompt, audit=None):
         except ConnectionLost:
             raise
         if reply is None:
-            raise ConnectionLost('the control connection closed without a bye')
+            raise ConnectionLost(T('cli.closed_without_bye'))
         if low.startswith(('set ', 'unset ')):
             if reply.startswith('note ') or 'restart required' in reply:
-                print('% ' + reply.split(' ', 1)[1])   # the startup-only knob: the note type, or the refused secret's fail — a note face, not a verdict
+                print(T('shared.plain_face') % reply.split(' ', 1)[1])   # the startup-only knob: the note type, or the refused secret's fail — a note face, not a verdict
             elif reply.startswith('ok'):
-                print('% changed')   # the one ok face keeping the marker
+                print(T('cli.changed'))   # the one ok face keeping the marker
             else:
                 display(reply)
         elif _SPEC['silent_ok'] and _SPEC['silent_ok'](low) and reply.startswith('ok'):
@@ -495,13 +496,13 @@ def typed_loop(sock, prompt, audit=None):
 def confirm_shutdown(sock):
     """console-style [confirm]: RETURN or y/yes proceeds, anything else aborts."""
     try:
-        ans = input('Proceed with shutdown? [confirm] ')
+        ans = input(T('cli.confirm_shutdown'))
     except (EOFError, KeyboardInterrupt):
         print()
-        print('% Aborted.')
+        print(T('cli.aborted'))
         return False
     if ans.strip().lower() not in ('', 'y', 'yes'):
-        print('% Aborted.')
+        print(T('cli.aborted'))
         return False
     try:
         reply = exchange(sock, wire('shutdown'))
@@ -539,9 +540,9 @@ def exchange(sock, wire_text):
             mac = obj.get('mac')
             if _token and mac is not None and not verify_reply(_token, st,
                                                                str(obj.get('text', '')), mac):
-                raise ConnectionLost('the reply mac does not verify — the wire was tampered with')
+                raise ConnectionLost(T('cli.mac_verify_failed'))
             if _token and mac is None and _require_reply_mac:
-                raise ConnectionLost('the server did not sign the reply')
+                raise ConnectionLost(T('shared.mac_missing'))
             if obj.get('status') == 'bye' and str(obj.get('text', '')).startswith('daemon-exit'):
                 raise DaemonExit(text)
             if text.strip() == 'ok pong':
@@ -549,9 +550,9 @@ def exchange(sock, wire_text):
             if text.strip():
                 return text.strip()
     except socket.timeout:
-        raise ConnectionLost('no reply within the socket timeout')
+        raise ConnectionLost(T('cli.no_reply_timeout'))
     except OSError:
-        raise ConnectionLost('the control connection failed')
+        raise ConnectionLost(T('cli.connection_failed'))
 
 
 def run_cli(spec):
@@ -591,7 +592,7 @@ def run_cli(spec):
     try:
         s = connect_once(addr, isinstance(addr, str), args.timeout)
     except OSError as e:
-        print('cannot reach control server at %s: %s' % (label, e), file=sys.stderr)
+        print(T('shared.cannot_reach') % (label, e), file=sys.stderr)
         raise SystemExit(1)
     if audit:
         audit.event('CONNECT', 'target=%s user=%s' % (label, getpass.getuser()))

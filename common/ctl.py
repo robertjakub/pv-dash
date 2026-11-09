@@ -13,6 +13,7 @@ import sys
 
 from common.audit import AuditLog
 from common.config import parse_secret, resolve_target
+from common.texts import T
 from common.wiresec import sign_request, verify_reply
 
 
@@ -66,7 +67,7 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         s.settimeout(args.timeout)
         s.connect(addr)
     except OSError as e:
-        print('cannot reach control server at %s: %s' % (label, e), file=sys.stderr)
+        print(T('shared.cannot_reach') % (label, e), file=sys.stderr)
         raise SystemExit(1)
     if audit:
         audit.event('CONNECT', 'target=%s user=%s' % (label, getpass.getuser()))
@@ -84,7 +85,7 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         while b'\n' not in buf:
             chunk = sock.recv(65536)
             if not chunk:
-                return 'fail', 'connection closed'
+                return 'fail', T('ctl.connection_closed')
             buf += chunk
         # the first complete frame only: the daemon-exit bye can ride the
         # same segment as a shutdown reply (announce_exit) — it is not
@@ -93,14 +94,14 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         try:
             obj = json.loads(line.decode('utf-8', 'replace'))
         except ValueError:
-            return 'fail', 'malformed reply'
+            return 'fail', T('ctl.malformed_reply')
         st, tx = obj.get('status', 'fail'), str(obj.get('text', ''))
         mac = obj.get('mac')
         if token and mac is not None and not verify_reply(token, st, tx, mac):
-            print('the reply mac does not verify (tampered or corrupted frame)', file=sys.stderr)
+            print(T('ctl.mac_verify_failed'), file=sys.stderr)
             raise SystemExit(1)
         if token and mac is None and required_auth:
-            print('the server did not sign the reply', file=sys.stderr)
+            print(T('shared.mac_missing'), file=sys.stderr)
             raise SystemExit(1)
         return st, tx
 
@@ -108,22 +109,22 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         if token and not isinstance(addr, str):
             st, tx = exchange(s, 'auth', token=token)
             if st != 'ok':
-                print('control auth failed: %s' % tx, file=sys.stderr)
+                print(T('shared.auth_failed') % tx, file=sys.stderr)
                 raise SystemExit(1)
             required_auth = True   # the handshake holds: every reply from here is signed and verified
         for cmd in commands:
             st, tx = exchange(s, cmd)
             if st == 'bye' and tx.startswith('daemon-exit'):
-                print('%% %s — done' % tx.replace('daemon-exit', 'daemon exit', 1))
+                print(T('ctl.daemon_exit_done') % tx.replace('daemon-exit', 'daemon exit', 1))
                 break
             if st == 'fail':
-                print('%% error: %s' % tx)
+                print(T('shared.error_face') % tx)
             elif st == 'note':
-                print('%% %s' % tx)   # a note, not a verdict: the startup-only set landed as the configured value
+                print(T('shared.plain_face') % tx)   # a note, not a verdict: the startup-only set landed as the configured value
             else:
                 print(('%s %s' % (st, tx)).rstrip())
     except OSError as e:
-        print('control error: %s' % e, file=sys.stderr)
+        print(T('ctl.control_error') % e, file=sys.stderr)
         raise SystemExit(1)
     finally:
         if audit:

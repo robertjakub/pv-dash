@@ -31,6 +31,8 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../common}/modbus/*.py $out/share/modbus-fake-inverter/common/modbus/
     install -dm755 $out/share/modbus-fake-inverter/profiles
     install -m644 ${../profiles/profiles}/*.json $out/share/modbus-fake-inverter/profiles/
+    install -Dm644 examples/acl-ip-prefix.json $out/share/modbus-fake-inverter/acl-ip-prefix.json
+    install -Dm644 schema/acl-ip-prefix.schema.json $out/share/modbus-fake-inverter/acl-ip-prefix.schema.json
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-fake-inverter \

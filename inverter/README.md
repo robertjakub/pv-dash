@@ -199,7 +199,12 @@ instance per Modbus port, stale files replaced, unlinked on shutdown, nothing
 ever lands in the working directory. Pass a TCP port number to bind
 `127.0.0.1:PORT` instead, or `0` to switch the control server off. Both tools
 resolve the target the same way: flag > **`CTL`** environment variable >
-default socket.
+default socket. The target also **rebinds live** — `set control port`
+(the family's listener, bind-first: a failed bind leaves the old listener
+untouched, the old loop retires by identity, the connected sessions keep
+serving; `off` stops accepting while the sessions keep serving, a later set
+re-enables) — and on the fake a **tokenless TCP rebind succeeds** (the
+F11 test-tool posture; every other tool in the family refuses it — F5).
 
 The wire is **JSON lines** (stdlib `json` only): one request object per
 line, one reply object per line. The request is `{"cmd": "<command>"}`, the
@@ -293,10 +298,15 @@ read-only ops token the same way):
 | `connect-acl` | `any` \| `none` \| IP/CIDR list | the Modbus connect ACL (`--connect-acl` startup value, tunable live): who may connect to the Modbus surface at all |
 | `write/allow` | `on` \| `off` | the write gate (`--allow-write` startup value, tunable live): whether the fake accepts Modbus writes (FC05/06/15/16) from its clients — off refuses every write with exception 01 |
 | `modbus auth` / `modbus auth key` | `suite` \| `none` / key | the auth scheme the fake's Modbus clients must speak (`--auth` startup value, tunable live): `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect and drops the client on `ERR`/anything else; `none`/empty = no auth at all — the key is a secret: **`show` refuses it**, `unset` refuses it |
-| `metrics-server` | `on`/`off` | the fake's own `/metrics` endpoint (default off; the address is `--metrics-listen`, tunable live); a token-less listen beyond loopback **refuses to start** (the F13 shape, the family's golden master) |
+| `metrics enable` | `on`/`off` | the fake's own `/metrics` endpoint (default off; the address is `--metrics-listen`, tunable live); a token-less listen beyond loopback **refuses to start** (the F13 shape, the family's golden master) |
 | `control token` | `<token>` \| `off` | rotate the **admin control token** live (the sessions re-auth); `off` drops the token entirely (the trusted-LAN posture, F11). A secret: **`show` refuses it**, `unset` refuses it — pass it by flag/env, or as `file:<path>` |
 | `control ops token` | `<token>` \| `off` | rotate the **read-only ops token** live (must differ from the admin token); `off` signs the ops shift out |
+| `control port` | unix path \| TCP port \| `off` | **rebind the control listener live** (the family's rebind: bind-first, the old loop retires by identity, the sessions keep serving); tokenless TCP included — the F11 posture |
+| `control ops verbs` | `VERB,...` | the read-only ops role's RBAC policy, live (the verbs its sessions may run) |
+| `control trust-uids` | `UID,...` \| `off` | the peer-cred trust list, live — the extra uids the unix socket authenticates without the token |
+| `control socket-group` | `on` \| `off` | the unix control socket's mode, live: 0660 (a local group shares it) or the plain 0600 — the live socket re-modes |
 | `metrics token` | `<token>` \| `off` | rotate the **/metrics bearer token** live; `off` serves tokenless on the loopback listen (beyond loopback it refuses — the F13 shape) |
+| `metrics acl` | `any` \| `none` \| IP/prefix list \| `file:<path>` | the /metrics connect ACL, live (`--metrics-acl` startup value): who may connect to the endpoint at all — checked at accept, a client off the ACL is closed without a reply; `file:<path>` reads the standalone ip-prefix acl file (the shipped example is `examples/acl-ip-prefix.json`), the chain's **last matching rule decides**; `show metrics acl table` renders the chain |
 | `dump path` / `dump restore-on-start` | `<file>` / `on`\|`off` | the state dump's file (the pins, the machines — the tokens apart) and the restore-on-start mark (prospective: the running session's start already chose) |
 | `register` | `addr value` | `set register <addr> <value>` — write a raw register into the **write overlay** (the same store the FC06/FC16 writes use, so the scrapers read it); `reset` clears it, `show registers` marks the rows with `*` |
 | `coil` | `addr 0\|1` | `set coil <addr> <0|1>` — pin a coil in the coil space (what FC1 reads and FC5/FC15 write); `reset` clears the pins |
@@ -405,9 +415,10 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 | `--unit` | `1` | Modbus unit id served |
 | `--grid-voltage` | `230` | nominal grid phase voltage (V, 120 or 230); the per-phase machine wanders ±10 % around it |
 | `--grid-frequency` | `50` | nominal grid frequency (Hz); the machine wanders ±0.2 Hz around it |
-| `--metrics-server` | off | serve the fake's own Prometheus `/metrics` endpoint — **live-settable** (`set metrics-server on/off`; refuses to start beyond loopback without `--metrics-token` on both paths — the F13 shape, the family's golden master) |
-| `--metrics-listen` | `127.0.0.1:9452` | the metrics bind address `HOST:PORT` (`0.0.0.0:PORT` serves every interface — a token is mandatory beyond loopback, F13) |
+| `--metrics-server` | off | serve the fake's own Prometheus `/metrics` endpoint — **live-settable** (`set metrics enable on/off`; refuses to start beyond loopback without `--metrics-token` on both paths — the F13 shape, the family's golden master) |
+| `--metrics-listen` | `127.0.0.1:9352` | the metrics bind address `HOST:PORT` (`0.0.0.0:PORT` serves every interface — a token is mandatory beyond loopback, F13) |
 | `--metrics-token` | off | require `Authorization: Bearer <token>` on the metrics endpoint (the same scheme as the scraper's `--auth-token`); the value may be `file:<path>` — the first line of an owner-only `0600` file, F12 |
+| `--metrics-acl` | `any` | the clients allowed to **connect** to /metrics: `any`, `none` (refuse everyone), comma-separated IPs/prefixes (`10.0.0.7,10.48.0.0/16`), or `file:<path>` — the standalone ip-prefix acl file (allow/deny rule chain, the **last matching rule decides**, a client no rule decides refuses; `any` = 0.0.0.0/0). Checked at accept — a client off the ACL is closed without a reply and logged; live-settable (`set metrics acl`, `unset metrics acl`); a group/world-readable acl file warns (`chmod 0600` silences it) — the shipped example is `examples/acl-ip-prefix.json`, its JSON Schema `schema/acl-ip-prefix.schema.json` |
 | `--metrics-max-clients` | `64` | cap concurrent HTTP clients on the metrics endpoint; extras get an immediate `503 # rate limited` (`0` = unlimited) |
 | `--metrics-client-timeout` | `5` | seconds an idle metrics client is kept before the socket times out (`0` = the same built-in 5 s cap) |
 | `--metrics-max-conn-per-ip` | `0` | cap concurrent metrics connections from one peer IP (`0` = no per-IP limit) |
@@ -434,7 +445,7 @@ Reloadable environment variables: `CHAOS` (0..1), `MAX_KWP`,
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
 | `--control-token` | off | require the token auth handshake on control connections (the clients take `--control-token` / `CONTROL_TOKEN`; the value may be `file:<path>` — the first line of an owner-only `0600` file, F12) |
 | `--control-ops-token` | off | a second, **read-only** control token: its sessions run the `show` verbs only (no `set`/`unset`, no `reset`, no `shutdown`) — needs `--control-token`, must differ from it; both roles audited (`CONTROL_OPS_TOKEN`) |
-| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (`CONTROL_OPS_VERBS`) |
+| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated, validated against the control grammar at start (config `set control ops verbs`, env `CONTROL_OPS_VERBS`) |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`): comma-separated — root and the daemon's own user are always trusted (env `CONTROL_TRUST_UIDS`) |
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`chmod 0660` instead of the default `0600`): a local group may speak to the control without being the service user |
 | `--control-log-replies` | off | DEBUG-log the full output of every control command, not just the command |
@@ -520,7 +531,9 @@ Honest scope of a demo device:
 > `--auth suite` shared-key handshake authenticates clients when a demo
 > wants it), and its
 > Prometheus `/metrics` serves without a token unless `--metrics-token` is
-> set. The audit (F11) accepts exactly this for a test instrument and asks
+> set (the `--metrics-acl` IP gate narrows who reaches the endpoint at
+> all, when a demo wants it). The audit (F11) accepts exactly this for a
+> test instrument and asks
 > for the blunt mitigations only: **`--max-clients` / `--client-timeout`**
 > cap runaway connections (both tunable live via the control server,
 > `show connections` watches them), the read-count gate keeps a malformed
@@ -581,6 +594,12 @@ inverter/bin/
     ├── statics.py      # static configuration loader (lib/static.json)
     ├── static.json     # the statics: solar times, cloud machines, battery limits
     └── paths.py        # default control-socket path
+
+inverter/examples/
+└── acl-ip-prefix.json         # example acl file: the /metrics connect policy (--metrics-acl file:...)
+
+inverter/schema/
+└── acl-ip-prefix.schema.json  # the acl file's JSON Schema (the editor's lint, the loader the strict word)
 ```
 
 ## License

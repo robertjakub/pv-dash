@@ -33,6 +33,12 @@ DEFAULT_MAX_KWP = DEFAULTS['max_kwp']
 DEFAULT_BATTERY_KWH = DEFAULTS['battery_kwh']
 DEFAULT_TIME_SCALE = DEFAULTS['time_scale']
 TIME_SCALE_MAX = DEFAULTS['time_scale_max']    # a day per minute
+
+# the control socket's name: the daemon's template (common.config's parsers
+# take it as the argument), the clients' default (the template spelled with
+# the default modbus port)
+CONTROL_SOCKET_TEMPLATE = '/tmp/fake-inverter-%d.socket'
+DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_MODBUS_PORT
 DEFAULT_CHAOS = DEFAULTS['chaos']
 DEFAULT_MAX_CLIENTS = DEFAULTS['max_clients']
 DEFAULT_CLIENT_TIMEOUT_S = DEFAULTS['client_timeout_s']

@@ -38,17 +38,17 @@ import os
 import threading
 
 from common.audit import AuditLog
-from common.config import acl_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, parse_secret
+from common.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
+    parse_secret, resolve_control_target, resolve_metrics_acl
 from common.cred import parse_trust_uids
 from common.options import build_parser
 from common.version import version_string
 from lib.chaos import Chaos
-from lib.paths import resolve_control_target
 from lib.control import ControlServer
 from lib.options import KNOWN_VERBS, OPTIONS
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
-from lib.statics import PEAK_RATIO, TIME_SCALE_MAX
+from lib.statics import CONTROL_SOCKET_TEMPLATE, PEAK_RATIO, TIME_SCALE_MAX
 from lib.signals import SignalBox, parse_time
 from lib.metrics import MetricsServer, describe_metrics
 from lib.simulator import Simulator
@@ -64,7 +64,7 @@ def validate(args):
         problems.append('--host is not a valid hostname/address: %r' % args.host)
     if not 1 <= args.port <= 65535:
         problems.append('--port out of range: %d' % args.port)
-    ctl = resolve_control_target(args.control_port, args.port)
+    ctl = resolve_control_target(args.control_port, args.port, CONTROL_SOCKET_TEMPLATE)
     if ctl != '0':
         if ctl.isdigit():
             if not 1 <= int(ctl) <= 65535:
@@ -96,12 +96,14 @@ def validate(args):
     return problems
 
 
-def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth):
+def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
+                        control_target, ops_verbs, trust_uids, metrics_acl):
     """Every setting's configured startup value — what `unset <setting>`
-    restores (the connect ACL and the auth type ride in, parsed once in
-    main). The secret rows (control/token, control/ops/token,
-    metrics/token, auth-key) carry NO entry: `unset` refuses them (the
-    metrics/token treatment) — a secret never renders, never re-applies."""
+    restores (the connect ACL, the auth type and the control family ride
+    in, parsed once in main). The secret rows (control/token,
+    control/ops/token, metrics/token, auth-key) carry NO entry: `unset`
+    refuses them (the metrics/token treatment) — a secret never renders,
+    never re-applies."""
     return {
         'pv': 'auto', 'load': 'auto', 'batt': 'auto', 'grid': 'auto', 'soc': 'auto', 'cloud': 'clear',
         'time': '%02d:%02d' % (int(frozen), round((frozen % 1.0) * 60)) if frozen is not None else 'auto',
@@ -126,18 +128,20 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth):
         'connect-acl': acl_text(connect_acl),
         'write/allow': 'on' if args.allow_write else 'off',
         'modbus/auth': modbus_auth or 'none',
-        'metrics-server': 'on' if args.metrics_server else 'off',
+        'metrics/enable': 'on' if args.metrics_server else 'off',
+        'metrics/acl': acl_value_text(metrics_acl),
         'profile': profile_text,
         'log-level': args.log_level,
         'dump/path': args.dump_path or 'off',
         'dump/restore-on-start': 'on' if args.restore_on_start else 'off',
+        # the live control family — what `unset` restores (the cache's model)
+        'control/port': control_target,
+        'control/ops/verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
+        'control/trust-uids': ','.join(str(u) for u in sorted(trust_uids or ())) or 'off',
+        'control/socket-group': 'on' if args.control_socket_group else 'off',
         # the startup-only knobs (restart: true) — what `show <knob>` answers
         'host': args.host, 'port': str(args.port), 'unit': str(args.unit),
         'no-battery': 'on' if not args.battery else 'off',   # the no-battery flag store_falses battery
-        'control-port': args.control_port or 'off',
-        'control-ops-verbs': args.control_ops_verbs or 'off',
-        'control-trust-uids': args.control_trust_uids or 'off',
-        'control-socket-group': 'on' if args.control_socket_group else 'off',
         'control-log-replies': 'on' if args.control_log_replies else 'off',
         'metrics-listen': args.metrics_listen or 'off',
         'metrics-max-clients': str(args.metrics_max_clients),
@@ -219,7 +223,7 @@ def main():
         logger.error('the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)')
         raise SystemExit(1)
     chaos = Chaos(args.chaos, seed=args.seed)
-    target = resolve_control_target(args.control_port, args.port)
+    target = resolve_control_target(args.control_port, args.port, CONTROL_SOCKET_TEMPLATE)
     dump_key = parse_secret((args.dump_key or os.environ.get('DUMP_KEY') or '').strip() or None, 'dump/key')
     for name, pending in ControlServer.fold_restart_state(None, dump_key).items():
         # the restart-marked overrides fold into the startup args BEFORE the
@@ -250,6 +254,8 @@ def main():
                                   'control-trust-uids')
     metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics/token')
     metrics_listen = parse_listen(args.metrics_listen)
+    metrics_acl, metrics_acl_warn = resolve_metrics_acl(args.metrics_acl or os.environ.get('METRICS_ACL'),
+                                                        'metrics/acl')   # a bad acl value or gate file refuses the start
     if args.metrics_server and metrics_token is None:
         from common.config import is_loopback_host
         if not is_loopback_host(metrics_listen[0]):
@@ -292,7 +298,8 @@ def main():
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,
                                 defaults=configured_defaults(args, frozen, profile_text,
-                                                             connect_acl, modbus_auth),
+                                                             connect_acl, modbus_auth,
+                                                             target, ops_verbs, trust_uids, metrics_acl),
                                 log_replies=args.control_log_replies, audit=audit,
                                 token=control_token, trust_uids=trust_uids,
                                 socket_group=args.control_socket_group,
@@ -307,6 +314,7 @@ def main():
                                 dump_key=dump_key)
     fake.metrics_listen = metrics_listen
     fake.metrics_token = metrics_token
+    fake.metrics_acl = metrics_acl
     fake.metrics_caps = (args.metrics_max_clients, args.metrics_client_timeout, args.metrics_max_conn_per_ip)
     fake.metrics_desc = describe_metrics(metrics_listen, metrics_token,
                                          args.metrics_max_clients, args.metrics_max_conn_per_ip) \
@@ -332,6 +340,8 @@ def main():
                     % (version_string(), args.host, args.port,
                        ('127.0.0.1:' + target) if target != '0' else 'off',
                        profile_label(profile_path), simulator.profile.description))
+        if metrics_acl_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
+            audit.event('ACL-FILE', metrics_acl_warn)
     try:
         fake.serve(args.host, args.port)
     except KeyboardInterrupt:

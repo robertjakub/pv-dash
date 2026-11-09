@@ -5,6 +5,32 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The metrics/acl family wave: the fake's own `/metrics` takes the cache's
+**`metrics/acl` gate** — `--metrics-acl`/`$METRICS_ACL`, live `set
+metrics acl` / `unset`, the table show `show metrics acl table`, the
+`set metrics acl table` pointer — the accept-time IP gate checked ahead
+of the caps (a client off the ACL is closed without a reply), the inline
+grammar or `file:<path>` (the shipped example `examples/acl-ip-prefix.json`
++ its JSON Schema `schema/acl-ip-prefix.schema.json` — both dirs new
+here). The toggle's live name re-spells to the family form
+**`metrics/enable`** (the wire spells `set metrics enable`; the knob
+name and the flag stay flat), and the default metrics bind moves
+`9452` → **`9352`** (the fake and the dashboard had shared 9452; the
+family's /metrics defaults now count from the scraper's 9350 up).
+
+The control-listener family wave: **the fake's control listener IS the
+cache's** — the listener tier lifted into `common/control.py` (one
+implementation, four riders) and the control family goes live on the
+wire: `control/port` rebinds the listener live (bind-first, the old loop
+retires by identity, the sessions keep serving, `off` retires, `unset`
+restores the configured target) — **tokenless TCP included** (the F11
+posture, the family's F5 refusal parameterized away as
+`TOKENLESS_TCP = 'allow'`), `control/ops/verbs` (the RBAC policy, the
+family spelling), `control/trust-uids`, `control/socket-group` (the live
+unix socket re-modes 0600/0660); the dump/reload state carries the
+listener. The old lib/paths.py wrapper died (the parsers unified in
+`common/config.py`, one signature — `listen_port` + the socket template).
+
 The F13 conformance: **the metrics token is mandatory beyond loopback,
 not warn-and-serve** — the startup check, the live `metrics-server on`
 and the live `metrics/token` off all refuse a non-loopback bind without
@@ -183,7 +209,8 @@ the command mapping in `help config`). The fake_ctl's TAB completion and
 `show?` word-help offer the new `show` argument.
 
 The RBAC verb set: `--control-ops-verbs` (default show,clear, validated
-against the fake's grammar at start) configures the read-only role's
+against the fake's grammar at start, live as `set control ops verbs`)
+configures the read-only role's
 policy; `show config` renders the argv that would restart the fake (the
 option registry landed in lib/options.py; the fake carries no config file
 — its startup surface stays the flags and the INV_* env layer).

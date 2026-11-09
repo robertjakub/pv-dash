@@ -28,9 +28,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 from common import cli
 from lib.man import cli_page
 from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
-from lib.paths import resolve_control_target
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, \
-    CLI_TIMEOUT_S
+    CLI_TIMEOUT_S, DEFAULT_CONTROL_SOCKET
 
 
 POOL_NAMES = tuple(n for n in SETTING_NAMES + ALIAS_NAMES if n not in HIDDEN_SETTINGS
@@ -64,7 +63,7 @@ SPEC = dict(label='the fake inverter', daemon_label='fake inverter control serve
             prompt_word='fake-inverter', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,
-            resolve=resolve_control_target, settings=SETTING_BY_NAME, nodes=NODE_BY_NAME,
+            ctl_socket=DEFAULT_CONTROL_SOCKET, settings=SETTING_BY_NAME, nodes=NODE_BY_NAME,
             live_settings=LIVE_SETTINGS, show_lives=SHOW_LIVES,
             command_pool=command_pool, setting_pool=setting_pool,
             describe=describe_word,

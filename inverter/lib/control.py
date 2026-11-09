@@ -22,7 +22,9 @@ import sys
 import threading
 import time
 
-from common.config import acl_text, parse_acl, parse_auth_type, parse_secret
+from common.config import acl_table, acl_text, acl_value_text, parse_acl, parse_auth_type, parse_control_target, \
+    parse_secret, resolve_metrics_acl
+from common.cred import parse_trust_uids
 from common.human import secs
 from common.modbus import AUTH_MIN_KEY
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
@@ -34,10 +36,11 @@ from .profile import load_profile, profile_label, resolve_profile
 from .signals import parse_time
 from common.version import version_string
 from common.dump import SECRET_REMOVED, dump_filter
-from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, \
-    NODE_BY_NAME, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
+from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, \
+    SHOW_OPTIONS, NODE_BY_NAME, KNOWN_VERBS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
-from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
+from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_MODBUS_PORT, \
+    LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
 
 logger = logging.getLogger('fake-inverter')
 
@@ -57,41 +60,11 @@ class ControlServer(_ControlServer):
     is configured — over the unix socket a kernel-vouched peer (root, the
     daemon's own user or trust_uids — SO_PEERCRED) skips the handshake. A
     second, read-only token (ops_token) may be configured beside the admin
-    token: it authenticates into the show/clear verbs only — no set/unset,
-    no reset, no reload, no shutdown (common/wiresec.py's roles)."""
-
-    def start(self):
-        self._restore_reload_state()   # a reload exec: the saved overrides re-apply once, the state file is consumed
-        threading.Thread(target=self.serve, daemon=True).start()
-
-    def serve(self):
-        srv = socket.socket(socket.AF_UNIX if self.is_unix else socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            if self.is_unix:
-                if os.path.exists(self.sockpath):
-                    logger.warning('control socket %s exists, replacing it', self.sockpath)
-                    os.unlink(self.sockpath)
-                srv.bind(self.sockpath)
-                # the mode is not left to the umask: 0600 = owner only,
-                # 0660 with --control-socket-group (a local group shares it)
-                os.chmod(self.sockpath, 0o660 if self.socket_group else 0o600)
-            else:
-                srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                srv.bind(('127.0.0.1', self.port))
-            srv.listen(64)   # the backlog above the client limit: a connect burst must not RST
-        except OSError as e:
-            logger.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
-            return
-        logger.info('control server listening on %s%s',
-                    self.describe(), (', token auth required on TCP' if self.token and not self.is_unix else '')
-                    + (', read-only ops token accepted' if self.ops_token else ''))
-        while True:
-            try:
-                client, addr = srv.accept()
-                threading.Thread(target=self.handle, args=(client, addr), daemon=True).start()
-            except (OSError, RuntimeError) as e:
-                logger.error('control accept failed (%s), retrying', e)
-                time.sleep(0.1)
+    token: it authenticates into the show/clear verbs only —     no set/unset,
+    no reset, no reload, no shutdown (common/wiresec.py's roles). The
+    listener rides the base's rebind family: a live `set control/port`
+    swaps the socket (bind first, the failed bind rolls back, the sessions
+    keep serving, off retires) — tokenless TCP included (F11)."""
 
     def handle(self, client, addr):
         who = self.peer(addr)
@@ -163,6 +136,7 @@ class ControlServer(_ControlServer):
     RELOAD_NEEDS_CONFIG = False   # the fake has no config file (F11) — the reload state falls to the XDG state home
     XDG_STATE_NAME = 'fake-inverter'   # the base's _reload_state_path fallback
     APPLY_FIRST = ('scenario',)   # a preset release is the state the pins were pinned after — pins land on top
+    TOKENLESS_TCP = 'allow'   # the F11 test-tool posture: a tokenless TCP control bind is fine here (the family refuses — F5)
 
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
                  trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None, startup_values=None,
@@ -178,6 +152,7 @@ class ControlServer(_ControlServer):
         self.fake = fake
         self.signalbox = None       # set by the entry; 'shutdown' hands over to it
         self.scenario = None        # last applied preset, or None = 'custom'
+        self.metrics_acl_warn = None   # the metrics/acl file's permission warning (the stash, None = no warning standing)
         self.target = str(target)
 
     def show_config(self):
@@ -365,7 +340,7 @@ class ControlServer(_ControlServer):
                 raise ValueError('modbus/auth/key must be at least %d characters, got %d' % (AUTH_MIN_KEY, len(v)))
             fake.auth_key = v
             return '<set>'
-        if key == 'metrics-server':
+        if key == 'metrics/enable':
             if not fake:
                 raise ValueError('no modbus device attached')
             if val in ('on', 'true', '1', 'yes'):
@@ -423,11 +398,24 @@ class ControlServer(_ControlServer):
                 sim.override(k, None)
             self.scenario = val
             return val
+        if key == 'control/port':
+            try:
+                target = parse_control_target(value.strip(), DEFAULT_MODBUS_PORT, CONTROL_SOCKET_TEMPLATE)
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if val in ('off', 'none', '0'):
+                target = None
+            if target is not None and not self.stopped and self._is_target(target):
+                return self.describe()   # the same target: nothing to rebind
+            self.refuse_tokenless_rebind(target)   # no-op here: the fake allows tokenless TCP (F11)
+            return self._rebind_control(target)
         if key == 'control/token':
             # the rotation is live: the sessions re-auth, the macs verify
             # against the new key. Dropping it entirely is the fake's
-            # documented trusted-LAN posture (F11) — even on TCP.
+            # documented trusted-LAN posture (F11) — even on TCP (the base's
+            # F5 guard exempts this class: TOKENLESS_TCP = 'allow').
             if val in ('off', 'none', ''):
+                self.refuse_token_drop()
                 self.token = None
                 return 'off'
             try:
@@ -452,6 +440,33 @@ class ControlServer(_ControlServer):
                                  'every holder the role the server picks first)')
             self.ops_token = val
             return '<set>'
+        if key == 'control/ops/verbs':
+            verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
+            unknown = sorted(v for v in verbs if v not in KNOWN_VERBS)
+            if not verbs or unknown:
+                raise ValueError('the ops policy needs at least one verb the grammar speaks%s: %s'
+                                 % ('' if not unknown else ' (unknown: %s)' % ', '.join(unknown),
+                                    ', '.join(sorted(KNOWN_VERBS))))
+            self.ops_verbs = verbs
+            return ','.join(sorted(verbs))
+        if key == 'control/trust-uids':
+            try:
+                uids = parse_trust_uids('none' if val == 'off' else val, 'control/trust-uids')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            self.trust_uids = uids or frozenset()
+            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
+        if key == 'control/socket-group':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('control/socket-group must be on or off')
+            self.socket_group = on
+            if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
+                os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
+            return 'on' if on else 'off'
         if key == 'metrics/token':
             if not fake:
                 raise ValueError('no modbus device attached')
@@ -476,6 +491,26 @@ class ControlServer(_ControlServer):
             fake.metrics_desc = describe_metrics(fake.metrics_listen, val,
                                                  fake.metrics_caps[0], fake.metrics_caps[2])
             return '<set>'
+        if key == 'metrics/acl':
+            if not fake:
+                raise ValueError('no modbus device attached')
+            if val == 'table':   # the show word is never a value — point at the report
+                raise ValueError('"table" is not a metrics/acl value — the table is the show: '
+                                 'show metrics acl table')
+            try:
+                gate, warn = resolve_metrics_acl(value)
+            except SystemExit as e:
+                raise ValueError(str(e))
+            self.metrics_acl_warn = warn   # the fresh state: an inline set clears a standing file warning
+            if warn is not None:   # the acl file's permission warning: the log, the audit trail, the reply's suffix
+                logger.warning('acl file: %s', warn)
+                if self.audit:
+                    self.audit.event('ACL-FILE', warn)
+            fake.metrics_acl = gate   # the swap is live: the accept check reads it per connection
+            shown = acl_value_text(gate)
+            if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
+                shown += ' (%s)' % warn
+            return shown
         if key == 'dump/path':
             if val in ('off', 'none', ''):   # the words lower fine; a path keeps its case
                 self.dump_path = None
@@ -541,7 +576,7 @@ class ControlServer(_ControlServer):
             return (fake.auth or 'none') if fake else '?'
         if key == 'modbus/auth/key':
             return ('<set>' if fake.auth_key else 'none') if fake else '?'   # the secret never renders
-        if key == 'metrics-server':
+        if key == 'metrics/enable':
             return ('on' if fake.metrics_srv else 'off') if fake else '?'
         if key == 'client-timeout':
             return ('%gs' % fake.client_timeout if fake.client_timeout else 'never') if fake else '?'
@@ -553,8 +588,18 @@ class ControlServer(_ControlServer):
             return '<set>' if self.token else 'off'   # the secret never renders
         if key == 'control/ops/token':
             return '<set>' if self.ops_token else 'off'   # the secret never renders
+        if key == 'control/port':
+            return 'off' if self.stopped else self.describe()
+        if key == 'control/ops/verbs':
+            return ','.join(sorted(self.ops_verbs)) or 'off'
+        if key == 'control/trust-uids':
+            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
+        if key == 'control/socket-group':
+            return 'on' if self.socket_group else 'off'
         if key == 'metrics/token':
             return '<set>' if (fake and fake.metrics_token) else 'off'   # the secret never renders
+        if key == 'metrics/acl':
+            return acl_value_text(fake.metrics_acl) if fake else '?'
         if key == 'dump/path':
             return self.dump_path or 'off'
         if key == 'scenario':
@@ -563,6 +608,17 @@ class ControlServer(_ControlServer):
         if s is not None and s.restart:   # a startup-only knob: the configured value
             return self.defaults.get(key, '?')   # renders (the secrets answer '<set>'/'off')
         return '?'
+
+    def acl_table_report(self):
+        """The metrics/acl/table show report (the show-only view of the
+        metrics ACL, one entry per line): the system forms spell the chain
+        they implement — 'allow 0.0.0.0/0' (any), 'deny 0.0.0.0/0' (none),
+        'deny 0.0.0.0/0' + one allow line per network (the whitelist); a
+        file gate renders its own rules — the gate desc as the '% ' line,
+        the rule descs as aligned '# ' comments, the matcher 'any' spelled
+        0.0.0.0/0 (common/config.py acl_table, the family's one renderer)."""
+        fake = self.fake
+        return 'ok metrics-acl-table\n%s' % '\n'.join(acl_table(fake.metrics_acl if fake else None))
 
     def command(self, line):
         if not line:
@@ -602,11 +658,14 @@ class ControlServer(_ControlServer):
             return self.show_config()
         if cmd == 'show' and args and args[0].lower() == 'knobs':
             return self.knobs_dictionary()
+        if cmd == 'show' and len(args) == 1 and args[0].lower() == 'metrics-acl-table':
+            # `show metrics acl table` (the live path's words) forwards here — the SHOW_BY_LIVE routing
+            return self.acl_table_report()
         if cmd == 'unset':
             if not args:
                 return 'err unset needs a setting (try help)'
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
-            s = SETTING_BY_NAME.get(key) if key is not None else None
+            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports have nothing to unset
+            s = SET_BY_NAME.get(key) if key is not None else None
             if s is not None and not rest and s.restart:
                 if s.secret:   # a secret never rides the reload state — the wire refuses it
                     return 'err restart required (startup-only knob)'
@@ -731,12 +790,12 @@ class ControlServer(_ControlServer):
                 self.fake.discrete[addr] = val
                 logger.info('control: set discrete %d=%d', addr, val)
                 return 'ok discrete %d=%d (the discrete-input space, FC2 sees it)' % (addr, val)
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports are not settable (and a show path never shadows a knob value)
             if key is None:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             if not rest:
                 return 'err set needs a setting and a value (try help)'
-            s = SETTING_BY_NAME.get(key)
+            s = SET_BY_NAME.get(key)
             if s is not None and s.restart and s.secret:
                 return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
             value = ' '.join(rest)
@@ -870,11 +929,16 @@ class ControlServer(_ControlServer):
             'max-conn-per-ip': fake.conn_gate.max_per_ip,
             'connect-acl': acl_text(fake.connect_acl),
             'modbus/auth': fake.auth or 'none',
-            'metrics-server': 'on' if fake.metrics_srv else 'off',
+            'metrics/enable': 'on' if fake.metrics_srv else 'off',
+            'metrics/acl': acl_value_text(fake.metrics_acl),
             'log-level': logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel()),
             'scenario': self.scenario or 'custom',
             'dump/path': self.dump_path or 'off',
             'dump/restore-on-start': 'on' if self.dump_restore else 'off',
+            'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
+            'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
+            'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
+            'control/socket-group': 'on' if self.socket_group else 'off',
         }
         for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
             if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:

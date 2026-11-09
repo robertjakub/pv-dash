@@ -7,13 +7,20 @@ scraper speaks when it pulls token-protected exporters). The bind address
 is --metrics-listen HOST:PORT (0.0.0.0 serves every interface — mind the
 values, the fake is a demo). Caps: --metrics-max-clients (immediate 503
 past it), --metrics-client-timeout (0 = the built-in 5 s cap),
---metrics-max-conn-per-ip (0 = no limit). The gated endpoint skeleton (the
-401/404/503, the caps, the thread start/stop) is the family's
-common/metrics_server."""
+--metrics-max-conn-per-ip (0 = no limit). Ahead of the caps the
+metrics/acl gate checks the peer IP at accept (the cache's metrics/acl
+reading): a client off the ACL is closed without a reply — nothing was
+parsed to answer, the caps never see the peer. The gated endpoint
+skeleton (the 401/404/503, the caps, the thread start/stop) is the
+family's common/metrics_server."""
+import logging
 import time
 
+from common.config import acl_admits
 from common.metrics_server import MetricsServer as _MetricsServer
 from common.metrics_server import describe_metrics
+
+logger = logging.getLogger('fake-inverter')
 
 
 class MetricsServer(_MetricsServer):
@@ -32,6 +39,16 @@ class MetricsServer(_MetricsServer):
         self.chaos = chaos
         self.fake = fake
         self.control = control
+
+    def acl_allows(self, ip):
+        """The accept-time metrics/acl gate: the gate reads through the
+        fake per connection — one live state, the set/unset swap needs no
+        push here (the cache's metrics.py reading)."""
+        return acl_admits(self.fake.metrics_acl, ip)
+
+    def acl_refused(self, request, client_address):
+        logger.info('connection rejected: %s:%d not on the metrics ACL', *client_address[:2])
+        self._http._refuse_close(request)
 
     def snapshot(self):
         sim = self.simulator

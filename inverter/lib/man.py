@@ -67,8 +67,9 @@ TCP requires the token when configured). Commands: \\fBset\\fR/\\fBunset\\fR/
 \\fBshow\\fR/\\fBhelp\\fR (the settings: pv, load, batt, grid, grid-voltage,
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
 scenario, chaos, seed, battery, battery-state, strict, static, max-kwp,
-battery-kwh, max-clients, client-timeout, max-conn-per-ip, metrics-server,
-register, coil, discrete, profile, log-level, modbus auth (the suite
+battery-kwh, max-clients, client-timeout, max-conn-per-ip,
+metrics enable, metrics acl, register, coil, discrete, profile,
+log-level, modbus auth (the suite
 scheme; the key
 \\(em modbus auth key \\(em is a secret: \\fBshow\\fR refuses it) \\(em
 and the token lives: control token, the ops token, metrics token, each
@@ -88,7 +89,14 @@ overrides as one 0600 integrity-hashed JSON; \\fB--dump-key\\fR seals it
 loads it at start), \\fBshutdown\\fR,
 \\fBquit\\fR. A second, read-only token (\\fB--control-ops-token\\fR)
 authenticates into the show verbs only \\(em the ops shift against the
-admin key, both roles audited. See
+admin key, both roles audited. The control listener rides the family's
+live rebind: \\fBset control port\\fR (a unix path, a TCP port on
+127.0.0.1, or off) swaps the socket without dropping the connected
+sessions \\(em tokenless TCP included, the F11 test-tool posture \\(em and
+the family's control knobs all set live: \\fBcontrol ops verbs\\fR (the
+read-only role's policy), \\fBcontrol trust-uids\\fR (the peer-cred
+list), \\fBcontrol socket-group\\fR (0660 instead of 0600, the live
+socket re-modes). See
 .BR modbus-fake-ctl (1)
 and
 .BR modbus-fake-cli (1)."""
@@ -102,12 +110,18 @@ optional \\fB--auth suite\\fR
 shared-key handshake authenticates clients when a demo wants it \\(em and
 the metrics endpoint
 speaks the family's F13 shape: it refuses to start beyond loopback
-without a token (the loopback bind serves tokenless). Run it on a trusted,
+without a token (the loopback bind serves tokenless), and the
+\\fB--metrics-acl\\fR IP gate narrows who reaches the endpoint at all
+(the cache's metrics/acl: \\fBany\\fR/\\fBnone\\fR/the IP/prefix list or
+\\fBfile:<path>\\fR, checked at accept \\(em a client off the ACL is
+closed without a reply). Run it on a trusted,
 LAN-isolated network, next to the tools it is meant to serve.
 \\fB--max-clients\\fR/\\fB--client-timeout\\fR cap runaway connections and
 the read-count gate keeps a malformed frame from assembling an oversized
 reply. The control surface can still carry the family's read-only ops
-token (\\fB--control-ops-token\\fR) when the ops shift only ever watches."""
+token (\\fB--control-ops-token\\fR) when the ops shift only ever watches;
+the unix control socket is 0600, or 0660 with
+\\fB--control-socket-group\\fR (a local group shares it)."""
     environment = """.SH ENVIRONMENT
 .TP
 .B CHAOS ", " MAX_KWP ", " PROFILE ", " BATTERY ,

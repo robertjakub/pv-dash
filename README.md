@@ -13,7 +13,7 @@ Huawei SUN2000 inverter, packaged together as one Nix flake:
 | [`scraper/`](scraper/README.md) | `modbus-scraper` | Huawei SUN2000 Prometheus exporter (Modbus TCP, stdlib only) with a NixOS module |
 | [`cache/`](cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
 | [`inverter/`](inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
-| [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; the tools select what to fetch/scrape via their own files; a linter and a formatter keep them in shape |
+| [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; a linter and a formatter keep them in shape |
 | [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`): the option registry (one knob, one source), the signed wire + RBAC, the audit trail, the config plumbing, the Modbus wire core, the man-page builder |
 
 The tools speak one vocabulary: the fake inverter serves from a profile, the
@@ -36,8 +36,10 @@ nix run .#modbus-fake-inverter   # fake inverter for development and testing
 ```
 
 The flake also exposes the packages (`nix build .#<name>`), an overlay and
-NixOS service modules (`services.dashboard`, `services.modbus-scraper`,
-`services.modbus-cache`). Each subproject's README documents its own tool.
+the NixOS service modules (`services.dashboard`, `services.modbus-scraper`,
+`services.modbus-cache`). **[docs/NIXOS.md](docs/NIXOS.md) is the one Nix
+reference** — the modules, their option maps, the secrets discipline
+(`LoadCredential`), the reload/restart story and the hardening check.
 
 ## Repo layout
 
@@ -53,13 +55,15 @@ pv-suite/
 ├── scripts/      # the registry gates + editors (check/lint/gen/edit_options, set_group/set_live), gen_man.py, gen_sbom.py, release.py, audit_verify.py
 ├── docker/       # one alpine image per Modbus tool + the compose demo stack ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
-├── docs/         # the family-level docs: the [security audit](docs/AUDIT.md), the
+├── docs/         # the family-level docs: the [Nix reference](docs/NIXOS.md), the
+│                 #   [security audit](docs/AUDIT.md), the
 │                 #   [Modbus protocol reference](docs/MODBUS.md), the
 │                 #   [ACL map](docs/ACL.md) (who may connect, whose writes forward,
 │                 #   which registers a write may touch — family-wide), the
 │                 #   [family-wide TODO](docs/TODO.md) (every open item, one file — the
-│                 #   per-tool TODOs keep the Done history), the [SBOM](docs/sbom/SBOM.md)
-├── CHANGELOG.md  # the release history (the suite versions as one, from common/version.py)
+│                 #   per-tool TODOs keep the Done history), the [SBOM](docs/sbom/SBOM.md),
+│                 #   the [release-history archive](docs/CHANGELOG.md)
+├── CHANGELOG.md  # Unreleased + the current release (the history lives in docs/CHANGELOG.md)
 └── LICENSE       # BSD 3-Clause (whole suite)
 ```
 

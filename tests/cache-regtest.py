@@ -1153,6 +1153,35 @@ try:
           reply.split(b'\r\n')[0].decode() if reply else 'empty reply')
     over.close()
     parked.close()
+    # the metrics client timeout: a silent peer is dropped on the timer (the slowloris cap)
+    r = ctl_cmd('show metrics limits timeout', 15530)
+    check('metrics client-timeout: the show renders the default cap', r == 'ok metrics/limits/timeout=5.00s', r)
+    r = ctl_cmd('set metrics limits timeout 1', 15530)
+    check('metrics client-timeout: set takes the seconds value', r.startswith('ok metrics/limits/timeout=1.00s'), r[:90])
+    idle = socket.create_connection(('127.0.0.1', 15529), timeout=5)
+    dropped = False
+    idle.settimeout(0.2)
+    for _ in range(60):          # the handler times the silent peer out at ~1s
+        time.sleep(0.1)
+        try:
+            if idle.recv(16) == b'':
+                dropped = True
+                break
+        except OSError:
+            continue             # keep polling until the server's timer closes the socket
+    idle.close()
+    check('metrics client-timeout: the silent peer is dropped on the timer', dropped,
+          'the idle socket stayed open past the cap')
+    r = ctl_cmd('unset metrics limits timeout', 15530)
+    check('metrics client-timeout: unset restores the default cap', r.startswith('ok metrics/limits/timeout=5.00s'), r[:90])
+    # the read-delay: the poll paces between the upstream blocks (the wire round-trip;
+    # the pacing itself shows in the poll-duration gauge when the spec splits)
+    r = ctl_cmd('set modbus read-delay 0.25', 15530)
+    check('read-delay: set takes the seconds value', r.startswith('ok modbus/read-delay=250.00ms'), r[:90])
+    r = ctl_cmd('show modbus read-delay', 15530)
+    check('read-delay: the show renders it', r == 'ok modbus/read-delay=250.00ms', r)
+    r = ctl_cmd('unset modbus read-delay', 15530)
+    check('read-delay: unset restores the configured default', r.startswith('ok modbus/read-delay=50.00ms'), r[:90])
     # the live metrics enable switch: off stops the endpoint, on restarts it
     r = ctl_cmd('set metrics enable off', 15530)
     check('metrics enable: set off stops the endpoint', r.startswith('ok metrics/enable=off'), r[:80])

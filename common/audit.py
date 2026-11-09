@@ -36,6 +36,15 @@ import time
 HASH_LEN = 12                                   # hex chars per entry hash
 GENESIS = '0' * HASH_LEN                        # the chain's first prev
 
+# The rotation bounds (the one home — the registries' audit-files/audit-max-mb
+# rows and the tools' startup gates repeat them, scripts/check_options.py
+# cross-checks that they never drift): the rotated backups kept and the size
+# that triggers a rotation in MB (0 = no size rotation).
+AUDIT_FILES_MIN = 1
+AUDIT_FILES_MAX = 100
+AUDIT_MAX_MB_MIN = 0
+AUDIT_MAX_MB_MAX = 1048576
+
 
 def entry_hash(prev, stamp, prefix, body):
     """The chained entry hash: sha256(prev | stamp | prefix | text), hex-truncated.
@@ -114,6 +123,10 @@ class AuditLog:
 
     def __init__(self, path=None, prefix='AUDIT', app='pv-suite',
                  max_mb=10.0, daily=False, files=3):
+        if not AUDIT_MAX_MB_MIN <= max_mb <= AUDIT_MAX_MB_MAX:
+            raise ValueError('audit-max-mb must be %d..%d MB' % (AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX))
+        if not AUDIT_FILES_MIN <= files <= AUDIT_FILES_MAX:
+            raise ValueError('audit-files must be %d..%d' % (AUDIT_FILES_MIN, AUDIT_FILES_MAX))
         self.prefix = prefix
         self.path = path or default_path(app)
         self.max_bytes = int(max_mb * 1024 * 1024) if max_mb and max_mb > 0 else 0

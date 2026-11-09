@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The alert rules pack: the cache contributes its side to the exporter's
+shipped pack ([`../scraper/alerts.yml`](../scraper/alerts.yml), the F16
+closure) — and the missing metric landed first:
+`modbus_cache_write_refused_total` on the cache's own /metrics counts the
+gate refusals (allow-write off, the write ACL, the register allow-list, a
+malformed frame) — each one a `WRITE-REFUSED` audit event. The pack's
+`CacheWriteRefusalBurst` watches the burst, `CachePollDown` and
+`CacheAgeSpike` the poll health; the group stays silent until the
+endpoint is scraped.
+
 The audit-family wave: the cache is the audit family's golden master and
 stays it — the rotation bounds (`audit-files` 1..100, `audit-max-mb`
 0..1048576) now live once in `common/runtime/audit.py` with the startup

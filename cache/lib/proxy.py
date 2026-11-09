@@ -90,6 +90,7 @@ class Proxy:
         self.clients = {}          # 'ip:port' -> {'since': monotonic, 'requests': n, 'audited': n}
         self.cache_hits = 0
         self.cache_misses = 0
+        self.write_refused = 0   # the WRITE-REFUSED events, exported on /metrics (F16's alert pack watches the burst)
         self.started = time.monotonic()
         self.last_ok = None
         self.poll_ok = False
@@ -493,18 +494,21 @@ class Proxy:
             if target is None:
                 desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
                 logger.info('write: refused %s (the frame is too short to carry a register address)', desc)
+                self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (the frame is too short to carry a register address)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
             if not self.allow_write:
                 desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
                 logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)
+                self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (write support disabled)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
             if not self._allowed(self.write_acl, addr[0]):
                 desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
                 logger.info('write: refused %s (client %s not on the write ACL)', desc, addr[0])
+                self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (client %s not on the write ACL)' % (desc, addr[0]))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
@@ -512,6 +516,7 @@ class Proxy:
                 desc = describe_write(pdu, unit) or '%s (unit %d)' % (describe_fc(func), unit)
                 logger.info('write: refused %s (registers outside the write allow-list %s)',
                             desc, self.describe_write_gate())
+                self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (registers outside the write allow-list)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
@@ -519,6 +524,7 @@ class Proxy:
             if shape_err:
                 desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
                 logger.info('write: refused %s (malformed frame: %s)', desc, shape_err)
+                self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (malformed frame: %s)' % (desc, shape_err))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)

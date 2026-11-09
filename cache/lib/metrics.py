@@ -62,6 +62,7 @@ class MetricsServer(_MetricsServer):
         return {
             'uptime': int(now - (p.started or now)),
             'hits': p.cache_hits, 'misses': p.cache_misses,
+            'write_refused': p.write_refused,
             'poll_up': 1 if p.poll_ok else 0,
             'last_poll_age': None if p.last_ok is None else max(0, int(now - p.last_ok)),
             'words': words, 'ranges': len(c.ranges), 'fc4': fc4,
@@ -89,6 +90,9 @@ class MetricsServer(_MetricsServer):
             '# HELP modbus_cache_misses_total Cache misses (reads forwarded to the device).',
             '# TYPE modbus_cache_misses_total counter',
             'modbus_cache_misses_total %d' % st['misses'],
+            '# HELP modbus_cache_write_refused_total Writes the gate refused (allow-write off, the write ACL, the register allow-list, a malformed frame) — each refusal is a WRITE-REFUSED audit event.',
+            '# TYPE modbus_cache_write_refused_total counter',
+            'modbus_cache_write_refused_total %d' % st['write_refused'],
             '# HELP modbus_cache_ranges The register ranges in the map (fc3/fc4 labels).',
             '# TYPE modbus_cache_ranges gauge',
             'modbus_cache_ranges{fc="3"} %d' % (st['ranges'] - st['fc4']),

@@ -181,6 +181,7 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--max-conn-per-ip` | `0` | per-peer-IP connection cap (`0` = no limit) |
 | **Audit trail** | | |
 | `--audit-log` | XDG state | the CACHE audit trail: a file path or `-` for stdout (docker logs / journald) — see [Audit logging](#audit-logging) |
+| `--audit-forward syslog` | off | also mirror every audit line to the local syslog socket (journald picks it up — the sealed external copy, F10) |
 | `--audit-max-mb` / `--audit-daily` / `--audit-files` / `--no-audit-log` | `10` / off / `3` / off | rotation at size / at UTC midnight / backups kept / the off switch |
 | `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds, `0` = off |
 | **Logging** | | |
@@ -205,7 +206,7 @@ config` maps every knob to its control command.
 
 | Signal | Effect |
 |---|---|
-| `SIGHUP` | **Reload the configuration and the register map** without dropping client connections: the map is swapped atomically, poll interval, read delay, merge gap, cache TTL, the ACLs (the `file:` gates re-read), limits and the upstream address/unit/timeout take effect immediately. A broken file keeps the previous settings. The listen address needs a restart (the registry's `restart: true` knobs record a live `set` and fold into the restarted process). |
+| `SIGHUP` | **Reload the configuration and the register map** without dropping client connections (the wire twin is `request reload-config`): the map is swapped atomically, poll interval, read delay, merge gap, cache TTL, the ACLs (the `file:` gates re-read), limits and the upstream address/unit/timeout take effect immediately. A broken file keeps the previous settings. The listen address needs a restart (the registry's `restart: true` knobs record a live `set` and fold into the restarted process). |
 | `SIGUSR1` | **Clean the cache**: all cached values, on-demand entries and poll-status errors are dropped atomically, the poller repopulates immediately. |
 | `SIGTERM` / `SIGINT` | **Graceful shutdown.** |
 
@@ -253,6 +254,7 @@ authenticated with.
 | `request clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
 | `request restart` | drop the upstream connection **and** the cache, repoll now |
 | `request reload` | **restart the whole daemon with the configuration kept**: the live overrides save to `<config>.reload`, the process re-execs, the fresh daemon re-applies them once (the `restart: true` knobs take their configured values); the cache starts empty |
+| `request reload-config` | re-read the config file without the restart — the same re-apply as `SIGHUP` (the map swaps atomically, the overrides clear, a broken file keeps the previous settings) |
 | `show version` / `show knobs` | the version / the whole knob registry |
 | `shutdown` | gracefully stop the proxy (same as SIGTERM) |
 | `help` / `?` / `quit` | the command reference / close the connection |
@@ -408,10 +410,12 @@ the endpoint, the `metrics limits` caps apply to the running gate, and
 never renders back; `set metrics token off` takes the endpoint tokenless on
 the loopback listen). A scrape job reads it like any bearer endpoint —
 `authorization: {type: Bearer, credentials_file: …}` in the job config (the
-docker demo's `prometheus.yml` ships this wired).
+docker demo's `prometheus.yml` wires the job for the exporter this way).
 
 The gauges: the hit/miss counters (`modbus_cache_hits_total` /
-`modbus_cache_misses_total`), the poll health and age
+`modbus_cache_misses_total`) and the write-refusal counter
+(`modbus_cache_write_refused_total` — every refused write is a
+`WRITE-REFUSED` audit event), the poll health and age
 (`modbus_cache_poll_up`, `modbus_cache_last_poll_age_seconds`,
 `modbus_cache_age_seconds`), the map size (`modbus_cache_words` /
 `modbus_cache_ranges`, the `fc` labels), `modbus_cache_clients`, the uptime
@@ -421,6 +425,11 @@ error's age) and every poll block
 (`modbus_cache_uplink_block_up{fc,start,count}`,
 `…block_latency_seconds{,_mean,_max}`, `…block_fails_total`). Anything but
 `/metrics` answers 404, an unauthenticated read 401.
+
+The alert rules pack ([`scraper/alerts.yml`](../scraper/alerts.yml), the
+F16 closure) watches this endpoint's poll down, the age spikes and the
+write-refusal bursts — see [the scraper's alerting
+section](../scraper/README.md#alerting).
 
 ## Audit logging
 
@@ -448,7 +457,11 @@ by default at the **XDG state home** (`~/.local/state/modbus-cache/audit.log`).
 `--audit-log <file>` renames it, `--no-audit-log` turns it off,
 `--audit-log -` sends it to stdout (the docker logs / journald way — the
 NixOS module ships with it). Rotation: `--audit-max-mb 10` (the default),
-`--audit-daily` (UTC midnight), `--audit-files 3`. The prefix names the
+`--audit-daily` (UTC midnight), `--audit-files 3`. And the F10 answer is
+opt-in: `--audit-forward syslog` mirrors every line — the hash chain
+included — to the local syslog socket, journald's sealed external copy: an
+edited local trail breaks its chain, the journal still shows the truth.
+The prefix names the
 writer — `CACHE` (the proxy), `CLI` (modbus-cache-cli), `CTL`
 (modbus-cache-ctl):
 

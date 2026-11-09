@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common import cli
+from common.texts import T
 from lib.config import DEFAULT_CONTROL_SOCKET
 from lib.man import cli_page
 from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
@@ -66,8 +67,8 @@ def welcome(sock):
     reply = cli.exchange(sock, cli.wire('show dump path'))
     val = reply[3:].split('=', 1)[-1].strip() if reply and reply.startswith('ok ') else ''
     SESSION['dump'] = val not in ('', 'off', 'none')
-    print('%   Welcome to the modbus-cache console')
-    print('%   TAB completes, ? lists the commands, quit leaves')
+    print(T('banner.welcome') % 'modbus-cache')
+    print(T('banner.hint'))
 
 
 def _render_special(low, reply):

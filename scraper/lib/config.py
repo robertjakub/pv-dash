@@ -10,10 +10,10 @@ import math
 import re
 
 from .options import OPTIONS
-from common.config import (IPGate, acl_file_warn, check_auth_key, check_token_chars, check_control_tokens,
-                           default_profile_path, is_loopback_host, load_config_script, load_write_gate_file,
-                           parse_acl, parse_auth_type, parse_listen, parse_secret, parse_upstream,
-                           resolve_profile_file, resolve_target, Resolver, str_to_bool)
+from common.config import (check_auth_key, check_token_chars, check_control_tokens, default_profile_path,
+                           is_loopback_host, load_config_script, parse_acl, parse_auth_type, parse_listen,
+                           parse_secret, parse_upstream, resolve_metrics_acl, resolve_profile_file, Resolver,
+                           str_to_bool)
 from .metrics import Metrics
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_REGISTERS, UNIT_ID_RANGE
 
@@ -21,45 +21,11 @@ logger = logging.getLogger('scraper')
 
 HOST_RE = re.compile(r'[A-Za-z0-9._:\[\]-]+')
 
-
-def parse_control_target(text, listen_port=DEFAULT_LISTEN_PORT):
-    """'' → the default unix socket for the listen port (/tmp is cleared on
-    reboot, nothing lands in a working directory); '0' → None (off); digits
-    → TCP port on 127.0.0.1; anything else → unix socket path."""
-    t = (text or '').strip()
-    if t == '0':
-        return None
-    if t.isdigit():
-        p = int(t)
-        if not 1 <= p <= 65535:
-            raise SystemExit('invalid control-port %d: use 1..65535, a unix socket path, or 0 to disable' % p)
-        return p
-    if t:
-        return t
-    return '/tmp/modbus-scraper-%d.socket' % listen_port
-
-
-def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
-    """The control server target for the daemon and the clients: the flag
-    wins, then CTL, then the default unix socket named after the
-    listen port (/tmp/modbus-scraper-9350.socket)."""
-    return resolve_target(explicit, '/tmp/modbus-scraper-%d.socket' % int(listen_port))
-
-
-def resolve_metrics_acl(val, label='metrics/acl'):
-    """The metrics/acl knob value -> (gate, warn): the system words and
-    the network lists ride parse_acl; 'file:<path>' loads the standalone
-    ip-prefix acl file (the gate object scraper/schema/acl-ip-prefix.schema.json
-    describes — the chain reads top to bottom, the LAST matching rule
-    decides, a client no rule decides refuses). The gate: None = any,
-    () = none, the networks tuple, IPGate = the file chain. SystemExit on
-    a bad value or file; a group/world-readable acl file warns (the
-    (gate, warn) pair — chmod 0600 silences it)."""
-    t = (val or '').strip()
-    if t.startswith('file:'):
-        desc, rules = load_write_gate_file(t[5:], allow=('ip-prefix',))
-        return IPGate(t, desc, rules), acl_file_warn(t[5:])
-    return parse_acl(t, label), None
+# the control socket's name: the daemon's template (common.config's parsers
+# take it as the argument), the clients' default (the template spelled with
+# the default serving port)
+CONTROL_SOCKET_TEMPLATE = '/tmp/modbus-scraper-%d.socket'
+DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_LISTEN_PORT
 
 
 def check_register(value, label):

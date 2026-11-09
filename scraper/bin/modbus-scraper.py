@@ -21,12 +21,12 @@ sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common.audit import AuditLog, default_path
-from common.config import parse_listen
+from common.config import parse_listen, resolve_control_target
 from common.cred import parse_trust_uids
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.version import version_string
-from lib.config import resolve_config, resolve_control_target, resolve_metrics_acl
+from lib.config import CONTROL_SOCKET_TEMPLATE, resolve_config, resolve_metrics_acl
 from lib.control import ControlServer
 from lib.metrics import Metrics
 from lib.options import KNOWN_VERBS, OPTIONS
@@ -167,7 +167,7 @@ def main():
                        'smaller than the inverter capacity, check the caps', cfg['max_kwp'], cfg['max_grid_kw'])
 
     listen_host, listen_port = parse_listen(cfg['listen'])
-    control_target = resolve_control_target(cfg['control_port'], listen_port)
+    control_target = resolve_control_target(cfg['control_port'], listen_port, CONTROL_SOCKET_TEMPLATE)
     control_token = cfg['control_token'] or None
     control_ops_token = cfg['control_ops_token'] or None
     ops_verbs = frozenset(v.strip().lower() for v in (cfg.get('control_ops_verbs') or 'show,clear').split(',') if v.strip())

@@ -32,16 +32,16 @@ from common.control import ControlServer as _ControlServer, num, numi
 from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
     match_setting_path
 from common.config import acl_table, acl_value_text, default_profile_path, is_loopback_host, parse_auth_type, \
-    parse_listen, parse_secret, parse_upstream, resolve_profile_file
+    parse_control_target, parse_listen, parse_secret, parse_upstream, resolve_profile_file
 from common.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
 from common.audit import AuditLog
 from common.logutil import UtcFormatter
-from .config import build_sources, load_device_profile, parse_control_target, resolve_metrics_acl
+from .config import CONTROL_SOCKET_TEMPLATE, build_sources, load_device_profile, resolve_metrics_acl
 from .metrics import Metrics
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, \
     NODE_BY_NAME, KNOWN_VERBS, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
-from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
+from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('scraper')
 
@@ -124,64 +124,6 @@ class ControlServer(_ControlServer):
                          defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
                          ops_token=ops_token, ops_verbs=ops_verbs, config_path=config_path,
                          dump_path=dump_path, restore_on_start=restore_on_start, dump_key=dump_key)
-        self._srv = None                 # the current accept() socket — a live control/port rebind swaps it
-        self.stopped = False             # the listener is retired (set control/port off); sessions keep serving
-
-    def describe(self):
-        if self.stopped:
-            return 'off'
-        return 'unix:%s' % self.sockpath if self.is_unix else '127.0.0.1:%d' % self.port
-
-    def _open_sock(self):
-        """Bind+listen the control socket per the current target attrs: the
-        unix path is replaced (stale files unlinked), the mode 0600/0660 is
-        not left to the umask, TCP takes SO_REUSEADDR; the listen(64) backlog
-        keeps a connect burst from RSTing."""
-        srv = socket.socket(socket.AF_UNIX if self.is_unix else socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            if self.is_unix:
-                if os.path.exists(self.sockpath):
-                    logger.warning('control socket %s exists, replacing it', self.sockpath)
-                    os.unlink(self.sockpath)
-                srv.bind(self.sockpath)
-                os.chmod(self.sockpath, 0o660 if self.socket_group else 0o600)
-            else:
-                srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                srv.bind(('127.0.0.1', self.port))
-            srv.listen(64)
-        except OSError:
-            try:
-                srv.close()
-            except OSError:
-                pass
-            raise
-        return srv
-
-    def serve(self):
-        try:
-            srv = self._open_sock()
-        except OSError as e:
-            logger.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
-            return
-        self._srv = srv
-        logger.info('control server listening on %s%s',
-                    self.describe(), (', token auth required on TCP' if self.token and not self.is_unix else '')
-                    + (', read-only ops token accepted' if self.ops_token else ''))
-        self._accept_loop(srv)
-
-    def _accept_loop(self, srv):
-        """accept() until this socket stops being the current one: a live
-        control/port rebind (or off) swaps self._srv and retires the old
-        listener by identity — this loop exits, the new thread takes over."""
-        while self._srv is srv:
-            try:
-                client, addr = srv.accept()
-                threading.Thread(target=self.handle, args=(client, addr), daemon=True).start()
-            except (OSError, RuntimeError) as e:
-                if self._srv is not srv:
-                    return   # rebinding or stopped: this listener is retired
-                logger.error('control accept failed (%s), retrying', e)
-                time.sleep(0.1)
 
     def _after_restore(self):
         self.scraper.wake.set()   # the poll loop re-reads the config-driven knobs now
@@ -519,25 +461,21 @@ class ControlServer(_ControlServer):
             return val
         if key == 'control/port':
             try:
-                target = parse_control_target(val)
+                target = parse_control_target(val, DEFAULT_LISTEN_PORT, CONTROL_SOCKET_TEMPLATE)
             except SystemExit as e:
                 raise ValueError(str(e))
             if val in ('off', 'none', '0'):
                 target = None
             if target is not None and not self.stopped and self._is_target(target):
                 return self.describe()   # the same target: nothing to rebind
-            if isinstance(target, int) and self.token is None:
-                raise ValueError('control/port cannot serve TCP without a token (F5 in docs/AUDIT.md): '
-                                 'set control/token first')
+            self.refuse_tokenless_rebind(target)
             shown = self._rebind_control(target)
             with s.lock:
                 s.cfg['control_port'] = '0' if target is None else str(target)
             return shown
         if key == 'control/token':
             if val in ('off', 'none', ''):
-                if not self.is_unix and not self.stopped:
-                    raise ValueError('the TCP control port needs its token (F5 in docs/AUDIT.md) — '
-                                     'only the unix socket (the filesystem is the auth) may run tokenless')
+                self.refuse_token_drop()
                 self.token = None
                 return 'off'
             try:
@@ -746,64 +684,6 @@ class ControlServer(_ControlServer):
         if s is not None and s.restart:   # a startup-only knob: the configured value
             return self.defaults.get(key, '?')   # renders (the secrets answer '<set>'/'off')
         return '?'
-
-    def _is_target(self, target):
-        """Whether `target` is the listener already running (a re-set of the
-        same control/port must not bounce the socket)."""
-        if self.stopped:
-            return False
-        if isinstance(target, int):
-            return not self.is_unix and target == self.port
-        return self.is_unix and str(target) == self.sockpath
-
-    @staticmethod
-    def _retire_listener(srv):
-        """The retired listener: shutdown BEFORE close — a bare close leaves
-        a Linux accept() blocked on the kernel-live listener (a connect in
-        the window still succeeds; the CI caught the old control port
-        answering once), the shutdown wakes the accept and the loop's
-        identity check retires it."""
-        try:
-            srv.shutdown(socket.SHUT_RDWR)
-        except OSError:
-            pass
-        try:
-            srv.close()
-        except OSError:
-            pass
-
-    def _rebind_control(self, target):
-        """The live control target (the `set control/port` plumb): bind the
-        new socket FIRST (a failed bind leaves the old listener untouched —
-        the attrs roll back), then swap self._srv (the old accept loop exits
-        by identity), close the old listener and start the new accept loop.
-        None retires the listener: the connected sessions keep their threads
-        and their replies, no new connection is accepted."""
-        old_attrs = (self.is_unix, self.port, self.sockpath)
-        if target is None:
-            old = self._srv
-            self._srv = None
-            self.stopped = True
-            if old is not None:
-                self._retire_listener(old)
-            logger.info('control: the control server stopped (a control/port set re-enables it)')
-            return 'off'
-        self.is_unix = not isinstance(target, int)
-        self.port = None if self.is_unix else int(target)
-        self.sockpath = str(target) if self.is_unix else None
-        self.stopped = False
-        try:
-            srv = self._open_sock()
-        except OSError as e:
-            self.is_unix, self.port, self.sockpath = old_attrs
-            raise ValueError('cannot bind control/port %s: %s' % (target if target is not None else 'off', e))
-        old = self._srv
-        self._srv = srv
-        if old is not None:
-            self._retire_listener(old)
-        logger.info('control: the control server rebound to %s (the old listener closed)', self.describe())
-        threading.Thread(target=self._accept_loop, args=(srv,), daemon=True).start()
-        return self.describe()
 
     def _rebuild_audit(self):
         """Swap the SCR audit trail for one rebuilt from the params (the

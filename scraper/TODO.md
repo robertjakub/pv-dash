@@ -5,6 +5,11 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The control-listener family wave: the scraper's private copy of the
+listener tier (the live rebind family its control-port wave carried)
+folds back into `common/control.py` — ONE implementation for the four
+tools, the cache's golden master lifted; nothing changes on the wire.
+
 The show-status removal: **`show status` is gone** (nothing replaces it) —
 the registry row, the dispatch branch and the key=value report body die;
 the per-setting `show <setting>`, `show config`, `inspect` and the

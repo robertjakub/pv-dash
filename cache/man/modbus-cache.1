@@ -10,7 +10,7 @@ modbus-cache \- Modbus TCP caching proxy for single-client devices
 
 .SH DESCRIPTION
 \fBmodbus-cache\fR owns the single Modbus TCP client connection a device
-allows (Huawei SUN2000 inverters and their SDongle/EMMA radios accept
+allows (e.g. a Huawei SUN2000 inverter and its SDongle/EMMA radio accept
 exactly one) and multiplexes it: a background loop polls the configured
 register ranges into an in-memory cache, any number of clients are served
 FC3/FC4 reads from the cache, reads outside the map and other function

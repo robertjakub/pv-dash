@@ -9,8 +9,9 @@ inverter — with a battery, a smart meter and the modbus-cache diagnostics
 block — so the [modbus-scraper](../scraper/README.md), the
 [modbus-cache](../cache/README.md) and the whole [pv-suite](../README.md)
 stack can be exercised without hardware. Through **inverter profiles** it
-can emulate different devices: the shipped default profile is the Huawei
-SUN2000 map, and Deye hybrid profiles are included as well — see
+can emulate different devices: the shipped default profile is the
+`sun2000` (Huawei SUN2000) map, and Deye hybrid profiles are included as
+well — see
 [profiles/README.md](../profiles/README.md).
 
 It ships three tools:

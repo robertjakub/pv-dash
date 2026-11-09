@@ -6,8 +6,8 @@
 > fuzzing and regression/stress suites), not against real hardware.
 
 A dependency-free (Python stdlib only) **Modbus TCP caching proxy** for
-devices that accept only a single client — Huawei SUN2000 inverters and
-their SDongle/EMMA radios allow one Modbus TCP connection, so the
+devices that accept only a single client — e.g. a Huawei SUN2000 inverter
+and its SDongle/EMMA radio allow one Modbus TCP connection, so the
 [modbus-scraper](../scraper/README.md) cannot share them with anything
 else. Point the scraper (or any other Modbus client) at the proxy instead
 of the inverter:

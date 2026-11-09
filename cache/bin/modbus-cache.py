@@ -2,8 +2,8 @@
 """Modbus TCP caching proxy for single-client devices (stdlib only).
 
 A Modbus TCP device that accepts only a single client (an inverter, its
-SDongle/EMMA radio — the bundled device profile is the Huawei SUN2000 map)
-allows exactly one consumer.
+SDongle/EMMA radio — the Huawei SUN2000's, for example) allows exactly
+one consumer.
 This proxy owns that one upstream connection: a background loop polls the
 configured register ranges at a fixed interval while any number of clients
 connect and are served FC3 reads from the in-memory cache. Reads outside the

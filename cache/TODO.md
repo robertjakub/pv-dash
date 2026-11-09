@@ -5,6 +5,15 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The docs restructure wave: the README re-laid on the family's one skeleton
+and shortened (965 → ~430 lines) — the Nix/NixOS section moved to
+[docs/NIXOS.md](../docs/NIXOS.md) (the module's option list rebuilt from
+`module.nix`: the README's had gone stale — it predated the metrics ACL,
+the dump knobs and the control-plane options), and the family-wide
+stories (the ACL grammar, the Modbus handshake, the audit chain
+mechanics) now point at docs/ACL.md / docs/MODBUS.md / docs/AUDIT.md
+instead of re-running them.
+
 The metrics/acl family wave: the cache rides along — the default
 metrics bind moves `9252` → **`9351`** (the family's /metrics defaults
 count from the scraper's 9350 up; the fake and the dashboard join the

@@ -103,11 +103,15 @@ python3 scripts/family_drift.py --check    # stale doc fails
   - `family_drift.py --check` joins release.py's gates: a stale
     drift doc (or a regenerating sweep that would change it) fails
     the release the way the suites do.
+  - the seed ledger (`family_drift.py --seeds` →
+    docs/family-drift-seeds.json): every uncovered promise carries a
+    stable ID + the suggested suite; `--check`'s growth gate fails
+    when a NEW knob/command/canon phrase ships uncovered — the list
+    may only shrink (the wave's proof).
   - the NixOS-parity and docker/env sweeps graduate from census to
     machine gate (the module.nix type/default vs the registry row;
     the env-file coverage vs the env twins) — the sweeps exist, the
     verdicts get asserted.
-  - the coverage sweep's seeds (the uncovered knobs, the commands,
-    the unpinned canon phrases) get their graduation path into the
+  - the coverage sweep's seeds get their graduation path into the
     test waves — the sweep prints them, a wave consumes them, the
     list shrinks.

@@ -1,0 +1,304 @@
+{
+ "seeds": [
+  {
+   "id": "knob:cache:audit-daily",
+   "kind": "knob",
+   "tool": "cache",
+   "name": "audit-daily",
+   "suite": "cache-regtest.py"
+  },
+  {
+   "id": "knob:cache:audit-files",
+   "kind": "knob",
+   "tool": "cache",
+   "name": "audit-files",
+   "suite": "cache-regtest.py"
+  },
+  {
+   "id": "knob:cache:audit-max-mb",
+   "kind": "knob",
+   "tool": "cache",
+   "name": "audit-max-mb",
+   "suite": "cache-regtest.py"
+  },
+  {
+   "id": "knob:cache:control-ops-verbs",
+   "kind": "knob",
+   "tool": "cache",
+   "name": "control-ops-verbs",
+   "suite": "cache-regtest.py"
+  },
+  {
+   "id": "knob:cache:control-trust-uids",
+   "kind": "knob",
+   "tool": "cache",
+   "name": "control-trust-uids",
+   "suite": "cache-regtest.py"
+  },
+  {
+   "id": "knob:cache:metrics-client-timeout",
+   "kind": "knob",
+   "tool": "cache",
+   "name": "metrics-client-timeout",
+   "suite": "cache-regtest.py"
+  },
+  {
+   "id": "knob:cache:metrics-max-conn-per-ip",
+   "kind": "knob",
+   "tool": "cache",
+   "name": "metrics-max-conn-per-ip",
+   "suite": "cache-regtest.py"
+  },
+  {
+   "id": "knob:cache:read-delay",
+   "kind": "knob",
+   "tool": "cache",
+   "name": "read-delay",
+   "suite": "cache-regtest.py"
+  },
+  {
+   "id": "knob:cache:requests-audit",
+   "kind": "knob",
+   "tool": "cache",
+   "name": "requests-audit",
+   "suite": "cache-regtest.py"
+  },
+  {
+   "id": "knob:scraper:audit-files",
+   "kind": "knob",
+   "tool": "scraper",
+   "name": "audit-files",
+   "suite": "scrape-regtest.py"
+  },
+  {
+   "id": "knob:scraper:audit-max-mb",
+   "kind": "knob",
+   "tool": "scraper",
+   "name": "audit-max-mb",
+   "suite": "scrape-regtest.py"
+  },
+  {
+   "id": "knob:scraper:control-ops-verbs",
+   "kind": "knob",
+   "tool": "scraper",
+   "name": "control-ops-verbs",
+   "suite": "scrape-regtest.py"
+  },
+  {
+   "id": "knob:scraper:control-trust-uids",
+   "kind": "knob",
+   "tool": "scraper",
+   "name": "control-trust-uids",
+   "suite": "scrape-regtest.py"
+  },
+  {
+   "id": "knob:scraper:modbus-offset",
+   "kind": "knob",
+   "tool": "scraper",
+   "name": "modbus-offset",
+   "suite": "scrape-regtest.py"
+  },
+  {
+   "id": "knob:inverter:control-ops-verbs",
+   "kind": "knob",
+   "tool": "inverter",
+   "name": "control-ops-verbs",
+   "suite": "inverter-regtest.py"
+  },
+  {
+   "id": "knob:inverter:control-trust-uids",
+   "kind": "knob",
+   "tool": "inverter",
+   "name": "control-trust-uids",
+   "suite": "inverter-regtest.py"
+  },
+  {
+   "id": "cmd:inverter:logout",
+   "kind": "command",
+   "tool": "inverter",
+   "name": "logout",
+   "suite": "inverter-regtest.py"
+  },
+  {
+   "id": "knob:dashboard:control-ops-verbs",
+   "kind": "knob",
+   "tool": "dashboard",
+   "name": "control-ops-verbs",
+   "suite": "dashboard-control-fuzz.py"
+  },
+  {
+   "id": "knob:dashboard:control-trust-uids",
+   "kind": "knob",
+   "tool": "dashboard",
+   "name": "control-trust-uids",
+   "suite": "dashboard-control-fuzz.py"
+  },
+  {
+   "id": "knob:dashboard:log-queries",
+   "kind": "knob",
+   "tool": "dashboard",
+   "name": "log-queries",
+   "suite": "dashboard-control-fuzz.py"
+  },
+  {
+   "id": "phrase:8c882b22",
+   "kind": "canon-phrase",
+   "tool": "cache, inverter",
+   "name": "cannot serve on",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:9dd1faed",
+   "kind": "canon-phrase",
+   "tool": "cache, inverter",
+   "name": "connection refused: per-ip limit of",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:4e544048",
+   "kind": "canon-phrase",
+   "tool": "cache, dashboard, inverter, scraper",
+   "name": "connection rejected:",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:8debd3e9",
+   "kind": "canon-phrase",
+   "tool": "common, inverter",
+   "name": "control client connected from",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:5998c18f",
+   "kind": "canon-phrase",
+   "tool": "common, inverter",
+   "name": "control client from",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:6a6d8b2a",
+   "kind": "canon-phrase",
+   "tool": "common, inverter",
+   "name": "control handler crashed ",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:3e83cead",
+   "kind": "canon-phrase",
+   "tool": "cache, dashboard, inverter, scraper",
+   "name": "control: shutdown requested",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:b200e752",
+   "kind": "canon-phrase",
+   "tool": "cache, common",
+   "name": "control: state dumped to",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:62443684",
+   "kind": "canon-phrase",
+   "tool": "cache, common",
+   "name": "control: state restored from",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:50f0a7d1",
+   "kind": "canon-phrase",
+   "tool": "cache, common",
+   "name": "control: the dump to",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:38da25ea",
+   "kind": "canon-phrase",
+   "tool": "dashboard, inverter, scraper",
+   "name": "dry-run: configuration is valid nothing was boun",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:f0a7a174",
+   "kind": "canon-phrase",
+   "tool": "cache, inverter",
+   "name": "error handling",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:9d0765b2",
+   "kind": "canon-phrase",
+   "tool": "cache, scraper",
+   "name": "poll cycle crashed ",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:bf04e62d",
+   "kind": "canon-phrase",
+   "tool": "cache, common, inverter",
+   "name": "sighup: reload failed ",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:66a0b81f",
+   "kind": "canon-phrase",
+   "tool": "cache, common",
+   "name": "sighup: reload requested",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:374b10b4",
+   "kind": "canon-phrase",
+   "tool": "cache, inverter",
+   "name": "sighup: reloaded",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:70c26024",
+   "kind": "canon-phrase",
+   "tool": "cache, common",
+   "name": "state dumped to",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:91228c18",
+   "kind": "canon-phrase",
+   "tool": "cache, inverter",
+   "name": "suite auth with",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:deddf647",
+   "kind": "canon-phrase",
+   "tool": "cache, inverter",
+   "name": "the ops token must differ from the admin token t",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:c3a89ae6",
+   "kind": "canon-phrase",
+   "tool": "cache, inverter",
+   "name": "the read-only ops token supplements the admin to",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:d76e6b22",
+   "kind": "canon-phrase",
+   "tool": "cache, common",
+   "name": "the shutdown dump to",
+   "suite": "the emitting tool's regtest"
+  },
+  {
+   "id": "phrase:22b858a1",
+   "kind": "canon-phrase",
+   "tool": "dashboard, scraper",
+   "name": "unhandled error serving",
+   "suite": "the emitting tool's regtest"
+  }
+ ],
+ "counts": {
+  "total": 42,
+  "knob": 19,
+  "command": 1,
+  "canon-phrase": 22
+ }
+}

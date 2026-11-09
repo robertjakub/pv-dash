@@ -84,6 +84,10 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = ('cache', 'scraper', 'inverter', 'dashboard')
 DOC = os.path.join(REPO, 'docs', 'family-drift.md')
+SEEDS = os.path.join(REPO, 'docs', 'family-drift-seeds.json')
+
+REGTEST = {'cache': 'cache-regtest.py', 'scraper': 'scrape-regtest.py',
+           'inverter': 'inverter-regtest.py', 'dashboard': 'dashboard-control-fuzz.py'}
 
 # ---------------------------------------------------------------- targets
 
@@ -859,7 +863,12 @@ The findings:
   family-wide suite the word-grep misses. The next test wave starts
   from this list.
 - **The canon-phrase pins** are the regtests' strongest tool — a
-  phrase in the canon no suite pins is a text free to drift."""
+  phrase in the canon no suite pins is a text free to drift.
+- **The graduation path is the ledger** (docs/family-drift-seeds.json,
+  `family_drift.py --seeds`): stable IDs, the suggested suite per
+  seed, the counts as the shrink metric; the `--check` growth gate
+  keeps the list honest — new promises ship covered or the gate
+  fails."""
 
 FLEDGER_FINDINGS = """\
 The findings:
@@ -976,11 +985,12 @@ serves. Ordered by the user's exposure; the code plane rides along.
    identical refusal texts and logs at both Modbus faces; the code
    plane: the surface sweep's ~50-line net win.
 
-10. **The coverage TODOs graduate** — the suite-coverage sweep's
-    uncovered knobs (the audit rotation trio, the ops-policy pair,
-    the metrics caps), commands and the 22 unpinned canon phrases
-    become the next test wave's checklist; the canon phrases get
-    pinned so the texts may not drift.
+10. **The coverage TODOs graduate** — the seeds carry stable IDs in
+    docs/family-drift-seeds.json (`family_drift.py --seeds`, the
+    suggested suite per seed); a test wave consumes entries, the
+    regeneration drops them, the shrinkage is the wave's proof, and
+    `--check` fails when a NEW promise ships uncovered (the list may
+    only shrink).
 
 11. **The parity gates wired** — the NixOS-parity and docker/env
     sweeps join `check_options`/the release gates as machine checks
@@ -993,6 +1003,58 @@ stays absent (no config to re-exec into — the fold on a manual
 restart keeps the note true); the man-page prose and the HTTP
 handlers stay per-tool by design; the malformed-frame split is the
 proxy/device difference, kept."""
+
+
+def seed_list(rows, cmds, canon):
+    """The work order: every uncovered promise as a stable-ID seed
+    (kind, tool, name, the suggested suite). The graduation path's
+    currency — the sweep prints them, a test wave consumes them, the
+    list shrinks."""
+    uncovered, cmd_missing, phrase_unpinned, _ = coverage(rows, cmds, canon)
+    seeds = []
+    for t in TOOLS:
+        for n in uncovered[t]:
+            seeds.append({'id': f'knob:{t}:{n}', 'kind': 'knob', 'tool': t,
+                          'name': n, 'suite': REGTEST[t]})
+        for w in cmd_missing[t]:
+            seeds.append({'id': f'cmd:{t}:{w}', 'kind': 'command', 'tool': t,
+                          'name': w, 'suite': REGTEST[t]})
+    for k in phrase_unpinned:
+        h = hashlib.sha1(k.encode()).hexdigest()[:8]
+        tools = ', '.join(sorted(set(x[0] for x in canon[k])))
+        seeds.append({'id': f'phrase:{h}', 'kind': 'canon-phrase', 'tool': tools,
+                      'name': k, 'suite': 'the emitting tool\'s regtest'})
+    return seeds
+
+
+def write_seeds(seeds):
+    """The ledger: the seeds file carries the counts + the IDs — a wave
+    consumes entries (the tests land), the next regeneration drops
+    them, the shrinkage is the wave's proof. The growth gate reads the
+    committed file: a seed PRESENT here and ABSENT there is new
+    uncovered promise (exit 1); the reverse is the shrink (write)."""
+    with open(SEEDS, 'w', encoding='utf-8') as f:
+        json.dump({'seeds': seeds,
+                   'counts': {'total': len(seeds),
+                              'knob': sum(1 for s in seeds if s['kind'] == 'knob'),
+                              'command': sum(1 for s in seeds if s['kind'] == 'command'),
+                              'canon-phrase': sum(1 for s in seeds if s['kind'] == 'canon-phrase')}},
+                  f, indent=1, ensure_ascii=False)
+        f.write('\n')
+
+
+def seed_guard(fresh):
+    """The growth gate: a seed in the FRESH list that the committed
+    ledger does not know = a new promise shipped uncovered -> rc 1.
+    The fresh list being SHORTER is the shrink — the ledger updates."""
+    try:
+        known = {s['id'] for s in json.load(open(SEEDS, encoding='utf-8'))['seeds']}
+    except (OSError, KeyError, ValueError):
+        return None   # no ledger yet — the first write seeds it
+    grown = [s for s in fresh if s['id'] not in known]
+    if grown:
+        return grown
+    return None
 
 
 def f_ledger():
@@ -1254,6 +1316,7 @@ def emit():
 
     # ---- 9. the coverage sweep
     uncovered, cmd_missing, phrase_unpinned, _ = coverage(rows, cmds, canon)
+    seeds = seed_list(rows, cmds, canon)
     ap(COVER_HEAD)
     ap('')
     ap('**The live knobs no suite mentions** (word-bounded grep):')
@@ -1273,6 +1336,13 @@ def emit():
             ap(f'- {t}: every command exercised')
     ap('')
     ap(f'**The canon phrases no suite pins**: {len(phrase_unpinned)}')
+    ap('')
+    ap('**The graduation path**: the seeds carry stable IDs in')
+    ap(f'[docs/family-drift-seeds.json](family-drift-seeds.json) ({len(seeds)}')
+    ap('open promise(s), the suggested suite per seed); a test wave')
+    ap('consumes entries, the regeneration drops them, the shrinkage is')
+    ap('the wave\'s proof; `--check` fails when a NEW promise ships')
+    ap('uncovered (the list may only shrink).')
     ap('')
     ap(COVER_FINDINGS)
     ap('')
@@ -1352,18 +1422,36 @@ def emit():
 
 def main():
     doc = emit()
+    rows, cmds = knobs()
+    events, logs = wire_texts()
+    canon, _solo = wire_canon(logs)
+    seeds = seed_list(rows, cmds, canon)
+    if '--seeds' in sys.argv:
+        write_seeds(seeds)
+        print(f'seed ledger: {len(seeds)} open promise(s) -> {os.path.relpath(SEEDS, REPO)}')
+        return
     if '--check' in sys.argv:
         try:
             cur = open(DOC, encoding='utf-8').read()
         except OSError:
             cur = None
-        if cur != doc:
+        stale = cur != doc
+        grown = seed_guard(seeds)
+        if stale:
             print('family-drift.md is stale (scripts/family_drift.py regenerates)')
+        if grown:
+            print(f'family-drift-seeds.json: {len(grown)} NEW uncovered promise(s) the ledger does not know:')
+            for s in grown[:10]:
+                print(f"  {s['id']}  ({s['kind']}, suggested: {s['suite']})")
+            print('a knob/command/canon phrase shipped without its test — write the tests, then regenerate the ledger')
+        if stale or grown:
             raise SystemExit(1)
-        print('family-drift.md is current')
+        print('family-drift.md is current; the seed ledger knows every open promise')
         return
     with open(DOC, 'w', encoding='utf-8') as f:
         f.write(doc)
+    if not os.path.exists(SEEDS):
+        write_seeds(seeds)   # the first run seeds the ledger; the waves shrink it
     print('regenerated', os.path.relpath(DOC, REPO))
 
 

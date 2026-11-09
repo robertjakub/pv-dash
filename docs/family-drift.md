@@ -543,6 +543,13 @@ list is the TODO seed, not a verdict.
 
 **The canon phrases no suite pins**: 22
 
+**The graduation path**: the seeds carry stable IDs in
+[docs/family-drift-seeds.json](family-drift-seeds.json) (42
+open promise(s), the suggested suite per seed); a test wave
+consumes entries, the regeneration drops them, the shrinkage is
+the wave's proof; `--check` fails when a NEW promise ships
+uncovered (the list may only shrink).
+
 The findings:
 
 - **The uncovered list is the TODO seed**, not a verdict: a knob can
@@ -551,6 +558,11 @@ The findings:
   from this list.
 - **The canon-phrase pins** are the regtests' strongest tool — a
   phrase in the canon no suite pins is a text free to drift.
+- **The graduation path is the ledger** (docs/family-drift-seeds.json,
+  `family_drift.py --seeds`): stable IDs, the suggested suite per
+  seed, the counts as the shrink metric; the `--check` growth gate
+  keeps the list honest — new promises ship covered or the gate
+  fails.
 
 ## The F-ledger sweep — docs/AUDIT.md vs the tree
 
@@ -758,11 +770,12 @@ serves. Ordered by the user's exposure; the code plane rides along.
    identical refusal texts and logs at both Modbus faces; the code
    plane: the surface sweep's ~50-line net win.
 
-10. **The coverage TODOs graduate** — the suite-coverage sweep's
-    uncovered knobs (the audit rotation trio, the ops-policy pair,
-    the metrics caps), commands and the 22 unpinned canon phrases
-    become the next test wave's checklist; the canon phrases get
-    pinned so the texts may not drift.
+10. **The coverage TODOs graduate** — the seeds carry stable IDs in
+    docs/family-drift-seeds.json (`family_drift.py --seeds`, the
+    suggested suite per seed); a test wave consumes entries, the
+    regeneration drops them, the shrinkage is the wave's proof, and
+    `--check` fails when a NEW promise ships uncovered (the list may
+    only shrink).
 
 11. **The parity gates wired** — the NixOS-parity and docker/env
     sweeps join `check_options`/the release gates as machine checks

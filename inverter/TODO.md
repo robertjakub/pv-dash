@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The serve-address wave (the family's one word): the fake trades its
+`--host`/`--port` pair for the canon knob — `--listen HOST:PORT`
+(`$LISTEN`, live `system/listen`, hidden, restart-marked; the default
+address keeps `127.0.0.1:5502`), `show system listen` answers, the
+restart fold moves the pending value into the argv before the binds,
+and the `system` node rows the namespace.
+
 The dump-interval wave (the family unification, the cache as the golden
 master): the fake gains the cache's `dump-interval` knob —
 `--dump-interval`, live as `set dump-interval <s|off>` — the write-behind

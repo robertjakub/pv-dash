@@ -47,10 +47,10 @@ VOLUME /config
 ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 5502
-CMD ["fake-inverter", "--host", "0.0.0.0", "--port", "5502", "--audit-log", "-"]
+CMD ["fake-inverter", "--listen", "0.0.0.0:5502", "--audit-log", "-"]
 
 # Liveness: the ctl answers over the fake's unix control socket (the
-# default socket follows the CMD's port; the check runs as root — a
+# default socket follows the CMD's listen port; the check runs as root — a
 # trusted peer over SO_PEERCRED, so no token is needed).
 HEALTHCHECK --interval=5m --timeout=5s --start-period=15s --retries=3 \
     CMD ["fake-ctl", "show", "version"]

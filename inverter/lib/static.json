@@ -61,8 +61,7 @@
   },
 
   "defaults": {
-    "host": "127.0.0.1",
-    "modbus_port": 5502,
+    "listen": "127.0.0.1:5502",
     "unit": 1,
     "max_kwp": 6.0,
     "battery_kwh": 6.9,

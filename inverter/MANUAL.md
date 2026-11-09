@@ -98,8 +98,6 @@ takes. The namespaces group them.
 | `scenario` | `set scenario` | settable | `morning\|noon\|evening\|night\|custom` | — / — | preset scene; releases the value pins |
 | `battery-state` | `set battery-state` | settable | `auto\|charging\|discharging` | — / — | force the battery state machine, or auto |
 | `grid-outage` | `set grid-outage` | settable | `on\|off\|outage` | — / — | the grid-outage machine: random blackouts over the simulated clock |
-| `host` | — | startup-only | `HOST` | `--host` / — | bind address |
-| `port` | — | startup-only | `N` | `--port` / — | modbus TCP port |
 | `unit` | — | startup-only | `ID` | `--unit` / — | modbus unit id served |
 | `profile` | `set profile` | settable | `\<file>` | `--profile` / `PROFILE` | inverter profile (JSON: name -> register + optional type/scale) |
 | `max-kwp` | `set max-kwp` | settable | `kW` | `--max-kwp` / `MAX_KWP` | PV array size (peak = 75 % of it) |
@@ -129,6 +127,14 @@ takes. The namespaces group them.
 | `no-audit-log` | — | startup-only | `on\|off` | `--no-audit-log` / — | disable the INV audit trail |
 | `log-level` | `set log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
 | `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
+
+### system
+
+the daemon's own serving socket: the Modbus listen address
+
+| knob | set / unset | kind | value | flag / env | description |
+|---|---|---|---|---|---|
+| `listen` | `set system listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
 
 ### modbus
 

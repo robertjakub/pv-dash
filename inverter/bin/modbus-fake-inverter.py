@@ -59,18 +59,19 @@ logger = logging.getLogger('fake-inverter')
 def validate(args):
     """Clean one-line failures instead of ugly bind errors (family convention)."""
     problems = []
-    host = (args.host or '').strip()
-    if not host or len(host) > 253 or not all(c.isalnum() or c in '._-[]:' for c in host):
-        problems.append('--host is not a valid hostname/address: %r' % args.host)
-    if not 1 <= args.port <= 65535:
-        problems.append('--port out of range: %d' % args.port)
-    ctl = resolve_control_target(args.control_port, args.port, CONTROL_SOCKET_TEMPLATE)
-    if ctl != '0':
-        if ctl.isdigit():
-            if not 1 <= int(ctl) <= 65535:
-                problems.append('--control-port out of range: %d' % int(ctl))
-        elif len(ctl) > 100:
-            problems.append('--control-port socket path too long (max ~100 chars): %r' % ctl)
+    try:
+        listen_host, listen_port = parse_listen(args.listen)
+    except SystemExit as e:
+        problems.append(str(e))
+        listen_host = listen_port = None
+    if listen_port is not None:
+        ctl = resolve_control_target(args.control_port, listen_port, CONTROL_SOCKET_TEMPLATE)
+        if ctl != '0':
+            if ctl.isdigit():
+                if not 1 <= int(ctl) <= 65535:
+                    problems.append('--control-port out of range: %d' % int(ctl))
+            elif len(ctl) > 100:
+                problems.append('--control-port socket path too long (max ~100 chars): %r' % ctl)
     if not 1 <= args.unit <= 247:
         problems.append('--unit out of range (1-247): %d' % args.unit)
     if not (math.isfinite(args.max_kwp) and args.max_kwp > 0):
@@ -144,7 +145,7 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'control/trust-uids': ','.join(str(u) for u in sorted(trust_uids or ())) or 'off',
         'control/socket-group': 'on' if args.control_socket_group else 'off',
         # the startup-only knobs (restart: true) — what `show <knob>` answers
-        'host': args.host, 'port': str(args.port), 'unit': str(args.unit),
+        'system/listen': args.listen, 'unit': str(args.unit),
         'control-log-replies': 'on' if args.control_log_replies else 'off',
         'metrics-listen': args.metrics_listen or 'off',
         'metrics-max-clients': str(args.metrics_max_clients),
@@ -183,6 +184,10 @@ def startup_values(args, secrets):
         else:
             out[name] = str(v)
     return out
+
+
+def fold_listen(argv, pending):
+    argv['listen'] = pending
 
 
 def main():
@@ -226,9 +231,11 @@ def main():
         logger.error('the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)')
         raise SystemExit(1)
     chaos = Chaos(args.chaos, seed=args.seed)
-    target = resolve_control_target(args.control_port, args.port, CONTROL_SOCKET_TEMPLATE)
     dump_key = parse_secret((args.dump_key or os.environ.get('DUMP_KEY') or '').strip() or None, 'dump/key')
-    apply_restart_state(vars(args), None, dump_key, ControlServer)
+    apply_restart_state(vars(args), None, dump_key, ControlServer,
+                        extra={'system/listen': fold_listen})
+    listen_host, listen_port = parse_listen(args.listen)   # the fold may have moved it
+    target = resolve_control_target(args.control_port, listen_port, CONTROL_SOCKET_TEMPLATE)
     control_token = parse_secret(args.control_token or os.environ.get('CONTROL_TOKEN'), 'control/token')
     control_ops_token = parse_secret(args.control_ops_token or os.environ.get('CONTROL_OPS_TOKEN'),
                                      'control-ops-token')
@@ -261,7 +268,7 @@ def main():
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')
         logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %g kWh, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, per-ip limit %s, modbus auth %s, profile %s: %s, %d register(s), metrics server %s, control server %s)',
-                    args.host, args.port, args.unit, PEAK_RATIO * args.max_kwp * 1000.0,
+                    listen_host, listen_port, args.unit, PEAK_RATIO * args.max_kwp * 1000.0,
                     mode,
                     args.battery_kwh,
                     args.strict, args.chaos,
@@ -331,19 +338,19 @@ def main():
     box.install()
     if audit:
         audit.event('START', 'version=%s modbus=%s:%d control=%s profile=%s: %s'
-                    % (version_string(), args.host, args.port,
+                    % (version_string(), listen_host, listen_port,
                        ('127.0.0.1:' + target) if target != '0' else 'off',
                        profile_label(profile_path), simulator.profile.description))
         if metrics_acl_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
             audit.event('ACL-FILE', metrics_acl_warn)
     try:
-        fake.serve(args.host, args.port)
+        fake.serve(listen_host, listen_port)
     except KeyboardInterrupt:
         logger.info('stopped')
     except OSError as e:
         if box.stop:
             return   # the signal box closed the listener; it logs the shutdown
-        logger.error('cannot serve on %s:%d: %s', args.host, args.port, e)
+        logger.error('cannot serve on %s:%d: %s', listen_host, listen_port, e)
         raise SystemExit(1)
 
 

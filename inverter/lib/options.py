@@ -46,7 +46,7 @@ def _load_options():
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
     d = static['defaults']
-    static_defaults = {'host': d['host'], 'port': d['modbus_port'], 'unit': d['unit'],
+    static_defaults = {'listen': d['listen'], 'unit': d['unit'],
                        'max-kwp': d['max_kwp'], 'battery-kwh': d['battery_kwh'],
                        'time-scale': d['time_scale'], 'chaos': d['chaos'],
                        'dump-interval': d['dump_interval'],

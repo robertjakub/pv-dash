@@ -123,7 +123,7 @@ hardcodes.
 python3 inverter/bin/modbus-fake-inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
 python3 inverter/bin/modbus-fake-inverter.py --time 12:00          # frozen noon: ~4.5 kW PV, exporting
 python3 inverter/bin/modbus-fake-inverter.py --static              # the classic static demo values
-python3 inverter/bin/modbus-fake-inverter.py --port 15502 --log-level DEBUG
+python3 inverter/bin/modbus-fake-inverter.py --listen 127.0.0.1:15502 --log-level DEBUG
 ```
 
 Add **`--dry-run`** to validate the configuration and print the effective
@@ -136,7 +136,7 @@ The fake has **no config file** (the audit's F11 test-tool posture: flags
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--host` / `--port` / `--unit` | `127.0.0.1` / `5502` / `1` | the Modbus TCP bind and unit id served |
+| `--listen` / `--unit` | `127.0.0.1:5502` / `1` | the Modbus TCP serve address `HOST:PORT` and the unit id served |
 | `--profile` | `sun2000` | register-map profile: the built-in name or a JSON path (`PROFILE` when unset) |
 | `--static` / `--battery-kwh` | off / `6.9` | static demo values / the battery's usable capacity in kWh |
 | `--max-kwp` | `6` | PV array size in kWp (peak = 75 % of it) |
@@ -166,7 +166,7 @@ startup-only): `CHAOS` (0..1), `MAX_KWP`, `PROFILE`, `STRICT`,
 ## Runtime control
 
 A JSON-lines control server runs **by default on the unix socket
-`/tmp/fake-inverter-<modbus-port>.socket`** — pass a TCP port number to
+`/tmp/fake-inverter-<listen-port>.socket`** — pass a TCP port number to
 bind `127.0.0.1:PORT` instead, or `0` to switch it off. Both tools resolve
 the target the same way: flag > **`CTL`** environment variable > the
 default socket. The target also **rebinds live** — `set control port` —
@@ -204,6 +204,7 @@ form is legitimate here in a way it never is on the daemons.
 
 | Setting | Values | Meaning |
 |---|---|---|
+| `system listen` | `HOST:PORT` | the address the fake serves Modbus on (`show system listen` answers it; restart to apply — `--listen`/`LISTEN` at start) |
 | `pv` / `load` / `batt` | `W` \| `auto` | pin the PV power / the home load / the battery power (+charge/−discharge — the state machine integrates it into the SoC) |
 | `grid` | `W` \| `auto` | pin the **grid setpoint** (+export/−import): the battery balances to hold it (`set grid 0` = zero-export) |
 | `soc` | `%` \| `auto` | pin the state of charge (also seeds the machine) |

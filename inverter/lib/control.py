@@ -22,7 +22,7 @@ import threading
 import time
 
 from common.config import acl_table, acl_text, acl_value_text, parse_acl, parse_auth_type, parse_control_target, \
-    resolve_metrics_acl
+    parse_listen, resolve_metrics_acl
 from common.cred import parse_trust_uids
 from common.human import secs
 from common.modbus import AUTH_MIN_KEY
@@ -38,7 +38,7 @@ from common.dump import SECRET_REMOVED, dump_filter
 from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, \
     SHOW_OPTIONS, NODE_BY_NAME, KNOWN_VERBS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
-from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_MODBUS_PORT, \
+from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, \
     LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
 
 logger = logging.getLogger('fake-inverter')
@@ -176,6 +176,13 @@ class ControlServer(_ControlServer):
                 if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
                     raise ValueError('dump/restore-on-start must be on or off')
                 self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
+                return self.defaults[key]
+            if key == 'system/listen':
+                try:
+                    t = parse_listen(val)
+                except SystemExit as e:
+                    raise ValueError(str(e))
+                self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
             raise ValueError('unknown setting %s' % key)
         auto = val in ('auto', 'off', 'none', 'clear', 'live')
@@ -383,7 +390,7 @@ class ControlServer(_ControlServer):
             return val
         if key == 'control/port':
             try:
-                target = parse_control_target(value.strip(), DEFAULT_MODBUS_PORT, CONTROL_SOCKET_TEMPLATE)
+                target = parse_control_target(value.strip(), DEFAULT_LISTEN_PORT, CONTROL_SOCKET_TEMPLATE)
             except SystemExit as e:
                 raise ValueError(str(e))
             if val in ('off', 'none', '0'):

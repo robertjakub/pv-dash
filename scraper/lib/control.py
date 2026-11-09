@@ -28,8 +28,6 @@ from common.human import secs
 from common.version import version_string
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.control import ControlServer as _ControlServer, num, numi
-from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
-    match_setting_path
 from common.config import acl_table, acl_value_text, default_profile_path, parse_auth_type, \
     parse_control_target, parse_listen, parse_upstream, resolve_profile_file
 from common.dump import SECRET_REMOVED, dump_filter
@@ -37,9 +35,9 @@ from common.modbus import AUTH_MIN_KEY
 from common.logutil import UtcFormatter
 from .config import CONTROL_SOCKET_TEMPLATE, build_sources, load_device_profile, resolve_metrics_acl
 from .metrics import Metrics
-from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, \
+from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, \
     NODE_BY_NAME, KNOWN_VERBS, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
-from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, DEFAULT_LISTEN_PORT, LOG_LEVELS
+from .statics import CONTROL_LINE_CAP, DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('scraper')
 
@@ -109,6 +107,19 @@ class ControlServer(_ControlServer):
     CFG_KEYS = CFG_KEYS   # the registry's knob -> cfg-key renames (show config)
     EXIT_TEXT = 'the modbus-scraper is shutting down'
     RELOAD_TEXT = 'the modbus-scraper is reloading — the daemon restarts with the saved configuration'
+    APP = 'modbus-scraper'
+    COMMANDS = COMMANDS
+    COMMAND_HELP = COMMAND_HELP
+    COMMAND_GROUPS = COMMAND_GROUPS
+    COMMAND_HIDDEN = COMMAND_HIDDEN
+    NODE_BY_NAME = NODE_BY_NAME
+    SET_BY_NAME = SET_BY_NAME
+    SHOW_BY_LIVE = SHOW_BY_LIVE
+    OPTION_BY_LIVE = OPTION_BY_LIVE
+    SHOW_OPTIONS = SHOW_OPTIONS
+    SHOW_REPORTS = {'show inputs-metrics': 'inputs_metrics_report',   # `show inputs metrics` (the live path's words) forwards here
+                    'show inputs': 'inputs_report',
+                    'show metrics-acl-table': 'acl_table_report'}   # `show metrics acl table` (the live path's words) forwards here
 
     def __init__(self, scraper, httpd, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None,
@@ -144,149 +155,19 @@ class ControlServer(_ControlServer):
         """The resolved startup config dict — the scraper's live one home."""
         return self.scraper.cfg
 
-    def command(self, cmd):
-        cmd = cmd.strip()
-        low = cmd.lower()
-        if not low:
-            return 'err empty command'
-        if low.split()[0] in ('help', '?') and low != '?':
-            args = cmd.split()[1:]
-            if args and args[0].lower() == 'config':
-                return self.config_mapping()
-            if args and args[0].lower() == 'knobs':
-                return self.knobs_dictionary()
-            path = '/'.join(w.lower() for w in args)   # the command paths spell as words too — the golden ladder: the commands before the settings
-            listing = describe_command_node(COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, path)
-            if listing is not None:
-                return 'ok %s' % listing
-            if path in COMMAND_HELP:   # a command word — or a childless command node — describes itself
-                return 'ok %s' % COMMAND_HELP[path]
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
-            if key is not None and not rest:
-                if key == 'dump-interval' and not self.dump_path:
-                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
-                return 'ok %s' % describe_setting(key)
-            if path in NODE_BY_NAME:
-                return 'ok %s' % describe_node(OPTIONS, path)
-            if args:
-                return 'err unknown command or setting %s (try ?)' % ' '.join(args)
-            return 'ok ' + self.command_help()
-        if low == '?':
-            return 'ok ' + self.command_help()
-        if low == 'quit':
-            return 'bye'
-        if low == 'ping':                 # keep-alive from scraper_ctl
-            return 'ok pong'
-        if cmd.startswith('unset'):
-            args = cmd.split()[1:]
-            if not args:
-                return 'err unset needs a setting (try help)'
-            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports have nothing to unset
-            s = SET_BY_NAME.get(key) if key is not None else None
-            if s is not None and not rest and s.restart:
-                if s.secret:   # a secret never rides the reload state — the wire refuses it
-                    return 'err restart required (startup-only knob)'
-                self.defaults[key] = self.baseline.get(key, self.defaults.get(key))
-                self.overridden.discard(key)
-                logger.info('control: unset %s (the restart re-applies the configured value)', key)
-                return 'note restart required (startup-only knob)'
-            if key is None or rest or key not in self.defaults:
-                return 'err unknown setting %s (try help)' % ' '.join(args)
-            try:
-                shown = self._apply(key, self.defaults[key])
-            except ValueError as e:
-                return 'err %s' % e
-            self.overridden.discard(key)
-            logger.info('control: unset %s -> ok %s=%s', key, key, shown)
-            return 'ok %s=%s %s' % (key, shown, self.summary())
-        if cmd.startswith('set'):
-            args = cmd.split()[1:]
-            if len(args) < 2:
-                return 'err set needs a setting and a value (try help)'
-            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports are not settable (and a show path never shadows a knob value)
-            if key is None:
-                return 'err unknown setting %s (try help)' % ' '.join(args)
-            if not rest:
-                return 'err set needs a setting and a value (try help)'
-            s = SET_BY_NAME.get(key)
-            if s is not None and s.restart and s.secret:
-                return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
-            value = ' '.join(rest)
-            if value == SECRET_REMOVED and getattr(s, 'secret', False):
-                return 'err *** SECRET REMOVED *** is not a value — pass the secret by flag/env, or as file:<path>'
-            try:
-                shown = self._apply(key, value)
-            except ValueError as e:
-                return 'err %s' % e
-            self.overridden.add(key)
-            logger.info('control: set %s=%s', key, shown)
-            if s is not None and s.restart:   # the value is recorded; the restart applies it — a note, not a verdict
-                return 'note restart required (startup-only knob)'
-            return 'ok %s=%s %s' % (key, shown, self.summary())
-        if low == 'show connections':
-            return 'ok connections ' + self.connections_line()
-        if low == 'show version':
-            return 'ok modbus-scraper %s' % version_string()
-        if low in ('show config', 'show config all'):   # 'all' rides along: the script IS the full config
-            return self.show_config()
-        if low == 'show knobs':
-            return self.knobs_dictionary()
-        if low == 'show inputs-metrics':   # `show inputs metrics` (the live path's words) forwards here
-            return self.inputs_metrics_report()
-        if low == 'show inputs':
-            return self.inputs_report()
-        if low == 'show metrics-acl-table':
-            return self.acl_table_report()
-        if low.startswith('show'):
-            args = cmd.split()[1:]
-            if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
-                return 'ok %s' % describe_root(OPTIONS, SHOW_OPTIONS)
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
-            if key is not None and not rest:
-                opt = OPTION_BY_LIVE.get(key)
-                if opt is not None and opt.secret:
-                    return 'err %s is a secret — it never shows (pass it by flag/env, or as file:<path>)' % key
-                word = SHOW_BY_LIVE.get(key)
-                if word:
-                    return self.command('show ' + word)   # a show command's report, by its word
-                if key == 'dump-interval' and not self.dump_path:
-                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
-                return 'ok %s=%s' % (key, self._get(key))
-            if key is not None and rest:
-                return 'err %s: unexpected %s' % (key, ' '.join(rest))
-            node_path = '/'.join(w.lower() for w in args)   # the walk the ? offers: every word of the path answers
-            if node_path in NODE_BY_NAME:
-                return 'ok %s' % describe_node(OPTIONS, node_path)
-            if len(args) == 1:
-                return 'err unknown setting %s (try help)' % args[0].lower()
-        if low == 'inspect':
-            return self.inspect()
+    def command_tool(self, low, cmd):
+        """The scraper's own verbs beside the family's request namespace:
+        the poll-now nudge and the modbus session drop (the reconnect
+        happens on the next poll)."""
         if low == 'poll now':
             self.scraper.wake.set()
             logger.info('control: poll now (the loop wakes immediately)')
             return 'ok poll now (the loop wakes immediately, %s)' % self.summary()
-        if low == 'request reload-config':
-            if not self.reloader:
-                return 'err no reloader configured'
-            try:
-                return 'ok reloaded (%s)' % self.reloader()
-            except Exception as e:
-                return 'err reload failed: %s' % e
-        if low == 'request dump':
-            return self.dump_state()
-        if low == 'request restore':
-            return self.restore_state()
-        if low == 'request reload':
-            return self.reload_daemon()
         if low == 'request restart':
             self.scraper.client.close()
             logger.info('control: the modbus session dropped (reconnects on the next poll)')
             return 'ok modbus session dropped (reconnects on the next poll)'
-        if low == 'shutdown':
-            self.shutdown_pending = True
-            logger.info('control: shutdown requested')
-            return 'bye shutdown'
-        return 'err unknown command %r (try help)' % cmd
+        return None
 
     def _apply(self, key, value):
         """Apply a live setting; returns the display string or raises

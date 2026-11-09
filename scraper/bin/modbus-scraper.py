@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 from common.audit import AuditLog, default_path
 from common.config import parse_listen, resolve_control_target
 from common.cred import parse_trust_uids
-from common.daemon import apply_restart_state, default_config_path, install_signal_handlers, log_state_dumps, \
+from common.daemon import apply_restart_state, default_config_path, fold_listen, install_signal_handlers, log_state_dumps, \
     parse_ops_verbs, setup_logging
 from common.options import build_parser
 from common.version import version_string
@@ -80,10 +80,6 @@ def describe(cfg, args, control_desc):
                 ', '.join(caps) if caps else 'none',
                 control_desc,
                 version_string()))
-
-
-def fold_listen(cfg, pending):
-    cfg['listen'] = pending
 
 
 def main():

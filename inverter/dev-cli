@@ -1,0 +1,7 @@
+#!/bin/sh
+# the dev console: the cli straight from the checkout against the dev
+# daemon (inverter/dev — the example conf's listen, the default unix socket).
+# $INVERTER_CTL overrides. Extra flags pass through: inverter/dev-cli --help
+DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+exec python3 "$DIR/bin/modbus-fake-cli.py" \
+    --control-port "${INVERTER_CTL:-/tmp/fake-inverter-5502.socket}" "$@"

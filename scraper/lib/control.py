@@ -501,21 +501,39 @@ class ControlServer(_ControlServer):
         if key == 'audit/log-file':
             if val in ('off', 'none'):
                 self.audit_params['disabled'] = True
+                with s.lock:
+                    s.cfg['no_audit_log'] = True
                 return self._rebuild_audit()
             self.audit_params['path'] = val   # the raw spelling: a path, '-' (= stdout) or empty (the XDG state home)
             self.audit_params['disabled'] = False
+            with s.lock:
+                s.cfg['audit_log'] = val
+                s.cfg['no_audit_log'] = False
             return self._rebuild_audit()
         if key == 'audit/rotate/max-size':
             v = num(val, 'max-size', 'MB')
             self._gate_range(key, v, 'MB')
             self.audit_params['max_mb'] = v
-            self._rebuild_audit()
+            with s.lock:
+                s.cfg['audit_max_mb'] = v
             return '%g' % v
+        if key == 'audit/rotate/daily':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('audit/rotate/daily must be on or off')
+            self.audit_params['daily'] = on
+            with s.lock:
+                s.cfg['audit_daily'] = on
+            return 'on' if on else 'off'
         if key == 'audit/rotate/files':
             v = numi(val, 'files', 'backups')
             self._gate_range(key, v, 'backups')
             self.audit_params['files'] = v
-            self._rebuild_audit()
+            with s.lock:
+                s.cfg['audit_files'] = v
             return '%d' % v
         if key == 'audit/disable':
             if val in ('on', 'true', '1', 'yes'):
@@ -525,8 +543,9 @@ class ControlServer(_ControlServer):
             else:
                 raise ValueError('audit/disable must be on or off')
             self.audit_params['disabled'] = on
-            self._rebuild_audit()
-            return 'on' if on else 'off'
+            with s.lock:
+                s.cfg['no_audit_log'] = on
+            return self._rebuild_audit()
         if key == 'local-time':
             if val in ('on', 'true', '1', 'yes'):
                 on = True
@@ -615,6 +634,8 @@ class ControlServer(_ControlServer):
             return self.audit.path if self.audit else 'off'
         if key == 'audit/rotate/max-size':
             return '%g' % self.audit_params['max_mb']
+        if key == 'audit/rotate/daily':
+            return 'on' if self.audit_params['daily'] else 'off'
         if key == 'audit/rotate/files':
             return '%d' % self.audit_params['files']
         if key == 'audit/disable':

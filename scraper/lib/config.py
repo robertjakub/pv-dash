@@ -10,6 +10,7 @@ import math
 import re
 
 from .options import OPTIONS
+from common.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 from common.config import (check_auth_key, check_token_chars, check_control_tokens, default_profile_path,
                            is_loopback_host, load_config_script, parse_acl, parse_auth_type, parse_listen,
                            parse_secret, parse_upstream, resolve_metrics_acl, resolve_profile_file, Resolver,
@@ -78,6 +79,11 @@ def validate_config(cfg):
         fail('client_timeout', 'must be >= 0 (0 = off)')
     if cfg['max_conn_per_ip'] < 0:
         fail('max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
+    if not (AUDIT_MAX_MB_MIN <= cfg['audit_max_mb'] <= AUDIT_MAX_MB_MAX):
+        fail('audit_max_mb', 'must be %d..%d (0 = no size rotation)'
+             % (AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX))
+    if not (AUDIT_FILES_MIN <= cfg['audit_files'] <= AUDIT_FILES_MAX):
+        fail('audit_files', 'must be %d..%d' % (AUDIT_FILES_MIN, AUDIT_FILES_MAX))
     for key in ('timeout', 'interval', 'max_kwp', 'max_grid_kw', 'client_timeout'):
         if not math.isfinite(cfg[key]):
             fail(key, 'must be a finite number (nan/inf are nonsense here)')
@@ -277,11 +283,13 @@ def resolve_config(args, script_dir=None):
                                           'CONTROL_SOCKET_GROUP', 'control_socket_group', False, str_to_bool)
     cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', None, str)
     cfg['audit_max_mb'] = resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
-                                  'audit_max_mb', 10.0, float)
+                                  'audit_max_mb', DEFAULTS['audit_max_mb'], float)
     cfg['audit_files'] = resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
-                                 'audit_files', 3, int)
+                                 'audit_files', DEFAULTS['audit_files'], int)
+    cfg['audit_daily'] = resolve(getattr(args, 'audit_daily', False) or None,
+                                 'AUDIT_DAILY', 'audit_daily', False, str_to_bool)
     cfg['no_audit_log'] = resolve(getattr(args, 'no_audit_log', False) or None,
-                                  None, 'no_audit_log', False, str_to_bool)
+                                  'NO_AUDIT_LOG', 'no_audit_log', False, str_to_bool)
     check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
     check_token_chars(cfg['control_token'], 'control_token')
     check_token_chars(cfg['auth_token'], 'auth_token')

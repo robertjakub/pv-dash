@@ -43,15 +43,16 @@ def _load_options():
     here = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
-    defaults = static['defaults']
-    static_defaults = {'audit-max-mb': defaults['audit_max_mb'],
-                       'audit-files': defaults['audit_files']}
+    # the audit rotation defaults do NOT ride the argparse parser: a
+    # static-wired default would shadow the env layer (the resolver never
+    # falls through a truthy flag value) — they ladder flag > env > config
+    # > static in lib/config.py like every other knob
     with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
         meta = json.load(f)
         rows = meta['options']
         for key, value in parse_registry_sections(meta).items():
             globals()[key] = value
-    return option_rows(rows, static_defaults=static_defaults,
+    return option_rows(rows,
                        choices={'log-level': tuple(static['log_levels'])})
 
 

@@ -114,9 +114,11 @@ def main():
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
     audit_params = {'path': None if cfg['no_audit_log'] else cfg['audit_log'],
                     'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],
+                    'daily': cfg['audit_daily'],
                     'disabled': bool(cfg['no_audit_log'])}
     audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'], 'SCR', app='modbus-scraper',
-                                                      max_mb=cfg['audit_max_mb'], files=cfg['audit_files'])
+                                                      max_mb=cfg['audit_max_mb'], daily=cfg['audit_daily'],
+                                                      files=cfg['audit_files'])
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target) \
         + (', read-only ops token accepted' if control_ops_token else '')
@@ -162,6 +164,10 @@ def main():
                 key = o.name.replace('-', '_')
                 if key in cfg and cfg[key] is not None:
                     defaults[o.live] = str(cfg[key])
+            elif o.live and o.conv is bool and not o.secret:
+                key = o.name.replace('-', '_')
+                if key in cfg:   # the live bools: `unset` needs a configured value too
+                    defaults[o.live] = 'on' if cfg[key] else 'off'
             if o.restart and not o.secret:   # the startup-only knobs: what `show <knob>` answers
                 key = o.name.replace('-', '_')
                 v = cfg.get(key, getattr(args, key, None))

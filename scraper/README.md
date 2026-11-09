@@ -194,7 +194,7 @@ set log-level INFO
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy |
 | `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
-| `--audit-log` (+ `--audit-max-mb`, `--audit-files`, `--no-audit-log`) | XDG state | the SCR audit trail: a file path or `-` for stdout (the docker/journald way) |
+| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`) | XDG state | the SCR audit trail: a file path or `-` for stdout (the docker/journald way) |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (overflow gets an immediate `503 # rate limited`) |
 | `--log-level` / `--log-access` / `--local-time` | `INFO` / off / UTC | the log surface |
 | `--config` / `--dry-run` / `--man` | — | the config file path / validate + print and exit / print the generated man page |

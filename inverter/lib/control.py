@@ -28,13 +28,11 @@ from common.human import secs
 from common.modbus import AUTH_MIN_KEY
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.control import ControlServer as _ControlServer, num
-from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
-    match_setting_path
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
 from .signals import parse_time
-from common.version import version_string
 from common.dump import SECRET_REMOVED, dump_filter
+from common.version import version_string
 from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, \
     SHOW_OPTIONS, NODE_BY_NAME, KNOWN_VERBS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
@@ -136,6 +134,19 @@ class ControlServer(_ControlServer):
     XDG_STATE_NAME = 'fake-inverter'   # the base's _reload_state_path fallback (--config '')
     APPLY_FIRST = ('scenario',)   # a preset release is the state the pins were pinned after — pins land on top
     TOKENLESS_TCP = 'allow'   # the F11 test-tool posture: a tokenless TCP control bind is fine here (the family refuses — F5)
+    APP = 'fake-inverter'
+    RELOAD_CONFIG = False   # the reload-config row decision stays open (docs/TODO.md) — the verb never answers here
+    COMMANDS = COMMANDS
+    COMMAND_HELP = COMMAND_HELP
+    COMMAND_GROUPS = COMMAND_GROUPS
+    COMMAND_HIDDEN = COMMAND_HIDDEN
+    NODE_BY_NAME = NODE_BY_NAME
+    SET_BY_NAME = SET_BY_NAME
+    SHOW_BY_LIVE = SHOW_BY_LIVE
+    OPTION_BY_LIVE = OPTION_BY_LIVE
+    SHOW_OPTIONS = SHOW_OPTIONS
+    SHOW_REPORTS = {'show registers': 'registers_report',
+                    'show metrics-acl-table': 'acl_table_report'}   # `show metrics acl table` (the live path's words) forwards here
 
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
                  trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None, startup_values=None,
@@ -584,68 +595,23 @@ class ControlServer(_ControlServer):
         fake = self.fake
         return 'ok metrics-acl-table\n%s' % '\n'.join(acl_table(fake.metrics_acl if fake else None))
 
-    def command(self, line):
-        if not line:
-            return 'err empty command'
-        parts = line.split()
-        cmd, args = parts[0].lower(), parts[1:]
-        if cmd == 'ping':                 # keep-alive from fake_cli
-            return 'ok pong'
-        if cmd in ('help', '?'):
-            if args:
-                if args[0].lower() == 'config':
-                    return self.config_mapping()
-                if args[0].lower() == 'knobs':
-                    return self.knobs_dictionary()
-                path = '/'.join(w.lower() for w in args)   # the command paths spell as words too — the golden ladder: the commands before the settings
-                listing = describe_command_node(COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, path)
-                if listing is not None:
-                    return 'ok %s' % listing
-                if path in COMMAND_HELP:   # a command word — or a childless command node — describes itself
-                    return 'ok %s' % COMMAND_HELP[path]
-                key, rest = match_setting_path(args, SETTING_BY_NAME)
-                if key is not None and not rest:
-                    if key == 'dump-interval' and not self.dump_path:
-                        return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
-                    return 'ok %s' % describe_setting(key)
-                if path in NODE_BY_NAME:
-                    return 'ok %s' % describe_node(OPTIONS, path)
-                return 'err unknown command or setting %s (try ?)' % ' '.join(args)
-            cmds = ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|connections|config|knobs>, '
-                    'reset' % '|'.join(self.SETTING_KEYS))
-            if self.dump_path:
-                cmds += ', request dump, request restore'
-            cmds += ', request reload, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
-            cmds += 'show knobs prints the full dictionary'
-            return 'ok ' + cmds   # the wire speaks ok|fail|bye — the bare 'commands:' status dies here
-        if cmd == 'show' and args and args[0].lower() == 'config' \
-                and len(args) in (1, 2) and (len(args) == 1 or args[1].lower() == 'all'):
-            # 'all' rides along: the script IS the full config
-            return self.show_config()
-        if cmd == 'show' and args and args[0].lower() == 'knobs':
-            return self.knobs_dictionary()
-        if cmd == 'show' and len(args) == 1 and args[0].lower() == 'metrics-acl-table':
-            # `show metrics acl table` (the live path's words) forwards here — the SHOW_BY_LIVE routing
-            return self.acl_table_report()
-        if cmd == 'unset':
-            if not args:
-                return 'err unset needs a setting (try help)'
-            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports have nothing to unset
-            s = SET_BY_NAME.get(key) if key is not None else None
-            if s is not None and not rest and s.restart:
-                if s.secret:   # a secret never rides the reload state — the wire refuses it
-                    return 'err restart required (startup-only knob)'
-                self.defaults[key] = self.baseline.get(key, self.defaults.get(key))
-                self.overridden.discard(key)
-                logger.info('control: unset %s (the restart re-applies the configured value)', key)
-                return 'note restart required (startup-only knob)'
-            if key is None or rest or key not in self.defaults:
-                return 'err unknown setting %s (try help)' % ' '.join(args)
-            shown = self._apply(key, self.defaults[key])
-            self.overridden.discard(key)
-            logger.info('control: unset %s -> ok %s=%s', key, key, shown)
-            return 'ok %s=%s %s' % (key, shown, self.status())
-        if cmd == 'reset':
+    def command_help(self):
+        """The one-line command reference: the fake's verb list speaks the
+        pin names; the state-dump commands appear only when a dump path is
+        configured (there is nothing to dump into otherwise)."""
+        cmds = ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|connections|config|knobs>, '
+                'reset' % '|'.join(self.SETTING_KEYS))
+        if self.dump_path:
+            cmds += ', request dump, request restore'
+        cmds += ', request reload, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
+        cmds += 'show knobs prints the full dictionary'
+        return cmds
+
+    def command_tool(self, low, cmd):
+        """The fake's own verb: reset clears the pins, the machines'
+        overlays and the scenario (the set-grammar settings re-apply from
+        the configured values)."""
+        if low == 'reset':
             pins = self.simulator.reset_overrides()
             overlay = coils = discrete = 0
             if self.fake:
@@ -662,124 +628,88 @@ class ControlServer(_ControlServer):
                         pins, overlay, coils, discrete)
             return 'ok reset (%d pin(s), %d overlay register(s), %d coil(s), %d discrete input(s) cleared) %s' \
                 % (pins, overlay, coils, discrete, self.status())
-        if cmd == 'inspect':
-            return self.inspect()
-        if cmd == 'request' and args and args[0].lower() == 'dump':
-            return self.dump_state()
-        if cmd == 'request' and args and args[0].lower() == 'restore':
-            return self.restore_state()
-        if cmd == 'request' and len(args) == 1 and args[0].lower() == 'reload':
-            return self.reload_daemon()
-        if cmd == 'shutdown':
-            self.shutdown_pending = True
-            logger.info('control: shutdown requested')
-            return 'bye shutdown'
-        if cmd == 'quit':
-            return 'bye'
-        if cmd == 'show':
-            if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
-                return 'ok %s' % describe_root(OPTIONS, SHOW_OPTIONS)
-            what = args[0].lower()
-            if what == 'connections':
-                return 'ok connections ' + self.connections_line()
-            if what == 'version':
-                return 'ok fake-inverter %s' % version_string()
-            if what == 'registers':
-                entries = self.simulator.profile.entries
-                if not entries:
-                    return 'ok registers: (the profile has no registers)'
-                # name | register | type | current value (NaN = the profile
-                # maps a value the simulator is not calculating right now)
-                vals = self.simulator.values()
-                overlay = dict(self.fake.overlay) if self.fake else {}
-                rows = []
-                for name, addr, typ, _scale, _fc in entries:
-                    if addr in overlay:
-                        val = '%d *' % overlay[addr]   # a write overlay wins (set register/FC16)
-                    elif vals.get(name) is None:
-                        val = 'NaN'
-                    else:
-                        val = '%g' % vals.get(name)
-                    rows.append((name, str(addr), typ, val))
-                # the multi-line reply carries its newlines inside the JSON text
-                w1 = max(len(r[0]) for r in rows)
-                w2 = max(len(r[1]) for r in rows)
-                w3 = max(len(r[2]) for r in rows)
-                w4 = max(len(r[3]) for r in rows)
-                table = '\n'.join('%-*s | %*s | %*s | %*s' % (w1, a, w2, b, w3, c, w4, d)
-                                  for a, b, c, d in rows)
-                return 'ok registers (%d)\n%s' % (len(rows), table)
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
-            if key is not None and not rest:
-                opt = OPTION_BY_LIVE.get(key)
-                if opt is not None and opt.secret:
-                    return 'err %s is a secret — it never shows (pass it by flag/env, or as file:<path>)' % key
-                word = SHOW_BY_LIVE.get(key)
-                if word:
-                    return self.command('show ' + word)   # a show command's report, by its word
-                if key == 'dump-interval' and not self.dump_path:
-                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
-                return 'ok %s=%s' % (key, self._get(key))
-            if key is not None and rest:
-                return 'err %s: unexpected %s' % (key, ' '.join(rest))
-            node_path = '/'.join(w.lower() for w in args)   # the walk the ? offers: every word of the path answers
-            if node_path in NODE_BY_NAME:
-                return 'ok %s' % describe_node(OPTIONS, node_path)
-            return 'err unknown setting %s (try help)' % ' '.join(args)
-        if cmd == 'set':
-            if len(args) < 2:
-                return 'err set needs a setting and a value (try help)'
-            if args[0].lower() in ('register', 'coil', 'discrete'):
-                # the control write = the Modbus write: the same overlay the
-                # wire writes land in, so the scrapers see it
-                what = args[0].lower()
-                if not self.fake:
-                    return 'err no modbus device attached'
-                if len(args) < 3:
-                    return 'err set %s needs an address and a value%s' % (
-                        what, ' (0 or 1)' if what != 'register' else '')
-                try:
-                    addr, val = int(args[1]), int(args[2])
-                except ValueError:
-                    return 'err %s address and value must be integers' % what
-                if what == 'register':
-                    if not 0 <= addr <= MAX_REGISTERS - 1 or not 0 <= val <= MAX_REGISTERS - 1:
-                        return 'err register address/value out of range (0..%d)' % (MAX_REGISTERS - 1)
-                    self.fake.overlay[addr] = val
-                    logger.info('control: set register %d=%d (write overlay)', addr, val)
-                    return 'ok register %d=%d (the write overlay, the scrapers read it)' % (addr, val)
-                if not 0 <= addr <= MAX_REGISTERS - 1 or val not in (0, 1):
-                    return 'err %s address out of range (0..%d) or value not 0/1' % (what, MAX_REGISTERS - 1)
-                if what == 'coil':
-                    self.fake.coils[addr] = val
-                    logger.info('control: set coil %d=%d', addr, val)
-                    return 'ok coil %d=%d (the coil space, FC1/FC5/FC15 see it)' % (addr, val)
-                self.fake.discrete[addr] = val
-                logger.info('control: set discrete %d=%d', addr, val)
-                return 'ok discrete %d=%d (the discrete-input space, FC2 sees it)' % (addr, val)
-            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports are not settable (and a show path never shadows a knob value)
-            if key is None:
-                return 'err unknown setting %s (try help)' % ' '.join(args)
-            if not rest:
-                return 'err set needs a setting and a value (try help)'
-            s = SET_BY_NAME.get(key)
-            if s is not None and s.restart and s.secret:
-                return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
-            value = ' '.join(rest)
-            if value == SECRET_REMOVED and getattr(s, 'secret', False):
-                return 'err *** SECRET REMOVED *** is not a value — pass the secret by flag/env, or as file:<path>'
-            try:
-                shown = self._apply(key, value)
-            except ValueError as e:
-                return 'err %s' % e
-            if key != 'scenario':
-                self.scenario = None   # a manual pin turns the state 'custom'
-            self.overridden.add(key)
-            logger.info('control: set %s=%s', key, shown)
-            if s is not None and s.restart:   # the value is recorded; the restart applies it — a note, not a verdict
-                return 'note restart required (startup-only knob)'
-            return 'ok %s=%s %s' % (key, shown, self.status())
-        return 'err unknown command %s (try help)' % cmd
+        return None
+
+    def command_set_special(self, args):
+        """The fake's Modbus-write set words: the same overlay the wire
+        writes land in, so the scrapers see it — `set register/coil/
+        discrete ADDR VAL` (no live row, reset clears)."""
+        if args[0].lower() not in ('register', 'coil', 'discrete'):
+            return None
+        what = args[0].lower()
+        if not self.fake:
+            return 'err no modbus device attached'
+        if len(args) < 3:
+            return 'err set %s needs an address and a value%s' % (
+                what, ' (0 or 1)' if what != 'register' else '')
+        try:
+            addr, val = int(args[1]), int(args[2])
+        except ValueError:
+            return 'err %s address and value must be integers' % what
+        if what == 'register':
+            if not 0 <= addr <= MAX_REGISTERS - 1 or not 0 <= val <= MAX_REGISTERS - 1:
+                return 'err register address/value out of range (0..%d)' % (MAX_REGISTERS - 1)
+            self.fake.overlay[addr] = val
+            logger.info('control: set register %d=%d (write overlay)', addr, val)
+            return 'ok register %d=%d (the write overlay, the scrapers read it)' % (addr, val)
+        if not 0 <= addr <= MAX_REGISTERS - 1 or val not in (0, 1):
+            return 'err %s address out of range (0..%d) or value not 0/1' % (what, MAX_REGISTERS - 1)
+        if what == 'coil':
+            self.fake.coils[addr] = val
+            logger.info('control: set coil %d=%d', addr, val)
+            return 'ok coil %d=%d (the coil space, FC1/FC5/FC15 see it)' % (addr, val)
+        self.fake.discrete[addr] = val
+        logger.info('control: set discrete %d=%d', addr, val)
+        return 'ok discrete %d=%d (the discrete-input space, FC2 sees it)' % (addr, val)
+
+    def _after_set(self, key):
+        """A manual pin turns the day simulation's state 'custom' (the
+        scenario preset releases)."""
+        if key != 'scenario':
+            self.scenario = None
+
+    def show_walk_tail(self, args):
+        """The fake's walk tail reports the whole path (the family's
+        one-word tail keeps the stray-word fall-through)."""
+        return 'err unknown setting %s (try help)' % ' '.join(args)
+
+    def unknown_command(self, cmd):
+        """The fake's unknown errs on the first word, unquoted (the
+        family's whole-command %r keeps its own)."""
+        return 'err unknown command %s (try help)' % cmd.split()[0].lower()
+
+    def registers_report(self):
+        """The registers table (show registers): name | register | type |
+        current value (NaN = the profile maps a value the simulator is
+        not calculating right now; a write overlay wins — set
+        register/FC16)."""
+        entries = self.simulator.profile.entries
+        if not entries:
+            return 'ok registers: (the profile has no registers)'
+        vals = self.simulator.values()
+        overlay = dict(self.fake.overlay) if self.fake else {}
+        rows = []
+        for name, addr, typ, _scale, _fc in entries:
+            if addr in overlay:
+                val = '%d *' % overlay[addr]   # a write overlay wins (set register/FC16)
+            elif vals.get(name) is None:
+                val = 'NaN'
+            else:
+                val = '%g' % vals.get(name)
+            rows.append((name, str(addr), typ, val))
+        # the multi-line reply carries its newlines inside the JSON text
+        w1 = max(len(r[0]) for r in rows)
+        w2 = max(len(r[1]) for r in rows)
+        w3 = max(len(r[2]) for r in rows)
+        w4 = max(len(r[3]) for r in rows)
+        table = '\n'.join('%-*s | %*s | %*s | %*s' % (w1, a, w2, b, w3, c, w4, d)
+                          for a, b, c, d in rows)
+        return 'ok registers (%d)\n%s' % (len(rows), table)
+
+    def summary(self):
+        """The status line is the fake's set/unset suffix (the family's
+        summary hook)."""
+        return self.status()
 
     def connections_line(self):
         """The fake's live Modbus clients: peer, connection age, requests

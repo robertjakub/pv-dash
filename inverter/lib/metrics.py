@@ -13,14 +13,11 @@ reading): a client off the ACL is closed without a reply — nothing was
 parsed to answer, the caps never see the peer. The gated endpoint
 skeleton (the 401/404/503, the caps, the thread start/stop) is the
 family's common/metrics_server."""
-import logging
 import time
 
 from common.config import acl_admits
 from common.metrics_server import MetricsServer as _MetricsServer
 from common.metrics_server import describe_metrics
-
-logger = logging.getLogger('fake-inverter')
 
 
 class MetricsServer(_MetricsServer):
@@ -45,10 +42,6 @@ class MetricsServer(_MetricsServer):
         fake per connection — one live state, the set/unset swap needs no
         push here (the cache's metrics.py reading)."""
         return acl_admits(self.fake.metrics_acl, ip)
-
-    def acl_refused(self, request, client_address):
-        logger.info('connection rejected: %s:%d not on the metrics ACL', *client_address[:2])
-        self._http._refuse_close(request)
 
     def snapshot(self):
         sim = self.simulator

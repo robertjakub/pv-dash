@@ -5,7 +5,8 @@ peer-cred trusted peers, the token auth with the admin / read-only-ops
 roles, the HMAC frame verification both ways, and the live control/port
 rebind family — the listener swaps by identity, the sessions keep
 serving), the buffered session handler, the bye-frame announce ladder and
-the dump/reload family (the write-behind dump, the restore, the
+the dump/reload family (the write-behind dump — on command, on the graceful
+stop and every dump-interval via the parked dumper loop — the restore, the
 whole-daemon reload with its re-exec and the one-shot state file). The
 tool subclasses it with its grammar — command()/_apply()/_get() — its
 registry rows and its reports; the class attributes name the logger, the
@@ -74,7 +75,7 @@ class ControlServer:
     def __init__(self, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None,
                  ops_verbs=None, config_path=None, dump_path=None,
-                 restore_on_start=False, dump_key=None):
+                 restore_on_start=False, dump_key=None, dump_interval=0.0):
         self.reloader = reloader         # request reload: re-resolve the config, apply, returns the summary
         self.audit = audit               # the audit trail (common.audit), None = off
         self.token = token               # the TCP auth token (the admin role); None = no auth (the unix = the perms)
@@ -84,6 +85,8 @@ class ControlServer:
         self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
         self.dump_path = dump_path or None   # the state dump file (the dump family)
         self.dump_restore = bool(restore_on_start)   # prospective-only: the START already chose
+        self.dump_interval = float(dump_interval or 0.0)   # seconds between the automatic dumps; 0 = only the command/shutdown dumps
+        self.dump_wake = threading.Event()   # a live `set dump-interval` (and the off/on swaps) wake the dumper without a restart
         if dump_key is not None:
             self.dump_key = dump_key   # only when given: a subclass may property dump_key
         self.is_unix = not isinstance(target, int) and not str(target).isdigit()
@@ -690,3 +693,27 @@ class ControlServer:
                           ', sealed' if self.dump_key else '')
         except (OSError, ValueError) as e:
             self.LOG.error('the shutdown dump to %s failed: %s', self.dump_path, e)
+
+    def run_dump_interval(self, stopping=None):
+        """The dump-interval loop (the cache's golden shape, family-wide):
+        parks while the interval is off — a live `set dump-interval` wakes it
+        without a restart — and writes the write-behind (the shutdown dump's
+        write, on a timer) every interval. `stopping` is the daemon's stop
+        predicate; the loop skips the tick once it runs."""
+        while not (stopping and stopping()):
+            if not self.dump_interval:
+                self.dump_wake.wait()
+                self.dump_wake.clear()
+                continue
+            if self.dump_wake.wait(self.dump_interval):
+                self.dump_wake.clear()
+            if stopping and stopping():
+                break
+            if not self.dump_path:
+                continue   # the path went off live: the interval ticks on, there is nothing to dump into
+            try:
+                n = state.write_dump(self.dump_path, self.dump_settings(), key=self.dump_key)
+                self.LOG.debug('state dumped to %s (%d setting(s)%s)', self.dump_path, n,
+                               ', sealed' if self.dump_key else '')
+            except (OSError, ValueError) as e:
+                self.LOG.error('the periodic dump to %s failed: %s', self.dump_path, e)

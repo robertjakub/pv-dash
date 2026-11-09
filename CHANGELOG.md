@@ -34,6 +34,19 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Changed
 
+- **everywhere** — **the `--battery` knob retires, battery support is
+  always on**: the fake's `--battery`/`--no-battery` pair (and its
+  `BATTERY` env twin — the flag and the SIGHUP reload block), the
+  scraper's `--battery` (`BATTERY`, live `modbus/battery`, the
+  `scraper_battery` gauge and the reserved `battery` compute input — the
+  reserved inputs are four now: `pv`, `grid`, `batt`, `soc`) and the
+  dashboard's `--battery` (`BATTERY`, live `battery`) are gone; the
+  battery registers/metrics/panels simply always serve (a device profile
+  without the battery registers keeps the battery metrics absent), the
+  fake's battery state machine runs unconditionally and the served
+  `config.js` always carries the battery panels. `--battery-kwh` (the
+  pack size) stays.
+
 - **everywhere** — **the /metrics default binds renumber from 9350 up,
   one per tool**: the scraper keeps `9350` (its own listen IS the
   /metrics), the cache `9252` → **`9351`**, the fake `9452` → **`9352`**,

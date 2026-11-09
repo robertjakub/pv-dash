@@ -164,7 +164,7 @@ class EvilUpstream:
 
 try:
     # 1. baseline: strict fake (undefined regs rejected with 02) + cache
-    start([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(PORT),
+    start([sys.executable, F, '--control-port', '0', '--static', '--strict', '--port', str(PORT),
            '--allow-write'])
     time.sleep(0.7)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT, '--listen', '127.0.0.1:%d' % CACHE_PORT,
@@ -313,7 +313,7 @@ try:
           b[0] == 3 and w[:2] == (0xCAFE, 0) and w[2] >= 3, str(w))
 
     # 3. poll status caching: profile variant with a register the device rejects
-    procs[0] = subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--strict', '--port', str(PORT),
+    procs[0] = subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--strict', '--port', str(PORT),
                                  '--allow-write'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(0.7)

@@ -89,9 +89,10 @@ class Scraper:
         try:
             pv_raw = self._read('pv-power')
             grid_raw = self._read('grid-power')
-            battery = cfg['battery']
-            batt_raw = self._read('battery-power') if battery else 0
-            soc = self._read('battery-soc') if battery else None
+            # the battery reads ride when the spec bound the registers (a
+            # profile without them keeps the battery metrics absent)
+            batt_raw = self._read('battery-power') if 'battery-power' in cfg['sources'] else 0
+            soc = self._read('battery-soc') if 'battery-soc' in cfg['sources'] else None
             diag = self._read_diag()
         except Exception as e:
             self.client.close()
@@ -127,11 +128,8 @@ class Scraper:
         cap = cfg['max_kwp'] * 1000.0
         grid_cap = cfg['max_grid_kw'] * 1000.0
         discharge = max(-batt, 0.0)
-        if battery:
-            context = ' [poll: pv_raw=%d grid_raw=%d batt_raw=%d -> pv=%.0fW grid=%.0fW batt=%.0fW]' % (
-                pv_raw, grid_raw, batt_raw, pv, grid, batt)
-        else:
-            context = ' [poll: pv_raw=%d grid_raw=%d -> pv=%.0fW grid=%.0fW]' % (pv_raw, grid_raw, pv, grid)
+        context = ' [poll: pv_raw=%d grid_raw=%d batt_raw=%d -> pv=%.0fW grid=%.0fW batt=%.0fW]' % (
+            pv_raw, grid_raw, batt_raw, pv, grid, batt)
         pv_reg = cfg['sources']['pv-power']['register']
         grid_reg = cfg['sources']['grid-power']['register']
         err = None
@@ -153,33 +151,34 @@ class Scraper:
             self.error = err
             if err is None:
                 metric = {pn: src['metric'] for pn, src in cfg['sources'].items()}
-                self.values = {
+                values = {
                     metric['pv-power']: pv,
                     metric['grid-power']: grid,
-                    'scraper_battery': 1 if battery else 0,
                 }
-                if battery and 'battery-power' in metric:
-                    self.values[metric['battery-power']] = batt
-                    self.values[metric['battery-soc']] = soc
-                self.values.update(extras)
+                if 'battery-power' in metric:
+                    values[metric['battery-power']] = batt
+                if 'battery-soc' in metric:
+                    values[metric['battery-soc']] = soc
+                values.update(extras)
                 # the compute metrics: the spec's expressions over the poll's
-                # reads — an unavailable input (soc with the battery off, a
-                # failed extras read) or a failed eval keeps the metric absent
-                inputs = {'pv': pv, 'grid': grid, 'batt': batt, 'battery': 1.0 if battery else 0.0}
-                if battery:
+                # reads — an unavailable input (a failed extras read, the
+                # unbound soc) or a failed eval keeps the metric absent
+                inputs = {'pv': pv, 'grid': grid, 'batt': batt}
+                if soc is not None:
                     inputs['soc'] = soc
                 inputs.update(raws)
                 for name, (fn, when) in self.spec.compute.items():
                     try:
                         if when is not None and not evaluate(when, inputs):
                             continue
-                        self.values[name] = evaluate(fn, inputs)
+                        values[name] = evaluate(fn, inputs)
                     except Exception as e:
                         logger.warning('compute %s stays absent (%s)', name, e)
                 if diag is not None:
-                    self.values['scraper_cache_device_up'] = diag[1]
-                    self.values['scraper_cache_age_seconds'] = min(diag[2], DIAG_MAX)
-                    self.values['scraper_cache_uptime_seconds'] = diag[3]
+                    values['scraper_cache_device_up'] = diag[1]
+                    values['scraper_cache_age_seconds'] = min(diag[2], DIAG_MAX)
+                    values['scraper_cache_uptime_seconds'] = diag[3]
+                self.values = values
                 self.last_poll = time.time()
             else:
                 self.errors += 1

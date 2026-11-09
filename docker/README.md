@@ -121,7 +121,7 @@ dashboard's published port and its `PROM_URL` (the stack's
 `AUTH_TOKEN` cannot override the stack's generated-token file
 either; the token story stays the volume file, a plain-docker
 `AUTH_TOKEN=file:...` in `scraper.env` is fine). The fake's simulation envs
-(`CHAOS`, `MAX_KWP`, `BATTERY`, `STRICT`, `TIME`, `TIME_SCALE`) are its
+(`CHAOS`, `MAX_KWP`, `STRICT`, `TIME`, `TIME_SCALE`) are its
 SIGHUP layer, not startup: they reach a container when it is created with
 them (compose recreates on the file change) or via
 `docker compose kill -s HUP fake-inverter`.
@@ -279,7 +279,7 @@ docker build -f ../docker/Dockerfile.fake-inverter -t fake-inverter \
 docker run --rm -p 127.0.0.1:5502:5502 fake-inverter      # loopback-published, serves on 0.0.0.0:5502 in the container
 docker run --rm -it fake-inverter bash                    # poke around as pvsuite
 docker run --rm -p 127.0.0.1:5502:5502 fake-inverter \
-    fake-inverter --profile deye-sg04lp3 --no-battery    # any flags via the CMD override
+    fake-inverter --profile deye-sg04lp3 --timezone local    # any flags via the CMD override
 ```
 
 The fake has no file configs yet — its `/config` volume is there for

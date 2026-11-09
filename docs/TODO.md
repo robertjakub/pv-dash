@@ -160,6 +160,16 @@ the **Done/history** records for their tool.
 
 ## The product (what the tools do next)
 
+- **the dashboard UI redesign** `[dashboard]` — battery support is always
+  on now (the `--battery` knob retired family-wide, the served
+  `config.js` always carries `battery: true`), but the front end still
+  treats the battery as an add-on: the `batteryEnabled` gate (config.js +
+  the `?battery=1` URL escape), the dimmed-node / "no battery detected"
+  banner path, and the generation-first layout. Redesign the UI around
+  the battery as a first-class, always-present citizen (the flow diagram,
+  the KPI row, the energy split) — and reconsider the layout while in
+  there.
+
 - **the rest of the demo stack** `[docker]` `[dashboard]` — the compose
   chain runs the three Modbus tools (fake inverter → cache → scraper) with
   the seeded `/config` volume, and a **Prometheus** service scrapes the

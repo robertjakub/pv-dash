@@ -22,7 +22,7 @@ Optional extras for demos and testing: a JSON-lines control server
 values / freeze time / tune chaos at runtime, and
 seeded chaos injection (--chaos) that answers requests hostile. Signals
 mirror the family: SIGHUP re-applies the environment layer
-(CHAOS/MAX_KWP/BATTERY/STRICT/TIME/TIME_SCALE/
+(CHAOS/MAX_KWP/STRICT/TIME/TIME_SCALE/
 LOG_LEVEL, keep-last-good), SIGUSR1 resets the scenario (releases pins
 + write overlay), SIGTERM/SIGINT shut down with a session summary.
 """
@@ -111,7 +111,6 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'scenario': 'custom',
         'chaos': '%.2f' % args.chaos,
         'seed': 'random' if args.seed is None else str(args.seed),
-        'battery': 'on' if args.battery else 'off',
         'battery-state': 'auto',
         'mppt': 'both',
         'grid-voltage': '%g' % args.grid_voltage,
@@ -141,7 +140,6 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'control/socket-group': 'on' if args.control_socket_group else 'off',
         # the startup-only knobs (restart: true) — what `show <knob>` answers
         'host': args.host, 'port': str(args.port), 'unit': str(args.unit),
-        'no-battery': 'on' if not args.battery else 'off',   # the no-battery flag store_falses battery
         'control-log-replies': 'on' if args.control_log_replies else 'off',
         'metrics-listen': args.metrics_listen or 'off',
         'metrics-max-clients': str(args.metrics_max_clients),
@@ -212,7 +210,7 @@ def main():
     profile_text = args.profile or os.environ.get('PROFILE') or 'sun2000'
     profile_path = resolve_profile(profile_text)
     simulator = Simulator(PEAK_RATIO * args.max_kwp * 1000.0, args.static, frozen,
-                          battery=args.battery, battery_kwh=args.battery_kwh,
+                          battery_kwh=args.battery_kwh,
                           profile=load_profile(profile_path), seed=args.seed)
     simulator.set_time_scale(args.time_scale)   # validated above; before any machine reads the clock
     connect_acl = parse_acl(args.connect_acl or os.environ.get('CONNECT_ACL'), 'connect-acl')
@@ -269,11 +267,10 @@ def main():
     if args.dry_run:
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')
-        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %s%s, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, per-ip limit %s, modbus auth %s, profile %s: %s, %d register(s), metrics server %s, control server %s)',
+        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %g kWh, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, per-ip limit %s, modbus auth %s, profile %s: %s, %d register(s), metrics server %s, control server %s)',
                     args.host, args.port, args.unit, PEAK_RATIO * args.max_kwp * 1000.0,
                     mode,
-                    'on' if args.battery else 'off',
-                    ' (%g kWh)' % args.battery_kwh if args.battery else '',
+                    args.battery_kwh,
                     args.strict, args.chaos,
                     args.seed if args.seed is not None else 'random',
                     args.max_clients or 'none',

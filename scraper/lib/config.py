@@ -217,7 +217,6 @@ def resolve_config(args, script_dir=None):
     except ValueError as e:
         raise SystemExit(str(e))
 
-    battery = resolve(args.battery, 'BATTERY', 'battery', False, str_to_bool)
     upstream = resolve(getattr(args, 'upstream', None), 'UPSTREAM', 'upstream',
                        DEFAULTS['upstream'], str)
     host, modbus_port = parse_upstream(upstream or DEFAULTS['upstream'])
@@ -237,7 +236,6 @@ def resolve_config(args, script_dir=None):
         'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
         'max_kwp': resolve(args.max_kwp, 'MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float),
         'max_grid_kw': resolve(args.max_grid_kw, 'MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float),
-        'battery': battery,
         'grid_positive_import': resolve(args.grid_positive_import, 'GRID_POSITIVE_IMPORT',
                                         'grid_positive_import', False, str_to_bool),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),

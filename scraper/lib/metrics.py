@@ -6,7 +6,7 @@ The spec is **sectioned** (docs/TODO.md — the metrics.json sections):
 - `"metrics"` — the metric tree: one entry per metric, the entry's own
   field says what feeds it — `"profile"` names a device-profile register
   (profiles/profiles schema) the metric is read from, `"expr"` derives it
-  per poll (over the declared inputs — pv, grid, batt, soc, battery and
+  per poll (over the declared inputs — pv, grid, batt, soc and
   every profile-bound metric key; an optional `"when"` gates the presence);
   compiled once at startup (lib/expr.py); the exported name is
   `<prefix>_<key>` with `--metric-prefix` (default `huawei`). The
@@ -20,7 +20,7 @@ and is always merged in: the configured spec (`--metrics-spec`, default
 metrics.json — the packaged root; a source checkout passes the flag) carries
 the `metrics` section, its `scraper` entries — when it has any — override
 the built-ins by name. lib/metrics.json also carries the `inputs`
-declaration (the reserved five's wording — every reserved input must be
+declaration (the reserved four's wording — every reserved input must be
 declared there); the configured spec's own "inputs" entries reword it.
 The merge happens in memory at startup; neither file
 is modified. The five classic compute metrics (the pre-expr hardcoded math)
@@ -40,7 +40,7 @@ DEFAULT_PATHS = [os.path.join(ROOT, 'metrics.json')]   # the packaged layout (fl
 # symlinks the root file (gitignored) or passes --metrics-spec explicitly
 # the reserved compute inputs' wiring: the poller's canonical reads — the
 # name an expr/when may reference -> the canonical profile register the
-# poller reads (None = the battery flag, no register). The declarations'
+# poller reads. The declarations'
 # WORDING ships in lib/metrics.json's "inputs" section (merged into every
 # spec); a spec's own "inputs" entries may reword it, never the wiring
 RESERVED_INPUT_REGISTERS = {
@@ -48,17 +48,15 @@ RESERVED_INPUT_REGISTERS = {
     'grid':    'grid-power',
     'batt':    'battery-power',
     'soc':     'battery-soc',
-    'battery': None,
 }
 # the classic five: the eval table's defaults under every spec that doesn't
-# define them (the pre-expr hardcoded math — `when: battery` keeps the
-# charge/discharge pair absent while the battery flag is off)
+# define them (the pre-expr hardcoded math)
 _COMPUTE_DEFAULTS = {
     'grid_export_watts':      ('max(grid, 0.0)',    None),
     'grid_import_watts':      ('max(-grid, 0.0)',   None),
     'home_consumption_watts': ('pv - batt - grid',  None),
-    'battery_charge_watts':   ('max(batt, 0.0)',    'battery'),
-    'battery_discharge_watts': ('max(-batt, 0.0)',  'battery'),
+    'battery_charge_watts':   ('max(batt, 0.0)',    None),
+    'battery_discharge_watts': ('max(-batt, 0.0)',  None),
 }
 
 
@@ -164,9 +162,9 @@ class Metrics:
         # section is the base (every reserved input must be declared there —
         # the wiring's invariant), the configured spec's entries reword it;
         # the profile keys may be declared too. Each entry: {register: the
-        # canonical profile register the poller reads (None = the battery
-        # flag), help: the rendered help} — the report brackets an input
-        # with the metric whose value it carries
+        # canonical profile register the poller reads, help: the rendered
+        # help} — the report brackets an input with the metric whose value
+        # it carries
         register_of = dict(RESERVED_INPUT_REGISTERS)
         register_of.update({key: register for register, key in self.profile_inputs.items()})
         self.inputs = {}
@@ -180,7 +178,7 @@ class Metrics:
                     raise SystemExit('metrics spec %s: the input %r declares no "help" string' % (section_path, iname))
                 if iname not in register_of:
                     raise SystemExit('metrics spec %s: the "inputs" section declares %r, which is not an input '
-                                     '(the inputs are: %s — the reserved five and the spec\'s profile keys)'
+                                     '(the inputs are: %s — the reserved four and the spec\'s profile keys)'
                                      % (section_path, iname, ', '.join(sorted(register_of))))
                 self.inputs[iname] = {'register': register_of[iname], 'help': decl['help']}
         undeclared = sorted(name for name in RESERVED_INPUT_REGISTERS if name not in self.inputs)

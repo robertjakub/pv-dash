@@ -85,7 +85,7 @@ class MetricsServer(_MetricsServer):
             'fake_inverter_power_watts{kind="load"} %g' % st['load_w'],
             'fake_inverter_power_watts{kind="grid"} %g' % st['grid_w'],
             'fake_inverter_power_watts{kind="battery"} %g' % st['batt_w'],
-            '# HELP fake_inverter_soc_percent The battery state of charge (absent with the battery off).',
+            '# HELP fake_inverter_soc_percent The battery state of charge.',
             '# TYPE fake_inverter_soc_percent gauge',
         ]
         if st['soc'] is not None:

@@ -66,7 +66,6 @@ def resolve_config(args, script_dir=None):
                                  else os.path.join(script_dir or '.', config_js))
     prom_prefix = resolve(args.prom_prefix, 'PROM_PREFIX', 'prom_prefix',
                           DEFAULTS['prom_prefix'], str).rstrip('/')
-    battery = resolve(args.battery, 'BATTERY', 'battery', DEFAULTS['battery'], str_to_bool)
 
     cfg = {
         'port': resolve(args.port, 'PORT', 'port', DEFAULT_PORT, int),
@@ -75,7 +74,6 @@ def resolve_config(args, script_dir=None):
         'prom_prefix': prom_prefix,
         'static_dir': static_dir,
         'config_js': config_js,
-        'battery': battery,
         'log_queries': resolve(args.log_queries, None, 'log_queries', DEFAULTS['log_queries'], str_to_bool),
         'log_access': resolve(args.log_access, 'LOG_ACCESS', 'log_access',
                               DEFAULTS['log_access'], str_to_bool),

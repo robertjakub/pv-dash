@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The battery-always-on wave: **`--battery`/`$BATTERY` are gone** (the live
+`modbus/battery` with them) — the battery reads happen on every poll, the
+battery metrics always export (a device profile without the battery
+registers keeps them absent), the `when: battery` gates and the
+`scraper_battery` gauge die (the reserved compute inputs are four now:
+`pv`, `grid`, `batt`, `soc`).
+
 The docs restructure wave: the README re-laid on the family's one skeleton
 and shortened (587 → ~330 lines) — the Nix/NixOS section moved to
 [docs/NIXOS.md](../docs/NIXOS.md) (the README's option list still carried

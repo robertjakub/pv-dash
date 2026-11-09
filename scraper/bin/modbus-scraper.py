@@ -86,12 +86,11 @@ def describe(cfg, args, control_desc):
              (['max-conn-per-ip %d' % cfg['max_conn_per_ip']] if cfg['max_conn_per_ip'] else []) + \
              (['metrics-acl %s' % cfg['metrics_acl']] if cfg['metrics_acl'] not in ('any', '') else [])
     listen_host, listen_port = parse_listen(cfg['listen'])
-    return ('polling %s:%d unit %d (profile %s, %d registers, positive=%s%s, modbus auth %s) every %gs; '
+    return ('polling %s:%d unit %d (profile %s, %d registers, positive=%s, modbus auth %s) every %gs; '
             '%s /metrics on %s:%d (config: %s, log level: %s, log time: %s, log access: %s, auth: %s, '
             'limits: %s, caps: %s, control server: %s, version: %s)' % (
                 cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['profile'], len(cfg['sources']),
                 'import' if cfg['grid_positive_import'] else 'export',
-                ', battery on' if cfg['battery'] else '',
                 cfg['auth'] or 'none',
                 cfg['interval'],
                 'would serve' if args.dry_run else 'serving',

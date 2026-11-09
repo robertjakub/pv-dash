@@ -47,7 +47,7 @@ class BatteryMachine:
         """The simulated day's SoC (used for seeding/reset)."""
         return min(100.0, max(5.0, 50.0 + net_kwh / kwh * 100.0))
 
-    def tick(self, t, pv_w, load_w, kwh, enabled, forced_w=None, max_dt_h=BATT_MAX_TICK_H):
+    def tick(self, t, pv_w, load_w, kwh, forced_w=None, max_dt_h=BATT_MAX_TICK_H):
         """Advance the SoC to simulated time t and return it. forced_w pins the
         power (the control server's battery-state force). Clock jumps integrate
         the effective power (time-lapse); going back in time, or a step wider
@@ -55,7 +55,7 @@ class BatteryMachine:
         it by the time-lapse factor), skips the integration (no free energy, no
         laptop-sleep monsters)."""
         with self._lock:
-            if not enabled or self.soc is None:
+            if self.soc is None:
                 self.last_tick = t
                 return self.soc
             if self.last_tick is None:      # just seeded: start integrating from here

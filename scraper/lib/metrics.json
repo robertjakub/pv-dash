@@ -2,9 +2,8 @@
   "inputs": {
     "pv":       {"help": "PV input power in watts (the sanity-checked, non-negative register read)."},
     "grid":     {"help": "Net grid power in watts (positive = export; the grid-positive-import flip already applied)."},
-    "batt":     {"help": "Net battery power in watts (positive = charging; 0 while the battery flag is off)."},
-    "soc":      {"help": "Battery state of charge in percent (absent while the battery flag is off — an expression naming it exports nothing that poll)."},
-    "battery":  {"help": "The battery flag (1 on, 0 off)."}
+    "batt":     {"help": "Net battery power in watts (positive = charging; 0 when the spec does not bind battery-power)."},
+    "soc":      {"help": "Battery state of charge in percent (absent when the spec does not bind battery-soc — an expression naming it exports nothing that poll)."}
   },
   "metrics": {
     "pv_generation_watts": {"profile": "pv-power",      "help": "Current PV (inverter input) power in watts."},
@@ -13,7 +12,6 @@
     "battery_soc_percent": {"profile": "battery-soc",   "help": "Battery state of charge in percent."}
   },
   "scraper": {
-    "scraper_battery":        {"help": "1 if battery support is enabled (always exported)."},
     "scraper_up":             {"type": "gauge",   "help": "1 if the last Modbus poll of the inverter succeeded."},
     "scraper_modbus_errors_total": {"type": "counter", "help": "Total failed or rejected polls since start."},
     "scraper_last_poll_timestamp_seconds": {"type": "gauge", "help": "Unix time of the last successful poll."},

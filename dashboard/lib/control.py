@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """JSON-lines control server for the dashboard: inspect and steer the running
 server — show connections/version/config, the live settings (the
-connection caps, the log surface, the battery flag), the config reload (the
+connection caps, the log surface), the config reload (the
 SIGHUP path), graceful shutdown. One command per line, one reply line. Every
 request and reply is one JSON object per line (the stdlib json module): the
 request = {"cmd": "<command>"}, the reply =
@@ -285,12 +285,6 @@ class ControlServer(_ControlServer):
             on = val in ('on', 'true', '1', 'yes')
             self.httpd.RequestHandlerClass.log_queries = on
             return 'on' if on else 'off'
-        if key == 'battery':
-            if val not in ('on', 'off', 'true', 'false', '1', '0', 'yes', 'no'):
-                raise ValueError('battery must be on or off')
-            on = val in ('on', 'true', '1', 'yes')
-            self.httpd.RequestHandlerClass.battery = on
-            return 'on' if on else 'off'
         if key == 'metrics/enable':
             from .statics import DEFAULT_METRICS_CAPS
             if val in ('on', 'true', '1', 'yes'):
@@ -482,8 +476,6 @@ class ControlServer(_ControlServer):
             return 'on' if h.log_access else 'off'
         if key == 'log-queries':
             return 'on' if h.log_queries else 'off'
-        if key == 'battery':
-            return 'on' if h.battery else 'off'
         if key == 'metrics/enable':
             return 'on' if self.metrics_srv else 'off'
         if key == 'control/token':
@@ -526,7 +518,6 @@ class ControlServer(_ControlServer):
         secret's current value."""
         h = self.httpd.RequestHandlerClass
         raw = {
-            'battery': 'on' if h.battery else 'off',
             'max-clients': self.httpd.gate.max_total,
             'client-timeout': h.timeout or 0,
             'max-conn-per-ip': self.httpd.gate.max_per_ip,
@@ -592,8 +583,7 @@ class ControlServer(_ControlServer):
             'upstream  %s (%s), proxy %s/*' % (h.upstream, 'ok' if h.upstream_ok else 'DOWN', h.prom_prefix or '/'),
             'listen    %s:%d, control %s' % (self.httpd.server_address[0], self.httpd.server_address[1],
                                              self.describe()),
-            'pages     %s, config.js %s%s' % (h.static_dir, h.config_js,
-                                              ', battery on' if h.battery else ''),
+            'pages     %s, config.js %s' % (h.static_dir, h.config_js),
             'clients   %d active (limit %s, timeout %s, per-ip %s)'
             % (total, self.httpd.gate.max_total or 'none',
                secs(h.timeout) if h.timeout else 'off',

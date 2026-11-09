@@ -720,7 +720,6 @@ class ControlServer(_ControlServer):
             'modbus/auth': cfg.get('auth') or 'none',
             'modbus/timeout': cfg['timeout'],
             'modbus/profile': cfg['profile'],
-            'modbus/battery': 'on' if cfg['battery'] else 'off',
             'modbus/grid-positive-import': 'on' if cfg['grid_positive_import'] else 'off',
             'metrics/interval': cfg['interval'],
             'metrics/filter': cfg['metrics_spec'],
@@ -788,18 +787,13 @@ class ControlServer(_ControlServer):
     def inputs_report(self):
         """The declared compute inputs: one aligned `name  [metric]  help`
         line per input the spec's "inputs" section declares (the reserved
-        five included) — the bracket names the spec's own metric whose
-        value the input carries (pv == the pv-power-bound metric, battery
-        == scraper_battery); a profile-fed input's bracket would name
-        itself, so it ships bare."""
+        four included) — the bracket names the spec's own metric whose
+        value the input carries (pv == the pv-power-bound metric); a
+        profile-fed input's bracket would name itself, so it ships bare."""
         mirrors = self.scraper.spec.profile_inputs     # the canonical register -> the spec key it feeds
         rows = []
         for name, decl in sorted(self.scraper.spec.inputs.items()):
-            register = decl['register']
-            if register is None:
-                mirror = 'scraper_battery' if name == 'battery' else None
-            else:
-                mirror = mirrors.get(register)
+            mirror = mirrors.get(decl['register'])
             rows.append((name, mirror if mirror and mirror != name else None, decl['help']))
         return 'ok inputs\n' + '\n'.join(self._aligned(rows))
 

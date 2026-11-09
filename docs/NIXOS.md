@@ -87,7 +87,6 @@ services.modbus-scraper = {
   upstream = "192.168.1.100:502";  # the inverter's LAN IP (:PORT)
   listenHost = "0.0.0.0";          # only if Prometheus runs on another host
   listenPort = 9350;
-  battery = true;                  # once a battery is installed
 };
 ```
 
@@ -99,7 +98,7 @@ services.modbus-scraper = {
 | `profile` | device-profile JSON path (null = the bundled `sun2000`) |
 | `metricsSpec` / `metricPrefix` | the metrics spec JSON / the profile- and compute-fed metric prefix (`huawei`) |
 | `maxKwp` / `maxGridKw` | the sanity caps in kW (6 / 12) |
-| `battery` / `gridPositiveImport` | battery support / the grid sign convention |
+| `gridPositiveImport` | the grid sign convention |
 | `timeout` / `interval` | Modbus timeout (3 s) / poll interval (10 s) |
 | `listenHost` / `listenPort` | the exporter bind (127.0.0.1 / 9350) |
 | `authToken` / `authTokenFile` | the `/metrics` bearer token — prefer the file (LoadCredential) |
@@ -179,7 +178,6 @@ services.modbus-scraper = {
 | `prometheusUrl` / `promPrefix` | the upstream Prometheus (http://localhost:9090) / the proxy path (`/prom`) |
 | `staticDir` | override the packaged `static/` |
 | `settings` / `configFile` | the SOLAR_CONFIG attrset rendered to the served `config.js` / an explicit config.js instead |
-| `battery` | battery support (the selectors come from `settings.metrics`) |
 | `authToken` / `authTokenFile` | the page's bearer token — mandatory beyond loopback (F21) |
 | `metricsServer` / `metricsListen` / `metricsToken` / `metricsTokenFile` / `metricsAcl` / `metricsMaxClients` / `metricsClientTimeout` / `metricsMaxConnPerIp` | the dashboard's own `/metrics` endpoint (bind 127.0.0.1:9353) |
 | `maxClients` / `clientTimeout` / `maxConnPerIp` | the HTTP caps |

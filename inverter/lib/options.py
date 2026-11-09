@@ -36,9 +36,9 @@ KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'reset', 'clear', 'reload', 'd
 def _load_options():
     """The rows from lib/options.json (next to this loader). A bool knob
     without an explicit default parses as the argparse store_true native
-    (False) unless the row negates one (--no-battery); a value knob
-    defaults to None. Control-only settings (the pins and the machines —
-    a live `set` name, no flag) ride the same rows with their control
+    (False); a value knob defaults to None. Control-only settings (the
+    pins and the machines — a live `set` name, no flag) ride the same
+    rows with their control
     vocabulary. The CLI defaults come from static.json (the same defaults
     block lib/statics.py serves the rest of the tool) — read directly here
     so the module also imports flat (scripts/check_options.py walks lib/
@@ -61,8 +61,7 @@ def _load_options():
                        'log-level': d['log_level'],
                        'grid-voltage': static['grid']['voltage_v'],
                        'grid-frequency': static['grid']['frequency_hz'],
-                       'timezone': 'utc',       # the settings registry's default
-                       'battery': True}         # --no-battery turns it off
+                       'timezone': 'utc'}       # the settings registry's default
     choices = {'log-level': tuple(static['log_levels']), 'timezone': ('utc', 'local')}
     with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
         meta = json.load(f)

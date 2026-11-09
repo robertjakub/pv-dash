@@ -18,7 +18,7 @@ Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP, stdlib
 only). Polls the inverter over Modbus TCP and serves the huawei_* metrics
 the dashboard expects at /metrics in the Prometheus text format: the PV
 generation, the grid exchange (import/export split), the home consumption
-implied by the balance, the battery (optional) and the health gauges
+implied by the balance, the battery and the health gauges
 (scraper_up, the error counter, the last poll age).
 .PP
 Every poll is sanity-checked: a negative PV reading, an array larger than

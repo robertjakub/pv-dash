@@ -19,8 +19,8 @@ energy summary and chart) fed by Prometheus through the bundled
 stdlib-only proxy: the browser loads the static app from the server, the
 app's queries go to \\fB/prom\\fR and are proxied to the upstream
 Prometheus (\\fB--upstream\\fR). The front-end configuration is served as
-/config.js (the SOLAR_CONFIG object; \\fB--battery\\fR injects the battery
-panels).
+/config.js (the SOLAR_CONFIG object; the battery panels are always on
+\\(em battery support is always enabled).
 .PP
 The HTTP surface is the tool's serving surface: the connection caps
 (\\fB--max-clients\\fR total, \\fB--max-conn-per-ip\\fR per peer, extras
@@ -31,8 +31,8 @@ bootstraps the session cookie). The default bind is the loopback.
 .PP
 The JSON-lines control server (\\fB--control-port\\fR, talked to with
 \\fBdashboard-ctl\\fR(1) and \\fBdashboard-cli\\fR(1)) inspects and steers
-the running server: the live settings (the caps, the log surface, the
-battery flag), the config reload, the graceful shutdown. With a control
+the running server: the live settings (the caps, the log surface), the
+config reload, the graceful shutdown. With a control
 token configured the wire is HMAC-signed: every command and reply carries
 the full sha256 of its payload, keyed by the token (common/wiresec.py)
 \\(em a token-holding client verifies both directions, and over TCP the
@@ -56,7 +56,7 @@ The control server speaks JSON lines ({"cmd": "..."} ->
 {"status": "ok|fail|bye", "text": "..."}; TCP requires the token when
 configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: max-clients,
-client-timeout, max-conn-per-ip, log-access, log-queries, battery,
+client-timeout, max-conn-per-ip, log-access, log-queries,
 log-level, metrics acl \\(em the /metrics IP gate at accept, the table
 show \\fBshow metrics acl table\\fR \\(em and the token lives: control token,
 the ops token,

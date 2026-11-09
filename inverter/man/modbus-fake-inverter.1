@@ -76,13 +76,6 @@ so a full simulated day takes 24/N real hours
 .B \-\-static
 constant demo values instead of the day simulation
 .TP
-.B \-\-battery
-simulate a battery (the real capacity story: the SoC machine, the
-\-\-battery\-kwh pack)
-.TP
-.B \-\-no\-battery
-no battery values
-.TP
 .BI \-\-battery\-kwh " N"
 usable battery capacity in kWhs)
 .TP
@@ -281,7 +274,7 @@ The control server speaks JSON lines
 TCP requires the token when configured). Commands: \fBset\fR/\fBunset\fR/
 \fBshow\fR/\fBhelp\fR (the settings: pv, load, batt, grid, grid-voltage,
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
-scenario, chaos, seed, battery, battery-state, strict, static, max-kwp,
+scenario, chaos, seed, battery-state, strict, static, max-kwp,
 battery-kwh, max-clients, client-timeout, max-conn-per-ip,
 metrics enable, metrics acl, register, coil, discrete, profile,
 log-level, modbus auth (the suite
@@ -341,7 +334,7 @@ the unix control socket is 0600, or 0660 with
 
 .SH ENVIRONMENT
 .TP
-.B CHAOS ", " MAX_KWP ", " PROFILE ", " BATTERY ,
+.B CHAOS ", " MAX_KWP ", " PROFILE ,
 .B STRICT ", " TIME ", " TIME_SCALE ", " LOG_LEVEL
 the SIGHUP-reloadable layer.
 .TP

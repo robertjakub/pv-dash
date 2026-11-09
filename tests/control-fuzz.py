@@ -97,7 +97,7 @@ def authed_roundtrip(port, token, cmd, timeout=5.0):
 def main():
     procs = []
     try:
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15960',
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15960',
                                        '--control-port', '15961'],
                                       stdout=open('/tmp/ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
         time.sleep(0.9)

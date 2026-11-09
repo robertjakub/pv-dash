@@ -47,12 +47,11 @@ settings without binding the port or contacting the inverter. Exit codes:
 |---|---|
 | `huawei_pv_generation_watts` | PV (inverter input) power |
 | `huawei_grid_export_watts` / `huawei_grid_import_watts` | power exported to / imported from the grid (≥ 0) |
-| `huawei_home_consumption_watts` | home load, derived as `PV − net grid` (− battery when enabled) |
+| `huawei_home_consumption_watts` | home load, derived as `PV − battery − net grid` |
 | `huawei_grid_net_watts` | signed net grid power (debugging aid) |
-| `huawei_battery_net_watts` | signed battery power, +charge/−discharge (`--battery` only) |
-| `huawei_battery_charge_watts` / `huawei_battery_discharge_watts` | the split, ≥ 0, for stacked graphs (`--battery` only) |
-| `huawei_battery_soc_percent` | battery state of charge (`--battery` only) |
-| `scraper_battery` | 1 if battery support is enabled (always exported); the dashboard treats 0 / missing as "no battery" |
+| `huawei_battery_net_watts` | signed battery power, +charge/−discharge |
+| `huawei_battery_charge_watts` / `huawei_battery_discharge_watts` | the split, ≥ 0, for stacked graphs |
+| `huawei_battery_soc_percent` | battery state of charge |
 | `scraper_up` / `scraper_modbus_errors_total` / `scraper_last_poll_timestamp_seconds` | poller health |
 | `scraper_poll_duration_seconds` / `_mean` / `_max` | the last poll cycle's duration and its running mean/maximum |
 | `scraper_cache_device_up` / `scraper_cache_age_seconds` / `scraper_cache_uptime_seconds` | modbus-cache diagnostics, **auto-detected**: exported only when the polled endpoint serves the cache's diag block. `device_up 0` / a growing age mean the device is down **behind the cache** |
@@ -114,17 +113,16 @@ and the exported metrics.
 ```
 ok inputs
 batt     [battery_net_watts]    Net battery power in watts (positive …
-battery  [scraper_battery]      The battery flag (1 on, 0 off).
 pv       [pv_generation_watts]  PV input power in watts (the …
 ```
 
 ## Battery
 
-Enable with `--battery` (env `BATTERY`, config `set modbus battery true`).
-The energy balance gains a battery term:
+The energy balance always carries the battery term (battery support is
+always on — the flag retired):
 
 ```
-home = pv − batt − grid      (without battery: home = pv − grid)
+home = pv − batt − grid
 ```
 
 Battery registers (defaults follow the same Huawei convention as the PV
@@ -134,10 +132,10 @@ charging**), **37004** state of charge (U16, percent×10). Charging midday
 surplus reduces the home value; evening discharge covers the home load even
 with PV at 0. The consistency checks adapt: exported power may exceed the
 PV cap by the battery discharge (a battery feeding the grid is
-legitimate), and a derived `home < 0` is rejected as inconsistent. The
-battery metrics are only exported when battery support is enabled. The
-fake inverter can emulate the battery for testing:
-`python3 inverter/bin/modbus-fake-inverter.py --battery`.
+legitimate), and a derived `home < 0` is rejected as inconsistent. A
+device profile without the battery registers keeps the battery metrics
+absent. The fake inverter emulates the battery for testing:
+`python3 inverter/bin/modbus-fake-inverter.py`.
 
 ## Configuration
 
@@ -148,7 +146,7 @@ Settings are resolved in this order (first hit wins), mirroring
 2. Environment variables — the same names, bare (no tool prefix):
    `CONFIG`, `METRICS_SPEC`, `UPSTREAM`, `MODBUS_UNIT`, `MODBUS_OFFSET`,
    `TIMEOUT`, `PROFILE`, `METRIC_PREFIX`, `MAX_KWP`, `MAX_GRID_KW`,
-   `BATTERY`, `GRID_POSITIVE_IMPORT`, `LISTEN`, `INTERVAL`, `LOCAL_TIME`,
+   `GRID_POSITIVE_IMPORT`, `LISTEN`, `INTERVAL`, `LOCAL_TIME`,
    `LOG_ACCESS`, `LOG_LEVEL`, `AUTH_TOKEN`, `MAX_CLIENTS`,
    `CLIENT_TIMEOUT`
 3. Config file — the set-grammar script (`set <name> <value>` lines) —
@@ -184,7 +182,6 @@ set log-level INFO
 | `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
 | `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
 | `--max-kwp` / `--max-grid-kw` | `6` / `12` | the sanity caps in kW: above the cap → HTTP 503 + error log; `0` = off |
-| `--battery` | off | enable battery support (see [Battery](#battery)) |
 | `--grid-positive-import` | off | grid register positive means import |
 | `--timeout` / `--interval` | `3` / `10` | Modbus timeout, seconds / seconds between Modbus polls |
 | `--listen` | `127.0.0.1:9350` | exporter bind address `HOST:PORT` (loopback by default; beyond loopback `--auth-token` is mandatory, F13) |
@@ -222,7 +219,7 @@ in flags:
 
 | Signal | Effect |
 |---|---|
-| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, caps, the device profile, battery flag, auth token (+ file re-read = rotation), client limits, the Modbus auth scheme/key and the upstream take effect immediately. An invalid value keeps the previous settings. The listen address, log level and `metrics.json` need a restart. |
+| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, caps, the device profile, auth token (+ file re-read = rotation), client limits, the Modbus auth scheme/key and the upstream take effect immediately. An invalid value keeps the previous settings. The listen address, log level and `metrics.json` need a restart. |
 | `SIGTERM` / `SIGINT` | **Graceful shutdown** with a session summary (duration + poll-error count). |
 
 ### The control server
@@ -300,7 +297,7 @@ ports and cleans up after itself:
 
 ```bash
 python3 tests/scrape-regtest.py   # the functional battery (values, export/import
-                                  #   split, battery on/off, caps 503 + recovery,
+                                  #   split, caps 503 + recovery,
                                   #   auth + token rotation, limits, diagnostics,
                                   #   SIGHUP, inverter death, hostile-inverter
                                   #   phase, dry-run exit codes — plus the fake's

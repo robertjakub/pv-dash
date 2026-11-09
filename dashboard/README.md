@@ -26,11 +26,12 @@ packaging overview live in the [suite root](../README.md).
   hourly (day view), daily (month view), monthly (year view), per-year for
   "All time", plus an hourly detailed export for a whole month. ISO 8601
   timestamps.
-- **Battery (optional, experimental)** — `battery: true` in `config.js`
+- **Battery** — `battery: true` in `config.js`
   joins a Battery node to the flow diagram (teal particles: up =
   discharging, down = charging, a SoC % line), splits the energy three-way
-  (PV / battery / grid) and adds the CSV columns. When `scraper_battery`
-  is `0` or missing, the node dims and a warning banner appears.
+  (PV / battery / grid) and adds the CSV columns. Without a working
+  battery selector (missing metric or a constant `0`), the node dims and a
+  warning banner appears.
   **Untested against real hardware** — verified only against simulated
   data so far.
 - **Theme** (dark / light / system) and **language** (EN / PL; add a
@@ -79,15 +80,14 @@ defaults):
 ```js
 const SOLAR_CONFIG = {
   prometheusUrl: '/prom',
-  battery: false,
+  battery: true,
   metrics: {
     pv: 'huawei_pv_generation_watts{job="sun2000"}',
     gridExport: 'huawei_grid_export_watts{job="sun2000"}',
     gridImport: 'huawei_grid_import_watts{job="sun2000"}',
     load: 'huawei_home_consumption_watts{job="sun2000"}',
     battery: 'huawei_battery_net_watts{job="sun2000"}',
-    batterySoC: 'huawei_battery_soc_percent{job="sun2000"}',
-    batteryFlag: 'scraper_battery{job="sun2000"}'
+    batterySoC: 'huawei_battery_soc_percent{job="sun2000"}'
   },
   scrapeSec: 10,
   smoothMin: 30,
@@ -101,7 +101,7 @@ const SOLAR_CONFIG = {
 |---|---|
 | `prometheusUrl` | `/prom` (the same-origin proxy) or a direct Prometheus URL |
 | `metrics` | the full metric selectors — label matchers are passed through to PromQL; values always in **watts**. `gridExport` = export power (≥ 0); with `gridImport` set, the net grid value is `export − import` |
-| `battery` | the master switch (the selectors: `metrics.battery` signed W / `metrics.batterySoC` % / `metrics.batteryFlag`) |
+| `battery` | the battery panels' master switch (the selectors: `metrics.battery` signed W / `metrics.batterySoC` %; an optional `metrics.batteryFlag` present-flag for exporters that have one) |
 | `scrapeSec` | the Prometheus scrape interval in seconds (bucket size) |
 | `smoothMin` | display smoothing window in minutes (0 = raw) |
 | `refreshSec` | the default auto-refresh interval (the header combo overrides; 0 = off) |
@@ -118,7 +118,7 @@ defaults.
 
 The server's settings resolve CLI > env > `server.conf` > defaults — the
 env twins are the knobs' bare upper-snake names (`PORT`, `BIND`,
-`PROM_URL`, `PROM_PREFIX`, `STATIC_DIR`, `CONFIG_JS`, `BATTERY`,
+`PROM_URL`, `PROM_PREFIX`, `STATIC_DIR`, `CONFIG_JS`,
 `AUTH_TOKEN`, the caps, `LOG_ACCESS`, `CTL`, `CONTROL_TOKEN`, …). The
 `server.conf` sample speaks the set grammar (every line a `set <name>
 <value>`):
@@ -145,7 +145,6 @@ control server.
 | `--prom-prefix` | `/prom` | the proxy path (empty = proxy everything) |
 | `--static-dir` | the packaged `static/` | override the served static directory |
 | `--config-js` | the bundled example | the served config.js path (`CONFIG_JS`) |
-| `--battery` | off | battery support (the selectors come from `config.js`) |
 | `--auth-token` | off | the page's bearer token (the `?auth=` bootstrap sets the cookie); `file:<path>` welcome |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (a total cap / the idle kick / the per-IP cap) |
 | `--metrics-server` / `--metrics-listen` | off / `127.0.0.1:9353` | the dashboard's own `/metrics` endpoint (a token is mandatory when it is on — F13) |
@@ -175,13 +174,13 @@ entries carry `role=ops`/`role=admin`).
 python3 bin/dashboard.py --control-port /tmp/dashboard-8080.socket &
 python3 bin/dashboard-ctl.py show upstream          # one-shot
 python3 bin/dashboard-ctl.py request reload-config  # the SIGHUP path
-printf 'set battery on\nshow battery\n' | python3 bin/dashboard-ctl.py
+printf 'set log-queries on\nshow config\n' | python3 bin/dashboard-ctl.py
 python3 bin/dashboard-cli.py                        # the console: TAB completion, ?, reconnect
 ```
 
 | Command | Effect |
 |---|---|
-| `set` / `unset` | the live settings: the caps, `log-access`, `log-queries`, `battery`, `log-level`, the tokens (`control token`, `control ops token`, `metrics token` rotate live; a value never renders back), `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` |
+| `set` / `unset` | the live settings: the caps, `log-access`, `log-queries`, `log-level`, the tokens (`control token`, `control ops token`, `metrics token` rotate live; a value never renders back), `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` |
 | `show <setting>` / `show knobs` / `show connections` | the value / the registry / the live HTTP clients per peer IP |
 | `inspect` | the one-page dump for a bug report |
 | `request reload-config` | re-read `server.conf` (the SIGHUP path; the listen address and port are bound and stay) |

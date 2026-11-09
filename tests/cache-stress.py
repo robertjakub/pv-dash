@@ -48,7 +48,7 @@ def check(name, cond, detail=''):
 
 
 try:
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(PORT),
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--port', str(PORT),
                                    '--allow-write'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, preexec_fn=raise_fds))
     time.sleep(0.7)

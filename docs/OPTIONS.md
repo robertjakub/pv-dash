@@ -35,7 +35,6 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `auth-upstream` |  | `set modbus auth-upstream` | ✓ live |  |  |  |
 | k | `auth-upstream-key` |  | `set modbus auth-upstream-key` | ✓ live+secret |  |  |  |
 | c | `batt` |  | `set batt` |  |  | ✓ live |  |
-| k | `battery` |  | `set battery`, `set modbus battery` |  | ✓ live | ✓ live | ✓ live |
 | k | `battery-kwh` |  | `set battery-kwh` |  |  | ✓ live |  |
 | c | `battery-state` |  | `set battery-state` |  |  | ✓ live |  |
 | k | `bind` |  | *(startup-only)* |  |  |  | ✓ |
@@ -105,7 +104,6 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `modbus-unit` |  | `set modbus unit` |  | ✓ live |  |  |
 | c | `mppt` |  | `set mppt` |  |  | ✓ live |  |
 | k | `no-audit-log` |  | `set audit disable` | **✓** live | **✓** live | **✓** | **✓** |
-| k | `no-battery` |  | *(startup-only)* |  |  | ✓ |  |
 | k | `port` |  | *(startup-only)* |  |  | ✓ | ✓ |
 | k | `profile` |  | `set modbus profile`, `set profile` | ✓ live | ✓ live | ✓ live |  |
 | k | `prom-prefix` |  | *(startup-only)* |  |  |  | ✓ |

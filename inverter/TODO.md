@@ -5,6 +5,12 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The battery-always-on wave: **`--battery`/`--no-battery`/`$BATTERY` are
+gone** — the battery state machine runs unconditionally (the live `set
+battery` toggle and the SIGHUP `BATTERY` reload block with it), the
+37001+ register block and the SoC/soc_percent surfaces always serve;
+`--battery-kwh` (the pack size) stays.
+
 The docs restructure wave: the README re-laid on the family's one skeleton
 and shortened (608 → ~330 lines) — the state machines' prose tightened,
 the flags table's wall-cells trimmed; the Nix section moved to

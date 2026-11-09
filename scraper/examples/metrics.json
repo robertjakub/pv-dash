@@ -13,7 +13,7 @@
     "grid_export_watts":      {"expr": "max(grid, 0.0)",    "help": "Current power exported to the grid in watts (>= 0)."},
     "grid_import_watts":      {"expr": "max(-grid, 0.0)",   "help": "Current power imported from the grid in watts (>= 0)."},
     "home_consumption_watts": {"expr": "pv - batt - grid",  "help": "Home consumption in watts (PV input minus battery power minus net grid power)."},
-    "battery_charge_watts":   {"expr": "max(batt, 0.0)",    "when": "battery", "help": "Battery charging power in watts (0 when not charging)."},
-    "battery_discharge_watts": {"expr": "max(-batt, 0.0)",  "when": "battery", "help": "Battery discharging power in watts (0 when not discharging)."}
+    "battery_charge_watts":   {"expr": "max(batt, 0.0)",    "help": "Battery charging power in watts (0 when not charging)."},
+    "battery_discharge_watts": {"expr": "max(-batt, 0.0)",  "help": "Battery discharging power in watts (0 when not discharging)."}
   }
 }

@@ -66,7 +66,7 @@ The control server speaks JSON lines
 TCP requires the token when configured). Commands: \\fBset\\fR/\\fBunset\\fR/
 \\fBshow\\fR/\\fBhelp\\fR (the settings: pv, load, batt, grid, grid-voltage,
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
-scenario, chaos, seed, battery, battery-state, strict, static, max-kwp,
+scenario, chaos, seed, battery-state, strict, static, max-kwp,
 battery-kwh, max-clients, client-timeout, max-conn-per-ip,
 metrics enable, metrics acl, register, coil, discrete, profile,
 log-level, modbus auth (the suite
@@ -124,7 +124,7 @@ the unix control socket is 0600, or 0660 with
 \\fB--control-socket-group\\fR (a local group shares it)."""
     environment = """.SH ENVIRONMENT
 .TP
-.B CHAOS ", " MAX_KWP ", " PROFILE ", " BATTERY ,
+.B CHAOS ", " MAX_KWP ", " PROFILE ,
 .B STRICT ", " TIME ", " TIME_SCALE ", " LOG_LEVEL
 the SIGHUP-reloadable layer.
 .TP
@@ -199,8 +199,7 @@ command-line misuse."""
 def cli_page(parser):
     description = """\
 An interactive console on the \\fBmodbus-fake-inverter\\fR JSON-lines
-control server: on connect it probes the fake and greets you with the
-profile, the uptime, the clock and the battery state; the prompt shows the
+control server; the prompt shows the
 connected port (\\fBfake-inverter:5502 >\\fR). TAB completes commands,
 settings and their values (the listings group the settings under the
 registry's own groups \\(em ungrouped rows render bare, no header \\(em, with

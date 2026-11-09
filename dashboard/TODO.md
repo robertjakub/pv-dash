@@ -5,6 +5,12 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The battery-always-on wave: **`--battery`/`$BATTERY` are gone** (the live
+`battery` with them) — the served `config.js` always carries the battery
+panels (the injection is unconditional now), and the dashboard UI
+redesign (the front end's batteryEnabled gate) is the open
+[docs/TODO.md](../docs/TODO.md) item.
+
 The docs restructure wave: the README re-laid on the family's one skeleton
 and shortened (404 → ~300 lines) — the Files table folded into the Source
 layout, the Control wall became the command table; the NixOS section

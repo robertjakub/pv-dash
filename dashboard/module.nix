@@ -28,7 +28,6 @@ let
       "--max-conn-per-ip ${toString cfg.maxConnPerIp}"
     ]
     ++ lib.optional (cfg.staticDir != null) "--static-dir ${cfg.staticDir}"
-    ++ lib.optional cfg.battery "--battery"
     ++ lib.optional cfg.logAccess "--log-access"
     ++ lib.optionals cfg.noAuditLog [ "--no-audit-log" ]
     ++ lib.optionals (cfg.auditLog != null) [
@@ -113,12 +112,6 @@ in
       type = lib.types.nullOr lib.types.path;
       default = null;
       description = "Override the packaged static/ directory (e.g. custom index.html).";
-    };
-
-    battery = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = "Battery support (experimental, untested against real hardware).";
     };
 
     settings = lib.mkOption {

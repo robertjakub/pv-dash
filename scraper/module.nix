@@ -26,7 +26,6 @@ let
     (setLine "timeout" (toString cfg.timeout))
     (setLine "max-kwp" (toString cfg.maxKwp))
     (setLine "max-grid-kw" (toString cfg.maxGridKw))
-    (setLine "battery" (lib.boolToString cfg.battery))
     (setLine "grid-positive-import" (lib.boolToString cfg.gridPositiveImport))
     ""
     "# --- what the tool serves and where ---"
@@ -130,12 +129,6 @@ in
         The shared key the suite handshake proves (min 16 characters).
         Needs auth = "suite".
       '';
-    };
-
-    battery = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = "Battery support (experimental, untested against real hardware).";
     };
 
     maxKwp = lib.mkOption {

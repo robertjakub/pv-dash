@@ -74,10 +74,6 @@ class SignalBox:
             if v:
                 plan.append(('peak=%gW' % (0.75 * float(v) * 1000.0),
                              lambda v=float(v): setattr(self.simulator, 'peak_w', 0.75 * v * 1000.0)))
-            v = env.get('BATTERY')
-            if v:
-                flag = v.strip().lower() in ('1', 'true', 'yes', 'on')
-                plan.append(('battery=%s' % flag, lambda: setattr(self.simulator, 'battery', flag)))
             v = env.get('STRICT')
             if v:
                 flag = v.strip().lower() in ('1', 'true', 'yes', 'on')

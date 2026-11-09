@@ -89,7 +89,6 @@ class Handler(BaseHTTPRequestHandler):
     static_dir = next_to_script('static')
     config_js = next_to_script('config.js')
     prom_prefix = None
-    battery = False
     upstream_ok = True
     _upstream_lock = threading.Lock()
     status_counts = {'2xx': 0, '4xx': 0, '5xx': 0, 'prom': 0}   # the /metrics counters
@@ -232,7 +231,7 @@ class Handler(BaseHTTPRequestHandler):
             path = '/index.html'
         name = path.lstrip('/')
         if name == 'config.js' and self.config_js and os.path.isfile(self.config_js):
-            self.serve_file(self.config_js, inject_battery=self.battery)
+            self.serve_file(self.config_js, inject_battery=True)
             return
         fpath = os.path.realpath(os.path.join(self.static_dir, path.lstrip('/')))
         base = os.path.realpath(self.static_dir)
@@ -245,6 +244,10 @@ class Handler(BaseHTTPRequestHandler):
         self.serve_file(fpath)
 
     def serve_file(self, fpath, inject_battery=False):
+        """Serve one file; config.js always rides with the battery panels
+        enabled — `battery: true` injected when the file does not already
+        spell it (battery support is always on, the --battery knob
+        retired)."""
         try:
             ctype = mimetypes.guess_type(fpath)[0] or 'application/octet-stream'
             with open(fpath, 'rb') as f:
@@ -302,7 +305,7 @@ def describe(cfg, args, control_desc):
              (['client-timeout %gs' % cfg['client_timeout']] if cfg['client_timeout'] else []) + \
              (['max-conn-per-ip %d' % cfg['max_conn_per_ip']] if cfg['max_conn_per_ip'] else [])
     return ('serving %s on http://%s:%d (proxy: %s/* -> %s, config.js: %s, page auth: %s, log level: %s, log time: %s, '
-            'log access: %s, log queries: %s%s, limits: %s, control server: %s, %s, version: %s)' % (
+            'log access: %s, log queries: %s, limits: %s, control server: %s, %s, version: %s)' % (
                 cfg['static_dir'], cfg['bind'], cfg['port'], cfg['prom_prefix'] or '/', cfg['upstream'],
                 cfg['config_js'],
                 'bearer token' if cfg['auth_token'] else 'none (the loopback bind is the auth)',
@@ -310,7 +313,6 @@ def describe(cfg, args, control_desc):
                 'local' if cfg['local_time'] else 'UTC',
                 'on' if cfg['log_access'] else 'off',
                 'on' if cfg['log_queries'] else 'off',
-                ', battery enabled' if cfg['battery'] else '',
                 ', '.join(limits) if limits else 'off',
                 control_desc,
                 ('metrics: %s' % args.metrics_desc) if getattr(args, 'metrics_desc', 'off') != 'off' else 'metrics: off',
@@ -417,7 +419,6 @@ def main():
     Handler.static_dir = cfg['static_dir']
     Handler.config_js = cfg['config_js']
     Handler.prom_prefix = cfg['prom_prefix']
-    Handler.battery = cfg['battery']
     Handler.auth_token = cfg['auth_token']
     Handler.timeout = cfg['client_timeout'] or None
     args.metrics_desc = metrics_desc
@@ -450,7 +451,6 @@ def main():
             'max-conn-per-ip': str(cfg['max_conn_per_ip']),
             'log-access': 'on' if cfg['log_access'] else 'off',
             'log-queries': 'on' if cfg['log_queries'] else 'off',
-            'battery': 'on' if cfg['battery'] else 'off',
             'log-level': cfg['level'],
             # the startup-only knobs (restart: true) — what `show <knob>` answers
             'port': str(cfg['port']),
@@ -531,7 +531,6 @@ def main():
         Handler.static_dir = new_cfg['static_dir']
         Handler.config_js = new_cfg['config_js']
         Handler.prom_prefix = new_cfg['prom_prefix']
-        Handler.battery = new_cfg['battery']
         Handler.timeout = new_cfg['client_timeout'] or None
         httpd.gate.max_total = new_cfg['max_clients']
         httpd.gate.max_per_ip = new_cfg['max_conn_per_ip']
@@ -539,9 +538,8 @@ def main():
         if control:
             control.clear_overrides()   # the config won: nothing is live-overridden
         if audit:
-            audit.event('RELOAD', 'upstream %s, battery %s' % (new_cfg['upstream'],
-                                                               'on' if new_cfg['battery'] else 'off'))
-        return 'upstream %s, battery %s' % (new_cfg['upstream'], 'on' if new_cfg['battery'] else 'off')
+            audit.event('RELOAD', 'upstream %s' % new_cfg['upstream'])
+        return 'upstream %s' % new_cfg['upstream']
 
     if control:
         control.reloader = apply_reload   # the control server's `request reload-config` runs the same path

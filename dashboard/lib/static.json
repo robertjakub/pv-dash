@@ -10,7 +10,6 @@
     "proxy_timeout_s": 30,
     "log_level": "INFO",
     "log_queries": false,
-    "battery": false,
     "log_access": false,
     "max_clients": 64,
     "client_timeout_s": 300.0,

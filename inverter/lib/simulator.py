@@ -33,12 +33,11 @@ def format_clock(t):
 
 
 class Simulator:
-    def __init__(self, peak_w, static, frozen_time, battery=False, battery_kwh=DEFAULT_BATTERY_KWH,
+    def __init__(self, peak_w, static, frozen_time, battery_kwh=DEFAULT_BATTERY_KWH,
                  profile=None, seed=None):
         self.peak_w = peak_w
         self.static = static
         self.frozen_time = frozen_time
-        self.battery = battery
         self.battery_kwh = battery_kwh
         self._lock = threading.Lock()
         self._overrides = {k: None for k in OVERRIDE_KEYS}
@@ -318,8 +317,6 @@ class Simulator:
 
     def batt(self, t):
         """The simulated day's battery plan (drives the day energy counters)."""
-        if not self.battery:
-            return 0.0
         surplus = self.pv(t) - self.home(t)
         if SUNRISE < t < SUNSET and surplus > BATT_GRID_MARGIN_W:
             return min(surplus - BATT_GRID_MARGIN_W, BATT_MAX_W)
@@ -329,8 +326,6 @@ class Simulator:
 
     def curve_soc(self, t):
         """The simulated day's SoC at time t (seeding/reset anchor)."""
-        if not self.battery:
-            return None
         net_kwh = self.integrate_kwh(self.batt, 0.0, t)
         return BatteryMachine.curve_soc(net_kwh, self.battery_kwh)
 
@@ -370,15 +365,14 @@ class Simulator:
             # re-balances the battery instead
             batt = ov['batt'] if ov['batt'] is not None else (
                 self._batt_clamp(self._forced_batt(1200.0 if ov['grid'] is None
-                                                   else self._grid_balanced(pv, load, ov)), t)
-                if self.battery else 0.0)
-            soc = ov['soc'] if ov['soc'] is not None else (65.0 if self.battery else None)
+                                                   else self._grid_balanced(pv, load, ov)), t))
+            soc = ov['soc'] if ov['soc'] is not None else 65.0
         else:
             pv = ov['pv'] if ov['pv'] is not None else self.pv(t) * (1.0 - cloud)
             load = ov['load'] if ov['load'] is not None else self.home(t)
             soc = ov['soc'] if ov['soc'] is not None else self._tick_soc(t, pv, load, ov, hold=outage)
             batt = ov['batt'] if ov['batt'] is not None else (
-                0.0 if not self.battery or soc is None else
+                0.0 if soc is None else
                 self._batt_clamp(self._forced_batt(self._grid_balanced(pv, load, ov, soc)), t))
         if outage:
             # the grid is down: the inverter is standby — no harvest, no
@@ -437,7 +431,7 @@ class Simulator:
         hold = the grid outage: the battery stands by (0 W; the self-discharge
         keeps ticking)."""
         m = self.batt_machine
-        if m.soc is None and self.battery:
+        if m.soc is None:
             m.seed(self.curve_soc(t))
         forced = None
         if hold:
@@ -452,13 +446,13 @@ class Simulator:
             forced = self._batt_clamp(forced, t)
         # the laptop-sleep guard stays on REAL time: the time-lapse factor
         # widens the allowed virtual step (24 h at x1, 24 h × N at xN)
-        return m.tick(t, pv_w, load_w, self.battery_kwh, self.battery, forced,
+        return m.tick(t, pv_w, load_w, self.battery_kwh, forced,
                       max_dt_h=BATT_MAX_TICK_H * self.time_scale)
 
     def values(self):
         """Named physical values for the current tick — the profile decides
-        which register (and encoding) each one lands on; a None value (e.g.
-        the battery block with --battery off) is simply not served."""
+        which register (and encoding) each one lands on; a None value is
+        simply not served."""
         pv_w, home_w, batt_w, soc, _cloud, ov = self.effective()
         t = self.clock()
         outage = self._outage(t)       # dt = 0 while effective() just ticked: dedup
@@ -527,11 +521,10 @@ class Simulator:
             'meter-import': METER_IMPORT_KWH + import_day,
             'meter-power-a': grid_w / 3.0, 'meter-power-b': grid_w / 3.0, 'meter-power-c': grid_w / 3.0,
         }
-        if self.battery:
-            v.update({'battery-power': batt_w, 'battery-efficiency': 0.0,
-                      'battery-soc': soc, 'battery-soc-reserve': soc,
-                      'battery-charge-total': charge_t, 'battery-discharge-total': discharge_t,
-                      'battery-charge-today': charge_d, 'battery-discharge-today': discharge_d})
+        v.update({'battery-power': batt_w, 'battery-efficiency': 0.0,
+                  'battery-soc': soc, 'battery-soc-reserve': soc,
+                  'battery-charge-total': charge_t, 'battery-discharge-total': discharge_t,
+                  'battery-charge-today': charge_d, 'battery-discharge-today': discharge_d})
         if outage:
             # the grid is down: no flow, no measurement — the phases collapse,
             # the inverter stands by (the strings keep their open-circuit

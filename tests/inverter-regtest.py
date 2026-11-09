@@ -958,7 +958,7 @@ def main():
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
         check("node walk: the bare show mimics the ? output (the walk's first position)",
-              words == ['batt', 'battery', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
+              words == ['batt', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
                         'connect-acl', 'connections', 'control', 'dump', 'grid', 'grid-frequency', 'grid-outage',
                         'grid-voltage', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
                         'metrics', 'modbus', 'mppt', 'profile', 'pv', 'registers', 'scenario', 'seed',

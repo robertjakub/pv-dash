@@ -223,9 +223,6 @@ class ControlServer(_ControlServer):
                 return 'random'
             chaos.reseed(int(val))
             return str(int(val))
-        if key == 'battery':
-            sim.battery = val in ('on', 'true', '1', 'yes')
-            return 'on' if sim.battery else 'off'
         if key == 'mppt':
             if val not in ('both', 'east', 'west', 'none'):
                 raise ValueError('mppt must be both|east|west|none')
@@ -234,8 +231,6 @@ class ControlServer(_ControlServer):
         if key == 'battery-state':
             if val not in ('auto', 'charging', 'discharging'):
                 raise ValueError('battery-state must be auto|charging|discharging')
-            if val != 'auto' and not sim.battery:
-                raise ValueError('battery-state needs the battery on (set battery on)')
             sim.batt_state = None if val == 'auto' else val
             return val
         if key == 'grid-voltage':
@@ -544,8 +539,6 @@ class ControlServer(_ControlServer):
             return '%.2f' % chaos.p
         if key == 'seed':
             return 'random' if chaos.seed is None else str(chaos.seed)
-        if key == 'battery':
-            return 'on' if sim.battery else 'off'
         if key == 'mppt':
             return sim.mppt
         if key == 'battery-state':
@@ -723,8 +716,7 @@ class ControlServer(_ControlServer):
                 if not entries:
                     return 'ok registers: (the profile has no registers)'
                 # name | register | type | current value (NaN = the profile
-                # maps a value the simulator is not calculating right now,
-                # e.g. the battery block with the battery off)
+                # maps a value the simulator is not calculating right now)
                 vals = self.simulator.values()
                 overlay = dict(self.fake.overlay) if self.fake else {}
                 rows = []
@@ -850,8 +842,7 @@ class ControlServer(_ControlServer):
             'power     pv %g W, load %g W, grid %g W' % (pv_w, load_w,
                 0.0 if sim.outage_active() else pv_w - batt_w - load_w),
             'battery   %s' % ('%g W, SoC %s, state %s' % (batt_w,
-                '%.1f %%' % soc if soc is not None else 'n/a', sim.batt_state or 'auto')
-                if sim.battery else 'off'),
+                '%.1f %%' % soc if soc is not None else 'n/a', sim.batt_state or 'auto')),
             'mppt      %s (string-1 = the east array, string-2 = the west)' % sim.mppt,
             'cloud     %s' % sim.cloud_display(),
             'grid      %g V nominal, %g Hz nominal; machines: %s V/phase, %.2f Hz now; outage %s'
@@ -913,7 +904,6 @@ class ControlServer(_ControlServer):
                     else '%02d:%02d' % (int(sim.frozen_time), round((sim.frozen_time % 1.0) * 60)),
             'time-scale': '%g' % sim.time_scale,
             'static': 'on' if sim.static else 'off',
-            'battery': 'on' if sim.battery else 'off',
             'battery-state': sim.batt_state or 'auto',
             'battery-kwh': '%g' % sim.battery_kwh,
             'strict': 'on' if fake.strict else 'off',

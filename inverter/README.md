@@ -41,7 +41,7 @@ hours and moving the clock (`set time 18:00`) acts as time-lapse control.
   double-shouldered day. `set mppt both|east|west|none` enables the
   strings; a dark string serves 0 V/0 A. The cloud factor scales the sun
   in real time; the day yield integrates the actual string curve.
-- **Battery** (on by default, `--no-battery` opts out) — charges from the
+- **Battery** (always on) — charges from the
   PV surplus (300 W grid margin, max ±2500 W), covers the home deficit by
   discharging, stops at 100 % full / the 10 % reserve floor. The SoC is
   **stateful**: it integrates the effective power with the simulated
@@ -50,7 +50,7 @@ hours and moving the clock (`set time 18:00`) acts as time-lapse control.
   temperature-derated (below 0 °C half power, below 10 °C 80 %, above
   40 °C 90 %, above 50 °C 70 %). `set soc <pct>` seeds the machine, `set
   battery-state charging|discharging` forces it, `auto`/`unset` hands the
-  decision back.
+  decision back; `--battery-kwh` sizes the pack.
 - **Grid setpoint** — `set grid <W>` pins the grid line: the battery
   balances to hold it (`set grid 0` = zero-export home); `auto` returns to
   the plain pv − battery − home balance.
@@ -94,7 +94,7 @@ the configured map.
 - **32089** — device status (512 on-grid / 40960 standby at night)
 - **32087** — temperature (I16, °C×10); **32114** daily and **32106** total
   yield (U32, kWh×100)
-- **37001+** — battery block when the battery is on (power, SoC, lifetime
+- **37001+** — battery block (power, SoC, lifetime
   totals)
 
 All of the above addresses come from the profile — remap them freely. The
@@ -137,7 +137,7 @@ The fake has **no config file** (the audit's F11 test-tool posture: flags
 |---|---|---|
 | `--host` / `--port` / `--unit` | `127.0.0.1` / `5502` / `1` | the Modbus TCP bind and unit id served |
 | `--profile` | `sun2000` | register-map profile: the built-in name or a JSON path (`PROFILE` when unset) |
-| `--static` / `--battery` / `--no-battery` / `--battery-kwh` | off / on / — / `6.9` | static demo values / the simulated battery / its usable capacity in kWh |
+| `--static` / `--battery-kwh` | off / `6.9` | static demo values / the battery's usable capacity in kWh |
 | `--max-kwp` | `6` | PV array size in kWp (peak = 75 % of it) |
 | `--grid-voltage` / `--grid-frequency` | `230` / `50` | nominal grid phase voltage (120 or 230) / frequency (the machine wanders ±0.2 Hz) |
 | `--time` / `--time-scale` / `--timezone` | real clock / `1` / `utc` | freeze simulated time `HH:MM` / the N× time-lapse factor / the machines' clock |
@@ -158,7 +158,7 @@ The fake has **no config file** (the audit's F11 test-tool posture: flags
 | `--log-level` / `--man` | `INFO` / off | the log surface / print the generated man page |
 
 `SIGHUP` re-applies the **environment layer** (all-or-nothing — flags are
-startup-only): `CHAOS` (0..1), `MAX_KWP`, `PROFILE`, `BATTERY`, `STRICT`,
+startup-only): `CHAOS` (0..1), `MAX_KWP`, `PROFILE`, `STRICT`,
 `TIME`, `TIME_SCALE`, `LOG_LEVEL` — booleans accept
 `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 
@@ -209,7 +209,7 @@ form is legitimate here in a way it never is on the daemons.
 | `grid-outage` | `on` \| `off` \| `outage` | the grid-outage machine; `outage` forces one now |
 | `timezone` / `time` / `time-scale` | `utc`\|`local` / `HH:MM`\|`auto` / `N`\|`auto` | the machines' clock / freeze-unfreeze it / the time-lapse factor |
 | `scenario` | `morning` \| `noon` \| `evening` \| `night` \| `custom` | the presets (above) |
-| `battery` / `battery-state` | `on`\|`off` / `auto`\|`charging`\|`discharging` | the simulated battery / force the machine at full power |
+| `battery-state` | `auto`\|`charging`\|`discharging` | force the battery machine at full power (the battery is always on) |
 | `chaos` / `seed` | `0..1`\|`off` / `N` | tune chaos injection live / re-seed the RNG |
 | `strict` / `static` | `on` \| `off` | reject undefined registers (exception 02) / switch static values vs the day simulation |
 | `max-kwp` / `battery-kwh` | kW / kWh | the array size / the usable battery capacity |
@@ -247,8 +247,6 @@ An interactive front-end on the same socket (same flag/env resolution):
 $ python3 inverter/bin/modbus-fake-cli.py
 
 %   Welcome to the fake-inverter console
-%   SUN2000 with optional LUNA2000 battery and meter
-%   running for 30 s | utc clock | 230 V grid | battery on
 %   TAB completes, ? lists the commands, quit leaves
 
 fake-inverter:5502 > set pv 2500

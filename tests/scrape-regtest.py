@@ -28,7 +28,7 @@ F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 # examples/ is never a loader default, a checkout has no bundled spec
 os.environ['METRICS_SPEC'] = os.path.join(SCRAPER_DIR, 'examples', 'metrics.json')
 PORT = 15541
-PORT_A, PORT_B = 19441, 19442
+PORT_A = 19441
 
 failures = []
 
@@ -180,14 +180,14 @@ def write_ini(path, extra=''):
 
 procs = []
 try:
-    # 1. baseline: fake with battery + scraper with battery enabled
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(PORT)],
+    # 1. baseline: the fake's battery (always on) + the scraper
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--port', str(PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     write_ini('/tmp/scr_base.ini')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
                                    '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % PORT_A, '--battery'],
+                                   '--listen', '127.0.0.1:%d' % PORT_A],
                                   stdout=open('/tmp/scr_reg.log', 'w'), stderr=subprocess.STDOUT))
     status, m = wait_metrics(PORT_A)
     check('pv value', m.get('huawei_pv_generation_watts') == 4000, str(m.get('huawei_pv_generation_watts')))
@@ -199,7 +199,7 @@ try:
           and m.get('huawei_battery_charge_watts') == 1200
           and m.get('huawei_battery_discharge_watts') == 0
           and m.get('huawei_battery_soc_percent') == 65)
-    check('battery flag + health gauges', m.get('scraper_battery') == 1 and m.get('scraper_up') == 1
+    check('health gauges', m.get('scraper_up') == 1
           and m.get('scraper_modbus_errors_total') == 0 and m.get('scraper_last_poll_timestamp_seconds', 0) > 0)
     check('cache diag auto-detected (fake serves the block)', m.get('scraper_cache_device_up') == 1
           and m.get('scraper_cache_age_seconds') == 7 and m.get('scraper_cache_uptime_seconds') == 4242,
@@ -214,13 +214,13 @@ try:
                     {'name': 'battery-power', 'register': 40005, 'type': 'i32', 'scale': 1, 'scrape': True},
                     {'name': 'battery-soc', 'register': 40123, 'type': 'u16', 'scale': 1, 'scrape': True},
                 ]}, open(prof, 'w'))
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', '15590',
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--strict', '--port', '15590',
                                    '--control-port', '0', '--profile', prof],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
                                     '--upstream', '127.0.0.1:15590',
-                                   '--listen', '127.0.0.1:9361', '--battery', '--profile', prof],
+                                   '--listen', '127.0.0.1:9361', '--profile', prof],
                                   stdout=open('/tmp/scr_prof_scraper.log', 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
         status, m = wait_metrics(9361)
@@ -340,13 +340,13 @@ try:
 
     # 1b. the shipped Deye profile end-to-end: real Deye addresses (SG03LP1
     # family), SoC reported as plain percent (gain 1), omitted registers = 0
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', '15596',
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--strict', '--port', '15596',
                                    '--control-port', '0', '--profile', 'deye-sg03lp1'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
                                     '--upstream', '127.0.0.1:15596',
-                                   '--listen', '127.0.0.1:9363', '--battery', '--profile', 'deye-sg03lp1'],
+                                   '--listen', '127.0.0.1:9363', '--profile', 'deye-sg03lp1'],
                                   stdout=open('/tmp/scr_deye.log', 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
         status, m = wait_metrics(9363)
@@ -361,13 +361,13 @@ try:
           str(m.get('huawei_grid_net_watts')))
 
     # 1c. the Deye three-phase profile (SG04LP3): 6xx registers, SoC gain 1
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', '15598',
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--strict', '--port', '15598',
                                    '--control-port', '0', '--profile', 'deye-sg04lp3'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
                                     '--upstream', '127.0.0.1:15598',
-                                   '--listen', '127.0.0.1:9365', '--battery', '--profile', 'deye-sg04lp3'],
+                                   '--listen', '127.0.0.1:9365', '--profile', 'deye-sg04lp3'],
                                   stdout=open('/tmp/scr_deye3.log', 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
         status, m = wait_metrics(9365)
@@ -385,11 +385,11 @@ try:
           b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 2, b.hex())
 
     # 1d. the SUN-12K-SG05LP3-EU profile (shares the SG04LP3 map)
-    r = subprocess.run([sys.executable, F, '--dry-run', '--static', '--battery',
+    r = subprocess.run([sys.executable, F, '--dry-run', '--static',
                         '--profile', 'deye-sg05lp3'], capture_output=True, text=True)
     check('deye-sg05lp3: profile loads (dry-run rc 0)', r.returncode == 0
           and 'Deye SUN-12K-SG05LP3-EU' in r.stderr, r.stderr.strip()[-80:])
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15593',
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15593',
                                    '--control-port', '0', '--profile', 'deye-sg05lp3'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
@@ -400,17 +400,7 @@ try:
     status, _ = get('/nope', PORT_A)
     check('404 for unknown paths', status == 404)
 
-    # 2. battery disabled: flag 0, no battery metrics
-    write_ini('/tmp/scr_nobatt.ini')
-    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_nobatt.ini',
-                                   '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % PORT_B],
-                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-    status, m = wait_metrics(PORT_B)
-    check('battery off: flag 0', m.get('scraper_battery') == 0)
-    check('battery off: no battery metrics', 'huawei_battery_net_watts' not in m)
-
-    # 2b. the compute expressions: a custom spec evaluates per poll
+    # 2. the compute expressions: a custom spec evaluates per poll
     with open('/tmp/scr_spec_expr.json', 'w') as fh:
         _json.dump({'metrics': {'pv_generation_watts': {'profile': 'pv-power', 'help': 'Current PV power in watts.'},
                                 'grid_net_watts': {'profile': 'grid-power', 'help': 'Net grid power in watts.'},
@@ -418,7 +408,7 @@ try:
                                 'battery_soc_percent': {'profile': 'battery-soc', 'help': 'Battery state of charge in percent.'},
                                 'pv_kilowatts': {'expr': 'pv / 1000', 'help': 'PV power in kilowatts.'}}}, fh)
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_base.ini',
-                                   '--upstream', '127.0.0.1:%d' % PORT, '--battery',
+                                   '--upstream', '127.0.0.1:%d' % PORT,
                                    '--metrics-spec', '/tmp/scr_spec_expr.json',
                                    '--listen', '127.0.0.1:19470'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
@@ -443,13 +433,13 @@ try:
         obj = _json.loads(buf.split(b'\n', 1)[0].decode('utf-8', 'replace'))
         return '%s %s' % (obj.get('status', 'fail'), str(obj.get('text', '')))
 
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15570',
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15570',
                                    '--control-port', '15571', '--allow-write'],
                                   stdout=open('/tmp/scr_ctl_fake.log', 'w'), stderr=subprocess.STDOUT))
     write_ini('/tmp/scr_ctl.ini')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_ctl.ini',
                                     '--upstream', '127.0.0.1:15570',
-                                   '--listen', '127.0.0.1:19455', '--battery'],
+                                   '--listen', '127.0.0.1:19455'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     status, m = wait_metrics(19455)
     check('control: baseline static values', m.get('huawei_pv_generation_watts') == 4000,
@@ -531,13 +521,9 @@ try:
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'settings'], capture_output=True, text=True)
     check('control: show settings is retired (err)', r.returncode == 0
           and r.stdout.startswith('% error:'), r.stdout.strip()[:120])
-    subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'battery', 'off'], capture_output=True)
-    time.sleep(1)
-    m = metrics_dict(get('/metrics', 19455)[1])
-    check('control: set battery off zeroes battery values live (scraper flag unaffected)',
-          m.get('scraper_battery') == 1 and m.get('huawei_battery_net_watts') == 0
-          and m.get('huawei_pv_generation_watts') == 4000, str(m.get('huawei_battery_net_watts')))
-    subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'battery', 'on'], capture_output=True)
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'battery', 'off'], capture_output=True, text=True)
+    check('control: set battery is retired (the battery is always on, err)',
+          r.returncode == 0 and r.stdout.startswith('% error:'), r.stdout.strip()[:120])
     check('fake audit: control commands quiet at INFO',
           'control: set pv nan -> err' not in ctl_log and 'control: set soc 30' not in ctl_log)
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15588', '--control-port', '15589',
@@ -574,7 +560,7 @@ try:
     check('fake_ctl: env-pinned value reaches /metrics', m.get('huawei_pv_generation_watts') == 2200,
           str(m.get('huawei_pv_generation_watts')))
     SIG_SOCK2 = '/tmp/fake-inverter-15577.socket'
-    fake_env = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15577'],
+    fake_env = subprocess.Popen([sys.executable, F, '--static', '--port', '15577'],
                                 stdout=open('/tmp/scr_sig2.log', 'w'), stderr=subprocess.STDOUT,
                                 env={**os.environ, 'CTL': SIG_SOCK2})
     procs.append(fake_env)
@@ -608,7 +594,7 @@ try:
 
     # 2g1. battery state machine: SoC integrates the effective battery power
     # with the simulated clock (clock jumps = time-lapse), reserve floor 10 %
-    procs.append(subprocess.Popen([sys.executable, F, '--battery', '--time', '12:00',
+    procs.append(subprocess.Popen([sys.executable, F, '--time', '12:00',
                                    '--port', '15580', '--control-port', '15583'],
                                   stdout=open('/tmp/scr_batt.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(0.8)
@@ -922,7 +908,7 @@ try:
     out, _ = p.communicate(timeout=15)
     check('fake_cli: keepalive keeps an idle session alive (pongs absorbed)',
           p.returncode == 0 and 'fake-inverter:15571 > 6' in out and 'ok pong' not in out, repr(out[-120:]))
-    fake_k = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15586',
+    fake_k = subprocess.Popen([sys.executable, F, '--static', '--port', '15586',
                                '--control-port', '15587'],
                               stdout=open('/tmp/scr_cli.log', 'w'), stderr=subprocess.STDOUT)
     procs.append(fake_k)
@@ -1026,7 +1012,7 @@ try:
                     {'name': 'battery-soc', 'register': 40123, 'type': 'u16', 'scale': 1},
                 ]}, open(prof, 'w'))
 
-    fake_prof = subprocess.Popen([sys.executable, F, '--static', '--battery', '--strict', '--port', '15592',
+    fake_prof = subprocess.Popen([sys.executable, F, '--static', '--strict', '--port', '15592',
                                   '--control-port', '0', '--profile', prof],
                                  stdout=open('/tmp/scr_prof.log', 'w'), stderr=subprocess.STDOUT)
     procs.append(fake_prof)
@@ -1060,7 +1046,7 @@ try:
     check('profile: a name the fake cannot simulate is accepted but never served', r.returncode == 0
           and 'mystery-value' in open(badprof).read(), r.stderr.strip()[-90:])
 
-    fake_env = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15594',
+    fake_env = subprocess.Popen([sys.executable, F, '--static', '--port', '15594',
                                  '--control-port', '0'],
                                 stdout=open('/tmp/scr_prof2.log', 'w'), stderr=subprocess.STDOUT,
                                 env={**os.environ, 'PROFILE': prof})
@@ -1153,30 +1139,27 @@ try:
     check('fake_ctl/fake_cli carry no exec bit (python runs the family)',
           not (os.stat(C).st_mode & 0o111) and not (os.stat(K).st_mode & 0o111))
 
-    # the battery is on by default (no flag): the status shows a real SoC, and
-    # the state force refuses while the battery is off
+    # the battery is always on (the flag retired): the status shows a real
+    # SoC without any flag, the toggle answers err, the state force works
     procs.append(subprocess.Popen([sys.executable, F, '--control-port', '15639', '--port', '15638',
                                    '--time', '12:00'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.8)
     r = subprocess.run([sys.executable, C, '--control-port', '15639', 'inspect'], capture_output=True, text=True)
-    check('battery: on by default (no flag)', r.returncode == 0 and 'SoC n/a' not in r.stdout
-          and 'SoC ' in r.stdout, r.stdout.strip())
-    subprocess.run([sys.executable, C, '--control-port', '15639', 'set', 'battery', 'off'], capture_output=True)
+    check('battery: always on (no flag)', r.returncode == 0 and 'SoC n/a' not in r.stdout
+          and '\nbattery   ' in r.stdout, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15639', 'set', 'battery', 'off'], capture_output=True, text=True)
+    check('battery: the toggle is retired (err)', r.returncode == 0
+          and r.stdout.startswith('% error:'), r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15639', 'set', 'battery-state', 'charging'], capture_output=True, text=True)
-    check('battery-state: refuses with the battery off',
-          '% error: battery-state needs the battery on' in r.stdout, r.stdout.strip())
-    r = subprocess.run([sys.executable, C, '--control-port', '15639', 'show', 'registers'], capture_output=True, text=True)
-    rows = [l for l in r.stdout.splitlines() if ' | ' in l]
-    check('show registers: NaN when the value is not calculated (the battery off)',
-          any(l.startswith('battery-power') and l.split(' | ')[-1].strip() == 'NaN' for l in rows)
-          and any(l.startswith('pv-power') and l.split(' | ')[-1].strip() != 'NaN' for l in rows), r.stdout.strip()[:120])
+    check('battery-state: forces the machine with the battery always on',
+          r.returncode == 0 and r.stdout.startswith('ok battery-state=charging'), r.stdout.strip())
     subprocess.run([sys.executable, C, '--control-port', '15639', 'shutdown'], capture_output=True)
 
     # 2e. signals, mirroring the scraper/cache family: SIGHUP = env reload,
     # SIGUSR1 = scenario reset (pins + write overlay), SIGTERM = summary + exit 0
     SIG_SOCK = '/tmp/scr_sig_ctl.sock'
-    fake_ctl = subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15574',
+    fake_ctl = subprocess.Popen([sys.executable, F, '--static', '--port', '15574',
                                  '--control-port', SIG_SOCK, '--allow-write'],
                                 stdout=open('/tmp/scr_sig.log', 'w'), stderr=subprocess.STDOUT,
                                 env={**os.environ, 'CHAOS': '0.9', 'LOG_LEVEL': 'DEBUG'})
@@ -1208,7 +1191,7 @@ try:
     check('signals: unix control socket unlinked on shutdown', not os.path.exists(SIG_SOCK))
 
     # 2e. fake dry-run: validate config, print effective settings, family exit codes
-    r = subprocess.run([sys.executable, F, '--dry-run', '--static', '--battery'], capture_output=True)
+    r = subprocess.run([sys.executable, F, '--dry-run', '--static'], capture_output=True)
     check('fake dry-run: valid rc=0', r.returncode == 0
           and b'nothing was bound or connected' in r.stderr
           and b'peak PV 4500W' in r.stderr)
@@ -1240,7 +1223,8 @@ try:
     check('chaos off: recovery to up=1', status == 200 and m.get('scraper_up') == 1)
     check('chaos: zero tracebacks in fake + scraper logs',
           'Traceback' not in open('/tmp/scr_chaos.log').read())
-    check('battery off: home = pv - grid', m.get('huawei_home_consumption_watts') == 5500)
+    check('chaos recovery: home = pv - batt - grid', m.get('huawei_home_consumption_watts') == 4300,
+          str(m.get('huawei_home_consumption_watts')))
 
     # 3. sanity caps: max_kwp=2 -> 4000 W exceeds -> 503, then reload fixes it
     write_ini('/tmp/scr_cap.ini', 'set max-kwp 2')
@@ -1482,7 +1466,7 @@ try:
                         'print(m.help["scraper_up"], len(m.specs))'
                         % (SCRAPER_DIR, '/tmp/scr_spec_override.json')], capture_output=True)
     check('custom scraper section: its entries override the built-ins by name',
-          r.returncode == 0 and b'custom up help. 14' in r.stdout, r.stdout.decode().strip())
+          r.returncode == 0 and b'custom up help. 13' in r.stdout, r.stdout.decode().strip())
 
     # 3h. the compute expressions: the bundled five compile (and the bad specs fail fast)
     r = subprocess.run([sys.executable, '-c',
@@ -1491,8 +1475,8 @@ try:
                         'print(len(m.compute), list(m.compute)[0], m.section_of("huawei_home_consumption_watts"),'
                         'len(m.inputs), m.inputs["batt"]["register"], m.inputs["batt"]["help"][:20])'
                         % SCRAPER_DIR], capture_output=True)
-    check('default spec: the five compute metrics compiled, the declared vocabulary is the reserved five',
-          r.returncode == 0 and b'5 huawei_grid_export_watts compute 5 battery-power Net battery power' in r.stdout,
+    check('default spec: the five compute metrics compiled, the declared vocabulary is the reserved four',
+          r.returncode == 0 and b'5 huawei_grid_export_watts compute 4 battery-power Net battery power' in r.stdout,
           r.stdout.decode().strip())
     for case, spec, needle in (
             ('no-expr', {'metrics': {'custom_watts': {'help': 'A compute entry without an expr.'}}},
@@ -1543,7 +1527,7 @@ try:
     write_ini('/tmp/scr_evil.ini', 'set log-level DEBUG')
     procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_evil.ini',
                                     '--upstream', '127.0.0.1:15542',
-                                   '--listen', '127.0.0.1:19450', '--battery'],
+                                   '--listen', '127.0.0.1:19450'],
                                   stdout=open('/tmp/scr_evil.log', 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
         try:
@@ -1668,7 +1652,7 @@ try:
     check('inverter dead: up=0, still HTTP 200 with last values',
           status == 200 and m.get('scraper_up') == 0 and m.get('huawei_pv_generation_watts') == 4000)
     check('inverter dead: error counter grew', m.get('scraper_modbus_errors_total', 0) >= 1)
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--battery', '--port', str(PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--port', str(PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(2)
     status, body = get('/metrics', PORT_A)
@@ -1792,7 +1776,7 @@ try:
     words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
     check('scraper control: the hierarchy node answers its namespace (the ? shape)',
-          words == ['auth', 'battery', 'grid-positive-import', 'offset', 'profile',
+          words == ['auth', 'grid-positive-import', 'offset', 'profile',
                     'timeout', 'unit', 'upstream'], r[:160])
     # 6b-2. the register map lives in the device profile: `set profile` swaps
     #        it live, a profile without the power registers rolls back
@@ -1823,13 +1807,13 @@ try:
     r = sctl('show inputs', 15597)
     check('scraper control: show inputs shows the declared inputs only, aligned, the help capped',
           r.startswith('ok inputs') and '[battery_net_watts]' in r
-          and 'The battery flag (1 on, 0 off).' in r
           and '[pv_generation_watts]' in r
+          and 'battery  ' not in r
           and 'phase_a_voltage_volts' not in r, r[:240])
     r = sctl('show inputs metrics', 15597)
     check('scraper control: show inputs metrics (the words forward to the dashed report) lists the exported metrics',
           r.startswith('ok inputs-metrics') and 'huawei_battery_charge_watts' in r and '[compute]' in r
-          and '[profile]' in r and '\nscraper_battery  ' in r and 'gauge' not in r
+          and '[profile]' in r and 'scraper_up  ' in r and 'gauge' not in r
           and list(r.splitlines()[1:]) == sorted(r.splitlines()[1:]), r[:240])
     r = sctl('show inputs-metrics', 15597)
     check('scraper control: the dashed spelling answers the same report',
@@ -2119,7 +2103,7 @@ try:
     words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
     check('scraper_ctl: show modbus mimics the ? walk (the grouped sections, the direct children)',
-          r.returncode == 0 and words == ['auth', 'battery', 'grid-positive-import', 'offset', 'profile',
+          r.returncode == 0 and words == ['auth', 'grid-positive-import', 'offset', 'profile',
                                           'timeout', 'unit', 'upstream'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
@@ -2200,7 +2184,7 @@ try:
     from common.modbus import auth_handshake_client
 
     SKEY = 'scr-suite-key-16chars!'
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15910',
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15910',
                                    '--control-port', '0', '--auth', 'suite', '--auth-key', SKEY],
                                   stdout=open('/tmp/scr_auth_fake.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(0.7)
@@ -2269,7 +2253,7 @@ try:
           r.returncode == 1 and 'at least 16 characters' in r.stderr, r.stderr[-160:])
     # an authed scraper against a PLAIN fake: the handshake gets a Modbus
     # exception frame back — the connector fails there too
-    procs.append(subprocess.Popen([sys.executable, F, '--static', '--battery', '--port', '15911',
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15911',
                                    '--control-port', '0'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)

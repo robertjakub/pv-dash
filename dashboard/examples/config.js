@@ -1,14 +1,13 @@
 const SOLAR_CONFIG = {
   prometheusUrl: '/prom',
-  battery: false,               // enable battery support (Battery node + energy split)
+  battery: true,                // the battery KPIs and charts (always served — the flag retired)
   metrics: {
     pv: 'huawei_pv_generation_watts{job="sun2000"}',
     gridExport: 'huawei_grid_export_watts{job="sun2000"}',
     gridImport: 'huawei_grid_import_watts{job="sun2000"}',
     load: 'huawei_home_consumption_watts{job="sun2000"}',
     battery: 'huawei_battery_net_watts{job="sun2000"}',
-    batterySoC: 'huawei_battery_soc_percent{job="sun2000"}',
-    batteryFlag: 'scraper_battery{job="sun2000"}'
+    batterySoC: 'huawei_battery_soc_percent{job="sun2000"}'
   },
   // three-phase health (the per-phase chain): the per-phase voltage/current
   // selectors — omit or empty to hide the strip

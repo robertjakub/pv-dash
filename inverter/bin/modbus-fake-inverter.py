@@ -38,7 +38,7 @@ import threading
 
 from common.audit import AuditLog
 from common.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
-    parse_secret, resolve_control_target, resolve_metrics_acl
+    parse_secret, resolve_control_target, resolve_metrics_acl, str_to_bool
 from common.cred import parse_trust_uids
 from common.daemon import apply_restart_state, parse_ops_verbs
 from common.options import build_parser
@@ -48,7 +48,7 @@ from lib.control import ControlServer
 from lib.options import KNOWN_VERBS, OPTIONS
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
-from lib.statics import CONTROL_SOCKET_TEMPLATE, PEAK_RATIO, TIME_SCALE_MAX
+from lib.statics import CONTROL_SOCKET_TEMPLATE, DEFAULTS, PEAK_RATIO, TIME_SCALE_MAX
 from lib.signals import SignalBox, parse_time
 from lib.metrics import MetricsServer, describe_metrics
 from lib.simulator import Simulator
@@ -154,7 +154,7 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'audit-log': 'off' if args.no_audit_log else ('stdout' if args.audit_log == '-'
                                                       else (args.audit_log or 'the XDG state home')),
         'audit-max-mb': '%g' % args.audit_max_mb,
-        'audit-daily': 'on' if args.audit_daily else 'off',
+        'audit/rotate/daily': 'on' if args.audit_daily else 'off',
         'audit-files': str(args.audit_files),
         'no-audit-log': 'on' if args.no_audit_log else 'off',
     }
@@ -203,6 +203,35 @@ def main():
         from lib.man import daemon_page
         sys.stdout.write(daemon_page(p))
         raise SystemExit(0)
+    # the env layer (the fake's ladder: flag > env > static — no config file, F11):
+    # the twinned knobs read the environment when the flag stayed unset
+    for attr, env, static_key, conv in (('listen', 'LISTEN', 'listen', str),
+                                        ('max_clients', 'MAX_CLIENTS', 'max_clients', int),
+                                        ('client_timeout', 'CLIENT_TIMEOUT', 'client_timeout_s', float),
+                                        ('max_conn_per_ip', 'MAX_CONN_PER_IP', 'max_conn_per_ip', int),
+                                        ('audit_log', 'AUDIT_LOG', None, str),
+                                        ('audit_max_mb', 'AUDIT_MAX_MB', 'audit_max_mb', float),
+                                        ('audit_files', 'AUDIT_FILES', 'audit_files', int)):
+        v = getattr(args, attr)
+        if v is None or v == '':
+            v = os.environ.get(env)
+            if v not in (None, '') and conv is not str:
+                try:
+                    v = conv(v)
+                except ValueError:
+                    logger.error('invalid %s = %r: not a %s (keeping the default)', env, v, conv.__name__)
+                    v = None
+        if (v is None or v == '') and static_key is not None:
+            v = DEFAULTS[static_key]
+        setattr(args, attr, v)
+    for attr, env in (('audit_daily', 'AUDIT_DAILY'), ('no_audit_log', 'NO_AUDIT_LOG')):
+        if not getattr(args, attr):
+            v = os.environ.get(env)
+            if v not in (None, ''):
+                try:
+                    setattr(args, attr, str_to_bool(v))
+                except ValueError:
+                    logger.error('invalid %s = %r: not a boolean (keeping off)', env, v)
     logging.basicConfig(level=getattr(logging, args.log_level),
                         format='%(levelname)-7s %(message)s' if os.environ.get('JOURNAL_STREAM')
                         else '%(asctime)s %(levelname)-7s %(message)s')
@@ -264,6 +293,16 @@ def main():
         logger.warning('the state dump %s is not sealed (the integrity hash only — plaintext at rest): '
                        'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '
                        'to encrypt it', args.dump_path)
+    try:
+        audit = None if args.no_audit_log else AuditLog(args.audit_log, 'INV', app='fake-inverter',
+                                                        max_mb=args.audit_max_mb,
+                                                        daily=args.audit_daily, files=args.audit_files)
+    except ValueError as e:
+        logger.error(str(e))
+        raise SystemExit(1)
+    audit_params = {'path': args.audit_log, 'max_mb': args.audit_max_mb,
+                    'files': args.audit_files, 'daily': args.audit_daily,
+                    'disabled': bool(args.no_audit_log)}
     if args.dry_run:
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')
@@ -283,9 +322,6 @@ def main():
                     ('127.0.0.1:' + target) if target.isdigit() else ('unix:' + target) if target != '0' else 'off')
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
-    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'INV', app='fake-inverter',
-                                                    max_mb=args.audit_max_mb,
-                                                    daily=args.audit_daily, files=args.audit_files)
     fake = FakeInverter(args.unit, simulator, strict=args.strict, chaos=chaos,
                         max_clients=args.max_clients, client_timeout=args.client_timeout,
                         max_conn_per_ip=args.max_conn_per_ip, connect_acl=connect_acl,
@@ -294,6 +330,7 @@ def main():
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,
+                                audit_params=audit_params,
                                 defaults=configured_defaults(args, frozen, profile_text,
                                                              connect_acl, modbus_auth,
                                                              target, ops_verbs, trust_uids, metrics_acl),

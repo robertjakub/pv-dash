@@ -112,19 +112,18 @@ takes. The namespaces group them.
 | `grid-frequency` | `set grid-frequency` | settable | `Hz` | `--grid-frequency` / — | nominal grid frequency; the machine wanders around it |
 | `seed` | `set seed` | settable | `N` | `--seed` / — | re-seed the chaos RNG |
 | `connect-acl` | `set connect-acl` | settable | `\<acl>` | `--connect-acl` / `CONNECT_ACL` | the Modbus clients allowed to connect (the cache's connect-acl, mirrored: "any", "none", or a comma-separated IP/CIDR list) |
-| `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / — | simultaneous Modbus client limit |
-| `client-timeout` | `set client-timeout` | settable | `s` | `--client-timeout` / — | disconnect Modbus clients silent for this long |
-| `max-conn-per-ip` | `set max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / — | simultaneous Modbus connections from one peer IP |
+| `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous Modbus client limit |
+| `client-timeout` | `set client-timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | disconnect Modbus clients silent for this long |
+| `max-conn-per-ip` | `set max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous Modbus connections from one peer IP |
 | `control-log-replies` | — | startup-only | `on\|off` | `--control-log-replies` / — | DEBUG-log the full output of every control command (plainly: only the command logs) |
 | `metrics-listen` | — | startup-only | `HOST:PORT` | `--metrics-listen` / — | the metrics bind address HOST:PORT |
 | `metrics-max-clients` | — | startup-only | `N` | `--metrics-max-clients` / — | maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited |
 | `metrics-client-timeout` | — | startup-only | `s` | `--metrics-client-timeout` / — | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
 | `metrics-max-conn-per-ip` | — | startup-only | `N` | `--metrics-max-conn-per-ip` / — | maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit |
-| `audit-log` | — | startup-only | `PATH\|-` | `--audit-log` / — | INV audit trail: a file path or - for stdout (the docker/journald way); the XDG state home when unset |
-| `audit-max-mb` | — | startup-only | `MB` | `--audit-max-mb` / — | rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation |
-| `audit-daily` | — | startup-only | `on\|off` | `--audit-daily` / — | also rotate the audit log at UTC midnight |
-| `audit-files` | — | startup-only | `N` | `--audit-files` / — | rotated audit backups to keep |
-| `no-audit-log` | — | startup-only | `on\|off` | `--no-audit-log` / — | disable the INV audit trail |
+| `audit-log` | — | startup-only | `PATH\|-` | `--audit-log` / `AUDIT_LOG` | INV audit trail: a file path or - for stdout (the docker/journald way); the XDG state home when unset |
+| `audit-max-mb` | — | startup-only | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation |
+| `audit-files` | — | startup-only | `N` | `--audit-files` / `AUDIT_FILES` | rotated audit backups to keep |
+| `no-audit-log` | — | startup-only | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the INV audit trail |
 | `log-level` | `set log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
 | `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 
@@ -184,6 +183,14 @@ presents and the client ACL checked at accept
 | `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / — | the fake's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
 | `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | require Authorization: Bearer \<token> on the /metrics endpoint (the same scheme the scraper speaks) — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
+
+### audit/rotate
+
+TODO: need update
+
+| knob | set / unset | kind | value | flag / env | description |
+|---|---|---|---|---|---|
+| `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit log at UTC midnight |
 
 ### dump
 

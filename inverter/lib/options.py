@@ -46,18 +46,19 @@ def _load_options():
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
     d = static['defaults']
-    static_defaults = {'listen': d['listen'], 'unit': d['unit'],
+    # the twinned knobs do NOT ride the argparse parser: a static-wired
+    # default would shadow the env layer (the flag never looks unset) —
+    # they ladder flag > env > static in the bin like every serving tool's
+    # resolver; the untwinned demo knobs keep the static default (F11)
+    static_defaults = {'unit': d['unit'],
                        'max-kwp': d['max_kwp'], 'battery-kwh': d['battery_kwh'],
                        'time-scale': d['time_scale'], 'chaos': d['chaos'],
                        'dump-interval': d['dump_interval'],
-                       'max-clients': d['max_clients'], 'client-timeout': d['client_timeout_s'],
-                       'max-conn-per-ip': d['max_conn_per_ip'],
                        'metrics-listen': d['metrics_listen'],
                        'metrics-acl': d['metrics_acl'],
                        'metrics-max-clients': d['metrics_max_clients'],
                        'metrics-client-timeout': d['metrics_client_timeout_s'],
                        'metrics-max-conn-per-ip': d['metrics_max_conn_per_ip'],
-                       'audit-max-mb': d['audit_max_mb'], 'audit-files': d['audit_files'],
                        'log-level': d['log_level'],
                        'grid-voltage': static['grid']['voltage_v'],
                        'grid-frequency': static['grid']['frequency_hz'],

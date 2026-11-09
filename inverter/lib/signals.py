@@ -148,7 +148,7 @@ class SignalBox:
             self.control.announce_exit(name)   # the consoles print the notice and exit
             self.control.cleanup()   # unlink the socket file before anything can exit first
         self.fake.stopping = True
-        fake_serve = getattr(self.fake, 'srv', None)
+        fake_serve = getattr(self.fake, 'listen_sock', None)
         if fake_serve:
             try:
                 fake_serve.close()

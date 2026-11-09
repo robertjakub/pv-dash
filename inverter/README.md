@@ -142,7 +142,7 @@ The fake has **no config file** (the audit's F11 test-tool posture: flags
 | `--max-kwp` | `6` | PV array size in kWp (peak = 75 % of it) |
 | `--grid-voltage` / `--grid-frequency` | `230` / `50` | nominal grid phase voltage (120 or 230) / frequency (the machine wanders ±0.2 Hz) |
 | `--time` / `--time-scale` / `--timezone` | real clock / `1` / `utc` | freeze simulated time `HH:MM` / the N× time-lapse factor / the machines' clock |
-| `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the Modbus caps (refuse past the count / kick the silent / per-IP cap; `0` = no limit) |
+| `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the Modbus caps (refuse past the count / kick the silent / per-IP cap; `0` = no limit; `$MAX_CLIENTS` / `$CLIENT_TIMEOUT` / `$MAX_CONN_PER_IP`) |
 | `--connect-acl` | any | the Modbus clients allowed to connect: `any`, `none`, or a comma-separated IP/CIDR list — the family ACL map lives in [docs/ACL.md](../docs/ACL.md) |
 | `--allow-write` | off | accept Modbus writes (FC05/06/15/16): a write lands in the write overlay, logged and audited; off = every write refused with exception 01 |
 | `--auth` / `--auth-key` | `none` | the auth scheme the fake's Modbus clients must speak: `suite` = the crypt handshake (the scraper takes the matching `--auth suite --auth-key …`); the key is a secret, `file:<path>` welcome |
@@ -155,7 +155,7 @@ The fake has **no config file** (the audit's F11 test-tool posture: flags
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the pins, the machines — the tokens apart; every `--dump-interval` seconds) |
 | `--chaos` / `--seed` | `0` / random | the chaos probability / the RNG seed — see [Chaos injection](#chaos-injection---chaos) |
 | `--strict` | off | reject undefined registers with exception 02 |
-| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`) | XDG state | the audit trail: a file path or `-` for stdout |
+| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`) | XDG state | the audit trail: a file path or `-` for stdout (`$AUDIT_LOG` / `$AUDIT_MAX_MB` / `$AUDIT_DAILY` / `$AUDIT_FILES` / `$NO_AUDIT_LOG`) |
 | `--log-level` / `--man` | `INFO` / off | the log surface / print the generated man page |
 
 `SIGHUP` re-applies the **environment layer** (all-or-nothing — flags are
@@ -307,6 +307,10 @@ default at the **XDG state home**
 (`~/.local/state/fake-inverter/audit.log`); `--audit-log <file>` renames
 it, `--no-audit-log` turns it off, `--audit-log -` sends it to stdout (the
 docker logs / journald way — the shipped Dockerfile runs with it). The
+rotation rides the family knobs: the size trigger (`--audit-max-mb`, the
+backups kept `--audit-files`) and the UTC-midnight trigger
+(`--audit-daily` — live on this tool too: `set audit rotate daily on/off`);
+the env twins spell the same names upper-snake. The
 prefix names the writer — `INV` (the fake), `CLI`, `CTL`:
 
 ```

@@ -139,13 +139,15 @@ class ControlServer(_ControlServer):
 
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
                  trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None, startup_values=None,
-                 dump_path=None, restore_on_start=False, config_path=None, dump_key=None, dump_interval=0.0):
+                 dump_path=None, restore_on_start=False, config_path=None, dump_key=None, dump_interval=0.0,
+                 audit_params=None):
         super().__init__(target, audit=audit, token=token, defaults=defaults, trust_uids=trust_uids,
                          socket_group=socket_group, ops_token=ops_token, ops_verbs=ops_verbs,
                          config_path=config_path, dump_path=dump_path,
                          restore_on_start=restore_on_start, dump_key=dump_key, dump_interval=dump_interval)
         self.log_replies = log_replies   # DEBUG also logs the full command output
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
+        self.audit_params = dict(audit_params or {})   # the audit family's live swaps rebuild from these
         self.simulator = simulator
         self.chaos = chaos
         self.fake = fake
@@ -374,6 +376,15 @@ class ControlServer(_ControlServer):
                 raise ValueError('log level must be one of %s' % ', '.join(LOG_LEVELS))
             logging.getLogger('fake-inverter').setLevel(level)
             return level
+        if key == 'audit/rotate/daily':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('audit/rotate/daily must be on or off')
+            self.audit_params['daily'] = on
+            return 'on' if on else 'off'
         if key == 'scenario':
             if val == 'custom':
                 sim.freeze(None)
@@ -513,6 +524,8 @@ class ControlServer(_ControlServer):
             return str(fake.max_clients) if fake else '?'
         if key == 'max-conn-per-ip':
             return str(fake.conn_gate.max_per_ip) if fake else '?'
+        if key == 'audit/rotate/daily':
+            return 'on' if self.audit_params['daily'] else 'off'
         if key == 'connect-acl':
             return acl_text(fake.connect_acl) if fake else '?'
         if key == 'write/allow':
@@ -547,6 +560,18 @@ class ControlServer(_ControlServer):
         if s is not None and s.restart:   # a startup-only knob: the configured value
             return self.defaults.get(key, '?')   # renders (the secrets answer '<set>'/'off')
         return '?'
+
+    def _rebuild_audit(self):
+        """Swap the INV audit trail for one rebuilt from the params (the
+        shared rebuild re-chains from the file's own tail): BOTH writers
+        swap — the control's own (the COMMAND events) and the fake's (the
+        WRITE / WRITE-REFUSED events). The old trail is NOT closed — a
+        session still holding it writes its last commands there."""
+        fresh = self.rebuild_audit(self.audit_params, 'INV', 'fake-inverter')
+        self.audit = fresh
+        if self.fake is not None:
+            self.fake.audit = fresh
+        return fresh.path if fresh else 'off'
 
     def acl_table_report(self):
         """The metrics/acl/table show report (the show-only view of the

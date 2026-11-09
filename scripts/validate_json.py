@@ -4,10 +4,10 @@
   python3 scripts/validate_json.py SCHEMA [FILE|- ...]
   python3 scripts/validate_json.py cache/schema/selection.schema.json cache/examples/selection.json
   python3 scripts/validate_json.py scraper/schema/metrics.schema.json scraper/examples/metrics.json
-  cat doc.json | python3 scripts/validate_json.py cache/schema/acl-ip-prefix.schema.json -
+  cat doc.json | python3 scripts/validate_json.py schema/acl-ip-prefix.schema.json -
 
 The keyword set is the draft-2020-12 core the repo's schemas speak
-(scraper/schema, cache/schema): "type", "enum", "const", "properties",
+(schema/, scraper/schema, cache/schema): "type", "enum", "const", "properties",
 "required", "additionalProperties", "patternProperties", "propertyNames",
 "items" (both the mapping and the draft-07 tuple form), "minItems",
 "maxItems", "uniqueItems", "minLength", "maxLength", "pattern", "minimum",

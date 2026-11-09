@@ -32,8 +32,8 @@ stdenv.mkDerivation (finalAttrs: {
     cp -r static $out/share/dashboard/static
     install -Dm644 examples/config.js $out/share/dashboard/config.js
     install -Dm644 examples/server.conf $out/share/dashboard/server.conf
-    install -Dm644 examples/acl-ip-prefix.json $out/share/dashboard/acl-ip-prefix.json
-    install -Dm644 schema/acl-ip-prefix.schema.json $out/share/dashboard/acl-ip-prefix.schema.json
+    install -Dm644 ${../examples}/acl-ip-prefix.json $out/share/dashboard/acl-ip-prefix.json
+    install -Dm644 ${../schema}/acl-ip-prefix.schema.json $out/share/dashboard/acl-ip-prefix.schema.json
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/
 

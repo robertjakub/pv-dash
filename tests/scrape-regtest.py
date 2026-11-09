@@ -2271,7 +2271,7 @@ try:
     # 9. the metrics ACL: the cache's acl/connect reading on the /metrics
     # listener — the accept-time IP gate (the inline grammar + the file: chain)
     r = subprocess.run([sys.executable, P, '--dry-run',
-                        '--metrics-acl', 'file:' + os.path.join(SCRAPER_DIR, 'examples', 'acl-ip-prefix.json')],
+                        '--metrics-acl', 'file:' + os.path.join(REPO, 'examples', 'acl-ip-prefix.json')],
                        capture_output=True, text=True, timeout=15)
     check('metrics acl: the shipped ip-prefix example loads (dry-run rc 0)',
           r.returncode == 0 and 'dry-run: configuration is valid' in r.stderr, r.stderr[-100:])

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Lint and reformat the standalone acl files — the json a cache acl
 option's file:<path> points at (cache/examples/acl-write-registers.json is
-the shipped write example, acl-ip-prefix.json the shipped IP-kind one;
-scripts/edit_acl.py edits one). A device profile's
+the shipped write example, examples/acl-ip-prefix.json the shared IP-kind
+one; scripts/edit_acl.py edits one). A device profile's
 embedded acl/write gate belongs to profiles/bin/profile-lint.py +
 profile-format.py.
 
@@ -378,7 +378,9 @@ def main():
     write = not check and not diff
     paths = [a for a in args if not a.startswith('--')]
     if not paths:
-        paths = sorted(p for p in glob.glob(os.path.join(REPO, 'cache', '**', 'acl-*.json'),
+        paths = sorted(p for p in glob.glob(os.path.join(REPO, 'examples', '**', 'acl-*.json'),
+                                            recursive=True)
+                       + glob.glob(os.path.join(REPO, 'cache', '**', 'acl-*.json'),
                                             recursive=True)
                        + glob.glob(os.path.join(REPO, 'scraper', '**', 'acl-*.json'),
                                    recursive=True)
@@ -388,7 +390,7 @@ def main():
                                    recursive=True)
                        if not p.endswith('.schema.json'))   # the JSON Schemas OF the acl files lint nothing
         if not paths:
-            print('no acl-*.json file under cache/, scraper/, inverter/ or dashboard/ — pass the path(s)')
+            print('no acl-*.json file under examples/, cache/, scraper/, inverter/ or dashboard/ — pass the path(s)')
             return 1
     bad = False
     for path in paths:

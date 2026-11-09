@@ -1266,7 +1266,7 @@ try:
     # chain, checked at accept: a client off the ACL is closed without a reply
     r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:15512',
                         '--listen', '127.0.0.1:15600', '--profile', R,
-                        '--metrics-acl', 'file:' + os.path.join(CACHE_DIR, 'examples', 'acl-ip-prefix.json')],
+                        '--metrics-acl', 'file:' + os.path.join(REPO, 'examples', 'acl-ip-prefix.json')],
                        capture_output=True, text=True, timeout=60)
     check('metrics acl: the shipped ip-prefix example loads (dry-run)',
           r.returncode == 0 and 'dry-run: configuration and register map are valid' in (r.stdout + r.stderr),
@@ -2190,7 +2190,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # and the ip-prefix reader takes it: the connect acl file the example ships
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15584',
                         '--listen', '127.0.0.1:15600', '--profile', R,
-                        '--connect-acl', 'file:' + os.path.join(CACHE_DIR, 'examples', 'acl-ip-prefix.json'),
+                        '--connect-acl', 'file:' + os.path.join(REPO, 'examples', 'acl-ip-prefix.json'),
                         '--dry-run'],
                        capture_output=True, text=True, timeout=60)
     check('acl connect: the shipped ip-prefix example loads (dry-run)',

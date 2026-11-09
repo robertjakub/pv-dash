@@ -12,34 +12,18 @@ from common.config import (ANY_NET, IPGate, _GATE_TYPES, _acl_desc, _prefix_matc
                            acl_admits, acl_file_warn, acl_gate_summary, acl_summary, acl_table, acl_text,
                            acl_value_text, check_auth_key, default_profile_path, load_config_script,
                            load_write_gate_file, parse_acl, parse_acl_value, parse_auth_type, parse_listen,
-                           parse_secret, parse_upstream, resolve_profile_file, resolve_target, Resolver)
+                           parse_secret, parse_upstream, resolve_profile_file, Resolver)
 from common.cred import parse_trust_uids
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_COUNT, MAX_REGISTERS, \
     REGISTER_TYPES, UNIT_ID_RANGE
 
 logger = logging.getLogger('modbus-cache')
 
-
-def parse_control_target(text, listen_port=DEFAULT_LISTEN_PORT):
-    """'' → the default unix socket for the listen port (/tmp is cleared on
-    reboot, nothing lands in a working directory); '0' → None (off); digits
-    → TCP port on 127.0.0.1; anything else → unix socket path."""
-    t = (text or '').strip()
-    if t == '0':
-        return None
-    if t.isdigit():
-        p = int(t)
-        if not 1 <= p <= 65535:
-            raise SystemExit('invalid control-port %d: use 1..65535, a unix socket path, or 0 to disable' % p)
-        return p
-    if t:
-        return t
-    return '/tmp/modbus-cache-%d.socket' % listen_port
-
-
-def resolve_control_target(explicit, listen_port=DEFAULT_LISTEN_PORT):
-    """--control-port flag > CTL environment > default socket."""
-    return resolve_target(explicit, '/tmp/modbus-cache-%d.socket' % listen_port)
+# the control socket's name: the daemon's template (common.config's parsers
+# take it as the argument), the clients' default (the template spelled with
+# the default serving port)
+CONTROL_SOCKET_TEMPLATE = '/tmp/modbus-cache-%d.socket'
+DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_LISTEN_PORT
 
 
 def parse_write_registers(text, label='write-registers'):

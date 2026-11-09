@@ -5,6 +5,22 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The metrics/acl family wave: the cache rides along — the default
+metrics bind moves `9252` → **`9351`** (the family's /metrics defaults
+count from the scraper's 9350 up; the fake and the dashboard join the
+gate with the shared 9452 split), and `package.nix` now ships the three
+`schema/*.schema.json` files beside the examples (they were the only
+schemas not installed).
+
+The control-listener family wave: the cache's listener tier — the live
+`control/port` rebind family, the socket-mode discipline, the live
+control knobs — lifts into `common/control.py` as the family's ONE
+implementation (the golden master gives the shape away; the private copy
+sheds), the F5 refusal parameterizes as `TOKENLESS_TCP` (the fake opts
+out — F11), and the ops-verbs live name re-spells to the family's
+**`control/ops/verbs`** (the scraper's nested form; the knob name and
+the config files stay flat — `set control ops verbs <list>` on the wire).
+
 The F13 conformance: **the metrics token is mandatory beyond loopback,
 not whenever on** — the startup refusal, the live `metrics/enable on`,
 the live `metrics/token` off and the restart-marked `metrics/listen`'s
@@ -260,7 +276,7 @@ The control-plane/audit/dump live wave: the whole control family answers
 the wire — `control/port` rebinds the listener live (bind-first, the old
 loop retires by identity; `off` stops accepting while the sessions keep
 serving), the admin and ops tokens rotate on the wire (the secrets answer
-`<set>`, `unset` refuses, the dump never carries one), `control/ops-verbs`
+`<set>`, `unset` refuses, the dump never carries one), `control/ops/verbs`
 re-validates the RBAC policy, `control/trust-uids` and
 `control/socket-group` retune the unix socket; `audit/log-file` moves the
 CACHE trail with the chain continuing from the file's tail,
@@ -350,7 +366,8 @@ maps every knob to its control command, and the option registry
 (lib/options.py on common/options.py) files every knob under the shared
 sections — scripts/check_options.py gates the flags/env/nix/README
 surfaces against it. The RBAC verb set is live too: `--control-ops-verbs`
-(default show,clear, validated at start).
+(default show,clear, validated at start; the wire spells it
+`set control ops verbs`).
 
 The read-only control role: a second token
 (`--control-ops-token`/`--control-ops-token-file`, ini `control_ops_token`,

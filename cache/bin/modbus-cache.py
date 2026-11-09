@@ -27,12 +27,12 @@ sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common.audit import AuditLog, default_path as default_audit_path
-from common.config import default_profile_path, is_loopback_host, parse_listen, parse_secret, parse_upstream
+from common.config import default_profile_path, is_loopback_host, parse_control_target, parse_listen, parse_secret, parse_upstream
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.modbus import exception_frame
 from common.version import version_string
-from lib.config import load_registers_file, load_selection, resolve_config, parse_control_target, acl_value_text, acl_gate_summary
+from lib.config import CONTROL_SOCKET_TEMPLATE, load_registers_file, load_selection, resolve_config, acl_value_text, acl_gate_summary
 from lib.options import KNOWN_VERBS, OPTIONS
 from lib.metrics import MetricsServer, describe_metrics
 from lib import persist
@@ -208,7 +208,7 @@ def main():
         logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
 
     listen_host, listen_port = parse_listen(cfg['listen'])
-    control_target = parse_control_target(cfg['control_port'], listen_port)
+    control_target = parse_control_target(cfg['control_port'], listen_port, CONTROL_SOCKET_TEMPLATE)
     control_token = cfg['control_token'] or None
     control_ops_token = cfg['control_ops_token'] or None
     if control_ops_token and not control_token:
@@ -351,7 +351,7 @@ def main():
                     'modbus/auth': cfg['auth'] or 'none',
                     'modbus/auth-upstream': cfg['auth_upstream'] or 'none',
                     'control/port': control_target,
-                    'control/ops-verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
+                    'control/ops/verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
                     'control/trust-uids': ','.join(str(u) for u in sorted(cfg['control_trust_uids'] or [])) or 'off',
                     'control/socket-group': 'on' if cfg['control_socket_group'] else 'off',
                     'audit/log-file': audit_display,

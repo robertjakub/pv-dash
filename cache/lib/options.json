@@ -130,7 +130,7 @@
       "help": "a second, read-only control token: sessions authenticating with it may run the show/clear verbs only (no set/unset, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
       "secret": true, "hidden": true },
     { "name": "control-ops-verbs", "flag": "--control-ops-verbs", "env": "CONTROL_OPS_VERBS", "conv": "str",
-      "live": "control/ops-verbs",
+      "live": "control/ops/verbs",
       "setting-help": "the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated",
       "hint": "VERB,...",
       "help": "the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated" },

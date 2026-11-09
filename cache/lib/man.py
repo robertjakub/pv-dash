@@ -89,7 +89,7 @@ metrics listen, the metrics limits caps, metrics token, metrics acl,
 audit requests, dump-interval, log-level, local-time, modbus profile,
 modbus selection, acl connect, acl write, modbus timeout, modbus auth,
 modbus auth key, modbus auth-upstream, modbus auth-upstream-key, control
-port, control token, control ops-token, control ops-verbs, control
+port, control token, control ops-token, control ops verbs, control
 trust-uids, control socket-group, audit log-file, audit rotate max-size,
 audit disable, dump path, dump with-cache); a SIGHUP re-applies the config
 (the file always wins). A knob the registry marks

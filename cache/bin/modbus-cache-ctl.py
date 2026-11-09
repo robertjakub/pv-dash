@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common.ctl import run_ctl
-from lib.config import resolve_control_target
+from lib.config import DEFAULT_CONTROL_SOCKET
 from lib.man import ctl_page
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S
 
@@ -29,5 +29,5 @@ if __name__ == '__main__':
     run_ctl(daemon='modbus-cache', bin_name='modbus-cache-ctl', app='modbus-cache',
             self_note='the proxy itself',
             command_help='e.g. inspect, show config, show cache, request clear cache, request restart, shutdown',
-            resolve=resolve_control_target, timeout_s=CLI_TIMEOUT_S,
+            ctl_socket=DEFAULT_CONTROL_SOCKET, timeout_s=CLI_TIMEOUT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES, ctl_page=ctl_page)

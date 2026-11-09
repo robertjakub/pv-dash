@@ -345,7 +345,7 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = ''
-        The metrics bind address HOST:PORT (default: 127.0.0.1:9252).
+        The metrics bind address HOST:PORT (default: 127.0.0.1:9351).
         0.0.0.0:PORT serves every interface — a token is mandatory
         regardless.
       '';

@@ -1,111 +1,6 @@
 {
  "seeds": [
   {
-   "id": "knob:cache:control-ops-verbs",
-   "kind": "knob",
-   "tool": "cache",
-   "name": "control-ops-verbs",
-   "suite": "cache-regtest.py"
-  },
-  {
-   "id": "knob:cache:control-trust-uids",
-   "kind": "knob",
-   "tool": "cache",
-   "name": "control-trust-uids",
-   "suite": "cache-regtest.py"
-  },
-  {
-   "id": "knob:cache:metrics-client-timeout",
-   "kind": "knob",
-   "tool": "cache",
-   "name": "metrics-client-timeout",
-   "suite": "cache-regtest.py"
-  },
-  {
-   "id": "knob:cache:metrics-max-conn-per-ip",
-   "kind": "knob",
-   "tool": "cache",
-   "name": "metrics-max-conn-per-ip",
-   "suite": "cache-regtest.py"
-  },
-  {
-   "id": "knob:cache:read-delay",
-   "kind": "knob",
-   "tool": "cache",
-   "name": "read-delay",
-   "suite": "cache-regtest.py"
-  },
-  {
-   "id": "knob:cache:requests-audit",
-   "kind": "knob",
-   "tool": "cache",
-   "name": "requests-audit",
-   "suite": "cache-regtest.py"
-  },
-  {
-   "id": "knob:scraper:control-ops-verbs",
-   "kind": "knob",
-   "tool": "scraper",
-   "name": "control-ops-verbs",
-   "suite": "scrape-regtest.py"
-  },
-  {
-   "id": "knob:scraper:control-trust-uids",
-   "kind": "knob",
-   "tool": "scraper",
-   "name": "control-trust-uids",
-   "suite": "scrape-regtest.py"
-  },
-  {
-   "id": "knob:scraper:modbus-offset",
-   "kind": "knob",
-   "tool": "scraper",
-   "name": "modbus-offset",
-   "suite": "scrape-regtest.py"
-  },
-  {
-   "id": "knob:inverter:control-ops-verbs",
-   "kind": "knob",
-   "tool": "inverter",
-   "name": "control-ops-verbs",
-   "suite": "inverter-regtest.py"
-  },
-  {
-   "id": "knob:inverter:control-trust-uids",
-   "kind": "knob",
-   "tool": "inverter",
-   "name": "control-trust-uids",
-   "suite": "inverter-regtest.py"
-  },
-  {
-   "id": "cmd:inverter:logout",
-   "kind": "command",
-   "tool": "inverter",
-   "name": "logout",
-   "suite": "inverter-regtest.py"
-  },
-  {
-   "id": "knob:dashboard:control-ops-verbs",
-   "kind": "knob",
-   "tool": "dashboard",
-   "name": "control-ops-verbs",
-   "suite": "dashboard-control-fuzz.py"
-  },
-  {
-   "id": "knob:dashboard:control-trust-uids",
-   "kind": "knob",
-   "tool": "dashboard",
-   "name": "control-trust-uids",
-   "suite": "dashboard-control-fuzz.py"
-  },
-  {
-   "id": "knob:dashboard:log-queries",
-   "kind": "knob",
-   "tool": "dashboard",
-   "name": "log-queries",
-   "suite": "dashboard-control-fuzz.py"
-  },
-  {
    "id": "phrase:8c882b22",
    "kind": "canon-phrase",
    "tool": "cache, inverter",
@@ -240,9 +135,9 @@
   }
  ],
  "counts": {
-  "total": 34,
-  "knob": 14,
-  "command": 1,
+  "total": 19,
+  "knob": 0,
+  "command": 0,
   "canon-phrase": 19
  }
 }

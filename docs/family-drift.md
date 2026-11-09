@@ -58,7 +58,7 @@ copy-paste twins), the similarity pass pairs cross-file bodies over the
 **The exact pass**: 0 duplicate group(s) in >= 2 files.
 
 
-**The similarity pass**: 49 cross-file pair(s) over the ratio
+**The similarity pass**: 52 cross-file pair(s) over the ratio
 floor (30 of them the man-page prose, per-tool by
 design); the top non-man pairs:
 
@@ -70,19 +70,20 @@ design); the top non-man pairs:
 | 0.93 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
 | 0.92 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:34` `_load_options` |
 | 0.89 | `scraper/bin/modbus-scraper.py:248` `graceful_stop` <-> `dashboard/bin/dashboard.py:475` `graceful_stop` |
+| 0.88 | `scraper/lib/options.py:34` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
+| 0.88 | `inverter/lib/options.py:35` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
+| 0.87 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
 | 0.86 | `cache/lib/control.py:96` `command` <-> `dashboard/lib/control.py:91` `command` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
 | 0.85 | `cache/lib/control.py:96` `command` <-> `scraper/lib/control.py:147` `command` |
 | 0.85 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
-| 0.82 | `cache/bin/modbus-cache.py:372` `watch_dump` <-> `common/control.py:696` `run_dump_interval` |
+| 0.82 | `cache/bin/modbus-cache.py:372` `watch_dump` <-> `common/control.py:698` `run_dump_interval` |
 | 0.81 | `inverter/lib/control.py:140` `__init__` <-> `dashboard/lib/control.py:68` `__init__` |
 | 0.78 | `inverter/lib/signals.py:30` `__init__` <-> `common/modbus/client.py:20` `__init__` |
 | 0.78 | `inverter/lib/control.py:576` `acl_table_report` <-> `dashboard/lib/control.py:545` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `inverter/lib/control.py:68` `handle` <-> `common/control.py:245` `handle` |
-| 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/config.py:420` `load_write_gate_file` |
-| 0.72 | `common/config.py:14` `resolve_target` <-> `common/daemon.py:44` `default_config_path` |
+| 0.75 | `inverter/lib/control.py:68` `handle` <-> `common/control.py:247` `handle` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -269,8 +270,8 @@ canon the operators grep for.
 | dashboard | `ACL-FILE`, `RELOAD`, `SHUTDOWN`, `START` |
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
-**The phrase canon**: 35 log phrase(s) shared by >= 2 tools;
-79 tool-local. The canon (the lead clause, the tools that speak it):
+**The phrase canon**: 34 log phrase(s) shared by >= 2 tools;
+80 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
@@ -293,12 +294,12 @@ canon the operators grep for.
 | `cannot bind` | dashboard, scraper |
 | `restore-on-start:` | dashboard, inverter, scraper |
 | `control from` | common, inverter |
-| `invalid` | common, inverter |
 | `control: state dumped to` | cache, common |
 | `control: state restored from` | cache, common |
 | `control: the dump to` | cache, common |
 | `sighup: reloaded` | cache, inverter |
 | `poll cycle crashed ` | cache, scraper |
+| `state dumps:` | cache, common |
 
 The findings:
 
@@ -495,22 +496,22 @@ list is the TODO seed, not a verdict.
 
 **The live knobs no suite mentions** (word-bounded grep):
 
-- cache: `control-ops-verbs`, `control-trust-uids`, `metrics-client-timeout`, `metrics-max-conn-per-ip`, `read-delay`, `requests-audit`
-- scraper: `control-ops-verbs`, `control-trust-uids`, `modbus-offset`
-- inverter: `control-ops-verbs`, `control-trust-uids`
-- dashboard: `control-ops-verbs`, `control-trust-uids`, `log-queries`
+- cache: every live knob named somewhere in the suites
+- scraper: every live knob named somewhere in the suites
+- inverter: every live knob named somewhere in the suites
+- dashboard: every live knob named somewhere in the suites
 
 **The command words no suite mentions:**
 
 - cache: every command exercised
 - scraper: every command exercised
-- inverter: `logout`
+- inverter: every command exercised
 - dashboard: every command exercised
 
 **The canon phrases no suite pins**: 19
 
 **The graduation path**: the seeds carry stable IDs in
-[docs/family-drift-seeds.json](family-drift-seeds.json) (34
+[docs/family-drift-seeds.json](family-drift-seeds.json) (19
 open promise(s), the suggested suite per seed); a test wave
 consumes entries, the regeneration drops them, the shrinkage is
 the wave's proof; `--check` fails when a NEW promise ships
@@ -614,6 +615,7 @@ shipped example re-parsed through the tool's own set-grammar reader
 | `cache/examples/selection.json` | json ok |
 | `scraper/examples/metrics.json` | json ok |
 | `scraper/examples/scraper.conf` | ok (18 setting line(s)) |
+| `inverter/examples/inverter.conf` | ok (3 setting line(s)) |
 | `dashboard/examples/server.conf` | ok (19 setting line(s)) |
 
 The findings:
@@ -629,34 +631,23 @@ The findings:
 ## The secret-surface sweep — the secret rows and their posture
 
 Every `secret`-marked registry row with its live/restart/hidden
-flags, and the secret-posture markers (`parse_secret`, the
-`SECRET_REMOVED` placeholder, the `file:` scheme) across the tree.
+posture, the table consolidated by knob — rows sharing a posture
+merge, the tools column carries the coverage (a knob missing from a
+tool is the visible gap). The secret-posture markers (`parse_secret`,
+the `SECRET_REMOVED` placeholder, the `file:` scheme) across the
+tree.
 
-21 secret-marked row(s):
+21 secret-marked row(s) across 7 knob(s), consolidated by posture:
 
-| tool | knob | live | restart | hidden |
+| knob | tools | live | restart | hidden |
 |---|---|---|---|---|
-| cache | `auth-key` | yes | yes | yes |
-| cache | `auth-upstream-key` | yes | yes | yes |
-| cache | `control-token` | yes | yes | yes |
-| cache | `control-ops-token` | yes | yes | yes |
-| cache | `metrics-token` | yes | yes | yes |
-| cache | `dump-key` | yes | yes | yes |
-| scraper | `auth-key` | yes | yes | yes |
-| scraper | `control-token` | yes | yes | yes |
-| scraper | `control-ops-token` | yes | yes | yes |
-| scraper | `auth-token` | yes | yes | yes |
-| scraper | `dump-key` | yes | yes | yes |
-| inverter | `auth-key` | yes | yes | yes |
-| inverter | `control-token` | yes | yes | yes |
-| inverter | `control-ops-token` | yes | yes | yes |
-| inverter | `metrics-token` | yes | yes | yes |
-| inverter | `dump-key` | yes | yes | yes |
-| dashboard | `auth-token` | yes | yes | yes |
-| dashboard | `control-token` | yes | yes | yes |
-| dashboard | `control-ops-token` | yes | yes | yes |
-| dashboard | `metrics-token` | yes | yes | yes |
-| dashboard | `dump-key` | yes | yes | yes |
+| `auth-key` | cache, inverter, scraper | yes | yes | yes |
+| `auth-token` | dashboard, scraper | yes | yes | yes |
+| `auth-upstream-key` | cache | yes | yes | yes |
+| `control-ops-token` | all four | yes | yes | yes |
+| `control-token` | all four | yes | yes | yes |
+| `dump-key` | all four | yes | yes | yes |
+| `metrics-token` | cache, dashboard, inverter | yes | yes | yes |
 
 The findings:
 

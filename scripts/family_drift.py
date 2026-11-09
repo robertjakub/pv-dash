@@ -426,7 +426,11 @@ def docker_env():
 
 def coverage(rows, cmds, canon):
     """Every live knob / command word / canon phrase grepped against
-    tests/*.py -> the uncovered list."""
+    tests/*.py -> the uncovered list. The knob's spellings are the
+    dashed name, the live path and the spaced live path (the wire's
+    set/show form — the suites speak `set control ops verbs`, not the
+    dashed row name); the command's are the /-path and the spaced
+    words."""
     tests = []
     td = os.path.join(REPO, 'tests')
     for f in sorted(os.listdir(td)):
@@ -436,8 +440,11 @@ def coverage(rows, cmds, canon):
     live = {t: [n for n, r in rows[t].items() if r.get('live')] for t in TOOLS}
     spellings = lambda w: (w, w.replace('/', ' '))   # the wire's two spellings:
                                                      # the /-path and the spaced words
-    uncovered = {t: sorted(n for n in live[t]
-                           if not any(s in blob for s in spellings(n))) for t in TOOLS}
+    def knob_spell(n, r):
+        lv = r.get('live') or n
+        return (n, lv, lv.replace('/', ' '))
+    uncovered = {t: sorted(n for n, r in rows[t].items() if r.get('live')
+                 and not any(s in blob for s in knob_spell(n, r))) for t in TOOLS}
     cmd_missing = {t: sorted(w for w in cmds[t]
                              if not any(s in blob for s in spellings(w))) for t in TOOLS}
     phrase_unpinned = sorted(k for k in canon
@@ -646,8 +653,11 @@ SECRET_HEAD = """\
 ## The secret-surface sweep — the secret rows and their posture
 
 Every `secret`-marked registry row with its live/restart/hidden
-flags, and the secret-posture markers (`parse_secret`, the
-`SECRET_REMOVED` placeholder, the `file:` scheme) across the tree."""
+posture, the table consolidated by knob — rows sharing a posture
+merge, the tools column carries the coverage (a knob missing from a
+tool is the visible gap). The secret-posture markers (`parse_secret`,
+the `SECRET_REMOVED` placeholder, the `file:` scheme) across the
+tree."""
 
 SURFACE_CENSUS = """\
 The listener census (ten listeners):
@@ -1348,12 +1358,16 @@ def emit():
     matrix, markers = secrets(rows)
     ap(SECRET_HEAD)
     ap('')
-    ap(f'{len(matrix)} secret-marked row(s):')
-    ap('')
-    ap('| tool | knob | live | restart | hidden |')
-    ap('|---|---|---|---|---|')
+    groups = {}
     for t, n, live, restart, hidden in matrix:
-        ap(f'| {t} | `{n}` | {"yes" if live else "no"} | {"yes" if restart else "no"} | {"yes" if hidden else "no"} |')
+        groups.setdefault((n, live, restart, hidden), []).append(t)
+    ap(f'{len(matrix)} secret-marked row(s) across {len(groups)} knob(s), consolidated by posture:')
+    ap('')
+    ap('| knob | tools | live | restart | hidden |')
+    ap('|---|---|---|---|---|')
+    for (n, live, restart, hidden), ts in sorted(groups.items()):
+        tools = 'all four' if len(ts) == len(TOOLS) else ', '.join(sorted(ts))
+        ap(f'| `{n}` | {tools} | {"yes" if live else "no"} | {"yes" if restart else "no"} | {"yes" if hidden else "no"} |')
     ap('')
     ap(SECRET_FINDINGS)
     ap('')

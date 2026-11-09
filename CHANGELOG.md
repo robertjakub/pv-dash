@@ -604,6 +604,24 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   moves the superseded release section(s) to the archive and the
   version-sweep's pathspec excludes it.
 
+### Docs
+
+- **everywhere** — **the man pages carry one section ladder per page
+  class**: the daemon pages all run NAME, SYNOPSIS, DESCRIPTION,
+  OPTIONS, SIGNALS, CONTROL, SECURITY, ENVIRONMENT, FILES, EXIT STATUS,
+  SEE ALSO (the cache's posture prose carves out of DESCRIPTION/CONTROL
+  into a new SECURITY; the scraper and the dashboard gain ENVIRONMENT +
+  EXIT STATUS, the fake EXIT STATUS), the ctl pages gain the missing
+  EXAMPLES / ENVIRONMENT / EXIT STATUS (the cache and the fake had the
+  exit codes but no env twins, the scraper and the dashboard had none
+  of the three), the cli pages gain EXIT STATUS where missing;
+  `common/manpage.py` grows the LADDERS table — `page(kind=...)`
+  refuses a page that misses, adds or misorders a section (the prose
+  stays per-tool, the ladder does not) — the four ctl EXAMPLES'
+  `printf` pipelines render their `\n` for the first time (`\\n` ate a
+  character and printed a `0` — latent since the pages were ported),
+  and the cache page's three over-long `.BR`/`.I` rows rewrap.
+
 ## 0.4.2 — 2026-11-08
 ### Changed
 

@@ -1,4 +1,4 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 21)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 23)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
@@ -40,7 +40,34 @@ Modbus surface, F11) and **F21 closed** — the dashboard's page and proxy
 take the bearer token (`--auth-token`, constant-time; the `?auth=<token>`
 query exchanges for an HttpOnly session cookie, the raw header stays for
 scripts), the default bind moves to 127.0.0.1 and a token-less
-non-loopback bind refuses to start. Scope:
+non-loopback bind refuses to start. **Rev. 22** made the control
+LISTENER one implementation family-wide — the cache's listener tier (the
+live `control/port` rebind: bind-first, the old loop retires by
+identity, the sessions keep serving; the F5 refusal now also guards the
+live wire, not only the start) lifted into `common/control.py`, the
+scraper's and cache's private copies shed, the fake and the dashboard
+riding it (the fake's tokenless-TCP posture parameterized as
+`TOKENLESS_TCP = 'allow'`; the dashboard gained `--control-socket-group`
+— 0660 was the cache's and scraper's alone), and the four
+`resolve_control_target`/`parse_control_target` wrappers unified into
+`common/config.py` (one signature: `listen_port` + the socket template).
+**Rev. 23** gave the fake's and dashboard's own `/metrics` the cache's
+`metrics/acl` gate and split the shared default bind — all four tools
+speak one metrics stack now: the token mandatory beyond loopback (F13's
+refusal) → `metrics/acl` at accept (`--metrics-acl`, env `METRICS_ACL`,
+live `set metrics acl` / `unset`, the table show `show metrics acl
+table`; the inline grammar or the standalone ip-prefix acl file —
+`common/config.py`'s `resolve_metrics_acl` is the one resolver, lifted
+from the scraper) → the caps. The default binds renumbered from 9350 up
+(the scraper's own listen keeps 9350): the cache 9252 → **9351**, the
+fake 9452 → **9352**, the dashboard 9452 → **9353** — the fake and the
+dashboard had SHARED 9452 (a co-located collision). The fake's and the
+dashboard's metrics toggle re-spelled `metrics/enable` family-wide (the
+cache's spelling; the knob names and the config files stay flat). The
+ip-prefix acl example + its JSON Schema shipped to `inverter/examples/`
++ `inverter/schema/` and `dashboard/examples/` + `dashboard/schema/`
+(the cache's and scraper's carried them since rev. 19).
+Scope:
 the control socket is NOT this gate (the tokens, the RBAC ops role and
 the trust-uids list are F5's own admission story, unchanged); the
 dashboard consumes the scraper's metrics and carries no ACL surface
@@ -366,11 +393,11 @@ historical finding records keep their period env names.
 |---|---|---|---|
 | `/cache` | the Modbus caching proxy: bin/ (the daemon + the ctl/cli clients), lib/ (proxy, cache, upstream, control, metrics, persist, config), man/, the set-grammar sample conf, the NixOS module | the production-relevant surface: two listeners (Modbus TCP + control), the metrics endpoint, the state dump, the audit trail; the write path quadruple-gated (the parse gate, `allow-write`, `write-acl` none, `write-registers` none); the Modbus connect/write clients and the `/metrics` endpoint IP-gated (`acl/connect`, `acl/write`, `metrics/acl` — the inline system grammar or the standalone ip-prefix acl file, the chain's last matching rule deciding; the table shows render the effective chain); the dump is config-equivalent trust at rest | F2–F5, F8, F18, F23 closed here; F1 accepted |
 | `/common` | the shared package every tool imports: `audit.py` (the append-only trail + the chained per-writer hashes), `config.py` (parse_listen, is_loopback_host, the profile resolution, the token loading + the 0600 enforcement, the shared IP-gate half — `IPGate`/`parse_acl_value`/`acl_admits`/`acl_file_warn`), `connlimit.py` (the connection gates + the `acl_allows`/`acl_refused` accept hooks), `cred.py` (peer-cred), `protocol.py` (recv_exact, exception frames), `human.py`, `logutil.py`, `version.py` | trust amplifier: every tool inherits its guarantees (the fail-closed token modes, the wire discipline, the fold at the audit writer, the admit/release symmetry); a regression here is family-wide — the regtests + the audit-chain suite watch it | F10, F12 closed here |
-| `/dashboard` | the web front: bin/ (the server + the ctl/cli clients), lib/ (the HTTP handler + the Prometheus proxy, the control server, config, settings, the static constants), static/, man/ | the viewer surface: GET-only HTTP — the static page (a realpath-guarded tree, 403 on escape) and the Prometheus proxy under `--prom-prefix` — with the family connection gate (`--max-clients`/`--client-timeout`/`--max-conn-per-ip`, extras 503) and the bearer token (`--auth-token`: mandatory beyond loopback, the `?auth=` cookie bootstrap — F21 closed, rev. 21); the JSON-lines control server in the family shape (the F5 refusal, peer-cred, the signed wire, the DSH trail, the socket `0600` after bind); the default bind is the loopback | F20 closed (the clients); F21 closed (rev. 21) |
+| `/dashboard` | the web front: bin/ (the server + the ctl/cli clients), lib/ (the HTTP handler + the Prometheus proxy, the control server, config, settings, the static constants), static/, man/ | the viewer surface: GET-only HTTP — the static page (a realpath-guarded tree, 403 on escape) and the Prometheus proxy under `--prom-prefix` — with the family connection gate (`--max-clients`/`--client-timeout`/`--max-conn-per-ip`, extras 503) and the bearer token (`--auth-token`: mandatory beyond loopback, the `?auth=` cookie bootstrap — F21 closed, rev. 21); the JSON-lines control server in the family shape (the F5 refusal, peer-cred, the signed wire, the DSH trail, the socket `0600`/`0660` after bind, the live rebind — rev. 22); the default bind is the loopback; the dashboard's own `/metrics` rides the family stack (rev. 23: the `metrics/acl` gate at accept, the default bind 9353) | F20 closed (the clients); F21 closed (rev. 21) |
 | `/docker` | one alpine image per Modbus tool, the Prometheus image, the two entrypoints (the `/config` seeding + the token handoff), the compose demo | the network is the boundary: one `internal: true` network, nothing published on the host; the images run unprivileged (`pvsuite`, the `prometheus` user); root exists only for the volume seeding and drops before exec; the bundled `*.token` defaults materialize as random 0600 values | F7 closed; F17 open (the volume trust) |
-| `/inverter` | the fake: bin/ (the daemon + the ctl/cli clients), lib/ (the simulator, the machines, control, metrics, inverter, profile), man/ | a test instrument on a trusted LAN: the Modbus surface capped (`max-clients`/`client-timeout`/`max-conn-per-ip`, live-settable) and connect-ACL'd (`--connect-acl`/`$CONNECT_ACL`, the cache's mirrored — `any` (the default)/`none`/the inline IP/CIDR list only, no `file:` gates), the read-count gate, the metrics endpoint optional (warns beyond loopback without a token); deliberately not security-first — documented as such | F11 closed; F1 accepted |
+| `/inverter` | the fake: bin/ (the daemon + the ctl/cli clients), lib/ (the simulator, the machines, control, metrics, inverter, profile), man/ | a test instrument on a trusted LAN: the Modbus surface capped (`max-clients`/`client-timeout`/`max-conn-per-ip`, live-settable) and connect-ACL'd (`--connect-acl`/`$CONNECT_ACL`, the cache's mirrored — `any` (the default)/`none`/the inline IP/CIDR list only, no `file:` gates), the read-count gate, the metrics endpoint optional (the F13 refusal — rev. 21) with the family `metrics/acl` gate (rev. 23); the control listener is the family's one tier (rev. 22: the live rebind, tokenless TCP included — the F11 posture); deliberately not security-first — documented as such | F11 closed; F1 accepted |
 | `/profiles` | the device profiles (JSON data: sun2000 + three Deye variants) + the linter and the formatter bins | data, not code: the profiles decide what the tools read (and what the cache's write allow-list may touch); the loader validates every entry (the type/width/scale, the address bounds, clean `SystemExit` one-liners), the search path is closed (three fixed candidates, no CWD or `PATH` dependence), the linter checks the schema shape, the overlaps and the bounds — treat a profile file like config: the operator picks it | none (rev. 4 review: the loader, the linter, the formatter) |
-| `/scraper` | the exporter: bin/ (the daemon + the ctl/cli clients), lib/ (server, scraper, poller, control, config, statics), man/, the set-grammar sample conf + the sample rules | the read-only consumer: one HTTP GET route set (bearer-gated, capped, IP-gated — `metrics/acl`, the non-loopback refusal) + one outbound Modbus client (FC3/FC4 reads only); the family JSON-lines control server (rev. 6: the unix socket `0600` after bind, the token'd TCP with the F5 refusal, peer-cred, the signed wire, the SCR trail); the SIGHUP reload re-validates everything (the token-file modes too) | F13 closed; F14/F15/F16 open; F20 closed (the clients) |
+| `/scraper` | the exporter: bin/ (the daemon + the ctl/cli clients), lib/ (server, scraper, poller, control, config, statics), man/, the set-grammar sample conf + the sample rules | the read-only consumer: one HTTP GET route set (bearer-gated, capped, IP-gated — `metrics/acl`, the non-loopback refusal) + one outbound Modbus client (FC3/FC4 reads only); the family JSON-lines control server (rev. 6: the unix socket `0600` after bind, the token'd TCP with the F5 refusal, peer-cred, the signed wire, the SCR trail; the listener tier is `common/control.py`'s one implementation now — rev. 22, the private copies shed); the SIGHUP reload re-validates everything (the token-file modes too) | F13 closed; F14/F15/F16 open; F20 closed (the clients) |
 | `/scripts` | `release.py` (the release orchestrator: the version sweep, the changelog rename, the verify, the tag, the push; the GH release is the workflow's job, the local cut is the opt-in `--release`) + `audit_verify.py` (the F10 chain verifier) | maintainer-local trust: the orchestrator guards the dirty tree and the main-only rule, verifies (the full suite + the nix build by default), then commits/tags/pushes; the verifier is offline and read-only; no runtime surface; the tag is the release's trust root, signed when a key exists — see F19 | F19 closed (rev. 5: the workflow cuts the release after the gate) |
 
 `flake.nix` (the packaging: the packages, the overlay, the NixOS modules)
@@ -380,8 +407,8 @@ but hold no runtime trust of their own.
 | Surface | cache/ | scrape/ | inverter/ | dashboard/ | Auth |
 |---|---|---|---|---|---|
 | Modbus TCP listener | `--listen`, default `127.0.0.1:15502`; the connect ACL on top (`acl/connect`: any/none/the inline list, or the ip-prefix acl file) | n/a (outbound only) | `--host/--port`, default `127.0.0.1:5502` (Docker: `0.0.0.0`); the connect-acl on top (the cache's mirrored, inline grammar only) | n/a | none (the Modbus protocol has none) |
-| HTTP surface | the `/metrics` endpoint: `--metrics-server` (live-settable), off; binds `--metrics-listen` (default `127.0.0.1:9252`; `0.0.0.0` allowed, **a token is mandatory beyond loopback — a token-less non-loopback bind refuses to start, F13**); the `metrics/acl` IP gate at accept (`any`/`none`/the inline list/`file:<path>` — an off-ACL peer closed without a reply) | the exporter itself: `--listen`, default `127.0.0.1:9350` — two GET routes (`/`, `/metrics`), everything else a 404, `Cache-Control: no-store`, the `metrics/acl` IP gate at accept (`--metrics-acl`, the same grammar — the ACL first, then the caps) | the `/metrics` endpoint: `--metrics-server`, off; binds `--metrics-listen` (default `127.0.0.1:9452`) | the page + the Prometheus proxy: `--bind`, default **`127.0.0.1`:8080** — GET-only, the static tree realpath-guarded (403 on escape), the proxy under `--prom-prefix` | bearer token (`hmac.compare_digest`): mandatory beyond loopback on every HTTP surface — the cache's, the scraper's and the dashboard's own /metrics, the fake's (rev. 21, the warn retired) and the dashboard's page (F21 closed — the `?auth=` bootstrap sets the session cookie, the raw header for scripts); the loopback bind serves tokenless everywhere; the metrics endpoints' IP gate (`metrics/acl`) sits at accept beside the caps — never instead of the token (F13's refusal stands, rev. 19) |
-| control server (JSON lines) | unix socket `/tmp/modbus-cache-<port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket `/tmp/modbus-scraper-<listen-port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1 (exempt from the refusal — the F11 test-tool posture) | unix socket `/tmp/dashboard-<port>.socket`, `chmod 0600` after bind; `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | token on TCP (`hmac.compare_digest`), refused without; on unix a kernel-vouched peer (peer-cred: root, the daemon's own user, `--control-trust-uids`) skips the handshake; the signed wire (the full HMAC per frame) wherever a token is held |
+| HTTP surface | the `/metrics` endpoint: `--metrics-server` (live-settable), off; binds `--metrics-listen` (default `127.0.0.1:9351`; `0.0.0.0` allowed, **a token is mandatory beyond loopback — a token-less non-loopback bind refuses to start, F13**); the `metrics/acl` IP gate at accept (`any`/`none`/the inline list/`file:<path>` — an off-ACL peer closed without a reply) | the exporter itself: `--listen`, default `127.0.0.1:9350` — two GET routes (`/`, `/metrics`), everything else a 404, `Cache-Control: no-store`, the `metrics/acl` IP gate at accept (`--metrics-acl`, the same grammar — the ACL first, then the caps) | the `/metrics` endpoint: `--metrics-server`, off; binds `--metrics-listen` (default `127.0.0.1:9352`); the `metrics/acl` IP gate at accept (rev. 23 — the same grammar, the family's one stack) | the page + the Prometheus proxy: `--bind`, default **`127.0.0.1`:8080** — GET-only, the static tree realpath-guarded (403 on escape), the proxy under `--prom-prefix`; the dashboard's own `/metrics` rides the family stack too (rev. 23): `--metrics-server`, off, binds `--metrics-listen` (default `127.0.0.1:9353`), the `metrics/acl` gate at accept | bearer token (`hmac.compare_digest`): mandatory beyond loopback on every HTTP surface — the cache's, the scraper's and the dashboard's own /metrics, the fake's (rev. 21, the warn retired) and the dashboard's page (F21 closed — the `?auth=` bootstrap sets the session cookie, the raw header for scripts); the loopback bind serves tokenless everywhere; the metrics endpoints' IP gate (`metrics/acl`, all four tools since rev. 23) sits at accept ahead of the caps — never instead of the token (F13's refusal stands, rev. 19) |
+| control server (JSON lines) | unix socket `/tmp/modbus-cache-<port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket `/tmp/modbus-scraper-<listen-port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix socket, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1 (exempt from the refusal — the F11 test-tool posture, a tokenless TCP rebind succeeds live) | unix socket `/tmp/dashboard-<port>.socket`, `chmod 0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | ONE listener tier for the family (`common/control.py`, rev. 22): token on TCP (`hmac.compare_digest`), refused without — at start AND on the live rebind; on unix a kernel-vouched peer (peer-cred: root, the daemon's own user, `--control-trust-uids`) skips the handshake; the signed wire (the full HMAC per frame) wherever a token is held; the target rebinds live (`set control/port` — bind-first, the failed bind rolls back, the old loop retires by identity, the sessions keep serving, `off` retires) |
 | state dump | `--dump-path`: the live setting overrides and — with `--dump-with-cache`/`request dump with-cache` — the cached words (+ stamps), as one atomic JSON — see F18 | n/a | n/a | n/a | **created `0600` explicitly** (never the umask) + a sha256 integrity hash checked at restore (F18) |
 | token files | the token knobs take `file:` references — `--control-token file:/path` / `--metrics-token file:/path` | `--auth-token file:/path` / `--control-token file:/path` | `--control-token file:/path` / `--metrics-token file:/path` | `--control-token file:/path` | **owner-only (0600) enforced** — a group/world-accessible token file refuses the reference (F12); the bare `*_FILE` env/flag spellings were REMOVED rev. 13 (the reference rides the token knob's own flag/env/config/live paths) |
 | upstream connection | outbound to the inverter/SDongle | outbound poll to the inverter/SDongle (or the cache), every 10 s by default | n/a (it *is* the device) | outbound HTTP to the Prometheus (`--upstream`, default `http://localhost:9090`) | none (protocol-inherent); the Prometheus hop is plain HTTP too |
@@ -422,13 +449,15 @@ control-server access only.
   `any`/`none`/an explicit list, `proxy.py:287,366-395`); control
   TCP requires the token before any command and a token-less TCP control
   refuses to start (F5) on every tool that serves one — the cache
-  (`cache/bin/modbus-cache.py:243-247`, `cache/lib/control.py:141-148`,
-  constant-time `hmac.compare_digest` at `:146`), the scraper
-  (`scrape/lib/config.py`, asserted by the regtest) and the dashboard
-  (`dashboard/lib/config.py:150`) — the fake stays exempt on purpose
-  (F11's test-tool posture); on the unix sockets the peer-cred path
+  (`cache/bin/modbus-cache.py:229`, `common/control.py`
+  `refuse_tokenless_rebind`/`refuse_token_drop` — the ONE guard the
+  family's live rebinds call, constant-time `hmac.compare_digest` in
+  `common/control.py` `auth_role`), the scraper
+  (`scraper/lib/config.py:113`, asserted by the regtest) and the dashboard
+  (`dashboard/lib/config.py:141`) — the fake stays exempt on purpose
+  (F11's test-tool posture, `TOKENLESS_TCP = 'allow'`); on the unix sockets the peer-cred path
    authenticates the kernel-vouched peers without the secret
-   (`cache/lib/control.py:110-126` and the family mirrors,
+   (`common/control.py:308` `trusted_peer`,
    `common/cred.py`) and everyone else still needs the token; wherever a
    token is held the wire is signed both directions (`common/wiresec.py` —
    the full payload HMAC per frame, mandatory over TCP, verify-if-present
@@ -950,6 +979,31 @@ Closed in rev. 2: F2, F3, F4, F5, F6, F8. Closed in rev. 3: F7, F9, F12. Closed 
   env `CONTROL_TOKEN=file:...`), all ten suites print ALL PASS;
   `scripts/check_options.py` + `scripts/lint_options.py --check` clean;
   the man pages regenerate (`mandoc -Tlint` clean).
+
+### Rev. 22 (this revision)
+
+- **The control listener is ONE implementation family-wide** — the
+  cache's listener tier lifted into `common/control.py` (the live
+  `control/port` rebind family: bind-first, the identity retire, the
+  sessions keep serving; the F5 refusal guards the live wire through the
+  shared `refuse_tokenless_rebind`/`refuse_token_drop` guards), the
+  cache's and scraper's private copies shed, the fake and the dashboard
+  riding it. The fake's tokenless-TCP posture is the class attribute
+  (`TOKENLESS_TCP = 'allow'`) — its live rebind SUCCEEDS tokenless (the
+  F11 posture, the family's inverse proof, pinned in the regtest). The
+  dashboard gained `--control-socket-group` (0660 — the cache's and
+  scraper's alone before) and the live `control/port`, `control/ops/verbs`
+  (the family spelling — the cache's `control/ops-verbs` re-spelled),
+  `control/trust-uids` lives; the four `resolve_control_target`/
+  `parse_control_target` wrappers unified into `common/config.py` (one
+  signature, `listen_port` + the socket template).
+- **The verified evidence**: the inverter regtest's family-listener block
+  (the tokenless TCP rebind, the old target closed, off-retires while the
+  session keeps serving, the unset restore, the 0660/0600 live re-modes),
+  the dashboard fuzz's §8c block (the tokenless live-rebind F5 refusal,
+  the tokenized rebind, the retired socket silent, the restored target
+  speaking), the scraper and cache regtests' rebind blocks unchanged and
+  green on the shared tier; all ten suites ALL PASS.
 
 ## 5. NIS2 / DORA mapping (all modules; cache is the production-relevant one)
 | Requirement | Status | Where |

@@ -31,7 +31,9 @@ collector, and a `compose.yaml` wiring the demo stack. The pattern:
 - a **HEALTHCHECK** on every image: the Modbus tools answer over their
   unix control socket (`<tool>-ctl ping` / `show version` — the check
   runs as root, a trusted peer over SO_PEERCRED, so no token is needed;
-  disabling the control plane with `CTL=0` fails the check), the
+  disabling the control plane with `CTL=0` fails the check — and so does
+  a live `set control port off` on a running container, by design; a
+  later `set control port <unix-path>` re-arms it), the
   Prometheus image probes `/-/ready` with busybox wget
 - the shared [`profiles/`](../profiles/README.md) JSON files copied flat to
   `/pv-suite/profiles/` (the subproject's `bin/` tools stay out of the

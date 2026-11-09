@@ -9,6 +9,64 @@ before the repo restructured into one suite.
 ## Unreleased
 ### Added
 
+- **everywhere** — **the /metrics listener is ONE stack, family wide**:
+  the fake's and dashboard's own `/metrics` take the cache's
+  **`metrics/acl`** (`--metrics-acl`, env `METRICS_ACL`, live `set
+  metrics acl` / `unset metrics acl`, the table show `show metrics acl
+  table`, the `set metrics acl table` pointer) — the same value grammar
+  (`any` the default, `none`, the comma-separated whitelist,
+  `file:<path>` the standalone ip-prefix acl file), checked at **accept,
+  ahead of the caps**: a client off the ACL is closed without a reply
+  and logged `connection rejected: … not on the metrics ACL`; a bad file
+  errs with the old gate standing, a group/world-readable acl file warns
+  (the log, the audit trail's `ACL-FILE` event, the `set` reply's
+  suffix). `common/config.py` gains `resolve_metrics_acl` (the one
+  `(gate, warn)` resolver, lifted from the scraper). The shipped example
+  + its JSON Schema copy to all four tools:
+  `inverter/examples/` + `inverter/schema/` and `dashboard/schema/` are
+  new dirs, `dashboard/examples/acl-ip-prefix.json` joins its existing
+  examples; the cache's `package.nix` now installs its three
+  `schema/*.schema.json` files too (the scraper's were the only ones
+  shipped).
+
+### Changed
+
+- **everywhere** — **the /metrics default binds renumber from 9350 up,
+  one per tool**: the scraper keeps `9350` (its own listen IS the
+  /metrics), the cache `9252` → **`9351`**, the fake `9452` → **`9352`**,
+  the dashboard `9452` → **`9353`** — the fake and the dashboard SHARED
+  `9452` until now (a co-located stack would have collided). The fake's
+  and dashboard's metrics toggle live name re-spells to the family form
+  **`metrics/enable`** (the cache's spelling; the knob name
+  `metrics-server`, the config files and the flag stay flat — the wire
+  spells `set metrics enable on/off`).
+
+- **everywhere** — **the control listener is ONE implementation, family
+  wide** (the cache's golden master lifted into `common/control.py`):
+  `control/port` rebinds the listener live on all four tools (bind-first,
+  the failed bind rolls back, the old loop retires by identity, the
+  connected sessions keep serving, `off` retires while the sessions keep
+  serving, `unset` restores the configured target); the F5 refusal (a
+  tokenless TCP control bind) now also guards the **live** rebind, not
+  just the start — the fake opts out by posture (`TOKENLESS_TCP =
+  'allow'`, F11: a tokenless TCP rebind succeeds there, the regtest pins
+  the inverse proof). The fake's `control-port`, `control-ops-verbs`,
+  `control-trust-uids`, `control-socket-group` go live (they were
+  startup-only); the **dashboard** gains the whole live control family
+  (`control/port`, `control/ops/verbs`, `control/trust-uids`) and a NEW
+  **`--control-socket-group`**/`CONTROL_SOCKET_GROUP` knob (0660 instead
+  of the plain 0600 — the cache's and scraper's alone until now; NixOS
+  `controlSocketGroup`). The ops-verbs live name re-spells to the family
+  form **`control/ops/verbs`** (the cache's `control/ops-verbs` included;
+  the knob name, the config files and the flag stay flat) — the wire
+  spells `set control ops verbs <list>`. The four per-tool
+  `resolve_control_target`/`parse_control_target` wrappers unify into
+  `common/config.py` (one signature: `listen_port` + the socket
+  template); the dump/reload state carries the listener on every tool.
+  The docker note: a live `set control port off` on a container daemon
+  fails the image's HEALTHCHECK by design (it probes the control socket;
+  `CTL=0` fails the check).
+
 - **cache** — **`metrics/acl`** (`--metrics-acl`, env `METRICS_ACL`,
   config `metrics_acl`, NixOS `metricsAcl`, live `set metrics acl` /
   `unset metrics acl`): the scraper's metrics/acl wave migrates to the

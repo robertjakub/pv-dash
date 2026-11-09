@@ -40,11 +40,9 @@ token shape beyond the loopback (the page's F21 closed it — rev. 21).
 | tool | listener | the default bind | the stack at it |
 |---|---|---|---|
 | cache | the Modbus mirror | `127.0.0.1:15502` | `acl/connect` (accept, ahead of the caps) → the caps → the suite auth; the write path then adds `--allow-write` + `acl/write` + `write-registers` |
-| cache + scraper | /metrics | `127.0.0.1:9252`, off / `127.0.0.1:9350`, always on | the token mandatory beyond loopback (F13's refusal) → `metrics/acl` → the caps |
-| cache + scraper + dashboard | control | unix \| TCP `127.0.0.1` | the TCP bind refuses without the admin token (F5); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660` |
+| all four | control | unix \| TCP `127.0.0.1` | ONE listener for the family (`common/control.py`'s tier, lifted from the cache): the TCP bind refuses without the admin token (F5 — the fake exempt, F11's test-tool posture); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660`; the target rebinds live (`set control port` — bind-first, the sessions keep serving), the tokens, the ops policy, the trust uids and the socket-group all set live |
+| all four | /metrics | the scraper always on at `127.0.0.1:9350`; the cache, fake and dashboard off at `9351`/`9352`/`9353` | ONE stack for the family: the token mandatory beyond loopback (F13's refusal) → `metrics/acl` (the inline grammar or `file:<path>`, checked at accept — a client off the ACL is closed without a reply) → the caps |
 | fake | the Modbus listener | `:5502` | `connect-acl` (the system grammar, no `file:`) → the caps → the suite auth; `--allow-write` |
-| fake | control | unix \| TCP `127.0.0.1` | the F11 tokenless-TCP exemption |
-| fake + dashboard | /metrics | the shared `127.0.0.1:9452`, off | no IP gate (the shared hooks' admit-all base); the token mandatory beyond loopback (F13's refusal) → the caps — harmless while both stay off |
 | dashboard | the page + the config proxy | `127.0.0.1:8080` | the bearer token (`auth/token`, F21 closed — the `?auth=` bootstrap sets the session cookie, the header for scripts; a token-less non-loopback bind refuses to start) — GET-only, the realpath guard, the cap gate |
 
 The defaults come from each tool's `statics.py`; the authoritative
@@ -231,7 +229,9 @@ The control socket is NOT this gate — see below.
 ## the control plane — loopback binds, no IP gate
 
 Every control TCP bind is hardcoded `127.0.0.1`
-(`common/control.py`'s `_open_sock`; the unix sockets are peer-cred), so
+(`common/control.py`'s `_open_sock` — the one listener tier all four
+tools ride, live-rebindable via `set control/port`, the target parsers
+unified in `common/config.py`; the unix sockets are peer-cred), so
 no control surface carries an IP gate — an IP filter on loopback decides
 on the one address that always matches. The plane's admission story is
 the tokens + the signed wire + the RBAC roles (docs/AUDIT.md, F5). An

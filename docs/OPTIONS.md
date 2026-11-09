@@ -14,9 +14,9 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (21): `audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `no-audit-log`, `restore-on-start`. The control-plane block is
+Common to **all four** tools (23): `audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
-family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `version` ride
+family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `metrics-acl-table`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
 
 | kind | name | group | live | cache | scraper | inverter | dashboard |
@@ -54,11 +54,11 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `control` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `control-log-replies` |  | *(startup-only)* |  |  | ✓ |  |
 | k | `control-ops-token` |  | `set control ops token` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
-| k | `control-ops-verbs` |  | `set control ops-verbs`, `set control ops verbs` | **✓** live | **✓** live | **✓** | **✓** |
-| k | `control-port` |  | `set control port` | **✓** live | **✓** live | **✓** | **✓** |
-| k | `control-socket-group` |  | `set control socket-group` | ✓ live | ✓ live | ✓ |  |
+| k | `control-ops-verbs` |  | `set control ops verbs` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `control-port` |  | `set control port` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `control-socket-group` |  | `set control socket-group` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `control-token` |  | `set control token` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
-| k | `control-trust-uids` |  | `set control trust-uids` | **✓** live | **✓** live | **✓** | **✓** |
+| k | `control-trust-uids` |  | `set control trust-uids` | **✓** live | **✓** live | **✓** live | **✓** live |
 | c | `control/ops` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | c | `dump` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `dump-interval` |  | `set dump-interval` | ✓ live |  |  |  |
@@ -89,13 +89,13 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `merge-gap` |  | `set modbus merge-gap` | ✓ live |  |  |  |
 | k | `metric-prefix` |  | `set metrics prefix` |  | ✓ live |  |  |
 | c | `metrics` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `metrics-acl` |  | `set metrics acl` | ✓ live | ✓ live |  |  |
-| s | `metrics-acl-table` |  | `show metrics-acl-table` | ✓ | ✓ |  |  |
+| k | `metrics-acl` |  | `set metrics acl` | **✓** live | **✓** live | **✓** live | **✓** live |
+| s | `metrics-acl-table` |  | `show metrics-acl-table` | **✓** | **✓** | **✓** | **✓** |
 | k | `metrics-client-timeout` |  | `set metrics limits timeout` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-listen` |  | `set metrics listen, restart` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-max-clients` |  | `set metrics limits max-clients` | ✓ live |  | ✓ | ✓ |
 | k | `metrics-max-conn-per-ip` |  | `set metrics limits max-conn-per-ip` | ✓ live |  | ✓ | ✓ |
-| k | `metrics-server` |  | `set metrics-server`, `set metrics enable` | ✓ live |  | ✓ live | ✓ live |
+| k | `metrics-server` |  | `set metrics enable` | ✓ live |  | ✓ live | ✓ live |
 | k | `metrics-spec` |  | `set metrics filter` |  | ✓ live |  |  |
 | k | `metrics-token` |  | `set metrics token` | ✓ live+secret |  | ✓ live+secret | ✓ live+secret |
 | c | `metrics/auth` |  | *(startup-only)* |  | ✓ |  |  |

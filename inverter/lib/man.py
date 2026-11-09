@@ -144,13 +144,24 @@ the control socket used when \\fB--control-port\\fR is unset.
 .TP
 .I ~/.local/state/fake-inverter/audit.log
 the audit trail when \\fB--audit-log\\fR is unset."""
+    exit_status = """.SH EXIT STATUS
+.TP
+.B 0
+success (\\fB--dry-run\\fR: valid configuration).
+.TP
+.B 1
+invalid configuration or a failed bind (reason on stderr).
+.TP
+.B 2
+command-line misuse."""
     return page(
         'simulated PV inverter for testing the pv-suite stack',
         'modbus-fake-inverter', 1, DATE, VERSION, MANUAL,
         '.B modbus-fake-inverter\n.RI [ options ]\n.br\n.B modbus-fake-inverter \\-\\-static\n.RI [ options ]',
         description,
         options_section(parser),
-        extra_sections=(signals, control, security, environment, files),
+        extra_sections=(signals, control, security, environment, files, exit_status),
+        kind='daemon',
         see_also='.BR modbus-fake-ctl (1),\n.BR modbus-fake-cli (1),\n.BR modbus-cache (1),\n.BR modbus-scraper (1)\n.PP\n\\fBinverter/README.md\\fR in the suite checkout \\(em the full documentation,\nincluding the state machines.')
 
 
@@ -175,8 +186,12 @@ CONTROL."""
 .IP \\(bu 2
 .B modbus-fake-ctl set pv 2500
 .IP \\(bu 2
-.B printf 'set pv 2500\\\\nset soc 30\\\\nshow pv\\\\n' | modbus-fake-ctl
+.B printf 'set pv 2500\\enset soc 30\\enshow pv\\en' | modbus-fake-ctl
 .RE"""
+    environment = """.SH ENVIRONMENT
+.TP
+.B CTL ", " CONTROL_TOKEN
+the control target and the TCP token when the flags are unset."""
     exit_status = """.SH EXIT STATUS
 .TP
 .B 0
@@ -193,7 +208,8 @@ command-line misuse."""
         '.B modbus-fake-ctl\n.RI [ options ]\n.IB command " [args ...]"\n.br\n.B modbus-fake-ctl\n.RI [ options ]\n< commands',
         description,
         options_section(parser),
-        extra_sections=(examples, exit_status),
+        extra_sections=(examples, environment, exit_status),
+        kind='ctl',
         see_also='.BR modbus-fake-inverter (1),\n.BR modbus-fake-cli (1)')
 
 
@@ -237,4 +253,5 @@ command-line misuse."""
         description,
         options_section(parser),
         extra_sections=(environment, exit_status),
+        kind='cli',
         see_also='.BR modbus-fake-inverter (1),\n.BR modbus-fake-ctl (1)')

@@ -47,20 +47,20 @@ overlay, audited WRITE.
 .SH OPTIONS
 .TP
 .B \-\-host
-bind addresss)
+bind address
 .TP
 .BI \-\-port " N"
-Modbus TCP ports)
+Modbus TCP port
 .TP
 .BI \-\-unit " N"
-Modbus unit id serveds)
+Modbus unit id served
 .TP
 .B \-\-profile
 inverter profile JSON: name \-> register (+ optional type/scale), e.g.
 profiles/profiles/sun2000.json; PROFILE when unset
 .TP
 .BI \-\-max\-kwp " N"
-PV array size in kWp, peak = 75%% of its)
+PV array size in kWp, peak = 75%% of it
 .TP
 .B \-\-timezone
 clock the state machines integrate over (the PV bell, the home load, the
@@ -78,7 +78,7 @@ so a full simulated day takes 24/N real hours
 constant demo values instead of the day simulation
 .TP
 .BI \-\-battery\-kwh " N"
-usable battery capacity in kWhs)
+usable battery capacity in kWh
 .TP
 .B \-\-strict
 reject reads of undefined registers with exception 02 (like the real
@@ -125,15 +125,15 @@ audited WRITE\-REFUSED — the cache's \-\-allow\-write gate, mirrored
 .TP
 .BI \-\-max\-clients " N"
 refuse further Modbus connections past this many simultaneous clients, 0
-= no limits)
+= no limit
 .TP
 .BI \-\-client\-timeout " N"
-disconnect Modbus clients silent for this many seconds, 0 = nevers) —
+disconnect Modbus clients silent for this many seconds, 0 = never —
 sheds connections from clients that died without closing
 .TP
 .BI \-\-max\-conn\-per\-ip " N"
 refuse further Modbus connections from one peer IP past this many
-simultaneous connections, 0 = no per\-IP limits)
+simultaneous connections, 0 = no per\-IP limit
 .TP
 .B \-\-control\-port
 control server target: unix socket path or TCP port number on 127.0.0.1
@@ -199,15 +199,15 @@ checked at accept — a client off the ACL is closed without a reply
 .TP
 .BI \-\-metrics\-max\-clients " N"
 maximum concurrent HTTP clients on the /metrics endpoint; extras get an
-immediate 503, 0 = unlimiteds)
+immediate 503, 0 = unlimited
 .TP
 .BI \-\-metrics\-client\-timeout " N"
 seconds an idle /metrics client is kept before the socket times out, 0 =
-the built\-in 5 s caps)
+the built\-in 5 s cap
 .TP
 .BI \-\-metrics\-max\-conn\-per\-ip " N"
 maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
-limits)
+limit
 .TP
 .B \-\-audit\-log
 INV audit trail: a file path or \- for stdout (the docker/journald way);
@@ -215,13 +215,13 @@ INV audit trail: a file path or \- for stdout (the docker/journald way);
 .TP
 .BI \-\-audit\-max\-mb " N"
 rotate the audit log at this size in MB, keeping 3 backups; 0 = no size
-rotations)
+rotation
 .TP
 .B \-\-audit\-daily
 also rotate the audit log at UTC midnight
 .TP
 .BI \-\-audit\-files " N"
-rotated audit backups to keeps)
+rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
 disable the INV audit trail
@@ -355,6 +355,17 @@ the control socket used when \fB--control-port\fR is unset.
 .TP
 .I ~/.local/state/fake-inverter/audit.log
 the audit trail when \fB--audit-log\fR is unset.
+
+.SH EXIT STATUS
+.TP
+.B 0
+success (\fB--dry-run\fR: valid configuration).
+.TP
+.B 1
+invalid configuration or a failed bind (reason on stderr).
+.TP
+.B 2
+command-line misuse.
 
 .SH SEE ALSO
 .BR modbus-fake-ctl (1),

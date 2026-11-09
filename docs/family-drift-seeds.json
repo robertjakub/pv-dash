@@ -1,27 +1,6 @@
 {
  "seeds": [
   {
-   "id": "knob:cache:audit-daily",
-   "kind": "knob",
-   "tool": "cache",
-   "name": "audit-daily",
-   "suite": "cache-regtest.py"
-  },
-  {
-   "id": "knob:cache:audit-files",
-   "kind": "knob",
-   "tool": "cache",
-   "name": "audit-files",
-   "suite": "cache-regtest.py"
-  },
-  {
-   "id": "knob:cache:audit-max-mb",
-   "kind": "knob",
-   "tool": "cache",
-   "name": "audit-max-mb",
-   "suite": "cache-regtest.py"
-  },
-  {
    "id": "knob:cache:control-ops-verbs",
    "kind": "knob",
    "tool": "cache",
@@ -62,20 +41,6 @@
    "tool": "cache",
    "name": "requests-audit",
    "suite": "cache-regtest.py"
-  },
-  {
-   "id": "knob:scraper:audit-files",
-   "kind": "knob",
-   "tool": "scraper",
-   "name": "audit-files",
-   "suite": "scrape-regtest.py"
-  },
-  {
-   "id": "knob:scraper:audit-max-mb",
-   "kind": "knob",
-   "tool": "scraper",
-   "name": "audit-max-mb",
-   "suite": "scrape-regtest.py"
   },
   {
    "id": "knob:scraper:control-ops-verbs",
@@ -148,16 +113,9 @@
    "suite": "the emitting tool's regtest"
   },
   {
-   "id": "phrase:9dd1faed",
-   "kind": "canon-phrase",
-   "tool": "cache, inverter",
-   "name": "connection refused: per-ip limit of",
-   "suite": "the emitting tool's regtest"
-  },
-  {
    "id": "phrase:4e544048",
    "kind": "canon-phrase",
-   "tool": "cache, dashboard, inverter, scraper",
+   "tool": "cache, common, dashboard, inverter, scraper",
    "name": "connection rejected:",
    "suite": "the emitting tool's regtest"
   },
@@ -218,13 +176,6 @@
    "suite": "the emitting tool's regtest"
   },
   {
-   "id": "phrase:f0a7a174",
-   "kind": "canon-phrase",
-   "tool": "cache, inverter",
-   "name": "error handling",
-   "suite": "the emitting tool's regtest"
-  },
-  {
    "id": "phrase:9d0765b2",
    "kind": "canon-phrase",
    "tool": "cache, scraper",
@@ -260,13 +211,6 @@
    "suite": "the emitting tool's regtest"
   },
   {
-   "id": "phrase:91228c18",
-   "kind": "canon-phrase",
-   "tool": "cache, inverter",
-   "name": "suite auth with",
-   "suite": "the emitting tool's regtest"
-  },
-  {
    "id": "phrase:deddf647",
    "kind": "canon-phrase",
    "tool": "cache, inverter",
@@ -296,9 +240,9 @@
   }
  ],
  "counts": {
-  "total": 42,
-  "knob": 19,
+  "total": 34,
+  "knob": 14,
   "command": 1,
-  "canon-phrase": 22
+  "canon-phrase": 19
  }
 }

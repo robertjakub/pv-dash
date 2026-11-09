@@ -2179,6 +2179,51 @@ try:
                         'show', 'version'], capture_output=True, text=True, timeout=15)
     check('scraper control: the restored target speaks', r.returncode == 0 and r.stdout.startswith('ok modbus-scraper'),
           repr(r.stdout[:60]) + repr(r.stderr[-80:]))
+
+    # 7b. the audit family's one shape on the SCR: the bounds, the daily knob,
+    #     the write-back, the env twins (the bounds' one home: common/audit.py)
+    def sctl(*words, port=15597):
+        return subprocess.run([sys.executable, CTLB, '--control-port', str(port), '--control-token', STOK]
+                              + list(words), capture_output=True, text=True, timeout=15).stdout.strip()
+
+    r = sctl('set', 'audit', 'rotate', 'files', '0')
+    check('scraper audit: the files bound refuses low (the family text)',
+          'must be 1..100 backups' in r, repr(r[:130]))
+    r = sctl('set', 'audit', 'rotate', 'files', '101')
+    check('scraper audit: the files bound refuses high', 'must be 1..100 backups' in r, repr(r[:130]))
+    r = sctl('set', 'audit', 'rotate', 'max-size', '-1')
+    check('scraper audit: the max-size bound refuses', 'must be 0..1048576 MB' in r, repr(r[:130]))
+    r = sctl('set', 'audit', 'rotate', 'daily', 'on')
+    check('scraper audit-daily: the daily trigger switches on', r.startswith('ok audit/rotate/daily=on'), repr(r[:110]))
+    check('scraper audit-daily: show audit rotate daily answers on',
+          sctl('show', 'audit', 'rotate', 'daily') == 'ok audit/rotate/daily=on')
+    r = sctl('unset', 'audit', 'rotate', 'daily')
+    check('scraper audit-daily: the daily trigger unsets to the configured off',
+          r.startswith('ok audit/rotate/daily=off'), repr(r[:110]))
+    r = sctl('set', 'audit', 'rotate', 'files', '7')
+    check('scraper audit: the live set writes the config back (the fresh show config)',
+          'set audit rotate files 7' in sctl('show', 'config'), sctl('show', 'config')[:80])
+    r = sctl('unset', 'audit', 'disable')
+    check('scraper audit: the live bool rows unset (the defaults loop)',
+          r.startswith('ok audit/disable='), repr(r[:110]))
+    env = dict(os.environ, AUDIT_MAX_MB='77', AUDIT_DAILY='1', AUDIT_FILES='9')
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
+                                   '--listen', '127.0.0.1:19471', '--interval', '1',
+                                   '--control-port', '15609', '--control-token', STOK],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env))
+    time.sleep(1.5)
+    check('scraper audit: the env twins drive the rotation',
+          sctl('show', 'audit', 'rotate', 'max-size', port=15609) == 'ok audit/rotate/max-size=77'
+          and sctl('show', 'audit', 'rotate', 'daily', port=15609) == 'ok audit/rotate/daily=on'
+          and sctl('show', 'audit', 'rotate', 'files', port=15609) == 'ok audit/rotate/files=9',
+          ' | '.join(sctl('show', 'audit', 'rotate', w, port=15609) for w in ('max-size', 'daily', 'files')))
+    env = dict(os.environ, AUDIT_FILES='0')
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT, '--dry-run',
+                        '--control-port', '0'], capture_output=True, text=True, env=env, timeout=15)
+    check('scraper audit: $AUDIT_FILES=0 refuses at start (the bound, the clean one-liner)',
+          r.returncode == 1 and 'must be 1..100' in r.stdout + r.stderr
+          and 'Traceback' not in r.stdout + r.stderr, (r.stdout + r.stderr)[-160:])
+
     # the group-accessible unix socket (--control-socket-group): 0660,
     # and the live set re-modes it
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,

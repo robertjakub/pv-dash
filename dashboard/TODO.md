@@ -5,6 +5,26 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The audit-family wave (the bounds, the daily knob, the env twins, the
+shared accept ladder): the audit rotation bounds are family-wide —
+`audit-files` (min 1, max 100) and `audit-max-mb` (min 0, max 1048576)
+carry bounds in all four registries with the constants living once in
+`common/audit.py` (`AuditLog` validates, `check_options` cross-checks);
+`set audit rotate files 0` refuses identically everywhere (the scraper
+accepted it before). The `audit-daily` knob is one shape: this tool gains
+the row (`--audit-daily`/`$AUDIT_DAILY`, live `audit/rotate/daily` — the
+UTC-midnight trigger switches on the wire) and the audit `_apply`
+branches write the config back (the live values rendered stale in
+`show config` before); the defaults loop covers the live bool rows
+(`unset audit disable`/`local-time`/`grid-positive-import` answered
+`unknown setting` before); the audit rotation defaults leave the parser
+(a static-wired default shadowed `$AUDIT_MAX_MB`/`$AUDIT_FILES` — the
+env layer never fell through) and `$NO_AUDIT_LOG` lands (the everywhere
+ruling). The Modbus accept ladder rides the shared `serve_modbus`
+(common/modbus/server.py — the gate/ACL/limits/thread discipline + the
+session opener one implementation; the refusal texts identical at both
+Modbus faces by construction).
+
 The serve-address wave (the family's one word): the dashboard trades its
 `--bind`/`--port` pair for the canon knob — `--listen HOST:PORT`
 (`$LISTEN`, live `system/listen`, hidden, restart-marked; the default

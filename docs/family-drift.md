@@ -57,31 +57,30 @@ copy-paste twins), the similarity pass pairs cross-file bodies over the
 **The exact pass**: 0 duplicate group(s) in >= 2 files.
 
 
-**The similarity pass**: 50 cross-file pair(s) over the ratio
+**The similarity pass**: 49 cross-file pair(s) over the ratio
 floor (30 of them the man-page prose, per-tool by
 design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
-| 0.98 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.96 | `scraper/lib/control.py:147` `command` <-> `dashboard/lib/control.py:90` `command` |
-| 0.94 | `scraper/lib/control.py:130` `command_help` <-> `dashboard/lib/control.py:223` `command_help` |
+| 0.96 | `scraper/lib/control.py:147` `command` <-> `dashboard/lib/control.py:91` `command` |
+| 0.94 | `scraper/lib/control.py:130` `command_help` <-> `dashboard/lib/control.py:224` `command_help` |
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
-| 0.89 | `scraper/bin/modbus-scraper.py:242` `graceful_stop` <-> `dashboard/bin/dashboard.py:463` `graceful_stop` |
-| 0.86 | `cache/lib/control.py:96` `command` <-> `dashboard/lib/control.py:90` `command` |
+| 0.93 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
+| 0.92 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:34` `_load_options` |
+| 0.89 | `scraper/bin/modbus-scraper.py:248` `graceful_stop` <-> `dashboard/bin/dashboard.py:475` `graceful_stop` |
+| 0.86 | `cache/lib/control.py:96` `command` <-> `dashboard/lib/control.py:91` `command` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
 | 0.85 | `cache/lib/control.py:96` `command` <-> `scraper/lib/control.py:147` `command` |
+| 0.85 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
-| 0.83 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:34` `_load_options` |
-| 0.82 | `cache/bin/modbus-cache.py:372` `watch_dump` <-> `common/control.py:697` `run_dump_interval` |
-| 0.81 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.80 | `inverter/lib/control.py:140` `__init__` <-> `dashboard/lib/control.py:68` `__init__` |
+| 0.82 | `cache/bin/modbus-cache.py:372` `watch_dump` <-> `common/control.py:696` `run_dump_interval` |
+| 0.81 | `inverter/lib/control.py:140` `__init__` <-> `dashboard/lib/control.py:68` `__init__` |
 | 0.78 | `inverter/lib/signals.py:30` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:551` `acl_table_report` <-> `dashboard/lib/control.py:525` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:576` `acl_table_report` <-> `dashboard/lib/control.py:545` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
 | 0.75 | `inverter/lib/control.py:68` `handle` <-> `common/control.py:245` `handle` |
-| 0.74 | `cache/lib/control.py:1028` `dump_state` <-> `common/control.py:634` `dump_state` |
-| 0.74 | `cache/lib/config.py:115` `load_profile_write_gate` <-> `common/config.py:420` `load_write_gate_file` |
+| 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/config.py:420` `load_write_gate_file` |
 | 0.72 | `common/config.py:14` `resolve_target` <-> `common/daemon.py:44` `default_config_path` |
 
 ## The surface sweep — the listeners, the wire and the loops
@@ -170,34 +169,33 @@ by semantic family — the knob layer is the one source --help, the man
 pages, the set grammar, the NixOS modules and the README checks read,
 so a drifted row travels wide.
 
-**The shape**: 209 knob rows across the
-four registries; 26 names carry in all four:
+**The shape**: 215 knob rows across the
+four registries; 29 names carry in all four:
 
-`audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
+`audit`, `audit-daily`, `audit-files`, `audit-log`, `audit-max-mb`, `audit/rotate`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
 
 **The tool-specific remainder** (by nature):
 
 | tool | only-there knobs |
 |---|---|
-| cache | `acl`, `allow-write`, `audit`, `audit-daily`, `audit/rotate`, `auth-key`, `auth-upstream`, `auth-upstream-key`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `local-time`, `log-access`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `profile`, `read-delay`, `requests-audit`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
-| scraper | `audit`, `audit/rotate`, `auth-key`, `auth-token`, `caps`, `grid-positive-import`, `interval`, `local-time`, `log-access`, `max-grid-kw`, `max-kwp`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-offset`, `modbus-unit`, `profile`, `timeout`, `upstream` |
-| inverter | `allow-write`, `audit-daily`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `control-log-replies`, `grid`, `grid-frequency`, `grid-outage`, `grid-voltage`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
+| cache | `acl`, `allow-write`, `auth-key`, `auth-upstream`, `auth-upstream-key`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `local-time`, `log-access`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `profile`, `read-delay`, `requests-audit`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
+| scraper | `auth-key`, `auth-token`, `caps`, `grid-positive-import`, `interval`, `local-time`, `log-access`, `max-grid-kw`, `max-kwp`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-offset`, `modbus-unit`, `profile`, `timeout`, `upstream` |
+| inverter | `allow-write`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `control-log-replies`, `grid`, `grid-frequency`, `grid-outage`, `grid-voltage`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
 | dashboard | `auth-token`, `config-js`, `local-time`, `log-access`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
-**The shared knobs whose fields disagree** (9 of
-26):
+**The shared knobs whose fields disagree** (8 of
+29):
 
 | knob | the drifted fields (cache / scraper / inverter / dashboard) |
 |---|---|
-| `audit-files` | env: c="AUDIT_FILES" | s="AUDIT_FILES" | i=null | d=null <br> live: c="audit/rotate/files" | s="audit/rotate/files" | i="·" | d="·" <br> min: c=1 | s="·" | i="·" | d="·" <br> max: c=100 | s="·" | i="·" | d="·" |
-| `audit-log` | env: c="AUDIT_LOG" | s="AUDIT_LOG" | i=null | d=null <br> live: c="audit/log-file" | s="audit/log-file" | i="·" | d="·" |
-| `audit-max-mb` | env: c="AUDIT_MAX_MB" | s="AUDIT_MAX_MB" | i=null | d=null <br> live: c="audit/rotate/max-size" | s="audit/rotate/max-size" | i="·" | d="·" <br> min: c=0 | s="·" | i="·" | d="·" <br> max: c=1048576 | s="·" | i="·" | d="·" |
+| `audit-files` | live: c="audit/rotate/files" | s="audit/rotate/files" | i="·" | d="·" |
+| `audit-log` | live: c="audit/log-file" | s="audit/log-file" | i="·" | d="·" |
+| `audit-max-mb` | live: c="audit/rotate/max-size" | s="audit/rotate/max-size" | i="·" | d="·" |
 | `auth` | flag: c="--auth" | s="--auth" | i="--auth" | d="·" <br> env: c="AUTH" | s="AUTH" | i="AUTH" | d="·" <br> conv: c="str" | s="str" | i="str" | d="·" <br> live: c="modbus/auth" | s="modbus/auth" | i="modbus/auth" | d="·" <br> values: c=["suite", "none"] | s=["suite", "none"] | i=["suite", "none"] | d="·" <br> node: c="·" | s="·" | i="·" | d=true |
-| `client-timeout` | env: c="CLIENT_TIMEOUT" | s="CLIENT_TIMEOUT" | i=null | d="CLIENT_TIMEOUT" <br> live: c="limits/client-timeout" | s="metrics/limits/timeout" | i="client-timeout" | d="client-timeout" |
-| `log-level` | env: c="LOG_LEVEL" | s="LOG_LEVEL" | i="LOG_LEVEL" | d=null |
-| `max-clients` | env: c="MAX_CLIENTS" | s="MAX_CLIENTS" | i=null | d="MAX_CLIENTS" <br> live: c="limits/max-clients" | s="metrics/limits/max-clients" | i="max-clients" | d="max-clients" |
-| `max-conn-per-ip` | env: c="MAX_CONN_PER_IP" | s="MAX_CONN_PER_IP" | i=null | d="MAX_CONN_PER_IP" <br> live: c="limits/max-conn-per-ip" | s="metrics/limits/max-conn-per-ip" | i="max-conn-per-ip" | d="max-conn-per-ip" |
-| `no-audit-log` | env: c="NO_AUDIT_LOG" | s=null | i=null | d=null <br> live: c="audit/disable" | s="audit/disable" | i="·" | d="·" |
+| `client-timeout` | live: c="limits/client-timeout" | s="metrics/limits/timeout" | i="client-timeout" | d="client-timeout" |
+| `max-clients` | live: c="limits/max-clients" | s="metrics/limits/max-clients" | i="max-clients" | d="max-clients" |
+| `max-conn-per-ip` | live: c="limits/max-conn-per-ip" | s="metrics/limits/max-conn-per-ip" | i="max-conn-per-ip" | d="max-conn-per-ip" |
+| `no-audit-log` | live: c="audit/disable" | s="audit/disable" | i="·" | d="·" |
 
 **The command vocabularies** (the wire words per tool):
 
@@ -275,35 +273,35 @@ canon the operators grep for.
 | dashboard | `ACL-FILE`, `RELOAD`, `SHUTDOWN`, `START` |
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
-**The phrase canon**: 40 log phrase(s) shared by >= 2 tools;
-77 tool-local. The canon (the lead clause, the tools that speak it):
+**The phrase canon**: 35 log phrase(s) shared by >= 2 tools;
+79 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
 | `control: unset` | cache, dashboard, inverter, scraper |
 | `acl file:` | cache, dashboard, inverter, scraper |
 | `stopped` | cache, dashboard, inverter, scraper |
-| `client` | dashboard, inverter, scraper |
-| `connection rejected:` | cache, dashboard, inverter, scraper |
 | `write:` | cache, inverter |
 | `write: refused` | cache, inverter |
 | `control client from` | common, inverter |
+| `connection rejected:` | cache, common, dashboard, inverter, scraper |
+| `client` | dashboard, scraper |
 | `control: set` | cache, dashboard, inverter, scraper |
 | `control: shutdown requested` | cache, dashboard, inverter, scraper |
 | `shutdown:` | cache, dashboard, inverter, scraper |
 | `the state dump` | cache, common, inverter |
 | `state dumped to` | cache, common |
-| `cannot bind` | common, dashboard, scraper |
 | `sighup: reload failed ` | cache, common, inverter |
 | `unhandled error serving` | dashboard, scraper |
 | `dry-run: configuration is valid nothing was boun` | dashboard, inverter, scraper |
+| `cannot bind` | dashboard, scraper |
 | `restore-on-start:` | dashboard, inverter, scraper |
 | `control from` | common, inverter |
+| `invalid` | common, inverter |
 | `control: state dumped to` | cache, common |
 | `control: state restored from` | cache, common |
 | `control: the dump to` | cache, common |
 | `sighup: reloaded` | cache, inverter |
-| `error handling` | cache, inverter |
 | `poll cycle crashed ` | cache, scraper |
 
 The findings:
@@ -320,7 +318,7 @@ the family canon: same cause, same code, same text shape.
 **The rc summary** + **the distinct refusal texts** (the literal
 message args — the family's refusal canon):
 
-- rc 0 (the clean exits): 9; rc 1 (the binds): 16; rc 2 (the CLI mistakes): 6; 0 site(s) raising a variable (the message/`rc` computed —
+- rc 0 (the clean exits): 9; rc 1 (the binds): 17; rc 2 (the CLI mistakes): 6; 0 site(s) raising a variable (the message/`rc` computed —
   the common SystemExit(str) prints the message and exits 1).
 
 The refusal texts (the literal SystemExit args, sorted):
@@ -337,7 +335,6 @@ The refusal texts (the literal SystemExit args, sorted):
 - `battery-kwh must be a positive kWh value`
 - `battery-state must be auto|charging|discharging`
 - `connection closed by peer`
-- `control/port cannot serve TCP without a token (F5 in docs/AUDIT.md): pass the token by flag/env/config and restart`
 - `control/socket-group must be on or off`
 - `dump-interval needs a dump path (set dump/path or --dump-path)`
 - `dump/restore-on-start must be on or off`
@@ -356,7 +353,6 @@ The refusal texts (the literal SystemExit args, sorted):
 - `no http server attached`
 - `no log handler to re-format`
 - `no modbus device attached`
-- `no reply within the socket timeout`
 - `non-finite result`
 - `not a boolean`
 - `refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind 127.0.0.1:PORT`
@@ -365,13 +361,9 @@ The refusal texts (the literal SystemExit args, sorted):
 - `system/listen cannot move beyond loopback while the page serves without a token (F21 in docs/AUDIT.md) — pass auth-token by flag/env/config and restart`
 - `system/log-access must be on or off`
 - `the Waveshare password must be ASCII`
-- `the control connection closed without a bye`
-- `the control connection failed`
 - `the metrics endpoint serves register values: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind metrics/listen on 127.0.0.1`
 - `the metrics endpoint serves the request counters: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind metrics/listen on 127.0.0.1`
 - `the ops token must differ from the admin token (the same secret would hand every holder the role the server picks first)`
-- `the reply mac does not verify — the wire was tampered with`
-- `the server did not sign the reply`
 - `time out of range (00:00-23:59)`
 - `timeout must be 0 < N <= 60 seconds`
 - `timezone must be utc|local`
@@ -433,9 +425,9 @@ LINES are quoted, the verdicts curated.
 | tool | mkOption blocks |
 |---|---|
 | cache | 12 |
-| scraper | 43 |
+| scraper | 44 |
 | inverter | no module.nix |
-| dashboard | 42 |
+| dashboard | 43 |
 
 **The module options NOT matching a registry knob name** (after
 the kebab/camel normalization; the `*File` suffix is the NixOS
@@ -477,11 +469,11 @@ published port not backed by a registry default is a lie.
 | `docker/demo/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
 | `docker/entrypoints/entrypoint-prometheus.sh` | `AUDIT`, `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
 | `docker/entrypoints/entrypoint.sh` | `AUDIT`, `JSON`, `README`, `REQUIRED` | — |
-| `docker/env/cache.env.example` | `AUTH`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `PORT`, `SERVER`, `UPSTREAM`, `WARNING` | — |
-| `docker/env/dashboard.env.example` | `AUTH_TOKEN`, `LISTEN`, `PLAIN`, `PROM_URL` | — |
-| `docker/env/fake.env.example` | `CHAOS`, `MAX_KWP`, `PROFILE`, `SIGHUP`, `STRICT`, `TIME`, `TIME_SCALE` | — |
+| `docker/env/cache.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL` … | — |
+| `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `INFO`, `LISTEN`, `LOG_LEVEL`, `NO_AUDIT_LOG`, `PLAIN`, `PROM_URL` | — |
+| `docker/env/fake.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CLIENT_TIMEOUT`, `LISTEN`, `MAX_CLIENTS`, `MAX_CONN_PER_IP`, `MAX_KWP`, `NO_AUDIT_LOG`, `PROFILE`, `SIGHUP`, `STRICT` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
-| `docker/env/scraper.env.example` | `AUTH_TOKEN`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `METRIC_PREFIX`, `PORT`, `UPSTREAM`, `VALUE`, `WARNING` | — |
+| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `METRIC_PREFIX`, `NO_AUDIT_LOG`, `PORT` … | — |
 | `docker/prod/README.md` | `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `EDITOR`, `HOST`, `JSON`, `PORT`, `PROM_URL`, `README`, `UPSTREAM`, `YOUR` | 8080, 9350 |
 | `docker/prod/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `ONLY`, `PORT`, `PRODUCTION` … | 8080, 9350 |
 | `docker/prometheus.yml` | `AUDIT` | — |
@@ -507,8 +499,8 @@ list is the TODO seed, not a verdict.
 
 **The live knobs no suite mentions** (word-bounded grep):
 
-- cache: `audit-daily`, `audit-files`, `audit-max-mb`, `control-ops-verbs`, `control-trust-uids`, `metrics-client-timeout`, `metrics-max-conn-per-ip`, `read-delay`, `requests-audit`
-- scraper: `audit-files`, `audit-max-mb`, `control-ops-verbs`, `control-trust-uids`, `modbus-offset`
+- cache: `control-ops-verbs`, `control-trust-uids`, `metrics-client-timeout`, `metrics-max-conn-per-ip`, `read-delay`, `requests-audit`
+- scraper: `control-ops-verbs`, `control-trust-uids`, `modbus-offset`
 - inverter: `control-ops-verbs`, `control-trust-uids`
 - dashboard: `control-ops-verbs`, `control-trust-uids`, `log-queries`
 
@@ -519,10 +511,10 @@ list is the TODO seed, not a verdict.
 - inverter: `logout`
 - dashboard: every command exercised
 
-**The canon phrases no suite pins**: 22
+**The canon phrases no suite pins**: 19
 
 **The graduation path**: the seeds carry stable IDs in
-[docs/family-drift-seeds.json](family-drift-seeds.json) (42
+[docs/family-drift-seeds.json](family-drift-seeds.json) (34
 open promise(s), the suggested suite per seed); a test wave
 consumes entries, the regeneration drops them, the shrinkage is
 the wave's proof; `--check` fails when a NEW promise ships
@@ -549,29 +541,29 @@ files cite it — the promise ledger against the code.
 
 | F | title | cited by |
 |---|---|---|
-| F2 | The writer folds control characters in every detail line | — |
-| F3 | Fail closed: an unparseable write frame is refused with ILLEGAL_VALUE and audite | — |
-| F4 | Both control servers drop the connection past the 1 MB `MAX_LINE` (`cache/lib/co | — |
-| F5 | The cache refuses to start a TCP control port without a token | cache, common, dashboard, inverter, scraper |
-| F6 | The token is mandatory when the port is set | — |
-| F7 | Nothing is published | — |
-| F8 | Both control servers `chmod 0600` immediately after `bind()`; the cache takes `- | cache, common |
-| F9 | Documented in all three READMEs and the token-flag man pages: the flag form is f | — |
-| F12 | Fail closed: `check_token_file_mode` (`common/config | cache, common |
-| F11 | The cache's knobs, mirrored: `--max-clients` (refuse past the limit at accept, ` | common, inverter |
-| F13 | Fail closed beyond loopback: a non-loopback listen without `--auth-token`/`--aut | cache, common, dashboard, inverter, scraper |
-| F10 | A chained hash per entry: every line carries a short hash right after the event  | cache, common |
-| F18 | Fail closed, the F8/F12 pattern: the dump is created `0600` explicitly (`os | cache, common |
-| F19 | The defaults flipped: the GitHub release is the workflow's job | — |
-| F20 | One resolution shape family-wide, in every ctl/cli: `token_file = flag or env`,  | — |
-| F21 | The scraper's F13 shape, page-sized: the bearer token (`--auth-token`/`$AUTH_TOK | dashboard |
-| F22 | A second, read-only token per control server (`--control-ops-token`/`--control-o | — |
-| F23 | The F18 posture, one surface over: the state file's tmp is created `0600` explic | — |
 | F1 | Modbus TCP carries no authentication and no encryption | — |
 | F14 | No TLS on the HTTP endpoint (plain HTTP): the bearer token and the metrics trave | dashboard |
 | F15 | The metrics expose production values (generation, consumption, battery SoC) | — |
-| F16 | No automated alerting yet (freshness gap, poll down, exception spikes | — |
-| F17 | The `/config` volume holds the live ini files | — |
+| F16 | No automated alerting yet (freshness gap, poll down, exception spikes) | — |
+| F17 | The `/config` volume holds live config in plaintext; the entrypoint seeds copies | — |
+| F2 | audit-trail injection: a newline in a control command wrote a forged second trai | — |
+| F3 | the register allow-list failed open on unparseable write frames | — |
+| F4 | uncapped pre-auth control line buffer | — |
+| F5 | token-less TCP control was fully unauthenticated | cache, common, dashboard, inverter, scraper |
+| F6 | the metrics endpoint without a token exposed register values; no handler timeout | — |
+| F7 | the compose stack published every listener on all host interfaces | — |
+| F8 | the unix control socket's mode was umask-derived | cache, common |
+| F9 | token flags are visible in `ps` / `/proc/*/cmdline` | — |
+| F10 | the audit trail was append-only but not integrity-protected | cache, common |
+| F11 | the fake's Modbus surface: no client limit/timeout/ACL, oversized replies | common, inverter |
+| F12 | token files were not permission-checked | cache, common |
+| F13 | `/metrics` unauthenticated by default; the loopback bind the only control | cache, common, dashboard, inverter, scraper |
+| F18 | the state dump was config-equivalent trust at rest with an umask-derived mode | cache, common |
+| F19 | the release landed before the CI gate reported | — |
+| F20 | the ctl/cli help promised token-file env vars the clients never read | — |
+| F21 | the HTTP surface served without authentication, bound `0 | dashboard |
+| F22 | the control plane had no role separation | — |
+| F23 | the reload state file was config-equivalent trust at rest with an umask-derived  | — |
 
 The findings:
 

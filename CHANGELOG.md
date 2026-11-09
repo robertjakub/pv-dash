@@ -12,6 +12,34 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Added
 
+- **everywhere** — **the `audit-daily` knob is one shape, family-wide**:
+  the UTC-midnight audit-rotation trigger is a live knob on all four —
+  the scraper and the dashboard gain the row
+  (`--audit-daily`/`$AUDIT_DAILY`, live `audit/rotate/daily`), the fake
+  inverter's startup-only row gains its live name (the control learns the
+  audit_params + the rebuild, swapping both writers — the control's
+  COMMAND trail and the fake's WRITE trail), and the cache's (the only
+  live one) stays the template. `set audit rotate daily on/off` switches
+  the trigger identically everywhere; the common `rebuild_audit` already
+  rode the params.
+
+- **everywhere** — **the env twins are complete**: every knob the docker
+  env files need is reachable from an env file. The fake inverter gains
+  `$AUDIT_LOG`/`$AUDIT_MAX_MB`/`$AUDIT_FILES`/`$AUDIT_DAILY`/
+  `$NO_AUDIT_LOG` and the F13 caps' twins `$MAX_CLIENTS`/
+  `$CLIENT_TIMEOUT`/`$MAX_CONN_PER_IP` — and `$LISTEN` finally works (the
+  row has declared the env since the serve-address wave; no code read
+  it); the dashboard's audit knobs reach the env layer and the config
+  script at all (they were flag-only — a config-script
+  `set audit log-file …` parsed and was silently ignored) and `log-level`
+  gains `$LOG_LEVEL`; `$NO_AUDIT_LOG` is family-wide (the everywhere
+  ruling — a journald-only deployment disables the file trail from the
+  env file). A knob ruled env-free carries the registry's `no-env` note
+  instead of a silent gap (the fake's F11 flags-first demo knobs, the
+  dashboard's `log-queries`), rendered in OPTIONS.md's env-free footnote
+  and gated: `check_options` fails a flag row with neither an env twin
+  nor a note.
+
 - **everywhere** — **the serve-address word is family-wide**: `show system
   listen` prints the address the daemon serves on, on all four. The cache's
   `system/listen` is the canon; the scraper's listen knob re-spells to it
@@ -86,6 +114,27 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   client the one route out).
 
 ### Changed
+
+- **everywhere** — **the audit rotation bounds are family-wide**:
+  `audit-files` (min 1, max 100) and `audit-max-mb` (min 0, max 1048576)
+  carry bounds in all four registries, and the constants live once in
+  `common/audit.py` (the audit module's own — `AuditLog` validates, the
+  registries repeat, `check_options` cross-checks that they never drift).
+  `set audit rotate files 0` refuses identically everywhere
+  (`audit/rotate/files must be 1..100 backups`) — the scraper accepted it
+  before; the startup planes (flag/env/config) refuse with the clean
+  one-liner on all four.
+
+- **common** — **the Modbus accept ladder is one implementation**
+  (`common/modbus/server.py` `serve_modbus`): the gate → ACL →
+  max-clients → count → thread discipline and the session opener (the
+  clients register, the suite handshake, the finally unwind) run shared
+  for the cache and the fake — the identical refusal texts and logs at
+  both Modbus faces by construction, not convention; the malformed-frame
+  policy stays the face's (the cache answers malformed PDUs in-band, the
+  fake logs and closes). The fake's Modbus listener backlogs 128 now (it
+  listened 16 under a 64 default client limit — the macOS RST shape the
+  control servers already learned). The surface sweep nets ~50 lines.
 
 - **everywhere** — **the secret knobs are startup-only, family wide**:
   every secret row (the control tokens, the ops tokens, the metrics
@@ -584,6 +633,20 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   ten-suite battery green.
 
 ### Fixed
+
+- **scraper, inverter, dashboard** — **the declared env twins that never
+  worked**: the scraper's `$AUDIT_MAX_MB`/`$AUDIT_FILES` were shadowed by
+  their static-wired argparse defaults (the resolver never falls through
+  a truthy flag value — the rotation defaults leave the parser and ladder
+  like every knob); the fake inverter's `$LISTEN` was declared since the
+  serve-address wave and read by nothing (the bin ladders
+  flag > env > static now); the dashboard's audit knobs were flag-only
+  (a config-script `set audit log-file …` was silently ignored). With
+  them, the scraper's `unset audit disable`/`local-time`/
+  `grid-positive-import` stop answering `unknown setting` (the defaults
+  loop covers the live bool rows) and the scraper's audit knobs render
+  their live values in `show config` (the `_apply` branches write the
+  config back — the stale start values were rendered before).
 
 - **cache, scraper, inverter, dashboard** — **the help surfaces stop
   advertising the removed `show status` word**: the `show` verb's one-line

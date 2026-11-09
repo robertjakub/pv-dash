@@ -59,10 +59,11 @@ class Option:
     def __init__(self, name, flag, env, help='', conv=str, default=None, live=None,
                  secret=False, choices=None, negates=None, group=None, alias=None, restart=False,
                  setting_help=None, values=None, hint=None, value_help=None,
-                 min=None, max=None, check=None, node=False, hidden=False):
+                 min=None, max=None, check=None, node=False, hidden=False, no_env=None):
         self.name = name
         self.flag = flag
         self.env = env
+        self.no_env = no_env      # the ruled-env-free note: why a flag row carries no env twin
         self.group = group        # the display bucket; None = ungrouped (bare, no header)
         self.alias = alias        # a second wire spelling for the same knob (a '/'-path
                                   # like live: acl/write and writer/acl both answer)
@@ -528,7 +529,7 @@ def option_rows(rows, static_defaults=None, choices=None):
                      setting_help=row.get('setting-help'), values=row.get('values'),
                      hint=row.get('hint'), value_help=row.get('value-help'),
                      min=row.get('min'), max=row.get('max'), check=row.get('check'), hidden=as_bool(row.get('hidden')),
-                     restart=as_bool(row.get('restart')),
+                     restart=as_bool(row.get('restart')), no_env=row.get('no-env'),
                      node=as_bool(row.get('node')))
         if opt.name in static_defaults:
             opt.default = static_defaults[opt.name]

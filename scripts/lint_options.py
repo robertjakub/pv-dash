@@ -29,7 +29,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = ('cache', 'scraper', 'inverter', 'dashboard')
 WIDTH = 118
 
-KEY_RANK = ('name', 'flag', 'env', 'conv', 'group', 'live', 'alias', 'negates',
+KEY_RANK = ('name', 'flag', 'env', 'no-env', 'conv', 'group', 'live', 'alias', 'negates',
             'setting-help', 'values', 'hint', 'value-help', 'default', 'help',
             'min', 'max', 'check', 'secret', 'internal', 'hidden', 'restart', 'node')
 KNOWN = set(KEY_RANK)

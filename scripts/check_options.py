@@ -21,6 +21,8 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, REPO)
 
+from common.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
+
 # tool -> (bin script, registry module dir, module.nix, README, bundled config, flag-table headings)
 TOOLS = {
     'cache': ('cache/bin/modbus-cache.py', 'cache', 'cache/module.nix', 'cache/README.md', 'cache/examples/modbus_cache.conf'),
@@ -112,6 +114,19 @@ def check_tool(tool):
                               if not o.node and not o.flag and (o.env or o.secret or not o.live))
     rows.append((not bad_control_only, '%s: the control-only settings are flag/env/secret-free and live%s'
                  % (tool, ' — bad rows: %s' % ', '.join(bad_control_only) if bad_control_only else '')))
+    # the env layer: a flag row reaches for an env twin or carries the
+    # no-env note (the ruled-env-free reason) — a silent gap fails here
+    unnoted = sorted(o.name for o in options if o.flag and not o.node and not o.env and not o.no_env)
+    rows.append((not unnoted, '%s: every flag row carries an env twin or a no-env note%s'
+                 % (tool, ' — unnoted: %s' % ', '.join(unnoted) if unnoted else '')))
+    # the audit rotation bounds are the audit module's one constants — the
+    # registries repeat them (the _gate_range reads the rows), never drift
+    bad_bounds = sorted(o.name for o in options
+                        if o.name == 'audit-files' and (o.min, o.max) != (AUDIT_FILES_MIN, AUDIT_FILES_MAX)
+                        or o.name == 'audit-max-mb' and (o.min, o.max) != (AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX))
+    rows.append((not bad_bounds, '%s: the audit rotation rows carry the common bounds (files %d..%d, max-mb %d..%d)%s'
+                 % (tool, AUDIT_FILES_MIN, AUDIT_FILES_MAX, AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX,
+                    ' — off: %s' % ', '.join(bad_bounds) if bad_bounds else '')))
     # the hierarchy nodes: a setting-help and at least one live child each
     bad_nodes = sorted(o.name for o in options if o.node
                        and (not (o.setting_help or o.help)

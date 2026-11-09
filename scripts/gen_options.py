@@ -172,6 +172,19 @@ def main():
                'in the registries — `--help`, the man pages, `show knobs` and '
                '`help config` render them per tool.')
     out.append('')
+    # the ruled-env-free rows: the registries' no-env notes (a flag row
+    # without an env twin names why — the silent-gap rule)
+    notes = []
+    for tool, _t in TOOLS:
+        rows, _shows = load(tool)
+        for o in rows:
+            if o.flag and not o.node and not o.env:
+                notes.append((tool, o))
+    if notes:
+        out.append('Ruled env-free (the rows\' `no-env` notes — a flag row without an env twin names why): %s.'
+                   % '; '.join('%s %s — %s' % (tool, '`--%s`' % o.name, o.no_env)
+                               for tool, o in notes))
+        out.append('')
 
     path = os.path.join(REPO, 'docs', 'OPTIONS.md')
     with open(path, 'w', encoding='utf-8') as fh:

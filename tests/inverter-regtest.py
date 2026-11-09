@@ -582,9 +582,13 @@ def main():
         #      dump/restore (instance I)
         I_MODBUS, I_CTL = 15985, 15986
         reload_state = '/tmp/inv_regtest_reload_state'
+        state_file = '/tmp/inv_regtest_state.json'
+        if os.path.exists(state_file):
+            os.unlink(state_file)   # the block is idempotent: a previous run's dump (its
+                                    # overrides ride restore-on-start) must not seed this one
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (I_MODBUS),
                                        '--control-port', str(I_CTL),
-                                       '--dump-path', '/tmp/inv_regtest_state.json', '--restore-on-start'],
+                                       '--dump-path', state_file, '--restore-on-start'],
                                       stdout=open(LOG + '.i', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
         time.sleep(1.5)
@@ -990,7 +994,7 @@ def main():
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
         check("node walk: the bare show mimics the ? output (the walk's first position)",
-              words == ['batt', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
+              words == ['audit', 'batt', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
                         'connect-acl', 'connections', 'control', 'dump', 'dump-interval', 'grid',
                         'grid-frequency', 'grid-outage',
                         'grid-voltage', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
@@ -1108,6 +1112,44 @@ def main():
         check('fake control: the trust uids set live', tx.startswith('ok control/trust-uids=1000,1001'), tx[:90])
         tx = ctl(msock, 'set control trust-uids off')
         check('fake control: the trust uids drop', tx.startswith('ok control/trust-uids=off'), tx[:90])
+
+        # ---- the audit family's one shape: the daily knob's live name, the
+        #      bounds (the one constants home: common/audit.py), the env twins
+        tx = ctl(msock, 'set audit rotate daily on')
+        check('fake audit-daily: the daily trigger switches on (the live name)',
+              tx.startswith('ok audit/rotate/daily=on'), tx[:90])
+        tx = ctl(msock, 'show audit rotate daily')
+        check('fake audit-daily: show audit rotate daily answers on',
+              tx == 'ok audit/rotate/daily=on', tx[:90])
+        tx = ctl(msock, 'unset audit rotate daily')
+        check('fake audit-daily: the daily trigger unsets to the configured off',
+              tx.startswith('ok audit/rotate/daily=off'), tx[:90])
+        tx = ctl(msock, 'set audit rotate daily maybe')
+        check('fake audit-daily: the daily set refuses a bad word',
+              tx.startswith('% error: audit/rotate/daily must be on or off'), tx[:90])
+        r = subprocess.run([sys.executable, F, '--control-port', '0', '--dry-run',
+                            '--audit-files', '0'], capture_output=True, text=True)
+        check('fake audit: the files bound refuses at start (the clean one-liner)',
+              r.returncode == 1 and 'audit-files must be 1..100' in r.stdout + r.stderr,
+              (r.stdout + r.stderr)[-160:])
+        r = subprocess.run([sys.executable, F, '--control-port', '0', '--dry-run',
+                            '--audit-max-mb', '-1'], capture_output=True, text=True)
+        check('fake audit: the max-mb bound refuses at start',
+              r.returncode == 1 and 'audit-max-mb must be 0..1048576 MB' in r.stdout + r.stderr,
+              (r.stdout + r.stderr)[-160:])
+        env = dict(os.environ, AUDIT_DAILY='1', MAX_CLIENTS='7', AUDIT_MAX_MB='77', AUDIT_FILES='9')
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15987',
+                                       '--control-port', '15988'],
+                                      stdout=open(LOG + '.n', 'w'), stderr=subprocess.STDOUT, env=env))
+        time.sleep(1.0)
+        tx = ctl(15988, 'show audit rotate daily')
+        check('fake audit-daily: $AUDIT_DAILY drives the start value', tx == 'ok audit/rotate/daily=on', tx[:90])
+        tx = ctl(15988, 'show max-clients')
+        check('fake audit: $MAX_CLIENTS drives the cap', tx == 'ok max-clients=7', tx[:90])
+        tx = ctl(15988, 'show config')
+        check('fake audit: the env-driven rotation renders in show config',
+              'set audit-max-mb 77.0' in tx and 'set audit rotate daily true' in tx
+              and 'set audit-files 9' in tx, tx[:160])
 
         # ---- the listening line documents the policy
         log = open(LOG).read()

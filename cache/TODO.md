@@ -5,6 +5,15 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The audit-family wave: the cache is the audit family's golden master and
+stays it — the rotation bounds (`audit-files` 1..100, `audit-max-mb`
+0..1048576) now live once in `common/audit.py` with the startup
+fail-block reading them (was the hardcoded 0/1), and the Modbus accept
+ladder rides the shared `serve_modbus` (common/modbus/server.py) — the
+proxy keeps only its face hooks (the forwarding dispatch, the in-band
+malformed answer, the REQUESTS unwind evidence); the refusal texts are
+the family's one texts by construction.
+
 The secrets-startup-only wave: every secret row (auth-key,
 auth-upstream-key, control-token, control-ops-token, metrics-token,
 dump-key) is `restart`-marked and the wire refuses set/unset on it with

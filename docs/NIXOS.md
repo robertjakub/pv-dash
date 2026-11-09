@@ -107,7 +107,7 @@ services.modbus-scraper = {
 | `controlPort` | the control server target (unix path under `/run/modbus-scraper/`, or a TCP port) |
 | `controlToken` / `controlTokenFile` (+ `controlOpsToken`/`controlOpsTokenFile`, `controlOpsVerbs`, `controlTrustUids`, `controlSocketGroup`) | the control plane's secrets and posture |
 | `dumpPath` / `dumpKey` / `restoreOnStart` | the sealed state dump |
-| `auditLog` (+ `auditMaxMb`, `auditFiles`, `noAuditLog`) | the SCR audit trail (default: stdout) |
+| `auditLog` (+ `auditMaxMb`, `auditDaily`, `auditFiles`, `noAuditLog`) | the SCR audit trail (default: stdout) |
 | `logLevel` / `logAccess` / `localTime` | the log surface |
 | `openFirewall` | open `listenPort` |
 
@@ -184,7 +184,7 @@ services.modbus-scraper = {
 | `controlPort` | the control server target (unix path under `/run/dashboard/`, or a TCP port) |
 | `controlToken` / `controlTokenFile` (+ `controlOpsToken`/`controlOpsTokenFile`, `controlOpsVerbs`, `controlTrustUids`, `controlSocketGroup`) | the control plane's secrets and posture |
 | `dumpPath` / `dumpKey` / `restoreOnStart` | the sealed state dump |
-| `auditLog` (+ `auditMaxMb`, `auditFiles`, `noAuditLog`) | the DSH audit trail (default: stdout) |
+| `auditLog` (+ `auditMaxMb`, `auditDaily`, `auditFiles`, `noAuditLog`) | the DSH audit trail (default: stdout) |
 | `logLevel` / `logQueries` / `logAccess` / `localTime` | the log surface |
 | `openFirewall` | open `port` |
 

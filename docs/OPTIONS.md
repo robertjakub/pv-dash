@@ -14,7 +14,7 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (26): `audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`. The control-plane block is
+Common to **all four** tools (29): `audit`, `audit-daily`, `audit-files`, `audit-log`, `audit-max-mb`, `audit/rotate`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `metrics-acl-table`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
@@ -23,12 +23,12 @@ on all four too (the per-tool extras carry their own rows below).
 |---|---|---|---|---|---|---|---|
 | c | `acl` |  | *(startup-only)* | ✓ |  |  |  |
 | k | `allow-write` |  | `set write allow` | ✓ live |  | ✓ live |  |
-| c | `audit` |  | *(startup-only)* | ✓ | ✓ |  |  |
-| k | `audit-daily` |  | `set audit rotate daily` | ✓ live |  | ✓ |  |
+| c | `audit` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
+| k | `audit-daily` |  | `set audit rotate daily` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** live | **✓** | **✓** |
 | k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** live | **✓** | **✓** |
 | k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** live | **✓** | **✓** |
-| c | `audit/rotate` |  | *(startup-only)* | ✓ | ✓ |  |  |
+| c | `audit/rotate` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `auth` |  | `set modbus auth` | **✓** live | **✓** live | **✓** live | **✓** |
 | k | `auth-key` |  | `startup-only — pass it by flag/env/config (set/unset refuse)` | ✓ live+secret | ✓ live+secret | ✓ live+secret |  |
 | k | `auth-token` |  | `startup-only — pass it by flag/env/config (set/unset refuse)` |  | ✓ live+secret |  | ✓ live+secret |
@@ -132,3 +132,5 @@ on all four too (the per-tool extras carry their own rows below).
 | s | `write-registers-profile` |  | `show write-registers-profile` | ✓ |  |  |  |
 
 Legend: `k` = a knob — the flag/env/config-file rows; `c` = control-only — a setting that lives on the control wire alone (the fake's pins and machines — no flag, no env, no config-file row); `s` = a show command — a report the wire answers with (`show <name>`; not a knob, nothing to set, the registry's `show` section); ✓ = the tool has the row (**bold** = all four do); the `live` column is the control command itself — `set <name>` over the control plane, the wire name the registry gives the knob (it can differ from the flag: the cache's `cache-ttl` sets `ttl`) — a show row spells `show <name>`; *(startup-only)* = no live form, a restart applies the knob; a trailing `, restart` = the knob is startup-only too — the set records the value (the wire answers the restart note), the restart applies it; every secret is restart-marked and renders `startup-only — pass it by flag/env/config` — the wire refuses set/unset on it outright; a cell's `live` mark says the tool takes the knob live (a cell without one = that tool applies the knob at startup only); `group` = the row's display bucket — the tool's surfaces file the knob under it (blank = ungrouped, rendered bare); `hidden` = the command stays out of the wire's listings (it still answers); `secret` = a token — `show config` and the dumps render the knob as `*** SECRET REMOVED ***` (the value never does; the `-file` form renders the same placeholder when the row is set). The knob descriptions stay in the registries — `--help`, the man pages, `show knobs` and `help config` render them per tool.
+
+Ruled env-free (the rows' `no-env` notes — a flag row without an env twin names why): inverter `--unit` — F11 — the unit id is the demo's own, flags only; inverter `--timezone` — F11 — the demo timezone rides the flags; inverter `--static` — F11 — the static-map toggle rides the flags; inverter `--battery-kwh` — the SIGHUP layer owns BATTERY; the startup kWh rides the flags; inverter `--grid-voltage` — F11 — the grid simulator rides the flags; inverter `--grid-frequency` — F11 — the grid simulator rides the flags; inverter `--seed` — the seed is a per-run choice — an env seed would pin every demo; inverter `--control-log-replies` — F11 — the debug toggle rides the flags; inverter `--metrics-server` — F11 — the /metrics extras ride the flags (the live toggle exists); inverter `--metrics-listen` — F11 — the /metrics extras ride the flags; inverter `--metrics-max-clients` — F11 — the /metrics extras ride the flags; inverter `--metrics-client-timeout` — F11 — the /metrics extras ride the flags; inverter `--metrics-max-conn-per-ip` — F11 — the /metrics extras ride the flags; dashboard `--log-queries` — the live toggle exists — the startup stays flag-only.

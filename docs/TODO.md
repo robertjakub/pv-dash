@@ -52,7 +52,8 @@ only the **Done/history** records for their tool —
   item below), F17 (the volume secrets), F14 (TLS — the item below), F15
   (closed — the README privacy note), F1 (accepted) — see
   [AUDIT.md](AUDIT.md); F2–F10, F11–F13, F18 and F19 are closed and
-  verified (§3.1/§4); re-run the audit after the scraper control surface,
+  verified ([AUDIT-history.md](AUDIT-history.md)); re-run the audit after
+  the scraper control surface,
   the TLS story or the dashboard service (the dashboard is the next audit
   wave).
 - **the RBAC rewrite** `[common]` — the role gate decides on the head

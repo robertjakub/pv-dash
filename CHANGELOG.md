@@ -635,6 +635,12 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
 
 ### Docs
 
+- **docs** — **AUDIT.md condensed to the current state (rev. 24)**: the
+  revision history (rev. 1–24), the closed findings' fix/verification
+  detail and the per-finding evidence move to the new
+  [AUDIT-history.md](docs/AUDIT-history.md); AUDIT.md keeps the posture,
+  the trust boundaries, the controls, the open findings, the closed
+  registry and the NIS2/DORA mapping — the docs/TODO pointer re-pointed.
 - **everywhere** — **the four `<tool>/MANUAL.md` pages land**: every
   command, knob and show report each tool's control wire answers, the
   kind of each — command, settable (`set`/`unset`, the restart-marked

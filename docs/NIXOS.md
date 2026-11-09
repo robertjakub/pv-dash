@@ -28,7 +28,8 @@ nix build .#modbus-scraper       # or any other package
 
 Each package installs the daemon, its `*-ctl` / `*-cli` clients, the
 generated man pages under `share/man/man1/` and — where the tool has them —
-the bundled profile, the `examples/` samples and the `schema/` JSON Schemas.
+the bundled profile, the `examples/` samples and the JSON Schemas (the
+shared one from `shared/schema/`, the tool-local ones from `schema/`).
 
 ## How the service modules work
 

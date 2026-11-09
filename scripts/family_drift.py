@@ -882,7 +882,7 @@ SCHEMA_FINDINGS = """\
 The findings:
 
 - **The shared pair is the pattern**: the ip-prefix acl's example +
-  schema live ONCE at the root examples/ + schema/ (the four
+  schema live ONCE at the root examples/ + shared/schema/ (the four
   per-tool copies died in the shared-examples wave). The per-tool
   schema/ dirs that remain carry the tool-specific shapes.
 - **The examples re-parse is the honest check**: a shipped example

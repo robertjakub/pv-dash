@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""The family's static texts, one JSON home (texts.json, next to this
-loader): the console's faces and reconnect ladder, the ctl's, the welcome
+"""The family's static texts, one JSON home (shared/texts.json at the
+tree root — the directory that contains common/, the same root in every
+layout: the checkout, the installed share/<tool>/ tree, the image's
+/pv-suite): the console's faces and reconnect ladder, the ctl's, the welcome
 banners, the wire's fixed replies, the daemon bind/startup lines. The
 dotted key resolves through the namespaces; the caller applies the
 %-format — the format applies only when args ride the call (a template
@@ -11,8 +13,8 @@ a value. Stdlib only."""
 import json
 import os
 
-_here = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(_here, 'texts.json'), encoding='utf-8') as _f:
+_tree = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+with open(os.path.join(_tree, 'shared', 'texts.json'), encoding='utf-8') as _f:
     TEXTS = json.load(_f)
 
 

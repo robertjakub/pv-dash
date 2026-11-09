@@ -9,8 +9,9 @@ One package, imported as `common` from everywhere:
 - the docker images: the common/ tree is copied to /pv-suite/common/
 
 Subpackages:
-- render/   — the human-facing rendering: the static texts (texts.json +
-              the T() loader), the man-page builder, the time formats
+- render/   — the human-facing rendering: the static texts (the T()
+              loader — shared/texts.json at the tree root), the
+              man-page builder, the time formats
 - runtime/  — the process scaffolding + the trail: the daemon-bin ladder,
               the audit trail writer, the UTC log stamps, the version
 - settings/ — the settings plane: the option registry (one knob, one

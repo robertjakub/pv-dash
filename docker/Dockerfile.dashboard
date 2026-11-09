@@ -7,7 +7,8 @@
 # the entrypoint lives at docker/entrypoints/entrypoint.sh):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.dashboard -t dashboard \
-#       --build-context scripts=../docker --build-context common=../common ../dashboard
+#       --build-context scripts=../docker --build-context common=../common \
+#       --build-context shared=../shared ../dashboard
 #   # or: docker compose up -d dashboard
 #
 # Run:
@@ -33,8 +34,8 @@ RUN apk add --no-cache python3 bash su-exec \
 WORKDIR /pv-suite
 COPY --from=scripts entrypoints/entrypoint.sh /usr/local/bin/pv-entrypoint
 COPY --from=common *.py common/
-COPY --from=common texts.json common/
 COPY --from=common modbus/*.py common/modbus/
+COPY --from=shared texts.json shared/
 COPY --chown=pvsuite bin/ dashboard/bin/
 COPY --chown=pvsuite lib/ dashboard/lib/
 COPY --chown=pvsuite static/ dashboard/static/

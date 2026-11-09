@@ -240,6 +240,7 @@ The demo device for development and testing — see the
 cd docker
 docker build -f ../docker/Dockerfile.fake-inverter -t fake-inverter \
     --build-context profiles=../profiles \
+    --build-context shared=../shared \
     --build-context scripts=../docker --build-context common=../common ../inverter
 docker run --rm -p 127.0.0.1:5502:5502 fake-inverter      # loopback-published, serves on 0.0.0.0:5502 in the container
 docker run --rm -it fake-inverter bash                    # poke around as pvsuite
@@ -265,6 +266,7 @@ from the image; the volume carries `/config/selection.json` (`SELECTION`)
 cd docker
 docker build -f ../docker/Dockerfile.modbus-cache -t modbus-cache \
     --build-context profiles=../profiles \
+    --build-context shared=../shared \
     --build-context scripts=../docker --build-context common=../common ../cache
 docker run --rm -p 127.0.0.1:15502:15502 modbus-cache    # upstream defaults to fake-inverter:5502 (the image's UPSTREAM env)
 docker run --rm -it modbus-cache bash          # poke around as pvsuite
@@ -291,6 +293,7 @@ there, it survives recreation; override the conf's knobs with
 cd docker
 docker build -f ../docker/Dockerfile.modbus-scraper -t modbus-scraper \
     --build-context profiles=../profiles \
+    --build-context shared=../shared \
     --build-context scripts=../docker --build-context common=../common ../scraper
 docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper    # upstream defaults to modbus-cache:15502 (the image's UPSTREAM env)
 docker run --rm -it modbus-scraper bash        # poke around as pvsuite

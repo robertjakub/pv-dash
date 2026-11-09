@@ -5,7 +5,7 @@
 # (dockerfile: ../docker/... from the subproject context — the subproject
 # contexts carry no Dockerfile of their own; compose resolves the
 # dockerfile relative to the context); the shared profiles/ directory, the entrypoint
-# and the common/ package ride in as named contexts. The production shape
+# and the common/ package + shared/ ride in as named contexts. The production shape
 # (real device, the four services: cache + scraper + prometheus +
 # dashboard) is the sibling prod/ stack — see ../README.md.
 # Run one service: docker compose up -d fake-inverter
@@ -59,6 +59,7 @@ services:
         profiles: ../../profiles
         scripts: ..
         common: ../../common
+        shared: ../../shared
     image: fake-inverter
     environment:
       # the server side: every client proves the stack's suite key right
@@ -82,6 +83,7 @@ services:
         profiles: ../../profiles
         scripts: ..
         common: ../../common
+        shared: ../../shared
     image: modbus-cache
     environment:
       # the upstream side: the cache proves the same suite key to the fake
@@ -109,6 +111,7 @@ services:
         profiles: ../../profiles
         scripts: ..
         common: ../../common
+        shared: ../../shared
     image: modbus-scraper
     environment:
       # the client side: the scraper proves the stack's suite key to the
@@ -153,6 +156,7 @@ services:
       additional_contexts:
         scripts: ..
         common: ../../common
+        shared: ../../shared
     image: dashboard
     environment:
       # the proxy target: the stack's internal Prometheus service (the

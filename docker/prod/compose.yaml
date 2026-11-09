@@ -2,7 +2,7 @@
 # the real deployment against real hardware. The same three tool images
 # the demo stack runs (the Dockerfiles are the parent directory's
 # Dockerfile.<daemon> files; the shared profiles/, the entrypoint and the
-# common/ package ride in as named contexts) — only the wiring differs:
+# common/ package + shared/ ride in as named contexts) — only the wiring differs:
 #
 #   - NO fake inverter: the cache's UPSTREAM points at the real device
 #   - NO in-stack Prometheus: the collector is YOURS, external — it pulls
@@ -54,6 +54,7 @@ services:
         profiles: ../../profiles
         scripts: ..
         common: ../../common
+        shared: ../../shared
     image: modbus-cache
     environment:
       # the server side: the scraper (any client) proves the stack's suite
@@ -82,6 +83,7 @@ services:
         profiles: ../../profiles
         scripts: ..
         common: ../../common
+        shared: ../../shared
     image: modbus-scraper
     environment:
       # the client side: the scraper proves the stack's suite key to the
@@ -119,6 +121,7 @@ services:
       additional_contexts:
         scripts: ..
         common: ../../common
+        shared: ../../shared
     image: dashboard
     environment:
       # EDIT before up: your external collector's base URL (the

@@ -136,6 +136,15 @@ only the **Done/history** records for their tool —
 
 ## The pipeline (CI, releases, supply chain)
 
+- **schema every family JSON** `[common]` — `scripts/validate_json.py`
+  speaks the draft-2020-12 core but only the shipped spec pairs meet it
+  today (the drift sweep's schema/example pass). Give the family's
+  remaining JSON artifacts schemas and one gate: `shared/texts.json`,
+  the four `options.json`/`static.json` pairs, the profiles' format
+  (profile-lint checks it in code — a schema would let editors speak
+  it) and the config-defaults placeholders; decide the surface (a lint
+  script riding the release battery, a drift-sweep type or its own CI
+  leg).
 - **the CI** `[all]` — GitHub Actions: the ten suites + `nix flake check`
   (all four packages, all systems) on the push; the release workflow on
   the tag; the man pages linted (`mandoc -Tlint`) as a job; `promtool

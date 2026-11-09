@@ -274,12 +274,25 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   fallback branches in `lib/server.py` were unreachable dead code); the
   flat-spec acceptance in the loader itself stays (keys verbatim).
 
+- **everywhere** — **the family's data moves out of the package into
+  `shared/`**: `texts.json` leaves `common/render/` for the new root
+  `shared/` home (the loader reads it one `shared/` segment below the
+  directory that contains `common/` — the same walk in the checkout,
+  the installed `share/<tool>/` tree and the image's `/pv-suite`;
+  `common/` stays pure `.py`), the shared acl schema follows
+  (`shared/schema/`), the four `package.nix` installs `shared/texts.json`
+  beside `common/` and re-point the schema at `${../shared}/schema`, the
+  Dockerfiles + both compose stacks carry the `shared=` named context,
+  `shared/README.md` joins, the root README's tree row follows and
+  docs/TODO.md gains the schema-every-JSON item.
+
 - **everywhere** — **the ip-prefix acl example + schema are one shared
   pair at the repo root** (`examples/acl-ip-prefix.json` +
-  `schema/acl-ip-prefix.schema.json`): the four per-tool copies die (the
+  `shared/schema/acl-ip-prefix.schema.json`): the four per-tool copies
+  die (the
   fake's `examples/`/`schema/` dirs held only the pair and empty out,
   the dashboard's `schema/` with them),   the four `package.nix` installs
-  re-point (`${../examples}`, `${../schema}`) with the packaged
+  re-point (`${../examples}`, `${../shared}/schema`) with the packaged
   `share/<tool>/` layout unchanged, `scripts/lint_acl.py`'s bare run
   globs the root `examples/` too, the regtests' `file:` rounds read
   the root file, and the two dirs grow READMEs.

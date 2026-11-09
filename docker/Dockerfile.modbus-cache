@@ -7,6 +7,7 @@
 #   cd docker
 #   docker build -f ../docker/Dockerfile.modbus-cache -t modbus-cache \
 #       --build-context profiles=../profiles \
+#       --build-context shared=../shared \
 #       --build-context scripts=../docker --build-context common=../common ../cache
 #   # or: docker compose up -d modbus-cache
 #
@@ -34,8 +35,8 @@ WORKDIR /pv-suite
 COPY --chown=pvsuite --from=profiles profiles/profiles/ profiles/
 COPY --from=scripts entrypoints/entrypoint.sh /usr/local/bin/pv-entrypoint
 COPY --from=common *.py common/
-COPY --from=common texts.json common/
 COPY --from=common modbus/*.py common/modbus/
+COPY --from=shared texts.json shared/
 COPY --chown=pvsuite bin/ cache/bin/
 COPY --chown=pvsuite lib/ cache/lib/
 COPY --chown=pvsuite examples/modbus_cache.conf examples/selection.json examples/acl-write-registers.json cache/

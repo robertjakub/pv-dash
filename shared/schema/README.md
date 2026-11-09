@@ -1,7 +1,8 @@
 # Shared JSON Schemas
 
-Draft-2020-12 schemas for the suite-wide sample files — one copy each, at
-the repo root. The tool-local schemas stay in each tool's `schema/` dir
+Draft-2020-12 schemas for the suite-wide sample files — one copy each,
+under `shared/` (the family's shared-data home). The tool-local schemas
+stay in each tool's `schema/` dir
 (`cache/schema/` for the acl-write-registers + selection pair,
 `scraper/schema/` for the metrics spec). A schema lives here when the
 file it describes is shared: today that is the standalone acl file's
@@ -18,7 +19,7 @@ feedback while editing.
 ## Validate
 
 ```bash
-python3 scripts/validate_json.py schema/acl-ip-prefix.schema.json examples/acl-ip-prefix.json
+python3 scripts/validate_json.py shared/schema/acl-ip-prefix.schema.json examples/acl-ip-prefix.json
 ```
 
 The repo's own stdlib-only checker speaks the draft-2020-12 core the

@@ -37,7 +37,8 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../common}/serve/*.py $out/share/modbus-cache/common/serve/
     install -dm755 $out/share/modbus-cache/common/wire
     install -m644 ${../common}/wire/*.py $out/share/modbus-cache/common/wire/
-    install -m644 ${../common}/render/texts.json $out/share/modbus-cache/common/render/
+    install -dm755 $out/share/modbus-cache/shared
+    install -m644 ${../shared}/texts.json $out/share/modbus-cache/shared/
     install -dm755 $out/share/modbus-cache/common/modbus
     install -m644 ${../common}/modbus/*.py $out/share/modbus-cache/common/modbus/
     install -Dm644 examples/modbus_cache.conf $out/share/modbus-cache/modbus_cache.conf
@@ -45,7 +46,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -Dm644 examples/acl-write-registers.json $out/share/modbus-cache/acl-write-registers.json
     install -Dm644 ${../examples}/acl-ip-prefix.json $out/share/modbus-cache/acl-ip-prefix.json
     install -Dm644 schema/acl-write-registers.schema.json $out/share/modbus-cache/acl-write-registers.schema.json
-    install -Dm644 ${../schema}/acl-ip-prefix.schema.json $out/share/modbus-cache/acl-ip-prefix.schema.json
+    install -Dm644 ${../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-cache/acl-ip-prefix.schema.json
     install -Dm644 schema/selection.schema.json $out/share/modbus-cache/selection.schema.json
     install -dm755 $out/share/modbus-cache/profiles
     install -m644 ${../profiles/profiles}/*.json $out/share/modbus-cache/profiles/

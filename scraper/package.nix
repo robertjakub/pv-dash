@@ -37,13 +37,14 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../common}/serve/*.py $out/share/modbus-scraper/common/serve/
     install -dm755 $out/share/modbus-scraper/common/wire
     install -m644 ${../common}/wire/*.py $out/share/modbus-scraper/common/wire/
-    install -m644 ${../common}/render/texts.json $out/share/modbus-scraper/common/render/
+    install -dm755 $out/share/modbus-scraper/shared
+    install -m644 ${../shared}/texts.json $out/share/modbus-scraper/shared/
     install -dm755 $out/share/modbus-scraper/common/modbus
     install -m644 ${../common}/modbus/*.py $out/share/modbus-scraper/common/modbus/
     install -Dm644 examples/metrics.json $out/share/modbus-scraper/metrics.json
     install -Dm644 examples/scraper.conf $out/share/modbus-scraper/scraper.conf
     install -Dm644 ${../examples}/acl-ip-prefix.json $out/share/modbus-scraper/acl-ip-prefix.json
-    install -Dm644 ${../schema}/acl-ip-prefix.schema.json $out/share/modbus-scraper/acl-ip-prefix.schema.json
+    install -Dm644 ${../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-scraper/acl-ip-prefix.schema.json
     install -dm755 $out/share/modbus-scraper/profiles
     install -m644 ${../profiles/profiles}/*.json $out/share/modbus-scraper/profiles/
     install -dm755 $out/share/man/man1

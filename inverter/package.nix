@@ -27,6 +27,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 lib/*.py lib/static.json lib/options.json $out/share/modbus-fake-inverter/lib/
     install -dm755 $out/share/modbus-fake-inverter/common
     install -m644 ${../common}/*.py $out/share/modbus-fake-inverter/common/
+    install -m644 ${../common}/texts.json $out/share/modbus-fake-inverter/common/
     install -dm755 $out/share/modbus-fake-inverter/common/modbus
     install -m644 ${../common}/modbus/*.py $out/share/modbus-fake-inverter/common/modbus/
     install -dm755 $out/share/modbus-fake-inverter/profiles

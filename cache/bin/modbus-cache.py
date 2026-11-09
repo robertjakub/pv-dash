@@ -366,27 +366,30 @@ def main():
                 logger.error('cannot restore the state dump %s: %s (starting cold)', proxy.dump_path, e)
         else:
             logger.info('no state dump at %s yet, starting cold', proxy.dump_path)
-        # the dumper thread always runs (it parks while dump-interval is off):
-        # a live `set dump-interval` wakes it without a restart
-        def watch_dump():
-            while not proxy.stopping:
-                if not proxy.dump_interval:
-                    proxy.dump_wake.wait()
-                    proxy.dump_wake.clear()
-                    continue
-                if proxy.dump_wake.wait(proxy.dump_interval):
-                    proxy.dump_wake.clear()
-                if proxy.stopping:
-                    break
-                try:
-                    n = persist.write_dump(proxy.dump_path, proxy.cache,
-                                           proxy.control.dump_settings() if getattr(proxy, 'control', None) else None,
-                                           with_cache=proxy.dump_with_cache, key=proxy.dump_key)
-                    logger.debug('state dumped to %s (%d word(s), %s)', proxy.dump_path, n,
-                                 'with cache' if proxy.dump_with_cache else 'settings only')
-                except (OSError, ValueError) as e:
-                    logger.error('the periodic dump to %s failed: %s', proxy.dump_path, e)
-        threading.Thread(target=watch_dump, daemon=True, name='dump').start()
+    # the dumper thread always runs (it parks while dump-interval is off):
+    # a live `set dump-interval` wakes it without a restart — and a live
+    # `set dump/path` (no path at start) finds the thread waiting too
+    def watch_dump():
+        while not proxy.stopping:
+            if not proxy.dump_interval:
+                proxy.dump_wake.wait()
+                proxy.dump_wake.clear()
+                continue
+            if proxy.dump_wake.wait(proxy.dump_interval):
+                proxy.dump_wake.clear()
+            if proxy.stopping:
+                break
+            if not proxy.dump_path:
+                continue   # the path went off live: the interval ticks on, nothing to dump into
+            try:
+                n = persist.write_dump(proxy.dump_path, proxy.cache,
+                                       proxy.control.dump_settings() if getattr(proxy, 'control', None) else None,
+                                       with_cache=proxy.dump_with_cache, key=proxy.dump_key)
+                logger.debug('state dumped to %s (%d word(s), %s)', proxy.dump_path, n,
+                             'with cache' if proxy.dump_with_cache else 'settings only')
+            except (OSError, ValueError) as e:
+                logger.error('the periodic dump to %s failed: %s', proxy.dump_path, e)
+    threading.Thread(target=watch_dump, daemon=True, name='dump').start()
     if proxy.metrics_srv:
         proxy.metrics_srv.start()
     try:

@@ -49,6 +49,7 @@ def _load_options():
     static_defaults = {'host': d['host'], 'port': d['modbus_port'], 'unit': d['unit'],
                        'max-kwp': d['max_kwp'], 'battery-kwh': d['battery_kwh'],
                        'time-scale': d['time_scale'], 'chaos': d['chaos'],
+                       'dump-interval': d['dump_interval'],
                        'max-clients': d['max_clients'], 'client-timeout': d['client_timeout_s'],
                        'max-conn-per-ip': d['max_conn_per_ip'],
                        'metrics-listen': d['metrics_listen'],

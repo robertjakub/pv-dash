@@ -27,7 +27,7 @@ from common.cred import parse_trust_uids
 from common.human import secs
 from common.modbus import AUTH_MIN_KEY
 from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.control import ControlServer as _ControlServer
+from common.control import ControlServer as _ControlServer, num
 from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
     match_setting_path
 from .metrics import MetricsServer, describe_metrics
@@ -139,11 +139,11 @@ class ControlServer(_ControlServer):
 
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
                  trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None, startup_values=None,
-                 dump_path=None, restore_on_start=False, config_path=None, dump_key=None):
+                 dump_path=None, restore_on_start=False, config_path=None, dump_key=None, dump_interval=0.0):
         super().__init__(target, audit=audit, token=token, defaults=defaults, trust_uids=trust_uids,
                          socket_group=socket_group, ops_token=ops_token, ops_verbs=ops_verbs,
                          config_path=config_path, dump_path=dump_path,
-                         restore_on_start=restore_on_start, dump_key=dump_key)
+                         restore_on_start=restore_on_start, dump_key=dump_key, dump_interval=dump_interval)
         self.log_replies = log_replies   # DEBUG also logs the full command output
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
         self.simulator = simulator
@@ -439,6 +439,18 @@ class ControlServer(_ControlServer):
             if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % warn
             return shown
+        if key == 'dump-interval':
+            if not self.dump_path:
+                raise ValueError('dump-interval needs a dump path (set dump/path or --dump-path)')
+            if val in ('off', 'none', '0'):
+                self.dump_interval = 0
+                self.dump_wake.set()
+                return 'off'
+            v = num(val, 'dump-interval', 'seconds or off')
+            self._gate_range(key, v, 'seconds')
+            self.dump_interval = v
+            self.dump_wake.set()
+            return secs(v)
         if key == 'dump/path':
             if val in ('off', 'none', ''):   # the words lower fine; a path keeps its case
                 self.dump_path = None
@@ -520,6 +532,8 @@ class ControlServer(_ControlServer):
             return acl_value_text(fake.metrics_acl) if fake else '?'
         if key == 'dump/path':
             return self.dump_path or 'off'
+        if key == 'dump-interval':
+            return 'off' if not self.dump_interval else secs(self.dump_interval)
         if key == 'scenario':
             return self.scenario or 'custom'
         s = SETTING_BY_NAME.get(key)
@@ -559,6 +573,8 @@ class ControlServer(_ControlServer):
                     return 'ok %s' % COMMAND_HELP[path]
                 key, rest = match_setting_path(args, SETTING_BY_NAME)
                 if key is not None and not rest:
+                    if key == 'dump-interval' and not self.dump_path:
+                        return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
                     return 'ok %s' % describe_setting(key)
                 if path in NODE_BY_NAME:
                     return 'ok %s' % describe_node(OPTIONS, path)
@@ -669,6 +685,8 @@ class ControlServer(_ControlServer):
                 word = SHOW_BY_LIVE.get(key)
                 if word:
                     return self.command('show ' + word)   # a show command's report, by its word
+                if key == 'dump-interval' and not self.dump_path:
+                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
                 return 'ok %s=%s' % (key, self._get(key))
             if key is not None and rest:
                 return 'err %s: unexpected %s' % (key, ' '.join(rest))
@@ -849,6 +867,7 @@ class ControlServer(_ControlServer):
             'scenario': self.scenario or 'custom',
             'dump/path': self.dump_path or 'off',
             'dump/restore-on-start': 'on' if self.dump_restore else 'off',
+            'dump-interval': self.dump_interval,
             'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
             'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
             'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',

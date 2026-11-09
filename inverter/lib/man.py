@@ -87,7 +87,8 @@ fresh fake re-applies them once), with a dump path configured
 overrides as one 0600 integrity-hashed JSON; \\fB--dump-key\\fR seals it
 \\(em the state rides encrypted, a restore refuses a wrong or missing key;
 \\fB--restore-on-start\\fR
-loads it at start), \\fBshutdown\\fR,
+loads it at start, \\fB--dump-interval\\fR rewrites it on a timer),
+\\fBshutdown\\fR,
 \\fBquit\\fR. A second, read-only token (\\fB--control-ops-token\\fR)
 authenticates into the show verbs only \\(em the ops shift against the
 admin key, both roles audited. The control listener rides the family's

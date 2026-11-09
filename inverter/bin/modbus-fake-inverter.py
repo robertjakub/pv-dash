@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 
 import logging
 import math
+import threading
 
 from common.audit import AuditLog
 from common.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
@@ -92,6 +93,10 @@ def validate(args):
         problems.append('--metrics-client-timeout must be >= 0 seconds, got %r' % args.metrics_client_timeout)
     if args.metrics_max_conn_per_ip < 0:
         problems.append('--metrics-max-conn-per-ip must be >= 0 (0 = no per-IP limit), got %d' % args.metrics_max_conn_per_ip)
+    if not (math.isfinite(args.dump_interval or 0.0) and (args.dump_interval or 0.0) >= 0):
+        problems.append('--dump-interval must be >= 0 seconds (0 = off), got %r' % args.dump_interval)
+    if (args.dump_interval or 0.0) and not args.dump_path:
+        problems.append('--dump-interval needs --dump-path set (there is nothing to dump into)')
     return problems
 
 
@@ -132,6 +137,7 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'log-level': args.log_level,
         'dump/path': args.dump_path or 'off',
         'dump/restore-on-start': 'on' if args.restore_on_start else 'off',
+        'dump-interval': 'off' if not args.dump_interval else '%g' % args.dump_interval,
         # the live control family — what `unset` restores (the cache's model)
         'control/port': control_target,
         'control/ops/verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
@@ -295,7 +301,7 @@ def main():
                                     'auth-key': bool(modbus_auth_key),
                                     'dump-key': bool(dump_key)}),
                                 dump_path=args.dump_path, restore_on_start=args.restore_on_start,
-                                dump_key=dump_key)
+                                dump_key=dump_key, dump_interval=args.dump_interval)
     fake.metrics_listen = metrics_listen
     fake.metrics_token = metrics_token
     fake.metrics_acl = metrics_acl
@@ -315,6 +321,10 @@ def main():
         control.start()   # the reload state restores first, then the listener binds
         if control.dump_path and args.restore_on_start:
             logger.info('restore-on-start: %s', control.restore_state())
+        # the dumper thread always runs (it parks while dump-interval is off):
+        # a live `set dump-interval` wakes it without a restart — and a live
+        # `set dump/path` (no path at start) finds the thread waiting too
+        threading.Thread(target=control.run_dump_interval, daemon=True, name='dump').start()
     box = SignalBox(simulator, chaos, fake, control=control, audit=audit)
     if control:
         control.signalbox = box

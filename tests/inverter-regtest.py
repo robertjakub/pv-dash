@@ -634,6 +634,19 @@ def main():
             time.sleep(0.1)
         check('reload: the state file is consumed', gone,
               os.path.join(reload_state, 'fake-inverter', 'reload.json'))
+        # the dump-interval (the family knob, the cache's golden shape): the
+        # dumper loop on the control base rewrites the file on the timer
+        # (the thread parks while the interval is off, a live set wakes it)
+        tx = ctl(I_CTL, 'show dump-interval')
+        check('dump: show dump-interval answers off', tx == 'ok dump-interval=off', tx)
+        tx = ctl(I_CTL, 'set dump-interval 2')
+        check('dump: the interval set live', tx.startswith('ok dump-interval=2.00s'), tx)
+        m1 = os.path.getmtime('/tmp/inv_regtest_state.json')
+        time.sleep(2.6)
+        m2 = os.path.getmtime('/tmp/inv_regtest_state.json')
+        check('dump: the dumper rewrote the file on the timer', m2 > m1, '%.2f -> %.2f' % (m1, m2))
+        tx = ctl(I_CTL, 'set dump-interval off')
+        check('dump: the interval off again', tx.startswith('ok dump-interval=off'), tx)
         tx = ctl(I_CTL, 'shutdown')
         check('reload: the re-execed fake shuts down clean', tx.startswith('bye shutdown'), tx)
         time.sleep(0.4)
@@ -978,7 +991,8 @@ def main():
                  if line.strip() and not line.strip().startswith('[')]
         check("node walk: the bare show mimics the ? output (the walk's first position)",
               words == ['batt', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
-                        'connect-acl', 'connections', 'control', 'dump', 'grid', 'grid-frequency', 'grid-outage',
+                        'connect-acl', 'connections', 'control', 'dump', 'dump-interval', 'grid',
+                        'grid-frequency', 'grid-outage',
                         'grid-voltage', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
                         'metrics', 'modbus', 'mppt', 'profile', 'pv', 'registers', 'scenario', 'seed',
                         'soc', 'static', 'strict', 'time', 'time-scale', 'timezone', 'version',

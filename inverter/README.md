@@ -152,7 +152,7 @@ The fake has **no config file** (the audit's F11 test-tool posture: flags
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
 | `--control-token` / `--control-ops-token` / `--control-ops-verbs` | off / off / `show,clear` | the control tokens (a secret, `file:<path>` welcome) / the ops role's RBAC policy |
 | `--control-trust-uids` / `--control-socket-group` / `--control-log-replies` | none / off / off | the extra trusted uids (`SO_PEERCRED`) / the socket's 0660 mode / DEBUG-log the control replies |
-| `--dump-path` / `--dump-key` / `--restore-on-start` | off | the sealed state dump (the pins, the machines — the tokens apart) |
+| `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the pins, the machines — the tokens apart; every `--dump-interval` seconds) |
 | `--chaos` / `--seed` | `0` / random | the chaos probability / the RNG seed — see [Chaos injection](#chaos-injection---chaos) |
 | `--strict` | off | reject undefined registers with exception 02 |
 | `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`) | XDG state | the audit trail: a file path or `-` for stdout |
@@ -199,7 +199,7 @@ form is legitimate here in a way it never is on the daemons.
 | `set scenario <name>` | a scenario preset: `morning`/`noon`/`evening`/`night` freeze the clock at a typical moment **and release the value pins**; manual pins turn it `custom` |
 | `reset` | clear **all** pinned settings, the write overlay and the pinned coils/discrete inputs at once (like SIGUSR1, per-connection) |
 | `request reload` | **restart the whole fake with the pins kept**: the live overrides save to the XDG state home (no config file), the process re-execs and re-applies them once |
-| `request dump` / `request restore` | with `--dump-path` configured: write the live overrides to the state file (`0600`, integrity-hashed) / load them back; `--dump-key` seals it, `--restore-on-start` does it automatically |
+| `request dump` / `request restore` | with `--dump-path` configured: write the live overrides to the state file (`0600`, integrity-hashed) / load them back; `--dump-key` seals it, `--restore-on-start` does it automatically, the `--dump-interval` loop rewrites it live |
 | `show version` / `help` / `help <setting>` / `quit` / `shutdown` | the version / the reference / one setting's description / close / graceful stop (a confirm guard) |
 
 | Setting | Values | Meaning |
@@ -222,7 +222,7 @@ form is legitimate here in a way it never is on the daemons.
 | `modbus auth` / `modbus auth key` | `suite` \| `none` / key | the auth scheme + key (secrets: `show` and `unset` refuse them) |
 | `metrics enable` / `metrics token` / `metrics acl` | — | the /metrics endpoint, its bearer, its connect ACL (live) |
 | `control port` / `control token` / `control ops token` / `control ops verbs` / `control trust-uids` / `control socket-group` | — | the control plane's live knobs (the listener rebinds, the tokens rotate, the socket re-modes) |
-| `dump path` / `dump restore-on-start` | — | the state dump's file and its restore mark |
+| `dump path` / `dump restore-on-start` / `dump-interval` | — | the state dump's file, its restore mark, the automatic rewrite interval |
 | `register` / `coil` / `discrete` | `set register <addr> <value>` etc. | the write-overlay emulation: raw register / coil / discrete-input pins (`reset` clears, `show registers` marks them) |
 | `profile` / `log-level` | `<file>` / level | swap the register-map profile live / the live log level |
 

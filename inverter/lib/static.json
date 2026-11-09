@@ -69,6 +69,7 @@
     "time_scale": 1.0,
     "time_scale_max": 1440.0,
     "chaos": 0.0,
+    "dump_interval": 0.0,
     "max_clients": 64,
     "client_timeout_s": 300.0,
     "max_conn_per_ip": 0,

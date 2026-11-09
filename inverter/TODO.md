@@ -5,6 +5,17 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The dump-interval wave (the family unification, the cache as the golden
+master): the fake gains the cache's `dump-interval` knob —
+`--dump-interval`, live as `set dump-interval <s|off>` — the write-behind
+rewrites the state dump on a timer (the shared dumper loop on the
+control base parks while the interval is off, a live set wakes it
+without a restart); a set/show/describe without a dump path answers the
+family's `dump-interval needs a dump path` error and the start
+validation refuses an interval without a dump path (the fake has no
+config file — the SIGHUP layer does not touch the dump family, the
+dump-path parity).
+
 The secrets-startup-only wave: every secret row (auth-key, control-token,
 control-ops-token, metrics-token, dump-key) is `restart`-marked and the
 wire refuses set/unset on it with the dump-key answer — the live rotation

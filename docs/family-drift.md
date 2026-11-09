@@ -2,8 +2,9 @@
 
 The wave record: the sweep types over the four surfaces (cache,
 scraper, inverter, dashboard) — what each sweeps, what it found,
-and the verdicts. **A working paper, not a shipped doc**; the
-landed legs ride their per-tool commits when the wave goes in.
+and the verdicts. **Ships in the repo, kept current by the
+workflow**: the landed legs ride their per-tool commits, the
+open findings wait in place, and `--check` fails a stale page.
 Regenerate with `python3 scripts/family_drift.py`; the verdict
 prose lives in this script (`*_FINDINGS`/`*_VERBS`/`*_CENSUS`)
 so a re-run updates the facts and keeps the judgement.
@@ -93,8 +94,8 @@ The listener census (ten listeners):
 
 | tool | surface | the class at it | the bind | the stack at it |
 |---|---|---|---|---|
-| inverter | Modbus TCP (the device) | `FakeInverter.serve` (lib/inverter.py) | backlog 16 | `conn_gate` -> connect ACL -> `max_clients` -> per-conn thread; the suite handshake in-handle; the chaos injector |
-| cache | Modbus TCP (the client face) | `Proxy.serve` (lib/proxy.py) | backlog 128 | the same ladder; the write-gate layers in `respond()` (shape -> allow-write -> write ACL -> register gate); the requests audit |
+| inverter | Modbus TCP (the device) | `serve_modbus` (common/modbus/server.py) under the fake's face object | backlog 128 | the shared ladder; the face's hooks carry the tool (the chaos injector, the counters) |
+| cache | Modbus TCP (the client face) | `serve_modbus` (common/modbus/server.py) under the proxy's face object | backlog 128 | the shared ladder; the write-gate layers in `respond()` (shape -> allow-write -> write ACL -> register gate); the requests audit rides `on_disconnect` |
 | inverter | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | `common/metrics_server` — the snapshot() hook is the tool's |
 | cache | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | the common server; the snapshot() hook |
 | dashboard | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | the common server; the snapshot() hook |
@@ -104,36 +105,36 @@ The listener census (ten listeners):
 
 The findings:
 
-- **The accept-ladder twins (the big one — found, not landed).** The
-  cache's `Proxy.serve` and the fake's `FakeInverter.serve` carry the
-  same ~35-line accept discipline near-verbatim: settimeout ->
-  `conn_gate.admit` (the per-IP cap, the log text identical) -> the
-  connect-ACL check (release + `connection rejected: ... not on the
-  connect ACL`) -> the `max_clients` check (release + `connection
-  refused: client limit ...`) -> the count under the lock -> the
-  handler thread -> the pre-serve failure unwind -> the `finally`
-  close. The deltas are three: the listen backlog (128 vs 16), the
-  fake's outer retry loop (its SignalBox closes the listener and the
-  loop must notice the `stopping` flag — the cache's accept never
-  fails by decision), and where the auth material reads (the cache's
-  live config dict vs the fake's ctor attrs). **The next leg**: a
-  `common/modbus/server.py` accept ladder (gate, acl, max_clients,
-  timeout, handle, stopping=None) — both serves shrink to ~10 lines
-  and the log texts get one home.
-- **The session opener twins (rides the same leg).** `handle()`'s
-  first act is the same in both: register the client in the `clients`
-  dict under the lock, run the suite handshake when armed
-  (`auth_handshake_server`, the failure logs identical, the peer
-  dropped before it ever sees a frame), count the requests per frame,
-  and the `finally` unregisters (pop, count, `conn_gate.release`,
-  close) — the cache adds the audit trail's `REQUESTS` event, the
-  fake none (its audit rides the control plane).
-- **The malformed-frame split (a difference to keep).** On an
-  unparseable frame the fake logs and closes; the cache answers what
-  it can in-band (`respond`'s proto/pdu guards -> exception frame)
-  and closes silently on the hopeless MBAP. The cache is a proxy —
-  its client deserves the protocol answer; the device just hangs up.
-  A common ladder needs this as a policy hook, not a fold.
+- **The accept ladder is one (landed — the audit-family wave).**
+  `common/modbus/server.py`'s `serve_modbus` runs the discipline
+  once: the client timeout -> `conn_gate.admit` (the per-IP cap,
+  counts always, enforces only when capped) -> the connect-ACL check
+  (release + `connection rejected: ... not on the connect ACL`) ->
+  the `max_clients` check (release + `connection refused: client
+  limit ...`) -> the count under the lock -> the daemon thread -> the
+  pre-serve failure unwind -> the `finally` close. The backlog sits
+  unified at 128 — above every face's client limit, a burst past a
+  short backlog RSTs on macOS/BSD before the client sends — and the
+  accept-error retry notices the `stopping` flag (the SignalBox
+  close). The faces delegate (`Proxy.serve`, the fake's `serve`) and
+  bring the face protocol's hooks: `listening`, `access`, `allowed`,
+  `suite_key`, `on_frame`/`on_session`, `malformed`, `frame`,
+  `on_disconnect`.
+- **The session opener rides the same ladder (landed).** `_session`
+  registers the client in the `clients` dict under the lock, runs the
+  suite handshake when armed (`auth_handshake_server`, the failure
+  logs identical, the peer dropped before it ever sees a frame),
+  counts the requests per frame, and the `finally` unregisters (pop,
+  count, `conn_gate.release`, close) — the cache's audit trail
+  `REQUESTS` event rides `on_disconnect`, the fake's counters ride
+  `on_frame`/`on_session`.
+- **The malformed-frame split (a policy hook, as ruled).** On an
+  unparseable frame the `malformed(addr, err)` hook decides: the fake
+  logs and closes; the cache answers what it can in-band
+  (`respond`'s proto/pdu guards -> exception frame) and closes
+  silently on the hopeless MBAP. The cache is a proxy — its client
+  deserves the protocol answer; the device just hangs up. The hook
+  keeps the difference without a fork.
 - **The poll-loop skeleton (declined).** The cache's `poll_loop` and
   the scraper's are the same shape — `while True: try poll_once()
   except log-crashed; wait(interval) on a wake Event; clear` — with
@@ -157,10 +158,9 @@ The findings:
   ladder. Not foldable without losing the shapes that make each
   correct.
 
-The verdict: one new landed-leg candidate (the Modbus accept ladder +
-the session opener, worth ~50 lines net and one home for the family's
-refusal texts); the rest of the surface drift is at parity or declined
-with the reasons above.
+The verdict: the accept-ladder leg is landed (the family's refusal
+texts and the session opener have one home); the rest of the surface
+drift is at parity or declined with the reasons above.
 
 ## The knobs drift — the four registries side by side
 
@@ -220,28 +220,24 @@ four registries; 29 names carry in all four:
 
 The findings:
 
-- **The live bounds ride the cache only.** The cache's `audit-files`
-  (min 1, max 100) and `audit-max-mb` (min 0, max 1048576) are
-  bound-gated at the live dispatch; the scraper's same-named rows
-  carry NO bounds — its live `set audit rotate files 0` would be
-  accepted where the cache refuses. The bounds should mirror (or the
-  shared bounds move into common as the family's constants).
-- **The `audit-daily` split.** Four shapes for one feature: the
-  cache's `audit-daily` is live (`audit/rotate/daily`), the fake's is
-  startup-only (no live name — F11, but its registry row exists), the
-  scraper and the dashboard have no daily knob at all (the scraper's
-  `audit/rotate` node help omits the midnight trigger accordingly).
-  The common `AuditLog` supports daily for everyone; the switch is
-  what drifted. Decide: family-wide live knob, or cache-only by
-  design.
-- **The env-twin gaps.** `$AUDIT_LOG/$AUDIT_MAX_MB/$AUDIT_FILES` on
-  the cache and scraper only (the fake's and dashboard's audit knobs
-  are config-only), `$NO_AUDIT_LOG` on the cache only, `$LOG_LEVEL`
-  missing on the dashboard, and the F13 caps' env twins
-  (`$MAX_CLIENTS`, `$MAX_CONN_PER_IP`, `$CLIENT_TIMEOUT`) missing on
-  the fake (its env layer is the F11 short list). Probably design,
-  worth a ruling: the env layer is the docker surface — a knob
-  without its twin cannot be set from an env file.
+- **The audit rotation bounds are family-wide (landed — the
+  audit-family wave).** `common/audit.py` holds the constants
+  (`AUDIT_FILES` 1..100, `AUDIT_MAX_MB` 0..1048576), all four
+  registries' rows repeat them, and `check_options` cross-checks the
+  repetition — `set audit rotate files 0` refuses identically
+  everywhere.
+- **The `audit-daily` knob is one shape (landed).** The live name
+  `audit/rotate/daily` and the `$AUDIT_DAILY` env twin agree on all
+  four, and the fake's live dispatch flips the same bit; its
+  remaining audit rows (log/max-mb/files/disable) stay startup-only
+  by posture — no live name, the env twin carries them.
+- **The env layer is complete under the env-or-note rule (landed).**
+  Every knob carries its env twin or an explicit `no-env` note, and
+  `check_options` gates the pair. The no-env census: the fake's 13
+  (the F11 simulator surface — the flags-only choices), the
+  dashboard's 1 (`log-queries` — the live toggle exists, the startup
+  stays flag-only), the cache and the scraper none; the nodes and
+  the command rows are env-free by nature.
 - **The `auth` name collision.** The dashboard's `auth` is a NODE
   (the page's auth namespace), the other three's is the modbus auth
   enum (`suite|none`). One spelling, two meanings in the family's
@@ -681,30 +677,17 @@ refusals and the same env layer; the code behind them lives once in
 `common/`. Each TODO states the consistent outcome and the plane it
 serves. Ordered by the user's exposure; the code plane rides along.
 
-1. **The audit rotation bounds, family-wide** — `audit-files` (min 1,
-   max 100) and `audit-max-mb` (min 0, max 1048576) carry bounds in
-   all four registries; the constants live once in `common/` (the
-   audit module's own). The user plane: `set audit rotate files 0`
-   refuses identically everywhere. Today the scraper accepts it.
+Landed (the audit-family wave): the audit rotation bounds
+family-wide (the constants in `common/audit.py`, every registry
+repeating them, `check_options` cross-checking); the `audit-daily`
+knob one shape (the live `audit/rotate/daily` + the `$AUDIT_DAILY`
+twin on all four); the env twins completed (the env-or-note rule —
+a knob carries its twin or an explicit `no-env` note, the gate
+enforces); the accept-ladder extraction (`common/modbus/server.py`
+`serve_modbus` — the discipline, the session opener and the
+malformed-frame policy hook with it).
 
-2. **The `audit-daily` knob, one shape** — the family-wide live knob
-   `audit/rotate/daily`: the scraper and the dashboard gain the row,
-   the fake's startup-only row gains its live name, the cache's
-   (today the only live one) is the template. The user plane: the
-   UTC-midnight trigger switches identically everywhere; the code
-   plane: `rebuild_audit`'s `daily` rides the params everywhere (the
-   common `AuditLog` already supports it).
-
-3. **The env twins completed** — every knob reachable from an env
-   file: `$AUDIT_LOG/$AUDIT_MAX_MB/$AUDIT_FILES` on the fake and the
-   dashboard, `$NO_AUDIT_LOG` everywhere (or nowhere, one ruling),
-   `$LOG_LEVEL` on the dashboard, the F13 caps' twins
-   (`$MAX_CLIENTS/$MAX_CONN_PER_IP/$CLIENT_TIMEOUT`) on the fake.
-   The user plane: the docker env files drive the whole surface; the
-   code plane: the loaders read one env layer. A knob ruled
-   env-free carries a registry note instead of a silent gap.
-
-4. **The `auth` name collision resolved** — one spelling, one
+1. **The `auth` name collision resolved** — one spelling, one
    meaning: the dashboard's `auth` node (the page's namespace)
    renames (`page-auth/` or the rows re-home), or the modbus enum
    re-homes; the set grammar never maps one word to two meanings.
@@ -712,33 +695,25 @@ serves. Ordered by the user's exposure; the code plane rides along.
    proposal + the migration note (the alias map carries the old
    spellings one release).
 
-5. **`request/reload-config` family-wide** — the re-read-without-exec
+2. **`request/reload-config` family-wide** — the re-read-without-exec
    surface exists on the scraper and the dashboard; the cache gains
    it (its reload execs; a profile or selection edit deserves the
    lighter verb). The fake stays exempt — no config file, F11 — and
    the asymmetry gets the registry note.
 
-6. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
+3. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
    the RBAC vocabulary from the registry's command rows (the
    hidden/internal flags included). One home; the silent drift
    (a policy accepting a verb the grammar refuses) dies.
 
-7. **The accept-ladder extraction** — `common/modbus/server.py`: the
-   gate -> ACL -> max-clients -> count -> thread discipline + the
-   session opener (the clients register, the suite handshake, the
-   `finally` unwind) with the malformed-frame policy hook (the
-   cache answers in-band, the fake closes). The user plane: the
-   identical refusal texts and logs at both Modbus faces; the code
-   plane: the surface sweep's ~50-line net win.
-
-8. **The coverage TODOs graduate** — the seeds carry stable IDs in
+4. **The coverage TODOs graduate** — the seeds carry stable IDs in
     docs/family-drift-seeds.json (`family_drift.py --seeds`, the
     suggested suite per seed); a test wave consumes entries, the
     regeneration drops them, the shrinkage is the wave's proof, and
     `--check` fails when a NEW promise ships uncovered (the list may
     only shrink).
 
-9. **The parity gates wired** — the NixOS-parity and docker/env
+5. **The parity gates wired** — the NixOS-parity and docker/env
     sweeps join `check_options`/the release gates as machine checks
     (the module.nix type/default vs the registry, the env-file
     coverage vs the env twins). The drift doc's `--check` already
@@ -748,5 +723,5 @@ Not-todo (the ruling recorded): the fake's `request/restart` verb
 stays absent (no config to re-exec into — the fold on a manual
 restart keeps the note true); the man-page prose and the HTTP
 handlers stay per-tool by design; the malformed-frame split is the
-proxy/device difference, kept.
+proxy/device difference, kept as the ladder's policy hook.
 

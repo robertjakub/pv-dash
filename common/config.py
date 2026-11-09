@@ -23,6 +23,39 @@ def resolve_target(explicit, default_socket):
     return default_socket
 
 
+def control_socket_path(listen_port, socket_template):
+    """The tool's default control socket path: its template spelled with
+    its serving port (/tmp is cleared on reboot, nothing lands in a
+    working directory)."""
+    return socket_template % int(listen_port)
+
+
+def parse_control_target(text, listen_port, socket_template):
+    """The control target from one flag/env/config value or live wire
+    value: '' → the default unix socket for the serving port; '0' → None
+    (off); digits → TCP port on 127.0.0.1; anything else → unix socket
+    path. SystemExit on an out-of-range port."""
+    t = (text or '').strip()
+    if t == '0':
+        return None
+    if t.isdigit():
+        p = int(t)
+        if not 1 <= p <= 65535:
+            raise SystemExit('invalid control-port %d: use 1..65535, a unix socket path, or 0 to disable' % p)
+        return p
+    if t:
+        return t
+    return control_socket_path(listen_port, socket_template)
+
+
+def resolve_control_target(explicit, listen_port, socket_template):
+    """--control-port flag > CTL environment > the tool's default socket
+    (its template spelled with its serving port). One signature for the
+    family — the daemons pass their serving port + template, the ctl/cli
+    ladders take the computed default socket (ctl_socket)."""
+    return resolve_target(explicit, control_socket_path(listen_port, socket_template))
+
+
 def load_config_script(path, options):
     """The set-grammar config script: every line a `set <name> <value>` (or
     the bare `<name> <value>` shorthand), `#` comments stay comments — a
@@ -455,6 +488,23 @@ def parse_acl_value(text, label):
     if t and t.startswith('file:'):
         return t
     return parse_acl(text, label)
+
+
+def resolve_metrics_acl(val, label='metrics/acl'):
+    """The metrics/acl knob value -> (gate, warn): the system words and
+    the network lists ride parse_acl; 'file:<path>' loads the standalone
+    ip-prefix acl file (the gate object each tool's
+    schema/acl-ip-prefix.schema.json describes — the chain reads top to
+    bottom, the LAST matching rule decides, a client no rule decides
+    refuses). The gate: None = any, () = none, the networks tuple, IPGate
+    = the file chain. SystemExit on a bad value or file; a
+    group/world-readable acl file warns (the (gate, warn) pair — chmod
+    0600 silences it)."""
+    t = (val or '').strip()
+    if t.startswith('file:'):
+        desc, rules = load_write_gate_file(t[5:], allow=('ip-prefix',))
+        return IPGate(t, desc, rules), acl_file_warn(t[5:])
+    return parse_acl(t, label), None
 
 
 def acl_value_text(acl):

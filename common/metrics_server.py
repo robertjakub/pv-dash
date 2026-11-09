@@ -53,7 +53,7 @@ def describe_metrics(listen, token, max_clients=0, max_per_ip=0):
 
 class MetricsServer:
     """A tiny Prometheus text-endpoint for a tool itself. The master switch
-    is the live `metrics-server` setting (default off); the bind address is
+    is the live `metrics enable` setting (default off); the bind address is
     --metrics-listen HOST:PORT. Caps (F13 round): --metrics-max-clients
     (immediate 503 past it), --metrics-client-timeout (0 = the built-in 5 s
     slowloris cap), --metrics-max-conn-per-ip; 0 = no per-IP limit."""
@@ -130,7 +130,7 @@ class MetricsServer:
     def _bind(self):
         """Construct and bind the listener in the caller's context: the bind
         error is the caller's to answer — the startup exits rc 1 after the
-        note, the live `set metrics-server on` turns it into the err reply
+        note, the live `set metrics enable on` turns it into the err reply
         (bind_error). Binding on the thread would spew the traceback (or
         worse, limp on silently without the endpoint)."""
         try:
@@ -146,7 +146,7 @@ class MetricsServer:
 
     def stop(self):
         """Stop the serving loop and close the socket (the live
-        `set metrics-server off`); a second stop is a no-op."""
+        `set metrics enable off`); a second stop is a no-op."""
         httpd, self._http = self._http, None
         if not httpd:
             return

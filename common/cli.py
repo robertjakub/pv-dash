@@ -21,7 +21,7 @@ except ImportError:
     readline = None
 
 from common.audit import AuditLog
-from common.config import parse_secret
+from common.config import parse_secret, resolve_target
 from common.human import secs
 from common.options import command_path_pool, render_word_sections, setting_path_pool, word_groups
 from common.wiresec import sign_request, verify_reply
@@ -581,7 +581,7 @@ def run_cli(spec):
 
     token = args.control_token or os.environ.get('CONTROL_TOKEN')
     token = parse_secret(token, 'control-token')   # the inline form may be file:<path> — the same loader
-    target = spec['resolve'](args.control_port)
+    target = resolve_target(args.control_port, spec['ctl_socket'])
     if target.isdigit():
         if not 1 <= int(target) <= 65535:
             p.error('--control-port port out of range: %d' % int(target))

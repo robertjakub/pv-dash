@@ -12,17 +12,18 @@ import socket
 import sys
 
 from common.audit import AuditLog
-from common.config import parse_secret
+from common.config import parse_secret, resolve_target
 from common.wiresec import sign_request, verify_reply
 
 
 def run_ctl(daemon, bin_name, app, self_note, command_help,
-            resolve, timeout_s, audit_max_mb, audit_files, ctl_page):
+            ctl_socket, timeout_s, audit_max_mb, audit_files, ctl_page):
     """The whole ctl ladder: the parser (the tool's name, socket, examples),
     the batch stdin strip (comments and blanks stay comments), the token
     parse, the connect, the CONNECT audit, the signed exchange closure, the
     auth handshake and the command loop (the daemon-exit bye short-circuits
-    it)."""
+    it). `ctl_socket` is the tool's default control socket path — the
+    --control-port flag and the CTL environment override it."""
     p = argparse.ArgumentParser(description='Send commands to the %s control server (TCP or unix socket).' % daemon)
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (env CTL when unset) — same flag as %s' % self_note)
     p.add_argument('command', nargs='*', help='control command, %s' % command_help)
@@ -53,7 +54,7 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
 
     token = args.control_token or os.environ.get('CONTROL_TOKEN')
     token = parse_secret(token, 'control-token')   # the inline form may be file:<path> — the same loader
-    target = resolve(args.control_port)
+    target = resolve_target(args.control_port, ctl_socket)
     if target.isdigit():
         if not 1 <= int(target) <= 65535:
             p.error('--control-port port out of range: %d' % int(target))

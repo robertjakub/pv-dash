@@ -21,6 +21,7 @@ import os
 import time
 
 from common.render.human import secs
+from common.runtime.audit import AUDIT_FORWARD_CHOICES
 from common.runtime.version import version_string
 from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.wire.control import ControlServer as _ControlServer, num, numi
@@ -224,7 +225,14 @@ class ControlServer(_ControlServer):
             else:
                 raise ValueError('audit/rotate/daily must be on or off')
             self.audit_params['daily'] = on
+            self._rebuild_audit()
             return 'on' if on else 'off'
+        if key == 'audit/forward':
+            if val not in ('none', 'syslog'):
+                raise ValueError('audit/forward must be one of %s' % ', '.join(AUDIT_FORWARD_CHOICES))
+            self.audit_params['forward'] = None if val == 'none' else val
+            self._rebuild_audit()
+            return val
         if key == 'control/port':
             try:
                 target = parse_control_target(val, DEFAULT_LISTEN_PORT, CONTROL_SOCKET_TEMPLATE)
@@ -333,6 +341,8 @@ class ControlServer(_ControlServer):
             return '%d' % self.httpd.gate.max_per_ip
         if key == 'audit/rotate/daily':
             return 'on' if self.audit_params['daily'] else 'off'
+        if key == 'audit/forward':
+            return self.audit_params.get('forward') or 'none'
         if key == 'log-access':
             return 'on' if h.log_access else 'off'
         if key == 'log-queries':
@@ -387,6 +397,7 @@ class ControlServer(_ControlServer):
             'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
             'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control/socket-group': 'on' if self.socket_group else 'off',
+            'audit/forward': self.audit_params.get('forward') or 'none',
         }
         for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
             if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:

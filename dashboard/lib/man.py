@@ -103,7 +103,10 @@ is signed and the commands/replies verify end to end; a second, read-only
 ops token (\\fB--control-ops-token\\fR) scopes its sessions to the
 show/clear verbs. The audit trail (in the XDG state home when
 \\fB--audit-log\\fR is unset, prefix DSH) records the control commands with
-their roles, the auth failures, the reloads and the shutdowns."""
+their roles, the auth failures, the reloads and the shutdowns. With
+\\fB--audit-forward syslog\\fR every line \\(em the per\\-writer hash
+chain included \\(em is mirrored to the local syslog socket, journald's
+sealed external copy beside the file/stdout sink (F10)."""
     files = """.SH FILES
 .TP
 .I /tmp/dashboard-<port>.socket

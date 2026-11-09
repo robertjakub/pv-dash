@@ -35,6 +35,7 @@ let
       "--audit-files ${toString cfg.auditFiles}"
     ]
     ++ lib.optional cfg.auditDaily "--audit-daily"
+    ++ lib.optionals (cfg.auditForward != null) [ "--audit-forward ${cfg.auditForward}" ]
     ++ lib.optionals (cfg.logLevel != null) [ "--log-level ${cfg.logLevel}" ]
     ++ lib.optional cfg.logQueries "--log-queries"
     ++ lib.optional cfg.localTime "--local-time"
@@ -405,6 +406,17 @@ in
       type = lib.types.float;
       default = 10.0;
       description = "Rotate the audit log at this size in MB, keeping auditFiles backups; 0 = off.";
+    };
+
+    auditForward = lib.mkOption {
+      type = lib.types.nullOr (lib.types.enum [ "syslog" ]);
+      default = null;
+      description = ''
+        Also forward the DSH audit trail to the local syslog socket
+        ("syslog"): journald picks every audit line up — the sealed external
+        copy beside the file/stdout sink, the per-writer hash chain included.
+        null = off.
+      '';
     };
 
     auditDaily = lib.mkOption {

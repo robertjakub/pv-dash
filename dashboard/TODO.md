@@ -5,6 +5,17 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The audit forwarding (`--audit-forward syslog`, the F10 follow-through):
+the DSH trail can mirror every line — the per-writer hash chain
+included — to the local syslog socket as it lands, journald picking them
+up sealed: the journal copy survives the box, the sink stays the
+authority. The machinery is shared (`common/runtime/audit.py`), the row
+is live on the wire (`set audit forward syslog`, live `audit/forward`,
+env `AUDIT_FORWARD`), a socket-less spelling refuses to start with the
+family's one-clean-ERROR shape, and `set audit rotate daily` rebuilds
+the running writer now (it updated the params but not the writer
+before).
+
 The audit-family wave (the bounds, the daily knob, the env twins, the
 shared accept ladder): the audit rotation bounds are family-wide —
 `audit-files` (min 1, max 100) and `audit-max-mb` (min 0, max 1048576)

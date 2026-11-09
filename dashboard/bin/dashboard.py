@@ -323,10 +323,16 @@ def main():
                                         cfg.get('metrics_max_conn_per_ip', 0))
     audit_params = {'path': None if cfg['no_audit_log'] else cfg['audit_log'],
                     'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],
-                    'daily': cfg['audit_daily'], 'disabled': bool(cfg['no_audit_log'])}
-    audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'], 'DSH', app='dashboard',
-                                                      max_mb=cfg['audit_max_mb'], daily=cfg['audit_daily'],
-                                                      files=cfg['audit_files'])
+                    'daily': cfg['audit_daily'],
+                    'forward': None if cfg['audit_forward'] in (None, '', 'none') else cfg['audit_forward'],
+                    'disabled': bool(cfg['no_audit_log'])}
+    try:
+        audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'], 'DSH', app='dashboard',
+                                                          max_mb=cfg['audit_max_mb'], daily=cfg['audit_daily'],
+                                                          files=cfg['audit_files'], forward=cfg['audit_forward'])
+    except ValueError as e:
+        logger.error(str(e))
+        raise SystemExit(1)
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target)
     Handler.upstream = cfg['upstream']
@@ -455,15 +461,12 @@ def main():
         httpd.gate.max_total = new_cfg['max_clients']
         httpd.gate.max_per_ip = new_cfg['max_conn_per_ip']
         logging.getLogger().setLevel(getattr(logging, new_cfg['level'], logging.INFO))
+        summary = 'upstream %s' % new_cfg['upstream']
         if control:
-            control.clear_overrides()   # the config won: nothing is live-overridden
-            # the dump-interval loop re-reads the configured interval (the
-            # parked dumper wakes to see it)
-            control.dump_interval = new_cfg['dump_interval']
-            control.dump_wake.set()
+            control.reloaded(summary, dump_interval=new_cfg['dump_interval'])
         if audit:
             audit.event('RELOAD', 'upstream %s' % new_cfg['upstream'])
-        return 'upstream %s' % new_cfg['upstream']
+        return summary
 
     if control:
         control.reloader = apply_reload   # the control server's `request reload-config` runs the same path

@@ -12,7 +12,6 @@ metrics/acl reading): a client off the ACL is closed without a reply —
 nothing was parsed to answer, the caps never see the peer. The gated
 endpoint skeleton (the 401/404/503, the caps, the thread start/stop) is the
 family's common/metrics_server."""
-import logging
 import time
 
 from common.config import acl_admits
@@ -47,11 +46,6 @@ class MetricsServer(_MetricsServer):
         exists to move it."""
         gate = self.control.metrics_acl if self.control is not None else self.metrics_acl
         return acl_admits(gate, ip)
-
-    def acl_refused(self, request, client_address):
-        logging.getLogger(self.LOG_NAME).info('connection rejected: %s:%d not on the metrics ACL',
-                                              *client_address[:2])
-        self._http._refuse_close(request)
 
     def render(self):
         h = self.httpd

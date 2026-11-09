@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 from common.audit import AuditLog
 from common.cred import parse_trust_uids
 from common.connlimit import GatedHTTPServer, rate_limit_503
-from common.daemon import apply_restart_state, default_config_path, install_signal_handlers, log_state_dumps, \
+from common.daemon import apply_restart_state, default_config_path, fold_listen, install_signal_handlers, log_state_dumps, \
     next_to_script, parse_ops_verbs, setup_logging
 from common.options import build_parser
 from common.version import version_string
@@ -287,10 +287,6 @@ def parse_args():
         sys.stdout.write(daemon_page(ap))
         raise SystemExit(0)
     return args
-
-
-def fold_listen(cfg, pending):
-    cfg['listen'] = pending
 
 
 def main():

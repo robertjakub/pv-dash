@@ -14,6 +14,7 @@ from common.config import (ANY_NET, IPGate, _GATE_TYPES, _acl_desc, _prefix_matc
                            load_write_gate_file, parse_acl, parse_acl_value, parse_auth_type, parse_listen,
                            parse_secret, parse_upstream, resolve_profile_file, Resolver)
 from common.cred import parse_trust_uids
+from common.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_COUNT, MAX_REGISTERS, \
     REGISTER_TYPES, UNIT_ID_RANGE
 
@@ -344,10 +345,11 @@ def validate_config(cfg):
                                  ' (min 16 characters)' if cfg['auth_upstream'] == 'suite' else ''))
     if cfg['level'] not in LOG_LEVELS:
         fail('log-level', 'must be one of %s' % ', '.join(LOG_LEVELS))
-    if cfg['audit_max_mb'] < 0:
-        fail('audit_max_mb', 'must be >= 0 (0 = no size rotation)')
-    if cfg['audit_files'] < 1:
-        fail('audit_files', 'must be >= 1')
+    if not (AUDIT_MAX_MB_MIN <= cfg['audit_max_mb'] <= AUDIT_MAX_MB_MAX):
+        fail('audit_max_mb', 'must be %d..%d (0 = no size rotation)'
+             % (AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX))
+    if not (AUDIT_FILES_MIN <= cfg['audit_files'] <= AUDIT_FILES_MAX):
+        fail('audit_files', 'must be %d..%d' % (AUDIT_FILES_MIN, AUDIT_FILES_MAX))
     if cfg['requests_audit_s'] < 0:
         fail('requests_audit', 'must be >= 0 (0 = off)')
     if cfg['dump_interval'] < 0:

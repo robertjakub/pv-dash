@@ -2,16 +2,14 @@
 """The proxy itself: poller thread, client handling, forwarding and reload (stdlib only)."""
 import logging
 import os
-import socket
 import struct
 import threading
 import time
 from collections import deque
 
-from common.modbus import (DeviceError, ModbusError, auth_handshake_server,
-                           describe_fc, describe_write, exception_frame,
-                           frame, pack_bits, read_frame, unpack_bits,
-                           write_shape_error, write_target)
+from common.modbus import (DeviceError, ModbusError, describe_fc, describe_write,
+                           exception_frame, frame, pack_bits, serve_modbus,
+                           unpack_bits, write_shape_error, write_target)
 from common.connlimit import ConnGate
 from .config import (IPGate, acl_admits, acl_file_warn, acl_gate_summary, acl_value_text,
                      load_profile_write_gate, load_write_gate_file, compile_write_acl,
@@ -442,92 +440,49 @@ class Proxy:
             return '%s (%s)' % (self.write_registers, self._ranges_text())
         return self._ranges_text()
 
+    # The accept ladder and the session opener are the family's one
+    # implementation (common/modbus/server.py serve_modbus) — the refusal
+    # texts and logs are identical at both Modbus faces by construction.
+    # The face hooks below carry what differs: the forwarding dispatch, the
+    # in-band answer for malformed PDUs, the REQUESTS evidence.
+
     def serve(self, host, port):
-        srv = socket.socket()
-        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        srv.bind((host, port))
-        srv.listen(128)
-        self.listen_sock = srv
-        self.listen_addr = (host, port)
+        serve_modbus(self, host, port)
+
+    max_pdu = MAX_PDU
+    log = logger
+
+    def access(self, fmt, *args):
+        (logger.info if self.log_access else logger.debug)(fmt, *args)
+
+    def listening(self, host, port):
         logger.info('modbus-cache listening on %s:%d (client limit %s, client timeout %s)',
                     host, port,
                     self.max_clients or 'none', '%gs' % self.client_timeout if self.client_timeout else 'none')
-        while True:
-            client, addr = srv.accept()
-            admitted = False
-            try:
-                if self.client_timeout:
-                    client.settimeout(self.client_timeout)
-                ok, _why = self.conn_gate.admit(addr[0])   # counts always; enforces only when capped
-                if not ok:
-                    logger.info('connection refused: per-IP limit of %d reached (%s:%d)',
-                                self.conn_gate.max_per_ip, *addr[:2])
-                elif not self._allowed(self.connect_acl, addr[0]):
-                    self.conn_gate.release(addr[0])
-                    logger.info('connection rejected: %s:%d not on the connect ACL', *addr[:2])
-                elif self.max_clients and self.client_count >= self.max_clients:
-                    self.conn_gate.release(addr[0])
-                    logger.info('connection refused: client limit of %d reached (%s:%d)',
-                                self.max_clients, *addr[:2])
-                else:
-                    with self.client_lock:
-                        self.client_count += 1
-                    admitted = True
-                    threading.Thread(target=self.handle, args=(client, addr), daemon=True).start()
-            except (OSError, RuntimeError) as e:
-                logger.error('connection from %s:%d failed before serving (%s)', addr[0], addr[1], e)
-                if admitted:
-                    with self.client_lock:
-                        self.client_count -= 1
-                    self.conn_gate.release(addr[0])
-                    admitted = False
-            finally:
-                if not admitted:
-                    client.close()
 
-    def handle(self, client, addr):
-        access = logger.info if self.log_access else logger.debug
-        access('client connected: %s:%d', *addr[:2])
-        key = '%s:%d' % addr[:2]
-        with self.client_lock:
-            self.clients[key] = {'since': time.monotonic(), 'requests': 0, 'audited': 0}
-        try:
-            # the suite auth (when enabled) gates the Modbus loop: the
-            # client speaks the handshake first, and one that cannot prove
-            # the key is dropped before it ever sees a frame
-            if self.config.get('auth') == 'suite' and self.config.get('auth_key'):
-                try:
-                    proved = auth_handshake_server(client, self.config['auth_key'])
-                except (ConnectionError, OSError) as e:
-                    logger.info('suite auth with %s:%d died mid-handshake (%s)', addr[0], addr[1], e)
-                    return
-                if not proved:
-                    logger.info('suite auth failed for %s:%d, closing', *addr[:2])
-                    return
-                access('client %s:%d passed the suite handshake', *addr[:2])
-            while True:
-                try:
-                    txn, proto, length, unit, pdu = read_frame(client, MAX_PDU)
-                except ModbusError:
-                    break   # a bad MBAP length: the frame is not parseable enough to answer
-                with self.client_lock:
-                    entry = self.clients.get(key)
-                    if entry:
-                        entry['requests'] += 1
-                client.sendall(self.respond(txn, proto, unit, pdu, addr))
-        except (ConnectionError, OSError) as e:
-            access('client %s:%d disconnected (%s)', *addr[:2], e)
-        except Exception as e:
-            logger.error('error handling %s:%d: %s', *addr[:2], e)
-        finally:
-            with self.client_lock:
-                self.client_count -= 1
-                entry = self.clients.pop(key, None)
-            self.conn_gate.release(addr[0])
-            client.close()
-            if self.audit and entry:
-                self.audit.event('REQUESTS', 'peer=%s requests=%d connected=%ds'
-                                 % (key, entry['requests'], int(time.monotonic() - entry['since'])))
+    def allowed(self, ip):
+        return self._allowed(self.connect_acl, ip)
+
+    def suite_key(self):
+        return self.config.get('auth_key') if self.config.get('auth') == 'suite' else None
+
+    def on_session(self):
+        pass
+
+    def on_frame(self):
+        pass
+
+    def malformed(self, addr, err):
+        pass   # a bad MBAP length: the frame is not parseable enough to answer — the PDU-level
+               # malformations get the in-band exception inside respond()
+
+    def frame(self, client, txn, proto, unit, pdu, addr):
+        client.sendall(self.respond(txn, proto, unit, pdu, addr))
+
+    def on_disconnect(self, key, entry):
+        if self.audit and entry:
+            self.audit.event('REQUESTS', 'peer=%s requests=%d connected=%ds'
+                             % (key, entry['requests'], int(time.monotonic() - entry['since'])))
 
     def respond(self, txn, proto, unit, pdu, addr):
         if proto != 0 or not pdu:

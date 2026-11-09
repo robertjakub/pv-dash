@@ -1113,6 +1113,24 @@ def main():
         tx = ctl(msock, 'set control trust-uids off')
         check('fake control: the trust uids drop', tx.startswith('ok control/trust-uids=off'), tx[:90])
 
+        # the logout verb: the cli's local session-close (quit's sibling) —
+        # the session ends with stdin still open (the exit is logout's, not EOF's)
+        p_cli = subprocess.Popen([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py')],
+                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 text=True, env={**os.environ, 'CTL': msock})
+        time.sleep(1.0)          # the banner + the prompt
+        p_cli.stdin.write('logout\n')
+        p_cli.stdin.flush()
+        try:
+            p_cli.wait(timeout=5)
+            closed = True
+        except subprocess.TimeoutExpired:
+            closed = False
+            p_cli.kill()
+        out, _ = p_cli.communicate()
+        check('fake_cli: logout closes the session', closed and p_cli.returncode == 0
+              and 'fake-inverter' in out, repr(out[-120:] if out else 'no output'))
+
         # ---- the audit family's one shape: the daily knob's live name, the
         #      bounds (the one constants home: common/audit.py), the env twins
         tx = ctl(msock, 'set audit rotate daily on')

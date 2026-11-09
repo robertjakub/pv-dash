@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The docs restructure wave: the README re-laid on the family's one skeleton
+and shortened (608 → ~330 lines) — the state machines' prose tightened,
+the flags table's wall-cells trimmed; the Nix section moved to
+[docs/NIXOS.md](../docs/NIXOS.md) (the no-module note included); the
+Testing section ADDED (the fake is the suites' workhorse and its README
+never said so).
+
 The metrics/acl family wave: the fake's own `/metrics` takes the cache's
 **`metrics/acl` gate** — `--metrics-acl`/`$METRICS_ACL`, live `set
 metrics acl` / `unset`, the table show `show metrics acl table`, the

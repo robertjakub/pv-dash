@@ -51,10 +51,12 @@ def numi(text, label, what):
 class ControlServer:
     """The family's control server. The subclass sets the class attributes:
     LOG (the daemon's logger), OPTIONS/SETTINGS (its registry), WHO (the
-    show-knobs voice), EXIT_TEXT/RELOAD_TEXT (the bye-frame wording) and —
-    for the fake, which has no config file — RELOAD_NEEDS_CONFIG = False,
-    XDG_STATE_NAME (the reload state lives under the state home instead of
-    beside a config) and APPLY_FIRST ('scenario' applies before the pins).
+    show-knobs voice), EXIT_TEXT/RELOAD_TEXT (the bye-frame wording) and
+    XDG_STATE_NAME (the reload state's home when a tool starts with no config
+    path — --config '' keeps it alive on every tool). RELOAD_NEEDS_CONFIG
+    (the reload verb needs a config path) is True family-wide, the fake
+    included since it takes the config file too. APPLY_FIRST ('scenario'
+    applies before the pins).
     The dump seal key reads self.dump_key — a subclass may replace it with
     a property pointing at its one home (the cache: the proxy's key)."""
 

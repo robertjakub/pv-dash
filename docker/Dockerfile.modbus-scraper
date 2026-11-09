@@ -40,6 +40,7 @@ WORKDIR /pv-suite
 COPY --chown=pvsuite --from=profiles profiles/profiles/ profiles/
 COPY --from=scripts entrypoints/entrypoint.sh /usr/local/bin/pv-entrypoint
 COPY --from=common *.py common/
+COPY --from=common texts.json common/
 COPY --from=common modbus/*.py common/modbus/
 COPY --chown=pvsuite bin/ scraper/bin/
 COPY --chown=pvsuite lib/ scraper/lib/

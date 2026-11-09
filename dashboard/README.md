@@ -221,8 +221,9 @@ the prefix); add auth at the proxy if exposed to the internet.
 
 ## Metrics source
 
-This page expects Huawei SUN2000 inverter metrics in Prometheus
-(`huawei_*_watts`). The `scraper/` subproject ships a dependency-free
+This page expects PV inverter metrics in Prometheus (`huawei_*_watts` —
+the scraper's `--metric-prefix` default). The `scraper/` subproject ships
+a dependency-free
 Python exporter that polls the inverter over Modbus TCP and serves exactly
 those metrics — see [`../scraper/README.md`](../scraper/README.md):
 

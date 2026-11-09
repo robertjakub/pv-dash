@@ -14,6 +14,8 @@ Huawei SUN2000 inverter, packaged together as one Nix flake:
 | [`cache/`](cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
 | [`inverter/`](inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
 | [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; a linter and a formatter keep them in shape |
+| [`examples/`](examples/README.md) | — | The shared sample file the tools' `file:` acl gates point at — `acl-ip-prefix.json`, the ip-prefix connect policy every tool reads ([docs/ACL.md](docs/ACL.md)) |
+| [`schema/`](schema/README.md) | — | The shared JSON Schemas (draft 2020-12) — `acl-ip-prefix.schema.json`, the standalone acl file's schema (the loader stays the strict word) |
 | [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`): the option registry (one knob, one source), the signed wire + RBAC, the audit trail, the config plumbing, the Modbus wire core, the man-page builder |
 
 The tools speak one vocabulary: the fake inverter serves from a profile, the

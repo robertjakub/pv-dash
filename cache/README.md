@@ -529,8 +529,7 @@ cache/
 ├── examples/
 │   ├── modbus_cache.conf    # sample config in the set grammar
 │   ├── selection.json       # example selection: the essential monitoring set
-│   ├── acl-write-registers.json  # example acl file: the deye write policy
-│   └── acl-ip-prefix.json   # example acl file: the connect/write IP policy
+│   └── acl-write-registers.json  # example acl file: the deye write policy
 ├── schema/                  # the JSON Schemas (draft 2020-12): the acl + selection files
 ├── man/                     # the generated man pages (scripts/gen_man.py)
 ├── module.nix               # the NixOS service module

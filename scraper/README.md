@@ -329,11 +329,9 @@ scraper/
 │   └── modbus-scraper-cli.py     # console-style control session
 ├── examples/
 │   ├── scraper.conf         # sample config in the set grammar
-│   ├── metrics.json         # the phase rows' + the compute expressions' specs
-│   └── acl-ip-prefix.json   # example acl file: the /metrics connect policy
+│   └── metrics.json         # the phase rows' + the compute expressions' specs
 ├── schema/
-│   ├── metrics.schema.json  # the metrics spec's JSON Schema (draft 2020-12)
-│   └── acl-ip-prefix.schema.json  # the ip-prefix acl file's JSON Schema
+│   └── metrics.schema.json  # the metrics spec's JSON Schema (draft 2020-12)
 └── lib/
     ├── static.json        # the static constants: protocol limits, diagnostics block, defaults
     ├── metrics.json       # the built-in inputs + the four canonical metrics + the scraper_* specs

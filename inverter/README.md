@@ -374,10 +374,6 @@ inverter/
 │   ├── modbus-fake-inverter.py    # CLI entry, logging, wiring
 │   ├── modbus-fake-ctl.py         # control-server CLI client (one-shot / batch)
 │   └── modbus-fake-cli.py         # console-style interactive control session
-├── examples/
-│   └── acl-ip-prefix.json         # example acl file: the /metrics connect policy
-├── schema/
-│   └── acl-ip-prefix.schema.json  # the acl file's JSON Schema
 └── lib/
     ├── options.json    # the knob registry: the flags, the env twins, the live settings
     ├── options.py      # its loader: the Option rows, the control-grammar vocabulary

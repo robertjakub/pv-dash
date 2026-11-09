@@ -5,6 +5,12 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The shared acl example/schema wave: the ip-prefix pair moves to the repo
+root as the family's one shared copy — the dashboard's example + schema
+copies die (`schema/` was all-new with the pair and empties out again),
+`package.nix` installs from `../examples` + `../schema` (the packaged
+`share/dashboard/` layout unchanged).
+
 The battery-always-on wave: **`--battery`/`$BATTERY` are gone** (the live
 `battery` with them) — the served `config.js` always carries the battery
 panels (the injection is unconditional now), and the dashboard UI

@@ -34,6 +34,16 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Changed
 
+- **everywhere** — **the ip-prefix acl example + schema are one shared
+  pair at the repo root** (`examples/acl-ip-prefix.json` +
+  `schema/acl-ip-prefix.schema.json`): the four per-tool copies die (the
+  fake's `examples/`/`schema/` dirs held only the pair and empty out,
+  the dashboard's `schema/` with them), the four `package.nix` installs
+  re-point (`${../examples}`, `${../schema}`) with the packaged
+  `share/<tool>/` layout unchanged, `scripts/lint_acl.py`'s bare run
+  globs the root `examples/` too, the regtests' `file:` rounds read
+  the root file, and the two dirs grow READMEs.
+
 - **everywhere** — **the `--battery` knob retires, battery support is
   always on**: the fake's `--battery`/`--no-battery` pair (and its
   `BATTERY` env twin — the flag and the SIGHUP reload block), the

@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The shared acl example/schema wave: the ip-prefix pair moves to the repo
+root as the family's one shared copy (`examples/acl-ip-prefix.json` +
+`schema/acl-ip-prefix.schema.json`) — the scraper's copies die,
+`package.nix` installs from `../examples` + `../schema`, the module's
+`metricsAclFile` description points at the root example and the regtest's
+`file:` round reads it.
+
 The battery-always-on wave: **`--battery`/`$BATTERY` are gone** (the live
 `modbus/battery` with them) — the battery reads happen on every poll, the
 battery metrics always export (a device profile without the battery

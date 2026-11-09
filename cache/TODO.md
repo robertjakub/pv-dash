@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The shared acl example/schema wave: the ip-prefix pair moves to the repo
+root as the family's one shared copy (`examples/acl-ip-prefix.json` +
+`schema/acl-ip-prefix.schema.json` — the four per-tool copies die);
+`package.nix` installs from `../examples` + `../schema` (the packaged
+`share/modbus-cache/` layout unchanged) and the regtest's `file:` rounds
+read the root file.
+
 The docs restructure wave: the README re-laid on the family's one skeleton
 and shortened (965 → ~430 lines) — the Nix/NixOS section moved to
 [docs/NIXOS.md](../docs/NIXOS.md) (the module's option list rebuilt from

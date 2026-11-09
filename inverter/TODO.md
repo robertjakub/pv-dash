@@ -5,6 +5,11 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The shared acl example/schema wave: the ip-prefix pair moves to the repo
+root as the family's one shared copy — the fake's `examples/` + `schema/`
+dirs die (the pair was all they held), `package.nix` installs from
+`../examples` + `../schema` (the packaged layout unchanged).
+
 The battery-always-on wave: **`--battery`/`--no-battery`/`$BATTERY` are
 gone** — the battery state machine runs unconditionally (the live `set
 battery` toggle and the SIGHUP `BATTERY` reload block with it), the

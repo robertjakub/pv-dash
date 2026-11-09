@@ -1,0 +1,107 @@
+# The pv-suite alert rules pack — the detection half of the audit
+# vocabulary (docs/AUDIT.md F16): every alert names the audit events and
+# the log lines it correlates with, so a fired page tells the operator
+# where the trail lives. Shipped next to the exporter: the scraper's
+# package (share/modbus-scraper/alerts.yml) and the demo Prometheus image
+# (docker/Dockerfile.prometheus) both carry this file.
+#
+# Two groups, one per exporter:
+#   pv-suite-scraper — the exporter's own poll story (the scraper_* gauges).
+#   pv-suite-cache   — the cache's side (the modbus_cache_* gauges): poll
+#                      down, age spikes, write-refusal bursts. Its endpoint
+#                      is off by default and its group stays SILENT until a
+#                      collector scrapes it — an absent series never fires;
+#                      the scraper's diag block (scraper_cache_device_up /
+#                      _age_seconds) mirrors two of the shapes for setups
+#                      that do not scrape the cache.
+#
+# Wire-in: `rule_files: [/etc/prometheus/alerts.yml]` — the demo image
+# bakes it; a NixOS Prometheus points services.prometheus.ruleFiles at the
+# packaged copy (docs/NIXOS.md). Thresholds assume the default 10 s poll
+# interval — tune them to yours. The exporter's own death (the scrape
+# itself failing) is the collector's stock `up{job}` gauge and its
+# scrape-failure hygiene, not this pack: this pack watches the poll and
+# the gates.
+groups:
+  - name: pv-suite-scraper
+    rules:
+      - alert: ScraperPollDown
+        expr: scraper_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'modbus-scraper: the Modbus poll of the device is down (scraper_up 0)'
+          description: >-
+            The last poll of the inverter failed; the exporter keeps
+            serving the last good values while the poller retries. The
+            scraper log names the failure per cycle (`inverter ...
+            unreachable`); the control commands and the auth failures ride
+            the SCR audit trail.
+      - alert: ScraperFreshnessGap
+        expr: time() - scraper_last_poll_timestamp_seconds > 120
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'modbus-scraper: the exported data is stale beyond the freshness budget'
+          description: >-
+            The last successful poll (scraper_last_poll_timestamp_seconds)
+            is more than 120s behind — 12 lost cycles at the default 10s
+            poll. Fires beside ScraperPollDown during an outage; alone it
+            means the poller is stalling — the slow-dongle gauges
+            (scraper_poll_duration_seconds, _mean, _max) tell which.
+      - alert: ScraperExceptionSpike
+        expr: increase(scraper_modbus_errors_total[10m]) > 30
+        labels:
+          severity: warning
+        annotations:
+          summary: 'modbus-scraper: the Modbus poll errors come in bursts'
+          description: >-
+            scraper_modbus_errors_total grew by more than 30 in 10m — at
+            the default 10s poll that is half the cycles failing. The
+            scraper log names the Modbus exception code per failed poll;
+            the SCR audit trail brackets the window with the control
+            commands around it.
+  - name: pv-suite-cache
+    rules:
+      - alert: CachePollDown
+        expr: modbus_cache_poll_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'modbus-cache: the last poll cycle of the device failed (poll_up 0)'
+          description: >-
+            The cache poll of the inverter failed — the cache serves its
+            last known words until the device answers again (that is the
+            cache job). The cache log names the failing block
+            (modbus_cache_uplink_block_fails_total shows which); the CACHE
+            audit trail records the session story around it.
+      - alert: CacheAgeSpike
+        expr: modbus_cache_age_seconds > 300
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'modbus-cache: the cache serves words older than the freshness budget'
+          description: >-
+            The oldest cached word (modbus_cache_age_seconds) is more than
+            300s old — reads keep succeeding with stale data behind them
+            (the cache-ttl budget is the knob). The exporter mirrors this
+            gauge through the diag block (scraper_cache_age_seconds); the
+            cache log names the upstream errors.
+      - alert: CacheWriteRefusalBurst
+        expr: increase(modbus_cache_write_refused_total[5m]) > 3
+        labels:
+          severity: critical
+        annotations:
+          summary: 'modbus-cache: a burst of refused Modbus writes (WRITE-REFUSED)'
+          description: >-
+            The write gate refused more than 3 writes in 5m — allow-write
+            off, the write ACL, the register allow-list or a malformed
+            frame answered Modbus exceptions. The CACHE audit trail records
+            each refusal as a WRITE-REFUSED event with the client, the
+            frame and the gate that refused it; a burst is a misconfigured
+            writer or a client poking the gate — NIS2 21.2(d) wants this
+            detection wired, not just logged.

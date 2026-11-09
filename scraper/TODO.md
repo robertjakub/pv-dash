@@ -5,6 +5,20 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The alert rules pack (the F16 closure): the exporter ships
+`alerts.yml` — the shipped Prometheus rules file next to the exporter,
+six alerts in two groups. This side is the poll story:
+`ScraperPollDown` (scraper_up 0 for 2m), `ScraperFreshnessGap` (the last
+good poll more than 120s behind) and `ScraperExceptionSpike`
+(scraper_modbus_errors_total bursting); the cache contributes its side
+(`CachePollDown`, `CacheAgeSpike`, `CacheWriteRefusalBurst` — silent
+until its own /metrics is scraped, the diag block mirrors two of the
+shapes). The annotations quote the audit vocabulary (the WRITE-REFUSED
+events, the SCR trail) so a fired page names where the trail lives; the
+demo image bakes the pack (`rule_files:`), the package installs it
+(`share/modbus-scraper/alerts.yml`), docs/NIXOS.md shows the
+services.prometheus.ruleFiles wiring.
+
 The audit-family wave (the bounds, the daily knob, the env twins, the
 shared accept ladder): the audit rotation bounds are family-wide —
 `audit-files` (min 1, max 100) and `audit-max-mb` (min 0, max 1048576)

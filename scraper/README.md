@@ -73,6 +73,37 @@ Sign conventions and sanity caps:
 - **Negative PV readings always trigger the error** regardless of the cap
   settings — a negative inverter input would corrupt the derived home load.
 
+## Alerting
+
+The exporter ships its **alert rules pack** — [`alerts.yml`](alerts.yml),
+the audit vocabulary's detection half (docs/AUDIT.md F16): every alert
+names the audit events and the log lines it correlates with, so a fired
+page tells the operator where the trail lives. Two groups, one per
+exporter:
+
+| Alert | Fires when | The trail says |
+|---|---|---|
+| `ScraperPollDown` | `scraper_up == 0` for 2m — the Modbus poll of the device is failing | the scraper log names the failure per cycle |
+| `ScraperFreshnessGap` | the last successful poll is more than 120s behind — 12 lost cycles at the default 10s poll | the slow-dongle gauges tell a stall from an outage |
+| `ScraperExceptionSpike` | `scraper_modbus_errors_total` grew by more than 30 in 10m — half the cycles failing at the default interval | the log names the Modbus exception code per failed poll |
+| `CachePollDown` (the cache's `/metrics`) | `modbus_cache_poll_up == 0` for 2m | the cache serves its last known words; the uplink block counters show the failing block |
+| `CacheAgeSpike` | the oldest cached word more than 300s old — reads succeed with stale data behind them | the `cache-ttl` budget is the knob |
+| `CacheWriteRefusalBurst` | `modbus_cache_write_refused_total` grew by more than 3 in 5m — the write gate refusing in bursts | each refusal is a `WRITE-REFUSED` audit event (the client, the frame, the gate) |
+
+The cache group stays silent until the cache's own `/metrics` endpoint is
+scraped (an absent series never fires); the exporter's diag block
+(`scraper_cache_device_up` / `scraper_cache_age_seconds`) mirrors two of
+its shapes for setups that do not scrape the cache. The exporter's own
+death (the scrape failing) is the collector's stock `up{job}` hygiene, not
+this pack.
+
+Wire-in: the demo image bakes the pack (`docker/prometheus.yml` sets
+`rule_files:`); a NixOS Prometheus points `services.prometheus.ruleFiles`
+at the packaged copy (`share/modbus-scraper/alerts.yml`, see
+[NIXOS.md](../docs/NIXOS.md)); an external collector copies the file and
+lists it under its own `rule_files:`. Thresholds assume the default 10 s
+poll interval — tune them to yours.
+
 ## Device profile
 
 *Where* the primary values live comes from a **device profile** — the same
@@ -194,7 +225,7 @@ set log-level INFO
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy |
 | `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
-| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`) | XDG state | the SCR audit trail: a file path or `-` for stdout (the docker/journald way) |
+| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward syslog`) | XDG state | the SCR audit trail: a file path or `-` for stdout (the docker/journald way); the syslog forward mirrors every line to journald (F10) |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (overflow gets an immediate `503 # rate limited`) |
 | `--log-level` / `--log-access` / `--local-time` | `INFO` / off / UTC | the log surface |
 | `--config` / `--dry-run` / `--man` | — | the config file path / validate + print and exit / print the generated man page |
@@ -284,7 +315,9 @@ timestamp — journald adds one.
 The control commands (with their wire macs), the auth failures, the
 reloads and the shutdowns land in the **SCR audit trail** (`--audit-log`,
 the XDG state home by default — `scripts/audit_verify.py` walks it like
-the others).
+the others). `--audit-forward syslog` mirrors every line — the per-writer
+hash chain included — to the local syslog socket, journald's sealed
+external copy beside the file/stdout sink (the F10 answer).
 
 ## Test inverter
 

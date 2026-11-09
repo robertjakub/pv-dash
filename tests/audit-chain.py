@@ -135,7 +135,66 @@ def main():
         ok, out = verify(flog, contain=['OK'])
         check('the fake + ctl trail verifies end-to-end', ok, out)
 
-        # 9. exit code and stdin
+        # 9. the syslog forwarding (audit/forward = syslog, F10): the mirror
+        # carries the tag + the finished line (chain hash included), a send
+        # failure stops the mirroring quietly, a socket-less spelling refuses
+        import io
+        import socket as sockmod
+        from contextlib import redirect_stderr
+
+        import common.runtime.audit as audit_mod
+        ssock_path = os.path.join(tmp, 'syslog.sock')
+        ssock = sockmod.socket(sockmod.AF_UNIX, sockmod.SOCK_DGRAM)
+        ssock.bind(ssock_path)
+        ssock.settimeout(5)
+        saved_sockets = audit_mod.SYSLOG_SOCKETS
+        audit_mod.SYSLOG_SOCKETS = (ssock_path,)
+        try:
+            fwd = AuditLog(log, 'CACHE', app='modbus-cache', forward='syslog')
+            fwd.event('COMMAND', "'show version' -> ok")
+            data = ssock.recv(65536).decode('utf-8')
+            import re
+            mirrored = re.sub(r'^<\d+>', '', data).rstrip('\x00')   # the PRI + the NUL journald strips
+            with open(log) as fh:
+                last = fh.read().rstrip().splitlines()[-1]
+            check('the syslog mirror carries the tag + the finished line (chain hash included)',
+                  mirrored == 'modbus-cache: %s' % last, '%r vs %r' % (mirrored, last))
+            ok, out = verify(log, contain=['OK'])
+            check('the sink stays the authority (the mirrored trail verifies)', ok, out)
+
+            ssock.close()
+            os.unlink(ssock_path)
+            err = io.StringIO()
+            with redirect_stderr(err):
+                fwd.event('COMMAND', "'set pv 2000' -> ok")
+                fwd.event('COMMAND', "'quit' -> bye")
+            ok, out = verify(log, contain=['OK'])
+            check('a send failure stops the forwarding (one note, the trail keeps the chain)',
+                  ok and fwd._syslog is None and 'syslog forwarding stopped' in err.getvalue(),
+                  err.getvalue())
+
+            audit_mod.SYSLOG_SOCKETS = ()
+            try:
+                AuditLog(log, 'CACHE', forward='syslog')
+                check('a socket-less syslog spelling refuses', False, 'no ValueError')
+            except ValueError as e:
+                check('a socket-less syslog spelling refuses', 'no local syslog socket' in str(e), str(e))
+            try:
+                AuditLog(log, 'CACHE', forward='udp')
+                check('a foreign forward spelling refuses', False, 'no ValueError')
+            except ValueError as e:
+                check('a foreign forward spelling refuses', 'must be one of' in str(e), str(e))
+        finally:
+            audit_mod.SYSLOG_SOCKETS = saved_sockets
+
+        fake = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+        r = subprocess.run([sys.executable, fake, '--static', '--dry-run', '--audit-forward', 'bogus'],
+                           capture_output=True, text=True, timeout=15)
+        check('a bad --audit-forward answers with one clean ERROR line (rc 1, no traceback)',
+              r.returncode == 1 and 'audit-forward must be one of syslog, none' in r.stderr
+              and 'Traceback' not in r.stderr, r.stderr)
+
+        # 10. exit code and stdin
         r = subprocess.run([sys.executable, V, os.path.join(tmp, 'missing.log')],
                            capture_output=True, text=True)
         check('a missing file does not crash the verifier', r.returncode == 0, r.stdout + r.stderr)

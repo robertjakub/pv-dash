@@ -878,17 +878,19 @@ class ControlServer:
 
     def rebuild_audit(self, prm, prefix, app):
         """Build the audit trail from its params dict (the live
-        path/rotation changes rebuild from it): the fresh writer re-chains
-        from the file's own tail (common/runtime/audit.py tail_hash), so the chain
+        path/rotation/forward changes rebuild from it): the fresh writer
+        re-chains from the file's own tail (common/runtime/audit.py tail_hash), so the chain
         stays verifiable across the swap. The old trail is NOT closed — a
         session still holding it writes its last commands there, and an
         in-flight writer must never hit a closed file. Returns the writer
         (None = off); the caller assigns where its live state reads. The
-        daily-rotation flag rides the params when the tool carries it."""
+        daily-rotation flag and the syslog forward ride the params when
+        the tool carries them."""
         if prm['disabled']:
             return None
         return AuditLog(prm['path'], prefix, app=app, max_mb=prm['max_mb'],
-                        daily=prm.get('daily', False), files=prm['files'])
+                        daily=prm.get('daily', False), files=prm['files'],
+                        forward=prm.get('forward'))
 
     def shutdown_dump(self):
         """The graceful stop's write-behind: the overrides to the dump path

@@ -14,8 +14,10 @@ verifiable on its own — scripts/audit_verify.py walks a file (and its
 rotated backups, oldest first), recomputes each prefix's chain and names the
 line where it breaks. The chain is tamper-EVIDENT: any edited, reordered or
 deleted middle entry breaks it; trailing deletion and a full rechain by
-someone holding the algorithm are outside its reach (journald forwarding
-stays the strong answer — docs/AUDIT.md F10).
+someone holding the algorithm are outside its reach; the strong answer
+is BUILT IN: audit/forward = syslog mirrors every line to the local
+syslog socket (journald picks it up — the sealed external copy the
+retention/immutability story leans on, docs/AUDIT.md F10).
 
 The default location is the tool's XDG state directory
 (~/.local/state/<app>/audit.log), NOT the current directory: a packaged
@@ -26,8 +28,14 @@ sends the trail to stdout — what docker logs / journald capture (stdout,
 not stderr: the audit is data, not an error, and it stays in the single
 ordered stream the service manager captures). When the sink is stdout,
 rotation is disabled by definition. The rotation depth is configurable:
---audit-files N (the default 3)."""
+--audit-files N (the default 3). The forwarding is opt-in:
+--audit-forward syslog mirrors every line (the same text, the chain hash
+included) to the local syslog socket — journald's sealed copy beside the
+sink, the F10 answer; a send failure stops the mirroring (one note on
+stderr, the sink keeps the chain)."""
 import hashlib
+import logging
+import logging.handlers
 import os
 import sys
 import threading
@@ -35,6 +43,34 @@ import time
 
 HASH_LEN = 12                                   # hex chars per entry hash
 GENESIS = '0' * HASH_LEN                        # the chain's first prev
+
+# The syslog forwarding (audit/forward = syslog): the local syslog unix
+# sockets tried in order — journald's /dev/log (the systemd compat socket,
+# Linux), the real journal syslog socket beside it, the macOS one. The
+# first that exists wins; none = the spelling refuses to start (a promised
+# forward that cannot exist is a misprint, not a posture).
+SYSLOG_SOCKETS = ('/dev/log', '/run/systemd/journal/syslog', '/var/run/syslog')
+AUDIT_FORWARD_CHOICES = ('syslog', 'none')
+
+
+class FailLoudSysLogHandler(logging.handlers.SysLogHandler):
+    """The one behavior the base omits: a send failure SURFACES (the base's
+    handleError swallows it into a stderr traceback per event and silently
+    keeps the handler alive). The audit mirror's fail-stop needs the
+    exception — handleError is called from emit's except block, so a bare
+    re-raise propagates the original failure to the caller."""
+
+    def handleError(self, record):
+        raise   # the active exception (emit's) — the caller decides
+
+
+def syslog_socket():
+    """The local syslog unix socket to forward to (the first candidate that
+    exists — see SYSLOG_SOCKETS), None when the host has none."""
+    for cand in SYSLOG_SOCKETS:
+        if os.path.exists(cand):
+            return cand
+    return None
 
 # The rotation bounds (the one home — the registries' audit-files/audit-max-mb
 # rows and the tools' startup gates repeat them, scripts/check_options.py
@@ -122,12 +158,13 @@ class AuditLog:
     concurrent writer into an ENOENT and kills the caller's connection."""
 
     def __init__(self, path=None, prefix='AUDIT', app='pv-suite',
-                 max_mb=10.0, daily=False, files=3):
+                 max_mb=10.0, daily=False, files=3, forward=None):
         if not AUDIT_MAX_MB_MIN <= max_mb <= AUDIT_MAX_MB_MAX:
             raise ValueError('audit-max-mb must be %d..%d MB' % (AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX))
         if not AUDIT_FILES_MIN <= files <= AUDIT_FILES_MAX:
             raise ValueError('audit-files must be %d..%d' % (AUDIT_FILES_MIN, AUDIT_FILES_MAX))
         self.prefix = prefix
+        self.app = app          # the syslog tag (the bin name) when forwarding
         self.path = path or default_path(app)
         self.max_bytes = int(max_mb * 1024 * 1024) if max_mb and max_mb > 0 else 0
         self.daily = daily
@@ -136,6 +173,7 @@ class AuditLog:
         self._lock = threading.Lock()
         self._last = GENESIS             # this prefix's last entry hash (the chain)
         self.disabled = False            # the kill switch: the writer object survives, the trail stops
+        self._syslog = self._open_forward(forward)
         if self.path == '-':    # the stdout sink: no rotation by definition
             self._f = sys.stdout
         else:
@@ -148,6 +186,35 @@ class AuditLog:
                 sys.stderr.write('audit: %s is not writable, logging the trail to stdout\n' % self.path)
                 self.path = '-'
                 self._f = sys.stdout
+
+    def _open_forward(self, forward):
+        """The syslog mirror (audit/forward = syslog): one fail-loud
+        SysLogHandler on the local syslog socket (daemon facility, the bin
+        name as the tag — journald's SYSLOG_IDENTIFIER), None for the off
+        spellings. A socket that does not exist raises ValueError: the bins
+        answer with one clean ERROR line + rc 1."""
+        if forward in (None, '', 'none'):
+            return None
+        if forward not in AUDIT_FORWARD_CHOICES:
+            raise ValueError('audit-forward must be one of %s' % ', '.join(AUDIT_FORWARD_CHOICES))
+        sock = syslog_socket()
+        if sock is None:
+            raise ValueError('no local syslog socket found (%s) — audit-forward syslog cannot forward'
+                             % ', '.join(SYSLOG_SOCKETS))
+        return FailLoudSysLogHandler(address=sock, facility=logging.handlers.SysLogHandler.LOG_DAEMON)
+
+    def _forward(self, line):
+        """The syslog mirror of one finished line (the chain hash included).
+        Best-effort by design: the sink is the authority, the chain lives
+        there — one send failure stops the mirroring (one stderr note, no
+        per-event spam); the sink keeps the chain either way, and a rebuild
+        (a live set) re-arms the handler."""
+        try:
+            self._syslog.handle(logging.LogRecord(self.app, logging.INFO, __file__, 0,
+                                                  '%s: %s' % (self.app, line), None, None))
+        except OSError as e:
+            self._syslog = None
+            sys.stderr.write('audit: syslog forwarding stopped (%s) — the sink keeps the chain\n' % e)
 
     def _rotate(self):
         """Close, shift the backups (.1 <- .2 <- .3), reopen fresh."""
@@ -187,6 +254,9 @@ class AuditLog:
             self._f.write('%s AUDIT %s %s %s%s\n' % (stamp, self.prefix, event, h,
                                                      (' ' + detail) if detail else ''))
             self._f.flush()
+            if self._syslog:
+                self._forward('%s AUDIT %s %s %s%s' % (stamp, self.prefix, event, h,
+                                                       (' ' + detail) if detail else ''))
 
     def command(self, cmd, result):
         """A command the user entered and its outcome (ok/err/bye/local/aborted)."""
@@ -194,6 +264,12 @@ class AuditLog:
 
     def close(self):
         with self._lock:
+            if self._syslog:
+                try:
+                    self._syslog.close()
+                except OSError:
+                    pass
+                self._syslog = None
             if self.path == '-':
                 return
             try:

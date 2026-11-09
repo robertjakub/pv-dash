@@ -12,7 +12,6 @@ the unix socket a kernel-vouched peer (root, the daemon's own user or
 --control-trust-uids — SO_PEERCRED) skips the handshake. A second,
 read-only token (--control-ops-token) authenticates into the show/clear
 verbs only — the ops shift against the admin key, both audited."""
-import hmac
 import json
 import logging
 import math
@@ -23,7 +22,7 @@ import threading
 import time
 
 from common.config import acl_table, acl_text, acl_value_text, parse_acl, parse_auth_type, parse_control_target, \
-    parse_secret, resolve_metrics_acl
+    resolve_metrics_acl
 from common.cred import parse_trust_uids
 from common.human import secs
 from common.modbus import AUTH_MIN_KEY
@@ -320,21 +319,10 @@ class ControlServer(_ControlServer):
             except SystemExit as e:
                 raise ValueError(str(e))
             if v and not fake.auth_key:
-                raise ValueError('the suite auth needs a key: set modbus auth key <value> first '
-                                 '(min %d characters)' % AUTH_MIN_KEY)
+                raise ValueError('the suite auth needs a key: pass auth-key by flag/env/config '
+                                 '(min %d characters) and restart' % AUTH_MIN_KEY)
             fake.auth = v   # the next connection handshakes; the standing ones keep their session
             return v or 'none'
-        if key == 'modbus/auth/key':
-            if not fake:
-                raise ValueError('no modbus device attached')
-            try:
-                v = parse_secret(val, 'modbus/auth/key')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if v is not None and len(v) < AUTH_MIN_KEY:
-                raise ValueError('modbus/auth/key must be at least %d characters, got %d' % (AUTH_MIN_KEY, len(v)))
-            fake.auth_key = v
-            return '<set>'
         if key == 'metrics/enable':
             if not fake:
                 raise ValueError('no modbus device attached')
@@ -345,8 +333,8 @@ class ControlServer(_ControlServer):
                     from common.config import is_loopback_host
                     if not is_loopback_host(fake.metrics_listen[0]):
                         raise ValueError('refusing to expose /metrics beyond loopback without a token '
-                                         '(F13 in docs/AUDIT.md) — set metrics/token first or bind '
-                                         '127.0.0.1:PORT')
+                                         '(F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config '
+                                         'and restart, or bind 127.0.0.1:PORT')
                 srv = MetricsServer(sim, chaos, fake, self, fake.metrics_listen, token=fake.metrics_token,
                                     max_clients=fake.metrics_caps[0], client_timeout=fake.metrics_caps[1],
                                     max_per_ip=fake.metrics_caps[2])
@@ -404,37 +392,6 @@ class ControlServer(_ControlServer):
                 return self.describe()   # the same target: nothing to rebind
             self.refuse_tokenless_rebind(target)   # no-op here: the fake allows tokenless TCP (F11)
             return self._rebind_control(target)
-        if key == 'control/token':
-            # the rotation is live: the sessions re-auth, the macs verify
-            # against the new key. Dropping it entirely is the fake's
-            # documented trusted-LAN posture (F11) — even on TCP (the base's
-            # F5 guard exempts this class: TOKENLESS_TCP = 'allow').
-            if val in ('off', 'none', ''):
-                self.refuse_token_drop()
-                self.token = None
-                return 'off'
-            try:
-                val = parse_secret(val, 'control/token')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if self.ops_token and hmac.compare_digest(val, self.ops_token):
-                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
-                                 'every holder the role the server picks first)')
-            self.token = val
-            return '<set>'
-        if key == 'control/ops/token':
-            if val in ('off', 'none', ''):
-                self.ops_token = None   # the ops shift signs off; the admin role is untouched
-                return 'off'
-            try:
-                val = parse_secret(val, 'control-ops-token')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if self.token and hmac.compare_digest(val, self.token):
-                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
-                                 'every holder the role the server picks first)')
-            self.ops_token = val
-            return '<set>'
         if key == 'control/ops/verbs':
             verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
             unknown = sorted(v for v in verbs if v not in KNOWN_VERBS)
@@ -462,30 +419,6 @@ class ControlServer(_ControlServer):
             if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
                 os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
             return 'on' if on else 'off'
-        if key == 'metrics/token':
-            if not fake:
-                raise ValueError('no modbus device attached')
-            if not val or val in ('off', 'none', '0'):
-                from common.config import is_loopback_host
-                if not is_loopback_host(fake.metrics_listen[0]):
-                    raise ValueError('metrics/token is mandatory while the listen is non-loopback '
-                                     '(F13 in docs/AUDIT.md) — set the new token')
-                fake.metrics_token = None
-                if fake.metrics_srv:
-                    fake.metrics_srv.token = None   # the handler reads it per request — the swap is live
-                fake.metrics_desc = describe_metrics(fake.metrics_listen, None,
-                                                     fake.metrics_caps[0], fake.metrics_caps[2])
-                return 'off'   # the loopback bind is the auth (the F13 shape)
-            try:
-                val = parse_secret(val, 'metrics/token')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            fake.metrics_token = val
-            if fake.metrics_srv:
-                fake.metrics_srv.token = val
-            fake.metrics_desc = describe_metrics(fake.metrics_listen, val,
-                                                 fake.metrics_caps[0], fake.metrics_caps[2])
-            return '<set>'
         if key == 'metrics/acl':
             if not fake:
                 raise ValueError('no modbus device attached')
@@ -567,8 +500,6 @@ class ControlServer(_ControlServer):
             return ('on' if fake.allow_write else 'off') if fake else '?'
         if key == 'modbus/auth':
             return (fake.auth or 'none') if fake else '?'
-        if key == 'modbus/auth/key':
-            return ('<set>' if fake.auth_key else 'none') if fake else '?'   # the secret never renders
         if key == 'metrics/enable':
             return ('on' if fake.metrics_srv else 'off') if fake else '?'
         if key == 'client-timeout':
@@ -577,10 +508,6 @@ class ControlServer(_ControlServer):
             return '%s (%s)' % (sim.profile.description, profile_label(sim.profile.path))
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel())
-        if key == 'control/token':
-            return '<set>' if self.token else 'off'   # the secret never renders
-        if key == 'control/ops/token':
-            return '<set>' if self.ops_token else 'off'   # the secret never renders
         if key == 'control/port':
             return 'off' if self.stopped else self.describe()
         if key == 'control/ops/verbs':
@@ -589,8 +516,6 @@ class ControlServer(_ControlServer):
             return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
         if key == 'control/socket-group':
             return 'on' if self.socket_group else 'off'
-        if key == 'metrics/token':
-            return '<set>' if (fake and fake.metrics_token) else 'off'   # the secret never renders
         if key == 'metrics/acl':
             return acl_value_text(fake.metrics_acl) if fake else '?'
         if key == 'dump/path':
@@ -881,13 +806,12 @@ class ControlServer(_ControlServer):
                    (' pinned: ' + pinned) if pinned else ''))
 
     def dump_settings(self):
-        """The live-overridden settings as raw, re-appliable values. The
-        secrets (control/token, the ops token, metrics/token) ride as
-        *** SECRET REMOVED ***: the knob renders, the value never lands in
-        the file — the restore skips the placeholder and keeps the
-        secret's current value. The scenario rides as its truth
-        ('custom' when the pins took over — the restore applies it first and
-        re-pins on top)."""
+        """The live-overridden settings as raw, re-appliable values. No
+        secret can be overridden (the wire refuses them — startup-only),
+        so no SECRET_REMOVED placeholder occurs; the dump filter's secret
+        branch stays as the class invariant's guard. The scenario rides as
+        its truth ('custom' when the pins took over — the restore applies
+        it first and re-pins on top)."""
         sim, chaos, fake = self.simulator, self.chaos, self.fake
         ov = sim.overrides()
         raw = {

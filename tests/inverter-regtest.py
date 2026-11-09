@@ -366,8 +366,8 @@ def main():
         check('control: --control-socket-group chmods the socket 0660',
               os.stat(E_SOCK).st_mode & 0o777 == 0o660, oct(os.stat(E_SOCK).st_mode & 0o777))
         tx = ctl(F_CTL, 'set metrics token off')
-        check('metrics token: the off beyond loopback refuses (the F13 shape)',
-              '% error:' in tx and 'F13' in tx, tx)
+        check('metrics token: startup-only — the set refuses (the dump/key treatment)',
+              tx.startswith('% error: restart required (startup-only knob)'), tx)
         tx = ctl(F_CTL, 'set metrics enable on')
         check('metrics enable: the token-less live start on 0.0.0.0 refuses (the F13 shape)',
               '% error:' in tx and 'refusing to expose /metrics beyond loopback' in tx, tx)
@@ -375,16 +375,19 @@ def main():
         check('metrics enable: the refusal is a clean err (no traceback)', 'Traceback' not in logf,
               [l for l in logf.splitlines() if 'Trace' in l])
         tx = ctl(F_CTL, 'set metrics token t')
-        check('metrics token: the token sets', tx.startswith('ok metrics/token=<set>'), tx)
-        tx = ctl(F_CTL, 'set metrics enable on')
-        check('metrics enable: with a token the live start on 0.0.0.0 serves',
-              tx.startswith('ok metrics/enable=on'), tx)
-        ctl(F_CTL, 'set metrics enable off')
-        tx = ctl(F_CTL, 'set metrics token off')
-        check('metrics token: the off refuses while the listen stays non-loopback',
-              '% error:' in tx and 'F13' in tx, tx)
-        tx = ctl(F_CTL, 'set metrics token t')
-        check('metrics token: the token stands again', tx.startswith('ok metrics/token=<set>'), tx)
+        check('metrics token: startup-only — the token set refuses too',
+              tx.startswith('% error: restart required (startup-only knob)'), tx)
+        # the token serves at START instead: a spawned instance answers the
+        # bearer on a non-loopback bind (the F13 floor's success side)
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15997',
+                                       '--metrics-server', '--metrics-token', 't',
+                                       '--metrics-listen', '0.0.0.0:15998'],
+                                      stdout=open(LOG + '.f2', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(1.1)
+        st, _ = http_get(15998)
+        check('metrics token: the started 0.0.0.0 endpoint demands the bearer', st.split()[1] == '401', st)
+        st, _ = http_get(15998, token='t')
+        check('metrics token: the started 0.0.0.0 endpoint serves with the bearer', st.split()[1] == '200', st)
         # the F13 matrix at the start: the loopback default needs no token
         r = subprocess.run([sys.executable, F, '--dry-run', '--metrics-server',
                             '--metrics-listen', '0.0.0.0:%d' % (F_METRICS + 1)], capture_output=True, text=True, timeout=15)
@@ -548,28 +551,28 @@ def main():
         aud = open('/tmp/inv_regtest_audit.log').read()
         check('signed wire: the audit COMMAND line carries the wire mac', "'show version' wire=h" in aud, aud[-200:])
 
-        # ---- the secret lives: the token lives rotate (the cache's
-        #      treatment) and the show verb refuses them — a secret never renders
+        # ---- the secrets: startup-only (the dump/key treatment) — set/unset
+        #      refuse on the wire, the show verb refuses them — a secret never renders
         tx = ctl(H_CTL, 'show control token', token='tok')
         check('secrets: the control token never shows', tx.startswith('% error: control/token is a secret'), tx)
         tx = ctl(H_CTL, 'unset control token', token='tok')
-        check('secrets: unset refuses a secret (no defaults entry)', tx.startswith('% error: unknown setting'), tx)
+        check('secrets: unset refuses a secret (startup-only)',
+              tx.startswith('% error: restart required (startup-only knob)'), tx)
         tx = ctl(H_CTL, 'set control token tok2', token='tok')
-        check('secrets: the control token rotates live', tx.startswith('ok control/token=<set>'), tx)
+        check('secrets: the control token is startup-only — the set refuses',
+              tx.startswith('% error: restart required (startup-only knob)'), tx)
         tx = ctl(H_CTL, 'show version', token='tok')
-        check('secrets: the old control token is refused', 'control auth failed' in tx or tx == '', tx or '(empty)')
-        tx = ctl(H_CTL, 'show version', token='tok2')
-        check('secrets: the rotated control token speaks', tx.startswith('ok fake-inverter'), tx)
-        tx = ctl(H_CTL, 'show control token', token='tok2')
-        check('secrets: the rotated control token never renders back',
-              tx.startswith('% error: control/token is a secret'), tx)
-        tx = ctl(H_CTL, 'set metrics token mtok2', token='tok2')
-        check('secrets: the metrics token rotates live', tx.startswith('ok metrics/token=<set>'), tx)
-        tx = ctl(H_CTL, 'show metrics token', token='tok2')
+        check('secrets: the configured control token still speaks (no live rotation)',
+              tx.startswith('ok fake-inverter'), tx)
+        tx = ctl(H_CTL, 'set metrics token mtok2', token='tok')
+        check('secrets: the metrics token is startup-only — the set refuses',
+              tx.startswith('% error: restart required (startup-only knob)'), tx)
+        tx = ctl(H_CTL, 'show metrics token', token='tok')
         check('secrets: the metrics token never shows', tx.startswith('% error: metrics/token is a secret'), tx)
-        tx = ctl(H_CTL, 'unset metrics token', token='tok2')
-        check('secrets: unset refuses the metrics token too', tx.startswith('% error: unknown setting'), tx)
-        tx = ctl(H_CTL, 'show config', token='tok2')
+        tx = ctl(H_CTL, 'unset metrics token', token='tok')
+        check('secrets: unset refuses the metrics token too',
+              tx.startswith('% error: restart required (startup-only knob)'), tx)
+        tx = ctl(H_CTL, 'show config', token='tok')
         check('secrets: show config renders the secret knob as the placeholder',
               'set control token *** SECRET REMOVED ***' in tx
               and 'set control token tok' not in tx and 'tok2' not in tx, tx[:200])
@@ -769,8 +772,8 @@ def main():
         #      unsealed-dump warning (instance K): the key rides a file
         #      reference (the first line of an owner-only file), an
         #      unreadable reference fails the start, a dump path without a
-        #      key warns at start and on set, and the live control token
-        #      takes the same reference form
+        #      key warns at start and on set, and the control token takes
+        #      the same reference form at start
         K_MODBUS, K_CTL = 15989, 15990
         kfile_state = '/tmp/inv_regtest_state_filekey.json'
         if os.path.exists(kfile_state):
@@ -858,18 +861,34 @@ def main():
             time.sleep(0.1)
         check('file-key: the restarted fake restores the sealed dump through the same reference',
               back == 'ok pv=78', repr(back))
+        procs[-1].kill()
+        time.sleep(0.3)
+        # the control token takes the file: reference form too — at start
+        # (the wire's set refuses every secret now)
         ktok = '/tmp/inv_regtest_ctl_token_file'
         with open(ktok, 'w') as fh:
             fh.write('tok-from-file-77\n')
         os.chmod(ktok, 0o600)
-        tx = ctl(K_CTL, 'set control token file:' + ktok)
-        check('file-key: the live set control token takes the file: reference',
-              'ok control/token=<set>' in tx, tx[:120])
-        tx = ctl(K_CTL, 'show pv')
-        check('file-key: the unauthenticated session is refused after the token set',
-              tx.startswith('% error: authenticate first'), tx[:100])
-        tx = ctl(K_CTL, 'show pv', token='tok-from-file-77')
-        check('file-key: the file material authenticates', tx == 'ok pv=78', repr(tx))
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+                                       '--control-port', str(K_CTL), '--dump-path', kfile_state2,
+                                       '--dump-key', 'file:' + kkey, '--restore-on-start',
+                                       '--control-token', 'file:' + ktok],
+                                      stdout=open(LOG + '.k4b', 'w'), stderr=subprocess.STDOUT,
+                                      env={**os.environ, 'XDG_STATE_HOME': reload_state}))
+        back = None
+        for _ in range(100):
+            try:
+                back = ctl(K_CTL, 'show pv', token='tok-from-file-77')
+                if back == 'ok pv=78':
+                    break
+            except Exception:
+                pass
+            time.sleep(0.1)
+        check('file-key: the control token takes the file: reference at start (the file material authenticates)',
+              back == 'ok pv=78', repr(back))
+        tx = ctl(K_CTL, 'set control token tok2', token='tok-from-file-77')
+        check('file-key: the tokenized instance still refuses the live set (startup-only)',
+              tx.startswith('% error: restart required (startup-only knob)'), tx[:120])
         procs[-1].kill()
         time.sleep(0.3)
         # an unreadable reference fails the start (a key that silently
@@ -968,22 +987,19 @@ def main():
         check('node walk: the intermediate node lists its live children',
               tx.startswith('ok') and 'verbs' in tx and 'read-only ops role' in tx, tx[:80])
         tx = ctl(L_CTL, 'unset modbus auth key')
-        check('suite auth: unset refuses the key (no defaults entry)', tx.startswith('% error: unknown setting'), tx[:80])
+        check('suite auth: unset refuses the key (startup-only)',
+              tx.startswith('% error: restart required (startup-only knob)'), tx[:80])
         tx = ctl(L_CTL, 'set modbus auth key short')
-        check('suite auth: a short key refuses on the wire', tx.startswith('% error: modbus/auth/key must be at least 16'), tx[:100])
+        check('suite auth: startup-only — the short-key set refuses with the rest',
+              tx.startswith('% error: restart required (startup-only knob)'), tx[:100])
         tx = ctl(L_CTL, 'set modbus auth key %s' % ('x' * 16))
-        check('suite auth: the key rotates live', tx.startswith('ok modbus/auth/key=<set>'), tx[:80])
+        check('suite auth: startup-only — the key set refuses (the dump/key treatment)',
+              tx.startswith('% error: restart required (startup-only knob)'), tx[:80])
         c = connect(L_MODBUS)
-        try:
-            auth_handshake_client(c, L_KEY)
-            check('suite auth: the old key no longer proves', False, 'accepted')
-        except Exception:
-            check('suite auth: the old key no longer proves (ERR)', True)
-        c.close()
-        c = connect(L_MODBUS)
-        auth_handshake_client(c, 'x' * 16)
+        auth_handshake_client(c, L_KEY)
         txn, unit, body = exchange(c, read_req(2, 3, 32064, 2), 2)
-        check('suite auth: the rotated key speaks', txn == 2 and body[0] == 3, body.hex())
+        check('suite auth: the configured key still proves (no live rotation)',
+              txn == 2 and body[0] == 3, body.hex())
         c.close()
         tx = ctl(L_CTL, 'set modbus auth none')
         check('suite auth: the scheme disables live', tx.startswith('ok modbus/auth=none'), tx[:80])
@@ -995,7 +1011,16 @@ def main():
         check('suite auth: re-enabling without a key change works (the key persists)',
               tx.startswith('ok modbus/auth=suite'), tx[:80])
         c = connect(L_MODBUS)
-        auth_handshake_client(c, 'x' * 16)
+        try:
+            auth_handshake_client(c, 'x' * 16)   # a wrong proof: dropped, logged
+            check('suite auth: a wrong proof is dropped', False, 'accepted')
+        except Exception:
+            check('suite auth: a wrong proof is dropped (ERR)', True)
+        c.close()
+        c = connect(L_MODBUS)
+        auth_handshake_client(c, L_KEY)
+        txn, unit, body = exchange(c, read_req(2, 3, 32064, 2), 2)
+        check('suite auth: the re-enabled scheme proves the configured key', txn == 2 and body[0] == 3, body.hex())
         c.close()
         logl = open(LOG + '.l').read()
         check('suite auth: the failed proofs are logged', 'suite auth failed for' in logl)

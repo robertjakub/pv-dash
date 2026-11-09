@@ -1,7 +1,10 @@
-# The stacks' Prometheus — alpine + the prometheus package, stdlib-style
-# (no pip, no python). The pattern of the Modbus images: an unprivileged
-# user, an entrypoint that runs as root only for the token handoff, then
-# su-exec drops before the exec.
+# The demo stack's Prometheus collector — alpine + the prometheus
+# package, stdlib-style (no pip, no python); production brings its own
+# collector (the prod stack ships none — this image is the reference
+# wiring for pulling the exporter's /metrics with the bearer token).
+# The pattern of the Modbus images: an unprivileged user, an entrypoint
+# that runs as root only for the token handoff, then su-exec drops
+# before the exec.
 #
 # Build (the context = the docker/ directory itself; both compose stacks
 # — demo/ and prod/ — build this image):
@@ -22,7 +25,7 @@ RUN apk add --no-cache prometheus su-exec
 RUN adduser -D prometheus 2>/dev/null || true
 
 COPY prometheus.yml /etc/prometheus/prometheus.yml
-COPY entrypoint-prometheus.sh /usr/local/bin/pv-prometheus-entrypoint
+COPY entrypoints/entrypoint-prometheus.sh /usr/local/bin/pv-prometheus-entrypoint
 RUN chmod +x /usr/local/bin/pv-prometheus-entrypoint \
     && mkdir -p /prometheus \
     && chown -R prometheus:prometheus /etc/prometheus /prometheus

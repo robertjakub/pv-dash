@@ -3,7 +3,7 @@
 # profiles/ directory via a named build context.
 #
 # Build (the context = ../scraper, the profiles = ../profiles, the entrypoint
-# = ../docker, the shared code = ../common):
+# = ../docker/entrypoints, the shared code = ../common):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.modbus-scraper -t modbus-scraper \
 #       --build-context profiles=../profiles \
@@ -38,7 +38,7 @@ RUN apk add --no-cache python3 bash su-exec \
 
 WORKDIR /pv-suite
 COPY --chown=pvsuite --from=profiles profiles/profiles/ profiles/
-COPY --from=scripts entrypoint.sh /usr/local/bin/pv-entrypoint
+COPY --from=scripts entrypoints/entrypoint.sh /usr/local/bin/pv-entrypoint
 COPY --from=common *.py common/
 COPY --from=common modbus/*.py common/modbus/
 COPY --chown=pvsuite bin/ scraper/bin/

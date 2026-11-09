@@ -97,7 +97,8 @@ tracebacks** in the logs.
 The containers — one alpine image per Modbus tool, plus the two compose
 stacks: `docker/demo` (the fake inverter end to end, internal-network
 only, nothing published on the host) and `docker/prod` (the production
-shape: the four services against real hardware, no fake) — are
+shape: the three services against real hardware, no fake, your own
+external collector) — are
 documented in [`docker/README.md`](docker/README.md), the demo's
 topology diagram included. Both stacks ship authenticated: the Modbus
 hops prove a shared suite key (the PVA1/HMAC handshake, generated into

@@ -14,14 +14,19 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 - **docker** — **the stacks split by wiring, and both ship
   authenticated**: the new `docker/prod/compose.yaml` is the production
-  shape — the same four images the demo runs (cache + scraper +
-  prometheus + dashboard), no fake, a **non-internal** network (`pv-suite`,
+  shape — the same three service images the demo runs (cache + scraper +
+  dashboard), no fake, **no in-stack collector** (your Prometheus is
+  external and pulls the exporter's `/metrics` — the loopback `9350`
+  publish for a host-level collector, or attach it to the network; the
+  dashboard's `PROM_URL` points its `/prom` proxy at it), a
+  **non-internal** network (`pv-suite`,
   the cache dials the device on the LAN), the cache's `env/cache.env`
   **required** (UPSTREAM is the operator's decision — the image default
   only ever resolves in the demo), the device's own auth
   (`AUTH_UPSTREAM`/`AUTH_UPSTREAM_KEY`, suite or the cache-only
-  waveshare) the env file's, and one published port (the dashboard's
-  loopback 8080). The Modbus hops ship authenticated in BOTH stacks now:
+  waveshare) the env file's, and two published ports (the dashboard's
+  loopback 8080 + the exporter's loopback 9350). The Modbus hops ship
+  authenticated in BOTH stacks now:
   one shared suite key (`/config/modbus-auth.token`, generated into the
   volume on the first seed by whichever Modbus image seeds first — the
   same mechanism as the tokens, a `*.token` placeholder in the fake's,
@@ -30,16 +35,21 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   proves it upstream and demands it from its own clients, the scraper
   proves it; the `environment:` blocks pin scheme + `file:` reference
   (environment beats env_file — opening a hop is a compose edit, the F7
-  shape). The collector (`Dockerfile.prometheus`,
-  `entrypoint-prometheus.sh`, `prometheus.yml`) serves both stacks from
-  `docker/`; the demo wiring lives in `docker/demo/` (`compose.yaml` —
+   shape). The collector (`Dockerfile.prometheus`,
+   `entrypoint-prometheus.sh`, `prometheus.yml`) serves the demo stack
+   from `docker/` — the reference wiring a prod collector mirrors; the
+   demo wiring lives in `docker/demo/` (`compose.yaml` —
   the build contexts re-point one level out — plus its README with the
-  demo blockquote + topology); the four tool Dockerfiles,
-  `entrypoint.sh` and the env examples stay at `docker/` — demo and
+  demo blockquote + topology); the four tool Dockerfiles and the env
+  examples stay at `docker/`, the two entrypoints move to
+  `docker/entrypoints/` (the five Dockerfiles' COPY paths + build
+  comments carry the prefix) — demo and
   production run identical images, the split is the wiring. The
   READMEs follow: `docker/README.md` turns production-facing (the
   secrets-story section joins), `docker/demo/README.md` carries the demo
-  blockquote + the topology.
+  blockquote + the topology, `docker/prod/README.md` the production
+  shape (its own topology: the device outside the network, the cache's
+  client the one route out).
 
 ### Changed
 

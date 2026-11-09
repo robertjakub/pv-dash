@@ -63,20 +63,17 @@ every listener binds inside the network only:
    │   │  ┌──────────────┐  FC3/4 reads  ┌──────────────┐         │      │
    │   │  │fake-inverter │◄────10s poll──┤ modbus-cache │         │      │
    │   │  │  (the device)│────values────►│    15502     │         │      │
-   │   │  └──────▲───────┘  + the suite └──────┬───────┘         │      │
-   │   │         │ handshake on     10s poll   │                 │      │
-   │   │         │ every connect    /metrics   │                 │      │
-   │   │         │ (writes stay     (bearer    │                 │      │
-   │   │         │ gated: allow-     token)    │                 │      │
-   │   │         │ write off,                  │                 │      │
-   │   │         │ write-acl/                  │                 │      │
-   │   │         │ write-registers             │                 │      │
-   │   │         │ none)                       │                 │      │
-   │   │         └─────────────────────────────┘                 │      │
+   │   │  └──────▲───────┘               └──────┬───────┘         │      │
+   │   │         │ the suite handshake -        │ 10s poll        │      │
+   │   │         │ proved on every connect      │ /metrics        │      │
+   │   │         │ (writes stay gated:          │ (bearer token)  │      │
+   │   │         │ allow-write off, write-acl/  │                 │      │
+   │   │         │ write-registers none)        │                 │      │
+   │   │         └──────────────────────────────┘                 │      │
    │   │                                        │                 │      │
-   │   │                                        ▼                 │      │
+   │   │   Suite key (0600) ──────────►         ▼                 │      │
    │   │   Bearer token (0600) ──────► ┌──────────────┐           │      │
-   │   │   Suite key (0600) ─────────► │modbus-scraper│           │      │
+   │   │                               │modbus-scraper│           │      │
    │   │                               │    9350      │           │      │
    │   │                               └──────┬───────┘           │      │
    │   │                                      │ scrape 10s        │      │
@@ -91,9 +88,10 @@ every listener binds inside the network only:
    │   │      └──────────────┘        (127.0.0.1 only)            │      │
    │   └──────────────────────────────────────────────────────────┘      │
    │                                                                     │
-   │   shared "config" volume (/config): metrics.token, modbus-auth.     │
-   │   token, the JSON specs, config.js - mounted by the Modbus          │
-   │   services + the dashboard; prometheus reads it read-only           │
+   │   shared "config" volume (/config): metrics.token,                  │
+   │   modbus-auth.token, the JSON specs, config.js - mounted by         │
+   │   the Modbus services + the dashboard; prometheus reads it          │
+   │   read-only                                                         │
    │                                                                     │
    │   docker compose exec <service> ... - the way in                    │
    └─────────────────────────────────────────────────────────────────────┘

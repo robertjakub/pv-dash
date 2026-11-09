@@ -8,14 +8,14 @@ The suite is stdlib-only, so the containers are trivial: `alpine` + `apk add
 python3`, no pip, no venv, ~50 MB images. One Dockerfile per tool, named
 after the tool's daemon — `Dockerfile.fake-inverter`,
 `Dockerfile.modbus-cache`, `Dockerfile.modbus-scraper`,
-`Dockerfile.dashboard` — plus `Dockerfile.prometheus` for the stacks'
-collector, and the stack wiring in two compose projects:
+`Dockerfile.dashboard` — plus `Dockerfile.prometheus` for the demo
+stack's collector, and the stack wiring in two compose projects:
 
 - **[demo/](demo/README.md)** — the self-contained demo: the fake inverter
   wired end to end on one `internal: true` network. A starting point to
   read and adapt — not a production recipe.
-- **[prod/](prod/compose.yaml)** — the production shape: the same images
-  against real hardware, no fake — see
+- **[prod/](prod/README.md)** — the production shape: the same four
+  services against real hardware, no fake — see
   [the production stack](#the-production-stack-prod) below.
 
 The images are identical in both — the split is the wiring, not the
@@ -57,17 +57,18 @@ artifacts. The pattern:
 
 ## The production stack (prod/)
 
-`prod/compose.yaml` runs the four services against real hardware — the
-cache, the scraper, the Prometheus collector, the dashboard (no fake):
+`prod/compose.yaml` runs the three services against real hardware — the
+cache, the scraper, the dashboard (no fake, **no in-stack collector**):
+your Prometheus is external and pulls the exporter's `/metrics`:
 
 ```bash
 cd docker/prod
 cp ../env/cache.env.example ../env/cache.env
 $EDITOR ../env/cache.env                            # UPSTREAM=192.168.1.100:5502 — the device
-docker compose up -d                                # cache + scraper + prometheus + dashboard
+docker compose up -d                                # cache + scraper + dashboard
 ```
 
-The operator's decisions, each called out in the compose file's comments:
+Three operator decisions, each called out in the compose file's comments:
 
 - **the device address** — `env/cache.env` is **required** here (no
   `required: false`): the stack refuses to start without it, because the
@@ -78,29 +79,23 @@ The operator's decisions, each called out in the compose file's comments:
   `AUTH_UPSTREAM_KEY` in the same env file: the upstream credential is
   the device's, the env file is its edit surface. (The Waveshare spelling
   is cache-only — the gateway connection password.)
+- **your collector's way in** — the exporter's `/metrics` is published
+  loopback-only (`127.0.0.1:9350:9350`) for a host-level collector; a
+  container collector instead: delete the mapping and attach it to the
+  `pv-suite` network. The dashboard's `PROM_URL` (edit in the compose)
+  points its `/prom` proxy at your collector.
 
-Everything else ships decided. The cache's server side and the scraper's
-client side prove the stack's suite key on every Modbus connect (see
-[the secrets story](#the-secrets-story)); the collector rides in-stack
-scraping `modbus-scraper:9350` over the compose network; the dashboard
-proxies it (`PROM_URL=http://prometheus:9090`, compose-level).
-
-**Exactly one port is published on the host** — the dashboard's HTTP
-interface, loopback-only (`127.0.0.1:8080:8080`). The network is
-deliberately **not** `internal: true` — the cache dials the device on
-the LAN; everything else (the Modbus listener, the exporter's
-`/metrics`, the Prometheus UI) stays reachable only from inside the
-network (`docker compose exec`, or a collector container attached by
-name). The tokens ride the shared `config` volume exactly as in the
-demo ([the secrets story](#the-secrets-story)). `docker compose down`
-keeps the volume; `down -v` wipes it (reseeded with the required file
-artifacts on the next `up`).
+Everything else ships decided — two loopback ports published (the
+dashboard's 8080 + the exporter's 9350), the secrets generated (see
+[the secrets story](#the-secrets-story)). The full shape, the topology
+diagram and the volume notes: [prod/README.md](prod/README.md).
 
 ## The demo stack (demo/)
 
 The demo wires the fake inverter end to end on one `internal: true`
-network — the self-contained tour of the same four services plus the
-fake as the device. Its blockquote, usage and topology diagram:
+network — the self-contained tour: the same three services, the demo's
+own in-stack Prometheus collector, plus the fake as the device. Its
+blockquote, usage and topology diagram:
 [demo/README.md](demo/README.md).
 
 ## The env files (one per tool)
@@ -225,9 +220,9 @@ A token-less request gets a 401 with a `WWW-Authenticate: Bearer` challenge.
 Give Prometheus for another stack the same value as
 `authorization.credentials_file` (an owner-only file, F12) — or attach the
 collector container to the stack's network and scrape
-`modbus-scraper:9350` like the in-stack service does.
+`modbus-scraper:9350` like the demo's in-stack service does.
 
-The poll chain is **device → modbus-cache → scraper → Prometheus**:
+The poll chain is **device → modbus-cache → scraper → your collector**:
 the cache owns the device's single Modbus client and the exporter polls
 the cache — which it auto-detects and reports with the `scraper_cache_*`
 diagnostics metrics (`device_up 0` / a growing `age_seconds` mean the device
@@ -309,8 +304,11 @@ stacks are what wire the secrets (`AUTH_TOKEN=file:...`,
 
 ### prometheus (`Dockerfile.prometheus`)
 
-The stacks' collector — alpine + the prometheus package, no python. The
-context is the `docker/` directory itself:
+The demo stack's collector — alpine + the prometheus package, no
+python. Production brings its own collector (the prod stack ships
+none) — this image is the reference wiring for pulling the exporter's
+`/metrics` with the bearer token. The context is the `docker/`
+directory itself:
 
 ```bash
 cd docker

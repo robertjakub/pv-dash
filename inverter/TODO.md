@@ -5,6 +5,23 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The config-file wave: the fake takes the family's set-grammar config
+(`--config`/`$CONFIG`, then `inverter.conf` next to the script; the
+bundled sample `examples/inverter.conf`) — `inverter/lib/config.py`
+`resolve_args` ladders flag > env > config > the static defaults onto
+the args namespace and the CLI defaults left the parser (a static-wired
+default shadowed the env/config layers); the demo twins
+(`CHAOS`/`MAX_KWP`/`STRICT`/`TIME`/`TIME_SCALE`) are ordinary env twins
+(start + SIGHUP, the SIGHUP-only posture retired, the scrape-regtest
+check reworked) and the declared-but-dead twins (`LOG_LEVEL`,
+`ALLOW_WRITE`, `CONTROL_SOCKET_GROUP`, `DUMP_PATH`, `DUMP_INTERVAL`,
+`RESTORE_ON_START`, `METRICS_ACL`) resolve at start; the pins/machines
+refuse in the config (the wire's settings); `request reload` saves the
+state beside the config script (`RELOAD_NEEDS_CONFIG` true family-wide);
+the image ships the conf, package.nix installs it, the man page and the
+MANUAL regen (the stale bundled-conf paths in the other three MANUALs
+fixed in the same regen).
+
 The audit-family wave (the bounds, the daily knob, the env twins, the
 shared accept ladder): the audit rotation bounds are family-wide —
 `audit-files` (min 1, max 100) and `audit-max-mb` (min 0, max 1048576)

@@ -23,6 +23,11 @@ whole stack can be exercised without hardware. The shipped default
 profile is the sun2000 (Huawei SUN2000) map; Deye hybrids are included.
 This is a test instrument:
 synthetic data only, no state worth protecting beyond its LAN segment.
+The startup surface is the family's: the flags, the bare env twins and
+the set-grammar config file (\\fB--config\\fR, every line a
+`set <name> <value>` \\(em the bundled sample is
+\\fBinverter/examples/inverter.conf\\fR) \\(em flag > env > config >
+default.
 .PP
 It simulates a sunny day: a double-shouldered PV curve over
 two MPPT strings (east/west), a home load with morning/evening peaks, a
@@ -80,8 +85,8 @@ rendering \\(em \\fBshow <secret>\\fR refuses),
 age, requests), \\fBshow registers\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
 \\fBinspect\\fR, \\fBreset\\fR, \\fBrequest reload\\fR (the whole-daemon restart
-that keeps the pins: the overrides save to a state file in the XDG state
-home \\(em the fake has no config file \\(em, the process re-execs, the
+that keeps the pins: the overrides save to a state file beside the config
+script, the process re-execs, the
 fresh fake re-applies them once), with a dump path configured
 (\\fB--dump-path\\fR): \\fBrequest dump\\fR / \\fBrequest restore\\fR (the
 overrides as one 0600 integrity-hashed JSON; \\fB--dump-key\\fR seals it
@@ -128,17 +133,27 @@ the unix control socket is 0600, or 0660 with
 .TP
 .B CHAOS ", " MAX_KWP ", " PROFILE ,
 .B STRICT ", " TIME ", " TIME_SCALE ", " LOG_LEVEL
-the SIGHUP-reloadable layer.
+the demo layer: the start reads it too (flag > env > the config script)
+and SIGHUP re-applies it (keep-last-good).
 .TP
 .B CTL
 the control target when \\fB--control-port\\fR is unset.
 .TP
+.B LISTEN ", " MAX_CLIENTS ", " CONTROL_TOKEN ", " ...
+every flag has an environment twin of the same bare name (no tool
+prefix); the flag wins over the env, the env over the config script.
+.TP
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the clients' TCP token and idle-ping interval.
 .TP
-.B CONTROL_OPS_TOKEN
-the daemon's read-only ops token (the flagless start; the OPTIONS above)."""
+.B CONFIG
+the config script when \\fB--config\\fR is unset."""
     files = """.SH FILES
+.TP
+.I inverter.conf
+the config script (the set grammar) \\(em next to the binary when
+\\fB--config\\fR is unset (the image ships it at
+/pv\\-suite/inverter/inverter.conf).
 .TP
 .I /tmp/fake-inverter-<port>.socket
 the control socket used when \\fB--control-port\\fR is unset.

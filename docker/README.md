@@ -139,9 +139,10 @@ suite key (the `environment:` blocks — environment beats env_file, so
 the env files cannot override the stacks' auth story; a plain-docker
 `AUTH_TOKEN=file:...` or `AUTH=suite` in the env file is fine for
 standalone runs). The fake's simulation envs (`CHAOS`, `MAX_KWP`,
-`STRICT`, `TIME`, `TIME_SCALE`) are its SIGHUP layer, not startup: they
-reach a container when it is created with them (compose recreates on
-the file change) or via `docker compose kill -s HUP fake-inverter`.
+`STRICT`, `TIME`, `TIME_SCALE`) are ordinary env twins — they apply at
+start (flag > env > the image's bundled conf) and SIGHUP re-applies
+them: retune a running fake with
+`docker compose kill -s HUP fake-inverter`.
 
 ### env or the config volume?
 

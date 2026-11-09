@@ -20,7 +20,10 @@ convention.
 Optional extras for demos and testing: a JSON-lines control server
 (--control-port, default unix socket /tmp/fake-inverter-<port>.socket; 0 = off) to pin
 values / freeze time / tune chaos at runtime, and
-seeded chaos injection (--chaos) that answers requests hostile. Signals
+seeded chaos injection (--chaos) that answers requests hostile. The
+startup surface is the family's: flag > env > config script (--config, the
+set grammar — every line a `set <name> <value>`; the bundled sample is
+inverter/examples/inverter.conf) > the built-in defaults. Signals
 mirror the family: SIGHUP re-applies the environment layer
 (CHAOS/MAX_KWP/STRICT/TIME/TIME_SCALE/
 LOG_LEVEL, keep-last-good), SIGUSR1 resets the scenario (releases pins
@@ -32,23 +35,26 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 import logging
 import math
 import threading
 
 from common.audit import AuditLog
 from common.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
-    parse_secret, resolve_control_target, resolve_metrics_acl, str_to_bool
+    parse_secret, resolve_control_target, resolve_metrics_acl
 from common.cred import parse_trust_uids
-from common.daemon import apply_restart_state, parse_ops_verbs
+from common.daemon import apply_restart_state, default_config_path, parse_ops_verbs
 from common.options import build_parser
 from common.version import version_string
 from lib.chaos import Chaos
+from lib.config import resolve_args
 from lib.control import ControlServer
 from lib.options import KNOWN_VERBS, OPTIONS
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
-from lib.statics import CONTROL_SOCKET_TEMPLATE, DEFAULTS, PEAK_RATIO, TIME_SCALE_MAX
+from lib.statics import CONTROL_SOCKET_TEMPLATE, PEAK_RATIO, TIME_SCALE_MAX
 from lib.signals import SignalBox, parse_time
 from lib.metrics import MetricsServer, describe_metrics
 from lib.simulator import Simulator
@@ -196,6 +202,8 @@ def main():
         print(version_string())
         raise SystemExit(0)
     p = build_parser(OPTIONS, description='Fake Inverter Simulator: a Modbus TCP server with demo values. Simulates different inverter/battery/meter devices through inverter profiles — the shipped default profile is the sun2000 (Huawei SUN2000) map, a Deye hybrid map is included as well.')
+    p.add_argument('--config', default=default_config_path(SCRIPT_DIR, 'inverter.conf'),
+                   help='config file — the set grammar: every line a `set <name> <value>`, comments start with # ($CONFIG, then inverter.conf next to this script, then the subproject root)')
     p.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
     p.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-fake-inverter --man | man -l -)')
     args = p.parse_args()
@@ -203,35 +211,9 @@ def main():
         from lib.man import daemon_page
         sys.stdout.write(daemon_page(p))
         raise SystemExit(0)
-    # the env layer (the fake's ladder: flag > env > static — no config file, F11):
-    # the twinned knobs read the environment when the flag stayed unset
-    for attr, env, static_key, conv in (('listen', 'LISTEN', 'listen', str),
-                                        ('max_clients', 'MAX_CLIENTS', 'max_clients', int),
-                                        ('client_timeout', 'CLIENT_TIMEOUT', 'client_timeout_s', float),
-                                        ('max_conn_per_ip', 'MAX_CONN_PER_IP', 'max_conn_per_ip', int),
-                                        ('audit_log', 'AUDIT_LOG', None, str),
-                                        ('audit_max_mb', 'AUDIT_MAX_MB', 'audit_max_mb', float),
-                                        ('audit_files', 'AUDIT_FILES', 'audit_files', int)):
-        v = getattr(args, attr)
-        if v is None or v == '':
-            v = os.environ.get(env)
-            if v not in (None, '') and conv is not str:
-                try:
-                    v = conv(v)
-                except ValueError:
-                    logger.error('invalid %s = %r: not a %s (keeping the default)', env, v, conv.__name__)
-                    v = None
-        if (v is None or v == '') and static_key is not None:
-            v = DEFAULTS[static_key]
-        setattr(args, attr, v)
-    for attr, env in (('audit_daily', 'AUDIT_DAILY'), ('no_audit_log', 'NO_AUDIT_LOG')):
-        if not getattr(args, attr):
-            v = os.environ.get(env)
-            if v not in (None, ''):
-                try:
-                    setattr(args, attr, str_to_bool(v))
-                except ValueError:
-                    logger.error('invalid %s = %r: not a boolean (keeping off)', env, v)
+    # the ladder (lib/config.py): flag > env > the config script > the
+    # static defaults — written back onto args, every knob the same way
+    resolve_args(args)
     logging.basicConfig(level=getattr(logging, args.log_level),
                         format='%(levelname)-7s %(message)s' if os.environ.get('JOURNAL_STREAM')
                         else '%(asctime)s %(levelname)-7s %(message)s')
@@ -246,27 +228,27 @@ def main():
         for problem in problems:
             logger.error(problem)
         raise SystemExit(1)
-    profile_text = args.profile or os.environ.get('PROFILE') or 'sun2000'
+    profile_text = args.profile or 'sun2000'
     profile_path = resolve_profile(profile_text)
     simulator = Simulator(PEAK_RATIO * args.max_kwp * 1000.0, args.static, frozen,
                           battery_kwh=args.battery_kwh,
                           profile=load_profile(profile_path), seed=args.seed)
     simulator.set_time_scale(args.time_scale)   # validated above; before any machine reads the clock
-    connect_acl = parse_acl(args.connect_acl or os.environ.get('CONNECT_ACL'), 'connect-acl')
-    modbus_auth = parse_auth_type(args.auth or os.environ.get('AUTH'), 'auth')
+    connect_acl = parse_acl(args.connect_acl, 'connect-acl')
+    modbus_auth = parse_auth_type(args.auth, 'auth')
     modbus_auth_key = check_auth_key(
-        parse_secret((args.auth_key or os.environ.get('AUTH_KEY') or '').strip() or None, 'auth-key'), 'auth-key')
+        parse_secret((args.auth_key or '').strip() or None, 'auth-key'), 'auth-key')
     if modbus_auth and not modbus_auth_key:
         logger.error('the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)')
         raise SystemExit(1)
     chaos = Chaos(args.chaos, seed=args.seed)
-    dump_key = parse_secret((args.dump_key or os.environ.get('DUMP_KEY') or '').strip() or None, 'dump/key')
-    apply_restart_state(vars(args), None, dump_key, ControlServer,
+    dump_key = parse_secret((args.dump_key or '').strip() or None, 'dump/key')
+    apply_restart_state(vars(args), args.config, dump_key, ControlServer,
                         extra={'system/listen': fold_listen})
     listen_host, listen_port = parse_listen(args.listen)   # the fold may have moved it
     target = resolve_control_target(args.control_port, listen_port, CONTROL_SOCKET_TEMPLATE)
-    control_token = parse_secret(args.control_token or os.environ.get('CONTROL_TOKEN'), 'control/token')
-    control_ops_token = parse_secret(args.control_ops_token or os.environ.get('CONTROL_OPS_TOKEN'),
+    control_token = parse_secret(args.control_token, 'control/token')
+    control_ops_token = parse_secret(args.control_ops_token,
                                      'control-ops-token')
     if control_ops_token and not control_token:
         logger.error('the read-only ops token supplements the admin token: set --control-token too '
@@ -276,12 +258,12 @@ def main():
         logger.error('the ops token must differ from the admin token (the same secret would hand '
                      'every holder the role the server picks first)')
         raise SystemExit(1)
-    ops_verbs = parse_ops_verbs(args.control_ops_verbs or os.environ.get('CONTROL_OPS_VERBS'), KNOWN_VERBS, rc=1)
-    trust_uids = parse_trust_uids(args.control_trust_uids or os.environ.get('CONTROL_TRUST_UIDS'),
+    ops_verbs = parse_ops_verbs(args.control_ops_verbs, KNOWN_VERBS, rc=1)
+    trust_uids = parse_trust_uids(args.control_trust_uids,
                                   'control-trust-uids')
-    metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics/token')
+    metrics_token = parse_secret(args.metrics_token, 'metrics/token')
     metrics_listen = parse_listen(args.metrics_listen)
-    metrics_acl, metrics_acl_warn = resolve_metrics_acl(args.metrics_acl or os.environ.get('METRICS_ACL'),
+    metrics_acl, metrics_acl_warn = resolve_metrics_acl(args.metrics_acl,
                                                         'metrics/acl')   # a bad acl value or gate file refuses the start
     if args.metrics_server and metrics_token is None:
         from common.config import is_loopback_host
@@ -306,7 +288,7 @@ def main():
     if args.dry_run:
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')
-        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %g kWh, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, per-ip limit %s, modbus auth %s, profile %s: %s, %d register(s), metrics server %s, control server %s)',
+        logger.info('would serve Modbus TCP on %s:%d (unit %d, peak PV %gW, %s, battery %g kWh, strict %s, chaos %g, seed %s, client limit %s, client timeout %s, per-ip limit %s, modbus auth %s, profile %s: %s, %d register(s), metrics server %s, control server %s, config %s)',
                     listen_host, listen_port, args.unit, PEAK_RATIO * args.max_kwp * 1000.0,
                     mode,
                     args.battery_kwh,
@@ -319,7 +301,8 @@ def main():
                     simulator.profile.description, profile_label(profile_path), len(simulator.profile.entries),
                     '%s:%d%s' % (metrics_listen[0], metrics_listen[1],
                                  ' (bearer token)' if metrics_token else '') if args.metrics_server else 'off',
-                    ('127.0.0.1:' + target) if target.isdigit() else ('unix:' + target) if target != '0' else 'off')
+                    ('127.0.0.1:' + target) if target.isdigit() else ('unix:' + target) if target != '0' else 'off',
+                    args.config)
         logger.info('dry-run: configuration is valid, nothing was bound or connected')
         return
     fake = FakeInverter(args.unit, simulator, strict=args.strict, chaos=chaos,
@@ -345,7 +328,8 @@ def main():
                                     'auth-key': bool(modbus_auth_key),
                                     'dump-key': bool(dump_key)}),
                                 dump_path=args.dump_path, restore_on_start=args.restore_on_start,
-                                dump_key=dump_key, dump_interval=args.dump_interval)
+                                dump_key=dump_key, dump_interval=args.dump_interval,
+                                config_path=args.config)
     fake.metrics_listen = metrics_listen
     fake.metrics_token = metrics_token
     fake.metrics_acl = metrics_acl

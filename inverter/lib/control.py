@@ -132,8 +132,8 @@ class ControlServer(_ControlServer):
     WHO = 'the fake inverter'
     EXIT_TEXT = 'the fake inverter is shutting down'
     RELOAD_TEXT = 'the fake inverter is reloading — the daemon restarts with the saved configuration'
-    RELOAD_NEEDS_CONFIG = False   # the fake has no config file (F11) — the reload state falls to the XDG state home
-    XDG_STATE_NAME = 'fake-inverter'   # the base's _reload_state_path fallback
+    RELOAD_NEEDS_CONFIG = True    # the fake takes the family's config file now — the reload state rides beside it
+    XDG_STATE_NAME = 'fake-inverter'   # the base's _reload_state_path fallback (--config '')
     APPLY_FIRST = ('scenario',)   # a preset release is the state the pins were pinned after — pins land on top
     TOKENLESS_TCP = 'allow'   # the F11 test-tool posture: a tokenless TCP control bind is fine here (the family refuses — F5)
 

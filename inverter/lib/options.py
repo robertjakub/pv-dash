@@ -9,15 +9,15 @@ live-settable (a '/'-path — `inverter/profile` spells as its words on the
 wire: `set inverter profile <value>`), and the secret flag. This module
 loads the JSON into the
 common Option rows and keeps the Python-side wiring: the control-grammar
-vocabulary, the static.json-wired CLI defaults (the fake parses its
-settings straight off the argv — F11: no config file) and the choice
-vocabularies (log-level from static.json, the timezone from the settings
-registry's values). The fake is a test instrument (F11) and never carried a
-config file — its startup surface is the flags and the env layer — so
-unlike the serving tools it has no --config; the registry still drives
-`show config` (the set-grammar form of the running fake's startup options —
-the argv that would restart it), the knob -> control-command mapper and
-scripts/check_options.py."""
+vocabulary and the choice vocabularies (log-level from static.json, the
+timezone from the settings registry's values). The fake takes the family's
+config file now (--config, the set grammar — inverter/examples/inverter.conf
+is the bundled sample): the CLI defaults stay out of the parser (a
+static-wired default would shadow the env/config layers — the flag never
+looks unset) and ladder flag > env > config > static in lib/config.py like
+every serving tool's resolver. The registry still drives `show config` (the
+set-grammar form of the running fake's effective startup options), the knob
+-> control-command mapper and scripts/check_options.py."""
 import json
 import os
 
@@ -38,38 +38,23 @@ def _load_options():
     show/commands sections, the control-grammar vocabulary) and the
     shared row builder (option_rows). Control-only settings (the pins and
     the machines — a live `set` name, no flag) ride the same rows with
-    their control vocabulary. The CLI defaults come from static.json (the
-    same defaults block lib/statics.py serves the rest of the tool) — read
-    directly here so the module also imports flat
-    (scripts/check_options.py walks lib/ on sys.path)."""
+    their control vocabulary. The CLI defaults stay out of the parser
+    (a static-wired default would shadow the env/config layers — the flag
+    never looks unset): they ladder flag > env > config > static in
+    lib/config.py like every serving tool's resolver; only the choice
+    vocabularies ride here (log-level from static.json, the timezone —
+    read directly so the module also imports flat
+    (scripts/check_options.py walks lib/ on sys.path))."""
     here = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
-    d = static['defaults']
-    # the twinned knobs do NOT ride the argparse parser: a static-wired
-    # default would shadow the env layer (the flag never looks unset) —
-    # they ladder flag > env > static in the bin like every serving tool's
-    # resolver; the untwinned demo knobs keep the static default (F11)
-    static_defaults = {'unit': d['unit'],
-                       'max-kwp': d['max_kwp'], 'battery-kwh': d['battery_kwh'],
-                       'time-scale': d['time_scale'], 'chaos': d['chaos'],
-                       'dump-interval': d['dump_interval'],
-                       'metrics-listen': d['metrics_listen'],
-                       'metrics-acl': d['metrics_acl'],
-                       'metrics-max-clients': d['metrics_max_clients'],
-                       'metrics-client-timeout': d['metrics_client_timeout_s'],
-                       'metrics-max-conn-per-ip': d['metrics_max_conn_per_ip'],
-                       'log-level': d['log_level'],
-                       'grid-voltage': static['grid']['voltage_v'],
-                       'grid-frequency': static['grid']['frequency_hz'],
-                       'timezone': 'utc'}       # the settings registry's default
     choices = {'log-level': tuple(static['log_levels']), 'timezone': ('utc', 'local')}
     with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
         meta = json.load(f)
         rows = meta['options']
         for key, value in parse_registry_sections(meta).items():
             globals()[key] = value
-    return option_rows(rows, static_defaults=static_defaults, choices=choices)
+    return option_rows(rows, choices=choices)
 
 
 # the control commands (the registries' `commands` rows — _load_options

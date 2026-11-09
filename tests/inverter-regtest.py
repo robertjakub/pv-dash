@@ -583,12 +583,15 @@ def main():
         I_MODBUS, I_CTL = 15985, 15986
         reload_state = '/tmp/inv_regtest_reload_state'
         state_file = '/tmp/inv_regtest_state.json'
+        with open('/tmp/inv_regtest_reload.conf', 'w') as fh:
+            fh.write('# the reload config: the state file rides beside it\nset max-clients 64\n')
         if os.path.exists(state_file):
             os.unlink(state_file)   # the block is idempotent: a previous run's dump (its
                                     # overrides ride restore-on-start) must not seed this one
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (I_MODBUS),
                                        '--control-port', str(I_CTL),
-                                       '--dump-path', state_file, '--restore-on-start'],
+                                       '--dump-path', state_file, '--restore-on-start',
+                                       '--config', '/tmp/inv_regtest_reload.conf'],
                                       stdout=open(LOG + '.i', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
         time.sleep(1.5)
@@ -632,12 +635,12 @@ def main():
         check('reload: the machine rode the exec too', back is not None and tx.startswith('ok cloud=autumn'), tx)
         gone = False
         for _ in range(100):     # the fresh daemon consumes the state at start — poll for the disappearance
-            if not os.path.exists(os.path.join(reload_state, 'fake-inverter', 'reload.json')):
+            if not os.path.exists('/tmp/inv_regtest_reload.conf.reload'):
                 gone = True
                 break
             time.sleep(0.1)
         check('reload: the state file is consumed', gone,
-              os.path.join(reload_state, 'fake-inverter', 'reload.json'))
+              '/tmp/inv_regtest_reload.conf.reload')
         # the dump-interval (the family knob, the cache's golden shape): the
         # dumper loop on the control base rewrites the file on the timer
         # (the thread parks while the interval is off, a live set wakes it)
@@ -662,11 +665,18 @@ def main():
         #      state file on the other side of the exec (instance J)
         J_MODBUS, J_CTL = 15987, 15988
         kstate = '/tmp/inv_regtest_state_sealed.json'
+        jconf = '/tmp/inv_regtest_sealed_reload.conf'
+        with open(jconf, 'w') as fh:
+            fh.write('# the sealed-reload config: the state file rides beside it\n')
+        if os.path.exists(jconf + '.reload'):
+            os.unlink(jconf + '.reload')   # the block is idempotent: a previous run's pending reload
+                                           # (a shutdown that beat the exec) must not seed this one
         if os.path.exists(kstate):
             os.unlink(kstate)   # the block is idempotent: a previous run's graceful-shutdown dump (2 settings) must not seed this one
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', kstate,
-                                       '--dump-key', 'inv-seal-key', '--restore-on-start'],
+                                       '--dump-key', 'inv-seal-key', '--restore-on-start',
+                                       '--config', jconf],
                                       stdout=open(LOG + '.j', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
         time.sleep(1.5)
@@ -702,7 +712,8 @@ def main():
         # the wrong key: the sealed dump refuses at start (the mac reads it as tampered content)
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', kstate,
-                                       '--dump-key', 'inv-seal-key-WRONG', '--restore-on-start'],
+                                       '--dump-key', 'inv-seal-key-WRONG', '--restore-on-start',
+                                       '--config', jconf],
                                       stdout=open(LOG + '.j2', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
         line = ''
@@ -720,7 +731,7 @@ def main():
         # no key at all: a sealed dump refuses with the pointer to dump/key
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', kstate,
-                                       '--restore-on-start'],
+                                       '--restore-on-start', '--config', jconf],
                                       stdout=open(LOG + '.j3', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
         line = ''
@@ -736,7 +747,7 @@ def main():
         # a configured key refuses an UNSEALED dump (plaintext stopped being trust at rest)
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', '/tmp/inv_regtest_state.json',
-                                       '--dump-key', 'inv-seal-key', '--restore-on-start'],
+                                       '--dump-key', 'inv-seal-key', '--restore-on-start', '--config', jconf],
                                       stdout=open(LOG + '.j4', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
         line = ''
@@ -753,7 +764,8 @@ def main():
         # reload's state file re-reads on the other side of the exec
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', kstate,
-                                       '--dump-key', 'inv-seal-key', '--restore-on-start'],
+                                       '--dump-key', 'inv-seal-key', '--restore-on-start',
+                                       '--config', jconf],
                                       stdout=open(LOG + '.j5', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
         back = None
@@ -1168,6 +1180,51 @@ def main():
         check('fake audit: the env-driven rotation renders in show config',
               'set audit-max-mb 77.0' in tx and 'set audit rotate daily true' in tx
               and 'set audit-files 9' in tx, tx[:160])
+
+        # ---- the config file: the family ladder (flag > env > config >
+        #      static), the sample's grammar, the fail-fast shapes
+        conf = '/tmp/inv_regtest.conf'
+        with open(conf, 'w') as fh:
+            fh.write('# the set grammar\nset max-kwp 20\nset chaos 0.25\nset unit 2\n')
+        r = subprocess.run([sys.executable, F, '--config', conf, '--control-port', '0', '--dry-run'],
+                           capture_output=True, text=True)
+        check('fake config: the conf values drive the dry run',
+              r.returncode == 0 and 'unit 2, peak PV 15000W' in r.stdout + r.stderr
+              and 'chaos 0.25' in r.stdout + r.stderr, (r.stdout + r.stderr)[-200:])
+        r = subprocess.run([sys.executable, F, '--config', conf, '--max-kwp', '1',
+                            '--control-port', '0', '--dry-run'], capture_output=True, text=True)
+        check('fake config: the flag beats the conf',
+              r.returncode == 0 and 'unit 2, peak PV 750W' in r.stdout + r.stderr,
+              (r.stdout + r.stderr)[-200:])
+        r = subprocess.run([sys.executable, F, '--config', conf, '--control-port', '0', '--dry-run'],
+                           capture_output=True, text=True, env=dict(os.environ, MAX_KWP='3'))
+        check('fake config: the env beats the conf',
+              r.returncode == 0 and 'unit 2, peak PV 2250W' in r.stdout + r.stderr,
+              (r.stdout + r.stderr)[-200:])
+        procs.append(subprocess.Popen([sys.executable, F, '--config', conf, '--listen', '127.0.0.1:15966',
+                                       '--control-port', '15967'],
+                                      stdout=open(LOG + '.c', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(1.0)
+        tx = ctl(15967, 'show max-kwp')
+        check('fake config: the conf value answers on the wire', tx == 'ok max-kwp=20', tx[:90])
+        ctl(15967, 'set max-kwp 2')
+        tx = ctl(15967, 'unset max-kwp')
+        check('fake config: unset returns the conf value', tx.startswith('ok max-kwp=20 '), tx[:90])
+        with open(conf, 'w') as fh:
+            fh.write('set pv 100\n')
+        r = subprocess.run([sys.executable, F, '--config', conf, '--control-port', '0', '--dry-run'],
+                           capture_output=True, text=True)
+        check('fake config: a pin refuses at start',
+              r.returncode == 1 and 'not startup knobs: pv' in r.stdout + r.stderr,
+              (r.stdout + r.stderr)[-200:])
+        with open(conf, 'w') as fh:
+            fh.write('set max-kwp\n')
+        r = subprocess.run([sys.executable, F, '--config', conf, '--control-port', '0', '--dry-run'],
+                           capture_output=True, text=True)
+        check('fake config: a malformed line fails fast',
+              r.returncode == 1 and 'a set line needs a name and a value' in r.stdout + r.stderr,
+              (r.stdout + r.stderr)[-200:])
+        os.remove(conf)
 
         # ---- the listening line documents the policy
         log = open(LOG).read()

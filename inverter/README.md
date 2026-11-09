@@ -124,6 +124,7 @@ python3 inverter/bin/modbus-fake-inverter.py                       # 127.0.0.1:5
 python3 inverter/bin/modbus-fake-inverter.py --time 12:00          # frozen noon: ~4.5 kW PV, exporting
 python3 inverter/bin/modbus-fake-inverter.py --static              # the classic static demo values
 python3 inverter/bin/modbus-fake-inverter.py --listen 127.0.0.1:15502 --log-level DEBUG
+python3 inverter/bin/modbus-fake-inverter.py --config inverter/examples/inverter.conf --dry-run
 ```
 
 Add **`--dry-run`** to validate the configuration and print the effective
@@ -131,8 +132,15 @@ settings. Exit codes: `0` = valid; `1` = invalid; `2` = CLI misuse.
 
 ## Configuration
 
-The fake has **no config file** (the audit's F11 test-tool posture: flags
-+ env only). The flags:
+The startup surface is the family's: **flag > env > config script > the
+built-in defaults**. The config file (`--config PATH`, `$CONFIG`, then
+`inverter.conf` next to the script) speaks the **set grammar** — every
+line a `set <name> <value>` in the CLI spelling, the same line pastes
+into the console or `modbus-fake-ctl` — and the bundled sample is
+[examples/inverter.conf](examples/inverter.conf). The pins and the
+machines (`pv`, `load`, `batt`, `grid`, `soc`, `mppt`, `cloud`,
+`scenario`, `battery-state`, `grid-outage`) stay control-wire settings:
+the config names one and the start refuses. The flags:
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -156,12 +164,14 @@ The fake has **no config file** (the audit's F11 test-tool posture: flags
 | `--chaos` / `--seed` | `0` / random | the chaos probability / the RNG seed — see [Chaos injection](#chaos-injection---chaos) |
 | `--strict` | off | reject undefined registers with exception 02 |
 | `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`) | XDG state | the audit trail: a file path or `-` for stdout (`$AUDIT_LOG` / `$AUDIT_MAX_MB` / `$AUDIT_DAILY` / `$AUDIT_FILES` / `$NO_AUDIT_LOG`) |
-| `--log-level` / `--man` | `INFO` / off | the log surface / print the generated man page |
+| `--config` / `--log-level` / `--man` | `inverter.conf` / `INFO` / off | the config script (the set grammar, above) / the log surface / print the generated man page |
 
 `SIGHUP` re-applies the **environment layer** (all-or-nothing — flags are
 startup-only): `CHAOS` (0..1), `MAX_KWP`, `PROFILE`, `STRICT`,
 `TIME`, `TIME_SCALE`, `LOG_LEVEL` — booleans accept
-`true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
+`true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`. The same twins ride the
+start in the ladder — `CHAOS=0.9` at creation is honored, SIGHUP retunes
+a running fake.
 
 ## Runtime control
 
@@ -198,7 +208,7 @@ form is legitimate here in a way it never is on the daemons.
 | `inspect` | one pretty dump of everything — the baton for a bug report |
 | `set scenario <name>` | a scenario preset: `morning`/`noon`/`evening`/`night` freeze the clock at a typical moment **and release the value pins**; manual pins turn it `custom` |
 | `reset` | clear **all** pinned settings, the write overlay and the pinned coils/discrete inputs at once (like SIGUSR1, per-connection) |
-| `request reload` | **restart the whole fake with the pins kept**: the live overrides save to the XDG state home (no config file), the process re-execs and re-applies them once |
+| `request reload` | **restart the whole fake with the pins kept**: the live overrides save beside the config script (`<config>.reload`), the process re-execs and re-applies them once |
 | `request dump` / `request restore` | with `--dump-path` configured: write the live overrides to the state file (`0600`, integrity-hashed) / load them back; `--dump-key` seals it, `--restore-on-start` does it automatically, the `--dump-interval` loop rewrites it live |
 | `show version` / `help` / `help <setting>` / `quit` / `shutdown` | the version / the reference / one setting's description / close / graceful stop (a confirm guard) |
 
@@ -296,9 +306,11 @@ fake never dying. Tune or disable live (`set chaos off`).
 The fake ships as an alpine container — stdlib-only, no pip, running as
 the unprivileged `pvsuite` user with the tools on `PATH`
 (`Dockerfile.fake-inverter` + `compose.yaml`; see
-[`docker/README.md`](../docker/README.md)). The version reports as
-`0.4.2` inside the image (no git metadata; a checkout shows
-`0.4.2-<short git>`).
+[`docker/README.md`](../docker/README.md)). The image loads its own
+bundled conf (`/pv-suite/inverter/inverter.conf`, the built-in
+`--config` target) — the env file and the CMD flags override it. The
+version reports as `0.4.2` inside the image (no git metadata; a checkout
+shows `0.4.2-<short git>`).
 
 ## Audit trail
 

@@ -19,6 +19,9 @@
 # The config volume: the entrypoint seeds /config with the required file
 # artifacts (for the fake: the generated suite key only — the volume is
 # there for symmetry with the other images and for future use).
+# The bundled conf is NOT in the volume — the tool loads the image's
+# /pv-suite/inverter/inverter.conf (the default --config target) and the
+# per-tool env file env/fake.env overrides it.
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \
@@ -32,6 +35,7 @@ COPY --from=common texts.json common/
 COPY --from=common modbus/*.py common/modbus/
 COPY --chown=pvsuite bin/ inverter/bin/
 COPY --chown=pvsuite lib/ inverter/lib/
+COPY --chown=pvsuite examples/inverter.conf inverter/inverter.conf
 # the suite key's placeholder: the entrypoint materializes any *.token in
 # config-defaults as a random value on the first seed (the bundled content
 # is never copied) — the compose stack points the fake's server-side auth
@@ -44,6 +48,8 @@ RUN chmod +x inverter/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/inverter/bin/modbus-fake-cli.py /usr/local/bin/fake-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
+# The bundled conf loads via the built-in default --config target
+# (/pv-suite/inverter/inverter.conf) — env and flags override it.
 VOLUME /config
 ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 

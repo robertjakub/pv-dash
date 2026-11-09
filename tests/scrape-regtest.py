@@ -1208,7 +1208,9 @@ try:
     subprocess.run([sys.executable, C, '--control-port', '15639', 'shutdown'], capture_output=True)
 
     # 2e. signals, mirroring the scraper/cache family: SIGHUP = env reload,
-    # SIGUSR1 = scenario reset (pins + write overlay), SIGTERM = summary + exit 0
+    # SIGUSR1 = scenario reset (pins + write overlay), SIGTERM = summary + exit 0.
+    # The demo envs are ordinary env twins now: CHAOS applies at start
+    # (flag > env), SIGHUP re-applies the layer.
     SIG_SOCK = '/tmp/scr_sig_ctl.sock'
     fake_ctl = subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15574',
                                  '--control-port', SIG_SOCK, '--allow-write'],
@@ -1216,8 +1218,11 @@ try:
                                 env={**os.environ, 'CHAOS': '0.9', 'LOG_LEVEL': 'DEBUG'})
     procs.append(fake_ctl)
     time.sleep(0.8)
-    check('signals: chaos off by flag despite CHAOS env',
-          'chaos     p=0.00' in subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'inspect'], capture_output=True, text=True).stdout)
+    check('signals: chaos from the env at start (flag > env)',
+          'chaos     p=0.90' in subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'inspect'], capture_output=True, text=True).stdout)
+    subprocess.run([sys.executable, C, '--control-port', SIG_SOCK, 'set', 'chaos', 'off'], capture_output=True)
+    # ^ chaos p=0.90 now rides the start: the wire turns it off so the raw
+    # write below lands (the SIGHUP re-applies the env right after)
     s = socket.create_connection(('127.0.0.1', 15574), timeout=5)
     s.sendall(struct.pack('>HHHB', 5, 0, 6, 1) + struct.pack('>BHH', 6, 47415, 99))
     s.recv(64)

@@ -245,12 +245,6 @@ only the **Done/history** records for their tool —
   mode (the laggy-modem character: every response delayed, not dropped) to
   exercise read-delay and poll pacing against a realistic SDongle — the
   chaos `stall` is a one-shot, a real dongle is a lifestyle.
-- **the dashboard's auth story** `[dashboard]` — the server binds
-  `0.0.0.0` by default with no authentication on page or proxy; the README
-  documents the loopback/reverse-proxy paths, but a bearer check mirroring
-  the scraper's (or at least a loud startup note) belongs in the server
-  itself before anything leaves localhost — the audit raised the same gap
-  as **F21** (docs/AUDIT.md, rev. 6); close them together.
 - **the cache gauges panels** `[dashboard]` — the cache's metrics endpoint
   exists (the `modbus_cache_*` gauges); chart the hit/miss ratio, the
   cache age and the poll health next to the generation panels.
@@ -319,9 +313,12 @@ only the **Done/history** records for their tool —
   state dump (common/dump.py: 0600, integrity-hashed, fail-closed
   restore) with the `dump` node (`dump/path`, `dump/restore-on-start`,
   `request dump`/`request restore`, the shutdown dump), the whole-daemon
-  `reload` (the cache's exec dance; the fake's state home is the XDG
-  state home — no config file, F11), and the **secret lives**: the token
-  pairs rotate on the wire everywhere now, the `show` verb refuses the
+  `reload` (the cache's exec dance; the fake's state home was the XDG
+  state home then — the config-file wave has since given the fake the
+  family's config file), and the **secret lives**: the token pairs
+  rotated on the wire at the time (the secrets-startup-only wave has
+  since retired the live rotation — every secret knob passes by
+  flag/env/config and a restart), the `show` verb refuses the
   secrets (the value renders nowhere), the secret defaults placeholders
   are gone (unset refuses).
 - **the hierarchical control grammar** — the live names are `/`-paths

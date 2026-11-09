@@ -247,9 +247,10 @@ docker run --rm -p 127.0.0.1:5502:5502 fake-inverter \
     fake-inverter --profile deye-sg04lp3 --timezone local    # any flags via the CMD override
 ```
 
-The fake's file configs are none — its `/config` volume carries the
-generated suite key (the compose stacks point the server-side auth at
-it) and stays open for future use.
+The bundled conf (`/pv-suite/inverter/inverter.conf`, the default
+`--config` target) loads from the image; its `/config` volume carries no
+conf — just the generated suite key (the compose stacks point the
+server-side auth at it) — and stays open for future use.
 
 ### modbus-cache (`Dockerfile.modbus-cache`)
 

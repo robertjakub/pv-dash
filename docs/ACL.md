@@ -4,9 +4,10 @@ This is the reference for the ACL support across the family: what the rule
 chain says, where it is enforced, and which surfaces speak it. The story
 has two planes. The **IP plane** decides who may reach a listener — the
 Modbus listeners' `acl/connect`, the /metrics expositions' `metrics/acl`
-(cache and scraper), and the cache's `acl/write` for the write frames
-already inside. The **register plane** decides which registers a forwarded
-write may touch — the `write-registers` knob and the device profiles'
+(all four tools' /metrics listeners), and the cache's `acl/write` for
+the write frames already inside. The **register plane** decides which
+registers a forwarded write may touch — the `write-registers` knob and
+the device profiles'
 embedded `acl`/`write` gate. Both planes speak ONE gate-object schema with
 TWO matcher kinds (registers, IP prefixes); one loader validates both, and
 the standalone acl file is the same object whether a knob points at it
@@ -27,12 +28,14 @@ section below maps the boundary.
 | modbus-cache | `metrics/acl` | IP | `any` | `any\|none\|IP,...\|file:` | accept on the /metrics port |
 | modbus-cache | `write-registers` | register | `none` | `START:COUNT,...\|any\|none\|profile\|file:` | the register gate on forwarded writes |
 | modbus-fake-inverter | `connect-acl` | IP | `any` | `any\|none\|IP,...` (no `file:`) | accept on the Modbus listen port |
+| modbus-fake-inverter | `metrics/acl` | IP | `any` | `any\|none\|IP,...\|file:` | accept on the /metrics port |
 | modbus-scraper | `metrics/acl` | IP | `any` | `any\|none\|IP,...\|file:` | accept on the /metrics port |
-| dashboard | — | — | — | — | no ACL surface — the page rides the bearer token + the loopback default instead (F21 closed, rev. 21); its /metrics is token-mandatory beyond loopback (F13's refusal) |
+| dashboard | `metrics/acl` | IP | `any` | `any\|none\|IP,...\|file:` | accept on the /metrics port |
+| dashboard | — | — | — | — | the page carries no ACL by decision — the bearer token + the loopback default stand in (F21 closed, rev. 21) |
 
 ## The listeners (the serving surfaces)
 
-Eleven listeners across the four tools: four carry an IP-kind ACL, every
+Eleven listeners across the four tools: six carry an IP-kind ACL, every
 serving surface carries the connection caps, the control sockets are
 loopback + token by decision, and every HTTP surface speaks the F13
 token shape beyond the loopback (the page's F21 closed it — rev. 21).
@@ -46,7 +49,7 @@ token shape beyond the loopback (the page's F21 closed it — rev. 21).
 | dashboard | the page + the config proxy | `127.0.0.1:8080` | the bearer token (`auth/token`, F21 closed — the `?auth=` bootstrap sets the session cookie, the header for scripts; a token-less non-loopback bind refuses to start) — GET-only, the realpath guard, the cap gate |
 
 The defaults come from each tool's `statics.py`; the authoritative
-per-surface detail is docs/AUDIT.md's surfaces table (rev. 19).
+per-surface detail is docs/AUDIT.md's surfaces table.
 
 ## The rule chain (the one semantics)
 
@@ -184,13 +187,16 @@ knob like the cache's. The fake takes NO `file:` gates and no chains — a
 test instrument on a trusted LAN keeps its soft-edge posture (F11 in
 docs/AUDIT.md); its write gate is `--allow-write` alone (off = every
 Modbus write refused), with no IP write-acl and no register allow-list.
+Its /metrics listener is the family's other gate — `metrics/acl`, the
+full grammar with `file:` included (the /metrics row above).
 
 ## modbus-scraper — the metrics listener, IP kind
 
 The scraper serves one listener beyond the control socket — the /metrics
 exposition — and one IP-kind gate covers it: `metrics/acl` on the HTTP
 listener, the same gate the cache's `acl/connect` runs on its Modbus
-listener (the cache's own /metrics endpoint speaks it too). The check is
+listener (the cache's, fake's and dashboard's own /metrics endpoints
+speak it too). The check is
 the shared accept ladder: ahead of the connection caps, an off-ACL
 client is closed without a reply (`connection rejected: … not on the
 metrics ACL`).
@@ -222,7 +228,7 @@ The gate never replaces the bearer: `--auth-token`'s request-time check
 and F13's non-loopback refusal stand on top of it — the ACL decides who
 may connect, the token decides whether the scrape authenticates (an
 ACL'd but tokenless non-loopback listen still refuses to start;
-docs/AUDIT.md rev. 19).
+docs/AUDIT.md).
 
 The control socket is NOT this gate — see below.
 
@@ -255,9 +261,9 @@ beyond loopback — until then the fake's tokenless-loopback TCP exemption
   bind serves tokenless), and the dashboard's page + proxy (the same
   shape, F21 closed rev. 21 — the `?auth=` bootstrap sets the session
   cookie, the raw header stays for scripts). The accept-time
-  ACL decides who may connect, the bearer decides whether the request
-  authenticates — both stack, neither replaces the other
-  (docs/AUDIT.md rev. 19).
+   ACL decides who may connect, the bearer decides whether the request
+   authenticates — both stack, neither replaces the other
+   (docs/AUDIT.md).
 - **the connection caps** — `max-clients`, `client-timeout`,
   `max-conn-per-ip` (and the metrics triple): the DoS posture, applied
   beside the connect ACL, never instead of it — and always answered

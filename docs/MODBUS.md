@@ -114,9 +114,10 @@ verdict is cleartext and unauthenticated; the nonce is client-chosen and
 not tracked server-side, so a captured 52-byte proof **can be replayed**
 to any server holding the same key; traffic after `OK` is unauthenticated
 and unencrypted. This is a connection gate for a trusted LAN, not a
-transport security layer. Keys are secrets: min 16 characters (enforced at
-start and on live `set`), never rendered back, loadable via `file:<path>`
-from an owner-only `0600` file.
+transport security layer. Keys are secrets: min 16 characters (enforced
+at start — the key knobs are startup-only, the wire refuses set/unset),
+never rendered back, loadable via `file:<path>` from an owner-only
+`0600` file.
 
 ### The Waveshare connection password (`waveshare` — cache upstream only)
 
@@ -449,7 +450,7 @@ replayed to clients).
 | client idle timeout | 300 s | — | 300 s |
 | max clients | 64 | — | 64 |
 | max conn per IP | 0 (off) | — | 0 (off) |
-| listen backlog | 128 | — | 16 |
+| listen backlog | 128 | — | 128 |
 | poll interval | 10 s | 10 s | — |
 | read delay between device reads | 0.05 s | — | — |
 | cache TTL | 3 × poll interval | — | — |
@@ -502,11 +503,15 @@ start; the live `set` enforces the same (including going `suite` while a
 short waveshare password stands as the key).
 
 Secret behavior: the keys never render — `show modbus auth key` answers
-`err modbus/auth/key is a secret — it never shows`; dumps render
-`set <name> *** SECRET REMOVED ***`, and the parser and the wire `set`
-refuse that placeholder back. Secrets cannot be `unset` — removing a key
-takes a restart. Live rotation: setting a key closes the session so the
-next exchange re-proves under the new material (the cache's inbound
+`err modbus/auth/key is a secret — it never shows`; the rendered script
+(`show config`) shows the knob as `set <name> *** SECRET REMOVED ***`
+(the value never does), the parser and the wire `set` refuse that
+placeholder back, and the state dumps cannot carry a secret at all —
+the secret rows are restart-marked, so nothing secret rides the reload
+state. The keys are startup-only: a live `set`/`unset` of a key answers
+`err restart required (startup-only knob)` — changing one is a
+flag/env/config edit plus a restart. The scheme itself still sets live:
+a scheme change re-proves the NEW connections (the cache's inbound
 scheme change does **not** drop standing sessions; they keep theirs).
 
 Useful verbs (`modbus-*-ctl` / `modbus-*-cli`): `set modbus auth suite`,
@@ -544,11 +549,14 @@ interval/...` rows. Startup logs name the schemes
 ## 12. Where the tests pin all this
 
 `tests/cache-regtest.py` (framing helpers at the top; the suite-auth block
-at the end — good key, wrong key, non-handshake `ERR`+EOF, both legs live,
-key rotation, secret refusal), `tests/inverter-regtest.py` (server-side
-handshake, silent client, bad magic, rotation), `tests/scrape-regtest.py`
-(client-side handshake, wrong-key counters, live rotation recovery,
-authed-vs-plain mismatch), `tests/cache-fuzz.py` (malformed MBAP lengths,
+at the end — good key, wrong key, non-handshake `ERR`+EOF, the scheme
+toggles live on both legs, the keys startup-only (set/unset refuse),
+secret refusal), `tests/inverter-regtest.py` (server-side
+handshake, silent client, bad magic, the no-live-rotation respawn pins),
+`tests/scrape-regtest.py`
+(client-side handshake, wrong-key counters, the startup-only key
+refusals + the fresh-start re-key, authed-vs-plain mismatch),
+`tests/cache-fuzz.py` (malformed MBAP lengths,
 random PDUs, pipelined bursts, trickled frames), `tests/cache-stress.py`
 (100 registers / 100 clients with pass-through and writes). The regtest
 `PASS suite auth: ...` lines are the executable form of §2.

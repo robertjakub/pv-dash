@@ -3,11 +3,13 @@
 # profiles/ directory via a named build context.
 #
 # Build (the context = ../cache, the profiles = ../profiles, the entrypoint
-# = ../docker/entrypoints, the shared code = ../common):
+# = ../docker/entrypoints, the shared code = ../common, the shared example
+# files = ../examples):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.modbus-cache -t modbus-cache \
 #       --build-context profiles=../profiles \
 #       --build-context shared=../shared \
+#       --build-context examples=../examples \
 #       --build-context scripts=../docker --build-context common=../common ../cache
 #   # or: docker compose up -d modbus-cache
 #
@@ -39,7 +41,8 @@ COPY --from=common modbus/*.py common/modbus/
 COPY --from=shared texts.json shared/
 COPY --chown=pvsuite bin/ cache/bin/
 COPY --chown=pvsuite lib/ cache/lib/
-COPY --chown=pvsuite examples/modbus_cache.conf examples/selection.json examples/acl-write-registers.json cache/
+COPY --chown=pvsuite examples/modbus_cache.conf examples/selection.json cache/
+COPY --chown=pvsuite --from=examples acl-write-registers.json cache/
 COPY --chown=pvsuite examples/selection.json config-defaults/
 # the suite key's placeholder: the entrypoint materializes any *.token in
 # config-defaults as a random value on the first seed (the bundled content

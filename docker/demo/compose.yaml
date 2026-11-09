@@ -84,6 +84,7 @@ services:
         scripts: ..
         common: ../../common
         shared: ../../shared
+        examples: ../../examples
     image: modbus-cache
     environment:
       # the upstream side: the cache proves the same suite key to the fake

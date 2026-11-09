@@ -477,15 +477,16 @@ def statics():
 
 def schemas(rows):
     """The JSON Schemas' properties vs the registry rows (the type and
-    the enum/bounds honest-check)."""
+    the enum/bounds honest-check). The tool-local schema/ dirs plus the
+    shared shared/schema/ home."""
     out = {}
-    for t in TOOLS:
-        sd = os.path.join(REPO, t, 'schema')
+    for t, base in [(t, os.path.join(REPO, t, 'schema')) for t in TOOLS] + [
+            ('shared', os.path.join(REPO, 'shared', 'schema'))]:
         per = {}
-        if os.path.isdir(sd):
-            for f in sorted(os.listdir(sd)):
+        if os.path.isdir(base):
+            for f in sorted(os.listdir(base)):
                 if f.endswith('.json'):
-                    with open(os.path.join(sd, f), encoding='utf-8') as fh:
+                    with open(os.path.join(base, f), encoding='utf-8') as fh:
                         per[f] = json.load(fh)
         out[t] = per
     return out
@@ -493,16 +494,17 @@ def schemas(rows):
 
 def examples(rows):
     """Every shipped example config re-parsed through the tool's own
-    reader (the set-grammar path; the JSON examples parse only)."""
+    reader (the set-grammar path; the JSON examples parse only). The
+    tool-local examples/ dirs plus the shared root examples/ home."""
     out = []
     sys.path.insert(0, REPO)
-    for t in TOOLS:
-        ed = os.path.join(REPO, t, 'examples')
+    for label, ed in [(f'{t}/examples', os.path.join(REPO, t, 'examples')) for t in TOOLS] + [
+            ('examples', os.path.join(REPO, 'examples'))]:
         if not os.path.isdir(ed):
             continue
         for f in sorted(os.listdir(ed)):
             p = os.path.join(ed, f)
-            rel = f'{t}/examples/{f}'
+            rel = f'{label}/{f}'
             if f.endswith('.conf'):
                 try:
                     from common.settings.options import parse_config_script
@@ -881,10 +883,13 @@ The findings:
 SCHEMA_FINDINGS = """\
 The findings:
 
-- **The shared pair is the pattern**: the ip-prefix acl's example +
-  schema live ONCE at the root examples/ + shared/schema/ (the four
-  per-tool copies died in the shared-examples wave). The per-tool
-  schema/ dirs that remain carry the tool-specific shapes.
+- **The shared pair is the pattern**: the standalone acl file's two
+  gates (ip-prefix + write-registers) ship their example + schema ONCE
+  at the root examples/ + shared/schema/ — the four per-tool ip-prefix
+  copies died in the shared-examples wave, the cache-local write pair
+  joined (one gate validator in common/settings/config.py reads both
+  kinds). The per-tool schema/ dirs that remain carry the
+  tool-specific shapes.
 - **The examples re-parse is the honest check**: a shipped example
   that the tool's own reader refuses is a broken promise shipped to
   every user who copies it. The table above is that check."""
@@ -1343,7 +1348,7 @@ def emit():
     schemas_ = schemas(rows)
     ap('| tool | schema files |')
     ap('|---|---|')
-    for t in TOOLS:
+    for t in list(TOOLS) + ['shared']:
         per = schemas_[t] or {}
         ap(f'| {t} | {", ".join(f"`{f}`" for f in sorted(per)) or "none"} |')
     ap('')

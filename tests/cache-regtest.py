@@ -2101,7 +2101,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           '%s %r' % (p.returncode, p.stderr[-120:]))
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15584',
                         '--listen', '127.0.0.1:15600', '--profile', R,
-                        '--write-registers', 'file:' + os.path.join(CACHE_DIR, 'examples', 'acl-write-registers.json'),
+                        '--write-registers', 'file:' + os.path.join(REPO, 'examples', 'acl-write-registers.json'),
                         '--dry-run'],
                        capture_output=True, text=True, timeout=60)
     check('acl file: the shipped example loads (the deye gate)',

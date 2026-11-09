@@ -55,6 +55,7 @@ services:
         scripts: ..
         common: ../../common
         shared: ../../shared
+        examples: ../../examples
     image: modbus-cache
     environment:
       # the server side: the scraper (any client) proves the stack's suite

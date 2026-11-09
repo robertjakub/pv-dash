@@ -19,7 +19,7 @@ read this table."""
 import json
 import os
 
-from common.options import as_bool, make_describe, option_rows, parse_registry_sections, settings_of
+from common.options import as_bool, load_registry, make_describe, settings_of
 
 
 # The verbs the control grammar speaks (the RBAC vocabulary — an ops verb
@@ -49,13 +49,11 @@ def _load_options():
     # falls through a truthy flag value) — they ladder flag > env > config
     # > static in lib/config.py like every other knob
     static_defaults = {'listen': defaults['listen']}
-    with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
-        meta = json.load(f)
-        rows = meta['options']
-        for key, value in parse_registry_sections(meta).items():
-            globals()[key] = value
-    return option_rows(rows, static_defaults=static_defaults,
-                       choices={'log-level': tuple(static['log_levels'])})
+    rows, sections, options = load_registry(here, static_defaults=static_defaults,
+                                            choices={'log-level': tuple(static['log_levels'])})
+    for key, value in sections.items():
+        globals()[key] = value
+    return options
 
 
 # the control commands (the registries' `commands` rows — _load_options

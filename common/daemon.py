@@ -92,6 +92,12 @@ def install_signal_handlers(apply_reload=None, graceful_stop=None):
         threading.Thread(target=watch_stop, daemon=True).start()
 
 
+def fold_listen(cfg, pending):
+    """The system/listen restart-fold: the pending value lands in the
+    resolved config's listen key (the bins' apply_restart_state extra)."""
+    cfg['listen'] = pending
+
+
 def apply_restart_state(target, config_path, dump_key, server, extra=None):
     """The restart-marked overrides fold into the startup config BEFORE
     the start's dump-restore decision — the piece that makes the restart

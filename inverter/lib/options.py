@@ -21,7 +21,7 @@ set-grammar form of the running fake's effective startup options), the knob
 import json
 import os
 
-from common.options import as_bool, make_describe, option_rows, parse_registry_sections, settings_of
+from common.options import as_bool, load_registry, make_describe, settings_of
 
 
 # The verbs the control grammar speaks (the RBAC vocabulary — an ops verb
@@ -49,12 +49,10 @@ def _load_options():
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
     choices = {'log-level': tuple(static['log_levels']), 'timezone': ('utc', 'local')}
-    with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
-        meta = json.load(f)
-        rows = meta['options']
-        for key, value in parse_registry_sections(meta).items():
-            globals()[key] = value
-    return option_rows(rows, choices=choices)
+    rows, sections, options = load_registry(here, choices=choices)
+    for key, value in sections.items():
+        globals()[key] = value
+    return options
 
 
 # the control commands (the registries' `commands` rows — _load_options

@@ -58,32 +58,32 @@ copy-paste twins), the similarity pass pairs cross-file bodies over the
 **The exact pass**: 0 duplicate group(s) in >= 2 files.
 
 
-**The similarity pass**: 52 cross-file pair(s) over the ratio
+**The similarity pass**: 51 cross-file pair(s) over the ratio
 floor (30 of them the man-page prose, per-tool by
 design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
-| 0.96 | `scraper/lib/control.py:147` `command` <-> `dashboard/lib/control.py:91` `command` |
-| 0.94 | `scraper/lib/control.py:130` `command_help` <-> `dashboard/lib/control.py:224` `command_help` |
+| 0.94 | `scraper/lib/control.py:141` `command_help` <-> `dashboard/lib/control.py:100` `command_help` |
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
-| 0.93 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
 | 0.92 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:34` `_load_options` |
-| 0.89 | `scraper/bin/modbus-scraper.py:248` `graceful_stop` <-> `dashboard/bin/dashboard.py:475` `graceful_stop` |
-| 0.88 | `scraper/lib/options.py:34` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
-| 0.88 | `inverter/lib/options.py:35` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.87 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
-| 0.86 | `cache/lib/control.py:96` `command` <-> `dashboard/lib/control.py:91` `command` |
+| 0.91 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
+| 0.89 | `scraper/bin/modbus-scraper.py:244` `graceful_stop` <-> `dashboard/bin/dashboard.py:471` `graceful_stop` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
-| 0.85 | `cache/lib/control.py:96` `command` <-> `scraper/lib/control.py:147` `command` |
-| 0.85 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
+| 0.85 | `inverter/lib/options.py:35` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
+| 0.85 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
+| 0.85 | `scraper/lib/options.py:34` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
-| 0.82 | `cache/bin/modbus-cache.py:372` `watch_dump` <-> `common/control.py:698` `run_dump_interval` |
-| 0.81 | `inverter/lib/control.py:140` `__init__` <-> `dashboard/lib/control.py:68` `__init__` |
+| 0.83 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
+| 0.82 | `cache/bin/modbus-cache.py:368` `watch_dump` <-> `common/control.py:905` `run_dump_interval` |
+| 0.81 | `inverter/lib/control.py:151` `__init__` <-> `dashboard/lib/control.py:77` `__init__` |
 | 0.78 | `inverter/lib/signals.py:30` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:576` `acl_table_report` <-> `dashboard/lib/control.py:545` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:587` `acl_table_report` <-> `dashboard/lib/control.py:421` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `inverter/lib/control.py:68` `handle` <-> `common/control.py:247` `handle` |
+| 0.75 | `inverter/lib/control.py:66` `handle` <-> `common/control.py:262` `handle` |
+| 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/config.py:420` `load_write_gate_file` |
+| 0.73 | `inverter/lib/control.py:598` `command_help` <-> `dashboard/lib/control.py:100` `command_help` |
+| 0.73 | `scraper/lib/control.py:141` `command_help` <-> `inverter/lib/control.py:598` `command_help` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -271,25 +271,22 @@ canon the operators grep for.
 | dashboard | `ACL-FILE`, `RELOAD`, `SHUTDOWN`, `START` |
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
-**The phrase canon**: 34 log phrase(s) shared by >= 2 tools;
-80 tool-local. The canon (the lead clause, the tools that speak it):
+**The phrase canon**: 31 log phrase(s) shared by >= 2 tools;
+83 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
-| `control: unset` | cache, dashboard, inverter, scraper |
 | `acl file:` | cache, dashboard, inverter, scraper |
 | `stopped` | cache, dashboard, inverter, scraper |
 | `write:` | cache, inverter |
 | `write: refused` | cache, inverter |
 | `control client from` | common, inverter |
-| `connection rejected:` | cache, common, dashboard, inverter, scraper |
 | `client` | dashboard, scraper |
-| `control: set` | cache, dashboard, inverter, scraper |
-| `control: shutdown requested` | cache, dashboard, inverter, scraper |
 | `shutdown:` | cache, dashboard, inverter, scraper |
 | `the state dump` | cache, common, inverter |
 | `state dumped to` | cache, common |
 | `sighup: reload failed ` | cache, common, inverter |
+| `connection rejected:` | common, scraper |
 | `unhandled error serving` | dashboard, scraper |
 | `dry-run: configuration is valid nothing was boun` | dashboard, inverter, scraper |
 | `cannot bind` | dashboard, scraper |
@@ -301,6 +298,9 @@ canon the operators grep for.
 | `sighup: reloaded` | cache, inverter |
 | `poll cycle crashed ` | cache, scraper |
 | `state dumps:` | cache, common |
+| `the read-only ops token supplements the admin to` | cache, inverter |
+| `the ops token must differ from the admin token t` | cache, inverter |
+| `cannot serve on` | cache, inverter |
 
 The findings:
 
@@ -509,10 +509,10 @@ list is the TODO seed, not a verdict.
 - inverter: every command exercised
 - dashboard: every command exercised
 
-**The canon phrases no suite pins**: 19
+**The canon phrases no suite pins**: 18
 
 **The graduation path**: the seeds carry stable IDs in
-[docs/family-drift-seeds.json](family-drift-seeds.json) (19
+[docs/family-drift-seeds.json](family-drift-seeds.json) (18
 open promise(s), the suggested suite per seed); a test wave
 consumes entries, the regeneration drops them, the shrinkage is
 the wave's proof; `--check` fails when a NEW promise ships

@@ -152,6 +152,30 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Changed
 
+- **everywhere** — **the control wire's verb walk is one implementation**:
+  the family's `command()` grammar (the help/topic ladder, the
+  quit/ping keepalives, the set/unset pair, the show reports and the
+  show walk, the request namespace, shutdown) rides the base in
+  `common/control.py` — the four per-tool `command()` copies die. The
+  tool differences are hooks now: the `SHOW_REPORTS` dict (the tool's
+  own show words), `command_tool` (poll now, reset, `request clear
+  cache`/`restart`, the cache's `request dump with-cache`), the fake's
+  Modbus-write set words (`command_set_special`) and its pin
+  bookkeeping (`_after_set`), the show-walk tail and the unknown-word
+  spellings, and `RELOAD_CONFIG = False` on the cache and the fake (the
+  `request reload-config` row decision stays open in docs/TODO.md).
+  The cache reads its live dump path through a `dump_path` property (the
+  proxy's value is the one home), `fold_listen` lives in
+  `common/daemon.py`, the cache answers an empty `{"cmd": ""}` with
+  `err empty command` (its own copy crashed the session) and the fake's
+  `unset` of a value that fails to re-apply now answers `err` instead of
+  dropping the session.
+- **common** — the one registry load the four `lib/options.py` share
+  (`load_registry`: the rows, the `show`/`commands` sections, the
+  choices/defaults wired per tool) and the metrics endpoints'
+  `acl_refused` (the one `connection rejected` log line rides the base —
+  the cache's, the fake's and the dashboard's overrides die).
+
 - **everywhere** — **the audit rotation bounds are family-wide**:
   `audit-files` (min 1, max 100) and `audit-max-mb` (min 0, max 1048576)
   carry bounds in all four registries, and the constants live once in

@@ -30,6 +30,7 @@ default. From this one row the surfaces are built or checked:
 Groups are free words each registry files its knobs under; a row without
 one renders ungrouped — bare, no header. Stdlib only."""
 import argparse
+import json
 import os
 
 from common.dump import SECRET_REMOVED
@@ -452,6 +453,19 @@ def as_bool(v):
 
 
 _CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
+
+
+def load_registry(here, choices=None, static_defaults=None):
+    """The one registry load the four lib/options.py share: options.json
+    next to the loader — the rows through option_rows (the static defaults
+    and the choices wired per tool), the `show`/`commands` sections through
+    parse_registry_sections (the caller folds them into its globals).
+    Returns (rows, sections, options); the module imports flat (the loaders
+    walk lib/ on sys.path — scripts/check_options.py)."""
+    with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
+        meta = json.load(f)
+    return meta['options'], parse_registry_sections(meta), \
+        option_rows(meta['options'], static_defaults=static_defaults, choices=choices or {})
 
 
 def parse_registry_sections(meta):

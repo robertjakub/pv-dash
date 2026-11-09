@@ -18,7 +18,7 @@ build_parser) and scripts/check_options.py all read this table."""
 import json
 import os
 
-from common.options import as_bool, make_describe, option_rows, parse_registry_sections, settings_of
+from common.options import as_bool, load_registry, make_describe, settings_of
 
 
 def _load_options():
@@ -33,12 +33,10 @@ def _load_options():
     here = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         log_levels = tuple(json.load(f)['log_levels'])
-    with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
-        meta = json.load(f)
-        rows = meta['options']
-        for key, value in parse_registry_sections(meta).items():
-            globals()[key] = value
-    return option_rows(rows, choices={'log-level': log_levels})
+    rows, sections, options = load_registry(here, choices={'log-level': log_levels})
+    for key, value in sections.items():
+        globals()[key] = value
+    return options
 
 
 # The verbs the control grammar speaks (the RBAC vocabulary — an ops verb

@@ -88,10 +88,13 @@ class MetricsServer:
         return True
 
     def acl_refused(self, request, client_address):
-        """The ACL-rejected peer: the default closes without a reply (the
+        """The ACL-rejected peer: one `connection rejected` line on the
+        tool's logger (LOG_NAME), then the close without a reply (the
         accept-check reading — nothing was parsed to answer). The close is
         the gate's refusal discipline (_refuse_close) — no reply, but a
         clean FIN: the unread request bytes must not RST the peer mid-read."""
+        logging.getLogger(self.LOG_NAME).info('connection rejected: %s:%d not on the metrics ACL',
+                                              *client_address[:2])
         self._http._refuse_close(request)
 
     class _Handler(http.server.BaseHTTPRequestHandler):

@@ -24,9 +24,11 @@ from common import dump as state
 from common.audit import AuditLog
 from common.cred import peer_uid
 from common.dump import SECRET_REMOVED
-from common.options import config_value, control_command, grouped_rows, knob_dictionary, \
+from common.options import config_value, control_command, describe_command_node, describe_node, \
+    describe_root, grouped_rows, knob_dictionary, make_describe, match_setting_path, \
     render_config_script
 from common.texts import T
+from common.version import version_string
 from common.wiresec import ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, proof_tag, role_allows, \
     role_tag, sanitize_command, sign_reply, verify_request_mac
 
@@ -74,6 +76,18 @@ class ControlServer:
     dump_key = None                       # the dump seal key — a subclass may property it
     CFG_KEYS = {}                         # the knob -> cfg-key renames — the subclass's registry wiring
     CFG_FORMATTERS = {}                   # the cfg key -> text map for the structured values
+    APP = 'daemon'                        # the show-version voice ('ok <app> <version>')
+    SHOW_REPORTS = {}                     # the tool's own show words: low -> method (or (method, arg))
+    RELOAD_CONFIG = True                  # request/reload-config answers (the cache + the fake keep the row decision open)
+    COMMANDS = ()                         # the registries' command rows — the subclass sets
+    COMMAND_HELP = {}                     # the command words' one-line help
+    COMMAND_GROUPS = {}                   # the command nodes' group buckets
+    COMMAND_HIDDEN = frozenset()          # the hidden rows (the dump gate's children)
+    NODE_BY_NAME = {}                     # the command namespace's nodes
+    SET_BY_NAME = {}                      # the set vocabulary's rows (the knobs — the show reports are not)
+    SHOW_BY_LIVE = {}                     # the live name -> the custom show word (the report routing)
+    OPTION_BY_LIVE = {}                   # the live name -> the Option row (the bounds, the secrets)
+    SHOW_OPTIONS = ()                     # the registry's show section (the bare-show pool)
 
     def __init__(self, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None,
@@ -109,6 +123,7 @@ class ControlServer:
         self.started = time.monotonic()
         self.option_by_live = {o.live: o for o in self.OPTIONS if o.live}   # the row bounds' one home
         self.option_by_name = {o.name: o for o in self.OPTIONS}   # the registry rows by knob name (show config)
+        self._describe = make_describe(self.SETTINGS)[0]   # the help-topic knob line (the wire's help <setting>)
 
     # --- the wire tier ---
 
@@ -433,6 +448,198 @@ class ControlServer:
         registry under its display group, with its flag, its env twin(s),
         the control command that changes it and the secret marker."""
         return knob_dictionary(self.OPTIONS, who=self.WHO)
+
+    # --- the command grammar (the family's wire verb walk) ---
+
+    def command(self, cmd):
+        """The family's wire grammar, one walk (the four tools' copies died
+        into it): the help/topic ladder, the quit/ping keepalives, the
+        set/unset pair, the show reports and the show walk, then the tool's
+        own verbs and the family's request namespace. The hooks the
+        subclasses use: SHOW_REPORTS (the tool's show words, beside show
+        knobs), RELOAD_CONFIG (the cache and the fake keep the
+        reload-config row decision open), command_set_special (the fake's
+        Modbus-write set words), _after_set (the fake's pin bookkeeping),
+        show_root_hidden (the bare-show pool's extra hidden words),
+        show_walk_tail (the walk's no-match tail), command_tool (the tool
+        verbs: poll now, reset, request clear cache / restart, the dump
+        with-cache spelling) and unknown_command (the final err's
+        spelling)."""
+        cmd = cmd.strip()
+        low = cmd.lower()
+        if not low:
+            return 'err empty command'
+        if low.split()[0] in ('help', '?') and low != '?':
+            args = cmd.split()[1:]
+            if args and args[0].lower() == 'config':
+                return self.config_mapping()
+            if args and args[0].lower() == 'knobs':
+                return self.knobs_dictionary()
+            path = '/'.join(w.lower() for w in args)   # the command paths spell as words too — the golden ladder: the commands before the settings
+            listing = describe_command_node(self.COMMANDS, self.COMMAND_HELP, self.COMMAND_GROUPS, self.COMMAND_HIDDEN, path)
+            if listing is not None:
+                return 'ok %s' % listing
+            if path in self.COMMAND_HELP:   # a command word — or a childless command node — describes itself
+                return 'ok %s' % self.COMMAND_HELP[path]
+            key, rest = match_setting_path(args, self.SETTINGS)
+            if key is not None and not rest:
+                if key == 'dump-interval' and not self.dump_path:
+                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
+                return 'ok %s' % self._describe(key)
+            if path in self.NODE_BY_NAME:
+                return 'ok %s' % describe_node(self.OPTIONS, path)
+            if args:
+                return 'err unknown command or setting %s (try ?)' % ' '.join(args)
+            return 'ok ' + self.command_help()
+        if low == '?':
+            return 'ok ' + self.command_help()
+        if low == 'quit':
+            return 'bye'
+        if low == 'ping':                 # keep-alive from the tool's ctl
+            return 'ok pong'
+        if cmd.startswith('unset'):
+            args = cmd.split()[1:]
+            if not args:
+                return 'err unset needs a setting (try help)'
+            key, rest = match_setting_path(args, self.SET_BY_NAME)   # the knobs: the show reports have nothing to unset
+            s = self.SET_BY_NAME.get(key) if key is not None else None
+            if s is not None and not rest and s.restart:
+                if s.secret:   # a secret never rides the reload state — the wire refuses it
+                    return 'err restart required (startup-only knob)'
+                self.defaults[key] = self.baseline.get(key, self.defaults.get(key))
+                self.overridden.discard(key)
+                self.LOG.info('control: unset %s (the restart re-applies the configured value)', key)
+                return 'note restart required (startup-only knob)'
+            if key is None or rest or key not in self.defaults:
+                return 'err unknown setting %s (try help)' % ' '.join(args)
+            try:
+                shown = self._apply(key, self.defaults[key])
+            except ValueError as e:
+                return 'err %s' % e
+            self.overridden.discard(key)
+            self.LOG.info('control: unset %s -> ok %s=%s', key, key, shown)
+            return 'ok %s=%s %s' % (key, shown, self.summary())
+        if cmd.startswith('set'):
+            args = cmd.split()[1:]
+            if len(args) < 2:
+                return 'err set needs a setting and a value (try help)'
+            special = self.command_set_special(args)   # the tool's own set words (the fake's Modbus writes)
+            if special is not None:
+                return special
+            key, rest = match_setting_path(args, self.SET_BY_NAME)   # the knobs: the show reports are not settable (and a show path never shadows a knob value)
+            if key is None:
+                return 'err unknown setting %s (try help)' % ' '.join(args)
+            if not rest:
+                return 'err set needs a setting and a value (try help)'
+            s = self.SET_BY_NAME.get(key)
+            if s is not None and s.restart and s.secret:
+                return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
+            value = ' '.join(rest)
+            if value == SECRET_REMOVED and getattr(s, 'secret', False):
+                return 'err *** SECRET REMOVED *** is not a value — pass the secret by flag/env, or as file:<path>'
+            try:
+                shown = self._apply(key, value)
+            except ValueError as e:
+                return 'err %s' % e
+            self._after_set(key)
+            self.overridden.add(key)
+            self.LOG.info('control: set %s=%s', key, shown)
+            if s is not None and s.restart:   # the value is recorded; the restart applies it — a note, not a verdict
+                return 'note restart required (startup-only knob)'
+            return 'ok %s=%s %s' % (key, shown, self.summary())
+        if low == 'show connections':
+            return 'ok connections ' + self.connections_line()
+        if low == 'show version':
+            return 'ok %s %s' % (self.APP, version_string())
+        if low in ('show config', 'show config all'):   # 'all' rides along: the script IS the full config
+            return self.show_config()
+        if low == 'show knobs':
+            return self.knobs_dictionary()
+        for word, report in self.SHOW_REPORTS.items():   # the tool's own show words (the SHOW_BY_LIVE routing)
+            if low == word:
+                if isinstance(report, tuple):
+                    return getattr(self, report[0])(report[1])
+                return getattr(self, report)()
+        if low.startswith('show'):
+            args = cmd.split()[1:]
+            if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
+                return 'ok %s' % describe_root(self.OPTIONS, self.SHOW_OPTIONS, hidden_words=self.show_root_hidden())
+            key, rest = match_setting_path(args, self.SETTINGS)
+            if key is not None and not rest:
+                opt = self.OPTION_BY_LIVE.get(key)
+                if opt is not None and opt.secret:
+                    return 'err %s is a secret — it never shows (pass it by flag/env, or as file:<path>)' % key
+                word = self.SHOW_BY_LIVE.get(key)
+                if word:
+                    return self.command('show ' + word)   # a show command's report, by its word
+                if key == 'dump-interval' and not self.dump_path:
+                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
+                return 'ok %s=%s' % (key, self._get(key))
+            if key is not None and rest:
+                return 'err %s: unexpected %s' % (key, ' '.join(rest))
+            node_path = '/'.join(w.lower() for w in args)   # the walk the ? offers: every word of the path answers
+            if node_path in self.NODE_BY_NAME:
+                return 'ok %s' % describe_node(self.OPTIONS, node_path)
+            tail = self.show_walk_tail(args)
+            if tail is not None:
+                return tail
+        if low == 'inspect':
+            return self.inspect()
+        tool = self.command_tool(low, cmd)   # the tool's own verbs, beside the family's request namespace
+        if tool is not None:
+            return tool
+        if low == 'request reload-config' and self.RELOAD_CONFIG:
+            if not self.reloader:
+                return 'err no reloader configured'
+            try:
+                return 'ok reloaded (%s)' % self.reloader()
+            except Exception as e:
+                return 'err reload failed: %s' % e
+        if low == 'request dump':
+            return self.dump_state()
+        if low == 'request restore':
+            return self.restore_state()
+        if low == 'request reload':
+            return self.reload_daemon()
+        if low == 'shutdown':
+            self.shutdown_pending = True
+            self.LOG.info('control: shutdown requested')
+            return 'bye shutdown'
+        return self.unknown_command(cmd)
+
+    def command_set_special(self, args):
+        """The tool's own set words ahead of the registry walk (the fake's
+        `set register/coil/discrete` Modbus-write emulation). None = not
+        special."""
+        return None
+
+    def _after_set(self, key):
+        """Post-apply bookkeeping (the fake: a manual pin clears the
+        scenario). The default is none."""
+
+    def show_root_hidden(self):
+        """Extra hidden words for the bare `show`'s pool (the cache hides
+        dump-interval while no dump path is configured)."""
+        return ()
+
+    def show_walk_tail(self, args):
+        """The show walk's no-match tail: None falls through to the next
+        branches (the family's `err unknown command` on a stray extra
+        word); a reply ends the walk (the fake reports the whole path)."""
+        if len(args) == 1:
+            return 'err unknown setting %s (try help)' % args[0].lower()
+        return None
+
+    def command_tool(self, low, cmd):
+        """The tool's own verbs, checked before the family's request
+        namespace (poll now, reset, request clear cache / restart, the
+        dump with-cache spelling). None = not one of them."""
+        return None
+
+    def unknown_command(self, cmd):
+        """The final err: the family spells the whole command %r-quoted
+        (the fake's first-word %s walk keeps its own)."""
+        return 'err unknown command %r (try help)' % cmd
 
     def show_config(self):
         """The effective configuration as a set-grammar script (modbus-cache's

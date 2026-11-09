@@ -12,6 +12,22 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Added
 
+- **everywhere** — **the `dump-interval` knob is family-wide** (the cache
+  was the only holder): the scraper, the fake inverter and the dashboard
+  gain the cache's `dump-interval` — `--dump-interval`/`$DUMP_INTERVAL`,
+  live as `set dump-interval <s|off>` — and the state dump rewrites
+  itself on a timer: the dumper loop parks on the control base while the
+  interval is off and a live set wakes it without a restart (the cache's
+  golden shape, shared now as `run_dump_interval`); a
+  set/show/describe without a dump path answers the family's
+  `dump-interval needs a dump path (set dump/path or --dump-path)`, the
+  start resolution refuses an interval without a dump path, and the
+  SIGHUP/`request reload-config` path re-reads the configured interval
+  (the scraper and the dashboard; the fake's SIGHUP layer does not touch
+  the dump family — the dump-path parity). The dump-path rows' help
+  spells the timer; the MANUALs, the man pages, OPTIONS.md and the
+  modules' `dumpInterval` option follow.
+
 - **docker** — **the stacks split by wiring, and both ship
   authenticated**: the new `docker/prod/compose.yaml` is the production
   shape — the same three service images the demo runs (cache + scraper +

@@ -14,7 +14,7 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (23): `audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`. The control-plane block is
+Common to **all four** tools (24): `audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `metrics-acl-table`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
@@ -60,7 +60,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `control-trust-uids` |  | `set control trust-uids` | **✓** live | **✓** live | **✓** live | **✓** live |
 | c | `control/ops` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | c | `dump` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `dump-interval` |  | `set dump-interval` | ✓ live |  |  |  |
+| k | `dump-interval` |  | `set dump-interval` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `dump-key` |  | `startup-only — pass it by flag/env/config (set/unset refuse)` | **✓** live+secret | **✓** live+secret | **✓** live+secret | **✓** live+secret |
 | k | `dump-path` |  | `set dump path` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `dump-with-cache` |  | `set dump with-cache` | ✓ live |  |  |  |

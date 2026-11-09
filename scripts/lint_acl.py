@@ -382,9 +382,13 @@ def main():
                                             recursive=True)
                        + glob.glob(os.path.join(REPO, 'scraper', '**', 'acl-*.json'),
                                    recursive=True)
+                       + glob.glob(os.path.join(REPO, 'inverter', '**', 'acl-*.json'),
+                                   recursive=True)
+                       + glob.glob(os.path.join(REPO, 'dashboard', '**', 'acl-*.json'),
+                                   recursive=True)
                        if not p.endswith('.schema.json'))   # the JSON Schemas OF the acl files lint nothing
         if not paths:
-            print('no acl-*.json file under cache/ or scraper/ — pass the path(s)')
+            print('no acl-*.json file under cache/, scraper/, inverter/ or dashboard/ — pass the path(s)')
             return 1
     bad = False
     for path in paths:

@@ -14,7 +14,7 @@ def daemon_page(parser):
     """The modbus-scraper(1) page: the OPTIONS from the parser, the prose
     from the README's poll/sanity/control story."""
     description = """\
-Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP, stdlib
+Prometheus exporter for PV inverters (Modbus TCP, stdlib
 only). Polls the inverter over Modbus TCP and serves the huawei_* metrics
 the dashboard expects at /metrics in the Prometheus text format: the PV
 generation, the grid exchange (import/export split), the home consumption
@@ -107,7 +107,7 @@ the control socket used when \\fB--control-port\\fR is unset.
 .I ~/.local/state/modbus-scraper/audit.log
 the audit trail when \\fB--audit-log\\fR is unset."""
     return page(
-        'Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP, stdlib only)',
+        'Prometheus exporter for PV inverters (Modbus TCP, stdlib only)',
         'modbus-scraper', 1, DATE, VERSION, MANUAL,
         '.B modbus-scraper\n.RI [ options ]',
         description,

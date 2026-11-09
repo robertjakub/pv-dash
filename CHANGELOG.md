@@ -34,6 +34,13 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Changed
 
+- **scraper** — **the legacy flat-spec wire-name fallback retires from
+  the exposition**: the poll gauges always render their fixed
+  `scraper_*` names (the built-in `scraper` section of
+  `lib/metrics.json` merges into every spec, so the `huawei_up`-style
+  fallback branches in `lib/server.py` were unreachable dead code); the
+  flat-spec acceptance in the loader itself stays (keys verbatim).
+
 - **everywhere** — **the ip-prefix acl example + schema are one shared
   pair at the repo root** (`examples/acl-ip-prefix.json` +
   `schema/acl-ip-prefix.schema.json`): the four per-tool copies die (the
@@ -491,6 +498,15 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   README/man spellings take the live name now.
 
 ### Docs
+
+- **everywhere** — **the family speaks Modbus TCP inverters, not a
+  vendor**: the root, scraper, cache, inverter and dashboard README
+  intros, the scraper's bin docstring + parser description and the
+  man-page title drop the "Huawei SUN2000" definition framing (the
+  devices ride on as the shipped-profile examples — the bundled profiles
+  cover the Huawei SUN2000 and the Deye hybrids); the
+  register-convention citations and the profile descriptions keep the
+  provenance, the `huawei_` metric-prefix default stays.
 
 - **everywhere** — **the docs restructure**: all Nix/NixOS documentation
   moved out of the per-tool READMEs into [docs/NIXOS.md](docs/NIXOS.md)

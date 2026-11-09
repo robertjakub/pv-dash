@@ -60,13 +60,11 @@ class Handler(BaseHTTPRequestHandler):
     def exposition(self):
         spec = self.scraper.spec
         up, values, last_poll, errors = self.scraper.snapshot()
-        # the poll gauges render from the spec (scraper_* in the bundled
-        # sectioned spec; the legacy flat specs keep their huawei_* names)
-        up_name = 'scraper_up' if 'scraper_up' in spec.help else 'huawei_up'
-        errors_name = 'scraper_modbus_errors_total' if 'scraper_modbus_errors_total' in spec.help \
-            else 'huawei_modbus_errors_total'
-        last_name = 'scraper_last_poll_timestamp_seconds' if 'scraper_last_poll_timestamp_seconds' in spec.help \
-            else 'huawei_last_poll_timestamp_seconds'
+        # the poll gauges — the fixed scraper_* names (the built-in
+        # "scraper" section of lib/metrics.json merges into every spec)
+        up_name = 'scraper_up'
+        errors_name = 'scraper_modbus_errors_total'
+        last_name = 'scraper_last_poll_timestamp_seconds'
 
         def fmt(v):
             return '%d' % round(v) if float(v).is_integer() else '%.3f' % v

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP, stdlib only).
+"""Prometheus exporter for PV inverters (Modbus TCP, stdlib only).
 
-Polls the inverter over Modbus TCP and serves the huawei_* metrics the
-dashboard expects at /metrics in the Prometheus text format.
+Polls the inverter over Modbus TCP and serves the profile- and
+compute-fed metrics (the huawei_* names by default) the dashboard
+expects, plus the fixed scraper_* health gauges, at /metrics in the
+Prometheus text format.
 
 Layout: lib/protocol (Modbus client), lib/config (settings resolution),
 lib/metrics (metric specs), lib/poller (poller + sanity checks),
@@ -55,7 +57,7 @@ logger = logging.getLogger('scraper')
 
 
 def parse_args():
-    ap = build_parser(OPTIONS, description='Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP).')
+    ap = build_parser(OPTIONS, description='Prometheus exporter for PV inverters (Modbus TCP).')
     ap.add_argument('--config', default=default_config_path(),
                     help='config file — the set grammar: every line a `set <name> <value>`, comments start with # ($CONFIG, then scraper.conf next to this script, then the subproject root)')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')

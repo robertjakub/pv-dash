@@ -1,4 +1,4 @@
-# Huawei SUN2000 Prometheus scraper
+# modbus-scraper
 
 > **Experimental — work in progress.** The whole pv-suite is still under
 > active development: interfaces, file formats and behavior can still change
@@ -6,10 +6,12 @@
 > mock Prometheus), not against real hardware.
 
 A dependency-free (Python stdlib only) Prometheus exporter that polls a
-Huawei SUN2000 inverter over **Modbus TCP** and exposes the `huawei_*_watts`
-metrics the [dashboard](../dashboard/README.md) expects, plus health
-gauges. It can poll the inverter directly or through the
-[modbus-cache](../cache/README.md) proxy (which it detects automatically).
+Modbus TCP inverter and exposes the `huawei_*_watts` metrics (the
+`--metric-prefix` default) the [dashboard](../dashboard/README.md)
+expects, plus health gauges. The bundled profiles cover the Huawei
+SUN2000 and the Deye hybrids. It can poll the inverter directly or
+through the [modbus-cache](../cache/README.md) proxy (which it detects
+automatically).
 Modbus TCP must be enabled on the inverter / SDongle / EMMA (via
 FusionSolar or the local setup), reachable at the inverter's LAN IP on TCP
 port **502**, unit id **1**.

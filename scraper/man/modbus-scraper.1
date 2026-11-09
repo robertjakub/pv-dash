@@ -1,13 +1,13 @@
 .TH MODBUS-SCRAPER 1 "2026-11-05" "pv-suite 0.4.2" "User Commands"
 .SH NAME
-modbus-scraper \- Prometheus exporter for Huawei SUN2000 inverters
-(Modbus TCP, stdlib only)
+modbus-scraper \- Prometheus exporter for PV inverters (Modbus TCP,
+stdlib only)
 .SH SYNOPSIS
 .B modbus-scraper
 .RI [ options ]
 
 .SH DESCRIPTION
-Prometheus exporter for Huawei SUN2000 inverters (Modbus TCP, stdlib
+Prometheus exporter for PV inverters (Modbus TCP, stdlib
 only). Polls the inverter over Modbus TCP and serves the huawei_* metrics
 the dashboard expects at /metrics in the Prometheus text format: the PV
 generation, the grid exchange (import/export split), the home consumption

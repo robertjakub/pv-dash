@@ -23,30 +23,30 @@ sys.path.insert(0, REPO)
 # blurb, the ctl/cli bins, the default control socket, the ctl example
 # (port + command, the bins' docstrings' own), whether TCP control refuses
 # to start without a token (F5; the fake is the F11 exempt) and the
-# bundled config script (the fake has none, F11)
+# bundled config script (the bundled sample's checkout path, examples/)
 TOOLS = (
     ('cache', 'modbus-cache', 'modbus-cache',
      'A dependency-free (Python stdlib only) Modbus TCP caching proxy for '
      'single-client devices: it polls the inverter once and serves every '
      'client from the cache.',
      'modbus-cache-ctl', 'modbus-cache-cli', '/tmp/modbus-cache-15502.socket',
-     '15509', 'request clear cache', True, 'cache/modbus_cache.conf'),
+     '15509', 'request clear cache', True, 'cache/examples/modbus_cache.conf'),
     ('scraper', 'modbus-scraper', 'modbus-scraper',
      'A dependency-free (Python stdlib only) Prometheus exporter that polls '
      'a Modbus device and exposes the metrics at /metrics.',
      'modbus-scraper-ctl', 'modbus-scraper-cli', '/tmp/modbus-scraper-9350.socket',
-     '15509', 'poll now', True, 'scraper/scraper.conf'),
+     '15509', 'poll now', True, 'scraper/examples/scraper.conf'),
     ('inverter', 'fake-inverter', 'modbus-fake-inverter',
      'A dependency-free (Python stdlib only) Modbus TCP server that plays '
      'an inverter — the battery, the smart meter, the diagnostics — for '
      'the family to develop and test against.',
      'modbus-fake-ctl', 'modbus-fake-cli', '/tmp/fake-inverter-5502.socket',
-     '15599', 'show registers', False, None),
+     '15599', 'show registers', False, 'inverter/examples/inverter.conf'),
     ('dashboard', 'dashboard', 'dashboard',
      'A single-page dashboard for home PV monitoring, fed by Prometheus: '
      'it serves the page and proxies the upstream queries.',
      'dashboard-ctl', 'dashboard-cli', '/tmp/dashboard-8080.socket',
-     '15598', 'request reload-config', True, 'dashboard/server.conf'),
+     '15598', 'request reload-config', True, 'dashboard/examples/server.conf'),
 )
 
 # the wire words no registry row carries (the registries' own audit's
@@ -334,12 +334,6 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
                'settings. No defaults live in these tables: `show config` '
                'prints the effective values, the READMEs are the '
                'reference.' % conf))
-    else:
-        w(wrap('A knob\'s value resolves at start as flag > env > default — '
-               'the fake takes no config file (F11), `--dry-run` prints the '
-               'effective settings. No defaults live in these tables: '
-               '`show config` prints the effective values, the READMEs are '
-               'the reference.'))
     w('')
     w('The kinds — every row of the tables below carries one:')
     w('')

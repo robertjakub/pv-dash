@@ -27,7 +27,7 @@ from common.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUD
 TOOLS = {
     'cache': ('cache/bin/modbus-cache.py', 'cache', 'cache/module.nix', 'cache/README.md', 'cache/examples/modbus_cache.conf'),
     'scraper': ('scraper/bin/modbus-scraper.py', 'scraper', 'scraper/module.nix', 'scraper/README.md', 'scraper/examples/scraper.conf'),
-    'inverter': ('inverter/bin/modbus-fake-inverter.py', 'inverter', None, 'inverter/README.md', None),
+    'inverter': ('inverter/bin/modbus-fake-inverter.py', 'inverter', None, 'inverter/README.md', 'inverter/examples/inverter.conf'),
     'dashboard': ('dashboard/bin/dashboard.py', 'dashboard', 'dashboard/module.nix', 'dashboard/README.md', 'dashboard/examples/server.conf'),
 }
 

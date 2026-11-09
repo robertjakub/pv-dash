@@ -12,6 +12,30 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Added
 
+- **inverter** — **the fake takes the family's config file**: `--config`
+  (`$CONFIG`, then `inverter.conf` next to the script) reads the set
+  grammar — every line a `set <name> <value>` in the CLI spelling — and
+  the bundled sample is `inverter/examples/inverter.conf`; the ladder is
+  the family's flag > env > config > the static defaults
+  (`inverter/lib/config.py` `resolve_args` writes the effective values
+  back onto the args namespace, and the CLI defaults left the parser —
+  a static-wired default would shadow the lower layers). The demo twins
+  (`CHAOS`, `MAX_KWP`, `STRICT`, `TIME`, `TIME_SCALE`) are ordinary env
+  twins now: they apply at start and SIGHUP re-applies them (the
+  SIGHUP-only posture is retired, the scrape-regtest check reworked);
+  the declared-but-dead twins (`LOG_LEVEL`, `ALLOW_WRITE`,
+  `CONTROL_SOCKET_GROUP`, `DUMP_PATH`, `DUMP_INTERVAL`,
+  `RESTORE_ON_START`, `METRICS_ACL`) resolve at start too. The pins and
+  the machines stay control-wire settings — a config line naming one
+  refuses the start. `request reload` saves the reload state beside the
+  config script (`RELOAD_NEEDS_CONFIG` true family-wide; the state home
+  stays the `--config ''` fallback) and the dry-run line names the
+  config path. The image ships the conf (`Dockerfile.fake-inverter`
+  COPYs `examples/inverter.conf` onto the built-in target),
+  `package.nix` installs it, the man page regenerates (the CONFIG env,
+  the conf in FILES) and the MANUAL prose carries the conf story (the
+  other three MANUALs' stale bundled-conf paths fixed in the regen).
+
 - **common** — **the static texts are one JSON home** (`common/texts.json`,
   loaded by the new `common/texts.py`): the console's faces and reconnect
   ladder, the ctl's, the four welcome banners, the wire's fixed replies

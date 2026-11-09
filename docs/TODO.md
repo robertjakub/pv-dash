@@ -9,15 +9,16 @@ only the **Done/history** records for their tool —
 
 ## The control plane (the grammar follow-through)
 
-- **`request reload-config` on all four** `[cache]` `[scraper]`
-  `[inverter]` `[dashboard]` — the config re-read (the SIGHUP path, the
-  wire face the request-namespace wave named) speaks on the scraper and
-  the dashboard only: the cache and the fake have no config file today
-  (the fake answers from flags/env, the cache from flags/env/the config
-  script). Give every daemon the reloader wiring — the cache and the
-  fake grow a config story (or the command answers `err no reloader
-  configured` there, which the registry rows should then say) — so the
-  grammar is family-shaped: `request/reload-config` listed beside
+- **`request reload-config` on the remaining two** `[cache]` `[inverter]`
+  — the config re-read (the SIGHUP path, the wire face the
+  request-namespace wave named) speaks on the scraper and the dashboard
+  only. The fake grew its config story (the config-file wave: the
+  `request reload` re-exec re-reads the conf) but still has no
+  `request/reload-config` row — decide: a reloader of its own (the
+  scraper's non-restart re-apply over the fake's machines) or the
+  family row answering `err no reloader configured`; the cache has the
+  config script but no reloader wiring at all. The grammar should end
+  up family-shaped: `request/reload-config` listed beside
   `request/reload` on all four, the ops policy unchanged (the verb
   stays out of the ops default).
 - **row the fake's write-emulation words** `[inverter]` — `register`,

@@ -14,7 +14,7 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (24): `audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`. The control-plane block is
+Common to **all four** tools (26): `audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `metrics-acl-table`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
@@ -37,7 +37,6 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `batt` |  | `set batt` |  |  | ✓ live |  |
 | k | `battery-kwh` |  | `set battery-kwh` |  |  | ✓ live |  |
 | c | `battery-state` |  | `set battery-state` |  |  | ✓ live |  |
-| k | `bind` |  | *(startup-only)* |  |  |  | ✓ |
 | s | `cache` |  | `show cache` | ✓ |  |  |  |
 | s | `cache-all` |  | `show cache-all` | ✓ hidden |  |  |  |
 | k | `cache-ttl` |  | `set cache ttl` | ✓ live |  |  |  |
@@ -69,13 +68,12 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `grid-outage` |  | `set grid-outage` |  |  | ✓ live |  |
 | k | `grid-positive-import` |  | `set modbus grid-positive-import` |  | ✓ live |  |  |
 | k | `grid-voltage` |  | `set grid-voltage` |  |  | ✓ live |  |
-| k | `host` |  | *(startup-only)* |  |  | ✓ |  |
 | s | `inputs` |  | `show inputs` |  | ✓ |  |  |
 | s | `inputs-metrics` |  | `show inputs-metrics` |  | ✓ |  |  |
 | k | `interval` |  | `set metrics interval`, `set modbus interval` | ✓ live | ✓ live |  |  |
 | s | `knobs` |  | `show knobs` | **✓** | **✓** | **✓** hidden | **✓** hidden |
 | c | `limits` |  | *(startup-only)* | ✓ |  |  |  |
-| k | `listen` |  | `set metrics listen, restart`, `set system listen, restart` | ✓ live | ✓ live |  |  |
+| k | `listen` |  | `set system listen, restart` | **✓** live | **✓** live | **✓** live | **✓** live |
 | c | `load` |  | `set load` |  |  | ✓ live |  |
 | k | `local-time` |  | `set local-time` | ✓ live | ✓ live |  | ✓ |
 | k | `log-access` |  | `set log-access`, `set system log-access` | ✓ live | ✓ live |  | ✓ live |
@@ -104,7 +102,6 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `modbus-unit` |  | `set modbus unit` |  | ✓ live |  |  |
 | c | `mppt` |  | `set mppt` |  |  | ✓ live |  |
 | k | `no-audit-log` |  | `set audit disable` | **✓** live | **✓** live | **✓** | **✓** |
-| k | `port` |  | *(startup-only)* |  |  | ✓ | ✓ |
 | k | `profile` |  | `set modbus profile`, `set profile` | ✓ live | ✓ live | ✓ live |  |
 | k | `prom-prefix` |  | *(startup-only)* |  |  |  | ✓ |
 | c | `pv` |  | `set pv` |  |  | ✓ live |  |
@@ -119,7 +116,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `static` |  | `set static` |  |  | ✓ live |  |
 | k | `static-dir` |  | *(startup-only)* |  |  |  | ✓ |
 | k | `strict` |  | `set strict` |  |  | ✓ live |  |
-| c | `system` |  | *(startup-only)* | ✓ |  |  |  |
+| c | `system` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `time` |  | `set time` |  |  | ✓ live |  |
 | k | `time-scale` |  | `set time-scale` |  |  | ✓ live |  |
 | k | `timeout` |  | `set modbus timeout` | ✓ live | ✓ live |  |  |

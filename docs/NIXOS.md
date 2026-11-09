@@ -162,7 +162,7 @@ services.modbus-scraper = {
         dashboard.nixosModules.default
         { services.dashboard = {
             enable = true;
-            port = 8080;
+            listenPort = 8080;
             prometheusUrl = "http://localhost:9090";
             # settings → generated config.js; or configFile = ./config.js;
           }; }
@@ -174,7 +174,7 @@ services.modbus-scraper = {
 
 | Option | Meaning |
 |---|---|
-| `host` / `port` | the server bind (127.0.0.1 / 8080) |
+| `listenHost` / `listenPort` | the server bind (127.0.0.1 / 8080) |
 | `prometheusUrl` / `promPrefix` | the upstream Prometheus (http://localhost:9090) / the proxy path (`/prom`) |
 | `staticDir` | override the packaged `static/` |
 | `settings` / `configFile` | the SOLAR_CONFIG attrset rendered to the served `config.js` / an explicit config.js instead |

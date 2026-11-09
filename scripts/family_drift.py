@@ -768,12 +768,6 @@ The findings:
   set-grammar space — legal (the registries are per-tool), but the
   merged-knob view (docs/OPTIONS.md) and any future family-wide
   grammar should note it.
-- **The `listen` naming map.** The cache's serve face is live
-  `system/listen` (restart-marked), the scraper's is
-  `metrics/listen` (its whole HTTP surface IS the metrics surface),
-  the dashboard binds via `bind`/`port` (no live name), the fake via
-  `host`/`port` (argv only). The meanings line up per tool; the
-  family lacks one word for "the address this daemon serves on".
 - **`KNOWN_VERBS` is hand-maintained.** The RBAC vocabulary lives as
   a Python tuple in each `lib/options.py` beside the registry that
   defines the same verbs as rows — two homes for one truth (the
@@ -941,25 +935,18 @@ serves. Ordered by the user's exposure; the code plane rides along.
    proposal + the migration note (the alias map carries the old
    spellings one release).
 
-5. **The serve-address word** — the family answers one question with
-   one word: `show system listen` prints the address the daemon
-   serves on, everywhere. The cache's `system/listen` is the canon;
-   the scraper's `metrics/listen` stays as the alias; the fake's
-   `host`/`port` gain the live name (F11 keeps the argv defaults);
-   the dashboard's `bind`/`port` gain theirs.
-
-6. **`request/reload-config` family-wide** — the re-read-without-exec
+5. **`request/reload-config` family-wide** — the re-read-without-exec
    surface exists on the scraper and the dashboard; the cache gains
    it (its reload execs; a profile or selection edit deserves the
    lighter verb). The fake stays exempt — no config file, F11 — and
    the asymmetry gets the registry note.
 
-7. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
+6. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
    the RBAC vocabulary from the registry's command rows (the
    hidden/internal flags included). One home; the silent drift
    (a policy accepting a verb the grammar refuses) dies.
 
-8. **The accept-ladder extraction** — `common/modbus/server.py`: the
+7. **The accept-ladder extraction** — `common/modbus/server.py`: the
    gate -> ACL -> max-clients -> count -> thread discipline + the
    session opener (the clients register, the suite handshake, the
    `finally` unwind) with the malformed-frame policy hook (the
@@ -967,14 +954,14 @@ serves. Ordered by the user's exposure; the code plane rides along.
    identical refusal texts and logs at both Modbus faces; the code
    plane: the surface sweep's ~50-line net win.
 
-9. **The coverage TODOs graduate** — the seeds carry stable IDs in
+8. **The coverage TODOs graduate** — the seeds carry stable IDs in
     docs/family-drift-seeds.json (`family_drift.py --seeds`, the
     suggested suite per seed); a test wave consumes entries, the
     regeneration drops them, the shrinkage is the wave's proof, and
     `--check` fails when a NEW promise ships uncovered (the list may
     only shrink).
 
-10. **The parity gates wired** — the NixOS-parity and docker/env
+9. **The parity gates wired** — the NixOS-parity and docker/env
     sweeps join `check_options`/the release gates as machine checks
     (the module.nix type/default vs the registry, the env-file
     coverage vs the env twins). The drift doc's `--check` already

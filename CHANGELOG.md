@@ -12,6 +12,24 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Added
 
+- **everywhere** — **the serve-address word is family-wide**: `show system
+  listen` prints the address the daemon serves on, on all four. The cache's
+  `system/listen` is the canon; the scraper's listen knob re-spells to it
+  (`metrics/listen` stays as the alias — the wire, the config grammar and
+  the state files accept both spellings, the canonical one renders), with
+  the restart fold that was missing (a `set` + `request reload` now really
+  rebinds). The fake inverter and the dashboard trade their custom serve
+  knobs for the same knob — the fake's `--host`/`--port` and the
+  dashboard's `--bind`/`--port` retire for `--listen HOST:PORT`
+  (`$LISTEN`, live `system/listen`, hidden, restart-marked — the argv
+  defaults keep their addresses: `127.0.0.1:5502` and `127.0.0.1:8080`);
+  the dashboard's `set system listen` refuses a pending move beyond
+  loopback while the page serves tokenless (the F21 shape at set time).
+  The NixOS module options are `listenHost`/`listenPort` rendering one
+  `--listen` (the cache's shape), the docker CMDs and the compose
+  `LISTEN` env follow, and the MANUALs, the man pages, OPTIONS.md and the
+  drift census ride along.
+
 - **everywhere** — **the `dump-interval` knob is family-wide** (the cache
   was the only holder): the scraper, the fake inverter and the dashboard
   gain the cache's `dump-interval` — `--dump-interval`/`$DUMP_INTERVAL`,

@@ -54,9 +54,8 @@ compared two ways: the exact pass groups identical bodies (the
 copy-paste twins), the similarity pass pairs cross-file bodies over the
 0.72 ratio (the near-copies that already drifted).
 
-**The exact pass**: 1 duplicate group(s) in >= 2 files.
+**The exact pass**: 0 duplicate group(s) in >= 2 files.
 
-- 22L `_load_options`: `scraper/lib/options.py:34`, `dashboard/lib/options.py:34`
 
 **The similarity pass**: 50 cross-file pair(s) over the ratio
 floor (30 of them the man-page prose, per-tool by
@@ -64,21 +63,21 @@ design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
-| 1.00 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.96 | `scraper/lib/control.py:146` `command` <-> `dashboard/lib/control.py:88` `command` |
-| 0.94 | `scraper/lib/control.py:129` `command_help` <-> `dashboard/lib/control.py:221` `command_help` |
-| 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:278` `parse_args` |
-| 0.89 | `scraper/bin/modbus-scraper.py:237` `graceful_stop` <-> `dashboard/bin/dashboard.py:457` `graceful_stop` |
-| 0.86 | `cache/lib/control.py:96` `command` <-> `dashboard/lib/control.py:88` `command` |
+| 0.98 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
+| 0.96 | `scraper/lib/control.py:147` `command` <-> `dashboard/lib/control.py:90` `command` |
+| 0.94 | `scraper/lib/control.py:130` `command_help` <-> `dashboard/lib/control.py:223` `command_help` |
+| 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
+| 0.89 | `scraper/bin/modbus-scraper.py:242` `graceful_stop` <-> `dashboard/bin/dashboard.py:463` `graceful_stop` |
+| 0.86 | `cache/lib/control.py:96` `command` <-> `dashboard/lib/control.py:90` `command` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
-| 0.85 | `cache/lib/control.py:96` `command` <-> `scraper/lib/control.py:146` `command` |
-| 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:278` `parse_args` |
+| 0.85 | `cache/lib/control.py:96` `command` <-> `scraper/lib/control.py:147` `command` |
+| 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.83 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:34` `_load_options` |
-| 0.83 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.79 | `inverter/lib/control.py:140` `__init__` <-> `dashboard/lib/control.py:68` `__init__` |
-| 0.79 | `cache/bin/modbus-cache.py:371` `watch_dump` <-> `common/control.py:697` `run_dump_interval` |
+| 0.82 | `cache/bin/modbus-cache.py:372` `watch_dump` <-> `common/control.py:697` `run_dump_interval` |
+| 0.81 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
+| 0.80 | `inverter/lib/control.py:140` `__init__` <-> `dashboard/lib/control.py:68` `__init__` |
 | 0.78 | `inverter/lib/signals.py:30` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:544` `acl_table_report` <-> `dashboard/lib/control.py:512` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:551` `acl_table_report` <-> `dashboard/lib/control.py:525` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
 | 0.75 | `inverter/lib/control.py:68` `handle` <-> `common/control.py:245` `handle` |
 | 0.74 | `cache/lib/control.py:1028` `dump_state` <-> `common/control.py:634` `dump_state` |
@@ -171,22 +170,22 @@ by semantic family — the knob layer is the one source --help, the man
 pages, the set grammar, the NixOS modules and the README checks read,
 so a drifted row travels wide.
 
-**The shape**: 208 knob rows across the
-four registries; 24 names carry in all four:
+**The shape**: 209 knob rows across the
+four registries; 26 names carry in all four:
 
-`audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`
+`audit-files`, `audit-log`, `audit-max-mb`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
 
 **The tool-specific remainder** (by nature):
 
 | tool | only-there knobs |
 |---|---|
-| cache | `acl`, `allow-write`, `audit`, `audit-daily`, `audit/rotate`, `auth-key`, `auth-upstream`, `auth-upstream-key`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `listen`, `local-time`, `log-access`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `profile`, `read-delay`, `requests-audit`, `selection`, `system`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
-| scraper | `audit`, `audit/rotate`, `auth-key`, `auth-token`, `caps`, `grid-positive-import`, `interval`, `listen`, `local-time`, `log-access`, `max-grid-kw`, `max-kwp`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-offset`, `modbus-unit`, `profile`, `timeout`, `upstream` |
-| inverter | `allow-write`, `audit-daily`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `control-log-replies`, `grid`, `grid-frequency`, `grid-outage`, `grid-voltage`, `host`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `mppt`, `port`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
-| dashboard | `auth-token`, `bind`, `config-js`, `local-time`, `log-access`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `port`, `prom-prefix`, `static-dir`, `upstream` |
+| cache | `acl`, `allow-write`, `audit`, `audit-daily`, `audit/rotate`, `auth-key`, `auth-upstream`, `auth-upstream-key`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `local-time`, `log-access`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `profile`, `read-delay`, `requests-audit`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
+| scraper | `audit`, `audit/rotate`, `auth-key`, `auth-token`, `caps`, `grid-positive-import`, `interval`, `local-time`, `log-access`, `max-grid-kw`, `max-kwp`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-offset`, `modbus-unit`, `profile`, `timeout`, `upstream` |
+| inverter | `allow-write`, `audit-daily`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `control-log-replies`, `grid`, `grid-frequency`, `grid-outage`, `grid-voltage`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
+| dashboard | `auth-token`, `config-js`, `local-time`, `log-access`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
 **The shared knobs whose fields disagree** (9 of
-24):
+26):
 
 | knob | the drifted fields (cache / scraper / inverter / dashboard) |
 |---|---|
@@ -251,12 +250,6 @@ The findings:
   set-grammar space — legal (the registries are per-tool), but the
   merged-knob view (docs/OPTIONS.md) and any future family-wide
   grammar should note it.
-- **The `listen` naming map.** The cache's serve face is live
-  `system/listen` (restart-marked), the scraper's is
-  `metrics/listen` (its whole HTTP surface IS the metrics surface),
-  the dashboard binds via `bind`/`port` (no live name), the fake via
-  `host`/`port` (argv only). The meanings line up per tool; the
-  family lacks one word for "the address this daemon serves on".
 - **`KNOWN_VERBS` is hand-maintained.** The RBAC vocabulary lives as
   a Python tuple in each `lib/options.py` beside the registry that
   defines the same verbs as rows — two homes for one truth (the
@@ -369,6 +362,7 @@ The refusal texts (the literal SystemExit args, sorted):
 - `refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind 127.0.0.1:PORT`
 - `restart required (startup-only knob)`
 - `short response: function byte only`
+- `system/listen cannot move beyond loopback while the page serves without a token (F21 in docs/AUDIT.md) — pass auth-token by flag/env/config and restart`
 - `system/log-access must be on or off`
 - `the Waveshare password must be ASCII`
 - `the control connection closed without a bye`
@@ -449,7 +443,7 @@ LoadCredential pattern, not a knob):
 
 - cache: `unitId`
 - scraper: `listenHost`, `listenPort`
-- dashboard: `host`, `prometheusUrl`
+- dashboard: `listenHost`, `listenPort`, `prometheusUrl`
 
 The findings:
 
@@ -480,16 +474,16 @@ published port not backed by a registry default is a lie.
 | `docker/Dockerfile.prometheus` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `VOLUME` | — |
 | `docker/README.md` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CHAOS`, `CONFIG`, `CONFIG_JS`, `COPY`, `EDITOR`, `ENTRYPOINT`, `HEALTHCHECK`, `HMAC`, `HOST` … | 15502, 5502, 8080, 9350 |
 | `docker/demo/README.md` | `DEMO`, `HOST`, `JSON`, `PROM_URL`, `README`, `TSDB`, `UPSTREAM` | 8080, 9090 |
-| `docker/demo/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `BIND`, `DEMO`, `HMAC`, `JSON`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
+| `docker/demo/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
 | `docker/entrypoints/entrypoint-prometheus.sh` | `AUDIT`, `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
 | `docker/entrypoints/entrypoint.sh` | `AUDIT`, `JSON`, `README`, `REQUIRED` | — |
 | `docker/env/cache.env.example` | `AUTH`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `PORT`, `SERVER`, `UPSTREAM`, `WARNING` | — |
-| `docker/env/dashboard.env.example` | `AUTH_TOKEN`, `BIND`, `PLAIN`, `PROM_URL` | — |
+| `docker/env/dashboard.env.example` | `AUTH_TOKEN`, `LISTEN`, `PLAIN`, `PROM_URL` | — |
 | `docker/env/fake.env.example` | `CHAOS`, `MAX_KWP`, `PROFILE`, `SIGHUP`, `STRICT`, `TIME`, `TIME_SCALE` | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
 | `docker/env/scraper.env.example` | `AUTH_TOKEN`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `METRIC_PREFIX`, `PORT`, `UPSTREAM`, `VALUE`, `WARNING` | — |
 | `docker/prod/README.md` | `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `EDITOR`, `HOST`, `JSON`, `PORT`, `PROM_URL`, `README`, `UPSTREAM`, `YOUR` | 8080, 9350 |
-| `docker/prod/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `BIND`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `ONLY`, `PORT`, `PRODUCTION` … | 8080, 9350 |
+| `docker/prod/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `ONLY`, `PORT`, `PRODUCTION` … | 8080, 9350 |
 | `docker/prometheus.yml` | `AUDIT` | — |
 
 The findings:
@@ -525,10 +519,10 @@ list is the TODO seed, not a verdict.
 - inverter: `logout`
 - dashboard: every command exercised
 
-**The canon phrases no suite pins**: 23
+**The canon phrases no suite pins**: 22
 
 **The graduation path**: the seeds carry stable IDs in
-[docs/family-drift-seeds.json](family-drift-seeds.json) (43
+[docs/family-drift-seeds.json](family-drift-seeds.json) (42
 open promise(s), the suggested suite per seed); a test wave
 consumes entries, the regeneration drops them, the shrinkage is
 the wave's proof; `--check` fails when a NEW promise ships
@@ -595,7 +589,11 @@ paths whose values disagree, the only-there paths (the audit
 defaults, the caps, the grid constants the loaders wire via
 `static_defaults`).
 
-100 leaf paths; 13 in all four; 0 shared with differing values.
+97 leaf paths; 14 in all four; 1 shared with differing values.
+
+| key-path | per-tool values |
+|---|---|
+| `defaults.listen` | c: "127.0.0.1:15502" | s: "127.0.0.1:9350" | i: "127.0.0.1:5502" | d: "127.0.0.1:8080" |
 
 The findings:
 
@@ -628,7 +626,7 @@ shipped example re-parsed through the tool's own set-grammar reader
 | `cache/examples/selection.json` | json ok |
 | `scraper/examples/metrics.json` | json ok |
 | `scraper/examples/scraper.conf` | ok (18 setting line(s)) |
-| `dashboard/examples/server.conf` | ok (20 setting line(s)) |
+| `dashboard/examples/server.conf` | ok (19 setting line(s)) |
 
 The findings:
 
@@ -722,25 +720,18 @@ serves. Ordered by the user's exposure; the code plane rides along.
    proposal + the migration note (the alias map carries the old
    spellings one release).
 
-5. **The serve-address word** — the family answers one question with
-   one word: `show system listen` prints the address the daemon
-   serves on, everywhere. The cache's `system/listen` is the canon;
-   the scraper's `metrics/listen` stays as the alias; the fake's
-   `host`/`port` gain the live name (F11 keeps the argv defaults);
-   the dashboard's `bind`/`port` gain theirs.
-
-6. **`request/reload-config` family-wide** — the re-read-without-exec
+5. **`request/reload-config` family-wide** — the re-read-without-exec
    surface exists on the scraper and the dashboard; the cache gains
    it (its reload execs; a profile or selection edit deserves the
    lighter verb). The fake stays exempt — no config file, F11 — and
    the asymmetry gets the registry note.
 
-7. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
+6. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
    the RBAC vocabulary from the registry's command rows (the
    hidden/internal flags included). One home; the silent drift
    (a policy accepting a verb the grammar refuses) dies.
 
-8. **The accept-ladder extraction** — `common/modbus/server.py`: the
+7. **The accept-ladder extraction** — `common/modbus/server.py`: the
    gate -> ACL -> max-clients -> count -> thread discipline + the
    session opener (the clients register, the suite handshake, the
    `finally` unwind) with the malformed-frame policy hook (the
@@ -748,14 +739,14 @@ serves. Ordered by the user's exposure; the code plane rides along.
    identical refusal texts and logs at both Modbus faces; the code
    plane: the surface sweep's ~50-line net win.
 
-9. **The coverage TODOs graduate** — the seeds carry stable IDs in
+8. **The coverage TODOs graduate** — the seeds carry stable IDs in
     docs/family-drift-seeds.json (`family_drift.py --seeds`, the
     suggested suite per seed); a test wave consumes entries, the
     regeneration drops them, the shrinkage is the wave's proof, and
     `--check` fails when a NEW promise ships uncovered (the list may
     only shrink).
 
-10. **The parity gates wired** — the NixOS-parity and docker/env
+9. **The parity gates wired** — the NixOS-parity and docker/env
     sweeps join `check_options`/the release gates as machine checks
     (the module.nix type/default vs the registry, the env-file
     coverage vs the env twins). The drift doc's `--check` already

@@ -6,8 +6,22 @@ live once, so `--help` and the man page can never drift), the prose
 sections are roff text kept next to the tool, and `--man` prints the page
 to stdout (`modbus-cache --man | man -l -` works in a container with no man
 pages installed). scripts/gen_man.py regenerates the shipped man/*.1 files
-from the same builders. Stdlib only."""
+from the same builders. Stdlib only.
+
+The family's one section ladder per page class (the LADDERS table): a
+daemon page carries SIGNALS, CONTROL, SECURITY, ENVIRONMENT, FILES,
+EXIT STATUS (in that order) after OPTIONS, a ctl page EXAMPLES,
+ENVIRONMENT, EXIT STATUS, a cli page ENVIRONMENT, EXIT STATUS —
+page(kind=...) asserts the page conforms, so a missing, extra or
+misordered section fails the build instead of shipping."""
 import textwrap
+
+LADDERS = {
+    'daemon': ('SIGNALS', 'CONTROL', 'SECURITY', 'ENVIRONMENT', 'FILES',
+               'EXIT STATUS'),
+    'ctl': ('EXAMPLES', 'ENVIRONMENT', 'EXIT STATUS'),
+    'cli': ('ENVIRONMENT', 'EXIT STATUS'),
+}
 
 
 def esc(text):
@@ -65,10 +79,25 @@ def options_section(parser, skip=('-h', '--help', '--man')):
 
 
 def page(name_tail, name, section, date, source, manual, synopsis, description,
-         options, extra_sections=(), see_also=None):
+         options, extra_sections=(), see_also=None, kind=None):
     """The whole roff page: .TH, .SH NAME (the name + the name_tail one-liner),
     .SH SYNOPSIS, .SH DESCRIPTION, the .SH OPTIONS blocks (from
-    options_section), the extra .SH sections (raw roff pieces), .SH SEE ALSO."""
+    options_section), the extra .SH sections (raw roff pieces), .SH SEE ALSO.
+    kind ('daemon' | 'ctl' | 'cli') gates the page against its LADDERS entry:
+    every extra section must open with .SH and the whole set must match the
+    class ladder exactly (the family's one shape; prose stays per-tool, the
+    ladder does not)."""
+    heads = []
+    for piece in extra_sections:
+        head = piece.split('\n', 1)[0]
+        if not head.startswith('.SH '):
+            raise ValueError('%s: an extra section must open with .SH, got %r'
+                             % (name, head[:40]))
+        heads.append(head[4:].strip())
+    if kind is not None and tuple(heads) != LADDERS[kind]:
+        raise ValueError('%s: the %s page carries %s, the ladder is %s'
+                         % (name, kind, ', '.join(heads) or 'no sections',
+                            ', '.join(LADDERS[kind])))
     out = [
         '.TH %s %s "%s" "%s" "%s"' % (name.upper(), section, date, source, manual),
         '.SH NAME',

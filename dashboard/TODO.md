@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The secrets-startup-only wave: every secret row (auth-token,
+control-token, control-ops-token, metrics-token, dump-key) is
+`restart`-marked and the wire refuses set/unset on it with the dump-key
+answer — the page-token off/rotate dance and the tokenless-rebind-then-
+tokenize flow respawn tokenized instances now; `help config` and
+OPTIONS.md render the startup-only recipe.
+
 The man-ladder wave: the page runs the family's one daemon ladder — it
 gains ENVIRONMENT (the flags' twins, `PROM_URL` named as the upstream's)
 and EXIT STATUS (the unified three-code block, the failed-bind rc 1

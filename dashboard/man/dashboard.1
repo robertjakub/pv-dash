@@ -223,9 +223,9 @@ configured and refuses to start without one). Commands:
 \fBset\fR/\fBunset\fR/\fBshow\fR/\fBhelp\fR (the settings: max-clients,
 client-timeout, max-conn-per-ip, log-access, log-queries,
 log-level, metrics acl \(em the /metrics IP gate at accept, the table
-show \fBshow metrics acl table\fR \(em and the token lives: control token,
-the ops token,
-metrics token, each rotating live, the value never rendering \(em
+show \fBshow metrics acl table\fR \(em and the startup-only secrets:
+control token, the ops token, metrics token \(em the wire refuses
+set/unset, the value never rendering \(em
 \fBshow <secret>\fR refuses), \fBshow connections\fR
 (the live HTTP clients), \fBshow version\fR, \fBshow knobs\fR
 (the dictionary of the registry), \fBinspect\fR,

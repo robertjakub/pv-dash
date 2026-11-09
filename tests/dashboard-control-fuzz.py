@@ -430,15 +430,21 @@ def main():
         r = page_get(PAGES_PORT, b'/config.js', b'Authorization: Bearer wrong\r\n')
         check('page auth: a wrong bearer is a 401', r.startswith(b'HTTP/1.1 401'), r[:40])
         st, tx = roundtrip(PAGES_CTL, signed('set auth token off'))
-        check('page auth: the live off on the loopback bind', st == 'ok' and 'auth/token=off' in tx, '%s %s' % (st, tx))
-        r = page_get(PAGES_PORT, b'/config.js')
-        check('page auth: the loopback endpoint serves tokenless after the off', r.startswith(b'HTTP/1.1 200'), r[:40])
+        check('page auth: startup-only — the off refuses (the dump/key treatment)',
+              st == 'fail' and 'restart required (startup-only knob)' in tx, '%s %s' % (st, tx))
         st, tx = roundtrip(PAGES_CTL, signed('set auth token ptok2'))
-        check('page auth: the token rotates live', st == 'ok' and 'auth/token=<set>' in tx, '%s %s' % (st, tx))
-        r = page_get(PAGES_PORT, b'/config.js', b'Authorization: Bearer ptok2\r\n')
-        check('page auth: the rotated token reads', r.startswith(b'HTTP/1.1 200'), r[:40])
+        check('page auth: startup-only — the rotation refuses too',
+              st == 'fail' and 'restart required (startup-only knob)' in tx, '%s %s' % (st, tx))
         r = page_get(PAGES_PORT, b'/config.js', b'Authorization: Bearer ptok\r\n')
-        check('page auth: the old token is a 401', r.startswith(b'HTTP/1.1 401'), r[:40])
+        check('page auth: the configured token still reads (no live rotation)', r.startswith(b'HTTP/1.1 200'), r[:40])
+        # the tokenless loopback page serves (the bind is the auth — the F21 shape)
+        procs.append(subprocess.Popen([sys.executable, P, '--port', '15980', '--bind', '127.0.0.1',
+                                       '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
+                                       '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js')],
+                                      stdout=open('/tmp/dash_ctl_fuzz_tokless.log', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(1.2)
+        r = page_get(15980, b'/config.js')
+        check('page auth: the tokenless loopback page serves', r.startswith(b'HTTP/1.1 200'), r[:40])
 
         # 8c. the control listener family (the cache's, family-wide): the
         #     live rebind — the tokenless TCP rebind refuses on the live
@@ -476,21 +482,28 @@ def main():
         check('family listener: the show verb still refuses the secret', tx.startswith('% error') and 'is a secret' in tx,
               tx[:140])
         tx = rctl('set control token rtok2')
-        check('family listener: the token rotates in live (the instance was tokenless)', tx.startswith('ok control/token=<set>'),
-              tx[:120])
-        tx = rctl('set control port %d' % REB_TCP)
+        check('family listener: startup-only — the token set refuses (the instance stays tokenless)',
+              tx.startswith('% error: restart required (startup-only knob)'), tx[:120])
+        # the token'd rebind: a spawned-token instance (the token is startup-only)
+        procs.append(subprocess.Popen([sys.executable, P, '--port', '15981', '--bind', '127.0.0.1',
+                                       '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
+                                       '--audit-log', '-', '--control-port', '15982',
+                                       '--control-token', 'rtok2'],
+                                      stdout=open('/tmp/dash_ctl_fuzz_rebind2.log', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(1.2)
+        tx = rctl('set control port %d' % REB_TCP, port='15982', token='rtok2')
         check('family listener: the tokenized TCP rebind succeeds', tx.startswith('ok control/port=127.0.0.1:%d' % REB_TCP),
               tx[:120])
-        tx = rctl('show version', port=reb_sock)
-        check('family listener: the retired unix socket no longer answers', tx == '', tx[:120])
+        tx = rctl('show version', port='15982')
+        check('family listener: the retired control port no longer answers', tx == '', tx[:120])
         tx = rctl('show version', port=str(REB_TCP), token='rtok2')
-        check('family listener: the new TCP port speaks (signed with the rotated token)',
+        check('family listener: the new TCP port speaks (signed with the token)',
               tx.startswith('ok dashboard'), tx[:120])
         tx = rctl('unset control port', port=str(REB_TCP), token='rtok2')
         check('family listener: unset restores the configured target',
-              tx.startswith('ok control/port=unix:%s' % reb_sock), tx[:120])
-        tx = rctl('show version', token='rtok2')
-        check('family listener: the restored socket speaks', tx.startswith('ok dashboard'), tx[:120])
+              tx.startswith('ok control/port=127.0.0.1:15982'), tx[:120])
+        tx = rctl('show version', port='15982', token='rtok2')
+        check('family listener: the restored port speaks', tx.startswith('ok dashboard'), tx[:120])
 
         # 8b. the metrics/acl gate (the cache's logic, the dashboard's
         # surface): the accept-time IP gate on the /metrics listener — the

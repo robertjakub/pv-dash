@@ -182,7 +182,7 @@ python3 bin/dashboard-cli.py                        # the console: TAB completio
 
 | Command | Effect |
 |---|---|
-| `set` / `unset` | the live settings: the caps, `log-access`, `log-queries`, `log-level`, the tokens (`control token`, `control ops token`, `metrics token` rotate live; a value never renders back), `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` |
+| `set` / `unset` | the live settings: the caps, `log-access`, `log-queries`, `log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — the tokens (`control token`, `control ops token`, `metrics token`, `auth token`) are startup-only: the wire refuses set/unset, pass them by flag/env/config |
 | `show <setting>` / `show knobs` / `show connections` | the value / the registry / the live HTTP clients per peer IP |
 | `inspect` | the one-page dump for a bug report |
 | `request reload-config` | re-read `server.conf` (the SIGHUP path; the listen address and port are bound and stay) |

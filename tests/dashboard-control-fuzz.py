@@ -325,6 +325,34 @@ def main():
         check('ops: both roles audited (role=ops show, role=admin set, the denials included)',
               "role=ops 'show version'" in aud and "role=admin 'set log-level DEBUG'" in aud
               and "role=ops 'shutdown'" in aud and '-> err' in aud, aud[-300:])
+
+        # the query log: the admin switch flips the page handler's logger
+        # level — on, a proxied query logs at info; off, it sinks to debug
+        import urllib.request, urllib.error
+        def query_lines():
+            return [l for l in open('/tmp/dash_ctl_fuzz_ops.log').read().splitlines()
+                    if 'GET /prom/metrics ->' in l]
+        st, tx, macok = ops_roundtrip('set log-queries on', token='admintok2')
+        check('log-queries: the admin switches it on', st == 'ok' and macok, '%s %s' % (st, tx))
+        try:
+            urllib.request.urlopen('http://127.0.0.1:%d/prom/metrics' % OPS_HTTP_PORT, timeout=5)
+        except (urllib.error.HTTPError, urllib.error.URLError):
+            pass                     # any status logs the line; the prom leg may wobble
+        time.sleep(0.5)
+        lines = query_lines()
+        check('log-queries: the proxied query logs at info', lines and 'INFO' in lines[-1],
+              repr(lines[-1] if lines else 'no GET line in the daemon log'))
+        st, tx, macok = ops_roundtrip('set log-queries off', token='admintok2')
+        check('log-queries: the admin switches it off', st == 'ok' and macok, '%s %s' % (st, tx))
+        try:
+            urllib.request.urlopen('http://127.0.0.1:%d/prom/metrics' % OPS_HTTP_PORT, timeout=5)
+        except (urllib.error.HTTPError, urllib.error.URLError):
+            pass
+        time.sleep(0.5)
+        lines = query_lines()
+        check('log-queries: off sinks the line to debug', lines and 'DEBUG' in lines[-1],
+              repr(lines[-1] if lines else 'no GET line in the daemon log'))
+
         r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
                             '--control-port', str(OPS_CTRL_PORT), '--control-token', OPS_TOKEN,
                             'show', 'version'], capture_output=True, text=True, timeout=15)

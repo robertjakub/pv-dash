@@ -12,6 +12,20 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Added
 
+- **common** — **the audit trail forwarding** (`--audit-forward syslog`):
+  every trail can mirror its lines to the local syslog socket as they
+  land — stdlib `SysLogHandler` on `/dev/log` (or its macOS/journal
+  siblings), daemon facility, the bin name as the tag, journald picking
+  every line up sealed. The F10 answer, built in: the file sink stays the
+  authority (the chain lives there — `scripts/audit_verify.py` walks it
+  unchanged), the mirror carries the finished line with its hash, a send
+  failure stops the mirroring with one stderr note, and a socket-less
+  spelling refuses to start with the family's one-clean-ERROR shape. The
+  knob is family-wide (`audit/forward`, live: `set audit forward syslog`,
+  `$AUDIT_FORWARD`, the dump/reload story carries it, the ctl/cli clients
+  take the flag too), the NixOS modules grew `auditForward`, and the
+  audit-chain suite pins the mirror, the fail-stop and the refusals.
+
 - **common** — **the flat package organizes into functional subdirs**: the
   17 flat modules split into five subpackages beside the existing
   `modbus/` — `render/` (the static texts + JSON, the man-page builder,

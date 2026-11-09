@@ -1,4 +1,4 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 25)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 26)
 
 Scope: the `cache/`, `scraper/`, `inverter/` and `dashboard/` subprojects plus
 the shared `common/` package, `profiles/`, `docker/` and `scripts/`. Method:
@@ -12,6 +12,21 @@ its risk class is "developer/demo infrastructure", not production OT;
 findings there are weighted accordingly. Findings keep their numbers across
 revisions; open ones are in §3.1, closed ones in §3.2 with their fix and
 verification in [AUDIT-history.md](AUDIT-history.md) (next number: F24).
+
+**Rev. 26 — the audit trail forwarding (the F10 follow-through).** The
+chain is tamper-EVIDENT, not tamper-PROOF — trailing deletion and a
+rechain by whoever holds the algorithm stay outside its reach, and
+journald forwarding was named the strong answer. It is built in now:
+every audit trail takes `--audit-forward syslog` (`audit/forward` live,
+`$AUDIT_FORWARD`, the ctl/cli clients too), mirroring every finished
+line — the per-writer hash chain included — to the local syslog socket
+(`FailLoudSysLogHandler` on `/dev/log` or its siblings, daemon facility,
+the bin name as the tag; journald picks the lines up sealed). The sink
+stays the authority: a send failure stops the mirroring with one stderr
+note, never the trail; a socket-less spelling refuses to start (the
+clean ERROR + rc 1 shape). The file rotation and the journal retention
+together close the retention/immutability story (NIS2 21.2(b), DORA
+art. 11 — the logs an incident needs survive the box).
 
 **Rev. 25 — the alert rules pack (F16 closed).** The exporter ships
 `scraper/alerts.yml` next to itself: six alerts in two groups — the
@@ -53,7 +68,7 @@ trust of their own.
 | state dump | `--dump-path`: the setting overrides (plus the cached words on `with-cache`) as one atomic JSON | n/a | n/a | n/a | created `0600` explicitly + a sha256 integrity hash, fail-closed restore (F18); sealed under `dump/key` when set (rev. 11) |
 | token files | every secret knob takes `file:<path>` | same | same | same | owner-only (0600) enforced at the shared loader (F12); the bare `-file` siblings removed rev. 13 |
 | upstream connection | outbound to the inverter/SDongle | outbound poll (the device or the cache), every 10 s by default | n/a (it *is* the device) | outbound HTTP to Prometheus (`--upstream`, default `http://localhost:9090`) | none (protocol-inherent) |
-| audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `scripts/audit_verify.py` (F10) |
+| audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `scripts/audit_verify.py` (F10); the opt-in syslog forward mirrors every line to journald (rev. 26) |
 | compose demo stack | four services on one `internal: true` network, **nothing published on the host**, one shared `config` volume, the generated 0600 `metrics.token` | | | | the internal network is the boundary; the exporter bearer-gated in the demo (F7) |
 
 Deployment (docker/): all three Modbus images run the tool as the

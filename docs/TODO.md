@@ -112,10 +112,6 @@ only the **Done/history** records for their tool —
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a
   proxy-less LAN install defensible: the bearer token stops travelling in
   clear text. The Modbus side stays F1 (accepted, protocol-inherent).
-- **the audit trail forwarding** `[common]` — F10's strong answer as an
-  option: `--audit-forward syslog` (stdlib `SysLogHandler`, journald picks
-  it up sealed) next to the file/stdout sinks; the hash chains + the
-  forwarding together close the retention/immutability story properly.
 - **the systemd unit hardening review** `[common]` — the NixOS modules
   ship `PrivateTmp`; a full sandbox pass (`ProtectSystem=strict`,
   `PrivateDevices`, `ProtectHome`, `RestrictAddressFamilies`,

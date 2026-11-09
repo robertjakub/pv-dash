@@ -163,7 +163,7 @@ the config names one and the start refuses. The flags:
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the pins, the machines — the tokens apart; every `--dump-interval` seconds) |
 | `--chaos` / `--seed` | `0` / random | the chaos probability / the RNG seed — see [Chaos injection](#chaos-injection---chaos) |
 | `--strict` | off | reject undefined registers with exception 02 |
-| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`) | XDG state | the audit trail: a file path or `-` for stdout (`$AUDIT_LOG` / `$AUDIT_MAX_MB` / `$AUDIT_DAILY` / `$AUDIT_FILES` / `$NO_AUDIT_LOG`) |
+| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward syslog`) | XDG state | the audit trail: a file path or `-` for stdout (`$AUDIT_LOG` / `$AUDIT_MAX_MB` / `$AUDIT_DAILY` / `$AUDIT_FILES` / `$NO_AUDIT_LOG` / `$AUDIT_FORWARD`); the syslog forward mirrors every line to journald (F10) |
 | `--config` / `--log-level` / `--man` | `inverter.conf` / `INFO` / off | the config script (the set grammar, above) / the log surface / print the generated man page |
 
 `SIGHUP` re-applies the **environment layer** (all-or-nothing — flags are
@@ -322,7 +322,11 @@ docker logs / journald way — the shipped Dockerfile runs with it). The
 rotation rides the family knobs: the size trigger (`--audit-max-mb`, the
 backups kept `--audit-files`) and the UTC-midnight trigger
 (`--audit-daily` — live on this tool too: `set audit rotate daily on/off`);
-the env twins spell the same names upper-snake. The
+the env twins spell the same names upper-snake. `--audit-forward syslog`
+mirrors every line — the per-writer hash chain included — to the local
+syslog socket, journald's sealed external copy beside the file/stdout
+sink (the F10 answer).
+The
 prefix names the writer — `INV` (the fake), `CLI`, `CTL`:
 
 ```

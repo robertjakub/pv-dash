@@ -185,6 +185,14 @@ presents and the client ACL checked at accept
 | `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | require Authorization: Bearer \<token> on the /metrics endpoint (the same scheme the scraper speaks) — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
 
+### audit
+
+the INV audit trail: the sink, the forwarding, the rotation, the kill switch
+
+| knob | set / unset | kind | value | flag / env | description |
+|---|---|---|---|---|---|
+| `audit-forward` | `set audit forward` | settable | `syslog\|none` | `--audit-forward` / `AUDIT_FORWARD` | also mirror every audit line to the local syslog (journald picks them up, chain hash included) |
+
 ### audit/rotate
 
 the audit trail's rotation: the size trigger, the UTC-midnight trigger and

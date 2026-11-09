@@ -44,6 +44,10 @@ reads the first line of an owner\-only 0600 file
 .B \-\-audit\-log
 audit trail: a file path or \- for stdout; the XDG state home when unset
 .TP
+.B \-\-audit\-forward
+also mirror every audit line to the local syslog socket (journald picks
+it up)
+.TP
 .BI \-\-audit\-max\-mb " N"
 rotate the audit log at this size, 0 = off
 .TP

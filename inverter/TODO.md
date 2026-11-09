@@ -5,6 +5,17 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The audit forwarding (`--audit-forward syslog`, the F10 follow-through):
+the INV trail can mirror every line — the per-writer hash chain
+included — to the local syslog socket as it lands, journald picking them
+up sealed: the journal copy survives the box, the sink stays the
+authority. The machinery is shared (`common/runtime/audit.py`), the row
+is live on the wire (`set audit forward syslog`, live `audit/forward`,
+env `AUDIT_FORWARD`), a socket-less spelling refuses to start with the
+family's one-clean-ERROR shape, and `set audit rotate daily` rebuilds
+the running writer now (it updated the params but not the writer
+before).
+
 The config-file wave: the fake takes the family's set-grammar config
 (`--config`/`$CONFIG`, then `inverter.conf` next to the script; the
 bundled sample `examples/inverter.conf`) — `inverter/lib/config.py`

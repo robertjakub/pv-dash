@@ -32,6 +32,7 @@ from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
 from .signals import parse_time
 from common.settings.dump import SECRET_REMOVED, dump_filter
+from common.runtime.audit import AUDIT_FORWARD_CHOICES
 from common.runtime.version import version_string
 from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, \
     SHOW_OPTIONS, NODE_BY_NAME, KNOWN_VERBS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
@@ -395,7 +396,14 @@ class ControlServer(_ControlServer):
             else:
                 raise ValueError('audit/rotate/daily must be on or off')
             self.audit_params['daily'] = on
+            self._rebuild_audit()
             return 'on' if on else 'off'
+        if key == 'audit/forward':
+            if val not in AUDIT_FORWARD_CHOICES:
+                raise ValueError('audit/forward must be one of %s' % ', '.join(AUDIT_FORWARD_CHOICES))
+            self.audit_params['forward'] = None if val == 'none' else val
+            fresh = self._rebuild_audit()
+            return val if val == 'none' else (fresh or 'syslog')
         if key == 'scenario':
             if val == 'custom':
                 sim.freeze(None)
@@ -537,6 +545,8 @@ class ControlServer(_ControlServer):
             return str(fake.conn_gate.max_per_ip) if fake else '?'
         if key == 'audit/rotate/daily':
             return 'on' if self.audit_params['daily'] else 'off'
+        if key == 'audit/forward':
+            return self.audit_params.get('forward') or 'none'
         if key == 'connect-acl':
             return acl_text(fake.connect_acl) if fake else '?'
         if key == 'write/allow':
@@ -834,6 +844,7 @@ class ControlServer(_ControlServer):
             'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
             'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control/socket-group': 'on' if self.socket_group else 'off',
+            'audit/forward': self.audit_params.get('forward') or 'none',
         }
         for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
             if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:

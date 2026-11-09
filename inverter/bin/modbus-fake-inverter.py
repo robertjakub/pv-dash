@@ -278,12 +278,14 @@ def main():
     try:
         audit = None if args.no_audit_log else AuditLog(args.audit_log, 'INV', app='fake-inverter',
                                                         max_mb=args.audit_max_mb,
-                                                        daily=args.audit_daily, files=args.audit_files)
+                                                        daily=args.audit_daily, files=args.audit_files,
+                                                        forward=args.audit_forward)
     except ValueError as e:
         logger.error(str(e))
         raise SystemExit(1)
     audit_params = {'path': args.audit_log, 'max_mb': args.audit_max_mb,
                     'files': args.audit_files, 'daily': args.audit_daily,
+                    'forward': None if args.audit_forward in (None, '', 'none') else args.audit_forward,
                     'disabled': bool(args.no_audit_log)}
     if args.dry_run:
         mode = 'static values' if args.static else (

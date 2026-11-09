@@ -137,6 +137,8 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile.prometheus
+      additional_contexts:
+        alerts: ../../scraper
     image: prometheus
     env_file:
       - path: ../env/prometheus.env

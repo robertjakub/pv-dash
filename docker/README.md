@@ -313,11 +313,15 @@ The demo stack's collector — alpine + the prometheus package, no
 python. Production brings its own collector (the prod stack ships
 none) — this image is the reference wiring for pulling the exporter's
 `/metrics` with the bearer token. The context is the `docker/`
-directory itself:
+directory itself; the **alert rules pack** rides in as the `alerts`
+build context (the exporter's `scraper/alerts.yml`, baked to
+`/etc/prometheus/alerts.yml` — the pack's `rule_files:` entry is in
+`prometheus.yml`):
 
 ```bash
 cd docker
-docker build -t prometheus -f Dockerfile.prometheus .
+docker build -t prometheus -f Dockerfile.prometheus \
+    --build-context alerts=../scraper .
 ```
 
 Compose-only by design: it mounts the shared `config` volume (read-only)

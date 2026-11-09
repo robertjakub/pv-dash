@@ -1880,6 +1880,32 @@ try:
           and 'integrity' in r, r[:120])
     r = sctl('unset dump/path', 15597)
     check('scraper control: the dump path unset back to off', r.startswith('ok dump/path=off'), r[:80])
+    # 6b-4c. the dump-interval (the family knob, the cache's golden shape):
+    #        the set/show/describe gate on the dump path, the dumper loop
+    #        rewrites the file on the timer (the thread parks while off)
+    r = sctl('show dump-interval', 15597)
+    check('scraper control: show dump-interval without a path is a clean err',
+          r.startswith('fail dump-interval needs a dump path'), r[:90])
+    r = sctl('help dump-interval', 15597)
+    check('scraper control: describe dump-interval without a path is a clean err',
+          r.startswith('fail dump-interval needs a dump path'), r[:90])
+    r = sctl('set dump-interval 5', 15597)
+    check('scraper control: set dump-interval without a path is a clean err',
+          r.startswith('fail dump-interval needs a dump path'), r[:90])
+    r = sctl('set dump/path /tmp/scr_regtest_state.json', 15597)
+    check('scraper control: the dump path set for the interval loop', r.startswith('ok dump/path='), r[:80])
+    r = sctl('set dump-interval 2', 15597)
+    check('scraper control: the interval set live', r.startswith('ok dump-interval=2.00s'), r[:80])
+    r = sctl('show dump-interval', 15597)
+    check('scraper control: the interval shows', r == 'ok dump-interval=2.00s', r[:80])
+    m1 = os.path.getmtime('/tmp/scr_regtest_state.json')
+    time.sleep(2.6)
+    m2 = os.path.getmtime('/tmp/scr_regtest_state.json')
+    check('scraper control: the dumper rewrote the file on the timer', m2 > m1, '%.2f -> %.2f' % (m1, m2))
+    r = sctl('set dump-interval off', 15597)
+    check('scraper control: the interval off again', r.startswith('ok dump-interval=off'), r[:80])
+    r = sctl('unset dump/path', 15597)
+    check('scraper control: the dump path unset back to off again', r.startswith('ok dump/path=off'), r[:80])
     # 6b-4b. the sealed dump (the DUMP_KEY env twin): the state rides encrypted,
     #        the restore fails closed without the key (the restart matrix lives
     #        in the inverter and cache regtests — the same open_dump gate)
@@ -2112,8 +2138,8 @@ try:
              if line.strip() and not line.strip().startswith('[')]
     check("scraper_ctl: the bare show mimics the ? output (the walk's first position)",
           r.returncode == 0 and words == ['audit', 'caps', 'config', 'connections', 'control', 'dump',
-                                          'inputs', 'knobs', 'local-time', 'log-access', 'log-level', 'metrics',
-                                          'modbus', 'version'],
+                                          'dump-interval', 'inputs', 'knobs', 'local-time', 'log-access',
+                                          'log-level', 'metrics', 'modbus', 'version'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'show', 'control', 'ops'], capture_output=True, text=True, timeout=15)

@@ -193,7 +193,7 @@ set log-level INFO
 | `--control-token` / `--control-ops-token` | off | the control tokens (a TCP control port refuses to start without the admin token, F5); `file:<path>` welcome |
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy |
 | `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
-| `--dump-path` / `--dump-key` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`) |
+| `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
 | `--audit-log` (+ `--audit-max-mb`, `--audit-files`, `--no-audit-log`) | XDG state | the SCR audit trail: a file path or `-` for stdout (the docker/journald way) |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (overflow gets an immediate `503 # rate limited`) |
 | `--log-level` / `--log-access` / `--local-time` | `INFO` / off / UTC | the log surface |
@@ -254,7 +254,7 @@ command, settable (`set`/`unset`) or show-only — is tabled in
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |
 | `request restart` | the Modbus session drops; the next poll reconnects |
 | `request reload` | the whole-daemon restart that keeps the sets: the live overrides save to `<config>.reload`, the process re-execs and re-applies them once (overridden secrets save as `*** SECRET REMOVED ***`, the reply names them) |
-| `request dump` / `request restore` | the state dump (`--dump-path`): the live overrides as one `0600` JSON with an integrity hash; `--dump-key` seals it |
+| `request dump` / `request restore` | the state dump (`--dump-path`): the live overrides as one `0600` JSON with an integrity hash; `--dump-key` seals it; the `--dump-interval` loop rewrites it live |
 | `inspect` / `show version` / `show knobs` | the one-page dump for a bug report / the version / the knob registry |
 | `shutdown` | gracefully stop the exporter |
 

@@ -113,7 +113,7 @@ class ControlServer(_ControlServer):
     def __init__(self, scraper, httpd, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None,
                  config_path=None, dump_path=None, restore_on_start=False, dump_key=None,
-                 audit_params=None):
+                 audit_params=None, dump_interval=0.0):
         self.scraper = scraper
         self.httpd = httpd
         self.metrics_acl_warn = None   # the metrics/acl file's permission warning (the stash, None = no warning standing)
@@ -121,7 +121,8 @@ class ControlServer(_ControlServer):
         super().__init__(target, reloader=reloader, stopper=stopper, audit=audit, token=token,
                          defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
                          ops_token=ops_token, ops_verbs=ops_verbs, config_path=config_path,
-                         dump_path=dump_path, restore_on_start=restore_on_start, dump_key=dump_key)
+                         dump_path=dump_path, restore_on_start=restore_on_start, dump_key=dump_key,
+                         dump_interval=dump_interval)
 
     def _after_restore(self):
         self.scraper.wake.set()   # the poll loop re-reads the config-driven knobs now
@@ -162,6 +163,8 @@ class ControlServer(_ControlServer):
                 return 'ok %s' % COMMAND_HELP[path]
             key, rest = match_setting_path(args, SETTING_BY_NAME)
             if key is not None and not rest:
+                if key == 'dump-interval' and not self.dump_path:
+                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
                 return 'ok %s' % describe_setting(key)
             if path in NODE_BY_NAME:
                 return 'ok %s' % describe_node(OPTIONS, path)
@@ -246,6 +249,8 @@ class ControlServer(_ControlServer):
                 word = SHOW_BY_LIVE.get(key)
                 if word:
                     return self.command('show ' + word)   # a show command's report, by its word
+                if key == 'dump-interval' and not self.dump_path:
+                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
                 return 'ok %s=%s' % (key, self._get(key))
             if key is not None and rest:
                 return 'err %s: unexpected %s' % (key, ' '.join(rest))
@@ -470,6 +475,22 @@ class ControlServer(_ControlServer):
             if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
                 os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
             return 'on' if on else 'off'
+        if key == 'dump-interval':
+            if not self.dump_path:
+                raise ValueError('dump-interval needs a dump path (set dump/path or --dump-path)')
+            if val in ('off', 'none', '0'):
+                self.dump_interval = 0
+                with s.lock:
+                    s.cfg['dump_interval'] = 0
+                self.dump_wake.set()
+                return 'off'
+            v = num(val, 'dump-interval', 'seconds or off')
+            self._gate_range(key, v, 'seconds')
+            self.dump_interval = v
+            with s.lock:
+                s.cfg['dump_interval'] = v
+            self.dump_wake.set()
+            return secs(v)
         if key == 'dump/path':
             if val in ('off', 'none', ''):
                 self.dump_path = None
@@ -604,6 +625,8 @@ class ControlServer(_ControlServer):
             return cfg['metrics_spec'] or 'off'
         if key == 'dump/path':
             return self.dump_path or 'off'
+        if key == 'dump-interval':
+            return 'off' if not cfg['dump_interval'] else secs(cfg['dump_interval'])
         # the generic path: a registry row with a typed conv reads its
         # config key with no branch at all; a bool row renders on/off
         opt = OPTION_BY_LIVE.get(key)
@@ -667,6 +690,7 @@ class ControlServer(_ControlServer):
             'audit/disable': 'on' if self.audit_params['disabled'] else 'off',
             'dump/path': self.dump_path or 'off',
             'dump/restore-on-start': 'on' if self.dump_restore else 'off',
+            'dump-interval': self.dump_interval,
         }
         for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
             if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:

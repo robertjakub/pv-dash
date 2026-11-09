@@ -82,7 +82,8 @@ configured (\\fB--dump-path\\fR): \\fBrequest dump\\fR / \\fBrequest
 restore\\fR (the overrides as one 0600 integrity-hashed JSON;
 \\fB--dump-key\\fR seals it \\(em the state rides encrypted, a restore
 refuses a wrong or missing key; \\fB--restore-on-start\\fR loads it at
-start), \\fBrequest restart\\fR, \\fBshutdown\\fR,
+start, \\fB--dump-interval\\fR rewrites it on a timer),
+\\fBrequest restart\\fR, \\fBshutdown\\fR,
 \\fBquit\\fR. See
 .BR modbus-scraper-ctl (1)
 and

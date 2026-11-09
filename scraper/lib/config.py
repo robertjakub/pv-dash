@@ -81,6 +81,12 @@ def validate_config(cfg):
     for key in ('timeout', 'interval', 'max_kwp', 'max_grid_kw', 'client_timeout'):
         if not math.isfinite(cfg[key]):
             fail(key, 'must be a finite number (nan/inf are nonsense here)')
+    if cfg['dump_interval'] < 0:
+        fail('dump_interval', 'must be >= 0 (0 = off)')
+    if not math.isfinite(cfg['dump_interval']):
+        fail('dump_interval', 'must be a finite number (nan/inf are nonsense here)')
+    if cfg['dump_interval'] and not cfg['dump_path']:
+        fail('dump_interval', 'needs dump_path set (there is nothing to dump into)')
     if cfg['timeout'] > cfg['interval']:
         logger.warning('timeout (%gs) > interval (%gs): one poll can take longer than the poll '
                        'interval; the loop simply runs back-to-back', cfg['timeout'], cfg['interval'])
@@ -286,6 +292,8 @@ def resolve_config(args, script_dir=None):
     cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', None, str)
     cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
                                             None, str) or '').strip() or None, 'dump/key')
+    cfg['dump_interval'] = resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
+                                   'dump_interval', 0.0, float)
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
                                       'restore_on_start', False, str_to_bool)
     cfg['listen'] = cfg['listen'].strip()

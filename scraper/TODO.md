@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The dump-interval wave (the family unification, the cache as the golden
+master): the scraper gains the cache's `dump-interval` knob —
+`--dump-interval`/`$DUMP_INTERVAL`, live as `set dump-interval
+<s|off>` — the write-behind rewrites the state dump on a timer (the
+shared dumper loop on the control base parks while the interval is off,
+a live set wakes it without a restart); a set/show/describe without a
+dump path answers the family's `dump-interval needs a dump path` error,
+the start resolve refuses an interval without a dump path, and the
+SIGHUP/`request reload-config` path re-reads the configured interval.
+
 The secrets-startup-only wave: every secret row (auth-key, control-token,
 control-ops-token, auth-token, dump-key) is `restart`-marked and the wire
 refuses set/unset on it with the dump-key answer — the live rotation

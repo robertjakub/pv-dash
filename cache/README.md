@@ -215,7 +215,9 @@ A JSON-lines control server runs **by default on the unix socket
 `/tmp/modbus-cache-<listen-port>.socket`** — pass a TCP port number to bind
 `127.0.0.1:PORT` instead, or `0` to switch it off. Both the proxy and the
 CLI tool resolve the target the same way: flag > the **`CTL`** environment
-variable > the default socket.
+variable > the default socket. Every command and knob the wire answers —
+command, settable (`set`/`unset`) or show-only — is tabled in
+[MANUAL.md](MANUAL.md) (generated from the registry).
 
 One command per line, one reply per line: `{"cmd": …}` →
 `{"status": "ok|fail|bye", "text": …}`. With `--control-token` set,

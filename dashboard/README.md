@@ -168,7 +168,9 @@ configured the wire is HMAC-signed). Over the unix socket a trusted peer
 handshake (`SO_PEERCRED`). The **read-only ops token**
 (`--control-ops-token`) authenticates into the `show` verbs only — the
 ops shift against the admin key, both audited (the DSH trail's COMMAND
-entries carry `role=ops`/`role=admin`).
+entries carry `role=ops`/`role=admin`). Every command and knob the wire
+answers — command, settable (`set`/`unset`) or show-only — is tabled in
+[MANUAL.md](MANUAL.md) (generated from the registry).
 
 ```bash
 python3 bin/dashboard.py --control-port /tmp/dashboard-8080.socket &

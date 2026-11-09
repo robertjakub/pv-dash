@@ -532,6 +532,17 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
 
 ### Fixed
 
+- **cache, scraper, inverter, dashboard** — **the help surfaces stop
+  advertising the removed `show status` word**: the `show` verb's one-line
+  help (the `?`/`help` reply and the registry's command row) spelled
+  `status` on all four tools; the word dies with the show-status removal
+  and the line reads the truth now. With it, the inverter's, scraper's and
+  dashboard's registries lose the stray `s)` tails an `edit_options`
+  replace path left in the audit/limits/metrics rows ("bind addresss)",
+  "rotated audit backups to keeps)", "0 = no size rotations)", ...) — the
+  drift doc's knobs finding and its TODO item 1 close with them (the man
+  pages re-rendered through).
+
 - **cache, scraper, inverter, dashboard** — **a busy bind answers with one
   line, not a traceback**: a listener dying on `EADDRINUSE` exits with one
   `cannot bind <host>:<port>: <why>` ERROR line, exit 1 — the scraper's
@@ -570,6 +581,15 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   README/man spellings take the live name now.
 
 ### Docs
+
+- **everywhere** — **the four `<tool>/MANUAL.md` pages land**: every
+  command, knob and show report each tool's control wire answers, the
+  kind of each — command, settable (`set`/`unset`, the restart-marked
+  knobs noted, the secrets flagged) or show-only (the startup-only
+  knobs included) — with the flag/env twin, the value shape and the
+  description, one page per tool. GENERATED from the registries by the
+  new `scripts/gen_manual.py` (`--check` fails a stale page); the four
+  READMEs' control sections point at them.
 
 - **everywhere** — **the family speaks Modbus TCP inverters, not a
   vendor**: the root, scraper, cache, inverter and dashboard README

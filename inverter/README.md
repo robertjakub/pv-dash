@@ -171,7 +171,10 @@ bind `127.0.0.1:PORT` instead, or `0` to switch it off. Both tools resolve
 the target the same way: flag > **`CTL`** environment variable > the
 default socket. The target also **rebinds live** — `set control port` —
 and on the fake a **tokenless TCP rebind succeeds** (the F11 test-tool
-posture; every other tool in the family refuses it — F5).
+posture; every other tool in the family refuses it — F5). Every command
+and knob the wire answers — command, settable (`set`/`unset`) or
+show-only — is tabled in [MANUAL.md](MANUAL.md) (generated from the
+registry).
 
 The wire is the family's JSON lines (one request object per line, one
 reply per line: `{"cmd": …}` → `{"status": "ok|fail|bye", "text": …}`;

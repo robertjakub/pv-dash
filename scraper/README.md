@@ -242,7 +242,9 @@ The wire (the signed frames, the peer-cred trusted peers, the read-only
 ops role, the F5 token rule) is the family's — one paragraph per piece in
 [docs/ACL.md](../docs/ACL.md) (the control-plane row) and
 [docs/AUDIT.md](../docs/AUDIT.md); a token value never renders back
-(`show <secret>` refuses). The commands:
+(`show <secret>` refuses). Every command and knob the wire answers —
+command, settable (`set`/`unset`) or show-only — is tabled in
+[MANUAL.md](MANUAL.md) (generated from the registry). The commands:
 
 | Command | Effect |
 |---|---|

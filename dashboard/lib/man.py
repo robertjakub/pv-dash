@@ -110,13 +110,34 @@ the control socket used when \\fB--control-port\\fR is unset.
 .TP
 .I ~/.local/state/dashboard/audit.log
 the audit trail when \\fB--audit-log\\fR is unset."""
+    environment = """.SH ENVIRONMENT
+.TP
+.B CTL
+control target for the daemon's clients when the flag is unset (flag
+\\fB--control-port\\fR wins).
+.TP
+.B PORT ", " BIND ", " PROM_URL ", " AUTH_TOKEN ", " ...
+the flags' environment twins (bare names; the Prometheus upstream's
+twin is \\fBPROM_URL\\fR); the flag wins over the env, the env over the
+config script."""
+    exit_status = """.SH EXIT STATUS
+.TP
+.B 0
+success (\\fB--dry-run\\fR: valid configuration).
+.TP
+.B 1
+invalid configuration or a failed bind (reason on stderr).
+.TP
+.B 2
+command-line misuse."""
     return page(
         'Static single-page home PV monitoring dashboard with a Prometheus proxy',
         'dashboard', 1, DATE, VERSION, MANUAL,
         '.B dashboard\n.RI [ options ]',
         description,
         options_section(parser),
-        extra_sections=(signals, control, security, files),
+        extra_sections=(signals, control, security, environment, files, exit_status),
+        kind='daemon',
         see_also='.BR dashboard-ctl (1),\n.BR dashboard-cli (1),\n.BR modbus-scraper (1),\n.BR modbus-cache (1),\n.BR modbus-fake-inverter (1)\n.PP\ndashboard/README.md in the suite checkout \\(em the full documentation.')
 
 
@@ -129,13 +150,37 @@ one-shot sibling of \\fBdashboard-cli\\fR(1): no session, no completion
 a control token configured the wire is HMAC-signed: the client signs every
 command and verifies every reply (the full sha256 of the frame, keyed by
 the token)."""
+    examples = """.SH EXAMPLES
+.RS
+.IP \\(bu 2
+.B dashboard-ctl show version
+.IP \\(bu 2
+.B dashboard-ctl request reload-config
+.IP \\(bu 2
+.B printf 'inspect\\enshow version\\en' | dashboard-ctl
+.RE"""
+    environment = """.SH ENVIRONMENT
+.TP
+.B CTL ", " CONTROL_TOKEN
+the control target and the TCP token when the flags are unset."""
+    exit_status = """.SH EXIT STATUS
+.TP
+.B 0
+every command answered \\fBok\\fR.
+.TP
+.B 1
+connection or control error.
+.TP
+.B 2
+command-line misuse."""
     return page(
         "send commands to the dashboard control server (one-shot / batch)",
         'dashboard-ctl', 1, DATE, VERSION, MANUAL,
         '.B dashboard-ctl\n.RI [ options ] " [command ...]"',
         description,
         options_section(parser),
-        extra_sections=(),
+        extra_sections=(examples, environment, exit_status),
+        kind='ctl',
         see_also='.BR dashboard-cli (1),\n.BR dashboard (1)')
 
 
@@ -158,11 +203,22 @@ the control target when \\fB--control-port\\fR is unset.
 .TP
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off)."""
+    exit_status = """.SH EXIT STATUS
+.TP
+.B 0
+the session ended cleanly.
+.TP
+.B 1
+connection or control error.
+.TP
+.B 2
+command-line misuse."""
     return page(
         "console-style session on the dashboard control server",
         'dashboard-cli', 1, DATE, VERSION, MANUAL,
         '.B dashboard-cli\n.RI [ options ]',
         description,
         options_section(parser),
-        extra_sections=(env,),
+        extra_sections=(env, exit_status),
+        kind='cli',
         see_also='.BR dashboard-ctl (1),\n.BR dashboard (1)')

@@ -45,6 +45,32 @@ rotated audit backups to keep
 disable the audit trail
 
 
+.SH EXAMPLES
+.RS
+.IP \(bu 2
+.B dashboard-ctl show version
+.IP \(bu 2
+.B dashboard-ctl request reload-config
+.IP \(bu 2
+.B printf 'inspect\enshow version\en' | dashboard-ctl
+.RE
+
+.SH ENVIRONMENT
+.TP
+.B CTL ", " CONTROL_TOKEN
+the control target and the TCP token when the flags are unset.
+
+.SH EXIT STATUS
+.TP
+.B 0
+every command answered \fBok\fR.
+.TP
+.B 1
+connection or control error.
+.TP
+.B 2
+command-line misuse.
+
 .SH SEE ALSO
 .BR dashboard-cli (1),
 .BR dashboard (1)

@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The secrets-startup-only wave: every secret row (auth-key,
+auth-upstream-key, control-token, control-ops-token, metrics-token,
+dump-key) is `restart`-marked and the wire refuses set/unset on it with
+the dump-key answer — the live rotation branches and their render-backs
+are deleted, the floor checks (min-16, ops ≠ admin, F13) stood at start
+already, and the set-advice errors point at flag/env/config + a restart;
+the regtest respawns with the desired tokens instead of rotating (the
+waveshare wrong-password matrix rides fresh instances), `help config`
+and OPTIONS.md render the startup-only recipe.
+
 The man-ladder wave: the page runs the family's one daemon ladder
 (NAME … OPTIONS, SIGNALS, CONTROL, SECURITY, ENVIRONMENT, FILES, EXIT
 STATUS, SEE ALSO) — the posture prose carves out of DESCRIPTION/CONTROL

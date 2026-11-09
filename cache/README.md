@@ -239,7 +239,7 @@ authenticated with.
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live** — the poll plan, the write gates, the ACLs, the limits, the auth schemes/keys, `control port` (rebinds the listener live), the tokens (rotate live; the value never renders back), `audit log-file`/`audit rotate …`, `dump path`/`dump with-cache`/`dump restore-on-start` |
+| `set <setting> <value>` | configure a setting **live** — the poll plan, the write gates, the ACLs, the limits, the auth schemes, `control port` (rebinds the listener live), `audit log-file`/`audit rotate …`, `dump path`/`dump with-cache`/`dump restore-on-start` |
 | `unset <setting>` | restore a setting to its **configured** startup value |
 | `show <setting>` | the bare live value of one tunable (a **secret knob refuses to show**) |
 | `help <setting>` | the registry description of one setting |

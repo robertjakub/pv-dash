@@ -51,8 +51,10 @@ The kinds — every row of the tables below carries one:
   pass it by flag/env or as `file:<path>`. *(hidden)* — never lists in the
   ?/TAB pools; the wire still answers.
 - **startup-only** — flag/env/config at start, a restart applies a change; the
-  wire has no set/unset/show for it (it renders in `show config` only). The
-  restart-marked secret (the dump key) refuses set/unset/show outright.
+  wire has no set/unset/show for it (it renders in `show config` only). Every
+  secret is startup-only now (the tokens, the auth keys, the dump key): the
+  wire refuses set/unset outright, the value passes by flag/env/config or as
+  `file:<path>` and a restart applies it.
 - **show-only** — a runtime report: `show <report>` answers, nothing to set.
 
 A show report's path never shadows a knob value: one spelling per side of
@@ -115,9 +117,9 @@ map, the auth schemes both directions
 | `unit` | `set modbus unit` | settable | `ID` | `--unit` / `UNIT` | the Modbus unit id the session speaks |
 | `timeout` | `set modbus timeout` | settable | `s` | `--timeout` / `TIMEOUT` | upstream Modbus connect/read timeout in seconds |
 | `auth` | `set modbus auth` | settable | `suite\|none` | `--auth` / `AUTH` | the auth scheme the cache's own Modbus clients must speak: suite (the crypt handshake) or none |
-| `auth-key` | `set modbus auth key` | settable (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key for the cache's clients, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
+| `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key for the cache's clients, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 | `auth-upstream` | `set modbus auth-upstream` | settable | `suite\|waveshare\|none` | `--auth-upstream` / `AUTH_UPSTREAM` | the auth scheme the cache speaks to the upstream inverter: suite (the crypt handshake), waveshare (the gateway connection password) or none |
-| `auth-upstream-key` | `set modbus auth-upstream-key` | settable (secret) | `KEY` | `--auth-upstream-key` / `AUTH_UPSTREAM_KEY` | the key the cache presents upstream: the suite handshake's shared key (min 16 characters) or the Waveshare gateway password (`file:<path>` reads an owner-only file) *(hidden)* |
+| `auth-upstream-key` | — | startup-only (secret) | `KEY` | `--auth-upstream-key` / `AUTH_UPSTREAM_KEY` | the key the cache presents upstream: the suite handshake's shared key (min 16 characters) or the Waveshare gateway password (`file:<path>` reads an owner-only file) *(hidden)* |
 | `interval` | `set modbus interval` | settable | `s` | `--interval` / `INTERVAL` | seconds between cache polls of the device |
 | `read-delay` | `set modbus read-delay` | settable | `s` | `--read-delay` / `READ_DELAY` | seconds between consecutive device reads within a poll cycle |
 | `merge-gap` | `set modbus merge-gap` | settable | `registers` | `--merge-gap` / `MERGE_GAP` | max register gap when merging ranges into block reads; the plan rebuilds |
@@ -142,7 +144,7 @@ trusted peers
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `control-port` | `set control port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | control server target: unix socket path or TCP port on 127.0.0.1 |
-| `control-token` | `set control token` | settable (secret) | `TOKEN` | `--control-token` / `CONTROL_TOKEN` | require a token on control connections: the client authenticates with {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `control-token` | — | startup-only (secret) | `TOKEN` | `--control-token` / `CONTROL_TOKEN` | require a token on control connections: the client authenticates with {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `control-trust-uids` | `set control trust-uids` | settable | `UID,...` | `--control-trust-uids` / `CONTROL_TRUST_UIDS` | extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted |
 | `control-socket-group` | `set control socket-group` | settable | `on\|off` | `--control-socket-group` / `CONTROL_SOCKET_GROUP` | leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600) |
 
@@ -153,7 +155,7 @@ configured verbs (the default: show and clear)
 
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `control-ops-token` | `set control ops token` | settable (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run the show/clear verbs only (no set/unset, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run the show/clear verbs only (no set/unset, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `control-ops-verbs` | `set control ops verbs` | settable | `VERB,...` | `--control-ops-verbs` / `CONTROL_OPS_VERBS` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated |
 
 ### metrics
@@ -165,7 +167,7 @@ the bearer token and the connection caps
 |---|---|---|---|---|---|
 | `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / `METRICS_SERVER` | the cache's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
 | `metrics-listen` | `set metrics listen` | settable (restart) | `HOST:PORT` | `--metrics-listen` / `METRICS_LISTEN` | the metrics bind address HOST:PORT — the set records the value, the restart (request reload) applies it |
-| `metrics-token` | `set metrics token` | settable (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | the metrics bearer token (Authorization: Bearer) — rotates live; the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | the metrics bearer token (Authorization: Bearer) — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
 
 ### metrics/limits

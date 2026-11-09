@@ -330,11 +330,10 @@ the ops
 changes a setting live (modbus interval, cache ttl, modbus read-delay,
 modbus merge-gap, write allow, write registers, limits max-clients,
 limits client-timeout, modbus upstream, modbus unit, metrics enable,
-metrics listen, the metrics limits caps, metrics token, metrics acl,
+metrics listen, the metrics limits caps, metrics acl,
 audit requests, dump-interval, log-level, local-time, modbus profile,
 modbus selection, acl connect, acl write, modbus timeout, modbus auth,
-modbus auth key, modbus auth-upstream, modbus auth-upstream-key, control
-port, control token, control ops-token, control ops verbs, control
+modbus auth-upstream, control port, control ops verbs, control
 trust-uids, control socket-group, audit log-file, audit rotate max-size,
 audit disable, dump path, dump with-cache); a SIGHUP re-applies the config
 (the file always wins). A knob the registry marks
@@ -343,10 +342,11 @@ answers the note
 .B restart required (startup-only knob)
 from set/unset \-\- the set records the value (show renders it; the
 whole-daemon reload folds it into the fresh process before the binds),
-the config (and a SIGHUP) changes it too. A restart-marked secret
-(dump/key) refuses set/unset outright: a secret never rides the reload
-state (a secret knob refuses to show at all \(em the value renders
-nowhere).
+the config (and a SIGHUP) changes it too. Every secret in the registry
+is restart-marked (the tokens, the auth keys, dump/key) and refuses
+set/unset outright: a secret never rides the reload state (a secret knob
+refuses to show at all \-\- the value renders nowhere) \-\- it passes
+by flag/env/config and a restart.
 .IP \(bu 2
 .B show cache all
 prints every cached entry: name, words, values, age, expiry, poll status.

@@ -1103,8 +1103,8 @@ try:
     time.sleep(1.5)
     import urllib.request, urllib.error
 
-    def get_metrics(tok=None):
-        req = urllib.request.Request('http://127.0.0.1:15529/metrics')
+    def get_metrics(tok=None, port=15529):
+        req = urllib.request.Request('http://127.0.0.1:%d/metrics' % port)
         if tok:
             req.add_header('Authorization', 'Bearer ' + tok)
         try:
@@ -1213,13 +1213,13 @@ try:
           reply.split(b'\r\n')[0].decode() if reply else 'empty reply')
     over.close()
     parked.close()
-    # the live token rotation: the old token is refused the moment the new one lands
+    # the secrets are startup-only (the dump/key treatment): the set/unset
+    # refuse on the wire, the configured token keeps serving
     r = ctl_cmd('set metrics token sekrit2', 15530)
-    check('metrics token: rotated live', r.startswith('ok metrics/token=<set>'), r[:90])
+    check('metrics token: startup-only — the set refuses',
+          r.startswith('fail restart required (startup-only knob)'), r[:90])
     st, _ = get_metrics('sekrit')
-    check('metrics token: the old token is a 401', st == 401, str(st))
-    st, _ = get_metrics('sekrit2')
-    check('metrics token: the new token serves', st == 200, str(st))
+    check('metrics token: the configured token still serves (no live rotation)', st == 200, str(st))
     r = ctl_cmd('show metrics token', 15530)
     check('metrics token: the secret never renders back', r.startswith('fail metrics/token is a secret'), r)
     # the startup-only listen: the set records the pending value and answers
@@ -1230,7 +1230,7 @@ try:
     r = ctl_cmd('show metrics listen', 15530)
     check('metrics listen: show renders the recorded pending value',
           r.startswith('ok metrics/listen=127.0.0.1:15535'), r[:90])
-    st, _ = get_metrics('sekrit2')
+    st, _ = get_metrics('sekrit')
     check('metrics listen: the running endpoint kept the old address (the restart applies it)', st == 200, str(st))
     r = ctl_cmd('set metrics listen bogus', 15530)
     check('metrics listen: a bad value still fails the set', r.startswith('fail'), r[:90])
@@ -1240,26 +1240,32 @@ try:
     r = ctl_cmd('show metrics listen', 15530)
     check('metrics listen: the unset restored the configured value',
           r.startswith('ok metrics/listen=127.0.0.1:15529'), r[:90])
-    # the F13 posture live: the token comes off on the loopback listen and
-    # the endpoint serves tokenless; a pending listen cannot move beyond
-    # loopback while the endpoint serves without a token
-    r = ctl_cmd('set metrics token off', 15530)
-    check('metrics token: off on the loopback listen (the F13 shape)',
-          r.startswith('ok metrics/token=off'), r[:90])
-    st, _ = get_metrics()
-    check('metrics token: the tokenless loopback endpoint serves', st == 200, str(st))
-    r = ctl_cmd('set metrics enable off', 15530)
-    check('metrics enable: off for the token-less re-enable', r.startswith('ok metrics/enable=off'), r[:80])
-    r = ctl_cmd('set metrics enable on', 15530)
-    check('metrics enable: on without a token on the loopback listen (the F13 shape)',
+    # the tokenless metrics endpoint (the F13 shapes on the live wire): the
+    # tokenless loopback serve is the auth, the enable dance works without a
+    # token, and the pending listen cannot move beyond loopback while it serves
+    p_tokless = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15512',
+                                  '--listen', '127.0.0.1:15540', '--interval', '1', '--profile', R,
+                                  '--control-port', '15542',
+                                  '--metrics-listen', '127.0.0.1:15541', '--metrics-server'],
+                                 stdout=open('/tmp/reg_cache_tokless.log', 'w'), stderr=subprocess.STDOUT,
+                                 env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
+    procs.append(p_tokless)
+    time.sleep(1.5)
+    st, _ = get_metrics(port=15541)
+    check('metrics token: the tokenless loopback endpoint serves (the bind is the auth)', st == 200, str(st))
+    r = ctl_cmd('set metrics token off', 15542)
+    check('metrics token: startup-only — the off refuses too',
+          r.startswith('fail restart required (startup-only knob)'), r[:90])
+    r = ctl_cmd('set metrics enable off', 15542)
+    check('metrics enable: off stops the tokenless endpoint', r.startswith('ok metrics/enable=off'), r[:80])
+    r = ctl_cmd('set metrics enable on', 15542)
+    check('metrics enable: on serves tokenless again (the F13 shape on loopback)',
           r.startswith('ok metrics/enable=on'), r[:80])
-    r = ctl_cmd('set metrics listen 0.0.0.0:15536', 15530)
+    r = ctl_cmd('set metrics listen 0.0.0.0:15543', 15542)
     check('metrics listen: the pending move beyond loopback refuses while serving tokenless (F13)',
           r.startswith('fail metrics/listen cannot move beyond loopback') and 'F13' in r, r[:140])
-    r = ctl_cmd('set metrics token sekrit2', 15530)
-    check('metrics token: the token is back for the acl block', r.startswith('ok metrics/token=<set>'), r[:90])
-    st, _ = get_metrics('sekrit2')
-    check('metrics token: the token serves again', st == 200, str(st))
+    p_tokless.send_signal(signal.SIGTERM)
+    p_tokless.wait(timeout=10)
 
     # the metrics/acl gate: the acl/connect reading on the /metrics listener
     # (the scraper's metrics/acl shape) — the inline grammar + the file:
@@ -1302,12 +1308,12 @@ try:
         except (ConnectionResetError, BrokenPipeError):
             return b''
 
-    check('metrics acl: any serves (the default)', metrics_acl_raw('sekrit2').startswith(b'HTTP/1.0 200'),
-          metrics_acl_raw('sekrit2').split(b'\r\n')[0].decode()[:60])
+    check('metrics acl: any serves (the default)', metrics_acl_raw('sekrit').startswith(b'HTTP/1.0 200'),
+          metrics_acl_raw('sekrit').split(b'\r\n')[0].decode()[:60])
     r = ctl_cmd('set metrics acl none', 15530)
     check('metrics acl: set none answers ok', r.startswith('ok metrics/acl=none'), r[:80])
-    check('metrics acl: none closes the client without a reply', metrics_acl_raw('sekrit2') == b'',
-          repr(metrics_acl_raw('sekrit2')[:40]))
+    check('metrics acl: none closes the client without a reply', metrics_acl_raw('sekrit') == b'',
+          repr(metrics_acl_raw('sekrit')[:40]))
     r = ctl_cmd('show metrics acl', 15530)
     check('metrics acl: the none show', r == 'ok metrics/acl=none', r[:60])
     r = ctl_cmd('show config', 15530)
@@ -1319,7 +1325,7 @@ try:
           r.startswith('fail') and 'show metrics acl table' in r, r[:120])
     r = ctl_cmd('set metrics acl 127.0.0.1', 15530)
     check('metrics acl: the whitelist set canonicalizes', r.startswith('ok metrics/acl=127.0.0.1/32'), r[:80])
-    check('metrics acl: the whitelist serves the lab', metrics_acl_raw('sekrit2').startswith(b'HTTP/1.0 200'))
+    check('metrics acl: the whitelist serves the lab', metrics_acl_raw('sekrit').startswith(b'HTTP/1.0 200'))
     r = ctl_cmd('show metrics acl table', 15530)
     check('metrics acl: the whitelist table',
           r == 'ok acl-metrics-table\ndeny 0.0.0.0/0\nallow 127.0.0.1/32', r[:80])
@@ -1336,16 +1342,16 @@ try:
     r = ctl_cmd('show metrics acl table', 15530)
     check('metrics acl: the file gate renders its own rules',
           r == 'ok acl-metrics-table\n% the lab gate\ndeny 0.0.0.0/0\nallow 127.0.0.1 # the loopback lab', r[:160])
-    check('metrics acl: the file gate serves the lab', metrics_acl_raw('sekrit2').startswith(b'HTTP/1.0 200'))
+    check('metrics acl: the file gate serves the lab', metrics_acl_raw('sekrit').startswith(b'HTTP/1.0 200'))
     with open(mgate, 'w') as fh:   # the gate re-reads on every set: a bad prefix refuses, the old gate stands
         _json.dump({'type': 'ip-prefix', 'rules': [{'type': 'allow', 'prefix': '127.0.0.1/8'}]}, fh)
     r = ctl_cmd('set metrics acl file:%s' % mgate, 15530)
     check('metrics acl: a bad file answers err with the old gate standing',
           r.startswith('fail') and 'spell the network' in r
-          and metrics_acl_raw('sekrit2').startswith(b'HTTP/1.0 200'), r[:140])
+          and metrics_acl_raw('sekrit').startswith(b'HTTP/1.0 200'), r[:140])
     r = ctl_cmd('unset metrics acl', 15530)
     check('metrics acl: unset restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
-    check('metrics acl: any serves again', metrics_acl_raw('sekrit2').startswith(b'HTTP/1.0 200'))
+    check('metrics acl: any serves again', metrics_acl_raw('sekrit').startswith(b'HTTP/1.0 200'))
 
     # the control plane, audit trail and dump lives (the same metrics pattern:
     # set/show/unset on the wire, the secrets never render, the rebind moves it)
@@ -1383,7 +1389,7 @@ try:
     r = ctl_cmd('show control token', 15530)
     check('control token: the secret never renders back', r.startswith('fail control/token is a secret'), r)
     r = ctl_cmd('unset control token', 15530)
-    check('control token: unset refuses (a secret has no defaults)', r.startswith('fail unknown setting'), r[:80])
+    check('control token: unset refuses (startup-only)', r.startswith('fail restart required (startup-only knob)'), r[:80])
     r = ctl_cmd('set control trust-uids 1000, 1001', 15530)
     check('control trust-uids: set takes the uid list', r.startswith('ok control/trust-uids=1000,1001'), r[:90])
     r = ctl_cmd('unset control trust-uids', 15530)
@@ -1496,19 +1502,20 @@ try:
     r = ctl_cmd('show version', 15530)
     check('control port: the restored target speaks', r.startswith('ok modbus-cache'), r[:60])
     r = ctl_cmd('set control token sekrit2', 15530)
-    check('control token: rotated live', r.startswith('ok control/token=<set>'), r[:90])
+    check('control token: startup-only — the set refuses',
+          r.startswith('fail restart required (startup-only knob)'), r[:90])
     s = socket.create_connection(('127.0.0.1', 15530), timeout=5)
-    s.sendall(_json.dumps({'cmd': 'auth', 'token': 'sekrit'}).encode() + b'\n')
+    s.sendall(_json.dumps({'cmd': 'auth', 'token': 'sekrit2'}).encode() + b'\n')
     buf = b''
     while not buf.endswith(b'\n'):
         buf += s.recv(4096)
     s.close()
-    check('control token: the old token is refused', _json.loads(buf.decode()).get('status') == 'fail',
-          buf.decode()[:80])
-    r = ctl_tok('show version', 15530, 'sekrit2')
-    check('control token: the new token speaks', r.startswith('ok modbus-cache'), r[:60])
-    r = ctl_tok('show control token', 15530, 'sekrit2')
-    check('control token: the rotated secret never renders back', r.startswith('fail control/token is a secret'), r)
+    check('control token: the never-set token does not authenticate',
+          _json.loads(buf.decode()).get('status') == 'fail', buf.decode()[:80])
+    r = ctl_tok('show version', 15530, 'sekrit')
+    check('control token: the configured token still speaks (no live rotation)', r.startswith('ok modbus-cache'), r[:60])
+    r = ctl_tok('show control token', 15530, 'sekrit')
+    check('control token: the secret never renders back', r.startswith('fail control/token is a secret'), r)
 
     p_metrics.send_signal(signal.SIGTERM)
     p_metrics.wait(timeout=10)
@@ -2381,10 +2388,11 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     r = ctl_auth('show', 'modbus', 'auth', 'key')
     check('suite auth: the client key never shows', r.startswith('% error: modbus/auth/key is a secret'), r[:80])
     r = ctl_auth('unset', 'modbus', 'auth-upstream-key')
-    check('suite auth: unset refuses the upstream key', r.startswith('% error: unknown setting'), r[:80])
+    check('suite auth: unset refuses the upstream key (startup-only)',
+          r.startswith('% error: restart required (startup-only knob)'), r[:80])
     r = ctl_auth('set', 'modbus', 'auth', 'key', 'short')
-    check('suite auth: a short key refuses on the wire',
-          r.startswith('% error: modbus/auth/key must be at least 16'), r[:100])
+    check('suite auth: startup-only — the key set refuses with the rest',
+          r.startswith('% error: restart required (startup-only knob)'), r[:100])
     # the live legs: disabling the client auth serves plain clients again,
     # disabling the upstream auth drops the poll (the fake still demands
     # the handshake), re-enabling restores it
@@ -2551,57 +2559,84 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           ws.ok_attempts > ok_before, 'ok=%d' % ws.ok_attempts)
     r = ctl_ws('inspect')
     check('waveshare auth: the poll recovers after the restart', '(FAILING)' not in r, r[-200:])
-    # live rotation under waveshare: a new (non-empty, short) password is
-    # accepted, the session drops, the old password now fails, the poll goes
-    # down; back to the gateway's password and the poll recovers
+    # the wrong password: a spawned instance (the key is startup-only) — the
+    # proofs fail against the gateway, the poll goes down, the log carries
+    # the exchange errors
     r = ctl_ws('set', 'modbus', 'auth-upstream-key', 'gw-pass2')
-    check('waveshare auth: a short password rotates live (non-empty is the floor)',
-          r.startswith('ok modbus/auth-upstream-key=<set>'), r[:100])
+    check('waveshare auth: startup-only — the key set refuses',
+          r.startswith('% error: restart required (startup-only knob)'), r[:100])
+    procs[-1].terminate()
+    procs[-1].wait(timeout=10)
+    time.sleep(0.5)
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
+           '--listen', '127.0.0.1:%d' % WS_PORT, '--profile', R,
+           '--timeout', '2', '--interval', '2',
+           '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
+           '--auth-upstream', 'waveshare', '--auth-upstream-key', 'gw-pass2'],
+          log='/tmp/reg_ws_cache_bad.log')
+    time.sleep(1.2)
     for _ in range(200):
         r = ctl_ws('inspect')
         if '(FAILING)' in r:
             break
         time.sleep(0.5)
-    check('waveshare auth: the rotated password fails against the gateway (poll=down)',
+    check('waveshare auth: the wrong password fails against the gateway (poll=down)',
           '(FAILING)' in r, r[-200:])
     check('waveshare auth: the gateway counted the bad attempts',
           ws.bad_attempts >= 1, 'bad=%d' % ws.bad_attempts)
-    logw = open('/tmp/reg_ws_cache.log').read()
+    logw = open('/tmp/reg_ws_cache_bad.log').read()
     check('waveshare auth: the failed proofs land in the log as exchange errors',
           'Waveshare TCP auth failed' in logw, logw[-200:])
-    r = ctl_ws('set', 'modbus', 'auth-upstream-key', GW_KEY)
-    check('waveshare auth: the gateway password rotates back',
-          r.startswith('ok modbus/auth-upstream-key=<set>'), r[:100])
+    procs[-1].terminate()
+    procs[-1].wait(timeout=10)
+    time.sleep(0.5)
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
+           '--listen', '127.0.0.1:%d' % WS_PORT, '--profile', R,
+           '--timeout', '2', '--interval', '2',
+           '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
+           '--auth-upstream', 'waveshare', '--auth-upstream-key', GW_KEY],
+          log='/tmp/reg_ws_cache.log')
+    time.sleep(1.2)
     for _ in range(40):
         r = ctl_ws('inspect')
         if '(FAILING)' not in r:
             break
         time.sleep(0.5)
-    check('waveshare auth: the poll recovers under the restored password', '(FAILING)' not in r, r[-200:])
-    # the dormant flow: scheme none first, then the short password (the
-    # suite floor would refuse it — dormant material passes), then the
-    # scheme — and the poll proves the pairing end to end
+    check('waveshare auth: the poll recovers under the gateway password', '(FAILING)' not in r, r[-200:])
+    # the scheme dance (the scheme is not a secret — it sets live; the KEY
+    # stands): the short standing key refuses the suite wake, the waveshare
+    # wake re-proves the standing password
     r = ctl_ws('set', 'modbus', 'auth-upstream', 'none')
     check('waveshare auth: the upstream auth disables live',
           r.startswith('ok modbus/auth-upstream=none'), r[:100])
-    r = ctl_ws('set', 'modbus', 'auth-upstream-key', 'shorty')
-    check('waveshare auth: a short key with no scheme set is accepted (dormant)',
-          r.startswith('ok modbus/auth-upstream-key=<set>'), r[:100])
     r = ctl_ws('set', 'modbus', 'auth-upstream', 'suite')
-    check('waveshare auth: going suite over a short standing key refuses',
+    check('waveshare auth: going suite over the short standing key refuses',
           r.startswith('% error: the suite auth rejects the standing key'), r[:120])
     r = ctl_ws('set', 'modbus', 'auth-upstream', 'waveshare')
-    check('waveshare auth: the dormant key wakes with the scheme',
+    check('waveshare auth: the scheme wakes over the standing key',
           r.startswith('ok modbus/auth-upstream=waveshare'), r[:100])
-    for _ in range(200):
+    for _ in range(40):
         r = ctl_ws('inspect')
-        if '(FAILING)' in r:
+        if '(FAILING)' not in r:
             break
         time.sleep(0.5)
-    check('waveshare auth: the dormant short key fails against the gateway (poll=down)',
-          '(FAILING)' in r, r[-200:])
+    check('waveshare auth: the woken scheme hands the standing password over', '(FAILING)' not in r, r[-200:])
     r = ctl_ws('set', 'modbus', 'auth-upstream', 'none')
     check('waveshare auth: the upstream auth disables again', r.startswith('ok'), r[:60])
+    # the dormant floor at start: a short key with no scheme passes (dormant
+    # material), the same key under suite refuses — the dry-run proves both
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
+                        '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
+                        '--auth-upstream', 'none', '--auth-upstream-key', 'shorty'],
+                       capture_output=True, text=True, timeout=15)
+    check('waveshare auth: a short key with no scheme is accepted at start (dormant)',
+          r.returncode == 0 and 'dry-run' in (r.stdout + r.stderr), (r.stdout + r.stderr)[-160:])
+    r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
+                        '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
+                        '--auth-upstream', 'suite', '--auth-upstream-key', 'shorty'],
+                       capture_output=True, text=True, timeout=15)
+    check('waveshare auth: the same key under the suite scheme refuses the start',
+          r.returncode != 0 and 'must be at least' in r.stderr, r.stderr[-160:])
     # the start-time grammar: the waveshare fast-fails and the dry-run accept
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
                         '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',

@@ -11,7 +11,6 @@ auth handshake when --control-token is set ({"cmd": "auth", "token": ...});
 the unix socket relies on filesystem permissions instead. A second,
 read-only token (--control-ops-token) authenticates into the show/clear
 verbs only — the ops shift against the admin key, both audited."""
-import hmac
 import logging
 import os
 import socket
@@ -20,7 +19,7 @@ import time
 
 from common.version import version_string
 from common.config import auth_key_floor_error, default_profile_path, is_loopback_host, parse_auth_type, parse_control_target, \
-    parse_upstream, resolve_profile_file, parse_secret
+    parse_upstream, resolve_profile_file
 from common.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
 from common.cred import parse_trust_uids
@@ -284,7 +283,7 @@ class ControlServer(_ControlServer):
                     if p.metrics_srv is not None and not p.metrics_token and not is_loopback_host(t[0]):
                         raise ValueError('metrics/listen cannot move beyond loopback while the endpoint '
                                          'serves without a token (F13 in docs/AUDIT.md) — '
-                                         'set metrics/token first')
+                                         'pass metrics-token by flag/env/config and restart')
                 self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
             if key == 'dump/restore-on-start':
@@ -339,19 +338,10 @@ class ControlServer(_ControlServer):
             except SystemExit as e:
                 raise ValueError(str(e))
             if v and not p.config.get('auth_key'):
-                raise ValueError('the suite auth needs a key: set modbus auth key <value> first '
-                                 '(min %d characters)' % AUTH_MIN_KEY)
+                raise ValueError('the suite auth needs a key: pass auth-key by flag/env/config '
+                                 '(min %d characters) and restart' % AUTH_MIN_KEY)
             p.config['auth'] = v   # the next connection handshakes; the standing ones keep their session
             return v or 'none'
-        if key == 'modbus/auth/key':
-            try:
-                v = parse_secret(val, 'modbus/auth/key')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if v is not None and len(v) < AUTH_MIN_KEY:
-                raise ValueError('modbus/auth/key must be at least %d characters, got %d' % (AUTH_MIN_KEY, len(v)))
-            p.config['auth_key'] = v
-            return '<set>'
         if key == 'modbus/auth-upstream':
             try:
                 v = parse_auth_type(val, 'modbus/auth-upstream', schemes=('suite', 'waveshare'))
@@ -359,30 +349,17 @@ class ControlServer(_ControlServer):
                 raise ValueError(str(e))
             standing = p.config.get('auth_upstream_key')
             if v and not standing:
-                raise ValueError('the %s auth needs a key: set modbus auth-upstream-key <value> first%s'
+                raise ValueError('the %s auth needs a key: pass auth-upstream-key by flag/env/config and restart%s'
                                  % (v, ' (min %d characters)' % AUTH_MIN_KEY if v == 'suite' else ''))
             if v and standing is not None:
                 err = auth_key_floor_error(v, standing)
                 if err:
                     raise ValueError('the %s auth rejects the standing key (modbus/auth-upstream-key %s) — '
-                                     'set modbus auth-upstream-key <value> first' % (v, err))
+                                     'pass auth-upstream-key by flag/env/config and restart' % (v, err))
             p.config['auth_upstream'] = v
             p.upstream.auth = v
             p.upstream.close()   # the session re-proves the new scheme on the next exchange
             return v or 'none'
-        if key == 'modbus/auth-upstream-key':
-            try:
-                v = parse_secret(val, 'modbus/auth-upstream-key')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if v is not None:
-                err = auth_key_floor_error(p.config.get('auth_upstream'), v)
-                if err:
-                    raise ValueError('modbus/auth-upstream-key %s' % err)
-            p.config['auth_upstream_key'] = v
-            p.upstream.auth_key = v
-            p.upstream.close()   # the session re-proves the new key on the next exchange
-            return '<set>'
         if key == 'write/allow':
             if val in ('on', 'true', '1', 'yes'):
                 on = True
@@ -434,37 +411,6 @@ class ControlServer(_ControlServer):
             shown = self._rebind_control(target)
             p.config['control_port'] = '0' if target is None else str(target)
             return shown
-        if key == 'control/token':
-            if val in ('off', 'none', ''):
-                self.refuse_token_drop()
-                self.token = None
-                p.config['control_token'] = ''
-                return 'off'
-            try:
-                val = parse_secret(val, 'control/token')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if self.ops_token and hmac.compare_digest(val, self.ops_token):
-                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
-                                 'every holder the role the server picks first)')
-            self.token = val   # the rotation is live: the sessions re-auth, the macs verify against the new key
-            p.config['control_token'] = val   # the value never renders — the secret row shows the removal placeholder
-            return '<set>'
-        if key == 'control/ops/token':
-            if val in ('off', 'none', ''):
-                self.ops_token = None   # the ops shift signs off; the admin role is untouched
-                p.config['control_ops_token'] = ''
-                return 'off'
-            try:
-                val = parse_secret(val, 'control-ops-token')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if self.token and hmac.compare_digest(val, self.token):
-                raise ValueError('the ops token must differ from the admin token (the same secret would hand '
-                                 'every holder the role the server picks first)')
-            self.ops_token = val
-            p.config['control_ops_token'] = val
-            return '<set>'
         if key == 'control/ops/verbs':
             verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
             unknown = sorted(v for v in verbs if v not in KNOWN_VERBS)
@@ -504,7 +450,8 @@ class ControlServer(_ControlServer):
                     if not is_loopback_host(host):
                         raise ValueError('the metrics endpoint serves register values: refusing to expose '
                                          '/metrics beyond loopback without a token (F13 in docs/AUDIT.md) — '
-                                         'set metrics/token first or bind metrics/listen on 127.0.0.1')
+                                         'pass metrics-token by flag/env/config and restart, or bind '
+                                         'metrics/listen on 127.0.0.1')
                 srv = MetricsServer(p, p.metrics_listen, token=p.metrics_token,
                                     max_clients=p.metrics_caps[0], client_timeout=p.metrics_caps[1],
                                     max_per_ip=p.metrics_caps[2])
@@ -526,28 +473,6 @@ class ControlServer(_ControlServer):
                 p.config['metrics_server'] = False
                 return 'off'
             raise ValueError('metrics enable must be on or off')
-        if key == 'metrics/token':
-            if not val or val in ('off', 'none', '0'):
-                host, _port = p.metrics_listen
-                if not is_loopback_host(host):
-                    raise ValueError('metrics/token is mandatory while the listen is non-loopback '
-                                     '(F13 in docs/AUDIT.md) — set the new token')
-                p.metrics_token = None
-                p.config['metrics_token'] = None
-                if p.metrics_srv:
-                    p.metrics_srv.token = None   # the handler reads it per request — the swap is live
-                p.metrics_desc = describe_metrics(p.metrics_listen, None, p.metrics_caps[0], p.metrics_caps[2])
-                return 'off'
-            try:
-                val = parse_secret(val, 'metrics/token')   # file: reads the first line of an owner-only file
-            except SystemExit as e:
-                raise ValueError(str(e))
-            p.metrics_token = val
-            p.config['metrics_token'] = val   # the value never renders — the secret row shows the removal placeholder
-            if p.metrics_srv:
-                p.metrics_srv.token = val   # the handler reads it per request — the swap is live
-            p.metrics_desc = describe_metrics(p.metrics_listen, val, p.metrics_caps[0], p.metrics_caps[2])
-            return '<set>'
         if key == 'metrics/limits/max-clients':
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
@@ -799,12 +724,8 @@ class ControlServer(_ControlServer):
             return '%d' % p.upstream.unit
         if key == 'modbus/auth':
             return p.config.get('auth') or 'none'
-        if key == 'modbus/auth/key':
-            return '<set>' if p.config.get('auth_key') else 'none'   # the secret never renders
         if key == 'modbus/auth-upstream':
             return p.config.get('auth_upstream') or 'none'
-        if key == 'modbus/auth-upstream-key':
-            return '<set>' if p.config.get('auth_upstream_key') else 'none'   # the secret never renders
         if key == 'write/allow':
             return 'on' if p.allow_write else 'off'
         if key == 'write/registers':
@@ -817,10 +738,6 @@ class ControlServer(_ControlServer):
             return '%d' % p.conn_gate.max_per_ip
         if key == 'control/port':
             return 'off' if self.stopped else self.describe()
-        if key == 'control/token':
-            return '<set>' if self.token else 'off'   # the secret never renders
-        if key == 'control/ops/token':
-            return '<set>' if self.ops_token else 'off'   # the secret never renders
         if key == 'control/ops/verbs':
             return ','.join(sorted(self.ops_verbs)) or 'off'
         if key == 'control/trust-uids':
@@ -829,8 +746,6 @@ class ControlServer(_ControlServer):
             return 'on' if self.socket_group else 'off'
         if key == 'metrics/enable':
             return 'on' if p.metrics_srv else 'off'
-        if key == 'metrics/token':
-            return '<set>' if p.metrics_token else 'off'   # the secret never renders
         if key == 'metrics/limits/max-clients':
             return '%d' % p.metrics_caps[0]
         if key == 'metrics/limits/timeout':
@@ -1050,10 +965,10 @@ class ControlServer(_ControlServer):
 
     def dump_settings(self):
         """The live-overridden settings as raw, re-appliable values (a
-        SIGHUP clears the override set — the dump follows). The secrets
-        (control/token, the ops token) ride as *** SECRET REMOVED ***: the
-        knob renders, the value never lands in the file — the restore
-        skips the placeholder and keeps the secret's current value."""
+        SIGHUP clears the override set — the dump follows). No secret can
+        be overridden (the wire refuses them — startup-only), so no
+        SECRET_REMOVED placeholder occurs; the dump filter's secret branch
+        stays as the class invariant's guard."""
         p = self.proxy
         prm = p.audit_params
         raw = {

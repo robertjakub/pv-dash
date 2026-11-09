@@ -1,11 +1,10 @@
-# The family drift — the shared-code sweeps
+# The family drift — the shared-code sweeps (regenerated)
 
 The wave record: the sweep types over the four surfaces (cache,
 scraper, inverter, dashboard) — what each sweeps, what it found,
-and the verdicts. The drift findings awaiting a ruling live in the
-findings blocks; the landed legs ride their per-tool commits (the
-drift-sweep wave went in as b5d6321). Regenerate with
-`python3 scripts/family_drift.py`; the verdict
+and the verdicts. **A working paper, not a shipped doc**; the
+landed legs ride their per-tool commits when the wave goes in.
+Regenerate with `python3 scripts/family_drift.py`; the verdict
 prose lives in this script (`*_FINDINGS`/`*_VERBS`/`*_CENSUS`)
 so a re-run updates the facts and keeps the judgement.
 
@@ -687,4 +686,93 @@ The findings:
   `file:`) is the F-trust surface: the loader parses, the dumps
   placeholder, the examples reference. A tool missing a marker is
   the story to chase.
+
+## The remediation TODOs — the consistency rulings
+
+The working assumption: **the family is one product** — a user moving
+between the four tools finds the same knobs, the same words, the same
+refusals and the same env layer; the code behind them lives once in
+`common/`. Each TODO states the consistent outcome and the plane it
+serves. Ordered by the user's exposure; the code plane rides along.
+
+1. **The audit help prose (the scraper)** — fix the mangled rows:
+   `audit-files` "rotated audit backups to keeps)" and `audit-max-mb`
+   "0 = no size rotations)". The user plane: `--help`, the man page
+   and `show audit rotate` read the same words on every tool. One
+   line each; ships with the next registry touch.
+
+2. **The audit rotation bounds, family-wide** — `audit-files` (min 1,
+   max 100) and `audit-max-mb` (min 0, max 1048576) carry bounds in
+   all four registries; the constants live once in `common/` (the
+   audit module's own). The user plane: `set audit rotate files 0`
+   refuses identically everywhere. Today the scraper accepts it.
+
+3. **The `audit-daily` knob, one shape** — the family-wide live knob
+   `audit/rotate/daily`: the scraper and the dashboard gain the row,
+   the fake's startup-only row gains its live name, the cache's
+   (today the only live one) is the template. The user plane: the
+   UTC-midnight trigger switches identically everywhere; the code
+   plane: `rebuild_audit`'s `daily` rides the params everywhere (the
+   common `AuditLog` already supports it).
+
+4. **The env twins completed** — every knob reachable from an env
+   file: `$AUDIT_LOG/$AUDIT_MAX_MB/$AUDIT_FILES` on the fake and the
+   dashboard, `$NO_AUDIT_LOG` everywhere (or nowhere, one ruling),
+   `$LOG_LEVEL` on the dashboard, the F13 caps' twins
+   (`$MAX_CLIENTS/$MAX_CONN_PER_IP/$CLIENT_TIMEOUT`) on the fake.
+   The user plane: the docker env files drive the whole surface; the
+   code plane: the loaders read one env layer. A knob ruled
+   env-free carries a registry note instead of a silent gap.
+
+5. **The `auth` name collision resolved** — one spelling, one
+   meaning: the dashboard's `auth` node (the page's namespace)
+   renames (`page-auth/` or the rows re-home), or the modbus enum
+   re-homes; the set grammar never maps one word to two meanings.
+   Breaking change for the dashboard's live names — the TODO is the
+   proposal + the migration note (the alias map carries the old
+   spellings one release).
+
+6. **The serve-address word** — the family answers one question with
+   one word: `show system listen` prints the address the daemon
+   serves on, everywhere. The cache's `system/listen` is the canon;
+   the scraper's `metrics/listen` stays as the alias; the fake's
+   `host`/`port` gain the live name (F11 keeps the argv defaults);
+   the dashboard's `bind`/`port` gain theirs.
+
+7. **`request/reload-config` family-wide** — the re-read-without-exec
+   surface exists on the scraper and the dashboard; the cache gains
+   it (its reload execs; a profile or selection edit deserves the
+   lighter verb). The fake stays exempt — no config file, F11 — and
+   the asymmetry gets the registry note.
+
+8. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
+   the RBAC vocabulary from the registry's command rows (the
+   hidden/internal flags included). One home; the silent drift
+   (a policy accepting a verb the grammar refuses) dies.
+
+9. **The accept-ladder extraction** — `common/modbus/server.py`: the
+   gate -> ACL -> max-clients -> count -> thread discipline + the
+   session opener (the clients register, the suite handshake, the
+   `finally` unwind) with the malformed-frame policy hook (the
+   cache answers in-band, the fake closes). The user plane: the
+   identical refusal texts and logs at both Modbus faces; the code
+   plane: the surface sweep's ~50-line net win.
+
+10. **The coverage TODOs graduate** — the suite-coverage sweep's
+    uncovered knobs (the audit rotation trio, the ops-policy pair,
+    the metrics caps), commands and the 22 unpinned canon phrases
+    become the next test wave's checklist; the canon phrases get
+    pinned so the texts may not drift.
+
+11. **The parity gates wired** — the NixOS-parity and docker/env
+    sweeps join `check_options`/the release gates as machine checks
+    (the module.nix type/default vs the registry, the env-file
+    coverage vs the env twins). The drift doc's `--check` already
+    shows the pattern: a stale claim fails the gate.
+
+Not-todo (the ruling recorded): the fake's `request/restart` verb
+stays absent (no config to re-exec into — the fold on a manual
+restart keeps the note true); the man-page prose and the HTTP
+handlers stay per-tool by design; the malformed-frame split is the
+proxy/device difference, kept.
 

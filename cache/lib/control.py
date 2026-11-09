@@ -87,7 +87,7 @@ class ControlServer(_ControlServer):
         """The one-line command reference: the state-dump commands appear
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
-        cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|cache|'
+        cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|connections|cache|'
                 'uplink|version|config|knobs|write-registers-profile|acl-connect-table|acl-write-table>')
         if self.proxy.dump_path:
             cmds += ', request dump [with-cache], request restore'

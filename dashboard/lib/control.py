@@ -220,7 +220,7 @@ class ControlServer(_ControlServer):
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, unset <setting>, inspect, '
-                'show <setting|status|connections|version|config|knobs>, request reload-config')
+                'show <setting|connections|version|config|knobs>, request reload-config')
         if self.dump_path:
             cmds += ', request dump, request restore'
         cmds += ', request reload, shutdown, quit; '

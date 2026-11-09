@@ -108,10 +108,10 @@
       "hint": "PATH|-",
       "help": "DSH audit trail: a file path or - for stdout (the docker/journald way); the XDG state home (~/.local/state/dashboard/audit.log) when unset" },
     { "name": "audit-max-mb", "flag": "--audit-max-mb", "env": null, "conv": "float",
-      "setting-help": "rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotations)",
-      "hint": "MB", "help": "rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotations)" },
+      "setting-help": "rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation",
+      "hint": "MB", "help": "rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation" },
     { "name": "audit-files", "flag": "--audit-files", "env": null, "conv": "int",
-      "setting-help": "rotated audit backups to keeps)", "hint": "N", "help": "rotated audit backups to keeps)" },
+      "setting-help": "rotated audit backups to keep", "hint": "N", "help": "rotated audit backups to keep" },
     { "name": "no-audit-log", "flag": "--no-audit-log", "env": null, "conv": "bool",
       "setting-help": "disable the DSH audit trail", "values": [ "on", "off" ],
       "help": "disable the DSH audit trail" },
@@ -175,7 +175,7 @@
     { "name": "request-restore", "live": "request/restore",
       "help": "re-apply a state dump's overrides (when the daemon has a dump path)" },
     { "name": "set", "help": "configure a setting (set battery on, set log-queries on)" },
-    { "name": "show", "help": "print a setting, the status report, or all of them" },
+    { "name": "show", "help": "print a setting's live value, or a report" },
     { "name": "shutdown", "help": "stop the dashboard server (asks to confirm)" },
     { "name": "unset", "help": "restore a setting to its configured value (unset battery, unset log-level)" }
   ]

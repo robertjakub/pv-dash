@@ -297,7 +297,7 @@
     { "name": "request-restore", "live": "request/restore",
       "help": "re-apply a state dump's overrides (when the daemon has a dump path)", "hidden": true },
     { "name": "set", "help": "configure a setting live: set <setting> <value>" },
-    { "name": "show", "help": "runtime state: show <setting|status|connections|cache|uplink|version|knobs>" },
+    { "name": "show", "help": "runtime state: show <setting|connections|cache|uplink|version|knobs>" },
     { "name": "shutdown", "help": "stop the proxy gracefully (asks to confirm)" },
     { "name": "unset", "help": "restore a setting to its configured value: unset <setting>" }
   ]

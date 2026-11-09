@@ -222,13 +222,6 @@ four registries; 23 names carry in all four:
 
 The findings:
 
-- **The audit rows' help prose is mangled on the scraper** —
-  `audit-files` reads "rotated audit backups to **keeps)**" and
-  `audit-max-mb` "0 = no size **rotations)**": a replace gone wrong
-  left the stray `s)`. The rows travel verbatim into `--help`, the man
-  page and `show audit rotate`'s word-help. One-line fixes; not made
-  here (the wave changes no registry rows — but they are the first
-  thing to fix when it lands).
 - **The live bounds ride the cache only.** The cache's `audit-files`
   (min 1, max 100) and `audit-max-mb` (min 0, max 1048576) are
   bound-gated at the live dispatch; the scraper's same-named rows
@@ -324,11 +317,6 @@ The findings:
 - **The audit vocabulary is tight** — the family speaks one event set;
   the tool-specific events are few and by nature. The matrix above is
   the canonical spelling list: a new event name should read it first.
-- **The mangled-prose class surfaces here too**: the scraper's audit
-  rows' "keeps)" / "rotations)" typos (the knobs section below) are
-  exactly what this sweep exists to catch — a log text that rhymes
-  with the canon but no longer matches it. The near-miss check is the
-  prose lint the registries' structural lint does not do.
 
 ## The exit-and-refusal sweep — the failure ladder
 
@@ -421,10 +409,10 @@ READMEs' `##` skeletons.
 
 **The man-page `.SH` ladders** (RENDER FAILED = the render died):
 
-- cache: NAME -> SYNOPSIS -> DESCRIPTION -> OPTIONS -> SIGNALS -> CONTROL -> ENVIRONMENT -> FILES -> EXIT STATUS -> SEE ALSO
-- scraper: NAME -> SYNOPSIS -> DESCRIPTION -> OPTIONS -> SIGNALS -> CONTROL -> SECURITY -> FILES -> SEE ALSO
-- inverter: NAME -> SYNOPSIS -> DESCRIPTION -> OPTIONS -> SIGNALS -> CONTROL -> SECURITY -> ENVIRONMENT -> FILES -> SEE ALSO
-- dashboard: NAME -> SYNOPSIS -> DESCRIPTION -> OPTIONS -> SIGNALS -> CONTROL -> SECURITY -> FILES -> SEE ALSO
+- cache: NAME -> SYNOPSIS -> DESCRIPTION -> OPTIONS -> SIGNALS -> CONTROL -> SECURITY -> ENVIRONMENT -> FILES -> EXIT STATUS -> SEE ALSO
+- scraper: NAME -> SYNOPSIS -> DESCRIPTION -> OPTIONS -> SIGNALS -> CONTROL -> SECURITY -> ENVIRONMENT -> FILES -> EXIT STATUS -> SEE ALSO
+- inverter: NAME -> SYNOPSIS -> DESCRIPTION -> OPTIONS -> SIGNALS -> CONTROL -> SECURITY -> ENVIRONMENT -> FILES -> EXIT STATUS -> SEE ALSO
+- dashboard: NAME -> SYNOPSIS -> DESCRIPTION -> OPTIONS -> SIGNALS -> CONTROL -> SECURITY -> ENVIRONMENT -> FILES -> EXIT STATUS -> SEE ALSO
 
 **The README `##` skeletons:**
 
@@ -574,7 +562,7 @@ files cite it — the promise ledger against the code.
 | F2 | The writer folds control characters in every detail line | — |
 | F3 | Fail closed: an unparseable write frame is refused with ILLEGAL_VALUE and audite | — |
 | F4 | Both control servers drop the connection past the 1 MB `MAX_LINE` (`cache/lib/co | — |
-| F5 | The cache refuses to start a TCP control port without a token | common, dashboard, inverter, scraper |
+| F5 | The cache refuses to start a TCP control port without a token | cache, common, dashboard, inverter, scraper |
 | F6 | The token is mandatory when the port is set | — |
 | F7 | Nothing is published | — |
 | F8 | Both control servers `chmod 0600` immediately after `bind()`; the cache takes `- | cache, common |
@@ -707,19 +695,13 @@ refusals and the same env layer; the code behind them lives once in
 `common/`. Each TODO states the consistent outcome and the plane it
 serves. Ordered by the user's exposure; the code plane rides along.
 
-1. **The audit help prose (the scraper)** — fix the mangled rows:
-   `audit-files` "rotated audit backups to keeps)" and `audit-max-mb`
-   "0 = no size rotations)". The user plane: `--help`, the man page
-   and `show audit rotate` read the same words on every tool. One
-   line each; ships with the next registry touch.
-
-2. **The audit rotation bounds, family-wide** — `audit-files` (min 1,
+1. **The audit rotation bounds, family-wide** — `audit-files` (min 1,
    max 100) and `audit-max-mb` (min 0, max 1048576) carry bounds in
    all four registries; the constants live once in `common/` (the
    audit module's own). The user plane: `set audit rotate files 0`
    refuses identically everywhere. Today the scraper accepts it.
 
-3. **The `audit-daily` knob, one shape** — the family-wide live knob
+2. **The `audit-daily` knob, one shape** — the family-wide live knob
    `audit/rotate/daily`: the scraper and the dashboard gain the row,
    the fake's startup-only row gains its live name, the cache's
    (today the only live one) is the template. The user plane: the
@@ -727,7 +709,7 @@ serves. Ordered by the user's exposure; the code plane rides along.
    plane: `rebuild_audit`'s `daily` rides the params everywhere (the
    common `AuditLog` already supports it).
 
-4. **The env twins completed** — every knob reachable from an env
+3. **The env twins completed** — every knob reachable from an env
    file: `$AUDIT_LOG/$AUDIT_MAX_MB/$AUDIT_FILES` on the fake and the
    dashboard, `$NO_AUDIT_LOG` everywhere (or nowhere, one ruling),
    `$LOG_LEVEL` on the dashboard, the F13 caps' twins
@@ -736,7 +718,7 @@ serves. Ordered by the user's exposure; the code plane rides along.
    code plane: the loaders read one env layer. A knob ruled
    env-free carries a registry note instead of a silent gap.
 
-5. **The `auth` name collision resolved** — one spelling, one
+4. **The `auth` name collision resolved** — one spelling, one
    meaning: the dashboard's `auth` node (the page's namespace)
    renames (`page-auth/` or the rows re-home), or the modbus enum
    re-homes; the set grammar never maps one word to two meanings.
@@ -744,25 +726,25 @@ serves. Ordered by the user's exposure; the code plane rides along.
    proposal + the migration note (the alias map carries the old
    spellings one release).
 
-6. **The serve-address word** — the family answers one question with
+5. **The serve-address word** — the family answers one question with
    one word: `show system listen` prints the address the daemon
    serves on, everywhere. The cache's `system/listen` is the canon;
    the scraper's `metrics/listen` stays as the alias; the fake's
    `host`/`port` gain the live name (F11 keeps the argv defaults);
    the dashboard's `bind`/`port` gain theirs.
 
-7. **`request/reload-config` family-wide** — the re-read-without-exec
+6. **`request/reload-config` family-wide** — the re-read-without-exec
    surface exists on the scraper and the dashboard; the cache gains
    it (its reload execs; a profile or selection edit deserves the
    lighter verb). The fake stays exempt — no config file, F11 — and
    the asymmetry gets the registry note.
 
-8. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
+7. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
    the RBAC vocabulary from the registry's command rows (the
    hidden/internal flags included). One home; the silent drift
    (a policy accepting a verb the grammar refuses) dies.
 
-9. **The accept-ladder extraction** — `common/modbus/server.py`: the
+8. **The accept-ladder extraction** — `common/modbus/server.py`: the
    gate -> ACL -> max-clients -> count -> thread discipline + the
    session opener (the clients register, the suite handshake, the
    `finally` unwind) with the malformed-frame policy hook (the
@@ -770,14 +752,14 @@ serves. Ordered by the user's exposure; the code plane rides along.
    identical refusal texts and logs at both Modbus faces; the code
    plane: the surface sweep's ~50-line net win.
 
-10. **The coverage TODOs graduate** — the seeds carry stable IDs in
+9. **The coverage TODOs graduate** — the seeds carry stable IDs in
     docs/family-drift-seeds.json (`family_drift.py --seeds`, the
     suggested suite per seed); a test wave consumes entries, the
     regeneration drops them, the shrinkage is the wave's proof, and
     `--check` fails when a NEW promise ships uncovered (the list may
     only shrink).
 
-11. **The parity gates wired** — the NixOS-parity and docker/env
+10. **The parity gates wired** — the NixOS-parity and docker/env
     sweeps join `check_options`/the release gates as machine checks
     (the module.nix type/default vs the registry, the env-file
     coverage vs the env twins). The drift doc's `--check` already

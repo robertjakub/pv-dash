@@ -131,7 +131,7 @@ class ControlServer(_ControlServer):
         """The one-line command reference: the state-dump commands appear
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
-        cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|status|connections|'
+        cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|connections|'
                 'version|config|knobs>, poll now, request reload-config')
         if self.dump_path:
             cmds += ', request dump, request restore'

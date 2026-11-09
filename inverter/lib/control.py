@@ -638,7 +638,7 @@ class ControlServer(_ControlServer):
                 if path in NODE_BY_NAME:
                     return 'ok %s' % describe_node(OPTIONS, path)
                 return 'err unknown command or setting %s (try ?)' % ' '.join(args)
-            cmds = ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|status|connections|config|knobs>, '
+            cmds = ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|connections|config|knobs>, '
                     'reset' % '|'.join(self.SETTING_KEYS))
             if self.dump_path:
                 cmds += ', request dump, request restore'

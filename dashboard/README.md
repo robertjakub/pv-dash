@@ -154,7 +154,7 @@ control server.
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy |
 | `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
-| `--audit-log` (+ `--audit-max-mb`, `--audit-files`, `--no-audit-log`) | the XDG state home | the DSH audit trail: a file path or `-` for stdout (the docker logs / journald way) + the rotation/off |
+| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`) | the XDG state home | the DSH audit trail: a file path or `-` for stdout (the docker logs / journald way) + the rotation/off |
 | `--log-level` / `--log-queries` / `--log-access` / `--local-time` | `INFO` / off / off / UTC | the log surface (`--log-queries` logs the proxied Prometheus queries at INFO) |
 
 ## Control

@@ -95,11 +95,11 @@ takes. The namespaces group them.
 | `metrics-max-clients` | — | startup-only | `N` | `--metrics-max-clients` / `METRICS_MAX_CLIENTS` | maximum concurrent /metrics clients; extras get an immediate 503, 0 = unlimited |
 | `metrics-client-timeout` | — | startup-only | `s` | `--metrics-client-timeout` / `METRICS_CLIENT_TIMEOUT` | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
 | `metrics-max-conn-per-ip` | — | startup-only | `N` | `--metrics-max-conn-per-ip` / `METRICS_MAX_CONN_PER_IP` | maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit |
-| `audit-log` | — | startup-only | `PATH\|-` | `--audit-log` / — | DSH audit trail: a file path or - for stdout (the docker/journald way); the XDG state home when unset |
-| `audit-max-mb` | — | startup-only | `MB` | `--audit-max-mb` / — | rotate the audit log at this size in MB, keeping 3 backups; 0 = no size rotation |
-| `audit-files` | — | startup-only | `N` | `--audit-files` / — | rotated audit backups to keep |
-| `no-audit-log` | — | startup-only | `on\|off` | `--no-audit-log` / — | disable the DSH audit trail |
-| `log-level` | `set log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / — | log verbosity |
+| `audit-log` | — | startup-only | `PATH\|-` | `--audit-log` / `AUDIT_LOG` | DSH audit trail: a file path or - for stdout (the docker/journald way); the XDG state home when unset |
+| `audit-max-mb` | — | startup-only | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation |
+| `audit-files` | — | startup-only | `N` | `--audit-files` / `AUDIT_FILES` | rotated audit backups to keep |
+| `no-audit-log` | — | startup-only | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the DSH audit trail |
+| `log-level` | `set log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
 | `log-queries` | `set log-queries` | settable | `on\|off` | `--log-queries` / — | log the proxied Prometheus queries at INFO |
 | `log-access` | `set log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log every HTTP request at INFO |
 | `local-time` | — | startup-only | `on\|off` | `--local-time` / `LOCAL_TIME` | log timestamps in the system time zone instead of UTC |
@@ -153,6 +153,14 @@ scrape presents and the client ACL checked at accept
 | `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / `METRICS_SERVER` | the dashboard's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
 | `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | require Authorization: Bearer \<token> on the /metrics endpoint — mandatory beyond loopback; startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
+
+### audit/rotate
+
+TODO: need update
+
+| knob | set / unset | kind | value | flag / env | description |
+|---|---|---|---|---|---|
+| `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit log at UTC midnight |
 
 ### dump
 

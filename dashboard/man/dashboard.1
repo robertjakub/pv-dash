@@ -146,8 +146,11 @@ DSH audit trail: a file path or \- for stdout (the docker/journald way);
 the XDG state home (~/.local/state/dashboard/audit.log) when unset
 .TP
 .BI \-\-audit\-max\-mb " N"
-rotate the audit log at this size in MB, keeping 3 backups; 0 = no size
+rotate the audit log at this size in MB, keeping N backups; 0 = no size
 rotation
+.TP
+.B \-\-audit\-daily
+also rotate the audit log at UTC midnight
 .TP
 .BI \-\-audit\-files " N"
 rotated audit backups to keep

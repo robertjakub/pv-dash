@@ -325,8 +325,12 @@ def main():
     if cfg['metrics_server']:
         metrics_desc = describe_metrics(metrics_listen, metrics_token, cfg.get('metrics_max_clients', 16),
                                         cfg.get('metrics_max_conn_per_ip', 0))
-    audit = None if args.no_audit_log else AuditLog(args.audit_log, 'DSH', app='dashboard',
-                                                    max_mb=args.audit_max_mb, files=args.audit_files)
+    audit_params = {'path': None if cfg['no_audit_log'] else cfg['audit_log'],
+                    'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],
+                    'daily': cfg['audit_daily'], 'disabled': bool(cfg['no_audit_log'])}
+    audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'], 'DSH', app='dashboard',
+                                                      max_mb=cfg['audit_max_mb'], daily=cfg['audit_daily'],
+                                                      files=cfg['audit_files'])
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target)
     Handler.upstream = cfg['upstream']
@@ -378,11 +382,12 @@ def main():
             'dump/path': cfg['dump_path'] or 'off',
             'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
             'dump-interval': 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval'],
-            'audit-log': 'off' if args.no_audit_log else ('stdout' if args.audit_log == '-'
-                                                          else (args.audit_log or 'the XDG state home')),
-            'audit-max-mb': '%g' % args.audit_max_mb,
-            'audit-files': str(args.audit_files),
-            'no-audit-log': 'on' if args.no_audit_log else 'off',
+            'audit-log': 'off' if cfg['no_audit_log'] else ('stdout' if cfg['audit_log'] == '-'
+                                                            else (cfg['audit_log'] or 'the XDG state home')),
+            'audit-max-mb': '%g' % cfg['audit_max_mb'],
+            'audit/rotate/daily': 'on' if cfg['audit_daily'] else 'off',
+            'audit-files': str(cfg['audit_files']),
+            'no-audit-log': 'on' if cfg['no_audit_log'] else 'off',
             'local-time': 'on' if cfg['local_time'] else 'off',
         }
         # the secret rows (control/token, control/ops/token, metrics/token,
@@ -390,6 +395,7 @@ def main():
         # metrics/token treatment) — a secret never renders, never re-applies
         control = ControlServer(httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
+                                audit_params=audit_params,
                                 socket_group=cfg['control_socket_group'],
                                 ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
                                 dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'],
@@ -405,6 +411,12 @@ def main():
                                                 'metrics_token': metrics_token,
                                                 'metrics_acl': acl_value_text(metrics_acl),
                                                 'auth_token': cfg['auth_token'],
+                                                'audit_log': cfg['audit_log'],
+                                                'audit_max_mb': cfg['audit_max_mb'],
+                                                'audit_daily': cfg['audit_daily'],
+                                                'audit_files': cfg['audit_files'],
+                                                'no_audit_log': cfg['no_audit_log'],
+                                                'log_level': cfg['level'],
                                                 'dump_key': cfg.get('dump_key')})
         control.start()
         if control.dump_path and cfg['restore_on_start']:

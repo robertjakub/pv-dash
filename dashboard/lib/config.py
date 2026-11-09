@@ -14,6 +14,7 @@ import logging
 import os
 
 from .options import OPTIONS
+from common.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 from common.config import check_control_tokens, check_token_chars, load_config_script, parse_listen, parse_secret, \
     resolve_metrics_acl, Resolver, str_to_bool
 from .statics import DEFAULTS, DEFAULT_LISTEN, DEFAULT_LISTEN_PORT, LOG_LEVELS
@@ -84,10 +85,19 @@ def resolve_config(args, script_dir=None):
                                   'client_timeout', DEFAULTS['client_timeout_s'], float),
         'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MAX_CONN_PER_IP',
                                    'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
-        'level': resolve(args.log_level, None, 'log_level', DEFAULTS['log_level'], str).strip().upper(),
+        'level': resolve(args.log_level, 'LOG_LEVEL', 'log_level', DEFAULTS['log_level'], str).strip().upper(),
     }
     cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'CTL',
                                   'control_port', None, str)
+    cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', None, str)
+    cfg['audit_max_mb'] = resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
+                                  'audit_max_mb', DEFAULTS['audit_max_mb'], float)
+    cfg['audit_files'] = resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
+                                 'audit_files', DEFAULTS['audit_files'], int)
+    cfg['audit_daily'] = resolve(getattr(args, 'audit_daily', False) or None,
+                                 'AUDIT_DAILY', 'audit_daily', False, str_to_bool)
+    cfg['no_audit_log'] = resolve(getattr(args, 'no_audit_log', False) or None,
+                                  'NO_AUDIT_LOG', 'no_audit_log', False, str_to_bool)
     cfg['control_token'] = parse_secret((resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
                                                  'control_token', None, str) or '').strip() or None, 'control/token')
     cfg['control_ops_token'] = parse_secret((resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
@@ -106,6 +116,12 @@ def resolve_config(args, script_dir=None):
         raise SystemExit('invalid client_timeout = %g: must be >= 0 (0 = off)' % cfg['client_timeout'])
     if cfg['max_conn_per_ip'] < 0:
         raise SystemExit('invalid max_conn_per_ip = %d: must be >= 0 (0 = no per-IP limit)' % cfg['max_conn_per_ip'])
+    if not (AUDIT_MAX_MB_MIN <= cfg['audit_max_mb'] <= AUDIT_MAX_MB_MAX):
+        raise SystemExit('invalid audit_max_mb = %g: must be %d..%d (0 = no size rotation)'
+                         % (cfg['audit_max_mb'], AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX))
+    if not (AUDIT_FILES_MIN <= cfg['audit_files'] <= AUDIT_FILES_MAX):
+        raise SystemExit('invalid audit_files = %d: must be %d..%d'
+                         % (cfg['audit_files'], AUDIT_FILES_MIN, AUDIT_FILES_MAX))
     if cfg['level'] not in LOG_LEVELS:
         raise SystemExit('invalid log_level = %r: must be one of %s' % (cfg['level'], ', '.join(LOG_LEVELS)))
     cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',

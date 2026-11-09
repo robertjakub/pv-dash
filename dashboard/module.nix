@@ -34,6 +34,7 @@ let
       "--audit-max-mb ${toString cfg.auditMaxMb}"
       "--audit-files ${toString cfg.auditFiles}"
     ]
+    ++ lib.optional cfg.auditDaily "--audit-daily"
     ++ lib.optionals (cfg.logLevel != null) [ "--log-level ${cfg.logLevel}" ]
     ++ lib.optional cfg.logQueries "--log-queries"
     ++ lib.optional cfg.localTime "--local-time"
@@ -404,6 +405,12 @@ in
       type = lib.types.float;
       default = 10.0;
       description = "Rotate the audit log at this size in MB, keeping auditFiles backups; 0 = off.";
+    };
+
+    auditDaily = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Also rotate the audit log at UTC midnight.";
     };
 
     auditFiles = lib.mkOption {

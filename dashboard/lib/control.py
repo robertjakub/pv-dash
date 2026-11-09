@@ -68,7 +68,7 @@ class ControlServer(_ControlServer):
     def __init__(self, httpd, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None,
                  startup_values=None, config_path=None, dump_path=None, restore_on_start=False,
-                 dump_key=None, dump_interval=0.0):
+                 dump_key=None, dump_interval=0.0, audit_params=None):
         self.httpd = httpd
         super().__init__(target, reloader=reloader, stopper=stopper, audit=audit, token=token,
                          defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
@@ -76,6 +76,7 @@ class ControlServer(_ControlServer):
                          dump_path=dump_path, restore_on_start=restore_on_start, dump_key=dump_key,
                          dump_interval=dump_interval)
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
+        self.audit_params = dict(audit_params or {})   # the audit family's live swaps rebuild from these
         self.config_path = config_path   # the config script the daemon started from — the reload state lives beside it
         self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
         self.dump_path = dump_path or None   # the state dump file (the dump family)
@@ -339,6 +340,15 @@ class ControlServer(_ControlServer):
                 raise ValueError('log-level must be one of %s' % ', '.join(LOG_LEVELS))
             logging.getLogger().setLevel(getattr(logging, lvl))
             return lvl
+        if key == 'audit/rotate/daily':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('audit/rotate/daily must be on or off')
+            self.audit_params['daily'] = on
+            return 'on' if on else 'off'
         if key == 'control/port':
             try:
                 target = parse_control_target(val, DEFAULT_LISTEN_PORT, CONTROL_SOCKET_TEMPLATE)
@@ -428,6 +438,14 @@ class ControlServer(_ControlServer):
         return ((self.metrics_srv.max_clients, self.metrics_srv.client_timeout, self.metrics_srv.max_per_ip)
                 if self.metrics_srv else DEFAULT_METRICS_CAPS)
 
+    def _rebuild_audit(self):
+        """Swap the DSH audit trail for one rebuilt from the params (the
+        shared rebuild re-chains from the file's own tail). The old trail
+        is NOT closed — a session still holding it writes its last
+        commands there."""
+        self.audit = self.rebuild_audit(self.audit_params, 'DSH', 'dashboard')
+        return self.audit.path if self.audit else 'off'
+
     def _get(self, key):
         h = self.httpd.RequestHandlerClass
         if key == 'max-clients':
@@ -437,6 +455,8 @@ class ControlServer(_ControlServer):
             return 'off' if not ct else secs(ct)
         if key == 'max-conn-per-ip':
             return '%d' % self.httpd.gate.max_per_ip
+        if key == 'audit/rotate/daily':
+            return 'on' if self.audit_params['daily'] else 'off'
         if key == 'log-access':
             return 'on' if h.log_access else 'off'
         if key == 'log-queries':

@@ -164,7 +164,7 @@ class EvilUpstream:
 
 try:
     # 1. baseline: strict fake (undefined regs rejected with 02) + cache
-    start([sys.executable, F, '--control-port', '0', '--static', '--strict', '--port', str(PORT),
+    start([sys.executable, F, '--control-port', '0', '--static', '--strict', '--listen', '127.0.0.1:%d' % (PORT),
            '--allow-write'])
     time.sleep(0.7)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT, '--listen', '127.0.0.1:%d' % CACHE_PORT,
@@ -313,7 +313,7 @@ try:
           b[0] == 3 and w[:2] == (0xCAFE, 0) and w[2] >= 3, str(w))
 
     # 3. poll status caching: profile variant with a register the device rejects
-    procs[0] = subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--strict', '--port', str(PORT),
+    procs[0] = subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--strict', '--listen', '127.0.0.1:%d' % (PORT),
                                  '--allow-write'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(0.7)
@@ -403,7 +403,7 @@ try:
             'the reply mac does not verify: %r' % obj
         return '%s %s' % (obj.get('status'), obj.get('text', ''))
 
-    start([sys.executable, F, '--static', '--port', '15512', '--control-port', '0', '--allow-write'])
+    start([sys.executable, F, '--static', '--listen', '127.0.0.1:15512', '--control-port', '0', '--allow-write'])
     # the shipped example selection: the essential set, by name
     SEL = os.path.join(CACHE_DIR, 'examples', 'selection.json')
     start([sys.executable, P, '--upstream', '127.0.0.1:15512',
@@ -1042,6 +1042,16 @@ try:
     check('dump-interval: the file refreshes by itself', m2 > m1, '%.2f -> %.2f' % (m1, m2))
     r = ctl_cmd('set dump-interval off', 15537)
     check('dump-interval: off again', r.startswith('ok dump-interval=off'), r[:80])
+    # the periodic dumper's failure speaks its one line (the canon phrase —
+    # the dumper keeps ticking, the write failure is logged, never fatal)
+    ctl_cmd('set dump path /nonexistent-dir-zz/dump.json', 15537)
+    ctl_cmd('set dump-interval 1', 15537)
+    time.sleep(2.2)
+    ctl_cmd('set dump-interval off', 15537)
+    dlog = open('/tmp/reg_cache_dump.log', errors='replace').read()
+    check('dump-interval: a failing periodic dump logs its one line',
+          'the periodic dump to /nonexistent-dir-zz/dump.json failed' in dlog, dlog[-200:])
+    ctl_cmd('set dump path ' + dumpfile, 15537)
     # the write-behind story: the shutdown dump restores into the next start
     ctl_cmd('set modbus interval 3', 15537)
     r = ctl_cmd('shutdown', 15537)
@@ -1871,7 +1881,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # decides, a register no rule decides refuses) — the deye profile allows
     # the TOU schedule slots (148-177) and the grid-start registers (127-128)
     deye = os.path.join(REPO, 'profiles', 'profiles', 'deye-sg05lp3.json')
-    start([sys.executable, F, '--static', '--port', '15584', '--profile', deye,
+    start([sys.executable, F, '--static', '--listen', '127.0.0.1:15584', '--profile', deye,
            '--control-port', '0', '--allow-write'], log='/tmp/reg_deye_fake.log')
     start([sys.executable, P, '--upstream', '127.0.0.1:15584',
            '--listen', '127.0.0.1:15585', '--interval', '1', '--profile', 'deye-sg05lp3',
@@ -2326,7 +2336,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
 
     AUTH_FAKE, AUTH_PORT, AUTH_CTL = 15561, 15562, 15563
     CL_KEY, UP_KEY = 'cl-suite-key-16chars!', 'up-suite-key-16chars!'
-    start([sys.executable, F, '--static', '--port', str(AUTH_FAKE), '--control-port', '0',
+    start([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (AUTH_FAKE), '--control-port', '0',
            '--auth', 'suite', '--auth-key', UP_KEY])
     time.sleep(0.7)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,

@@ -97,7 +97,7 @@ def authed_roundtrip(port, token, cmd, timeout=5.0):
 def main():
     procs = []
     try:
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15960',
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15960',
                                        '--control-port', '15961'],
                                       stdout=open('/tmp/ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
         time.sleep(0.9)
@@ -166,7 +166,7 @@ def main():
         check('fuzz: real command after the flood', st == 'ok', '%s %s' % (st, tx))
 
         # 6. the token server: the auth abuse is rejected, the real token works
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15962',
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15962',
                                        '--control-port', '15963', '--control-token', 'sekrit'],
                                       stdout=open('/tmp/ctl_fuzz2.log', 'w'), stderr=subprocess.STDOUT))
         time.sleep(0.9)
@@ -211,7 +211,7 @@ def main():
         #     with it (the file must be owner-only 0600 — F12 in docs/AUDIT.md)
         open('/tmp/ctl_fuzz_token', 'w').write('filesecret\n')
         os.chmod('/tmp/ctl_fuzz_token', 0o600)
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15965',
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15965',
                                        '--control-port', '15964', '--control-token',
                                        'file:/tmp/ctl_fuzz_token'],
                                       stdout=open('/tmp/ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
@@ -243,7 +243,7 @@ def main():
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
         open('/tmp/ctl_fuzz_token_lax', 'w').write('laxsecret\n')          # the umask default (0644)
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
-                            '--port', '15962', '--dry-run',
+                            '--listen', '127.0.0.1:15962', '--dry-run',
                             '--control-token', 'file:/tmp/ctl_fuzz_token_lax'],
                            capture_output=True, text=True, timeout=15)
         check('fuzz: a group/world-readable token file refuses to start (F12)',
@@ -258,7 +258,7 @@ def main():
         check('fuzz: fake_ctl honors CONTROL_TOKEN=file:...', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
-                            '--port', '15962', '--dry-run', '--metrics-server',
+                            '--listen', '127.0.0.1:15962', '--dry-run', '--metrics-server',
                             '--metrics-listen', '127.0.0.1:15967'],
                            capture_output=True, text=True, timeout=15,
                            env={**os.environ, 'METRICS_TOKEN': 'file:/tmp/ctl_fuzz_token'})
@@ -269,7 +269,7 @@ def main():
         # 6d. the read-only ops token: the show/clear verbs only, both audited
         OPS_AUDIT = '/tmp/ctl_fuzz_ops_audit.log'
         open(OPS_AUDIT, 'w').write('')
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15983',
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15983',
                                        '--control-port', '15982', '--control-token', 'admintok',
                                        '--control-ops-token', 'opstok', '--audit-log', OPS_AUDIT],
                                       stdout=open('/tmp/ctl_fuzz4.log', 'w'), stderr=subprocess.STDOUT))
@@ -328,13 +328,13 @@ def main():
                            capture_output=True, text=True, timeout=15)
         check('ops: fake_ctl cannot steer with the ops token', 'forbidden' in r.stdout
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stdout + r.stderr)[:120]))
-        r = subprocess.run([sys.executable, F, '--static', '--port', '15983', '--dry-run',
+        r = subprocess.run([sys.executable, F, '--static', '--listen', '127.0.0.1:15983', '--dry-run',
                             '--control-port', '0', '--control-ops-token', 'opstok'],
                            capture_output=True, text=True, timeout=15)
         check('ops: an ops token without the admin token is a clean error', r.returncode != 0
               and 'supplements' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
-        r = subprocess.run([sys.executable, F, '--static', '--port', '15983', '--dry-run',
+        r = subprocess.run([sys.executable, F, '--static', '--listen', '127.0.0.1:15983', '--dry-run',
                             '--control-port', '0', '--control-token', 'same',
                             '--control-ops-token', 'same'],
                            capture_output=True, text=True, timeout=15)

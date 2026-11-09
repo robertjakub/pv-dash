@@ -143,7 +143,7 @@ def main():
     threading.Thread(target=stub.serve_forever, daemon=True).start()
     procs = []
     try:
-        procs.append(subprocess.Popen([sys.executable, P, '--port', str(HTTP_PORT), '--bind', '127.0.0.1',
+        procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (HTTP_PORT),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js'),
                                        '--metrics-server', '--metrics-listen', '127.0.0.1:%d' % METRICS_PORT,
@@ -289,7 +289,7 @@ def main():
         # 6c. the read-only ops token: show allowed, steering forbidden; both audited
         OPS_AUDIT = '/tmp/dash_ctl_fuzz_ops_audit.log'
         open(OPS_AUDIT, 'w').write('')
-        procs.append(subprocess.Popen([sys.executable, P, '--port', str(OPS_HTTP_PORT), '--bind', '127.0.0.1',
+        procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (OPS_HTTP_PORT),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--control-port', str(OPS_CTRL_PORT), '--control-token', 'admintok2',
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
@@ -302,7 +302,7 @@ def main():
         check('ops: show version honored', st == 'ok' and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show knobs')
         check('ops: show knobs honored (the dictionary of the registry, a show verb)',
-              st == 'ok' and macok and '--port' in tx, '%s %s' % (st, tx[:160]))
+              st == 'ok' and macok and '--listen' in tx, '%s %s' % (st, tx[:160]))
         st, tx, macok = ops_roundtrip('set log-level DEBUG')
         check('ops: set is forbidden', st == 'fail' and 'forbidden' in tx and 'admin' in tx and macok,
               '%s %s' % (st, tx))
@@ -335,13 +335,13 @@ def main():
                             'shutdown'], capture_output=True, text=True, timeout=15)
         check('ops: dashboard_ctl cannot steer with the ops token', 'forbidden' in r.stdout
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stdout + r.stderr)[:120]))
-        r = subprocess.run([sys.executable, P, '--port', str(OPS_HTTP_PORT), '--bind', '127.0.0.1',
+        r = subprocess.run([sys.executable, P, '--listen', '127.0.0.1:%d' % (OPS_HTTP_PORT),
                             '--control-port', str(OPS_CTRL_PORT), '--control-ops-token', 'x', '--dry-run'],
                            capture_output=True, text=True, timeout=15)
         check('ops: an ops token without the admin token is a clean error', r.returncode != 0
               and 'supplements' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
-        r = subprocess.run([sys.executable, P, '--port', str(OPS_HTTP_PORT), '--bind', '127.0.0.1',
+        r = subprocess.run([sys.executable, P, '--listen', '127.0.0.1:%d' % (OPS_HTTP_PORT),
                             '--control-port', str(OPS_CTRL_PORT), '--control-token', 'same',
                             '--control-ops-token', 'same', '--dry-run'],
                            capture_output=True, text=True, timeout=15)
@@ -405,20 +405,20 @@ def main():
             except OSError as e:
                 return ('boom: %s' % e).encode()
 
-        r = subprocess.run([sys.executable, P, '--port', str(PAGES_PORT), '--bind', '0.0.0.0', '--dry-run',
+        r = subprocess.run([sys.executable, P, '--listen', '0.0.0.0:%d' % (PAGES_PORT), '--dry-run',
                             '--upstream', 'http://127.0.0.1:%d' % PROM_PORT], capture_output=True, text=True, timeout=15)
         check('page auth: a token-less non-loopback bind refuses to start (F21)',
               r.returncode != 0 and 'refusing to expose the page beyond loopback' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
-        r = subprocess.run([sys.executable, P, '--port', str(PAGES_PORT), '--bind', '0.0.0.0', '--dry-run',
+        r = subprocess.run([sys.executable, P, '--listen', '0.0.0.0:%d' % (PAGES_PORT), '--dry-run',
                             '--auth-token', 'ptok',
                             '--upstream', 'http://127.0.0.1:%d' % PROM_PORT], capture_output=True, text=True, timeout=15)
         check('page auth: a non-loopback bind with a token starts', r.returncode == 0, repr((r.stderr + r.stdout)[-140:]))
-        r = subprocess.run([sys.executable, P, '--port', str(PAGES_PORT), '--dry-run',
+        r = subprocess.run([sys.executable, P, '--listen', '127.0.0.1:%d' % (PAGES_PORT), '--dry-run',
                             '--upstream', 'http://127.0.0.1:%d' % PROM_PORT], capture_output=True, text=True, timeout=15)
         check('page auth: the loopback default needs no token', r.returncode == 0, repr((r.stderr + r.stdout)[-140:]))
 
-        procs.append(subprocess.Popen([sys.executable, P, '--port', str(PAGES_PORT), '--bind', '127.0.0.1',
+        procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (PAGES_PORT),
                                        '--auth-token', 'ptok',
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js'),
@@ -447,7 +447,7 @@ def main():
         r = page_get(PAGES_PORT, b'/config.js', b'Authorization: Bearer ptok\r\n')
         check('page auth: the configured token still reads (no live rotation)', r.startswith(b'HTTP/1.1 200'), r[:40])
         # the tokenless loopback page serves (the bind is the auth — the F21 shape)
-        procs.append(subprocess.Popen([sys.executable, P, '--port', '15980', '--bind', '127.0.0.1',
+        procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:15980',
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js')],
                                       stdout=open('/tmp/dash_ctl_fuzz_tokless.log', 'w'), stderr=subprocess.STDOUT))
@@ -461,7 +461,7 @@ def main():
         #     closes, the group-accessible mode re-modes the unix socket live
         REB_HTTP, REB_TCP = 15978, 15979
         reb_sock = '/tmp/dashboard-%d.socket' % REB_HTTP
-        procs.append(subprocess.Popen([sys.executable, P, '--port', str(REB_HTTP), '--bind', '127.0.0.1',
+        procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (REB_HTTP),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--audit-log', '-'],
                                       stdout=open('/tmp/dash_ctl_fuzz_rebind.log', 'w'), stderr=subprocess.STDOUT))
@@ -494,7 +494,7 @@ def main():
         check('family listener: startup-only — the token set refuses (the instance stays tokenless)',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:120])
         # the token'd rebind: a spawned-token instance (the token is startup-only)
-        procs.append(subprocess.Popen([sys.executable, P, '--port', '15981', '--bind', '127.0.0.1',
+        procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:15981',
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--audit-log', '-', '--control-port', '15982',
                                        '--control-token', 'rtok2'],

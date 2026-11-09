@@ -95,31 +95,31 @@ def eof_soon(sock, seconds=3.0):
 def main():
     procs = []
     try:
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(A_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (A_MODBUS),
                                        '--control-port', str(A_CTL), '--max-clients', '1', '--allow-write'],
                                       stdout=open(LOG, 'w'), stderr=subprocess.STDOUT))
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(B_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (B_MODBUS),
                                        '--control-port', str(B_CTL), '--client-timeout', '1',
                                        '--metrics-listen', '127.0.0.1:%d' % B_METRICS, '--metrics-token', 'tok', '--metrics-server',
                                        '--metrics-max-clients', '1'],
                                       stdout=open(LOG + '.b', 'w'), stderr=subprocess.STDOUT))
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(C_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (C_MODBUS),
                                        '--control-port', str(C_CTL), '--max-clients', '0',
                                        '--max-conn-per-ip', '1'],
                                       stdout=open(LOG + '.c', 'w'), stderr=subprocess.STDOUT))
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(D_MODBUS)],
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (D_MODBUS)],
                                       stdout=open(LOG + '.d', 'w'), stderr=subprocess.STDOUT))
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(E_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (E_MODBUS),
                                        '--control-port', E_SOCK, '--control-socket-group'],
                                       stdout=open(LOG + '.e', 'w'), stderr=subprocess.STDOUT))
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(F_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (F_MODBUS),
                                        '--control-port', str(F_CTL),
                                        '--metrics-listen', '0.0.0.0:%d' % F_METRICS],
                                       stdout=open(LOG + '.f', 'w'), stderr=subprocess.STDOUT))
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(G_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (G_MODBUS),
                                        '--control-port', G_SOCK],
                                       stdout=open(LOG + '.g', 'w'), stderr=subprocess.STDOUT))
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(H_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (H_MODBUS),
                                        '--control-port', str(H_CTL), '--control-token', 'tok',
                                        '--audit-log', '/tmp/inv_regtest_audit.log'],
                                       stdout=open(LOG + '.h', 'w'), stderr=subprocess.STDOUT))
@@ -242,7 +242,7 @@ def main():
             {'name': 'grid-power', 'register': 400, 'type': 'i32', 'scale': 1, 'fc': 4},
             {'name': 'device-insulation', 'register': 500, 'type': 'f32', 'scale': 1},
         ]}, open(split_prof, 'w'))
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(S_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (S_MODBUS),
                                        '--control-port', '0', '--profile', split_prof],
                                       stdout=open(LOG + '.i', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.0)
@@ -379,7 +379,7 @@ def main():
               tx.startswith('% error: restart required (startup-only knob)'), tx)
         # the token serves at START instead: a spawned instance answers the
         # bearer on a non-loopback bind (the F13 floor's success side)
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15997',
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15997',
                                        '--metrics-server', '--metrics-token', 't',
                                        '--metrics-listen', '0.0.0.0:15998'],
                                       stdout=open(LOG + '.f2', 'w'), stderr=subprocess.STDOUT))
@@ -582,7 +582,7 @@ def main():
         #      dump/restore (instance I)
         I_MODBUS, I_CTL = 15985, 15986
         reload_state = '/tmp/inv_regtest_reload_state'
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(I_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (I_MODBUS),
                                        '--control-port', str(I_CTL),
                                        '--dump-path', '/tmp/inv_regtest_state.json', '--restore-on-start'],
                                       stdout=open(LOG + '.i', 'w'), stderr=subprocess.STDOUT,
@@ -660,7 +660,7 @@ def main():
         kstate = '/tmp/inv_regtest_state_sealed.json'
         if os.path.exists(kstate):
             os.unlink(kstate)   # the block is idempotent: a previous run's graceful-shutdown dump (2 settings) must not seed this one
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', kstate,
                                        '--dump-key', 'inv-seal-key', '--restore-on-start'],
                                       stdout=open(LOG + '.j', 'w'), stderr=subprocess.STDOUT,
@@ -696,7 +696,7 @@ def main():
         procs[-1].kill()
         time.sleep(0.3)
         # the wrong key: the sealed dump refuses at start (the mac reads it as tampered content)
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', kstate,
                                        '--dump-key', 'inv-seal-key-WRONG', '--restore-on-start'],
                                       stdout=open(LOG + '.j2', 'w'), stderr=subprocess.STDOUT,
@@ -714,7 +714,7 @@ def main():
         procs[-1].kill()
         time.sleep(0.3)
         # no key at all: a sealed dump refuses with the pointer to dump/key
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', kstate,
                                        '--restore-on-start'],
                                       stdout=open(LOG + '.j3', 'w'), stderr=subprocess.STDOUT,
@@ -730,7 +730,7 @@ def main():
         procs[-1].kill()
         time.sleep(0.3)
         # a configured key refuses an UNSEALED dump (plaintext stopped being trust at rest)
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', '/tmp/inv_regtest_state.json',
                                        '--dump-key', 'inv-seal-key', '--restore-on-start'],
                                       stdout=open(LOG + '.j4', 'w'), stderr=subprocess.STDOUT,
@@ -747,7 +747,7 @@ def main():
         time.sleep(0.3)
         # the right key: the sealed dump restores at start, and the keyed
         # reload's state file re-reads on the other side of the exec
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(J_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', kstate,
                                        '--dump-key', 'inv-seal-key', '--restore-on-start'],
                                       stdout=open(LOG + '.j5', 'w'), stderr=subprocess.STDOUT,
@@ -791,7 +791,7 @@ def main():
         kfile_state = '/tmp/inv_regtest_state_filekey.json'
         if os.path.exists(kfile_state):
             os.unlink(kfile_state)
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (K_MODBUS),
                                        '--control-port', str(K_CTL), '--dump-path', kfile_state],
                                       stdout=open(LOG + '.k', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
@@ -817,7 +817,7 @@ def main():
         with open(kkey, 'w') as fh:
             fh.write('file-key-material-9\n')
         os.chmod(kkey, 0o600)
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (K_MODBUS),
                                        '--control-port', str(K_CTL), '--dump-path', kfile_state,
                                        '--dump-key', 'file:' + kkey, '--restore-on-start'],
                                       stdout=open(LOG + '.k2', 'w'), stderr=subprocess.STDOUT,
@@ -833,7 +833,7 @@ def main():
         procs[-1].kill()
         time.sleep(0.3)
         kfile_state2 = '/tmp/inv_regtest_state_filekey2.json'
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (K_MODBUS),
                                        '--control-port', str(K_CTL), '--dump-path', kfile_state2,
                                        '--dump-key', 'file:' + kkey],
                                       stdout=open(LOG + '.k3', 'w'), stderr=subprocess.STDOUT,
@@ -858,7 +858,7 @@ def main():
               and kd.get('box') and '"pv"' not in raw, raw[:120])
         procs[-1].kill()
         time.sleep(0.3)
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (K_MODBUS),
                                        '--control-port', str(K_CTL), '--dump-path', kfile_state2,
                                        '--dump-key', 'file:' + kkey, '--restore-on-start'],
                                       stdout=open(LOG + '.k4', 'w'), stderr=subprocess.STDOUT,
@@ -882,7 +882,7 @@ def main():
         with open(ktok, 'w') as fh:
             fh.write('tok-from-file-77\n')
         os.chmod(ktok, 0o600)
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (K_MODBUS),
                                        '--control-port', str(K_CTL), '--dump-path', kfile_state2,
                                        '--dump-key', 'file:' + kkey, '--restore-on-start',
                                        '--control-token', 'file:' + ktok],
@@ -906,7 +906,7 @@ def main():
         time.sleep(0.3)
         # an unreadable reference fails the start (a key that silently
         # vanishes is a misconfiguration, not a fallback to plaintext)
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(K_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (K_MODBUS),
                                        '--control-port', str(K_CTL), '--dump-path', kfile_state2,
                                        '--dump-key', 'file:/nonexistent/dump_key', '--restore-on-start'],
                                       stdout=open(LOG + '.k5', 'w'), stderr=subprocess.STDOUT,
@@ -937,7 +937,7 @@ def main():
 
         L_MODBUS, L_CTL = 15991, 15992
         L_KEY = 'inv-suite-key-16chars!'
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(L_MODBUS),
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (L_MODBUS),
                                        '--control-port', str(L_CTL), '--auth', 'suite',
                                        '--auth-key', L_KEY],
                                       stdout=open(LOG + '.l', 'w'), stderr=subprocess.STDOUT))
@@ -1047,7 +1047,7 @@ def main():
         #      unset restores the configured socket, the socket-group
         #      re-modes live, the ops policy and the trust uids ride the wire
         M_MODBUS, M_TCP1, M_TCP2 = 15994, 15995, 15996
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(M_MODBUS)],
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (M_MODBUS)],
                                       stdout=open(LOG + '.m', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.0)
         msock = '/tmp/fake-inverter-%d.socket' % M_MODBUS

@@ -33,7 +33,7 @@ def check(name, cond, detail=''):
 
 procs = []
 try:
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--strict', '--port', str(PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--strict', '--listen', '127.0.0.1:%d' % (PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,

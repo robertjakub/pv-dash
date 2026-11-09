@@ -116,7 +116,7 @@ def main():
         flog = os.path.join(tmp, 'fake.log')
         fake = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
         ctl = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py')
-        proc = subprocess.Popen([sys.executable, fake, '--static', '--port', '15977',
+        proc = subprocess.Popen([sys.executable, fake, '--static', '--listen', '127.0.0.1:15977',
                                  '--control-port', '15978', '--audit-log', flog],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:

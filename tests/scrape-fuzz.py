@@ -54,7 +54,7 @@ import socket  # noqa: E402  (late import keeps the helpers above readable)
 
 procs = []
 try:
-    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--port', str(INV_PORT)],
+    procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--listen', '127.0.0.1:%d' % (INV_PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     with open('/tmp/scr_fuzz.ini', 'w') as fh:

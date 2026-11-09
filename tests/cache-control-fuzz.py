@@ -126,7 +126,7 @@ def roundtrip(port, wire_bytes, timeout=5.0):
 def main():
     procs = []
     try:
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', '15960',
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15960',
                                        '--control-port', '0'], stdout=subprocess.DEVNULL,
                                       stderr=subprocess.DEVNULL))
         procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15960',

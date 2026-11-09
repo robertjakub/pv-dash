@@ -165,10 +165,10 @@ the XDG state home (~/.local/state/modbus\-scraper/audit.log) when unset
 .TP
 .BI \-\-audit\-max\-mb " N"
 rotate the audit log at this size in MB, keeping 3 backups; 0 = no size
-rotations)
+rotation
 .TP
 .BI \-\-audit\-files " N"
-rotated audit backups to keeps)
+rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
 disable the SCR audit trail
@@ -265,6 +265,16 @@ the show/clear verbs. The audit trail (in the XDG state home when
 \fB--audit-log\fR is unset, prefix SCR) records the control commands
 with their roles, the auth failures, the reloads and the shutdowns.
 
+.SH ENVIRONMENT
+.TP
+.B CTL
+control target for the daemon's clients when the flag is unset (flag
+\fB--control-port\fR wins).
+.TP
+.B UPSTREAM ", " LISTEN ", " INTERVAL ", " AUTH_TOKEN ", " ...
+every flag has an environment twin of the same bare name (no tool
+prefix); the flag wins over the env, the env over the config script.
+
 .SH FILES
 .TP
 .I /tmp/modbus-scraper-<listen-port>.socket
@@ -272,6 +282,17 @@ the control socket used when \fB--control-port\fR is unset.
 .TP
 .I ~/.local/state/modbus-scraper/audit.log
 the audit trail when \fB--audit-log\fR is unset.
+
+.SH EXIT STATUS
+.TP
+.B 0
+success (\fB--dry-run\fR: valid configuration).
+.TP
+.B 1
+invalid configuration or a failed bind (reason on stderr).
+.TP
+.B 2
+command-line misuse.
 
 .SH SEE ALSO
 .BR modbus-scraper-ctl (1),

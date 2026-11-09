@@ -59,6 +59,17 @@ the control target when \fB--control-port\fR is unset.
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off).
 
+.SH EXIT STATUS
+.TP
+.B 0
+the session ended cleanly.
+.TP
+.B 1
+connection or control error.
+.TP
+.B 2
+command-line misuse.
+
 .SH SEE ALSO
 .BR modbus-scraper-ctl (1),
 .BR modbus-scraper (1)

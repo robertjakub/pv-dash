@@ -106,13 +106,33 @@ the control socket used when \\fB--control-port\\fR is unset.
 .TP
 .I ~/.local/state/modbus-scraper/audit.log
 the audit trail when \\fB--audit-log\\fR is unset."""
+    environment = """.SH ENVIRONMENT
+.TP
+.B CTL
+control target for the daemon's clients when the flag is unset (flag
+\\fB--control-port\\fR wins).
+.TP
+.B UPSTREAM ", " LISTEN ", " INTERVAL ", " AUTH_TOKEN ", " ...
+every flag has an environment twin of the same bare name (no tool
+prefix); the flag wins over the env, the env over the config script."""
+    exit_status = """.SH EXIT STATUS
+.TP
+.B 0
+success (\\fB--dry-run\\fR: valid configuration).
+.TP
+.B 1
+invalid configuration or a failed bind (reason on stderr).
+.TP
+.B 2
+command-line misuse."""
     return page(
         'Prometheus exporter for PV inverters (Modbus TCP, stdlib only)',
         'modbus-scraper', 1, DATE, VERSION, MANUAL,
         '.B modbus-scraper\n.RI [ options ]',
         description,
         options_section(parser),
-        extra_sections=(signals, control, security, files),
+        extra_sections=(signals, control, security, environment, files, exit_status),
+        kind='daemon',
         see_also='.BR modbus-scraper-ctl (1),\n.BR modbus-scraper-cli (1),\n.BR modbus-cache (1),\n.BR modbus-fake-inverter (1)\n.PP\nscraper/README.md in the suite checkout \\(em the full documentation.')
 
 
@@ -125,13 +145,37 @@ completion — the scriptable surface (the exit codes, one reply per
 command). With a control token configured the wire is HMAC-signed: the
 client signs every command and verifies every reply (the full sha256 of
 the frame, keyed by the token)."""
+    examples = """.SH EXAMPLES
+.RS
+.IP \\(bu 2
+.B modbus-scraper-ctl poll now
+.IP \\(bu 2
+.B modbus-scraper-ctl show version
+.IP \\(bu 2
+.B printf 'inspect\\enpoll now\\en' | modbus-scraper-ctl
+.RE"""
+    environment = """.SH ENVIRONMENT
+.TP
+.B CTL ", " CONTROL_TOKEN
+the control target and the TCP token when the flags are unset."""
+    exit_status = """.SH EXIT STATUS
+.TP
+.B 0
+every command answered \\fBok\\fR.
+.TP
+.B 1
+connection or control error.
+.TP
+.B 2
+command-line misuse."""
     return page(
         "send commands to the modbus-scraper control server (one-shot / batch)",
         'modbus-scraper-ctl', 1, DATE, VERSION, MANUAL,
         '.B modbus-scraper-ctl\n.RI [ options ] " [command ...]"',
         description,
         options_section(parser),
-        extra_sections=(),
+        extra_sections=(examples, environment, exit_status),
+        kind='ctl',
         see_also='.BR modbus-scraper-cli (1),\n.BR modbus-scraper (1)')
 
 
@@ -154,11 +198,22 @@ the control target when \\fB--control-port\\fR is unset.
 .TP
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off)."""
+    exit_status = """.SH EXIT STATUS
+.TP
+.B 0
+the session ended cleanly.
+.TP
+.B 1
+connection or control error.
+.TP
+.B 2
+command-line misuse."""
     return page(
         "console-style session on the modbus-scraper control server",
         'modbus-scraper-cli', 1, DATE, VERSION, MANUAL,
         '.B modbus-scraper-cli\n.RI [ options ]',
         description,
         options_section(parser),
-        extra_sections=(env,),
+        extra_sections=(env, exit_status),
+        kind='cli',
         see_also='.BR modbus-scraper-ctl (1),\n.BR modbus-scraper (1)')

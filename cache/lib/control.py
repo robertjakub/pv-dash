@@ -16,6 +16,7 @@ import os
 import socket
 import time
 
+from common.runtime.audit import AUDIT_FORWARD_CHOICES
 from common.runtime.version import version_string
 from common.settings.config import auth_key_floor_error, default_profile_path, is_loopback_host, parse_auth_type, parse_control_target, \
     parse_upstream, resolve_profile_file
@@ -445,6 +446,13 @@ class ControlServer(_ControlServer):
             p.config['audit_files'] = v
             self._rebuild_audit()
             return '%d' % v
+        if key == 'audit/forward':
+            if val not in AUDIT_FORWARD_CHOICES:
+                raise ValueError('audit/forward must be one of %s' % ', '.join(AUDIT_FORWARD_CHOICES))
+            p.audit_params['forward'] = None if val == 'none' else val
+            p.config['audit_forward'] = val
+            self._rebuild_audit()
+            return val
         if key == 'audit/disable':
             if val in ('on', 'true', '1', 'yes'):
                 on = True
@@ -661,6 +669,8 @@ class ControlServer(_ControlServer):
             return '%d' % p.metrics_caps[2]
         if key == 'audit/log-file':
             return p.audit.path if p.audit else 'off'
+        if key == 'audit/forward':
+            return p.audit_params.get('forward') or 'none'
         if key == 'audit/rotate/max-size':
             return '%g' % p.audit_params['max_mb']
         if key == 'audit/rotate/daily':
@@ -905,6 +915,7 @@ class ControlServer(_ControlServer):
             'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control/socket-group': 'on' if self.socket_group else 'off',
             'audit/log-file': (p.audit.path if p.audit else 'off'),
+            'audit/forward': p.audit_params.get('forward') or 'none',
             'audit/rotate/max-size': '%g' % prm['max_mb'],
             'audit/rotate/daily': 'on' if prm['daily'] else 'off',
             'audit/rotate/files': '%d' % prm['files'],

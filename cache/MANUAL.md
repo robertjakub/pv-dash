@@ -183,11 +183,13 @@ limits
 
 ### audit
 
-the CACHE audit trail: the sink, the rotation, the kill switch
+the CACHE audit trail: the sink, the forwarding, the rotation, the kill
+switch
 
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `audit-log` | `set audit log-file` | settable | `PATH\|-` | `--audit-log` / `AUDIT_LOG` | the audit trail's file: a path, - for stdout, empty = the XDG state home |
+| `audit-forward` | `set audit forward` | settable | `syslog\|none` | `--audit-forward` / `AUDIT_FORWARD` | also mirror every audit line to the local syslog (journald picks them up, chain hash included) |
 | `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the audit trail entirely |
 | `requests-audit` | `set audit requests` | settable | `s\|off` | `--requests-audit` / `REQUESTS_AUDIT` | audit one REQUESTS tally per client per this many seconds |
 

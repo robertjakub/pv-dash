@@ -91,7 +91,8 @@ metrics listen, the metrics limits caps, metrics acl,
 audit requests, dump-interval, log-level, local-time, modbus profile,
 modbus selection, acl connect, acl write, modbus timeout, modbus auth,
 modbus auth-upstream, control port, control ops verbs, control
-trust-uids, control socket-group, audit log-file, audit rotate max-size,
+trust-uids, control socket-group, audit log-file, audit forward, audit
+rotate max-size,
 audit disable, dump path, dump with-cache); a SIGHUP re-applies the config
 (the file always wins). A knob the registry marks
 .B restart: true
@@ -182,7 +183,10 @@ With \\fB--dump-key\\fR the state file is sealed (an HMAC\\-SHA256
 counter\\-mode keystream, authenticated \\(em a restore refuses a wrong
 or missing key). The audit trail (in the XDG state home when
 \\fB--audit-log\\fR is unset, prefix CACHE) records the control commands
-with their roles, the auth failures, the writes and the reloads."""
+with their roles, the auth failures, the writes and the reloads. With
+\\fB--audit-forward syslog\\fR every line \\(em the per\\-writer hash
+chain included \\(em is mirrored to the local syslog socket, journald's
+sealed external copy beside the file/stdout sink (F10)."""
     environment = """.SH ENVIRONMENT
 .TP
 .B CTL

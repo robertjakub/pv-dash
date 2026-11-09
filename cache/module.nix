@@ -79,6 +79,7 @@ let
     "# --- the audit trail ---"
     (setLine "no-audit-log" (lib.boolToString cfg.noAuditLog))
     (setLine "audit-log" (if cfg.auditLog == null then "-" else cfg.auditLog))
+    (setLine "audit-forward" (if cfg.auditForward == null then "none" else cfg.auditForward))
     (setLine "audit-max-mb" (toString cfg.auditMaxMb))
     (setLine "audit-daily" (lib.boolToString cfg.auditDaily))
     (setLine "audit-files" (toString cfg.auditFiles))
@@ -613,6 +614,17 @@ in
       type = lib.types.float;
       default = 10.0;
       description = "Rotate the audit log at this size in MB, keeping auditFiles backups; 0 = off.";
+    };
+
+    auditForward = lib.mkOption {
+      type = lib.types.nullOr (lib.types.enum [ "syslog" ]);
+      default = null;
+      description = ''
+        Also forward the CACHE audit trail to the local syslog socket
+        ("syslog"): journald picks every audit line up — the sealed external
+        copy beside the file/stdout sink, the per-writer hash chain included.
+        null = off.
+      '';
     };
 
     auditDaily = lib.mkOption {

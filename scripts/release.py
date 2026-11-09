@@ -30,6 +30,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHANGELOG = ROOT / 'CHANGELOG.md'
+ARCHIVE = ROOT / 'docs' / 'CHANGELOG.md'
 PKG_NIX = ['cache/package.nix', 'inverter/package.nix',
            'scraper/package.nix', 'dashboard/package.nix']
 SUITES_QUICK = ['tests/cache-regtest.py', 'tests/scrape-regtest.py']
@@ -72,9 +73,11 @@ def old_version():
 
 
 def version_sites(old):
-    """Every file that mentions the old version, CHANGELOG excluded (it
-    keeps the history) — the same sweep a manual bump does."""
-    r = run(['git', 'grep', '-l', '-F', old, '--', '.', ':!CHANGELOG.md'])
+    """Every file that mentions the old version, the two CHANGELOGs
+    excluded (they keep the history; the archive legitimately carries the
+    old version strings) — the same sweep a manual bump does."""
+    r = run(['git', 'grep', '-l', '-F', old, '--', '.',
+             ':!CHANGELOG.md', ':!docs/CHANGELOG.md'])
     return [pathlib.Path(line) for line in r.stdout.splitlines() if line.strip()]
 
 
@@ -89,7 +92,8 @@ def bump(old, new, dry):
         print('release: bumped %s' % f)
     if dry:
         return
-    left = subprocess.run(['git', 'grep', '-l', '-F', old, '--', '.', ':!CHANGELOG.md'],
+    left = subprocess.run(['git', 'grep', '-l', '-F', old, '--', '.',
+                           ':!CHANGELOG.md', ':!docs/CHANGELOG.md'],
                           cwd=ROOT, capture_output=True, text=True)
     if left.returncode not in (0, 1):  # 1 = no matches, the success case
         sys.exit('release: %r failed:\n%s%s' % ('git grep', left.stdout, left.stderr))
@@ -107,7 +111,31 @@ def changelog(new, dry):
     if not m:
         sys.exit('release: CHANGELOG has neither %s nor an Unreleased section' % new)
     today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-    CHANGELOG.write_text(text[:m.start()] + '## %s — %s\n' % (new, today) + text[m.end():])
+    text = text[:m.start()] + '## %s — %s\n' % (new, today) + text[m.end():]
+    heads = list(re.finditer(r'^## ', text, re.M))
+    if len(heads) > 1:
+        # the split: the root file keeps the current release only — every
+        # older release section moves to the top of the archive (the
+        # archive is newest-first, the block slots in above its first
+        # release heading)
+        older = text[heads[1].start():].rstrip('\n') + '\n'
+        if dry:
+            n = len(re.findall(r'^## ', older, re.M))
+            print('release: would move %d older release section(s) to %s'
+                  % (n, ARCHIVE.relative_to(ROOT)))
+        else:
+            if not ARCHIVE.exists():
+                sys.exit('release: %s is missing' % ARCHIVE.relative_to(ROOT))
+            arc = ARCHIVE.read_text()
+            a = re.search(r'^## ', arc, re.M)
+            if not a:
+                sys.exit('release: %s carries no release sections'
+                         % ARCHIVE.relative_to(ROOT))
+            ARCHIVE.write_text(arc[:a.start()] + older + '\n' + arc[a.start():])
+            text = text[:heads[1].start()].rstrip('\n') + '\n'
+            print('release: moved the older release section(s) to %s'
+                  % ARCHIVE.relative_to(ROOT))
+    CHANGELOG.write_text(text)
     print('release: CHANGELOG Unreleased -> %s (%s)' % (new, today))
 
 

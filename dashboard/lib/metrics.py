@@ -6,11 +6,16 @@ the dashboard's
 self-observability in the Prometheus text format: the uptime, the request
 counters by status, the proxied Prometheus query total, the active clients
 from the family gate and the configured upstream — not the PV values (the
-page and the proxy already serve those, F21's auth story aside). The gated
+page and the proxy already serve those, F21's auth story aside). Ahead of
+the caps the metrics/acl gate checks the peer IP at accept (the cache's
+metrics/acl reading): a client off the ACL is closed without a reply —
+nothing was parsed to answer, the caps never see the peer. The gated
 endpoint skeleton (the 401/404/503, the caps, the thread start/stop) is the
 family's common/metrics_server."""
+import logging
 import time
 
+from common.config import acl_admits
 from common.metrics_server import MetricsServer as _MetricsServer
 from common.metrics_server import describe_metrics
 from common.version import version_string
@@ -18,7 +23,7 @@ from common.version import version_string
 
 class MetricsServer(_MetricsServer):
     """A tiny Prometheus text-endpoint for the dashboard itself. The master
-    switch is the live `metrics-server` setting (default off); the bind
+    switch is the live `metrics enable` setting (default off); the bind
     address is --metrics-listen HOST:PORT. Caps: --metrics-max-clients
     (immediate 503 past it), --metrics-client-timeout (0 = the built-in 5 s
     slowloris cap), --metrics-max-conn-per-ip; 0 = no per-IP limit."""
@@ -26,11 +31,27 @@ class MetricsServer(_MetricsServer):
     REALM = 'dashboard'
     LOG_NAME = 'dashboard'
 
-    def __init__(self, httpd, listen, token=None, started=0.0, max_clients=64,
-                 client_timeout=5.0, max_per_ip=0):
+    def __init__(self, httpd, control, listen, token=None, started=0.0, max_clients=64,
+                 client_timeout=5.0, max_per_ip=0, acl=None):
         super().__init__(listen, token=token, started=started, max_clients=max_clients,
                          client_timeout=client_timeout, max_per_ip=max_per_ip)
         self.httpd = httpd
+        self.control = control
+        self.metrics_acl = acl   # the gate when no control server exists (the control owns the state otherwise)
+
+    def acl_allows(self, ip):
+        """The accept-time metrics/acl gate: the gate reads through the
+        control per connection — one live state, the set/unset swap needs
+        no push here (the cache's metrics.py reading); control-less (the
+        control-port 0 edge) the ctor's copy stands, and no set surface
+        exists to move it."""
+        gate = self.control.metrics_acl if self.control is not None else self.metrics_acl
+        return acl_admits(gate, ip)
+
+    def acl_refused(self, request, client_address):
+        logging.getLogger(self.LOG_NAME).info('connection rejected: %s:%d not on the metrics ACL',
+                                              *client_address[:2])
+        self._http._refuse_close(request)
 
     def render(self):
         h = self.httpd

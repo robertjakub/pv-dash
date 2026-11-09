@@ -149,6 +149,7 @@ for s in SETTINGS:   # the row's `alias` spelling answers the same Setting — t
         SETTING_BY_NAME[s.alias] = s
         alias_names.append(s.alias)
 SETTING_NAMES = tuple(s.name for s in SETTINGS)   # the canonical spellings — the dump keys and the unset defaults iterate these
+SET_BY_NAME = {s.name: s for s in settings_of(OPTIONS)}   # the knobs only: the show reports are not settable (and a show path never shadows a knob value — the cache's reading)
 ALIAS_NAMES = tuple(alias_names)                  # the ?/TAB pools ride them beside the canonicals
 SHOW_LIVES = frozenset(o.live for o in SHOW_OPTIONS)   # the show reports' lives: show answers them, set/unset never offers them
 LIVE_SETTINGS = frozenset(o.live for o in OPTIONS if o.live) | SHOW_LIVES   # the live-named settings: the pools list these — a row the registry spells

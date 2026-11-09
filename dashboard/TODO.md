@@ -5,6 +5,36 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The metrics/acl family wave: the dashboard's own `/metrics` takes the
+cache's **`metrics/acl` gate** — `--metrics-acl`/`$METRICS_ACL`, live
+`set metrics acl` / `unset`, the table show `show metrics acl table`,
+the `set metrics acl table` pointer — the accept-time IP gate checked
+ahead of the caps (a client off the ACL is closed without a reply), the
+inline grammar or `file:<path>` (the shipped example
+`examples/acl-ip-prefix.json` + its JSON Schema
+`schema/acl-ip-prefix.schema.json` — the schema/ dir is new here;
+NixOS `metricsAcl`). The toggle's live name re-spells to the family form
+**`metrics/enable`** (the wire spells `set metrics enable`; the knob
+name and the flag stay flat), and the default metrics bind moves
+`9452` → **`9353`** (the fake and the dashboard had shared 9452; the
+family's /metrics defaults now count from the scraper's 9350 up).
+
+The control-listener family wave: **the dashboard's control listener IS
+the cache's** — the listener tier lifted into `common/control.py` (one
+implementation, four riders) and the control family goes live on the
+wire: `control/port` rebinds the listener live (bind-first, the old loop
+retires by identity, the sessions keep serving, `off` retires, `unset`
+restores the configured target; a tokenless TCP bind still refuses — the
+F5 posture now guards the live wire too, not only the start),
+`control/ops/verbs` (the RBAC policy, the family spelling),
+`control/trust-uids`, and a NEW **`control-socket-group`** knob
+(`--control-socket-group`/`CONTROL_SOCKET_GROUP`, the live unix socket
+re-modes 0600/0660 — the dashboard could not share its control socket
+with a local group before); the dump/reload state carries the listener
+and `show config` renders the live values. The per-tool
+`resolve_control_target` wrapper died (the parsers unified in
+`common/config.py`, one signature — `listen_port` + the socket template).
+
 The F21 closure: **the page takes a bearer token** — `--auth-token`
 (`auth/token` live, a secret) gates every GET on the main listener
 (page, static, config.js, the /prom proxy) constant-time; the

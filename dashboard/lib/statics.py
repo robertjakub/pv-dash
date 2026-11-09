@@ -16,6 +16,12 @@ LOG_LEVELS = tuple(STATIC['log_levels'])
 
 DEFAULTS = STATIC['defaults']
 DEFAULT_PORT = DEFAULTS['port']
+
+# the control socket's name: the daemon's template (common.config's parsers
+# take it as the argument), the clients' default (the template spelled with
+# the default page port)
+CONTROL_SOCKET_TEMPLATE = '/tmp/dashboard-%d.socket'
+DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_PORT
 DEFAULT_BIND = DEFAULTS['bind']
 DEFAULT_UPSTREAM = DEFAULTS['upstream']
 DEFAULT_PROM_PREFIX = DEFAULTS['prom_prefix']
@@ -30,7 +36,7 @@ CLI_RECONNECT_WAIT_S = DEFAULTS['cli_reconnect_wait_s']
 CONTROL_IDLE_TIMEOUT_S = DEFAULTS['control_idle_timeout_s']
 CONTROL_LINE_CAP = int(STATIC['control']['line_cap_bytes'])
 
-# the live `set metrics-server on` defaults (the flags configure the start-up one)
+# the live `set metrics enable on` defaults (the flags configure the start-up one)
 DEFAULT_METRICS_CAPS = (int(DEFAULTS.get('metrics_max_clients', 16)),
                         float(DEFAULTS.get('metrics_client_timeout_s', 5.0)),
                         int(DEFAULTS.get('metrics_max_conn_per_ip', 0)))

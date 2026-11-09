@@ -158,8 +158,8 @@ DEBUG level only (or at INFO when `--log-queries` is passed / set in
    `--max-clients`, `--client-timeout`, `--max-conn-per-ip`, `--local-time`,
    `--control-port`, `--control-token`,
    `--control-ops-token`, `--control-ops-verbs`,
-   `--control-trust-uids`, `--audit-log`, `--audit-max-mb`, `--audit-files`,
-   `--no-audit-log`, `--metrics-server`, `--metrics-listen`, `--metrics-token`,
+   `--control-trust-uids`, `--control-socket-group`, `--audit-log`, `--audit-max-mb`, `--audit-files`,
+   `--no-audit-log`, `--metrics-server`, `--metrics-listen`, `--metrics-token`, `--metrics-acl`,
    `--metrics-max-clients`, `--metrics-client-timeout`,
    `--metrics-max-conn-per-ip`, `--dry-run`, `--man`
 2. Environment: every env twin is the knob's bare upper-snake name (no
@@ -171,7 +171,7 @@ DEBUG level only (or at INFO when `--log-queries` is passed / set in
    `MAX_CONN_PER_IP`, `LOG_ACCESS`, `CTL`,
    `CONTROL_TOKEN`,
    `CONTROL_OPS_TOKEN`,
-   `CONTROL_OPS_VERBS`, `METRICS_SERVER`,
+   `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `METRICS_SERVER`,
    `METRICS_LISTEN`, `METRICS_TOKEN`,
    `METRICS_CLIENT_TIMEOUT`, `METRICS_MAX_CONN_PER_IP`,
    `CONTROL_TRUST_UIDS`
@@ -205,7 +205,8 @@ the control server below.
 
 The server speaks the family's JSON-lines control protocol (the same wire
 as `modbus-cache`, `modbus-fake-inverter` and `modbus-scraper`): it listens
-on a 0600 unix socket by default (`/tmp/dashboard-<port>.socket`) or a TCP
+on a 0600 unix socket by default (`/tmp/dashboard-<port>.socket`, or 0660
+with `--control-socket-group`) or a TCP
 port on 127.0.0.1 (a token is mandatory there — a token-less TCP control
 port refuses to start; with a token configured the wire is HMAC-signed:
 every command and reply carries the full sha256 of its frame, keyed by the
@@ -233,7 +234,20 @@ Commands: `set <setting> <value>` / `unset <setting>` (the live settings:
 (the sessions re-auth),
 `metrics token` rotates the /metrics bearer live; a
 token value never renders back — **`show <secret>` refuses** (it is a
-secret: pass it by flag/env, or as `file:<path>`)), `show <setting>` /
+secret: pass it by flag/env, or as `file:<path>`)),
+`metrics acl` gates who may connect to /metrics at all
+(`any`/`none`/the comma-separated IPs/prefixes/`file:<path>` — the
+standalone ip-prefix acl file, the shipped example
+`examples/acl-ip-prefix.json`; checked at accept, a client off the ACL
+is closed without a reply; `show metrics acl table` renders the chain) — and the
+**`control port` rebinds the listener live** (the family's listener:
+bind-first — a failed bind leaves the old listener untouched; the old loop
+retires by identity, the connected sessions keep serving; `off` stops
+accepting while the sessions keep serving, a later set re-enables; a
+tokenless TCP bind still refuses — F5), `control ops verbs` (the
+read-only role's RBAC policy, live), `control trust-uids` (the peer-cred
+list, live), `control socket-group` (re-modes the live unix socket
+`0600`/`0660`), `show <setting>` /
 `show connections` (the live HTTP clients per peer IP) /
 `show version` / `show knobs` (the dictionary of every registry knob: its
 flag, its env twin, how it changes),
@@ -349,7 +363,8 @@ the control surface (`controlPort` — a TCP port or a unix socket path; the
 service's PrivateTmp makes /tmp private, so put the socket under
 `/run/dashboard/`, which the module creates for you; `controlTokenFile` —
 mounted via systemd LoadCredential, the hardened way; `controlToken` —
-inline, store-rendered, discouraged; `controlTrustUids`). The service runs
+inline, store-rendered, discouraged; `controlTrustUids`; `controlSocketGroup`
+— 0660 instead of the plain 0600, a local group shares the socket). The service runs
 with a dynamic user and systemd hardening (`systemctl reload` re-reads the
 config); put a reverse proxy in front for LAN/HTTPS.
 

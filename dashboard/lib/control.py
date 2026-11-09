@@ -18,6 +18,7 @@ TCP the signed commands are mandatory. A second, read-only token
 ops shift against the admin key, both audited."""
 import hmac
 import logging
+import os
 import time
 
 from common.human import secs
@@ -26,11 +27,13 @@ from common.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN
 from common.control import ControlServer as _ControlServer, num, numi
 from common.options import control_command, describe_node, describe_root, describe_command_node, grouped_rows, \
     match_setting_path
-from common.config import is_loopback_host, parse_secret
+from common.config import acl_table, acl_value_text, is_loopback_host, parse_control_target, parse_secret, \
+    resolve_metrics_acl
+from common.cred import parse_trust_uids
 from common.dump import SECRET_REMOVED, dump_filter
-from .options import OPTIONS, SETTING_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
-    COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
-from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, LOG_LEVELS
+from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
+    COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, KNOWN_VERBS
+from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
 
@@ -64,21 +67,23 @@ class ControlServer(_ControlServer):
     CFG_KEYS = CFG_KEYS   # the registry's knob -> cfg-key renames (show config)
 
     def __init__(self, httpd, target, reloader=None, stopper=None, audit=None, token=None,
-                 defaults=None, trust_uids=None, ops_token=None, ops_verbs=None, startup_values=None,
-                 config_path=None, dump_path=None, restore_on_start=False, dump_key=None):
+                 defaults=None, trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None,
+                 startup_values=None, config_path=None, dump_path=None, restore_on_start=False, dump_key=None):
         self.httpd = httpd
         super().__init__(target, reloader=reloader, stopper=stopper, audit=audit, token=token,
-                         defaults=defaults, trust_uids=trust_uids, ops_token=ops_token,
-                         ops_verbs=ops_verbs, config_path=config_path, dump_path=dump_path,
-                         restore_on_start=restore_on_start, dump_key=dump_key)
+                         defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
+                         ops_token=ops_token, ops_verbs=ops_verbs, config_path=config_path,
+                         dump_path=dump_path, restore_on_start=restore_on_start, dump_key=dump_key)
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
         self.config_path = config_path   # the config script the daemon started from — the reload state lives beside it
         self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
         self.dump_path = dump_path or None   # the state dump file (the dump family)
         self.dump_restore = bool(restore_on_start)   # prospective-only: the START already chose
-        self.metrics_srv = None          # set by the entry (the live metrics-server toggle)
+        self.metrics_srv = None          # set by the entry (the live metrics enable toggle)
         self.metrics_token = None        # the /metrics bearer token (the entry passes it)
         self.metrics_listen = None       # the /metrics bind address (the entry passes it)
+        self.metrics_acl = None          # the /metrics accept gate (the entry passes it; the hooks read it per connection)
+        self.metrics_acl_warn = None     # the metrics/acl file's permission warning (the stash, None = no warning standing)
         self.metrics_desc = 'off'        # the status/inspect one-liner
 
     def command(self, cmd):
@@ -116,8 +121,8 @@ class ControlServer(_ControlServer):
             args = cmd.split()[1:]
             if not args:
                 return 'err unset needs a setting (try help)'
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
-            s = SETTING_BY_NAME.get(key) if key is not None else None
+            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports have nothing to unset
+            s = SET_BY_NAME.get(key) if key is not None else None
             if s is not None and not rest and s.restart:
                 if s.secret:   # a secret never rides the reload state — the wire refuses it
                     return 'err restart required (startup-only knob)'
@@ -138,12 +143,12 @@ class ControlServer(_ControlServer):
             args = cmd.split()[1:]
             if len(args) < 2:
                 return 'err set needs a setting and a value (try help)'
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
+            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports are not settable (and a show path never shadows a knob value)
             if key is None:
                 return 'err unknown setting %s (try help)' % ' '.join(args)
             if not rest:
                 return 'err set needs a setting and a value (try help)'
-            s = SETTING_BY_NAME.get(key)
+            s = SET_BY_NAME.get(key)
             if s is not None and s.restart and s.secret:
                 return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
             value = ' '.join(rest)
@@ -166,6 +171,9 @@ class ControlServer(_ControlServer):
             return self.show_config()
         if low == 'show knobs':
             return self.knobs_dictionary()
+        if low == 'show metrics-acl-table':
+            # `show metrics acl table` (the live path's words) forwards here — the SHOW_BY_LIVE routing
+            return self.acl_table_report()
         if low.startswith('show'):
             args = cmd.split()[1:]
             if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
@@ -221,10 +229,13 @@ class ControlServer(_ControlServer):
         return cmds
 
     def show_config_cfg(self):
-        """The resolved startup values with the metrics-server knob's LIVE
-        state folded in (the dashboard's own endpoint runs on and off — the
-        row renders what runs, not what the startup flag said)."""
-        return dict(self.startup_values or {}, metrics_server=bool(self.metrics_srv))
+        """The resolved startup values with the metrics knobs' LIVE state
+        folded in (the dashboard's own endpoint runs on and off and its
+        acl sets live — the rows render what runs, not what the startup
+        flag said)."""
+        from common.config import acl_value_text
+        return dict(self.startup_values or {}, metrics_server=bool(self.metrics_srv),
+                    metrics_acl=acl_value_text(self.metrics_acl))
 
     def _apply(self, key, value):
         """Apply a live setting; returns the display string or raises
@@ -280,7 +291,7 @@ class ControlServer(_ControlServer):
             on = val in ('on', 'true', '1', 'yes')
             self.httpd.RequestHandlerClass.battery = on
             return 'on' if on else 'off'
-        if key == 'metrics-server':
+        if key == 'metrics/enable':
             from .statics import DEFAULT_METRICS_CAPS
             if val in ('on', 'true', '1', 'yes'):
                 if self.metrics_srv:
@@ -294,8 +305,9 @@ class ControlServer(_ControlServer):
                 from .metrics import MetricsServer, describe_metrics
                 listen = self.metrics_listen
                 caps = DEFAULT_METRICS_CAPS
-                srv = MetricsServer(self.httpd, listen, token=self.metrics_token,
-                                    max_clients=caps[0], client_timeout=caps[1], max_per_ip=caps[2])
+                srv = MetricsServer(self.httpd, self, listen, token=self.metrics_token,
+                                    max_clients=caps[0], client_timeout=caps[1], max_per_ip=caps[2],
+                                    acl=self.metrics_acl)
                 try:
                     srv.start()
                 except SystemExit:
@@ -318,9 +330,7 @@ class ControlServer(_ControlServer):
             return lvl
         if key == 'control/token':
             if val in ('off', 'none', ''):
-                if not self.is_unix:
-                    raise ValueError('the TCP control port needs its token (F5 in docs/AUDIT.md) — '
-                                     'only the unix socket (the filesystem is the auth) may run tokenless')
+                self.refuse_token_drop()
                 self.token = None
                 return 'off'
             try:
@@ -345,6 +355,49 @@ class ControlServer(_ControlServer):
                                  'every holder the role the server picks first)')
             self.ops_token = val
             return '<set>'
+        if key == 'control/port':
+            try:
+                target = parse_control_target(val, DEFAULT_PORT, CONTROL_SOCKET_TEMPLATE)
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if val in ('off', 'none', '0'):
+                target = None
+            if target is not None and not self.stopped and self._is_target(target):
+                return self.describe()   # the same target: nothing to rebind
+            self.refuse_tokenless_rebind(target)
+            shown = self._rebind_control(target)
+            self.startup_values['control_port'] = '0' if target is None else str(target)
+            return shown
+        if key == 'control/ops/verbs':
+            verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
+            unknown = sorted(v for v in verbs if v not in KNOWN_VERBS)
+            if not verbs or unknown:
+                raise ValueError('the ops policy needs at least one verb the grammar speaks%s: %s'
+                                 % ('' if not unknown else ' (unknown: %s)' % ', '.join(unknown),
+                                    ', '.join(sorted(KNOWN_VERBS))))
+            self.ops_verbs = verbs
+            self.startup_values['control_ops_verbs'] = ','.join(sorted(verbs))
+            return ','.join(sorted(verbs))
+        if key == 'control/trust-uids':
+            try:
+                uids = parse_trust_uids('none' if val == 'off' else val, 'control/trust-uids')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            self.trust_uids = uids or frozenset()
+            self.startup_values['control_trust_uids'] = ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
+            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
+        if key == 'control/socket-group':
+            if val in ('on', 'true', '1', 'yes'):
+                on = True
+            elif val in ('off', 'false', '0', 'no'):
+                on = False
+            else:
+                raise ValueError('control/socket-group must be on or off')
+            self.socket_group = on
+            self.startup_values['control_socket_group'] = on
+            if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
+                os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
+            return 'on' if on else 'off'
         if key == 'metrics/token':
             if not val or val in ('off', 'none', '0'):
                 host, _port = self.metrics_listen
@@ -369,6 +422,24 @@ class ControlServer(_ControlServer):
             caps = self._metrics_caps()
             self.metrics_desc = describe_metrics(self.metrics_listen, val, caps[0], caps[2])
             return '<set>'
+        if key == 'metrics/acl':
+            if val.lower() == 'table':   # the show word is never a value — point at the report
+                raise ValueError('"table" is not a metrics/acl value — the table is the show: '
+                                 'show metrics acl table')
+            try:
+                gate, warn = resolve_metrics_acl(val)
+            except SystemExit as e:
+                raise ValueError(str(e))
+            self.metrics_acl_warn = warn   # the fresh state: an inline set clears a standing file warning
+            if warn is not None:   # the acl file's permission warning: the log, the audit trail, the reply's suffix
+                logger.warning('acl file: %s', warn)
+                if self.audit:
+                    self.audit.event('ACL-FILE', warn)
+            self.metrics_acl = gate   # the swap is live: the accept check reads it per connection
+            shown = acl_value_text(gate)
+            if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
+                shown += ' (%s)' % warn
+            return shown
         if key == 'auth/token':
             if not val or val in ('off', 'none', '0'):
                 if not is_loopback_host(self.httpd.server_address[0]):
@@ -413,14 +484,24 @@ class ControlServer(_ControlServer):
             return 'on' if h.log_queries else 'off'
         if key == 'battery':
             return 'on' if h.battery else 'off'
-        if key == 'metrics-server':
+        if key == 'metrics/enable':
             return 'on' if self.metrics_srv else 'off'
         if key == 'control/token':
             return '<set>' if self.token else 'off'   # the secret never renders
         if key == 'control/ops/token':
             return '<set>' if self.ops_token else 'off'   # the secret never renders
+        if key == 'control/port':
+            return 'off' if self.stopped else self.describe()
+        if key == 'control/ops/verbs':
+            return ','.join(sorted(self.ops_verbs)) or 'off'
+        if key == 'control/trust-uids':
+            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
+        if key == 'control/socket-group':
+            return 'on' if self.socket_group else 'off'
         if key == 'metrics/token':
             return '<set>' if self.metrics_token else 'off'   # the secret never renders
+        if key == 'metrics/acl':
+            return acl_value_text(self.metrics_acl)
         if key == 'auth/token':
             return '<set>' if self.httpd.RequestHandlerClass.auth_token else 'off'   # the secret never renders
         if key == 'dump/path':
@@ -451,10 +532,15 @@ class ControlServer(_ControlServer):
             'max-conn-per-ip': self.httpd.gate.max_per_ip,
             'log-access': 'on' if h.log_access else 'off',
             'log-queries': 'on' if h.log_queries else 'off',
-            'metrics-server': 'on' if self.metrics_srv else 'off',
+            'metrics/enable': 'on' if self.metrics_srv else 'off',
+            'metrics/acl': acl_value_text(self.metrics_acl),
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'dump/path': self.dump_path or 'off',
             'dump/restore-on-start': 'on' if self.dump_restore else 'off',
+            'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
+            'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
+            'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
+            'control/socket-group': 'on' if self.socket_group else 'off',
         }
         for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
             if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:
@@ -485,6 +571,16 @@ class ControlServer(_ControlServer):
         rows = ['%d active' % total]
         rows += ['%s: %d' % (ip, n) for ip, n in sorted(per_ip.items())]
         return '; '.join(rows)
+
+    def acl_table_report(self):
+        """The metrics/acl/table show report (the show-only view of the
+        metrics ACL, one entry per line): the system forms spell the chain
+        they implement — 'allow 0.0.0.0/0' (any), 'deny 0.0.0.0/0' (none),
+        'deny 0.0.0.0/0' + one allow line per network (the whitelist); a
+        file gate renders its own rules — the gate desc as the '% ' line,
+        the rule descs as aligned '# ' comments, the matcher 'any' spelled
+        0.0.0.0/0 (common/config.py acl_table, the family's one renderer)."""
+        return 'ok metrics-acl-table\n%s' % '\n'.join(acl_table(self.metrics_acl))
 
     def inspect(self):
         """One pretty dump of everything — the state, the counters, the caps,

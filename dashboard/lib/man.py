@@ -57,7 +57,9 @@ The control server speaks JSON lines ({"cmd": "..."} ->
 configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: max-clients,
 client-timeout, max-conn-per-ip, log-access, log-queries, battery,
-log-level \\(em and the token lives: control token, the ops token,
+log-level, metrics acl \\(em the /metrics IP gate at accept, the table
+show \\fBshow metrics acl table\\fR \\(em and the token lives: control token,
+the ops token,
 metrics token, each rotating live, the value never rendering \\(em
 \\fBshow <secret>\\fR refuses), \\fBshow connections\\fR
 (the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
@@ -70,7 +72,14 @@ re-applies them once), with a dump path configured (\\fB--dump-path\\fR):
 integrity-hashed JSON; \\fB--dump-key\\fR seals it \\(em the state rides
 encrypted, a restore refuses a wrong or missing key;
 \\fB--restore-on-start\\fR loads it at start),
-\\fBshutdown\\fR, \\fBquit\\fR. See
+\\fBshutdown\\fR, \\fBquit\\fR. The control listener rides the family's
+live rebind: \\fBset control port\\fR (a unix path, a TCP port on
+127.0.0.1, or off) swaps the socket without dropping the connected
+sessions \\(em a tokenless TCP bind still refuses (F5) \\(em and the
+family's control knobs all set live: \\fBcontrol ops verbs\\fR (the
+read-only role's policy), \\fBcontrol trust-uids\\fR (the peer-cred
+list), \\fBcontrol socket-group\\fR (0660 instead of 0600, the live
+socket re-modes). See
 .BR dashboard-ctl (1)
 and
 .BR dashboard-cli (1)."""
@@ -79,10 +88,15 @@ The page and the proxy speak the F13 shape (F21 closed): the bearer token
 (\\fB--auth-token\\fR, constant-time) is mandatory beyond loopback \\(em a
 token-less non-loopback bind refuses to start \\(em and the loopback bind
 serves tokenless; the `?auth=<token>` query exchanges for an HttpOnly
-session cookie, the raw Bearer header stays for scripts. Terminate TLS at
+session cookie, the raw Bearer header stays for scripts. The dashboard's
+own /metrics endpoint (when \\fB--metrics-server\\fR serves it) speaks the
+family's one stack: the F13 refusal, the \\fB--metrics-acl\\fR IP gate at
+accept (a client off the ACL is closed without a reply), the caps.
+Terminate TLS at
 an authenticating reverse proxy for anything beyond localhost (plain HTTP
 carries the token in the clear \\(em the F14 answer). The
-control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
+control surface is loopback-only (TCP) or a 0600 unix socket (0660 with
+\\fB--control-socket-group\\fR); a TCP
 control port without a token refuses to start (F5); with a token the wire
 is signed and the commands/replies verify end to end; a second, read-only
 ops token (\\fB--control-ops-token\\fR) scopes its sessions to the

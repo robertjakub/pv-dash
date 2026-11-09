@@ -56,6 +56,7 @@ let
     ]
     ++ lib.optionals (cfg.controlOpsVerbs != null) [ "--control-ops-verbs ${cfg.controlOpsVerbs}" ]
     ++ lib.optionals (cfg.controlTrustUids != null) [ "--control-trust-uids ${cfg.controlTrustUids}" ]
+    ++ lib.optional cfg.controlSocketGroup "--control-socket-group"
     ++ lib.optionals (cfg.metricsServer != null) [ "--metrics-server" ]
     ++ lib.optionals (cfg.metricsServer != null) [
       "--metrics-listen ${cfg.metricsListen}"
@@ -64,6 +65,7 @@ let
       "--metrics-client-timeout ${toString cfg.metricsClientTimeout}"
       "--metrics-max-conn-per-ip ${toString cfg.metricsMaxConnPerIp}"
     ]
+    ++ lib.optionals (cfg.metricsAcl != null) [ "--metrics-acl ${cfg.metricsAcl}" ]
     ++ lib.optionals (cfg.metricsToken != null) [ "--metrics-token ${cfg.metricsToken}" ]
     ++ lib.optionals (cfg.authTokenFile != null) [ "--auth-token file:/run/credentials/dashboard/auth-token" ]
     ++ lib.optionals (cfg.authToken != null) [ "--auth-token ${cfg.authToken}" ]
@@ -287,8 +289,20 @@ in
 
     metricsListen = lib.mkOption {
       type = lib.types.str;
-      default = "127.0.0.1:9452";
+      default = "127.0.0.1:9353";
       description = "The /metrics bind address HOST:PORT (metricsServer on).";
+    };
+
+    metricsAcl = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Clients allowed to connect to the dashboard's /metrics endpoint:
+        "any", "none" (refuse every peer), a comma-separated list of IPs
+        and CIDR prefixes, or "file:<path>" — the standalone ip-prefix acl
+        file. Checked at accept — a client off the ACL is closed without a
+        reply. null = the tool's default ("any").
+      '';
     };
 
     metricsTokenFile = lib.mkOption {
@@ -358,6 +372,16 @@ in
         (SO_PEERCRED): a comma-separated uid list — a local systemd unit
         speaks without the secret. Root and the daemon's own user are
         always trusted. null = the defaults only.
+      '';
+    };
+
+    controlSocketGroup = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Leave the unix control socket group-accessible (chmod 0660 instead
+        of the plain 0600): a local group may speak to the control without
+        being the service user.
       '';
     };
 

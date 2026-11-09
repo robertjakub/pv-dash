@@ -15,17 +15,16 @@ import os
 
 from .options import OPTIONS
 from common.config import check_control_tokens, check_token_chars, load_config_script, parse_secret, \
-    resolve_target, Resolver, str_to_bool
+    resolve_metrics_acl, Resolver, str_to_bool
 from .statics import DEFAULTS, DEFAULT_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
 
-
-def resolve_control_target(explicit, listen_port=DEFAULT_PORT):
-    """The control server target for the daemon and the clients: the flag
-    wins, then CTL, then the default unix socket named after the
-    listen port (/tmp/dashboard-8080.socket)."""
-    return resolve_target(explicit, '/tmp/dashboard-%d.socket' % int(listen_port))
+# the control socket's name: the daemon's template (common.config's parsers
+# take it as the argument), the clients' default (the template spelled with
+# the default page port)
+CONTROL_SOCKET_TEMPLATE = '/tmp/dashboard-%d.socket'
+DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_PORT
 
 
 def load_config(path):
@@ -99,6 +98,8 @@ def resolve_config(args, script_dir=None):
                                             'control-ops-token')
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None),
                                         'CONTROL_TRUST_UIDS', 'control_trust_uids', None, str)
+    cfg['control_socket_group'] = resolve(getattr(args, 'control_socket_group', None), 'CONTROL_SOCKET_GROUP',
+                                          'control_socket_group', False, str_to_bool)
     check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
     check_token_chars(cfg['control_token'], 'control_token')
     if cfg['port'] < 1 or cfg['port'] > 65535:
@@ -119,6 +120,9 @@ def resolve_config(args, script_dir=None):
                                     'metrics_listen', DEFAULTS['metrics_listen'], str)
     cfg['metrics_token'] = parse_secret((resolve(getattr(args, 'metrics_token', None), 'METRICS_TOKEN',
                                                   'metrics_token', None, str) or '').strip() or None, 'metrics/token')
+    cfg['metrics_acl'] = resolve(getattr(args, 'metrics_acl', None), 'METRICS_ACL',
+                                 'metrics_acl', DEFAULTS['metrics_acl'], str) or 'any'
+    resolve_metrics_acl(cfg['metrics_acl'], 'metrics/acl')   # a bad acl value or gate file refuses the start
     cfg['auth_token'] = parse_secret((resolve(getattr(args, 'auth_token', None), 'AUTH_TOKEN',
                                               'auth_token', None, str) or '').strip() or None, 'auth/token')
     check_token_chars(cfg['auth_token'], 'auth_token')

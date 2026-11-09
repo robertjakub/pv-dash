@@ -34,8 +34,9 @@ from common.connlimit import GatedHTTPServer
 from common.logutil import UtcFormatter
 from common.options import build_parser
 from common.version import version_string
-from common.config import is_loopback_host, parse_listen, parse_secret
-from lib.config import resolve_config, resolve_control_target
+from common.config import acl_value_text, is_loopback_host, parse_control_target, parse_listen, parse_secret, \
+    resolve_control_target, resolve_metrics_acl
+from lib.config import CONTROL_SOCKET_TEMPLATE, resolve_config
 from lib.control import ControlServer
 from lib.man import daemon_page
 from lib.metrics import MetricsServer, describe_metrics
@@ -380,7 +381,7 @@ def main():
         if name == 'dump/restore-on-start':
             cfg['restore_on_start'] = str(pending).strip() in ('on', 'true', '1', 'yes')
         logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
-    control_target = resolve_control_target(cfg['control_port'], cfg['port'])
+    control_target = resolve_control_target(cfg['control_port'], cfg['port'], CONTROL_SOCKET_TEMPLATE)
     control_token = cfg['control_token'] or None
     control_ops_token = cfg['control_ops_token'] or None
     ops_verbs = frozenset(v.strip().lower() for v in (cfg['control_ops_verbs'] or 'show,clear').split(',') if v.strip())
@@ -391,11 +392,12 @@ def main():
         raise SystemExit(2)
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
     metrics_token = parse_secret(args.metrics_token or cfg.get('metrics_token'), 'metrics/token')
-    metrics_listen = parse_listen(cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9452'))
+    metrics_listen = parse_listen(cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9353'))
+    metrics_acl, metrics_acl_warn = resolve_metrics_acl(cfg.get('metrics_acl') or 'any', 'metrics/acl')
     if cfg['metrics_server'] and not metrics_token and not is_loopback_host(metrics_listen[0]):
         logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
                      'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
-                     % (cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9452')))
+                     % (cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9353')))
         raise SystemExit(2)
     if not cfg['auth_token'] and not is_loopback_host(cfg['bind']):
         logger.error('refusing to expose the page beyond loopback without a token (F21 in docs/AUDIT.md): '
@@ -457,10 +459,12 @@ def main():
             'prom-prefix': cfg['prom_prefix'] or 'off',
             'static-dir': cfg['static_dir'] or 'off',
             'config-js': cfg['config_js'] or 'off',
-            'control-port': cfg['control_port'] or 'off',
-            'control-ops-verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
-            'control-trust-uids': ','.join(str(u) for u in sorted(trust_uids or [])) if trust_uids else 'off',
+            'control/port': control_target,
+            'control/ops/verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
+            'control/trust-uids': ','.join(str(u) for u in sorted(trust_uids or [])) if trust_uids else 'off',
+            'control/socket-group': 'on' if cfg['control_socket_group'] else 'off',
             'metrics-listen': cfg['metrics_listen'],
+            'metrics/acl': acl_value_text(metrics_acl),
             'metrics-max-clients': str(cfg['metrics_max_clients']),
             'metrics-client-timeout': '%g' % cfg['metrics_client_timeout'],
             'metrics-max-conn-per-ip': str(cfg['metrics_max_conn_per_ip']),
@@ -478,6 +482,7 @@ def main():
         # metrics/token treatment) — a secret never renders, never re-applies
         control = ControlServer(httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
+                                socket_group=cfg['control_socket_group'],
                                 ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
                                 dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'],
                                 dump_key=cfg['dump_key'],
@@ -485,7 +490,12 @@ def main():
                                 # (the values never render — config_value refuses them)
                                 startup_values={'control_token': control_token,
                                                 'control_ops_token': control_ops_token,
+                                                'control_port': control_target,
+                                                'control_ops_verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
+                                                'control_trust_uids': ','.join(str(u) for u in sorted(trust_uids or [])) or 'off',
+                                                'control_socket_group': cfg['control_socket_group'],
                                                 'metrics_token': metrics_token,
+                                                'metrics_acl': acl_value_text(metrics_acl),
                                                 'auth_token': cfg['auth_token'],
                                                 'dump_key': cfg.get('dump_key')})
         control.start()
@@ -493,18 +503,20 @@ def main():
             logger.info('restore-on-start: %s', control.restore_state())
     metrics_srv = None
     if cfg['metrics_server']:
-        metrics_srv = MetricsServer(httpd, metrics_listen, token=metrics_token, started=started,
+        metrics_srv = MetricsServer(httpd, control, metrics_listen, token=metrics_token, started=started,
                                     max_clients=cfg.get('metrics_max_clients', 16),
                                     client_timeout=cfg.get('metrics_client_timeout', 5),
-                                    max_per_ip=cfg.get('metrics_max_conn_per_ip', 0))
+                                    max_per_ip=cfg.get('metrics_max_conn_per_ip', 0), acl=metrics_acl)
         metrics_srv.start()
         httpd.metrics_srv = metrics_srv
     if control:
         # the control always knows the metrics state: the live token
-        # rotation and the metrics-server toggle re-describe from here
+        # rotation and the metrics enable toggle re-describe from here
         control.metrics_srv = metrics_srv
         control.metrics_token = metrics_token
         control.metrics_listen = metrics_listen
+        control.metrics_acl = metrics_acl
+        control.metrics_acl_warn = metrics_acl_warn
         control.metrics_desc = metrics_desc
 
     def apply_reload():
@@ -551,6 +563,8 @@ def main():
     if audit:
         audit.event('START', 'version=%s upstream=%s listen=%s:%d control=%s'
                     % (version_string(), cfg['upstream'], cfg['bind'], cfg['port'], control_desc))
+        if metrics_acl_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
+            audit.event('ACL-FILE', metrics_acl_warn)
     try:
         httpd.serve_forever()
         logger.info('stopped')

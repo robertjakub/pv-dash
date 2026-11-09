@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/robertjakub/pv-dash/main/dashboard/schema/acl-ip-prefix.schema.json",
+  "title": "pv-dash standalone acl file — the ip-prefix gate",
+  "description": "The standalone acl file the dashboard metrics-acl knob reads via file:<path> (dashboard/examples/acl-ip-prefix.json is the shipped example): the root object IS the gate — an optional terse-ASCII desc, the gate type naming the schema, and the ordered rules list. The chain reads top to bottom, the LAST matching rule decides, and a client no rule decides refuses (the default deny any); the matcher word any is the whole space (0.0.0.0/0 — both address families). One address family per matcher: the comma-separated items must all be IPv4 or all IPv6. The loader (common/config.py's _write_gate_object — one gate validator for the family) stays the strict word: a loader-valid file is always schema-valid, but a schema-valid file can still be loader-refused (a prefix with host bits set, a malformed v6 spelling) — this schema is the editor's lint, not the daemon. A group/world-readable acl file warns (chmod 0600 silences it).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "rules"
+  ],
+  "properties": {
+    "desc": {
+      "type": "string",
+      "description": "The gate's terse-ASCII description — renders as the % line of the table shows and the set/unset replies' context."
+    },
+    "type": {
+      "const": "ip-prefix",
+      "description": "The schema kind: prefix rules. A typeless ip-prefix gate refuses — spell the type; a register-kind file (type write-registers, range rules) refuses this reader."
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The ordered rule chain. A rule that is never the last match for any address is dead (scripts/lint_acl.py catches it); the whole-space deny is [{\"type\": \"deny\", \"prefix\": \"any\"}].",
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "prefix"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "allow",
+            "deny"
+          ],
+          "description": "The verdict this rule hands every address its matcher decides."
+        },
+        "prefix": {
+          "$ref": "#/$defs/prefix",
+          "description": "The matcher: any, or a comma-separated IP/IP-prefix string — strict CIDR (a prefix with host bits set refuses at the loader: spell the network, e.g. 10.0.0.0/8, not 10.1.2.3/8); one family per matcher; a bare IP is its /32 (or /128)."
+        },
+        "desc": {
+          "type": "string",
+          "description": "The rule's terse-ASCII description — the aligned # comment in the table shows; speaks for every entry in a comma-separated list."
+        }
+      }
+    },
+    "prefix": {
+      "type": "string",
+      "oneOf": [
+        {
+          "pattern": "^[Aa][Nn][Yy]$",
+          "description": "any — the whole space, both families (the table shows spell it 0.0.0.0/0).",
+          "type": "string"
+        },
+        {
+          "pattern": "^(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}(?:/(?:3[0-2]|[12][0-9]|[0-9]))?(\\s*,\\s*(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}(?:/(?:3[0-2]|[12][0-9]|[0-9]))?)*$",
+          "description": "A comma-separated IPv4 list — an address or an IP/prefix length (/0-32).",
+          "type": "string"
+        },
+        {
+          "pattern": "^[0-9A-Fa-f]*:[0-9A-Fa-f:.]*(?:/(?:12[0-8]|1[01][0-9]|[0-9]{1,2}))?(\\s*,\\s*[0-9A-Fa-f]*:[0-9A-Fa-f:.]*(?:/(?:12[0-8]|1[01][0-9]|[0-9]{1,2}))?)*$",
+          "description": "A comma-separated IPv6 list — an address (the :: forms and the v4-mapped tails included) or an IP/prefix length (/0-128); at least one colon so the v4 list cannot ride this branch.",
+          "type": "string"
+        }
+      ]
+    }
+  }
+}

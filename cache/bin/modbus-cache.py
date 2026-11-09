@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 
 from common.audit import AuditLog, default_path as default_audit_path
 from common.config import is_loopback_host, parse_control_target, parse_listen, parse_secret, parse_upstream
-from common.daemon import apply_restart_state, default_config_path, parse_ops_verbs, setup_logging
+from common.daemon import apply_restart_state, default_config_path, fold_listen, parse_ops_verbs, setup_logging
 from common.options import build_parser
 from common.version import version_string
 from lib.config import CONTROL_SOCKET_TEMPLATE, load_registers_file, load_selection, resolve_config, acl_value_text, acl_gate_summary
@@ -59,10 +59,6 @@ def parse_args():
     if args.config is None:
         args.config = default_config_path(SCRIPT_DIR, 'modbus_cache.conf')
     return args
-
-
-def fold_listen(cfg, pending):
-    cfg['listen'] = pending
 
 
 def fold_metrics_listen(cfg, pending):

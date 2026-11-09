@@ -14,7 +14,6 @@ verbs only — the ops shift against the admin key, both audited."""
 import logging
 import os
 import socket
-import threading
 import time
 
 from common.version import version_string
@@ -27,10 +26,9 @@ from common.human import secs
 from common.logutil import UtcFormatter
 from common.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.control import ControlServer as _ControlServer, num, numi
-from common.options import control_command, grouped_rows, match_setting_path, describe_node, describe_root, \
-    describe_command_node
-from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, DEFAULT_LISTEN_PORT, LOG_LEVELS
-from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
+from common.options import control_command, grouped_rows
+from .statics import CONTROL_LINE_CAP, DEFAULT_LISTEN_PORT, LOG_LEVELS
+from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
     KNOWN_VERBS, CFG_KEYS, CFG_FORMATTERS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .cache import build_blocks
 from .config import CONTROL_SOCKET_TEMPLATE, parse_write_registers, acl_value_text, acl_gate_summary, acl_table, parse_selection, parse_listen, \
@@ -68,6 +66,35 @@ class ControlServer(_ControlServer):
     RELOAD_TEXT = 'the modbus-cache proxy is reloading — the daemon restarts with the saved configuration'
     CFG_KEYS = CFG_KEYS               # the registry's knob -> cfg-key renames (show config)
     CFG_FORMATTERS = CFG_FORMATTERS   # the structured values (the ACLs, the write map, the selection)
+    APP = 'modbus-cache'
+    RELOAD_CONFIG = False   # the reload-config row decision stays open (docs/TODO.md) — the verb never answers here
+    COMMANDS = COMMANDS
+    COMMAND_HELP = COMMAND_HELP
+    COMMAND_GROUPS = COMMAND_GROUPS
+    COMMAND_HIDDEN = COMMAND_HIDDEN
+    NODE_BY_NAME = NODE_BY_NAME
+    SET_BY_NAME = SET_BY_NAME
+    SHOW_BY_LIVE = SHOW_BY_LIVE
+    OPTION_BY_LIVE = OPTION_BY_LIVE
+    SHOW_OPTIONS = SHOW_OPTIONS
+    SHOW_REPORTS = {'show cache-all': 'cache_all_report',
+                    'show uplink': 'uplink_report',
+                    'show cache': 'cache_report',
+                    'show write-registers-profile': 'write_registers_profile_report',
+                    'show connect-acl-table': ('acl_table_report', 'connect'),
+                    'show write-acl-table': ('acl_table_report', 'write'),
+                    'show metrics-acl-table': ('acl_table_report', 'metrics')}
+
+    @property
+    def dump_path(self):
+        """The state dump file's one home is the proxy's (set dump/path
+        applies there) — the base's dump-family reads and the command
+        spine's dump-interval gates ride this view."""
+        return self.proxy.dump_path
+
+    @dump_path.setter
+    def dump_path(self, v):
+        pass   # the base __init__'s startup assignment lands nowhere — the proxy's value rules
 
     def show_config_cfg(self):
         """The resolved startup config dict — the proxy's live one home (the
@@ -93,141 +120,17 @@ class ControlServer(_ControlServer):
         cmds += ', request clear cache, request reload, request restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
         return cmds
 
-    def command(self, cmd):
-        cmd = cmd.strip()
-        low = cmd.lower()
-        if low.split()[0] in ('help', '?') and low != '?':
-            args = cmd.split()[1:]
-            if args and args[0].lower() == 'config':
-                return self.config_mapping()
-            if args and args[0].lower() == 'knobs':
-                return self.knobs_dictionary()
-            path = '/'.join(w.lower() for w in args)   # the command paths spell as words too — the golden ladder: the commands before the settings
-            listing = describe_command_node(COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, path)
-            if listing is not None:
-                return 'ok %s' % listing
-            if path in COMMAND_HELP:   # a command word — or a childless command node — describes itself
-                return 'ok %s' % COMMAND_HELP[path]
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
-            if key is not None and not rest:
-                if key == 'dump-interval' and not self.proxy.dump_path:
-                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
-                return 'ok %s' % describe_setting(key)
-            if path in NODE_BY_NAME:
-                return 'ok %s' % describe_node(OPTIONS, path)
-            if args:
-                return 'err unknown command or setting %s (try ?)' % ' '.join(args)
-            return 'ok ' + self.command_help()
-        if low == '?':
-            return 'ok ' + self.command_help()
-        if low == 'quit':
-            return 'bye'
-        if low == 'ping':                 # keep-alive from cache_cli
-            return 'ok pong'
-        if cmd.startswith('unset'):
-            args = cmd.split()[1:]
-            if not args:
-                return 'err unset needs a setting (try help)'
-            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports have nothing to unset
-            s = SET_BY_NAME.get(key) if key is not None else None
-            if s is not None and not rest and s.restart:
-                if s.secret:   # a secret never rides the reload state — the wire refuses it
-                    return 'err restart required (startup-only knob)'
-                self.defaults[key] = self.baseline.get(key, self.defaults.get(key))
-                self.overridden.discard(key)
-                logger.info('control: unset %s (the restart re-applies the configured value)', key)
-                return 'note restart required (startup-only knob)'
-            if key is None or rest or key not in self.defaults:
-                return 'err unknown setting %s (try help)' % ' '.join(args)
-            try:
-                shown = self._apply(key, self.defaults[key])
-            except ValueError as e:
-                return 'err %s' % e
-            self.overridden.discard(key)
-            logger.info('control: unset %s -> ok %s=%s', key, key, shown)
-            return 'ok %s=%s %s' % (key, shown, self.summary())
-        if cmd.startswith('set'):
-            args = cmd.split()[1:]
-            if len(args) < 2:
-                return 'err set needs a setting and a value (try help)'
-            key, rest = match_setting_path(args, SET_BY_NAME)   # the knobs: the show reports are not settable (and a show path never shadows a knob value)
-            if key is None:
-                return 'err unknown setting %s (try help)' % ' '.join(args)
-            if not rest:
-                return 'err set needs a setting and a value (try help)'
-            s = SET_BY_NAME.get(key)
-            if s is not None and s.restart and s.secret:
-                return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
-            value = ' '.join(rest)
-            if value == SECRET_REMOVED and getattr(s, 'secret', False):
-                return 'err *** SECRET REMOVED *** is not a value — pass the secret by flag/env, or as file:<path>'
-            try:
-                shown = self._apply(key, value)
-            except ValueError as e:
-                return 'err %s' % e
-            self.overridden.add(key)
-            logger.info('control: set %s=%s', key, shown)
-            if s is not None and s.restart:   # the value is recorded; the restart applies it — a note, not a verdict
-                return 'note restart required (startup-only knob)'
-            return 'ok %s=%s %s' % (key, shown, self.summary())
-        if low == 'show connections':
-            return 'ok connections ' + self.connections_line()
-        if low == 'show cache-all':
-            return self.cache_all_report()
-        if low == 'show uplink':
-            return self.uplink_report()
-        if low == 'show cache':
-            return 'ok ' + self.cache_line()
-        if low == 'show version':
-            return 'ok modbus-cache %s' % version_string()
-        if low in ('show config', 'show config all'):   # 'all' rides along: the script IS the full config
-            return self.show_config()
-        if low == 'show knobs':
-            return self.knobs_dictionary()
-        if low == 'show write-registers-profile':
-            return self.write_registers_profile_report()
-        if low == 'show connect-acl-table':
-            return self.acl_table_report('connect')
-        if low == 'show write-acl-table':
-            return self.acl_table_report('write')
-        if low == 'show metrics-acl-table':
-            return self.acl_table_report('metrics')
-        if low.startswith('show'):
-            args = cmd.split()[1:]
-            if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
-                return 'ok %s' % describe_root(OPTIONS, SHOW_OPTIONS,
-                                               hidden_words=() if self.proxy.dump_path else ('dump-interval',))
-            key, rest = match_setting_path(args, SETTING_BY_NAME)
-            if key is not None and not rest:
-                opt = OPTION_BY_LIVE.get(key)
-                if opt is not None and opt.secret:
-                    return 'err %s is a secret — it never shows (pass it by flag/env, or as file:<path>)' % key
-                word = SHOW_BY_LIVE.get(key)
-                if word:
-                    return self.command('show ' + word)   # a show command's report, by its word
-                if key == 'dump-interval' and not self.proxy.dump_path:
-                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
-                return 'ok %s=%s' % (key, self._get(key))
-            if key is not None and rest:
-                return 'err %s: unexpected %s' % (key, ' '.join(rest))
-            node_path = '/'.join(w.lower() for w in args)   # the walk the ? offers: every word of the path answers
-            if node_path in NODE_BY_NAME:
-                return 'ok %s' % describe_node(OPTIONS, node_path)
-            if len(args) == 1:
-                return 'err unknown setting %s (try help)' % args[0].lower()
-        if low == 'inspect':
-            return self.inspect()
+    def command_tool(self, low, cmd):
+        """The cache's own verbs beside the family's request namespace:
+        the cache clear (the words drop, the poll wakes), the dump
+        with-cache spelling and the upstream session restart."""
         if low == 'request clear cache':
             dropped = self.proxy.cache.clear()
             self.proxy.poll_wake.set()
             logger.info('control: cache cleared (%d register word(s) dropped), repolling now', dropped)
             return 'ok cache cleared (%d register word(s) dropped), repolling now' % dropped
-        if low == 'request dump':
-            return self.dump_state(self.proxy.dump_with_cache)
         if low == 'request dump with-cache':
             return self.dump_state(True)
-        if low == 'request restore':
-            return self.restore_state()
         if low == 'request restart':
             with self.proxy.upstream.lock:
                 self.proxy.upstream.close()
@@ -236,13 +139,17 @@ class ControlServer(_ControlServer):
             logger.info('control: upstream session restarted (connection dropped, %d register word(s) dropped, repolling now)',
                         dropped)
             return 'ok upstream session restarted (connection dropped, %d register word(s) dropped, repolling now)' % dropped
-        if low == 'request reload':
-            return self.reload_daemon()
-        if low == 'shutdown':
-            self.shutdown_pending = True
-            logger.info('control: shutdown requested')
-            return 'bye shutdown'
-        return 'err unknown command %r (try help)' % cmd
+        return None
+
+    def cache_report(self):
+        """The one-line cache state (show cache): the ok frame wraps the
+        bare line the proxy renders."""
+        return 'ok ' + self.cache_line()
+
+    def show_root_hidden(self):
+        """The bare `show`'s pool hides dump-interval while no dump path
+        is configured (nothing would dump into it)."""
+        return () if self.dump_path else ('dump-interval',)
 
     def _apply(self, key, value):
         """Apply a live setting; returns the display string or raises
@@ -1025,12 +932,15 @@ class ControlServer(_ControlServer):
         return self.proxy.dump_key
 
 
-    def dump_state(self, with_cache):
+    def dump_state(self, with_cache=None):
         """The write-behind: the live setting overrides and — when
         with_cache (the `request dump with-cache` command, the
         `--dump-with-cache` default or the dump-interval loop) — the cached
         words (+ stamps), to the configured dump path — sealed when
-        dump/key is configured."""
+        dump/key is configured. The family's `request dump` calls bare:
+        None = the configured --dump-with-cache default."""
+        if with_cache is None:
+            with_cache = self.proxy.dump_with_cache
         path = self.proxy.dump_path
         if not path:
             return 'err no dump path configured (set dump/path or --dump-path)'

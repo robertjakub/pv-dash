@@ -10,14 +10,11 @@ per-block poll latency/errors — without depending on the scraper's
 `Authorization: Bearer <token>` (the same scheme the scraper speaks).
 The gated endpoint skeleton (the 401/404/503, the caps, the thread
 start/stop) is the family's common/metrics_server."""
-import logging
 import time
 
 from common.config import acl_admits
 from common.metrics_server import MetricsServer as _MetricsServer
 from common.metrics_server import describe_metrics
-
-logger = logging.getLogger('modbus-cache')
 
 
 class MetricsServer(_MetricsServer):
@@ -44,10 +41,6 @@ class MetricsServer(_MetricsServer):
 
     def acl_allows(self, ip):
         return acl_admits(self.proxy.metrics_acl, ip)
-
-    def acl_refused(self, request, client_address):
-        logger.info('connection rejected: %s:%d not on the metrics ACL', *client_address[:2])
-        self._http._refuse_close(request)
 
     def snapshot(self):
         p = self.proxy

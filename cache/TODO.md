@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The man-ladder wave: the page runs the family's one daemon ladder
+(NAME … OPTIONS, SIGNALS, CONTROL, SECURITY, ENVIRONMENT, FILES, EXIT
+STATUS, SEE ALSO) — the posture prose carves out of DESCRIPTION/CONTROL
+into a new SECURITY (the F5 refusal, the signed wire, the ops token,
+the secret rule, the write gate's audits, the IP gates, the dump seal,
+the audit trail), the ctl page gains its ENVIRONMENT twins, the EXIT
+STATUS row names the failed-bind rc 1, and `common/manpage.py`'s
+LADDERS gate (`page(kind=...)`) refuses a page that drifts. The ctl
+EXAMPLES' `printf` pipeline renders its `\n` for the first time.
+
 The shared acl example/schema wave: the ip-prefix pair moves to the repo
 root as the family's one shared copy (`examples/acl-ip-prefix.json` +
 `schema/acl-ip-prefix.schema.json` — the four per-tool copies die);

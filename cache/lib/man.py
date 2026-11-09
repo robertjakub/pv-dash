@@ -74,8 +74,10 @@ The control server speaks JSON lines: one request
 .BR set ", " unset ", " show ", " help ,
 the reports
 .BR inspect ", " "show connections" ,
-.BR "show cache" " [all]" ", " "show write registers profile" ", " "show uplink" ", " "show version" ,
-.BR "show acl connect table" ", " "show acl write table" ", " "show metrics acl table" ,
+.BR "show cache" " [all]" ", " "show write registers profile" ,
+.BR "show uplink" ", " "show version" ,
+.BR "show acl connect table" ", " "show acl write table" ,
+.BR "show metrics acl table" ,
 the ops
 .BR "request dump" ", " "request restore" ", " "request clear cache" ,
 .BR "request reload" ", " "request restart" ", " shutdown ", " quit .
@@ -96,11 +98,11 @@ audit disable, dump path, dump with-cache); a SIGHUP re-applies the config
 .B restart: true
 answers the note
 .B restart required (startup-only knob)
-from set/unset \-\- the set records the value (show renders it; the
+from set/unset \\-\\- the set records the value (show renders it; the
 whole-daemon reload folds it into the fresh process before the binds),
 the config (and a SIGHUP) changes it too. A restart-marked secret
 (dump/key) refuses set/unset outright: a secret never rides the reload
-state (a secret knob refuses to show at all \(em the value renders
+state (a secret knob refuses to show at all \\(em the value renders
 nowhere).
 .IP \\(bu 2
 .B show cache all
@@ -123,7 +125,7 @@ its desc, the comments aligned.
 IP ACL as its chain, one
 entry per line (show-only): \\fBallow 0.0.0.0/0\\fR (any), \\fBdeny
 0.0.0.0/0\\fR (none), \\fBdeny 0.0.0.0/0\\fR then one \\fBallow\\fR line
-per network (the whitelist) \(em and in file mode the ip-prefix gate's
+per network (the whitelist) \\(em and in file mode the ip-prefix gate's
 own rules, the gate desc as the % line, the rule descs as aligned
 comments.
 .IP \\(bu 2
@@ -148,23 +150,39 @@ overrides re-apply once; the cache starts empty),
 \\fBshutdown\\fR (the same as SIGTERM).
 .RE
 .PP
-A second, read-only token (\\fB--control-ops-token\\fR) authenticates
-sessions into the show/clear verbs only \\(em no set/unset, no
-request dump/restore, no request reload, no request restart, no
-shutdown \\(em the ops shift against the
-admin key, both roles audited. A secret knob (control token, the ops
-token, the metrics token) never shows its value:
-\\fBshow\\fR
-answers \\fBerr <name> is a secret \\(em it never shows\\fR, \\fBunset\\fR
-refuses \\(em pass the secret by flag/env, or as file:<path>; \\fBshow config\\fR
-and the dumps render the knob as \\fB*** SECRET REMOVED ***\\fR (the
-config parser refuses the placeholder \\(em it is never a value).
-.PP
 See
 .BR modbus-cache-ctl (1)
 and
 .BR modbus-cache-cli (1)
 for the clients."""
+    security = """.SH SECURITY
+The control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
+control port without a token refuses to start (F5); with a token the
+wire is signed and the commands/replies verify end to end; a second,
+read-only ops token (\\fB--control-ops-token\\fR) authenticates sessions
+into the show/clear verbs only \\(em no set/unset, no request
+dump/restore, no request reload, no request restart, no shutdown \\(em
+the ops shift against the admin key, both roles audited. A secret knob
+(control token, the ops token, the metrics token, modbus auth key, dump
+key) never shows its value: \\fBshow\\fR answers \\fBerr <name> is a
+secret \\(em it never shows\\fR, \\fBunset\\fR refuses \\(em pass the
+secret by flag/env, or as \\fBfile:<path>\\fR; \\fBshow config\\fR and the
+dumps render the knob as \\fB*** SECRET REMOVED ***\\fR (the config
+parser refuses the placeholder \\(em it is never a value).
+.PP
+The Modbus port is read-only until the write gate says otherwise:
+writes ride \\fB--write-registers\\fR (the direct ranges, the profile's
+acl/write chain or a \\fBfile:<path>\\fR acl) and every accepted or
+refused write lands in the audit trail (WRITE / WRITE\\-REFUSED). The
+\\fB--connect-acl\\fR IP gate (acl/connect) filters who may connect at
+all; the metrics endpoint carries the family's one /metrics stack (F13):
+a token-less non-loopback bind refuses to start, the metrics acl IP
+gate narrows who reaches the endpoint, the caps bound the concurrency.
+With \\fB--dump-key\\fR the state file is sealed (an HMAC\\-SHA256
+counter\\-mode keystream, authenticated \\(em a restore refuses a wrong
+or missing key). The audit trail (in the XDG state home when
+\\fB--audit-log\\fR is unset, prefix CACHE) records the control commands
+with their roles, the auth failures, the writes and the reloads."""
     environment = """.SH ENVIRONMENT
 .TP
 .B CTL
@@ -183,7 +201,8 @@ replaced, unlinked on shutdown).
 .I ~/.local/state/modbus-cache/audit.log
 the audit trail when \\fB--audit-log\\fR is unset.
 .TP
-.I cache/examples/modbus_cache.conf ", " cache/examples/selection.json ", " cache/examples/acl-write-registers.json
+.I cache/examples/modbus_cache.conf ", " cache/examples/selection.json ,
+.I cache/examples/acl-write-registers.json
 the packaged sample config, the example selection and the example acl
 file (the deye write policy for \\fB--write-registers file:<path>\\fR \\(em
 a group/world-readable acl file warns in the log, the audit trail
@@ -194,7 +213,7 @@ a group/world-readable acl file warns in the log, the audit trail
 success (\\fB--dry-run\\fR: valid configuration).
 .TP
 .B 1
-invalid configuration (reason on stderr; \\fB--dry-run\\fR only).
+invalid configuration or a failed bind (reason on stderr).
 .TP
 .B 2
 command-line misuse."""
@@ -204,7 +223,8 @@ command-line misuse."""
         '.B modbus-cache\n.RI [ options ]\n.br\n.B modbus-cache \\-\\-dry-run\n.RI [ options ]',
         description,
         options_section(parser),
-        extra_sections=(signals, control, environment, files, exit_status),
+        extra_sections=(signals, control, security, environment, files, exit_status),
+        kind='daemon',
         see_also='.BR modbus-cache-ctl (1),\n.BR modbus-cache-cli (1),\n.BR modbus-scraper (1),\n.BR modbus-fake-inverter (1)\n.PP\n\\fBcache/README.md\\fR in the suite checkout \\(em the full documentation.')
 
 
@@ -232,7 +252,7 @@ CONTROL."""
 .IP \\(bu 2
 .B modbus-cache-ctl request clear cache
 .IP \\(bu 2
-.B printf 'show cache\\\\nrequest clear cache\\\\n' | modbus-cache-ctl
+.B printf 'show cache\\enrequest clear cache\\en' | modbus-cache-ctl
 .RE"""
     exit_status = """.SH EXIT STATUS
 .TP
@@ -244,13 +264,18 @@ connection or control error.
 .TP
 .B 2
 command-line misuse."""
+    environment = """.SH ENVIRONMENT
+.TP
+.B CTL ", " CONTROL_TOKEN
+the control target and the TCP token when the flags are unset."""
     return page(
         'one-shot control client for the modbus-cache daemon',
         'modbus-cache-ctl', 1, DATE, VERSION, MANUAL,
         '.B modbus-cache-ctl\n.RI [ options ]\n.IB command " [args ...]"\n.br\n.B modbus-cache-ctl\n.RI [ options ]\n< commands',
         description,
         options_section(parser),
-        extra_sections=(examples, exit_status),
+        extra_sections=(examples, environment, exit_status),
+        kind='ctl',
         see_also='.BR modbus-cache (1),\n.BR modbus-cache-cli (1)')
 
 
@@ -301,4 +326,5 @@ command-line misuse."""
         description,
         options_section(parser),
         extra_sections=(environment, exit_status),
+        kind='cli',
         see_also='.BR modbus-cache (1),\n.BR modbus-cache-ctl (1)')

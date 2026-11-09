@@ -64,8 +64,13 @@ disable the audit trail
 .IP \(bu 2
 .B modbus-cache-ctl request clear cache
 .IP \(bu 2
-.B printf 'show cache\\nrequest clear cache\\n' | modbus-cache-ctl
+.B printf 'show cache\enrequest clear cache\en' | modbus-cache-ctl
 .RE
+
+.SH ENVIRONMENT
+.TP
+.B CTL ", " CONTROL_TOKEN
+the control target and the TCP token when the flags are unset.
 
 .SH EXIT STATUS
 .TP

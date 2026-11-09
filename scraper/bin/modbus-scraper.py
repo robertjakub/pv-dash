@@ -82,6 +82,10 @@ def describe(cfg, args, control_desc):
                 version_string()))
 
 
+def fold_listen(cfg, pending):
+    cfg['listen'] = pending
+
+
 def main():
     if '--version' in sys.argv:
         print(version_string())
@@ -95,7 +99,8 @@ def main():
 
     setup_logging(cfg)
 
-    apply_restart_state(cfg, args.config, cfg['dump_key'], ControlServer)
+    apply_restart_state(cfg, args.config, cfg['dump_key'], ControlServer,
+                        extra={'system/listen': fold_listen, 'metrics/listen': fold_listen})
 
     if cfg['max_kwp'] > 0 and cfg['max_grid_kw'] > 0 and cfg['max_kwp'] > cfg['max_grid_kw']:
         logger.warning('max_kwp (%g) is greater than max_grid_kw (%g): the grid line cannot be '

@@ -117,7 +117,6 @@ prefix
 |---|---|---|---|---|---|
 | `metrics-spec` | `set metrics filter` | settable | `PATH\|-` | `--metrics-spec` / `METRICS_SPEC` | metrics spec JSON, sectioned: {inputs: {name: {help}}, metrics: {key: {profile?, expr?, when?, help, type?}}, scraper:...} — the metrics entries are register- (profile) or expression-fed (expr/when) over the declared inputs (show inputs), merged in memory over the built-in lib/metrics.json scraper_* block |
 | `metric-prefix` | `set metrics prefix` | settable | `PREFIX` | `--metric-prefix` / `METRIC_PREFIX` | the prefix on the profile- and compute-fed metric names |
-| `listen` | `set metrics listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
 | `interval` | `set metrics interval` | settable | `s` | `--interval` / `INTERVAL` | seconds between polls of the inverter |
 
@@ -130,6 +129,14 @@ ceilings
 |---|---|---|---|---|---|
 | `max-kwp` | `set caps max-pv` | settable | `KW` | `--max-kwp` / `MAX_KWP` | maximum PV array kWp |
 | `max-grid-kw` | `set caps max-grid` | settable | `KW` | `--max-grid-kw` / `MAX_GRID_KW` | maximum grid kW, either direction |
+
+### system
+
+the daemon's own serving socket: the listen address
+
+| knob | set / unset | kind | value | flag / env | description |
+|---|---|---|---|---|---|
+| `listen` | `set system listen` (alias: `set metrics listen`) | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
 
 ### metrics/limits
 

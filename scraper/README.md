@@ -170,7 +170,7 @@ set modbus upstream 127.0.0.1:5502
 set modbus unit 1
 set caps max-pv 6
 set caps max-grid 12
-set metrics listen 127.0.0.1:9350
+set system listen 127.0.0.1:9350
 set metrics interval 10
 set log-level INFO
 ```
@@ -248,7 +248,7 @@ command, settable (`set`/`unset`) or show-only — is tabled in
 
 | Command | Effect |
 |---|---|
-| `set` / `unset` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `modbus auth` (the scheme swaps live), `metrics acl`, the control verbs/socket-group, `control port` (rebinds the listener live) — the tokens and the auth keys are startup-only: the wire refuses set/unset, pass them by flag/env/config |
+| `set` / `unset` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `modbus auth` (the scheme swaps live), `metrics acl`, the control verbs/socket-group, `control port` (rebinds the listener live) — `system listen` (the serve address, `show system listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
 | `poll now` | the loop wakes immediately |
 | `show connections` | the live HTTP clients of /metrics |
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |

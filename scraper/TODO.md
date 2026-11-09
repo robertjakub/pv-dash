@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The serve-address wave (the family's one word): the scraper's listen knob
+re-spells to the canon — live `system/listen`, `metrics/listen` stays as
+the alias (the wire, the config grammar and the state files accept both,
+the canonical one renders) — and the restart fold lands with it (a
+`set system listen` + `request reload` now really rebinds; before, the
+pending value never folded). The `system` node rows the namespace.
+
 The dump-interval wave (the family unification, the cache as the golden
 master): the scraper gains the cache's `dump-interval` knob —
 `--dump-interval`/`$DUMP_INTERVAL`, live as `set dump-interval

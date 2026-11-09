@@ -303,7 +303,7 @@ class ControlServer(_ControlServer):
         if rs is not None and rs.restart:   # a startup-only knob: validate + record the pending value
             if rs.secret:
                 raise ValueError('restart required (startup-only knob)')
-            if key == 'metrics/listen':
+            if key in ('system/listen', 'metrics/listen'):   # the second spelling: a state file written before the rename
                 try:
                     t = parse_listen(val)
                 except SystemExit as e:

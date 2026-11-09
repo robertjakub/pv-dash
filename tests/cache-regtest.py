@@ -561,8 +561,10 @@ try:
     r = cli('show control token ?\nshow control ops ?\nset connections ?\nrequest?\nquit\n')
     check("cache_cli: ? at a hidden leaf describes it (the wire's help answer)",
           'control/token - require a token on control connections' in r.stdout, repr(r.stdout[-300:]))
-    check("cache_cli: ? at a hidden-only namespace stays Invalid input (the secrets never list)",
-          r.stdout.count('% Invalid input.') == 2, repr(r.stdout[-300:]))
+    check("cache_cli: ? at the ops namespace lists its non-secret child (the verbs row rides the walk)",
+          'verbs the read-only ops role' in r.stdout, repr(r.stdout[-300:]))
+    check("cache_cli: ? at a show-only namespace stays Invalid input (the reports never join the set space)",
+          r.stdout.count('% Invalid input.') == 1, repr(r.stdout[-300:]))
     check('cache_cli: the command tree describes by its registry row (the walk-on borrows the node descr)',
           'request the state machinery: the dump written and restored' in r.stdout, repr(r.stdout[-300:]))
     r = cli('shutdown\nn\n')
@@ -1370,14 +1372,14 @@ try:
                                           hashlib.sha256).hexdigest(), 'the reply mac does not verify: %r' % obj
         return '%s %s' % (obj.get('status'), obj.get('text', ''))
 
-    r = ctl_cmd('show control ops-verbs', 15530)
-    check('control ops-verbs: show answers the policy', r == 'ok control/ops-verbs=clear,show', r)
-    r = ctl_cmd('set control ops-verbs show, ping', 15530)
-    check('control ops-verbs: set takes the comma list', r.startswith('ok control/ops-verbs=ping,show'), r[:90])
-    r = ctl_cmd('set control ops-verbs bogus', 15530)
-    check('control ops-verbs: an unknown verb is a clean err', r.startswith('fail the ops policy needs at least one'),
+    r = ctl_cmd('show control ops verbs', 15530)
+    check('control ops verbs: show answers the policy', r == 'ok control/ops/verbs=clear,show', r)
+    r = ctl_cmd('set control ops verbs show, ping', 15530)
+    check('control ops verbs: set takes the comma list', r.startswith('ok control/ops/verbs=ping,show'), r[:90])
+    r = ctl_cmd('set control ops verbs bogus', 15530)
+    check('control ops verbs: an unknown verb is a clean err', r.startswith('fail the ops policy needs at least one'),
           r[:80])
-    ctl_cmd('unset control ops-verbs', 15530)
+    ctl_cmd('unset control ops verbs', 15530)
     r = ctl_cmd('show control token', 15530)
     check('control token: the secret never renders back', r.startswith('fail control/token is a secret'), r)
     r = ctl_cmd('unset control token', 15530)

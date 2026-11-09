@@ -32,6 +32,7 @@ OPS_HTTP_PORT = 15973   # the ops-token'd dashboard (the read-only role, §6c)
 OPS_CTRL_PORT = 15974
 PAGES_PORT = 15975    # the token'd page (the F21 auth round)
 PAGES_CTL = 15977
+METRICS_PORT = 15976  # the main instance's /metrics (the metrics/acl round)
 
 
 class PromStub(BaseHTTPRequestHandler):
@@ -145,6 +146,7 @@ def main():
         procs.append(subprocess.Popen([sys.executable, P, '--port', str(HTTP_PORT), '--bind', '127.0.0.1',
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js'),
+                                       '--metrics-server', '--metrics-listen', '127.0.0.1:%d' % METRICS_PORT,
                                        '--control-port', str(CTRL_PORT), '--control-token', TOKEN,
                                        '--audit-log', '-'],
                                       stdout=open('/tmp/dash_ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
@@ -437,6 +439,95 @@ def main():
         check('page auth: the rotated token reads', r.startswith(b'HTTP/1.1 200'), r[:40])
         r = page_get(PAGES_PORT, b'/config.js', b'Authorization: Bearer ptok\r\n')
         check('page auth: the old token is a 401', r.startswith(b'HTTP/1.1 401'), r[:40])
+
+        # 8c. the control listener family (the cache's, family-wide): the
+        #     live rebind — the tokenless TCP rebind refuses on the live
+        #     wire (F5), the token'd rebind swaps the socket, the old one
+        #     closes, the group-accessible mode re-modes the unix socket live
+        REB_HTTP, REB_TCP = 15978, 15979
+        reb_sock = '/tmp/dashboard-%d.socket' % REB_HTTP
+        procs.append(subprocess.Popen([sys.executable, P, '--port', str(REB_HTTP), '--bind', '127.0.0.1',
+                                       '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
+                                       '--audit-log', '-'],
+                                      stdout=open('/tmp/dash_ctl_fuzz_rebind.log', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(1.2)
+
+        def rctl(*cmds, port=None, token=None):
+            r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
+                                '--control-port', port if port is not None else reb_sock]
+                               + (['--control-token', token] if token else []) + list(cmds),
+                               capture_output=True, text=True, timeout=15)
+            return r.stdout.strip()
+
+        check('family listener: the default unix socket is 0600',
+              os.stat(reb_sock).st_mode & 0o777 == 0o600, oct(os.stat(reb_sock).st_mode))
+        tx = rctl('set control socket-group on')
+        check('family listener: set control socket-group on re-modes the live socket 0660',
+              tx.startswith('ok control/socket-group=on') and os.stat(reb_sock).st_mode & 0o777 == 0o660,
+              tx[:120] + ' ' + oct(os.stat(reb_sock).st_mode))
+        tx = rctl('set control socket-group off')
+        check('family listener: set control socket-group off re-modes it back 0600',
+              tx.startswith('ok control/socket-group=off') and os.stat(reb_sock).st_mode & 0o777 == 0o600,
+              tx[:120] + ' ' + oct(os.stat(reb_sock).st_mode))
+        tx = rctl('set control port %d' % REB_TCP)
+        check('family listener: a tokenless TCP rebind refuses on the live wire (F5)',
+              tx.startswith('% error: control/port cannot serve TCP without a token'), tx[:140])
+        tx = rctl('show control token')
+        check('family listener: the show verb still refuses the secret', tx.startswith('% error') and 'is a secret' in tx,
+              tx[:140])
+        tx = rctl('set control token rtok2')
+        check('family listener: the token rotates in live (the instance was tokenless)', tx.startswith('ok control/token=<set>'),
+              tx[:120])
+        tx = rctl('set control port %d' % REB_TCP)
+        check('family listener: the tokenized TCP rebind succeeds', tx.startswith('ok control/port=127.0.0.1:%d' % REB_TCP),
+              tx[:120])
+        tx = rctl('show version', port=reb_sock)
+        check('family listener: the retired unix socket no longer answers', tx == '', tx[:120])
+        tx = rctl('show version', port=str(REB_TCP), token='rtok2')
+        check('family listener: the new TCP port speaks (signed with the rotated token)',
+              tx.startswith('ok dashboard'), tx[:120])
+        tx = rctl('unset control port', port=str(REB_TCP), token='rtok2')
+        check('family listener: unset restores the configured target',
+              tx.startswith('ok control/port=unix:%s' % reb_sock), tx[:120])
+        tx = rctl('show version', token='rtok2')
+        check('family listener: the restored socket speaks', tx.startswith('ok dashboard'), tx[:120])
+
+        # 8b. the metrics/acl gate (the cache's logic, the dashboard's
+        # surface): the accept-time IP gate on the /metrics listener — the
+        # ACL first, then the caps, the token's 401 only past both
+        def metrics_raw():
+            s = socket.create_connection(('127.0.0.1', METRICS_PORT), timeout=5)
+            try:
+                s.sendall(b'GET /metrics HTTP/1.0\r\n\r\n')
+                buf = b''
+                while True:
+                    chunk = s.recv(4096)
+                    if not chunk:
+                        break
+                    buf += chunk
+                return buf
+            except (ConnectionResetError, BrokenPipeError):
+                return b''
+            finally:
+                s.close()
+
+        st, tx = roundtrip(CTRL_PORT, signed('set metrics acl none'))
+        check('metrics acl: set none answers ok', st == 'ok' and tx.startswith('metrics/acl=none'), '%s %s' % (st, tx[:80]))
+        check('metrics acl: none closes the client without a reply', metrics_raw() == b'', repr(metrics_raw()[:40]))
+        st, tx = roundtrip(CTRL_PORT, signed('show metrics acl'))
+        check('metrics acl: the none show', st == 'ok' and tx == 'metrics/acl=none', '%s %s' % (st, tx[:60]))
+        st, tx = roundtrip(CTRL_PORT, signed('show metrics acl table'))
+        check('metrics acl: none spells the deny-any chain',
+              st == 'ok' and tx.startswith('metrics-acl-table') and 'deny 0.0.0.0/0' in tx, '%s %s' % (st, tx[:80]))
+        st, tx = roundtrip(CTRL_PORT, signed('set metrics acl table'))
+        check('metrics acl: the show word is not a value (the pointer to the report)',
+              st == 'fail' and 'show metrics acl table' in tx, '%s %s' % (st, tx[:120]))
+        st, tx = roundtrip(CTRL_PORT, signed('set metrics acl 127.0.0.1'))
+        check('metrics acl: the whitelist set canonicalizes', st == 'ok' and tx.startswith('metrics/acl=127.0.0.1/32'), '%s %s' % (st, tx[:80]))
+        check('metrics acl: the whitelist serves the lab', metrics_raw().startswith(b'HTTP/1.0 200'))
+        st, tx = roundtrip(CTRL_PORT, signed('unset metrics acl'))
+        check('metrics acl: unset restores the configured value', st == 'ok' and tx.startswith('metrics/acl=any'), '%s %s' % (st, tx[:80]))
+        check('metrics acl: any serves again', metrics_raw().startswith(b'HTTP/1.0 200'))
 
         # 9. clean shutdown
         st, tx = roundtrip(CTRL_PORT, signed('shutdown'))

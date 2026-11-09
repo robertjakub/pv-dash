@@ -339,23 +339,23 @@ def main():
         st, _ = http_get(B_METRICS, token='tok')
         check('metrics recovers after the slot frees', st.split()[1] == '200', st)
         # the live metrics-server switch: off stops the endpoint, on restarts it
-        tx = ctl(B_CTL, 'set metrics-server off')
-        check('metrics-server: set off', tx.startswith('ok metrics-server=off'), tx)
+        tx = ctl(B_CTL, 'set metrics enable off')
+        check('metrics enable: set off', tx.startswith('ok metrics/enable=off'), tx)
         srv_down = False
         try:
             connect(B_METRICS, 1.0).close()
         except OSError:
             srv_down = True
-        check('metrics-server: the port is closed after set off', srv_down)
+        check('metrics enable: the port is closed after set off', srv_down)
         insb = ctl(B_CTL, 'inspect')
-        check('metrics-server: inspect says off', '\nmetrics   off' in '\n' + insb,
+        check('metrics enable: inspect says off', '\nmetrics   off' in '\n' + insb,
               [l for l in insb.splitlines() if l.startswith('metrics')])
-        tx = ctl(B_CTL, 'set metrics-server on')
-        check('metrics-server: set on serves again', tx.startswith('ok metrics-server=on'), tx)
+        tx = ctl(B_CTL, 'set metrics enable on')
+        check('metrics enable: set on serves again', tx.startswith('ok metrics/enable=on'), tx)
         st, _ = http_get(B_METRICS, token='tok')
-        check('metrics-server: the gauges are back', st.split()[1] == '200', st)
+        check('metrics enable: the gauges are back', st.split()[1] == '200', st)
         insb = ctl(B_CTL, 'inspect')
-        check('metrics-server: inspect carries the endpoint line',
+        check('metrics enable: inspect carries the endpoint line',
               'metrics   127.0.0.1:%d (bearer token), clients 1, per-ip none' % B_METRICS in insb,
               [l for l in insb.splitlines() if l.startswith('metrics')])
 
@@ -368,18 +368,18 @@ def main():
         tx = ctl(F_CTL, 'set metrics token off')
         check('metrics token: the off beyond loopback refuses (the F13 shape)',
               '% error:' in tx and 'F13' in tx, tx)
-        tx = ctl(F_CTL, 'set metrics-server on')
-        check('metrics-server: the token-less live start on 0.0.0.0 refuses (the F13 shape)',
+        tx = ctl(F_CTL, 'set metrics enable on')
+        check('metrics enable: the token-less live start on 0.0.0.0 refuses (the F13 shape)',
               '% error:' in tx and 'refusing to expose /metrics beyond loopback' in tx, tx)
         logf = open(LOG + '.f').read()
-        check('metrics-server: the refusal is a clean err (no traceback)', 'Traceback' not in logf,
+        check('metrics enable: the refusal is a clean err (no traceback)', 'Traceback' not in logf,
               [l for l in logf.splitlines() if 'Trace' in l])
         tx = ctl(F_CTL, 'set metrics token t')
         check('metrics token: the token sets', tx.startswith('ok metrics/token=<set>'), tx)
-        tx = ctl(F_CTL, 'set metrics-server on')
-        check('metrics-server: with a token the live start on 0.0.0.0 serves',
-              tx.startswith('ok metrics-server=on'), tx)
-        ctl(F_CTL, 'set metrics-server off')
+        tx = ctl(F_CTL, 'set metrics enable on')
+        check('metrics enable: with a token the live start on 0.0.0.0 serves',
+              tx.startswith('ok metrics/enable=on'), tx)
+        ctl(F_CTL, 'set metrics enable off')
         tx = ctl(F_CTL, 'set metrics token off')
         check('metrics token: the off refuses while the listen stays non-loopback',
               '% error:' in tx and 'F13' in tx, tx)
@@ -399,6 +399,64 @@ def main():
                             '--metrics-listen', '127.0.0.1:%d' % (F_METRICS + 1)], capture_output=True, text=True, timeout=15)
         check('F13: the loopback metrics listen needs no token',
               r.returncode == 0, repr((r.stderr + r.stdout)[-140:]))
+
+        # ---- the metrics/acl gate (the cache's logic, the fake's surface):
+        # the accept-time IP gate on the /metrics listener — the ACL first,
+        # then the caps, the token's 401 only past both
+        ACLGATE = '/tmp/inv_acl_gate.json'
+        with open(ACLGATE, 'w') as f:
+            json.dump({'desc': 'the lab gate', 'type': 'ip-prefix', 'rules': [
+                {'type': 'deny', 'prefix': 'any'},
+                {'type': 'allow', 'prefix': '127.0.0.1', 'desc': 'the loopback lab'}]}, f)
+
+        def acl_raw():
+            s = connect(B_METRICS)
+            try:
+                s.sendall(b'GET /metrics HTTP/1.0\r\nAuthorization: Bearer tok\r\n\r\n')
+                buf = b''
+                while True:
+                    chunk = s.recv(4096)
+                    if not chunk:
+                        break
+                    buf += chunk
+                return buf
+            except (ConnectionResetError, BrokenPipeError):
+                return b''
+            finally:
+                s.close()
+
+        r = ctl(B_CTL, 'set metrics acl none')
+        check('metrics acl: set none answers ok', r.startswith('ok metrics/acl=none'), r[:80])
+        check('metrics acl: none closes the client without a reply', acl_raw() == b'',
+              repr(acl_raw()[:40]))
+        r = ctl(B_CTL, 'show metrics acl')
+        check('metrics acl: the none show', r == 'ok metrics/acl=none', r[:60])
+        r = ctl(B_CTL, 'show metrics acl table')
+        check('metrics acl: none spells the deny-any chain', r == 'ok metrics-acl-table\ndeny 0.0.0.0/0', r[:80])
+        r = ctl(B_CTL, 'set metrics acl table')
+        check('metrics acl: the show word is not a value (the pointer to the report)',
+              r.startswith('% error:') and 'show metrics acl table' in r, r[:120])
+        r = ctl(B_CTL, 'set metrics acl 127.0.0.1')
+        check('metrics acl: the whitelist set canonicalizes', r.startswith('ok metrics/acl=127.0.0.1/32'), r[:80])
+        check('metrics acl: the whitelist serves the lab', acl_raw().startswith(b'HTTP/1.0 200'))
+        r = ctl(B_CTL, 'show metrics acl table')
+        check('metrics acl: the whitelist table', r == 'ok metrics-acl-table\ndeny 0.0.0.0/0\nallow 127.0.0.1/32', r[:80])
+        r = ctl(B_CTL, 'set metrics acl file:' + ACLGATE)
+        check('metrics acl: the file gate loads', r.startswith('ok metrics/acl=file:%s' % ACLGATE), r[:100])
+        r = ctl(B_CTL, 'show metrics acl')
+        check('metrics acl: the file spelling shows', r == 'ok metrics/acl=file:%s' % ACLGATE, r[:80])
+        r = ctl(B_CTL, 'show metrics acl table')
+        check('metrics acl: the file gate renders its own rules',
+              r == 'ok metrics-acl-table\n% the lab gate\ndeny 0.0.0.0/0\nallow 127.0.0.1 # the loopback lab', r[:160])
+        check('metrics acl: the file gate serves the lab', acl_raw().startswith(b'HTTP/1.0 200'))
+        with open(ACLGATE, 'w') as f:
+            json.dump({'type': 'ip-prefix', 'rules': [{'type': 'allow', 'prefix': '127.0.0.1/8'}]}, f)
+        r = ctl(B_CTL, 'set metrics acl file:' + ACLGATE)
+        check('metrics acl: a bad file answers err with the old gate standing',
+              r.startswith('% error:') and 'spell the network' in r and acl_raw().startswith(b'HTTP/1.0 200'), r[:140])
+        r = ctl(B_CTL, 'unset metrics acl')
+        check('metrics acl: unset restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
+        check('metrics acl: any serves again', acl_raw().startswith(b'HTTP/1.0 200'))
         g = connect(G_MODBUS)
         txn, unit, body = exchange(g, read_req(1, 3, 32064, 2), 1)
         check('control: the fake serves Modbus despite the failed control bind', txn == 1 and body[0] == 3, body.hex())
@@ -901,13 +959,14 @@ def main():
                  if line.strip() and not line.strip().startswith('[')]
         check("node walk: the bare show mimics the ? output (the walk's first position)",
               words == ['batt', 'battery', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
-                        'connect-acl', 'connections', 'dump', 'grid', 'grid-frequency', 'grid-outage',
+                        'connect-acl', 'connections', 'control', 'dump', 'grid', 'grid-frequency', 'grid-outage',
                         'grid-voltage', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
-                        'metrics-server', 'modbus', 'mppt', 'profile', 'pv', 'registers', 'scenario', 'seed',
+                        'metrics', 'modbus', 'mppt', 'profile', 'pv', 'registers', 'scenario', 'seed',
                         'soc', 'static', 'strict', 'time', 'time-scale', 'timezone', 'version',
                         'write'], tx[:220])
         tx = ctl(L_CTL, 'show control ops')
-        check('node walk: the intermediate node answers', tx.startswith('ok control/ops - '), tx[:80])
+        check('node walk: the intermediate node lists its live children',
+              tx.startswith('ok') and 'verbs' in tx and 'read-only ops role' in tx, tx[:80])
         tx = ctl(L_CTL, 'unset modbus auth key')
         check('suite auth: unset refuses the key (no defaults entry)', tx.startswith('% error: unknown setting'), tx[:80])
         tx = ctl(L_CTL, 'set modbus auth key short')
@@ -941,6 +1000,75 @@ def main():
         logl = open(LOG + '.l').read()
         check('suite auth: the failed proofs are logged', 'suite auth failed for' in logl)
         check('suite auth: the listening line names the scheme', 'modbus auth suite' in logl)
+
+        # ---- the control listener family (instance M): the live rebind —
+        #      tokenless TCP included (the F11 posture INVERTS the family's
+        #      F5 refusal: a tokenless TCP rebind succeeds here), the old
+        #      target closes, off retires while the session keeps serving,
+        #      unset restores the configured socket, the socket-group
+        #      re-modes live, the ops policy and the trust uids ride the wire
+        M_MODBUS, M_TCP1, M_TCP2 = 15994, 15995, 15996
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--port', str(M_MODBUS)],
+                                      stdout=open(LOG + '.m', 'w'), stderr=subprocess.STDOUT))
+        time.sleep(1.0)
+        msock = '/tmp/fake-inverter-%d.socket' % M_MODBUS
+        tx = ctl(msock, 'show control port')
+        check('fake control: the default socket answers with its target',
+              tx == 'ok control/port=unix:%s' % msock, tx[:90])
+        tx = ctl(msock, 'set control port %d' % M_TCP1)
+        check('fake control: a tokenless TCP rebind SUCCEEDS live (the F11 inverse of the family F5)',
+              tx.startswith('ok control/port=127.0.0.1:%d' % M_TCP1), tx[:90])
+        tx = ctl(msock, 'show version')
+        check('fake control: the retired unix socket no longer answers', tx == '', tx[:90])
+        tx = ctl(str(M_TCP1), 'show version')
+        check('fake control: the new TCP port speaks tokenless', tx.startswith('ok fake-inverter'), tx[:90])
+        tx = ctl(str(M_TCP1), 'set control port %d' % M_TCP1)
+        check('fake control: a re-set of the same target no-ops',
+              tx.startswith('ok control/port=127.0.0.1:%d' % M_TCP1), tx[:90])
+        # off retires the listener; the CONNECTED session keeps serving
+        # (the raw wire: one JSON object per line)
+        m = socket.create_connection(('127.0.0.1', M_TCP1), timeout=5)
+        m.sendall(b'{"cmd": "set control port off"}\n')
+        off_reply = m.recv(4096)
+        check('fake control: off retires the listener', b'control/port=off' in off_reply, off_reply[:120])
+        m.sendall(b'{"cmd": "show control port"}\n')
+        off_show = m.recv(4096)
+        check('fake control: the session keeps serving after the retire', b'ok control/port=off' in off_show
+              or b'"control/port=off"' in off_show, off_show[:120])
+        gone = False
+        try:
+            socket.create_connection(('127.0.0.1', M_TCP1), timeout=1).close()
+        except OSError:
+            gone = True
+        check('fake control: no new connection lands on the retired port', gone)
+        m.sendall(b'{"cmd": "unset control port"}\n')
+        unset_reply = m.recv(4096)
+        check('fake control: unset restores the configured target', b'unix:%s' % msock.encode() in unset_reply,
+              unset_reply[:120])
+        m.close()
+        tx = ctl(msock, 'show version')
+        check('fake control: the restored socket speaks', tx.startswith('ok fake-inverter'), tx[:90])
+        # the group-accessible mode, live
+        check('fake control: the default socket is 0600', os.stat(msock).st_mode & 0o777 == 0o600,
+              oct(os.stat(msock).st_mode))
+        tx = ctl(msock, 'set control socket-group on')
+        check('fake control: set control socket-group on re-modes the live socket 0660',
+              tx.startswith('ok control/socket-group=on') and os.stat(msock).st_mode & 0o777 == 0o660,
+              tx[:90] + ' ' + oct(os.stat(msock).st_mode))
+        tx = ctl(msock, 'set control socket-group off')
+        check('fake control: set control socket-group off re-modes it back 0600',
+              tx.startswith('ok control/socket-group=off') and os.stat(msock).st_mode & 0o777 == 0o600,
+              tx[:90] + ' ' + oct(os.stat(msock).st_mode))
+        # the ops policy + the trust uids ride the wire
+        tx = ctl(msock, 'set control ops verbs show, ping')
+        check('fake control: the ops policy sets live (the family spelling)',
+              tx.startswith('ok control/ops/verbs=ping,show'), tx[:90])
+        tx = ctl(msock, 'unset control ops verbs')
+        check('fake control: the ops policy unsets', tx.startswith('ok control/ops/verbs='), tx[:90])
+        tx = ctl(msock, 'set control trust-uids 1000,1001')
+        check('fake control: the trust uids set live', tx.startswith('ok control/trust-uids=1000,1001'), tx[:90])
+        tx = ctl(msock, 'set control trust-uids off')
+        check('fake control: the trust uids drop', tx.startswith('ok control/trust-uids=off'), tx[:90])
 
         # ---- the listening line documents the policy
         log = open(LOG).read()

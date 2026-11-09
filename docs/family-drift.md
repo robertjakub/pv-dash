@@ -65,22 +65,22 @@ design); the top non-man pairs:
 | ratio | pair |
 |---|---|
 | 1.00 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.94 | `scraper/lib/control.py:130` `command_help` <-> `dashboard/lib/control.py:218` `command_help` |
+| 0.94 | `scraper/lib/control.py:129` `command_help` <-> `dashboard/lib/control.py:217` `command_help` |
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:278` `parse_args` |
 | 0.89 | `scraper/bin/modbus-scraper.py:226` `graceful_stop` <-> `dashboard/bin/dashboard.py:448` `graceful_stop` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
-| 0.85 | `cache/lib/control.py:97` `command` <-> `dashboard/lib/control.py:89` `command` |
+| 0.85 | `cache/lib/control.py:96` `command` <-> `dashboard/lib/control.py:88` `command` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:278` `parse_args` |
-| 0.84 | `cache/lib/control.py:97` `command` <-> `scraper/lib/control.py:147` `command` |
+| 0.84 | `cache/lib/control.py:96` `command` <-> `scraper/lib/control.py:146` `command` |
 | 0.83 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:34` `_load_options` |
 | 0.83 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.81 | `scraper/lib/control.py:147` `command` <-> `dashboard/lib/control.py:89` `command` |
-| 0.79 | `inverter/lib/control.py:141` `__init__` <-> `dashboard/lib/control.py:69` `__init__` |
+| 0.81 | `scraper/lib/control.py:146` `command` <-> `dashboard/lib/control.py:88` `command` |
+| 0.79 | `inverter/lib/control.py:140` `__init__` <-> `dashboard/lib/control.py:68` `__init__` |
 | 0.78 | `inverter/lib/signals.py:30` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:605` `acl_table_report` <-> `dashboard/lib/control.py:566` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:530` `acl_table_report` <-> `dashboard/lib/control.py:493` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `inverter/lib/control.py:69` `handle` <-> `common/control.py:250` `handle` |
-| 0.74 | `cache/lib/control.py:1113` `dump_state` <-> `common/control.py:637` `dump_state` |
+| 0.75 | `inverter/lib/control.py:68` `handle` <-> `common/control.py:242` `handle` |
+| 0.74 | `cache/lib/control.py:1028` `dump_state` <-> `common/control.py:631` `dump_state` |
 | 0.74 | `cache/lib/config.py:115` `load_profile_write_gate` <-> `common/config.py:420` `load_write_gate_file` |
 | 0.72 | `common/config.py:14` `resolve_target` <-> `common/daemon.py:44` `default_config_path` |
 
@@ -339,12 +339,11 @@ The refusal texts (the literal SystemExit args, sorted):
 - `audit/disable must be on or off`
 - `audit/rotate/daily must be on or off`
 - `auth handshake rejected by the peer (key mismatch?)`
-- `auth/token is mandatory while the bind is non-loopback (F21 in docs/AUDIT.md) — set the new token`
 - `bad auth handshake reply`
 - `battery-kwh must be a positive kWh value`
 - `battery-state must be auto|charging|discharging`
 - `connection closed by peer`
-- `control/port cannot serve TCP without a token (F5 in docs/AUDIT.md): set control/token first`
+- `control/port cannot serve TCP without a token (F5 in docs/AUDIT.md): pass the token by flag/env/config and restart`
 - `control/socket-group must be on or off`
 - `dump-interval needs a dump path (set dump/path or --dump-path)`
 - `dump/restore-on-start must be on or off`
@@ -358,10 +357,7 @@ The refusal texts (the literal SystemExit args, sorted):
 - `max-kwp must be a positive kW value`
 - `metrics enable must be on or off`
 - `metrics-server must be on or off`
-- `metrics/auth/token is mandatory while the listen is non-loopback (F13 in docs/AUDIT.md) — set the new token`
-- `metrics/auth/token must not contain whitespace or control characters`
-- `metrics/listen cannot move beyond loopback while the endpoint serves without a token (F13 in docs/AUDIT.md) — set metrics/token first`
-- `metrics/token is mandatory while the listen is non-loopback (F13 in docs/AUDIT.md) — set the new token`
+- `metrics/listen cannot move beyond loopback while the endpoint serves without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart`
 - `mppt must be both|east|west|none`
 - `no http server attached`
 - `no log handler to re-format`
@@ -369,16 +365,15 @@ The refusal texts (the literal SystemExit args, sorted):
 - `no reply within the socket timeout`
 - `non-finite result`
 - `not a boolean`
-- `refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — set metrics/token first or bind 127.0.0.1:PORT`
+- `refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind 127.0.0.1:PORT`
 - `restart required (startup-only knob)`
 - `short response: function byte only`
 - `system/log-access must be on or off`
-- `the TCP control port needs its token (F5 in docs/AUDIT.md) — only the unix socket (the filesystem is the auth) may run tokenless`
 - `the Waveshare password must be ASCII`
 - `the control connection closed without a bye`
 - `the control connection failed`
-- `the metrics endpoint serves register values: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — set metrics/token first or bind metrics/listen on 127.0.0.1`
-- `the metrics endpoint serves the request counters: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — set metrics/token first or bind metrics/listen on 127.0.0.1`
+- `the metrics endpoint serves register values: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind metrics/listen on 127.0.0.1`
+- `the metrics endpoint serves the request counters: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind metrics/listen on 127.0.0.1`
 - `the ops token must differ from the admin token (the same secret would hand every holder the role the server picks first)`
 - `the reply mac does not verify — the wire was tampered with`
 - `the server did not sign the reply`
@@ -654,26 +649,26 @@ flags, and the secret-posture markers (`parse_secret`, the
 
 | tool | knob | live | restart | hidden |
 |---|---|---|---|---|
-| cache | `auth-key` | yes | no | yes |
-| cache | `auth-upstream-key` | yes | no | yes |
-| cache | `control-token` | yes | no | yes |
-| cache | `control-ops-token` | yes | no | yes |
-| cache | `metrics-token` | yes | no | yes |
+| cache | `auth-key` | yes | yes | yes |
+| cache | `auth-upstream-key` | yes | yes | yes |
+| cache | `control-token` | yes | yes | yes |
+| cache | `control-ops-token` | yes | yes | yes |
+| cache | `metrics-token` | yes | yes | yes |
 | cache | `dump-key` | yes | yes | yes |
-| scraper | `auth-key` | yes | no | yes |
-| scraper | `control-token` | yes | no | yes |
-| scraper | `control-ops-token` | yes | no | yes |
-| scraper | `auth-token` | yes | no | yes |
+| scraper | `auth-key` | yes | yes | yes |
+| scraper | `control-token` | yes | yes | yes |
+| scraper | `control-ops-token` | yes | yes | yes |
+| scraper | `auth-token` | yes | yes | yes |
 | scraper | `dump-key` | yes | yes | yes |
-| inverter | `auth-key` | yes | no | yes |
-| inverter | `control-token` | yes | no | yes |
-| inverter | `control-ops-token` | yes | no | yes |
-| inverter | `metrics-token` | yes | no | yes |
+| inverter | `auth-key` | yes | yes | yes |
+| inverter | `control-token` | yes | yes | yes |
+| inverter | `control-ops-token` | yes | yes | yes |
+| inverter | `metrics-token` | yes | yes | yes |
 | inverter | `dump-key` | yes | yes | yes |
-| dashboard | `auth-token` | yes | no | yes |
-| dashboard | `control-token` | yes | no | yes |
-| dashboard | `control-ops-token` | yes | no | yes |
-| dashboard | `metrics-token` | yes | no | yes |
+| dashboard | `auth-token` | yes | yes | yes |
+| dashboard | `control-token` | yes | yes | yes |
+| dashboard | `control-ops-token` | yes | yes | yes |
+| dashboard | `metrics-token` | yes | yes | yes |
 | dashboard | `dump-key` | yes | yes | yes |
 
 The findings:

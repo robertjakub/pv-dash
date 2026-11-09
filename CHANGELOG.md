@@ -53,6 +53,25 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Changed
 
+- **everywhere** — **the secret knobs are startup-only, family wide**:
+  every secret row (the control tokens, the ops tokens, the metrics
+  tokens, the Modbus auth keys, the dashboard's page token, `dump/key`)
+  takes the dump-key shape — `live` + `restart` + `hidden` + `secret` —
+  and the wire **refuses `set`/`unset`** on it
+  (`restart required (startup-only knob)`) before any dispatch: a secret
+  never rides the reload state, so it has no pending form — it passes by
+  flag/env/config (`file:<path>` included) and a restart, where the
+  resolution and the floors (min-16, the scheme-aware key floor,
+  ops ≠ admin, the F13 token-mandatory binds) already check it. The live
+  rotation branches and their `<set>`/`<set>`-render backs are deleted;
+  `help config`/`show knobs`/OPTIONS.md render the secrets
+  `startup-only — pass it by flag/env/config (set/unset refuse)` instead
+  of a set recipe; the scraper's SIGHUP/`request reload-config` path
+  still re-reads the `file:` references, and the dump/reload state files
+  are unchanged (the SECRET_REMOVED placeholder can no longer occur —
+  no secret can be overridden). The regtests respawn daemons with the
+  desired tokens instead of rotating them live.
+
 - **everywhere** — **the /metrics listener is ONE stack, family wide**:
   the fake's and dashboard's own `/metrics` take the cache's
   **`metrics/acl`** (`--metrics-acl`, env `METRICS_ACL`, live `set

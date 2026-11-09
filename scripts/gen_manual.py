@@ -355,8 +355,10 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
              'never lists in the ?/TAB pools; the wire still answers.'))
     w(bullet('**startup-only** — flag/env/config at start, a restart applies '
              'a change; the wire has no set/unset/show for it (it renders '
-             'in `show config` only). The restart-marked secret (the dump '
-             'key) refuses set/unset/show outright.'))
+             'in `show config` only). Every secret is startup-only now (the '
+             'tokens, the auth keys, the dump key): the wire refuses '
+             'set/unset outright, the value passes by flag/env/config or as '
+             '`file:<path>` and a restart applies it.'))
     w(bullet('**show-only** — a runtime report: `show <report>` answers, '
              'nothing to set.'))
     w('')

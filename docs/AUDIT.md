@@ -1,8 +1,28 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 23)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 24)
 
 Scope: the `cache/`, `scrape/` and `inverter/` subprojects plus the shared
 `common/` package and the `docker/` images. Rev. 1 audited the post-refactor
 tree after `2db6cfa` (absorbing the former per-subproject `secaudit.md`s);
+**rev. 24** retired the live secret rotation, family-wide: every secret
+knob is startup-only now — the registry marks restart on all of them (the
+dump-key shape: a live name + restart + hidden + secret) and the wire
+refuses set/unset before `_apply` (`restart required (startup-only knob)`,
+the dump-key answer — a secret never rides the reload state, so there is
+no pending form to record). The live-rotation branches died per tool (the
+control tokens, the metrics tokens, the auth keys, the dashboard's page
+token), their validations' start-time twins stood already (the min-16
+floor, the scheme-aware key floor, the ops ≠ admin check, the F13
+token-mandatory bind, the token-char check); the wire's set-advice errors
+re-pointed at flag/env/config + a restart. The tradeoff is deliberate:
+zero-downtime rotation is gone — the wire never carries secret material
+and a secret's state can no longer fork between the running process and
+the config file. The F13/F21 shapes stand (a tokenless loopback serve is
+still the auth; the enable-time and rebind-time refusals kept their
+checks, only the advice changed); the scraper's SIGHUP/`request
+reload-config` re-resolution still re-reads the `file:` references; the
+dump/reload surfaces are byte-unchanged and the SECRET_REMOVED
+placeholder can no longer occur at runtime (no secret can be overridden)
+— `dump_filter` keeps the branch as the class invariant's guard.
 **rev. 19**
 re-audited the metrics exposure plane — the scraper's `metrics/acl`
 wave and its cache migration (both `/metrics` endpoints speak the same

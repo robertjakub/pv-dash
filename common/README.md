@@ -8,6 +8,7 @@ the [fake inverter](../inverter/README.md) and the [dashboard](../dashboard/READ
 |---|---|
 | `version.py` | the suite version string: `0.4.2`, or `0.4.2-<short git>` in a checkout |
 | `options.py` | the family's option registry — one knob, one source: the `Option` rows (the flag, the env twin, the display group, the live `/`-path name, the control-grammar vocabulary), the argparse parser builder, the set-grammar config parser/renderer (the CLI spelling), the knob dictionary, the golden `config_value` (the set-grammar form of one knob's effective value over the tool's renames + formatters), the `Setting` rows the control grammar speaks and the command-namespace listing (`describe_command_node` — the wire's `help <command node>`, the `?` shape over the registries' `commands` rows) |
+| `texts.py` | the family's static texts, one JSON home (`texts.json` beside the loader): the console's faces and reconnect ladder, the ctl's, the welcome banners, the wire's fixed replies, the daemon bind/startup lines — the dotted `T(key)` resolves, the caller applies the `%`-format; `scripts/lint_texts.py --check` gates the references both ways (every reference resolves, every key referenced, no duplicated value) |
 | `wiresec.py` | the control wire's integrity layer: the full-HMAC frame signing/verification, the token auth, the RBAC roles (admin / the read-only ops shift) |
 | `ctl.py` | the ctl client, one ladder for the family: one command or a stdin batch, the signed exchange, the auth handshake, the daemon-exit bye — the four `*-ctl` bins keep only their prose and constants |
 | `control.py` | the control server's base: the wire tier (the unix/TCP listener with the 0600/0660 mode, the peer-cred trusted peers, the admin/ops roles, the HMAC frame verification — the reply status speaks `ok`/`fail`/`bye`, the internal `err` maps at the frame and the mac signs the wire form) **plus the listener's live-rebind family** (rev. 22: `set control/port` swaps the socket bind-first, the old loop retires by identity, the sessions keep serving; the F5 refusal guards the live wire through `refuse_tokenless_rebind`/`refuse_token_drop` — `TOKENLESS_TCP = 'allow'` exempts, the fake's F11 posture), the buffered session handler, the bye-frame announce ladder, the registry surfaces (help config / show knobs / the golden `show config` — the resolved startup dict over the `CFG_KEYS`/`CFG_FORMATTERS` wiring each tool's registry passes) and the dump/reload family (the write-behind dump, the restore, the whole-daemon reload with its re-exec) — the four tools subclass it with their grammar (`command`/`_apply`/`_get`), their registry rows and their reports |
@@ -26,8 +27,8 @@ How `common` is found:
 
 - **checkout** — the bin scripts put the repo root on `sys.path` (the same
   insert that exposes each subproject's `lib/`), and `common/` sits there
-- **nix package** — each tool's `package.nix` installs `common/*.py` into
-  `share/<tool>/common/`, next to `lib/`
+- **nix package** — each tool's `package.nix` installs `common/*.py` and
+  `texts.json` into `share/<tool>/common/`, next to `lib/`
 - **docker image** — the tree is copied to `/pv-suite/common/` (the
   `common` named build context)
 

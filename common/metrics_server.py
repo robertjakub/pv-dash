@@ -14,6 +14,7 @@ import threading
 import time
 
 from common.connlimit import GatedHTTPServer
+from common.texts import T
 
 METRICS_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
                b'Content-Type: text/plain; charset=utf-8\r\n'
@@ -138,7 +139,7 @@ class MetricsServer:
         except OSError as e:
             host, port = self.listen
             self.bind_error = e
-            logging.getLogger(self.LOG_NAME).error('cannot bind %s:%d: %s', host, port, e)
+            logging.getLogger(self.LOG_NAME).error(T('daemon.metrics_cannot_bind'), host, port, e)
             raise SystemExit(1)
         httpd.setup_gate(self.max_clients, self.max_per_ip)
         httpd.metrics_server = self

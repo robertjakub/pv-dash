@@ -33,6 +33,7 @@ import argparse
 import os
 
 from common.dump import SECRET_REMOVED
+from common.texts import T
 
 
 class Option:
@@ -407,7 +408,7 @@ def control_command(opt):
         if opt.restart:
             cmd += ', restart'
         return cmd
-    return 'restart required (startup-only knob)'
+    return T('wire.restart_required')
 
 
 def knob_dictionary(options, who='the tool'):
@@ -420,8 +421,7 @@ def knob_dictionary(options, who='the tool'):
     secret note) and the secret marker.
     Registry data only — no values render here (`show config` is the
     values view), so secrets are named, never shown."""
-    lines = ['ok knobs — the registry of %s: every knob, its flag, its env twin, '
-             'how it changes' % who]
+    lines = [T('wire.knobs_header') % who]
     for key, rows in grouped_rows(options):
         if key:
             lines.append('# --- %s ---' % key)

@@ -26,6 +26,7 @@ from common.cred import peer_uid
 from common.dump import SECRET_REMOVED
 from common.options import config_value, control_command, grouped_rows, knob_dictionary, \
     render_config_script
+from common.texts import T
 from common.wiresec import ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, proof_tag, role_allows, \
     role_tag, sanitize_command, sign_reply, verify_request_mac
 
@@ -154,12 +155,12 @@ class ControlServer:
         try:
             srv = self._open_sock()
         except OSError as e:
-            self.LOG.error('control server cannot bind %s: %s (use --control-port 0 to disable it)', self.describe(), e)
+            self.LOG.error(T('daemon.control_cannot_bind'), self.describe(), e)
             return
         self._srv = srv
-        self.LOG.info('control server listening on %s%s',
-                      self.describe(), (', token auth required on TCP' if self.token and not self.is_unix else '')
-                      + (', read-only ops token accepted' if self.ops_token else ''))
+        self.LOG.info(T('daemon.control_listening'),
+                      self.describe(), (T('daemon.control_listening_token') if self.token and not self.is_unix else '')
+                      + (T('daemon.control_listening_ops') if self.ops_token else ''))
         self._accept_loop(srv)
 
     def _accept_loop(self, srv):
@@ -225,7 +226,7 @@ class ControlServer:
             srv = self._open_sock()
         except OSError as e:
             self.is_unix, self.port, self.sockpath = old_attrs
-            raise ValueError('cannot bind control/port %s: %s' % (target, e))
+            raise ValueError(T('daemon.control_rebind_cannot_bind') % (target, e))
         old = self._srv
         self._srv = srv
         if old is not None:
@@ -239,8 +240,7 @@ class ControlServer:
         admin token refuses (TOKENLESS_TCP='allow' exempts — the fake's
         F11 test-tool posture)."""
         if self.TOKENLESS_TCP != 'allow' and isinstance(target, int) and self.token is None:
-            raise ValueError('control/port cannot serve TCP without a token (F5 in docs/AUDIT.md): '
-                             'pass the token by flag/env/config and restart')
+            raise ValueError(T('wire.f5_tokenless'))
 
     def handle(self, client, addr):
         who = self.peer(addr)
@@ -349,31 +349,31 @@ class ControlServer:
             obj = None
         if not isinstance(obj, dict) or not isinstance(obj.get('cmd'), str):
             return '', {'status': 'fail',
-                        'text': 'malformed request: expected {"cmd": "<command>"} JSON'}, 'err malformed request', role
+                        'text': T('wire.malformed_request')}, 'err ' + T('wire.malformed_request_short'), role
         cmd = obj['cmd']
         if self.token and cmd.lower() != 'auth' and role is None:
-            return cmd, {'status': 'fail', 'text': 'authenticate first: {"cmd": "auth", "token": "..."}'}, \
-                'err authenticate first', role
+            return cmd, {'status': 'fail', 'text': T('wire.authenticate_first')}, \
+                'err ' + T('wire.authenticate_first_short'), role
         if cmd.lower() == 'auth':
             granted = self.auth_role(obj.get('token'))
             if granted:
                 key = self.session_key(granted)
-                reply = 'ok authenticated'
-                return 'auth', {'status': 'ok', 'text': 'authenticated', 'mac': sign_reply(key, reply)}, reply, granted
-            return 'auth', {'status': 'fail', 'text': 'bad token'}, 'err bad token', role
+                text = T('wire.authenticated')
+                reply = 'ok ' + text
+                return 'auth', {'status': 'ok', 'text': text, 'mac': sign_reply(key, reply)}, reply, granted
+            return 'auth', {'status': 'fail', 'text': T('wire.bad_token')}, 'err ' + T('wire.bad_token'), role
         key = self.session_key(role)
         if key and obj.get('mac') is None and not self.is_unix:
             return cmd, {'status': 'fail',
-                         'text': 'unsigned command rejected: TCP commands carry the hmac-sha256 of the command, keyed by the token'}, \
-                'err unsigned command', role
+                         'text': T('wire.unsigned_command')}, \
+                'err ' + T('wire.unsigned_command_short'), role
         if key and obj.get('mac') is not None and not verify_request_mac(key, cmd, obj.get('mac')):
             return cmd, {'status': 'fail',
-                         'text': 'the command mac does not verify (tampered or corrupted frame)'}, 'err bad command mac', role
+                         'text': T('wire.command_mac_failed')}, 'err ' + T('wire.command_mac_failed_short'), role
         folded = sanitize_command(cmd)   # the mac spoke the client's bytes; the grammar is printable 8-bit
         if not role_allows(role, folded, self.ops_verbs):
             verb = command_verb(folded) or folded
-            text = ('forbidden: the ops token runs the %s verbs only (%s needs the admin token)'
-                    % ('/'.join(sorted(self.ops_verbs)), verb))
+            text = T('wire.forbidden') % ('/'.join(sorted(self.ops_verbs)), verb)
             reply = 'err ' + text
             reply_obj = {'status': 'fail', 'text': text}
             if key:
@@ -418,7 +418,7 @@ class ControlServer:
         the registry under its display group (the row's `group`, ungrouped
         rows headerless), with the command that changes it on a running
         daemon — or the restart note when the knob is startup-only."""
-        lines = ['ok config mapping']
+        lines = [T('wire.config_mapping')]
         for key, rows in grouped_rows(self.OPTIONS):
             if key:
                 lines.append('# --- %s ---' % key)
@@ -452,9 +452,8 @@ class ControlServer:
             elif o.secret and o.flag and cfg.get(o.flag[2:].replace('-', '_')):
                 values[o.name] = SECRET_REMOVED   # the knob renders, the value never does
         script = render_config_script(self.OPTIONS, values,
-                                      comment='generated by show config — the secret knobs render as '
-                                              '*** SECRET REMOVED ***, pass them by flag/env, or as file:<path>')
-        return 'ok config\n' + script
+                                      comment=T('wire.show_config_comment'))
+        return T('wire.config_head') + script
 
     def show_config_cfg(self):
         """The resolved startup config dict the render reads (the subclass
@@ -589,7 +588,7 @@ class ControlServer:
             applied, failed = self.apply_dump_settings(state_obj.get('settings'))
             os.unlink(path)
             self.LOG.info('reload: %d override(s) re-applied from %s%s', applied, path,
-                          (' (%d skipped: %s)' % (len(failed), ', '.join(failed))) if failed else '')
+                          (T('wire.skipped_suffix') % (len(failed), ', '.join(failed))) if failed else '')
             if self.audit:
                 self.audit.event('RELOAD', 'restored %d override(s) from %s' % (applied, path))
         except (OSError, ValueError) as e:
@@ -603,19 +602,19 @@ class ControlServer:
         dump rule): an overridden secret is named in the reply, to re-pass
         by flag/env, or as file:<path>."""
         if self.RELOAD_NEEDS_CONFIG and not self.config_path:
-            return 'err reload needs a config path (start with --config)'
+            return T('wire.reload_needs_config')
         try:
             settings, lost = self._save_reload_state()
         except OSError as e:
             self.LOG.error('control: reload could not save the overrides: %s', e)
-            return 'err reload failed: %s' % e
+            return T('wire.reload_failed') % e
         self.reload_pending = True
         self.LOG.info('control: reload — %d override(s) saved to %s, re-execing',
                       len(settings), self._reload_state_path())
-        msg = 'ok reload: %s, the daemon restarts now' % (
-            '%d override(s) saved' % len(settings) if settings else 'no overrides to save')
+        msg = T('wire.reload_ok') % (
+            T('wire.reload_saved') % len(settings) if settings else T('wire.reload_none'))
         if lost:
-            msg += ' (%s: secret, not saved — re-pass by flag/env, or as file:<path>)' % ', '.join(lost)
+            msg += T('wire.reload_lost_secret') % ', '.join(lost)
         return msg
 
     def _exec_reload(self):
@@ -636,34 +635,34 @@ class ControlServer:
         dump path (the `request dump` command and the graceful shutdown) —
         sealed when dump/key is configured."""
         if not self.dump_path:
-            return 'err no dump path configured (set dump/path or --dump-path)'
+            return T('wire.no_dump_path')
         settings = self.dump_settings()
         try:
             n = state.write_dump(self.dump_path, settings, key=self.dump_key)
         except (OSError, ValueError) as e:
             self.LOG.error('control: the dump to %s failed: %s', self.dump_path, e)
-            return 'err dump failed: %s' % e
+            return T('wire.dump_failed') % e
         self.LOG.info('control: state dumped to %s (%d setting(s)%s)', self.dump_path, n,
-                      ', sealed' if self.dump_key else '')
-        return 'ok dumped %d setting(s) to %s%s' % (n, self.dump_path, ' (sealed)' if self.dump_key else '')
+                      T('daemon.sealed_log_suffix') if self.dump_key else '')
+        return T('wire.dumped') % (n, self.dump_path, T('wire.sealed_suffix') if self.dump_key else '')
 
     def restore_state(self):
         """Load a dump back: the setting overrides re-apply (a sealed dump
         restores only under the configured dump/key)."""
         if not self.dump_path:
-            return 'err no dump path configured (set dump/path or --dump-path)'
+            return T('wire.no_dump_path')
         if not os.path.exists(self.dump_path):
-            return 'err no dump at %s yet (run dump first)' % self.dump_path
+            return T('wire.no_dump_yet') % self.dump_path
         try:
             settings = state.read_dump(self.dump_path, key=self.dump_key)
             applied, failed = self.apply_dump_settings(settings)
         except ValueError as e:
-            return 'err restore failed: %s' % e
+            return T('wire.restore_failed') % e
         self._after_restore()
         self.LOG.info('control: state restored from %s (%d setting(s))', self.dump_path, applied)
-        return 'ok restored %d setting(s) from %s%s' % (
+        return T('wire.restored') % (
             applied, self.dump_path,
-            ' (%d skipped: %s)' % (len(failed), ', '.join(failed)) if failed else '')
+            T('wire.skipped_suffix') % (len(failed), ', '.join(failed)) if failed else '')
 
     def _after_restore(self):
         """The tool's post-restore nudge (the scraper wakes its poll loop)."""
@@ -690,7 +689,7 @@ class ControlServer:
         try:
             n = state.write_dump(self.dump_path, self.dump_settings(), key=self.dump_key)
             self.LOG.info('state dumped to %s (%d setting(s)%s)', self.dump_path, n,
-                          ', sealed' if self.dump_key else '')
+                          T('daemon.sealed_log_suffix') if self.dump_key else '')
         except (OSError, ValueError) as e:
             self.LOG.error('the shutdown dump to %s failed: %s', self.dump_path, e)
 
@@ -714,6 +713,6 @@ class ControlServer:
             try:
                 n = state.write_dump(self.dump_path, self.dump_settings(), key=self.dump_key)
                 self.LOG.debug('state dumped to %s (%d setting(s)%s)', self.dump_path, n,
-                               ', sealed' if self.dump_key else '')
+                               T('daemon.sealed_log_suffix') if self.dump_key else '')
             except (OSError, ValueError) as e:
                 self.LOG.error('the periodic dump to %s failed: %s', self.dump_path, e)

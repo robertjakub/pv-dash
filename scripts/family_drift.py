@@ -736,12 +736,12 @@ drift is at parity or declined with the reasons above."""
 KNOBS_VERBS = """\
 - `request/clear/cache` + `request/dump/with-cache` — the cache only
   (the write-behind cadence and the flush verb are its nature).
-- `request/reload-config` — the scraper and the dashboard (the cache's
-  reload execs and re-reads in one, the fake's re-applies the env
-  layer: no separate re-read surface).
-- `request/restart` — absent on the fake (no config file to re-exec
-  into; its restart-marked overrides still fold on a manual restart,
-  the note stays true).
+- `request/reload-config` — the scraper and the dashboard (the
+  cache's and the fake's reload exec and re-read in one — the fake's
+  conf rides the exec since the config-file wave).
+- `request/restart` — absent on the fake (its reload execs and
+  re-reads the conf already, so the verb would double it; the
+  restart-marked overrides fold in the exec).
 - `reset` (the SIGUSR1 scenario reset) + `exit`/`logout` — the fake's
   console verbs (F11).
 - `poll/now` — the scraper's poll trigger."""
@@ -763,7 +763,8 @@ The findings:
 - **The env layer is complete under the env-or-note rule (landed).**
   Every knob carries its env twin or an explicit `no-env` note, and
   `check_options` gates the pair. The no-env census: the fake's 13
-  (the F11 simulator surface — the flags-only choices), the
+  (the F11 simulator surface — env-less by posture, their flags
+  reachable from the config file since the config-file wave), the
   dashboard's 1 (`log-queries` — the live toggle exists, the startup
   stays flag-only), the cache and the scraper none; the nodes and
   the command rows are env-free by nature.
@@ -928,10 +929,12 @@ malformed-frame policy hook with it).
    spellings one release).
 
 2. **`request/reload-config` family-wide** — the re-read-without-exec
-   surface exists on the scraper and the dashboard; the cache gains
-   it (its reload execs; a profile or selection edit deserves the
-   lighter verb). The fake stays exempt — no config file, F11 — and
-   the asymmetry gets the registry note.
+   surface exists on the scraper and the dashboard; the remaining two
+   are the cache and the fake. The fake grew its config story (its
+   reload execs and the conf re-reads in the new process) but has no
+   reload-config row — the row decision open (a reloader of its own,
+   or the family row answering `err no reloader configured`); the
+   cache has the config script but no reloader wiring at all.
 
 3. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
    the RBAC vocabulary from the registry's command rows (the
@@ -952,8 +955,9 @@ malformed-frame policy hook with it).
     shows the pattern: a stale claim fails the gate.
 
 Not-todo (the ruling recorded): the fake's `request/restart` verb
-stays absent (no config to re-exec into — the fold on a manual
-restart keeps the note true); the man-page prose and the HTTP
+stays absent (its reload execs and re-reads the conf — the
+config-file wave — so the verb would double the reload); the
+man-page prose and the HTTP
 handlers stay per-tool by design; the malformed-frame split is the
 proxy/device difference, kept as the ladder's policy hook."""
 

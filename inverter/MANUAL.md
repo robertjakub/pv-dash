@@ -69,6 +69,7 @@ The kinds — every row of the tables below carries one:
 | `request` | namespace | the state machinery: the dump written and restored, the fake restarted |
 | `request dump` | command (hidden) | write the state dump: the live setting overrides, sealed (when the fake has a dump path) |
 | `request reload` | command | save the live overrides and restart the whole daemon (the flags and the env are re-resolved) |
+| `request reload-config` | command | re-read the config file (the values re-apply over the running machines) |
 | `request restore` | command (hidden) | re-apply a state dump's overrides (when the fake has a dump path) |
 | `reset` | command | clear all pins + the write overlay |
 | `set` | command | configure a setting (set soc auto, set scenario noon) |

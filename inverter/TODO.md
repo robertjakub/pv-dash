@@ -5,6 +5,20 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The config re-read joins the wire family-wide (`request/reload-config`,
+the grammar follow-through): the reloader re-resolves the ladder
+(`resolve_args` — flag > env > the config script) and re-applies the
+demo knobs (chaos, peak, strict, time, time-scale, profile, log level)
+over the running machines, all-or-nothing keep-last-good; the applied
+knobs' override markers drop and the machine pins keep theirs (the
+config never speaks for them). The machines-application extracts into
+`lib/signals.py` `apply_demo` — the SIGHUP env layer rides it too (the
+env twins parse as before; a bad HH:MM keeps everything now instead of
+the partial apply). The registry row lands beside `request/reload`
+(its own help — the re-read is not this tool's SIGHUP path),
+`reload-config` joins KNOWN_VERBS (the ops default stays show,clear),
+and the ctl docstring + the man prose + the README row follow.
+
 The audit forwarding (`--audit-forward syslog`, the F10 follow-through):
 the INV trail can mirror every line — the per-writer hash chain
 included — to the local syslog socket as it lands, journald picking them

@@ -290,6 +290,9 @@ def main():
         r = authed_roundtrip(15982, 'opstok', 'request reload')
         check('ops: the whole-daemon request reload is forbidden', r.get('status') == 'fail'
               and 'forbidden' in r.get('text', ''), str(r))
+        r = authed_roundtrip(15982, 'opstok', 'request reload-config')
+        check('ops: the config re-read request reload-config is forbidden', r.get('status') == 'fail'
+              and 'forbidden' in r.get('text', ''), str(r))
         r = authed_roundtrip(15982, 'admintok', 'show control token')
         check('secrets: the show verb refuses the control token (the admin sees the refusal too)',
               r.get('status') == 'fail' and 'is a secret' in r.get('text', '') and r.get('_mac_ok'), str(r))

@@ -209,6 +209,7 @@ form is legitimate here in a way it never is on the daemons.
 | `set scenario <name>` | a scenario preset: `morning`/`noon`/`evening`/`night` freeze the clock at a typical moment **and release the value pins**; manual pins turn it `custom` |
 | `reset` | clear **all** pinned settings, the write overlay and the pinned coils/discrete inputs at once (like SIGUSR1, per-connection) |
 | `request reload` | **restart the whole fake with the pins kept**: the live overrides save beside the config script (`<config>.reload`), the process re-execs and re-applies them once |
+| `request reload-config` | re-read the config file without the restart: the config's values (flag > env > config) re-apply over the running machines — the demo knobs, not the pins; a broken file keeps the previous settings |
 | `request dump` / `request restore` | with `--dump-path` configured: write the live overrides to the state file (`0600`, integrity-hashed) / load them back; `--dump-key` seals it, `--restore-on-start` does it automatically, the `--dump-interval` loop rewrites it live |
 | `show version` / `help` / `help <setting>` / `quit` / `shutdown` | the version / the reference / one setting's description / close / graceful stop (a confirm guard) |
 

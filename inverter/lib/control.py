@@ -136,7 +136,6 @@ class ControlServer(_ControlServer):
     APPLY_FIRST = ('scenario',)   # a preset release is the state the pins were pinned after — pins land on top
     TOKENLESS_TCP = 'allow'   # the F11 test-tool posture: a tokenless TCP control bind is fine here (the family refuses — F5)
     APP = 'fake-inverter'
-    RELOAD_CONFIG = False   # the reload-config row decision stays open (docs/TODO.md) — the verb never answers here
     COMMANDS = COMMANDS
     COMMAND_HELP = COMMAND_HELP
     COMMAND_GROUPS = COMMAND_GROUPS
@@ -399,7 +398,7 @@ class ControlServer(_ControlServer):
             self._rebuild_audit()
             return 'on' if on else 'off'
         if key == 'audit/forward':
-            if val not in AUDIT_FORWARD_CHOICES:
+            if val not in ('none', 'syslog'):
                 raise ValueError('audit/forward must be one of %s' % ', '.join(AUDIT_FORWARD_CHOICES))
             self.audit_params['forward'] = None if val == 'none' else val
             fresh = self._rebuild_audit()
@@ -613,7 +612,7 @@ class ControlServer(_ControlServer):
                 'reset' % '|'.join(self.SETTING_KEYS))
         if self.dump_path:
             cmds += ', request dump, request restore'
-        cmds += ', request reload, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
+        cmds += ', request reload, request reload-config, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
         cmds += 'show knobs prints the full dictionary'
         return cmds
 

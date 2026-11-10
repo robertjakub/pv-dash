@@ -184,10 +184,21 @@ def main():
               tx == 'ok restore a setting to its configured value (unset pv, unset seed)', tx)
         tx = ctl(A_CTL, 'help request')
         check('help <command node>: the namespace lists its visible children',
-              tx == 'ok     reload save the live overrides and restart the whole daemon (the flags and the env are re-resolved)', tx)
+              tx == 'ok     reload        save the live overrides and restart the whole daemon (the flags and the env are re-resolved)\n'
+                    '    reload-config re-read the config file (the values re-apply over the running machines)', tx)
         tx = ctl(A_CTL, 'help request reload')
         check('help <deep command path>: the row describes itself',
               tx == 'ok save the live overrides and restart the whole daemon (the flags and the env are re-resolved)', tx)
+        tx = ctl(A_CTL, 'help request reload-config')
+        check('help <the re-read deep path>: the row describes itself',
+              tx == 'ok re-read the config file (the values re-apply over the running machines)', tx)
+        tx = ctl(A_CTL, 'set chaos 0.9')
+        check('set chaos pins the probability', tx.startswith('ok chaos=0.90'), tx)
+        tx = ctl(A_CTL, 'request reload-config')
+        check('request reload-config re-reads the config (the config wins)',
+              tx.startswith('ok reloaded (') and 'chaos=0' in tx, tx[:160])
+        tx = ctl(A_CTL, 'show chaos')
+        check('request reload-config restored the configured chaos', tx == 'ok chaos=0.00', tx)
         tx = ctl(A_CTL, 'help bogus')
         check('help <unknown topic>: the reworded two-space error',
               tx == '% error: unknown command or setting bogus (try ?)', tx)

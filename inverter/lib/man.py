@@ -87,7 +87,10 @@ age, requests), \\fBshow registers\\fR,
 \\fBinspect\\fR, \\fBreset\\fR, \\fBrequest reload\\fR (the whole-daemon restart
 that keeps the pins: the overrides save to a state file beside the config
 script, the process re-execs, the
-fresh fake re-applies them once), with a dump path configured
+fresh fake re-applies them once), \\fBrequest reload-config\\fR (re-read
+the config file without the restart: the config's values re-apply over
+the running machines \\(em the demo knobs, not the pins), with a dump
+path configured
 (\\fB--dump-path\\fR): \\fBrequest dump\\fR / \\fBrequest restore\\fR (the
 overrides as one 0600 integrity-hashed JSON; \\fB--dump-key\\fR seals it
 \\(em the state rides encrypted, a restore refuses a wrong or missing key;
@@ -193,7 +196,8 @@ The command grammar is the fake's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
 \\fBshow connections\\fR (the live Modbus clients: peer, age, requests),
 \\fBshow registers\\fR, \\fBshow version\\fR,
 \\fBshow knobs\\fR (the dictionary of the registry),
-\\fBinspect\\fR, \\fBreset\\fR, \\fBrequest reload\\fR, \\fBshutdown\\fR,
+\\fBinspect\\fR, \\fBreset\\fR, \\fBrequest reload\\fR,
+\\fBrequest reload-config\\fR, \\fBshutdown\\fR,
 \\fBquit\\fR. See
 .BR modbus-fake-inverter (1)
 CONTROL."""

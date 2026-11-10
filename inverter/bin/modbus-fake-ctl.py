@@ -11,7 +11,7 @@ require the token first ({"cmd": "auth", "token": ...}) — pass it with
 
 Commands (see the server's help): set <setting> <value>, show
 <setting|connections|registers|version|config|knobs>, reset,
-request reload, shutdown, quit.
+request reload, request reload-config, shutdown, quit.
 
 Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.
 """

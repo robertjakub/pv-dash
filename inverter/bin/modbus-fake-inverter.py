@@ -55,7 +55,7 @@ from lib.options import KNOWN_VERBS, OPTIONS
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
 from lib.statics import CONTROL_SOCKET_TEMPLATE, PEAK_RATIO, TIME_SCALE_MAX
-from lib.signals import SignalBox, parse_time
+from lib.signals import SignalBox, apply_demo, parse_time
 from lib.metrics import MetricsServer, describe_metrics
 from lib.simulator import Simulator
 
@@ -355,6 +355,28 @@ def main():
         # a live `set dump-interval` wakes it without a restart — and a live
         # `set dump/path` (no path at start) finds the thread waiting too
         threading.Thread(target=control.run_dump_interval, daemon=True, name='dump').start()
+    def apply_reload():
+        """The `request reload-config` re-read (the whole-daemon `request
+        reload` keeps its exec dance): re-resolve the ladder (flag > env >
+        the config script), re-apply the demo knobs over the running
+        machines (all-or-nothing, keep-last-good), drop the applied knobs'
+        override markers, wake the dump loop, audit."""
+        resolve_args(args)
+        labels = apply_demo(simulator, chaos, fake, {
+            'chaos': args.chaos, 'max_kwp': args.max_kwp, 'strict': args.strict,
+            'time': args.time or 'live', 'time_scale': args.time_scale,
+            'profile': resolve_profile(args.profile or 'sun2000'),
+            'log_level': args.log_level})
+        summary = ', '.join(labels)
+        control.reloaded(summary, dump_interval=args.dump_interval,
+                         applied=('chaos', 'max-kwp', 'strict', 'time', 'time-scale',
+                                  'profile', 'log-level'))
+        if control.audit:
+            control.audit.event('RELOAD', '%d setting(s): %s' % (len(labels), summary))
+        return summary
+
+    if control:
+        control.reloader = apply_reload   # the control server's `request reload-config` runs the same path
     box = SignalBox(simulator, chaos, fake, control=control, audit=audit)
     if control:
         control.signalbox = box

@@ -23,6 +23,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, REPO)
 
 from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
+from common.settings.options import default_ops_verbs
 
 # tool -> (bin script, registry module dir, module.nix, README, bundled config, flag-table headings)
 TOOLS = {
@@ -56,20 +57,16 @@ DEFAULT_KEYS = {
 }
 
 # the knobs whose default is deliberately no tree entry — a reason each
-# (the secret None is banned outright by its own row): the empty
-# word, the derived path, the registry-computed vocabulary
-_COMMON_NO_TREE_DEFAULT = {
-    'control-port': 'empty — the control socket derives from the listen port',
-    'control-ops-verbs': "the registry's default_ops_verbs",
-}
+# (the secret None is banned outright by its own row). The defaults
+# sweep graduated every named entry (the control socket's empty word,
+# the ops verbs, the metrics spec, the fake's time): the map sits
+# empty but for the fake's per-run seed — a future no-entry names its
+# reason here.
 NO_TREE_DEFAULT = {
-    'cache': dict(_COMMON_NO_TREE_DEFAULT),
-    'scraper': dict(_COMMON_NO_TREE_DEFAULT,
-                    **{'metrics-spec': 'empty = the built-in lib/metrics.json block'}),
-    'inverter': dict(_COMMON_NO_TREE_DEFAULT,
-                     **{'seed': 'a per-run choice — no default',
-                        'time': 'empty = the clock runs'}),
-    'dashboard': dict(_COMMON_NO_TREE_DEFAULT),
+    'cache': {},
+    'scraper': {},
+    'inverter': {'seed': 'a per-run choice — no default'},
+    'dashboard': {},
 }
 
 
@@ -120,7 +117,7 @@ def check_tool(tool):
     """One tool: returns [(ok, message)] rows."""
     rows = []
     bin_script, tool_dir, module_nix, readme, config = TOOLS[tool]
-    options, _verbs = load_registry(tool_dir)
+    options, verbs = load_registry(tool_dir)
     flags = {'--' + o.name for o in options if o.flag}   # control-only settings carry no flag
 
     # the control grammar's vocabulary rides the same rows: every live name
@@ -158,7 +155,8 @@ def check_tool(tool):
     # spelling or a rename) or a named no-entry reason
     lib_dir = os.path.join(REPO, tool_dir, 'lib')
     with open(os.path.join(lib_dir, 'defaults.json'), encoding='utf-8') as f:
-        tree_keys = set((json.load(f).get('defaults') or {}).keys())
+        tree = json.load(f).get('defaults') or {}
+    tree_keys = set(tree.keys())
     referenced = set()
     for name in sorted(os.listdir(lib_dir)):
         if name.endswith('.py'):
@@ -176,6 +174,15 @@ def check_tool(tool):
                                or o.name in reasons))
     rows.append((not unbacked, '%s: every flag knob\'s default is a defaults-tree key or a named no-entry%s'
                  % (tool, ' — unbacked: %s' % ', '.join(unbacked) if unbacked else '')))
+    # the ops-verbs policy: the tree literal is the resolver's static rung,
+    # the registry's default_ops_verbs the derivation the prose renders —
+    # the gate pins the two together (one truth, two faces)
+    expected_verbs = default_ops_verbs(verbs)
+    got_verbs = tree.get('control_ops_verbs')
+    rows.append((got_verbs == expected_verbs,
+                 '%s: the tree\'s control_ops_verbs matches the registry\'s default_ops_verbs%s'
+                 % (tool, '' if got_verbs == expected_verbs
+                    else ' — tree: %r, derived: %r' % (got_verbs, expected_verbs))))
     # a secret never takes a settable default: its default is the None
     # ladder-end, categorically — a tree entry naming one fails even
     # before a resolver could wire it (a shipped secret default rides

@@ -14,7 +14,7 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (31): `audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-log`, `audit-max-mb`, `audit/rotate`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`. The control-plane block is
+Common to **all four** tools (30): `audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-log`, `audit-max-mb`, `audit/rotate`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `metrics-acl-table`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
@@ -31,7 +31,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** live | **✓** live | **✓** live |
 | c | `audit/rotate` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
-| k | `auth` |  | `set modbus auth` | **✓** live | **✓** live | **✓** live | **✓** |
+| c | `auth` |  | *(startup-only)* |  |  |  | ✓ |
 | k | `auth-key` |  | `startup-only — pass it by flag/env/config (set/clear refuse)` | ✓ live+secret | ✓ live+secret | ✓ live+secret |  |
 | k | `auth-token` |  | `startup-only — pass it by flag/env/config (set/clear refuse)` |  | ✓ live+secret |  | ✓ live+secret |
 | k | `auth-upstream` |  | `set modbus auth-upstream` | ✓ live |  |  |  |
@@ -47,7 +47,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `client-timeout` |  | `set client-timeout`, `set limits client-timeout`, `set metrics limits timeout` | **✓** live | **✓** live | **✓** live | **✓** live |
 | c | `cloud` |  | `set cloud` |  |  | ✓ live |  |
 | s | `config` |  | `show config` | **✓** | **✓** | **✓** hidden | **✓** hidden |
-| k | `config-js` |  | *(startup-only)* |  |  |  | ✓ |
+| k | `config-js` |  | `startup-only — pass it by flag/env/config (set/clear refuse)` |  |  |  | ✓ live+secret |
 | k | `connect-acl` |  | `set acl connect`, `set connect-acl` | ✓ live |  | ✓ live |  |
 | s | `connect-acl-table` |  | `show connect-acl-table` | ✓ |  |  |  |
 | s | `connections` |  | `show connections` | **✓** | **✓** | **✓** | **✓** |
@@ -100,6 +100,7 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `metrics/auth` |  | *(startup-only)* |  | ✓ |  |  |
 | c | `metrics/limits` |  | *(startup-only)* | ✓ | ✓ |  |  |
 | c | `modbus` |  | *(startup-only)* | ✓ | ✓ | ✓ |  |
+| k | `modbus-auth` |  | `set modbus auth` | ✓ live | ✓ live | ✓ live |  |
 | k | `modbus-offset` |  | `set modbus offset` |  | ✓ live |  |  |
 | k | `modbus-unit` |  | `set modbus unit` |  | ✓ live |  |  |
 | c | `mppt` |  | `set mppt` |  |  | ✓ live |  |
@@ -116,7 +117,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `selection` |  | `set modbus selection` | ✓ live |  |  |  |
 | c | `soc` |  | `set soc` |  |  | ✓ live |  |
 | k | `static` |  | `set static` |  |  | ✓ live |  |
-| k | `static-dir` |  | *(startup-only)* |  |  |  | ✓ |
+| k | `static-dir` |  | `startup-only — pass it by flag/env/config (set/clear refuse)` |  |  |  | ✓ live+secret |
 | k | `strict` |  | `set strict` |  |  | ✓ live |  |
 | c | `system` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `time` |  | `set time` |  |  | ✓ live |  |

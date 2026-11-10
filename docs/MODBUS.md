@@ -484,7 +484,7 @@ path as words normalize to the canonical key.
 
 | Knob | Flag | Env | Live path | Tools |
 |---|---|---|---|---|
-| `auth` | `--auth suite\|none` | `AUTH` | `modbus/auth` | all three |
+| `modbus-auth` | `--modbus-auth suite\|none` | `MODBUS_AUTH` | `modbus/auth` | all three |
 | `auth-key` *(secret)* | `--auth-key` | `AUTH_KEY` | `modbus/auth/key` | all three |
 | `auth-upstream` | `--auth-upstream suite\|waveshare\|none` | `AUTH_UPSTREAM` | `modbus/auth-upstream` | cache |
 | `auth-upstream-key` *(secret)* | `--auth-upstream-key` | `AUTH_UPSTREAM_KEY` | `modbus/auth-upstream-key` | cache |

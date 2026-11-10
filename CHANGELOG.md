@@ -12,6 +12,14 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **cache, scraper, inverter** — **the auth knob is `modbus-auth`**
+  (`--modbus-auth` / `MODBUS_AUTH`; the wire spelling stays
+  `modbus/auth`) and its default graduates into the trees as
+  `"modbus_auth": "none"` — the explicit off; the NixOS modules'
+  option is `modbusAuth` and their config lines spell
+  `set modbus-auth …` (the old bare `set auth …` lines never matched
+  the wire grammar). Breaking: the `--auth` flag and the `AUTH` env
+  are gone.
 - **dashboard** — **`static-dir` and `config-js` are startup-only
   secrets** (secret, hidden, restart; lives `static-dir`/`config-js`):
   the wire refuses set/show (flag/env/config and restart — the

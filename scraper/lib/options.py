@@ -19,16 +19,8 @@ table."""
 import json
 import os
 
-from common.settings.options import as_bool, load_registry, make_describe, settings_of
+from common.settings.options import as_bool, default_ops_verbs, known_verbs, load_registry, make_describe, settings_of
 
-
-# The verbs the control grammar speaks (the RBAC vocabulary — an ops verb
-# set must name verbs this server knows). 'clear' rides along: the family's
-# default ops policy names it, and on the scraper it just answers
-# "unknown command" (there is nothing to flush).
-KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'poll', 'dump', 'restore', 'reload', 'reload-config', 'restart',
-               'clear', 'shutdown', 'help', 'ping', 'quit')   # 'clear': the default ops policy names it;
-                                                               # the wire answers unknown command (nothing to flush)
 
 
 def _load_options():
@@ -50,6 +42,8 @@ def _load_options():
     rows, sections, options = load_registry(here, choices={'log-level': tuple(static['log_levels'])})
     for key, value in sections.items():
         globals()[key] = value
+    globals()['KNOWN_VERBS'] = known_verbs(sections['COMMANDS'])   # the RBAC vocabulary — the registry's rows are its one home
+    globals()['DEFAULT_OPS_VERBS'] = default_ops_verbs(globals()['KNOWN_VERBS'])
     return options
 
 

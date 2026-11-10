@@ -9,7 +9,7 @@ import logging
 import math
 import re
 
-from .options import OPTIONS
+from .options import DEFAULT_OPS_VERBS, OPTIONS
 from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 from common.settings.config import (check_auth_key, check_token_chars, check_control_tokens, default_profile_path,
                            is_loopback_host, load_config_script, parse_acl, parse_auth_type, parse_listen,
@@ -276,7 +276,8 @@ def resolve_config(args, script_dir=None):
                                                      'control_ops_token', None, str) or '').strip() or None,
                                             'control-ops-token')
     cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
-                                        'control_ops_verbs', 'show,clear', str) or 'show,clear').strip() or 'show,clear'
+                                        'control_ops_verbs', DEFAULT_OPS_VERBS,
+                                        str) or DEFAULT_OPS_VERBS).strip() or DEFAULT_OPS_VERBS
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'CONTROL_TRUST_UIDS',
                                         'control_trust_uids', None, str)
     cfg['control_socket_group'] = resolve(getattr(args, 'control_socket_group', False) or None,

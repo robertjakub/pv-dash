@@ -25,19 +25,18 @@ import threading
 import time
 
 from common.render.human import secs
-from common.runtime.audit import AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward
 from common.runtime.version import version_string
 from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.wire.control import ControlServer as _ControlServer, num, numi
+from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
 from common.settings.config import acl_table, acl_value_text, default_profile_path, parse_auth_type, \
-    parse_control_target, parse_listen, parse_upstream, resolve_profile_file
+    parse_listen, parse_upstream, resolve_profile_file
 from common.settings.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
-from common.runtime.logutil import UtcFormatter
+from common.render.texts import T
 from .config import CONTROL_SOCKET_TEMPLATE, build_sources, load_device_profile, resolve_metrics_acl
 from .metrics import Metrics
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, \
-    NODE_BY_NAME, KNOWN_VERBS, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
+    NODE_BY_NAME, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .statics import CONTROL_LINE_CAP, DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('scraper')
@@ -109,6 +108,11 @@ class ControlServer(_ControlServer):
     EXIT_TEXT = 'the modbus-scraper is shutting down'
     RELOAD_TEXT = 'the modbus-scraper is reloading — the daemon restarts with the saved configuration'
     APP = 'modbus-scraper'
+    AUDIT_PREFIX = 'SCR'
+    AUDIT_APP = 'modbus-scraper'
+    CONTROL_PORT_DEFAULT = DEFAULT_LISTEN_PORT
+    CONTROL_SOCKET_TEMPLATE = CONTROL_SOCKET_TEMPLATE
+    LOG_LEVELS = LOG_LEVELS
     COMMANDS = COMMANDS
     COMMAND_HELP = COMMAND_HELP
     COMMAND_GROUPS = COMMAND_GROUPS
@@ -184,7 +188,10 @@ class ControlServer(_ControlServer):
         rs = SETTING_BY_NAME.get(key)
         if rs is not None and rs.restart:   # a startup-only knob: validate + record the pending value
             if rs.secret:
-                raise ValueError('restart required (startup-only knob)')
+                raise ValueError(T('wire.restart_required'))
+            handled, shown = self.apply_restart_key(key, val)
+            if handled:
+                return shown
             if key in ('system/listen', 'metrics/listen'):   # the second spelling: a state file written before the rename
                 try:
                     t = parse_listen(val)
@@ -195,22 +202,21 @@ class ControlServer(_ControlServer):
                 try:
                     probe.bind(t)
                 except OSError as e:
-                    raise ValueError('cannot bind %s:%d: %s' % (t[0], t[1], e))
+                    raise ValueError(T('wire.cannot_bind') % (t[0], t[1], e))
                 finally:
                     probe.close()
                 self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
-            if key == 'dump/restore-on-start':
-                if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
-                    raise ValueError('dump/restore-on-start must be on or off')
-                self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
-                return self.defaults[key]
-            raise ValueError('unknown setting %s' % key)
+            raise ValueError(T('wire.unknown_setting_bare') % key)
+
+        handled, shown = self.apply_family_key(key, val)   # the family's shared knobs: the control plane
+        if handled:                                        # (the ops policy + the trusted peers ARRIVED here),
+            return shown                                   # the audit family, the log level, local-time, the dump pair
 
         if key == 'metrics/interval':
             v = num(val, 'interval', 'seconds')
             if not 0 < v <= 86400:
-                raise ValueError('interval must be 0 < N <= 86400 seconds')
+                raise ValueError(T('wire.interval_range'))
             with s.lock:
                 s.cfg['interval'] = v
             s.wake.set()
@@ -218,7 +224,7 @@ class ControlServer(_ControlServer):
         if key == 'modbus/timeout':
             v = num(val, 'timeout', 'seconds')
             if not 0 < v <= 60:
-                raise ValueError('timeout must be 0 < N <= 60 seconds')
+                raise ValueError(T('wire.timeout_range'))
             with s.lock:
                 s.cfg['timeout'] = v
             s.client.apply(timeout=v)
@@ -237,8 +243,7 @@ class ControlServer(_ControlServer):
             except SystemExit as e:
                 raise ValueError(str(e))
             if v and not s.client.auth_key:
-                raise ValueError('the suite auth needs a key: pass auth-key by flag/env/config '
-                                 '(min %d characters) and restart' % AUTH_MIN_KEY)
+                raise ValueError(T('wire.suite_auth_needs_key') % AUTH_MIN_KEY)
             with s.lock:
                 s.cfg['auth'] = v
             s.client.auth = v
@@ -269,8 +274,7 @@ class ControlServer(_ControlServer):
             return '%d' % v
         if key == 'metrics/acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError('"table" is not a metrics/acl value — the table is the show: '
-                                 'show metrics acl table')
+                raise ValueError(T('wire.acl_table_value') % ('a metrics/acl', 'metrics acl'))
             if not self.httpd:
                 raise ValueError('no http server attached')
             try:
@@ -290,198 +294,11 @@ class ControlServer(_ControlServer):
                 shown += ' (%s)' % warn
             return shown
         if key == 'log-access':
-            if val not in ('on', 'off', 'true', 'false', '1', '0', 'yes', 'no'):
-                raise ValueError('log-access must be on or off')
-            on = val in ('on', 'true', '1', 'yes')
+            on = on_off(val, 'log-access')
             if self.httpd:
                 self.httpd.RequestHandlerClass.log_access = on
             with s.lock:
                 s.cfg['log_access'] = on
-            return 'on' if on else 'off'
-        if key == 'log-level':
-            lvl = val.upper()
-            if lvl not in LOG_LEVELS:
-                raise ValueError('log-level must be one of %s' % ', '.join(LOG_LEVELS))
-            logging.getLogger().setLevel(getattr(logging, lvl))
-            return lvl
-        if key == 'modbus/profile':
-            # the register map swaps to the new profile: load it, rebuild the
-            # sources, then swap atomically (a bad file rolls everything back)
-            path = default_profile_path() if val in ('default', 'auto') else resolve_profile_file(val)
-            try:
-                profile = load_device_profile(path)
-                sources = build_sources(profile, s.spec, path)
-            except (ValueError, SystemExit) as e:
-                raise ValueError(str(e))
-            with s.lock:
-                s.cfg['profile'], s.cfg['sources'] = path, sources
-            logger.info('control: profile set to %s (the next poll reads the new register map)', path)
-            return path
-        if key == 'metrics/prefix':
-            # the exported names carry the prefix: the spec re-builds (the
-            # same files re-read, re-compiled) and swaps atomically — the
-            # rename lands with the next poll (woken); a bad spec file
-            # rolls back to the old spec
-            val = val.strip() or 'huawei'
-            if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', val):
-                raise ValueError('invalid metric_prefix = %r: must be a valid metric-name start '
-                                 '(letters/digits/underscore, not starting with a digit)' % val)
-            try:
-                new_spec = Metrics(s.cfg['metrics_spec'], prefix=val)
-                profile = load_device_profile(s.cfg['profile'])
-                sources = build_sources(profile, new_spec, s.cfg['profile'])
-            except (ValueError, SystemExit) as e:
-                raise ValueError(str(e))
-            with s.lock:
-                s.spec, s.cfg['metric_prefix'], s.cfg['sources'] = new_spec, val, sources
-            s.wake.set()
-            return val
-        if key == 'control/port':
-            try:
-                target = parse_control_target(val, DEFAULT_LISTEN_PORT, CONTROL_SOCKET_TEMPLATE)
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if val in ('off', 'none', '0'):
-                target = None
-            if target is not None and not self.stopped and self._is_target(target):
-                return self.describe()   # the same target: nothing to rebind
-            self.refuse_tokenless_rebind(target)
-            shown = self._rebind_control(target)
-            with s.lock:
-                s.cfg['control_port'] = '0' if target is None else str(target)
-            return shown
-        if key == 'control/socket-group':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('control/socket-group must be on or off')
-            self.socket_group = on
-            if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
-                os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
-            return 'on' if on else 'off'
-        if key == 'dump-interval':
-            if not self.dump_path:
-                raise ValueError('dump-interval needs a dump path (set dump/path or --dump-path)')
-            if val in ('off', 'none', '0'):
-                self.dump_interval = 0
-                with s.lock:
-                    s.cfg['dump_interval'] = 0
-                self.dump_wake.set()
-                return 'off'
-            v = num(val, 'dump-interval', 'seconds or off')
-            self._gate_range(key, v, 'seconds')
-            self.dump_interval = v
-            with s.lock:
-                s.cfg['dump_interval'] = v
-            self.dump_wake.set()
-            return secs(v)
-        if key == 'dump/path':
-            if val in ('off', 'none', ''):
-                self.dump_path = None
-                return 'off'
-            self.dump_path = val   # request dump and the graceful shutdown write it from here on
-            # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
-            return val if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
-        if key == 'audit/log-file':
-            if val == 'none' and self.audit_params.get('forward'):
-                # remote-only: the collector is the sole holder (the chain
-                # reseeds at GENESIS on the next restart)
-                self.audit_params['path'] = 'none'
-                self.audit_params['disabled'] = False
-                with s.lock:
-                    s.cfg['audit_log'] = 'none'
-                    s.cfg['no_audit_log'] = False
-                return self._rebuild_audit()
-            if val in ('off', 'none'):
-                # the full off — none without a forward folds to it (the
-                # same state --no-audit-log spells)
-                self.audit_params['disabled'] = True
-                with s.lock:
-                    s.cfg['no_audit_log'] = True
-                    if val == 'none':
-                        s.cfg['audit_log'] = 'none'
-                return self._rebuild_audit()
-            self.audit_params['path'] = val   # the raw spelling: a path, '-' (= stdout) or empty (the XDG state home)
-            self.audit_params['disabled'] = False
-            with s.lock:
-                s.cfg['audit_log'] = val
-                s.cfg['no_audit_log'] = False
-            return self._rebuild_audit()
-        if key == 'audit/rotate/max-size':
-            v = num(val, 'max-size', 'MB')
-            self._gate_range(key, v, 'MB')
-            self.audit_params['max_mb'] = v
-            with s.lock:
-                s.cfg['audit_max_mb'] = v
-            self._rebuild_audit()
-            return '%g' % v
-        if key == 'audit/rotate/daily':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('audit/rotate/daily must be on or off')
-            self.audit_params['daily'] = on
-            with s.lock:
-                s.cfg['audit_daily'] = on
-            self._rebuild_audit()
-            return 'on' if on else 'off'
-        if key == 'audit/rotate/files':
-            v = numi(val, 'files', 'backups')
-            self._gate_range(key, v, 'backups')
-            self.audit_params['files'] = v
-            with s.lock:
-                s.cfg['audit_files'] = v
-            self._rebuild_audit()
-            return '%d' % v
-        if key == 'audit/forward':
-            try:
-                parse_forward(val)
-            except ValueError:
-                raise ValueError('audit/forward must be %s' % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
-            self.audit_params['forward'] = None if val in ('', 'none') else val
-            with s.lock:
-                s.cfg['audit_forward'] = val
-            return self._rebuild_audit()
-        if key == 'audit/forward-format':
-            if val not in AUDIT_FORWARD_FORMATS:
-                raise ValueError('audit/forward-format must be one of %s' % ', '.join(AUDIT_FORWARD_FORMATS))
-            self.audit_params['forward_format'] = val
-            with s.lock:
-                s.cfg['audit_forward_format'] = val
-            return self._rebuild_audit()
-        if key == 'audit/disable':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('audit/disable must be on or off')
-            self.audit_params['disabled'] = on
-            with s.lock:
-                s.cfg['no_audit_log'] = on
-            return self._rebuild_audit()
-        if key == 'local-time':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('local-time must be on|off')
-            swapped = 0
-            for h in logging.getLogger().handlers:
-                f = h.formatter
-                if f is None or not getattr(f, '_fmt', None):
-                    continue
-                h.setFormatter(logging.Formatter(f._fmt) if on else UtcFormatter(f._fmt))
-                swapped += 1
-            if not swapped:
-                raise ValueError('no log handler to re-format')
-            with s.lock:
-                s.cfg['local_time'] = on
             return 'on' if on else 'off'
         # the generic path: a typed row (int/float/str conv) needs no branch
         # — the row's conv parses, the row's min/max gate, the config key
@@ -523,6 +340,9 @@ class ControlServer(_ControlServer):
 
     def _get(self, key):
         s = self.scraper
+        handled, value = self.get_family_key(key)   # the family's shared knobs (the control plane,
+        if handled:                                 # the audit family, the log level, local-time, the dump pair)
+            return value
         with s.lock:
             cfg = dict(s.cfg)
         if key == 'metrics/interval':
@@ -540,38 +360,12 @@ class ControlServer(_ControlServer):
             return acl_value_text(self.httpd.metrics_acl) if self.httpd else (cfg['metrics_acl'] or 'any')
         if key == 'log-access':
             return 'on' if (self.httpd.RequestHandlerClass.log_access if self.httpd else cfg['log_access']) else 'off'
-        if key == 'log-level':
-            return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         if key == 'modbus/profile':
             return cfg['profile']
-        if key == 'control/port':
-            return 'off' if self.stopped else self.describe()
-        if key == 'control/socket-group':
-            return 'on' if self.socket_group else 'off'
-        if key == 'audit/log-file':
-            if self.audit is None or self.audit.disabled:
-                return 'off'
-            return 'remote' if self.audit.path == 'none' else self.audit.path
-        if key == 'audit/forward':
-            return self.audit_params.get('forward') or 'none'
-        if key == 'audit/forward-format':
-            return self.audit_params.get('forward_format') or 'rfc5424'
-        if key == 'audit/rotate/max-size':
-            return '%g' % self.audit_params['max_mb']
-        if key == 'audit/rotate/daily':
-            return 'on' if self.audit_params['daily'] else 'off'
-        if key == 'audit/rotate/files':
-            return '%d' % self.audit_params['files']
-        if key == 'audit/disable':
-            return 'on' if self.audit_params['disabled'] else 'off'
         if key == 'modbus/auth':
             return cfg.get('auth') or 'none'
         if key == 'metrics/filter':
             return cfg['metrics_spec'] or 'off'
-        if key == 'dump/path':
-            return self.dump_path or 'off'
-        if key == 'dump-interval':
-            return 'off' if not cfg['dump_interval'] else secs(cfg['dump_interval'])
         # the generic path: a registry row with a typed conv reads its
         # config key with no branch at all; a bool row renders on/off
         opt = OPTION_BY_LIVE.get(key)
@@ -584,17 +378,11 @@ class ControlServer(_ControlServer):
             return self.defaults.get(key, '?')   # renders (the secrets answer '<set>'/'off')
         return '?'
 
-    def _rebuild_audit(self):
-        """Swap the SCR audit trail for one rebuilt from the params (the
-        live path/rotation/kill-switch changes): the shared rebuild re-chains
-        from the file's own tail, the chain verifiable across the swap. The
-        old trail is NOT closed — a session still holding it writes its last
-        commands there."""
-        p = self.audit_params
-        self.audit = self.rebuild_audit(p, 'SCR', 'modbus-scraper')
-        if self.audit is None or self.audit.disabled:
-            return 'off'
-        return 'remote' if self.audit.path == 'none' else self.audit.path
+    def record_cfg(self, updates):
+        """The live truth rides the scraper's resolved-config dict (the
+        show-config-writeback contract), under the poller's lock."""
+        with self.scraper.lock:
+            self.scraper.cfg.update(updates)
 
     def clear_overrides(self):
         """The config was re-applied (SIGHUP/request reload): nothing is

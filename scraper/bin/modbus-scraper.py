@@ -31,7 +31,7 @@ from common.runtime.version import version_string
 from lib.config import CONTROL_SOCKET_TEMPLATE, resolve_config, resolve_metrics_acl
 from lib.control import ControlServer
 from lib.metrics import Metrics
-from lib.options import KNOWN_VERBS, OPTIONS
+from lib.options import DEFAULT_OPS_VERBS, KNOWN_VERBS, OPTIONS
 from lib.poller import Scraper
 from lib.protocol import ModbusTCP
 from lib.server import Handler, Server
@@ -109,7 +109,7 @@ def main():
     control_target = resolve_control_target(cfg['control_port'], listen_port, CONTROL_SOCKET_TEMPLATE)
     control_token = cfg['control_token'] or None
     control_ops_token = cfg['control_ops_token'] or None
-    ops_verbs = parse_ops_verbs(cfg.get('control_ops_verbs'), KNOWN_VERBS)
+    ops_verbs = parse_ops_verbs(cfg.get('control_ops_verbs'), KNOWN_VERBS, default=DEFAULT_OPS_VERBS)
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
     audit_params = {'path': None if cfg['no_audit_log'] else cfg['audit_log'],
                     'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],

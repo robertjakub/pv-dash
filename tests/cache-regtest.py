@@ -1460,6 +1460,7 @@ try:
     listing = '\n'.join([
         '    disable        disable the audit trail entirely',
         '    forward        also forward every audit line: the local syslog mirror or a remote collector (the off-box copy)',
+        '    forward-format the remote forward\'s envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send (the alias of audit/forward/format)',
         '    log-file       the audit trail\'s file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home',
         '    requests       audit one REQUESTS tally per client per this many seconds',
         '    rotate         the audit trail\'s rotation: the size trigger, the UTC-midnight trigger and the backup count'])
@@ -1518,12 +1519,12 @@ try:
     check('audit forward: the remote target takes the grammar (the soft bind warns, the set lands)',
           r.startswith('ok audit/forward=tcp://127.0.0.1:%d' % (19799 + BASE)), r[:120])
     r = ctl_cmd('show audit forward format', 15530 + BASE)
-    check('audit forward-format: the default renders', r == 'ok audit/forward/format=rfc5424', r)
+    check('audit forward format: the default renders', r == 'ok audit/forward/format=rfc5424', r)
     r = ctl_cmd('set audit forward format cef', 15530 + BASE)
-    check('audit forward-format: cef takes', r.startswith('ok audit/forward/format=cef'), r)
+    check('audit forward format: cef takes', r.startswith('ok audit/forward/format=cef'), r)
     r = ctl_cmd('set audit forward format gelf', 15530 + BASE)
-    check('audit forward-format: a foreign format refuses',
-          r.startswith('fail audit/forward-format must be one of rfc5424, cef'), r)
+    check('audit forward format: a foreign format refuses',
+          r.startswith('fail audit/forward/format must be one of rfc5424, cef'), r)
     r = ctl_cmd('set audit forward bogus', 15530 + BASE)
     check('audit forward: a bad spelling refuses with the grammar one-liner',
           r.startswith('fail audit/forward must be none, syslog, syslog:/path'), r)

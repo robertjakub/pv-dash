@@ -82,7 +82,7 @@ def resolve_config(args, script_dir=None):
         'max_clients': resolve(getattr(args, 'max_clients', None), 'MAX_CLIENTS',
                                'max_clients', DEFAULTS['max_clients'], int),
         'client_timeout': resolve(getattr(args, 'client_timeout', None), 'CLIENT_TIMEOUT',
-                                  'client_timeout', DEFAULTS['client_timeout_s'], float),
+                                  'client_timeout', DEFAULTS['client_timeout'], float),
         'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MAX_CONN_PER_IP',
                                    'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
         'level': resolve(args.log_level, 'LOG_LEVEL', 'log_level', DEFAULTS['log_level'], str).strip().upper(),
@@ -147,7 +147,7 @@ def resolve_config(args, script_dir=None):
                                          'metrics_max_clients', DEFAULTS['metrics_max_clients'], int)
     cfg['metrics_client_timeout'] = resolve(getattr(args, 'metrics_client_timeout', None),
                                             'METRICS_CLIENT_TIMEOUT', 'metrics_client_timeout',
-                                            DEFAULTS['metrics_client_timeout_s'], float)
+                                            DEFAULTS['metrics_client_timeout'], float)
     cfg['metrics_max_conn_per_ip'] = resolve(getattr(args, 'metrics_max_conn_per_ip', None),
                                              'METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
                                              DEFAULTS['metrics_max_conn_per_ip'], int)

@@ -26,9 +26,10 @@ def _load_options():
     """The rows from lib/options.json (next to this loader): the shared
     registry parser (common/settings/options.py parse_registry_sections — the
     show/commands sections, the control-grammar vocabulary) and the
-    shared row builder (option_rows). The defaults.json-wired bits ride
-    here too (the audit log's rotation defaults, the log-level choices)
-    so the constants keep their one home; the loader reads defaults.json
+    shared row builder (option_rows) — the rows carry their `default` (the
+    static rung; lib/statics.py reads them off OPTIONS). The log-level row
+    takes its choices from lib/defaults.json (the same LOG_LEVELS the
+    control grammar validates against); the loader reads defaults.json
     directly so the module also imports flat (scripts/check_options.py
     walks lib/ on sys.path)."""
     here = os.path.dirname(os.path.realpath(__file__))
@@ -36,9 +37,9 @@ def _load_options():
         static = json.load(f)
     # no static default rides the argparse parser: a static-wired default
     # would shadow the env layer (the resolver never falls through a truthy
-    # flag value) — every knob ladders flag > env > config > static in
-    # lib/config.py, the tree read there (a wired listen hid the LISTEN env
-    # once)
+    # flag value) — every knob ladders flag > env > config > the row's
+    # default in lib/config.py, the rows read there (a wired listen hid the
+    # LISTEN env once)
     rows, sections, options = load_registry(here,
                                             choices={'log-level': tuple(static['log_levels'])})
     for key, value in sections.items():

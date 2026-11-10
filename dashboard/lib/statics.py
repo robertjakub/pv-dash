@@ -14,7 +14,9 @@ with open(os.path.join(_here, 'defaults.json'), encoding='utf-8') as _f:
 
 LOG_LEVELS = tuple(STATIC['log_levels'])
 
-DEFAULTS = STATIC['defaults']
+from .options import OPTIONS   # the registry rows — the defaults' one home (the rows' `default`)
+DEFAULTS = {o.name.replace('-', '_'): o.static_default
+            for o in OPTIONS if o.static_default is not None}
 DEFAULT_LISTEN = DEFAULTS['listen']
 DEFAULT_LISTEN_PORT = int(DEFAULT_LISTEN.rsplit(':', 1)[1])
 
@@ -25,7 +27,7 @@ CONTROL_SOCKET_TEMPLATE = '/tmp/dashboard-%d.socket'
 DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_LISTEN_PORT
 DEFAULT_UPSTREAM = DEFAULTS['upstream']
 DEFAULT_PROM_PREFIX = DEFAULTS['prom_prefix']
-PROXY_TIMEOUT_S = DEFAULTS['proxy_timeout_s']
+PROXY_TIMEOUT_S = STATIC['proxy_timeout_s']   # a plain static — the proxy has no knob row
 DEFAULT_LOG_LEVEL = DEFAULTS['log_level']
 AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
 AUDIT_FILES = DEFAULTS['audit_files']

@@ -144,9 +144,10 @@ collector's pull are the two routes through:
   that pulls `/metrics` (Prometheus or another pull collector). The
   demo's `Dockerfile.prometheus` is the reference wiring
   ([the images](../README.md#prometheus-dockerfileprometheus)). The
-  **alert rules pack** ships with the exporter
-  (`scraper/alerts.yml`; the packaged copy sits at
-  `share/modbus-scraper/alerts.yml`) — list it under your
+  **alert rules pack** ships at `alerts/` in the repo, one file per
+  watched exporter — the packaged copy sits at
+  `share/modbus-scraper/alerts.yml` (the cache package carries
+  `share/modbus-cache/alerts.yml`) — list them under your
   Prometheus's `rule_files:` and the audit vocabulary's alerts ride
   along (docs/AUDIT.md F16).
 - **the `config` volume** — mounted by the three Modbus services and

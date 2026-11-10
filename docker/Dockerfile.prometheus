@@ -6,12 +6,12 @@
 # that runs as root only for the token handoff, then su-exec drops
 # before the exec.
 #
-# Build (the context = the docker/ directory itself; the alerts rules
-# pack rides the exporter = the scraper tree, as a named build context;
+# Build (the context = the docker/ directory itself; the alert rules
+# pack rides the alerts/ tree, as a named build context;
 # both compose stacks — demo/ and prod/ — build this image):
 #   cd docker
 #   docker build -t prometheus -f Dockerfile.prometheus \
-#       --build-context alerts=../scraper .
+#       --build-context alerts=../alerts .
 #   # or: cd docker/demo (or docker/prod) && docker compose up -d prometheus
 #
 # The entrypoint waits for /config/metrics.token (the modbus-scraper's
@@ -27,9 +27,9 @@ RUN apk add --no-cache prometheus su-exec
 RUN adduser -D prometheus 2>/dev/null || true
 
 COPY prometheus.yml /etc/prometheus/prometheus.yml
-# the exporter's alert rules pack (scraper/alerts.yml — the F16 pack,
-# wired by prometheus.yml's rule_files)
-COPY --from=alerts alerts.yml /etc/prometheus/alerts.yml
+# the family's alert rules pack (alerts/ — the F16 pack, one file per
+# watched exporter, wired by prometheus.yml's rule_files)
+COPY --from=alerts *.yml /etc/prometheus/alerts/
 COPY entrypoints/entrypoint-prometheus.sh /usr/local/bin/pv-prometheus-entrypoint
 RUN chmod +x /usr/local/bin/pv-prometheus-entrypoint \
     && mkdir -p /prometheus \

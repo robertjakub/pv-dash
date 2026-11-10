@@ -7,11 +7,11 @@
 global:
   scrape_interval: 10s
 
-# The alert rules pack ships with the exporter (scraper/alerts.yml, the
-# audit vocabulary's detection half — docs/AUDIT.md F16); the image bakes
-# it in (Dockerfile.prometheus, the alerts build context).
+# The alert rules pack ships at alerts/ (one file per watched exporter,
+# the audit vocabulary's detection half — docs/AUDIT.md F16); the image
+# bakes both files (Dockerfile.prometheus, the alerts build context).
 rule_files:
-  - /etc/prometheus/alerts.yml
+  - /etc/prometheus/alerts/*.yml
 
 scrape_configs:
   - job_name: modbus-scraper

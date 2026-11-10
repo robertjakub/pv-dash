@@ -46,10 +46,12 @@ NIX_NAMES = {
 DEFAULT_KEYS = {
     'cache': {'timeout': 'timeout_s', 'interval': 'interval_s', 'read-delay': 'read_delay_s',
               'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s',
-              'requests-audit': 'requests_audit_s'},
+              'requests-audit': 'requests_audit_s', 'profile': 'modbus_profile'},
     'scraper': {'timeout': 'timeout_s', 'interval': 'interval_s',
-                'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s'},
-    'inverter': {'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s'},
+                'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s',
+                'profile': 'modbus_profile'},
+    'inverter': {'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s',
+                 'profile': 'modbus_profile'},
     'dashboard': {'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s'},
 }
 
@@ -71,8 +73,8 @@ NO_TREE_DEFAULT = {
                         'grid-voltage': "the tree's grid block (voltage_v), read via statics.GRID",
                         'grid-frequency': "the tree's grid block (frequency_hz), read via statics.GRID"}),
     'dashboard': dict(_COMMON_NO_TREE_DEFAULT,
-                      **{'static-dir': 'resolves next to the script',
-                         'config-js': 'resolves next to the script'}),
+                      **{'static-dir': 'the startup-only secret — flag/env/config and restart',
+                         'config-js': 'the startup-only secret — flag/env/config and restart'}),
 }
 
 

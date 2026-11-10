@@ -740,17 +740,20 @@ class ControlServer:
             self._gate_range(key, v, 'MB')
             self.audit_params['max_mb'] = v
             self.record_cfg({'audit_max_mb': v})
+            self._rebuild_audit()   # the rotation re-chains live
             return True, '%g' % v
         if key == 'audit/rotate/daily':
             on = on_off(val, 'audit/rotate/daily')
             self.audit_params['daily'] = on
             self.record_cfg({'audit_daily': on})
+            self._rebuild_audit()
             return True, 'on' if on else 'off'
         if key == 'audit/rotate/files':
             v = numi(val, 'files', 'backups')
             self._gate_range(key, v, 'backups')
             self.audit_params['files'] = v
             self.record_cfg({'audit_files': v})
+            self._rebuild_audit()
             return True, '%d' % v
         if key == 'audit/forward':
             try:
@@ -759,17 +762,20 @@ class ControlServer:
                 raise ValueError(T('wire.audit_forward_grammar') % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
             self.audit_params['forward'] = None if val in ('', 'none') else val
             self.record_cfg({'audit_forward': val})
+            self._rebuild_audit()   # the fresh forward re-arms the sender, the collector-only fold re-chains
             return True, val
         if key == 'audit/forward-format':
             if val not in AUDIT_FORWARD_FORMATS:
                 raise ValueError(T('wire.audit_forward_format_invalid') % ', '.join(AUDIT_FORWARD_FORMATS))
             self.audit_params['forward_format'] = val
             self.record_cfg({'audit_forward_format': val})
+            self._rebuild_audit()
             return True, val
         if key == 'audit/disable':
             on = on_off(val, 'audit/disable')
             self.audit_params['disabled'] = on
             self.record_cfg({'no_audit_log': on})
+            self._rebuild_audit()   # the kill-switch swaps the live trail for None (the commands stop landing)
             return True, 'on' if on else 'off'
         return False, None
 

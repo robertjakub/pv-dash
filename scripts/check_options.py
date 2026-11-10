@@ -66,9 +66,7 @@ _COMMON_NO_TREE_DEFAULT = {
 }
 NO_TREE_DEFAULT = {
     'cache': dict(_COMMON_NO_TREE_DEFAULT,
-                  **{'auth-upstream': 'empty = no upstream auth',
-                     'cache-ttl': 'the default derives: cache_ttl_factor x interval',
-                     'profile': 'the bundled profile resolves next to the bin'}),
+                  **{'profile': 'the bundled profile resolves next to the bin'}),
     'scraper': dict(_COMMON_NO_TREE_DEFAULT,
                     **{'metrics-spec': 'empty = the built-in lib/metrics.json block',
                        'profile': 'the bundled profile resolves next to the bin'}),

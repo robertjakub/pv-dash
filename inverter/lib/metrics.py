@@ -48,7 +48,9 @@ class MetricsServer(_MetricsServer):
         pv_w, load_w, batt_w, soc, cloud, _ov = sim.effective()
         t = sim.clock()
         v_phases = sim._grid_voltages(t)
+        now = time.monotonic()
         return {
+            'uptime': int(now - (self.started or now)),
             'pv_w': pv_w, 'load_w': load_w,
             'grid_w': 0.0 if sim.outage_active() else pv_w - batt_w - load_w,
             'batt_w': batt_w, 'soc': soc, 'cloud': sim.cloud_display(),
@@ -65,7 +67,7 @@ class MetricsServer(_MetricsServer):
         rows = [
             '# HELP fake_inverter_uptime_seconds The fake-inverter process uptime.',
             '# TYPE fake_inverter_uptime_seconds gauge',
-            'fake_inverter_uptime_seconds %d' % int(self._uptime()),
+            'fake_inverter_uptime_seconds %d' % st['uptime'],
             '# HELP fake_inverter_time_scale The simulated clock speed (N× real time).',
             '# TYPE fake_inverter_time_scale gauge',
             'fake_inverter_time_scale %g' % st['time_scale'],
@@ -104,6 +106,3 @@ class MetricsServer(_MetricsServer):
             'fake_inverter_modbus_connections_total %d' % st['conns'],
         ]
         return '\n'.join(rows) + '\n'
-
-    def _uptime(self):
-        return time.monotonic() - (self.started or time.monotonic())

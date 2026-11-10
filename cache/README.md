@@ -427,9 +427,10 @@ error's age) and every poll block
 `…block_latency_seconds{,_mean,_max}`, `…block_fails_total`). Anything but
 `/metrics` answers 404, an unauthenticated read 401.
 
-The alert rules pack ([`scraper/alerts.yml`](../scraper/alerts.yml), the
-F16 closure) watches this endpoint's poll down, the age spikes and the
-write-refusal bursts — see [the scraper's alerting
+The alert rules pack ([`alerts/cache.yml`](../alerts/cache.yml), the F16
+closure) watches this endpoint's poll down, the age spikes and the
+write-refusal bursts — the cache-only install ships its half
+(`share/modbus-cache/alerts.yml`); see [the scraper's alerting
 section](../scraper/README.md#alerting).
 
 ## Audit logging

@@ -51,9 +51,10 @@ now rebuild the running writer on every knob (the rotation sets updated
 the params but not the writer before — this tool already rebuilt, the
 family does now).
 
-The alert rules pack: the cache contributes its side to the exporter's
-shipped pack ([`../scraper/alerts.yml`](../scraper/alerts.yml), the F16
-closure) — and the missing metric landed first:
+The alert rules pack: the cache contributes its side to the family's
+pack ([`../alerts/cache.yml`](../alerts/cache.yml), the F16
+closure — installed with this package as `share/modbus-cache/alerts.yml`)
+— and the missing metric landed first:
 `modbus_cache_write_refused_total` on the cache's own /metrics counts the
 gate refusals (allow-write off, the write ACL, the register allow-list, a
 malformed frame) — each one a `WRITE-REFUSED` audit event. The pack's

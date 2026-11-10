@@ -48,6 +48,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -Dm644 ${../shared}/schema/acl-write-registers.schema.json $out/share/modbus-cache/acl-write-registers.schema.json
     install -Dm644 ${../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-cache/acl-ip-prefix.schema.json
     install -Dm644 schema/selection.schema.json $out/share/modbus-cache/selection.schema.json
+    install -Dm644 ${../alerts}/cache.yml $out/share/modbus-cache/alerts.yml
     install -dm755 $out/share/modbus-cache/profiles
     install -m644 ${../profiles/profiles}/*.json $out/share/modbus-cache/profiles/
     install -dm755 $out/share/man/man1

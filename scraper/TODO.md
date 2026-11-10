@@ -5,6 +5,14 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The audit family live family-wide + the scraper's control-handler crash
+fixed: every audit live-set (`set audit forward` included) closed the
+connection with `control handler crashed ('disabled')` — `audit_params`
+was wired before `super().__init__()` and the base wiped it to `{}`;
+it rides the base constructor now. The dump carries the shared
+`audit_dump_rows()` (a live `audit/rotate/daily` override survives a
+dump) and the set row lists the audit family.
+
 The family-wide code sweep (the shared-live-knobs wave): the control
 plane (the port rebind, the ops policy, the trusted peers, the socket
 group), the audit family's seven swaps, the log level, the local-time

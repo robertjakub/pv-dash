@@ -133,12 +133,11 @@ class ControlServer(_ControlServer):
         self.scraper = scraper
         self.httpd = httpd
         self.metrics_acl_warn = None   # the metrics/acl file's permission warning (the stash, None = no warning standing)
-        self.audit_params = dict(audit_params or {})   # the audit family's live swaps rebuild from these
         super().__init__(target, reloader=reloader, stopper=stopper, audit=audit, token=token,
                          defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
-                         ops_token=ops_token, ops_verbs=ops_verbs, config_path=config_path,
-                         dump_path=dump_path, restore_on_start=restore_on_start, dump_key=dump_key,
-                         dump_interval=dump_interval)
+                         ops_token=ops_token, ops_verbs=ops_verbs, audit_params=audit_params,
+                         config_path=config_path, dump_path=dump_path, restore_on_start=restore_on_start,
+                         dump_key=dump_key, dump_interval=dump_interval)
 
     def _after_restore(self):
         self.scraper.wake.set()   # the poll loop re-reads the config-driven knobs now
@@ -419,12 +418,7 @@ class ControlServer(_ControlServer):
             'local-time': self._get('local-time'),
             'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
             'control/socket-group': 'on' if self.socket_group else 'off',
-            'audit/log-file': ('off' if (self.audit is None or self.audit.disabled) else self.audit.path),
-            'audit/forward': self.audit_params.get('forward') or 'none',
-            'audit/forward/format': self.audit_params.get('forward_format') or 'rfc5424',
-            'audit/rotate/max-size': '%g' % self.audit_params['max_mb'],
-            'audit/rotate/files': '%d' % self.audit_params['files'],
-            'audit/disable': 'on' if self.audit_params['disabled'] else 'off',
+            **self.audit_dump_rows(),
             'dump/path': self.dump_path or 'off',
             'dump/restore-on-start': 'on' if self.dump_restore else 'off',
             'dump-interval': self.dump_interval,

@@ -4,7 +4,7 @@
 Fires hostile client traffic (binary junk, huge request lines, wrong methods,
 pipelined+nulls, partial requests, slow trickle) at a live scraper instance
 and verifies it stays up, keeps serving correct metrics and never prints a
-traceback. Run from anywhere: python3 tests/scrape-fuzz.py
+traceback. Runs through scripts/battery.sh: tests/scrape-fuzz.py [rounds] [quick|full]
 """
 import os
 import random
@@ -12,6 +12,11 @@ import subprocess
 import sys
 import time
 import urllib.request
+
+if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
+    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
+             'a standalone run shares /tmp scratch and collides across sessions)')
+print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRAPER_DIR = os.path.join(REPO, 'scraper')
@@ -21,7 +26,11 @@ F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 os.environ['METRICS_SPEC'] = os.path.join(SCRAPER_DIR, 'examples', 'metrics.json')
 BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
 INV_PORT, PORT = 15545 + BASE, 19455 + BASE
-ROUNDS = 3000
+ROUNDS = int(sys.argv[1]) if len(sys.argv) > 1 else 300
+PROFILE = sys.argv[2] if len(sys.argv) > 2 else os.environ.get('PV_SUITE_PROFILE', 'quick')
+# quick: the basic HTTP shapes plus a small raw-junk sample; full: the whole
+# hostile spread (the nightly depth — scripts/battery.sh full passes it)
+KIND_POOL = ([3, 4, 3, 4, 0] if PROFILE == 'quick' else [0, 1, 2, 3, 4])
 
 failures = []
 
@@ -70,7 +79,7 @@ try:
     random.seed(1234)
     frames = []
     for i in range(ROUNDS):
-        kind = i % 5
+        kind = KIND_POOL[i % len(KIND_POOL)]
         if kind == 0:
             frames.append(bytes(random.randrange(256) for _ in range(random.randrange(1, 200))))
         elif kind == 1:
@@ -82,9 +91,9 @@ try:
         else:
             frames.append(b'GET /metrics HTTP/1.1\r\nHost: x\r\n')
     t0 = time.time()
-    for f in frames:
+    for i, f in enumerate(frames, 1):
         conn(f)                                    # steady fire
-        if i % 500 == 499:                          # periodic bursts of 50
+        if i % 500 == 0:                            # periodic bursts of 50
             for _ in range(50):
                 conn(frames[random.randrange(len(frames))])
     slow = None                                     # one slow trickle client
@@ -111,5 +120,7 @@ finally:
     for p in procs:
         p.kill()
 
+print()
+print('NOTE finished at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 print('\n%s' % ('ALL PASS' if not failures else 'FAILURES: %s' % failures))
 sys.exit(1 if failures else 0)

@@ -18,6 +18,14 @@ import sys
 import tempfile
 import time
 
+if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
+    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
+             'a standalone run shares /tmp scratch and collides across sessions)')
+print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+
+PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
+    else os.environ.get('PV_SUITE_PROFILE', 'quick')
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V = os.path.join(REPO, 'scripts', 'audit_verify.py')
 sys.path.insert(0, REPO)
@@ -42,6 +50,10 @@ def verify(*paths, rc=0, quiet=False, contain=None, absent=None):
     if absent:
         ok = ok and not any(a in out for a in absent)
     return ok, out
+
+
+class QuickDone(Exception):
+    pass
 
 
 def main():
@@ -103,6 +115,8 @@ def main():
         ok, out = verify(log, contain=['OK'])
         check('restarted writer chains seamlessly', ok, out)
 
+        if PROFILE == 'quick':
+            raise QuickDone()   # quick: the core sections only
         # 7. rotation: the chain spans the backups (verified oldest-first)
         open(log, 'w').write('')
         a = AuditLog(log, 'CACHE', max_mb=0.000001, files=3)   # ~every event rotates
@@ -121,7 +135,6 @@ def main():
                                  '--control-port', '15978', '--audit-log', flog],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
-            import time
             time.sleep(1.0)
             subprocess.run([sys.executable, ctl, '--control-port', '15978', '--audit-log', flog,
                             'set', 'pv', '2000'], capture_output=True, text=True, timeout=15)
@@ -465,8 +478,12 @@ def main():
         r = subprocess.run([sys.executable, V, os.path.join(tmp, 'missing.log')],
                            capture_output=True, text=True)
         check('a missing file does not crash the verifier', r.returncode == 0, r.stdout + r.stderr)
+    except QuickDone:
+        pass
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    print()
+    print('NOTE finished at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
     print()
     if FAILURES:
         print('FAILURES (%d): %s' % (len(FAILURES), ', '.join(FAILURES)))

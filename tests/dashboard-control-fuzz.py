@@ -6,7 +6,8 @@ afterwards.
 
   python3 tests/dashboard-control-fuzz.py
 
-Checks: ALL PASS (or a FAILURES list; exit 1).
+Checks: ALL PASS (or a FAILURES list; exit 1). A dead daemon or a refused
+port fails its named check — the suite never tracebacks.
 """
 import hashlib
 import hmac
@@ -18,6 +19,14 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
+    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
+             'a standalone run shares /tmp scratch and collides across sessions)')
+print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+
+PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
+    else os.environ.get('PV_SUITE_PROFILE', 'quick')
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 P = os.path.join(REPO, 'dashboard', 'bin', 'dashboard.py')
@@ -36,28 +45,31 @@ PAGES_CTL = 15977 + BASE
 
 def wait_port(port, timeout=20):
     """The daemon's startup race: the bind lands when it lands — poll-connect
-    instead of a blind sleep."""
+    instead of a blind sleep. False when the port never opened — the caller
+    fails its named check."""
     end = time.monotonic() + timeout
     while True:
         try:
             socket.create_connection(('127.0.0.1', port), timeout=1).close()
-            return
+            return True
         except OSError:
             if time.monotonic() >= end:
-                raise
+                return False
             time.sleep(0.2)
 
 
 def wait_file(path, timeout=10):
     """The control rebind's socket file: it exists when the rebound control
-    says it does — poll-stat instead of a blind sleep."""
+    says it does — poll-stat instead of a blind sleep. False when it never
+    appeared — the caller fails its named check."""
     end = time.monotonic() + timeout
     while not os.path.exists(path):
         if time.monotonic() >= end:
-            raise RuntimeError('the %s never came up' % path)
+            return False
         time.sleep(0.2)
+    return True
 
-METRICS_PORT = 15976  # the main instance's /metrics (the metrics/acl round)
+METRICS_PORT = 15976 + BASE  # the main instance's /metrics (the metrics/acl round)
 
 
 class PromStub(BaseHTTPRequestHandler):
@@ -163,6 +175,10 @@ def roundtrip(port, wire_bytes, timeout=5.0):
         return 'boom', str(e)
 
 
+class QuickDone(Exception):
+    pass
+
+
 def main():
     stub = HTTPServer(('127.0.0.1', PROM_PORT), PromStub)
     threading.Thread(target=stub.serve_forever, daemon=True).start()
@@ -175,7 +191,9 @@ def main():
                                        '--control-port', str(CTRL_PORT), '--control-token', TOKEN,
                                        '--audit-log', '-'],
                                       stdout=open('/tmp/dash_ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
-        wait_port(HTTP_PORT)
+        if not wait_port(HTTP_PORT):
+            check('fuzz: the dashboard came up (page port %d)' % HTTP_PORT, False,
+                  'the port never opened — see /tmp/dash_ctl_fuzz.log')
 
         # 1. malformed and hostile frames (pre-auth): always a well-formed err reply
         garbage = [
@@ -226,11 +244,15 @@ def main():
             check('fuzz: byte-by-byte request assembled', False, str(e))
 
         # 4. no newline, then close: no crash, the server keeps serving
-        s = connect(CTRL_PORT)
-        s.sendall(b'{"cmd": "show version"}')
-        s.close()
-        st, tx = roundtrip(CTRL_PORT, signed('show version'))
-        check('fuzz: frameless close does not wedge the server', st == 'ok', '%s %s' % (st, tx))
+        try:
+            s = connect(CTRL_PORT)
+            s.sendall(b'{"cmd": "show version"}')
+            s.close()
+        except OSError as e:
+            check('fuzz: frameless close does not wedge the server', False, str(e))
+        else:
+            st, tx = roundtrip(CTRL_PORT, signed('show version'))
+            check('fuzz: frameless close does not wedge the server', st == 'ok', '%s %s' % (st, tx))
 
         # 5. ping flood: 100 keepalives, then a real command still works
         ok = True
@@ -319,7 +341,9 @@ def main():
                                        '--control-port', str(OPS_CTRL_PORT), '--control-token', 'admintok2',
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
                                       stdout=open('/tmp/dash_ctl_fuzz_ops.log', 'w'), stderr=subprocess.STDOUT))
-        wait_port(OPS_HTTP_PORT)
+        if not wait_port(OPS_HTTP_PORT):
+            check('ops: the ops dashboard came up (page port %d)' % OPS_HTTP_PORT, False,
+                  'the port never opened — see /tmp/dash_ctl_fuzz_ops.log')
         st, tx, macok = ops_roundtrip('show version')
         check('ops: the ops token authenticates, show version honored, mac\'d with the ops key',
               st == 'ok' and macok, '%s %s' % (st, tx))
@@ -346,17 +370,24 @@ def main():
         st, tx, macok = ops_roundtrip('set log-level DEBUG', token='admintok2')
         check('ops: the admin token still steers the same server, mac\'d with the admin key',
               st == 'ok' and macok, '%s %s' % (st, tx))
-        aud = open(OPS_AUDIT).read()
+        try:
+            aud = open(OPS_AUDIT).read()
+            ok = ("role=ops 'show version'" in aud and "role=admin 'set log-level DEBUG'" in aud
+                  and "role=ops 'shutdown'" in aud and '-> err' in aud)
+        except OSError as e:
+            aud, ok = str(e), False
         check('ops: both roles audited (role=ops show, role=admin set, the denials included)',
-              "role=ops 'show version'" in aud and "role=admin 'set log-level DEBUG'" in aud
-              and "role=ops 'shutdown'" in aud and '-> err' in aud, aud[-300:])
+              ok, aud[-300:])
 
         # the query log: the admin switch flips the page handler's logger
         # level — on, a proxied query logs at info; off, it sinks to debug
         import urllib.request, urllib.error
         def query_lines():
-            return [l for l in open('/tmp/dash_ctl_fuzz_ops.log').read().splitlines()
-                    if 'GET /prom/metrics ->' in l]
+            try:
+                body = open('/tmp/dash_ctl_fuzz_ops.log').read()
+            except OSError as e:
+                return ['the daemon log is unreadable: %s' % e]
+            return [l for l in body.splitlines() if 'GET /prom/metrics ->' in l]
         st, tx, macok = ops_roundtrip('set log-queries on', token='admintok2')
         check('log-queries: the admin switches it on', st == 'ok' and macok, '%s %s' % (st, tx))
         try:
@@ -402,6 +433,8 @@ def main():
               and 'differ' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
 
+        if PROFILE == 'quick':
+            raise QuickDone()   # quick: the core sections only
         # 7. twenty parallel clients: garbage and real commands interleaved
         results = []
 
@@ -478,7 +511,9 @@ def main():
                                        '--control-port', str(PAGES_CTL), '--control-token', TOKEN,
                                        '--audit-log', '-'],
                                       stdout=open('/tmp/dash_ctl_fuzz_pages.log', 'w'), stderr=subprocess.STDOUT))
-        wait_port(PAGES_PORT)
+        if not wait_port(PAGES_PORT):
+            check('page auth: the token\'d page came up (page port %d)' % PAGES_PORT, False,
+                  'the port never opened — see /tmp/dash_ctl_fuzz_pages.log')
         r = page_get(PAGES_PORT, b'/config.js')
         check('page auth: the token-less read is a 401', r.startswith(b'HTTP/1.1 401')
               and b'WWW-Authenticate: Bearer' in r, r[:60])
@@ -504,7 +539,9 @@ def main():
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js')],
                                       stdout=open('/tmp/dash_ctl_fuzz_tokless.log', 'w'), stderr=subprocess.STDOUT))
-        wait_port(15980 + BASE)
+        if not wait_port(15980 + BASE):
+            check('page auth: the tokenless page came up (page port %d)' % (15980 + BASE), False,
+                  'the port never opened — see /tmp/dash_ctl_fuzz_tokless.log')
         r = page_get(15980 + BASE, b'/config.js')
         check('page auth: the tokenless loopback page serves', r.startswith(b'HTTP/1.1 200'), r[:40])
 
@@ -537,7 +574,9 @@ def main():
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--audit-log', '-'],
                                       stdout=open('/tmp/dash_ctl_fuzz_rebind.log', 'w'), stderr=subprocess.STDOUT))
-        wait_port(REB_HTTP)
+        if not wait_port(REB_HTTP):
+            check('family listener: the rebind dashboard came up (page port %d)' % REB_HTTP, False,
+                  'the port never opened — see /tmp/dash_ctl_fuzz_rebind.log')
 
         def rctl(*cmds, port=None, token=None):
             r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
@@ -546,17 +585,22 @@ def main():
                                capture_output=True, text=True, timeout=15)
             return r.stdout.strip()
 
-        wait_file(reb_sock)
+        def sock_mode():
+            try:
+                return oct(os.stat(reb_sock).st_mode & 0o777)
+            except OSError:
+                return 'gone'
+        check('family listener: the rebound control socket came up', wait_file(reb_sock), reb_sock)
         check('family listener: the default unix socket is 0600',
-              os.stat(reb_sock).st_mode & 0o777 == 0o600, oct(os.stat(reb_sock).st_mode))
+              sock_mode() == oct(0o600), sock_mode())
         tx = rctl('set control socket-group on')
         check('family listener: set control socket-group on re-modes the live socket 0660',
-              tx.startswith('ok control/socket-group=on') and os.stat(reb_sock).st_mode & 0o777 == 0o660,
-              tx[:120] + ' ' + oct(os.stat(reb_sock).st_mode))
+              tx.startswith('ok control/socket-group=on') and sock_mode() == oct(0o660),
+              tx[:120] + ' ' + sock_mode())
         tx = rctl('set control socket-group off')
         check('family listener: set control socket-group off re-modes it back 0600',
-              tx.startswith('ok control/socket-group=off') and os.stat(reb_sock).st_mode & 0o777 == 0o600,
-              tx[:120] + ' ' + oct(os.stat(reb_sock).st_mode))
+              tx.startswith('ok control/socket-group=off') and sock_mode() == oct(0o600),
+              tx[:120] + ' ' + sock_mode())
         tx = rctl('set control port %d' % REB_TCP)
         check('family listener: a tokenless TCP rebind refuses on the live wire (F5)',
               tx.startswith('% error: control/port cannot serve TCP without a token'), tx[:140])
@@ -572,7 +616,9 @@ def main():
                                        '--audit-log', '-', '--control-port', '%d' % (15982 + BASE),
                                        '--control-token', 'rtok2'],
                                       stdout=open('/tmp/dash_ctl_fuzz_rebind2.log', 'w'), stderr=subprocess.STDOUT))
-        wait_port(15981 + BASE)
+        if not wait_port(15981 + BASE):
+            check('family listener: the tokenized rebind dashboard came up (page port %d)' % (15981 + BASE), False,
+                  'the port never opened — see /tmp/dash_ctl_fuzz_rebind2.log')
         tx = rctl('set control port %d' % REB_TCP, port=str(15982 + BASE), token='rtok2')
         check('family listener: the tokenized TCP rebind succeeds', tx.startswith('ok control/port=127.0.0.1:%d' % REB_TCP),
               tx[:120])
@@ -583,7 +629,7 @@ def main():
               tx.startswith('ok dashboard'), tx[:120])
         tx = rctl('unset control port', port=str(REB_TCP), token='rtok2')
         check('family listener: unset restores the configured target',
-              tx.startswith('ok control/port=127.0.0.1:15982'), tx[:120])
+              tx.startswith('ok control/port=127.0.0.1:%d' % (15982 + BASE)), tx[:120])
         tx = rctl('show version', port=str(15982 + BASE), token='rtok2')
         check('family listener: the restored port speaks', tx.startswith('ok dashboard'), tx[:120])
 
@@ -591,7 +637,10 @@ def main():
         # surface): the accept-time IP gate on the /metrics listener — the
         # ACL first, then the caps, the token's 401 only past both
         def metrics_raw():
-            s = socket.create_connection(('127.0.0.1', METRICS_PORT), timeout=5)
+            try:
+                s = socket.create_connection(('127.0.0.1', METRICS_PORT), timeout=5)
+            except OSError:
+                return b''
             try:
                 s.sendall(b'GET /metrics HTTP/1.0\r\n\r\n')
                 buf = b''
@@ -629,15 +678,22 @@ def main():
         check('fuzz: shutdown still works', st == 'bye', '%s %s' % (st, tx))
         time.sleep(1)
         check('fuzz: dashboard exited cleanly', procs[0].poll() == 0, str(procs[0].poll()))
+    except QuickDone:
+        pass
     finally:
         stub.shutdown()
         for p in procs:
             if p.poll() is None:
                 p.kill()
-    log = open('/tmp/dash_ctl_fuzz.log').read() + open('/tmp/dash_ctl_fuzz_ops.log').read() \
-        + open('/tmp/dash_ctl_fuzz_pages.log').read()
-    check('fuzz: no tracebacks in the logs', 'Traceback' not in log, log[-200:])
+    log = ''
+    for f in ('/tmp/dash_ctl_fuzz.log', '/tmp/dash_ctl_fuzz_ops.log', '/tmp/dash_ctl_fuzz_pages.log'):
+        if os.path.exists(f):          # quick skips the sections that own some of these
+            log += open(f).read()
+    ok = 'Traceback' not in log
+    check('fuzz: no tracebacks in the logs', ok, log[-200:])
 
+    print()
+    print('NOTE finished at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
     print()
     if FAILURES:
         print('FAILURES: %s' % FAILURES)
@@ -646,4 +702,15 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except KeyboardInterrupt:
+        print()
+        print('INTERRUPTED')
+        raise SystemExit(130)
+    except Exception as e:
+        print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
+        if FAILURES:
+            print('FAILURES: %s' % FAILURES)

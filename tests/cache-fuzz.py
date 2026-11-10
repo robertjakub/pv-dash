@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Client-garbage fuzz for modbus-cache.
 
-Run from anywhere: python3 cache/test/fuzz.py [iterations]
+Runs through scripts/battery.sh: tests/cache-fuzz.py [iterations] [quick|full]
 Starts its own fake inverter + proxy on scratch ports and cleans up.
 Every request must be answered; lying MBAP lengths must close the
 connection. The proxy must never crash or log a traceback.
@@ -14,6 +14,11 @@ import subprocess
 import sys
 import time
 
+if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
+    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
+             'a standalone run shares /tmp scratch and collides across sessions)')
+print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(REPO, 'cache')
 
@@ -21,7 +26,12 @@ P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
 PORT, CACHE_PORT = 15591 + BASE, 15592 + BASE
-ITERATIONS = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
+ITERATIONS = int(sys.argv[1]) if len(sys.argv) > 1 else 300
+PROFILE = sys.argv[2] if len(sys.argv) > 2 else os.environ.get('PV_SUITE_PROFILE', 'quick')
+# quick: the basic supported FCs plus a small unsupported sample; full: the
+# whole opcode spread (the nightly depth — scripts/battery.sh full passes it)
+FC_POOL = ([3, 6, 15, 16, 3, 6, 22, 99] if PROFILE == 'quick'
+           else [0, 3, 5, 6, 15, 16, 22, 99, 170, 255])
 
 failures = []
 
@@ -61,10 +71,12 @@ try:
     s = conn()
     trickle_frame = struct.pack('>HHHB', 1, 0, 3, 1) + b'\x03\x20\x40'   # 9 bytes, len-3 frame
     for i in range(ITERATIONS):
+        if i and i % 500 == 0:
+            print('... %d of %d iterations' % (i, ITERATIONS))
         k = rnd.random()
         try:
             if k < 0.30:                              # random garbage PDUs
-                pdu = bytes([rnd.choice([0, 3, 5, 6, 15, 16, 22, 99, 170, 255])]) + \
+                pdu = bytes([rnd.choice(FC_POOL)]) + \
                     bytes(rnd.randrange(256) for _ in range(rnd.randrange(0, 60)))
                 s.sendall(struct.pack('>HHHB', i & 0xFFFF, 0, len(pdu) + 1, 1) + pdu)
             elif k < 0.45:                            # garbage with self-consistent lengths
@@ -120,5 +132,7 @@ finally:
     for p in procs:
         p.kill()
 
+print()
+print('NOTE finished at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 print('\n%s' % ('ALL PASS' if not failures else 'FAILURES: %s' % failures))
 sys.exit(1 if failures else 0)

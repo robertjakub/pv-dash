@@ -6,7 +6,8 @@ afterwards.
 
   python3 tests/cache-control-fuzz.py
 
-Checks: ALL PASS (or a FAILURES list; exit 1).
+Checks: ALL PASS (or a FAILURES list; exit 1). A dead daemon or a refused
+port fails its named check — the suite never tracebacks.
 """
 import hashlib
 import hmac
@@ -19,6 +20,14 @@ import sys
 import threading
 import time
 
+if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
+    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
+             'a standalone run shares /tmp scratch and collides across sessions)')
+print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+
+PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
+    else os.environ.get('PV_SUITE_PROFILE', 'quick')
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 P = os.path.join(REPO, 'cache', 'bin', 'modbus-cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
@@ -26,15 +35,16 @@ FAILURES = []
 
 def wait_port(port, timeout=20):
     """The daemon's startup race: the bind lands when it lands (the pyc, the
-    profile load, the audit init) — poll-connect instead of a blind sleep."""
+    profile load, the audit init) — poll-connect instead of a blind sleep.
+    False when the port never opened — the caller fails its named check."""
     end = time.monotonic() + timeout
     while True:
         try:
             socket.create_connection(('127.0.0.1', port), timeout=1).close()
-            return
+            return True
         except OSError:
             if time.monotonic() >= end:
-                raise
+                return False
             time.sleep(0.2)
 
 TOKEN = 'sekrit'
@@ -138,6 +148,10 @@ def roundtrip(port, wire_bytes, timeout=5.0):
         return 'boom', str(e)
 
 
+class QuickDone(Exception):
+    pass
+
+
 def main():
     procs = []
     try:
@@ -148,7 +162,9 @@ def main():
                                        '--listen', '127.0.0.1:%d' % (15964 + BASE), '--interval', '1',
                                        '--control-port', '%d' % AUTH_PORT, '--control-token', TOKEN],
                                       stdout=open('/tmp/cache_ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
-        wait_port(AUTH_PORT)
+        if not wait_port(AUTH_PORT):
+            check('fuzz: the fuzz cache came up (control port %d)' % AUTH_PORT, False,
+                  'the port never opened — see /tmp/cache_ctl_fuzz.log')
 
         # 1. malformed and hostile frames: always a well-formed err reply
         garbage = [
@@ -168,19 +184,19 @@ def main():
         ]
         expect_ok = {'deeply nested'}   # a valid command with the extra fields = honored
         for wire, label in garbage:
-            st, tx = roundtrip(15965, wire)
+            st, tx = roundtrip(AUTH_PORT, wire)
             check('fuzz: %s answered with a JSON frame' % label, st in ('ok', 'fail'), '%s %s' % (st, tx))
             want = 'ok' if label in expect_ok else 'fail'
             check('fuzz: %s %s' % (label, 'honored' if label in expect_ok else 'rejected cleanly'),
                   st == want, '%s %s' % (st, tx))
 
         # 2. the overlong request (1 MB): answered or closed, never a crash
-        st, tx = roundtrip(15965, b'{"cmd": "show version", "pad": "' + b'a' * (1024 * 1024) + b'"}\n', timeout=10)
+        st, tx = roundtrip(AUTH_PORT, b'{"cmd": "show version", "pad": "' + b'a' * (1024 * 1024) + b'"}\n', timeout=10)
         check('fuzz: 1 MB request handled', st in ('ok', 'fail', 'dead'), '%s %s' % (st, tx[:80]))
 
         # 3. split packets: one byte at a time, the server assembles the frame
         try:
-            s = connect(15965)
+            s = connect(AUTH_PORT)
             s.sendall(_json.dumps({'cmd': 'auth', 'token': TOKEN}).encode() + b'\n')
             buf = b''
             while not buf.endswith(b'\n'):
@@ -202,37 +218,43 @@ def main():
             check('fuzz: byte-by-byte request assembled', False, str(e))
 
         # 4. no newline, then close: no crash, the server keeps serving
-        s = connect(15965)
-        s.sendall(b'{"cmd": "show version"}')
-        s.close()
-        st, tx = roundtrip(15965, signed('show version'))
-        check('fuzz: frameless close does not wedge the server', st == 'ok', '%s %s' % (st, tx))
+        try:
+            s = connect(AUTH_PORT)
+            s.sendall(b'{"cmd": "show version"}')
+            s.close()
+        except OSError as e:
+            check('fuzz: frameless close does not wedge the server', False, str(e))
+        else:
+            st, tx = roundtrip(AUTH_PORT, signed('show version'))
+            check('fuzz: frameless close does not wedge the server', st == 'ok', '%s %s' % (st, tx))
 
         # 5. ping flood: 100 keepalives, then a real command still works
         ok = True
         for _ in range(100):
-            st, tx = roundtrip(15965, signed('ping'), timeout=10)
+            st, tx = roundtrip(AUTH_PORT, signed('ping'), timeout=10)
             ok = ok and st == 'ok'
         check('fuzz: ping flood survives (100x)', ok)
-        st, tx = roundtrip(15965, signed('show version'))
+        st, tx = roundtrip(AUTH_PORT, signed('show version'))
         check('fuzz: real command after the flood', st == 'ok', '%s %s' % (st, tx))
 
         # 6. the token server: the auth abuse is rejected, the real token works
-        procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15960',
-                                       '--listen', '127.0.0.1:15966', '--interval', '1',
-                                       '--control-port', '15967', '--control-token', 'sekrit'],
+        procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
+                                       '--listen', '127.0.0.1:%d' % (15966 + BASE), '--interval', '1',
+                                       '--control-port', '%d' % (15967 + BASE), '--control-token', 'sekrit'],
                                       stdout=open('/tmp/cache_ctl_fuzz2.log', 'w'), stderr=subprocess.STDOUT))
-        wait_port(AUTH_PORT)
-        st, tx = roundtrip(15967, b'{"cmd": "show version"}\n')
+        if not wait_port(15967 + BASE):
+            check('fuzz: the token cache came up (control port %d)' % (15967 + BASE), False,
+                  'the port never opened — see /tmp/cache_ctl_fuzz2.log')
+        st, tx = roundtrip(15967 + BASE, b'{"cmd": "show version"}\n')
         check('fuzz: token server rejects the unauthenticated', st == 'fail' and 'authenticate' in tx,
               '%s %s' % (st, tx))
         bad = True
         for _ in range(30):
-            st, tx = roundtrip(15967, b'{"cmd": "auth", "token": "guess-%d"}\n' % _)
+            st, tx = roundtrip(15967 + BASE, b'{"cmd": "auth", "token": "guess-%d"}\n' % _)
             bad = bad and st == 'fail' and 'bad token' in tx
         check('fuzz: 30 wrong tokens all rejected', bad)
         try:
-            s = connect(15967)
+            s = connect(15967 + BASE)
             s.sendall(_json.dumps({'cmd': 'auth', 'token': 'sekrit'}).encode() + b'\n')
             buf = b''
             while not buf.endswith(b'\n'):
@@ -254,12 +276,14 @@ def main():
         #     steers the daemon forbidden; both roles audited, both mac keys
         OPS_AUDIT = '/tmp/cache_ctl_fuzz_ops_audit.log'
         open(OPS_AUDIT, 'w').write('')
-        procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15960',
-                                       '--listen', '127.0.0.1:15968', '--interval', '1',
+        procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
+                                       '--listen', '127.0.0.1:%d' % (15968 + BASE), '--interval', '1',
                                        '--control-port', str(OPS_PORT), '--control-token', 'admintok2',
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
                                       stdout=open('/tmp/cache_ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
-        wait_port(AUTH_PORT)
+        if not wait_port(OPS_PORT):
+            check('ops: the ops cache came up (control port %d)' % OPS_PORT, False,
+                  'the port never opened — see /tmp/cache_ctl_fuzz3.log')
         st, tx, macok = ops_roundtrip('show version')
         check('ops: the ops token authenticates, show version honored, mac\'d with the ops key',
               st == 'ok' and macok, '%s %s' % (st, tx))
@@ -291,25 +315,31 @@ def main():
               st == 'ok' and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show version', token='nope')
         check('ops: a bogus token is refused', st == 'auth-fail', '%s %s' % (st, tx))
-        aud = open(OPS_AUDIT).read()
+        try:
+            aud = open(OPS_AUDIT).read()
+            ok = ("role=ops 'request clear cache'" in aud and "role=admin 'set modbus interval 5'" in aud
+                  and "role=ops 'shutdown'" in aud and "role=ops 'set modbus interval 5' wire=h" in aud)
+        except OSError as e:
+            aud, ok = str(e), False
         check('ops: both roles audited (role=ops clear, role=admin set, the denials included)',
-              "role=ops 'request clear cache'" in aud and "role=admin 'set modbus interval 5'" in aud
-              and "role=ops 'shutdown'" in aud and "role=ops 'set modbus interval 5' wire=h" in aud, aud[-300:])
-        r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15960',
-                            '--listen', '127.0.0.1:15968', '--control-port', str(OPS_PORT),
+              ok, aud[-300:])
+        r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
+                            '--listen', '127.0.0.1:%d' % (15968 + BASE), '--control-port', str(OPS_PORT),
                             '--control-ops-token', 'x', '--dry-run'],
                            capture_output=True, text=True, timeout=15)
         check('ops: an ops token without the admin token is a clean error', r.returncode != 0
               and 'supplements' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
-        r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:15960',
-                            '--listen', '127.0.0.1:15968', '--control-port', str(OPS_PORT),
+        r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
+                            '--listen', '127.0.0.1:%d' % (15968 + BASE), '--control-port', str(OPS_PORT),
                             '--control-token', 'same', '--control-ops-token', 'same', '--dry-run'],
                            capture_output=True, text=True, timeout=15)
         check('ops: the ops token equal to the admin token is a clean error', r.returncode != 0
               and 'differ' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
 
+        if PROFILE == 'quick':
+            raise QuickDone()   # quick: the core sections only
         # 7. twenty parallel clients: garbage and real commands interleaved
         results = []
 
@@ -319,7 +349,7 @@ def main():
                     wire = signed('show cache')
                 else:
                     wire = ('garbage %d\n' % i).encode()
-                st, tx = roundtrip(15965, wire, timeout=15)
+                st, tx = roundtrip(AUTH_PORT, wire, timeout=15)
                 results.append((i, st))
             except OSError as e:
                 results.append((i, 'boom: %s' % e))
@@ -333,25 +363,38 @@ def main():
               and all(st in ('ok', 'fail') for _, st in results), str(results[:6]))
 
         # 8. the proxy is still alive and serving Modbus (the device answers)
-        s = connect(15964, timeout=5)
-        s.sendall(struct.pack('>HHHB', 9, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 1))
-        r = s.recv(512)
-        s.close()
-        check('fuzz: modbus side still answers after the fuzzing', len(r) >= 10, r.hex())
+        try:
+            s = connect(15964 + BASE, timeout=5)
+            s.sendall(struct.pack('>HHHB', 9, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 1))
+            r = s.recv(512)
+            s.close()
+            ok, detail = len(r) >= 10, r.hex()
+        except OSError as e:
+            ok, detail = False, str(e)
+        check('fuzz: modbus side still answers after the fuzzing', ok, detail)
 
         # 9. clean shutdown
-        st, tx = roundtrip(15965, signed('shutdown'))
+        st, tx = roundtrip(AUTH_PORT, signed('shutdown'))
         check('fuzz: shutdown still works', st == 'bye', '%s %s' % (st, tx))
         time.sleep(1)
         check('fuzz: proxy exited cleanly', procs[1].poll() == 0, str(procs[1].poll()))
+    except QuickDone:
+        pass
     finally:
         for p in procs:
             if p.poll() is None:
                 p.kill()
-    log = open('/tmp/cache_ctl_fuzz.log').read() + open('/tmp/cache_ctl_fuzz2.log').read() \
-        + open('/tmp/cache_ctl_fuzz3.log').read()
-    check('fuzz: no tracebacks in the logs', 'Traceback' not in log, log[-200:])
+    ok = False
+    try:
+        log = open('/tmp/cache_ctl_fuzz.log').read() + open('/tmp/cache_ctl_fuzz2.log').read() \
+            + open('/tmp/cache_ctl_fuzz3.log').read()
+        ok = 'Traceback' not in log
+    except OSError as e:
+        log = 'the daemon logs are unreadable: %s' % e
+    check('fuzz: no tracebacks in the logs', ok, log[-200:])
 
+    print()
+    print('NOTE finished at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
     print()
     if FAILURES:
         print('FAILURES: %s' % FAILURES)
@@ -360,4 +403,15 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except KeyboardInterrupt:
+        print()
+        print('INTERRUPTED')
+        raise SystemExit(130)
+    except Exception as e:
+        print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
+        if FAILURES:
+            print('FAILURES: %s' % FAILURES)

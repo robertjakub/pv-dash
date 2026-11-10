@@ -18,23 +18,32 @@ import subprocess
 import sys
 import time
 
+if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
+    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
+             'a standalone run shares /tmp scratch and collides across sessions)')
+print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+
+PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
+    else os.environ.get('PV_SUITE_PROFILE', 'quick')
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 CTL = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py')
 LOG = '/tmp/inv_regtest.log'
 FAILURES = []
 
-A_MODBUS, A_CTL = 15970, 15971        # --max-clients 1
-B_MODBUS, B_CTL = 15972, 15973        # --client-timeout 1
-C_MODBUS, C_CTL = 15974, 15975        # --max-conn-per-ip 1 --max-clients 0
-D_MODBUS = 15976                      # the default unix control socket (mode 0600)
-E_MODBUS, E_SOCK = 15977, '/tmp/inv_regtest_eg.socket'   # --control-socket-group (0660)
-F_MODBUS, F_CTL = 15978, 15980        # the live token-less metrics warn (listen 0.0.0.0)
-F_METRICS = 15981
-G_MODBUS, G_SOCK = 15982, '/nonexistent_dir_regtest/x.socket'   # an unbindable control target (the bind guard)
-H_MODBUS, H_CTL = 15983, 15984        # the token'd TCP control (the signed wire)
-S_MODBUS = 15993                      # the fc-split profile (the per-entry address spaces)
-B_METRICS = 15979                     # instance B's /metrics (max-clients 1)
+BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
+A_MODBUS, A_CTL = 15970 + BASE, 15971 + BASE        # --max-clients 1
+B_MODBUS, B_CTL = 15972 + BASE, 15973 + BASE        # --client-timeout 1
+C_MODBUS, C_CTL = 15974 + BASE, 15975 + BASE        # --max-conn-per-ip 1 --max-clients 0
+D_MODBUS = 15976 + BASE                      # the default unix control socket (mode 0600)
+E_MODBUS, E_SOCK = 15977 + BASE, '/tmp/inv_regtest_eg.socket'   # --control-socket-group (0660)
+F_MODBUS, F_CTL = 15978 + BASE, 15980 + BASE        # the live token-less metrics warn (listen 0.0.0.0)
+F_METRICS = 15981 + BASE
+G_MODBUS, G_SOCK = 15982 + BASE, '/nonexistent_dir_regtest/x.socket'   # an unbindable control target (the bind guard)
+H_MODBUS, H_CTL = 15983 + BASE, 15984 + BASE        # the token'd TCP control (the signed wire)
+S_MODBUS = 15993 + BASE                      # the fc-split profile (the per-entry address spaces)
+B_METRICS = 15979 + BASE                     # instance B's /metrics (max-clients 1)
 UNIT = 1
 
 
@@ -90,6 +99,10 @@ def eof_soon(sock, seconds=3.0):
         return sock.recv(4096) == b'' and time.monotonic() - t0 < seconds
     except OSError:
         return False
+
+
+class QuickDone(Exception):
+    pass
 
 
 def main():
@@ -318,6 +331,8 @@ def main():
         logc = open(LOG + '.c').read()
         check('per-IP refusal logged', 'connection refused: per-IP limit of 1 reached' in logc)
 
+        if PROFILE == 'quick':
+            raise QuickDone()   # quick: the core sections only
         # ---- instance B's /metrics: the 503 cap, the token, the recovery
         def http_get(port, token=None, timeout=5):
             """Raw HTTP GET: (status-line, full reply bytes)."""
@@ -390,14 +405,14 @@ def main():
               tx.startswith('% error: restart required (startup-only knob)'), tx)
         # the token serves at START instead: a spawned instance answers the
         # bearer on a non-loopback bind (the F13 floor's success side)
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15997',
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15997 + BASE),
                                        '--metrics-server', '--metrics-token', 't',
-                                       '--metrics-listen', '0.0.0.0:15998'],
+                                       '--metrics-listen', '0.0.0.0:%d' % (15998 + BASE)],
                                       stdout=open(LOG + '.f2', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.1)
-        st, _ = http_get(15998)
+        st, _ = http_get(15998 + BASE)
         check('metrics token: the started 0.0.0.0 endpoint demands the bearer', st.split()[1] == '401', st)
-        st, _ = http_get(15998, token='t')
+        st, _ = http_get(15998 + BASE, token='t')
         check('metrics token: the started 0.0.0.0 endpoint serves with the bearer', st.split()[1] == '200', st)
         # the F13 matrix at the start: the loopback default needs no token
         r = subprocess.run([sys.executable, F, '--dry-run', '--metrics-server',
@@ -1244,6 +1259,8 @@ def main():
         logb = open(LOG + '.b').read()
         check('listening line names timeout 1s', 'client limit 64, client timeout 1s' in logb)
         check('metrics 503 logged', 'metrics: rejected' in logb and 'too many concurrent clients' in logb)
+    except QuickDone:
+        pass
     finally:
         for p in procs:
             p.terminate()
@@ -1252,6 +1269,8 @@ def main():
                 p.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 p.kill()
+    print()
+    print('NOTE finished at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
     print()
     if FAILURES:
         print('FAILURES (%d): %s' % (len(FAILURES), ', '.join(FAILURES)))

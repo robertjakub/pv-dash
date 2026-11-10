@@ -577,14 +577,6 @@ by semantic family — the knob layer is the one source --help, the man
 pages, the set grammar, the NixOS modules and the README checks read,
 so a drifted row travels wide."""
 
-VERIFICATION = """\
-**The wave's verification state** (Nov 9): every `--help`/`--man`
-byte-identical vs HEAD; `check_options` + `lint_options --check` clean;
-the ten-suite battery green (the cache/scrape regtests and the
-cache-fuzz legs needed one clean re-run after the killed first
-battery's daemons squatted the suite ports — the failures were port
-squatters, not code; the bind-note's clean death told the story)."""
-
 WIRE_HEAD = """\
 ## The wire-text sweep — the log/audit canon
 
@@ -678,29 +670,13 @@ The listener census (ten listeners):
 SURFACE_FINDINGS = """\
 The findings:
 
-- **The accept ladder is one (landed — the audit-family wave).**
-  `common/modbus/server.py`'s `serve_modbus` runs the discipline
-  once: the client timeout -> `conn_gate.admit` (the per-IP cap,
-  counts always, enforces only when capped) -> the connect-ACL check
-  (release + `connection rejected: ... not on the connect ACL`) ->
-  the `max_clients` check (release + `connection refused: client
-  limit ...`) -> the count under the lock -> the daemon thread -> the
-  pre-serve failure unwind -> the `finally` close. The backlog sits
-  unified at 128 — above every face's client limit, a burst past a
-  short backlog RSTs on macOS/BSD before the client sends — and the
-  accept-error retry notices the `stopping` flag (the SignalBox
-  close). The faces delegate (`Proxy.serve`, the fake's `serve`) and
-  bring the face protocol's hooks: `listening`, `access`, `allowed`,
-  `suite_key`, `on_frame`/`on_session`, `malformed`, `frame`,
-  `on_disconnect`.
-- **The session opener rides the same ladder (landed).** `_session`
-  registers the client in the `clients` dict under the lock, runs the
-  suite handshake when armed (`auth_handshake_server`, the failure
-  logs identical, the peer dropped before it ever sees a frame),
-  counts the requests per frame, and the `finally` unregisters (pop,
-  count, `conn_gate.release`, close) — the cache's audit trail
-  `REQUESTS` event rides `on_disconnect`, the fake's counters ride
-  `on_frame`/`on_session`.
+- **The face protocol's hooks.** The faces delegate (`Proxy.serve`,
+  the fake's `serve`) into the one shared ladder and bring the face
+  protocol's hooks: `listening`, `access`, `allowed`, `suite_key`,
+  `on_frame`/`on_session`, `malformed`, `frame`, `on_disconnect` — the
+  cache's audit trail `REQUESTS` event rides `on_disconnect`, the
+  fake's counters ride `on_frame`/`on_session`. The backlog sits
+  unified at 128, above every face's client limit.
 - **The malformed-frame split (a policy hook, as ruled).** On an
   unparseable frame the `malformed(addr, err)` hook decides: the fake
   logs and closes; the cache answers what it can in-band
@@ -731,9 +707,10 @@ The findings:
   ladder. Not foldable without losing the shapes that make each
   correct.
 
-The verdict: the accept-ladder leg is landed (the family's refusal
-texts and the session opener have one home); the rest of the surface
-drift is at parity or declined with the reasons above."""
+The verdict: the accept ladder and the session opener have one home
+(the landed legs: [history/family-drift.md](history/family-drift.md));
+the rest of the surface drift is at parity or declined with the
+reasons above."""
 
 KNOBS_VERBS = """\
 - `request/clear/cache` + `request/dump/with-cache` — the cache only
@@ -748,25 +725,6 @@ KNOBS_VERBS = """\
 KNOBS_FINDINGS = """\
 The findings:
 
-- **The audit rotation bounds are family-wide (landed — the
-  audit-family wave).** `common/runtime/audit.py` holds the constants
-  (`AUDIT_FILES` 1..100, `AUDIT_MAX_MB` 0..1048576), all four
-  registries' rows repeat them, and `check_options` cross-checks the
-  repetition — `set audit rotate files 0` refuses identically
-  everywhere.
-- **The `audit-daily` knob is one shape (landed).** The live name
-  `audit/rotate/daily` and the `$AUDIT_DAILY` env twin agree on all
-  four, and the fake's live dispatch flips the same bit; its
-  remaining audit rows (log/max-mb/files/disable) stay startup-only
-  by posture — no live name, the env twin carries them.
-- **The env layer is complete under the env-or-note rule (landed).**
-  Every knob carries its env twin or an explicit `no-env` note, and
-  `check_options` gates the pair. The no-env census: the fake's 13
-  (the F11 simulator surface — env-less by posture, their flags
-  reachable from the config file since the config-file wave), the
-  dashboard's 1 (`log-queries` — the live toggle exists, the startup
-  stays flag-only), the cache and the scraper none; the nodes and
-  the command rows are env-free by nature.
 - **The `auth` name collision.** The dashboard's `auth` is a NODE
   (the page's auth namespace), the other three's is the modbus auth
   enum (`suite|none`). One spelling, two meanings in the family's
@@ -779,7 +737,11 @@ The findings:
   commands-lint gates the registry, not the tuple). A drift here is
   silent: an ops policy accepting a verb the grammar refuses, or the
   reverse. Candidate: derive `KNOWN_VERBS` from the registry's
-  command rows at load."""
+  command rows at load.
+
+The landed knob legs (the audit rotation bounds family-wide, the
+`audit-daily` one shape, the env-or-note completion):
+[history/family-drift.md](history/family-drift.md)."""
 
 WIRE_FINDINGS = """\
 The findings:
@@ -911,16 +873,9 @@ between the four tools finds the same knobs, the same words, the same
 refusals and the same env layer; the code behind them lives once in
 `common/`. Each TODO states the consistent outcome and the plane it
 serves. Ordered by the user's exposure; the code plane rides along.
-
-Landed (the audit-family wave): the audit rotation bounds
-family-wide (the constants in `common/runtime/audit.py`, every registry
-repeating them, `check_options` cross-checking); the `audit-daily`
-knob one shape (the live `audit/rotate/daily` + the `$AUDIT_DAILY`
-twin on all four); the env twins completed (the env-or-note rule —
-a knob carries its twin or an explicit `no-env` note, the gate
-enforces); the accept-ladder extraction (`common/modbus/server.py`
-`serve_modbus` — the discipline, the session opener and the
-malformed-frame policy hook with it).
+The landed legs (the audit rotation bounds, the `audit-daily` shape,
+the env-or-note completion, the accept-ladder extraction):
+[history/family-drift.md](history/family-drift.md).
 
 1. **The `auth` name collision resolved** — one spelling, one
    meaning: the dashboard's `auth` node (the page's namespace)
@@ -1041,11 +996,13 @@ def emit():
     ap('The wave record: the sweep types over the four surfaces (cache,')
     ap('scraper, inverter, dashboard) — what each sweeps, what it found,')
     ap('and the verdicts. **Ships in the repo, kept current by the')
-    ap('workflow**: the landed legs ride their per-tool commits, the')
-    ap('open findings wait in place, and `--check` fails a stale page.')
-    ap('Regenerate with `python3 scripts/family_drift.py`; the verdict')
-    ap('prose lives in this script (`*_FINDINGS`/`*_VERBS`/`*_CENSUS`)')
-    ap('so a re-run updates the facts and keeps the judgement.')
+    ap('workflow**: the open findings wait in place, and `--check` fails')
+    ap('a stale page. Regenerate with `python3 scripts/family_drift.py`;')
+    ap('the verdict prose lives in this script (`*_FINDINGS`/`*_VERBS`/')
+    ap('`*_CENSUS`) so a re-run updates the facts and keeps the')
+    ap('judgement. This doc carries the CURRENT findings only — the')
+    ap('landed legs and the wave history live in')
+    ap('[history/family-drift.md](history/family-drift.md).')
     ap('')
     ap('The sweep types:')
     ap('')
@@ -1077,8 +1034,6 @@ def emit():
     ap('    registries; the shipped examples re-parsed.')
     ap('13. **The secret-surface sweep** — the secret rows and the')
     ap('    posture markers.')
-    ap('')
-    ap(VERIFICATION)
     ap('')
 
     # ---- 1. the code sweep

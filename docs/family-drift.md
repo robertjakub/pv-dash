@@ -3,11 +3,13 @@
 The wave record: the sweep types over the four surfaces (cache,
 scraper, inverter, dashboard) — what each sweeps, what it found,
 and the verdicts. **Ships in the repo, kept current by the
-workflow**: the landed legs ride their per-tool commits, the
-open findings wait in place, and `--check` fails a stale page.
-Regenerate with `python3 scripts/family_drift.py`; the verdict
-prose lives in this script (`*_FINDINGS`/`*_VERBS`/`*_CENSUS`)
-so a re-run updates the facts and keeps the judgement.
+workflow**: the open findings wait in place, and `--check` fails
+a stale page. Regenerate with `python3 scripts/family_drift.py`;
+the verdict prose lives in this script (`*_FINDINGS`/`*_VERBS`/
+`*_CENSUS`) so a re-run updates the facts and keeps the
+judgement. This doc carries the CURRENT findings only — the
+landed legs and the wave history live in
+[history/family-drift.md](history/family-drift.md).
 
 The sweep types:
 
@@ -39,13 +41,6 @@ The sweep types:
     registries; the shipped examples re-parsed.
 13. **The secret-surface sweep** — the secret rows and the
     posture markers.
-
-**The wave's verification state** (Nov 9): every `--help`/`--man`
-byte-identical vs HEAD; `check_options` + `lint_options --check` clean;
-the ten-suite battery green (the cache/scrape regtests and the
-cache-fuzz legs needed one clean re-run after the killed first
-battery's daemons squatted the suite ports — the failures were port
-squatters, not code; the bind-note's clean death told the story).
 
 ## The code sweep — the text-structural pass
 
@@ -106,29 +101,13 @@ The listener census (ten listeners):
 
 The findings:
 
-- **The accept ladder is one (landed — the audit-family wave).**
-  `common/modbus/server.py`'s `serve_modbus` runs the discipline
-  once: the client timeout -> `conn_gate.admit` (the per-IP cap,
-  counts always, enforces only when capped) -> the connect-ACL check
-  (release + `connection rejected: ... not on the connect ACL`) ->
-  the `max_clients` check (release + `connection refused: client
-  limit ...`) -> the count under the lock -> the daemon thread -> the
-  pre-serve failure unwind -> the `finally` close. The backlog sits
-  unified at 128 — above every face's client limit, a burst past a
-  short backlog RSTs on macOS/BSD before the client sends — and the
-  accept-error retry notices the `stopping` flag (the SignalBox
-  close). The faces delegate (`Proxy.serve`, the fake's `serve`) and
-  bring the face protocol's hooks: `listening`, `access`, `allowed`,
-  `suite_key`, `on_frame`/`on_session`, `malformed`, `frame`,
-  `on_disconnect`.
-- **The session opener rides the same ladder (landed).** `_session`
-  registers the client in the `clients` dict under the lock, runs the
-  suite handshake when armed (`auth_handshake_server`, the failure
-  logs identical, the peer dropped before it ever sees a frame),
-  counts the requests per frame, and the `finally` unregisters (pop,
-  count, `conn_gate.release`, close) — the cache's audit trail
-  `REQUESTS` event rides `on_disconnect`, the fake's counters ride
-  `on_frame`/`on_session`.
+- **The face protocol's hooks.** The faces delegate (`Proxy.serve`,
+  the fake's `serve`) into the one shared ladder and bring the face
+  protocol's hooks: `listening`, `access`, `allowed`, `suite_key`,
+  `on_frame`/`on_session`, `malformed`, `frame`, `on_disconnect` — the
+  cache's audit trail `REQUESTS` event rides `on_disconnect`, the
+  fake's counters ride `on_frame`/`on_session`. The backlog sits
+  unified at 128, above every face's client limit.
 - **The malformed-frame split (a policy hook, as ruled).** On an
   unparseable frame the `malformed(addr, err)` hook decides: the fake
   logs and closes; the cache answers what it can in-band
@@ -159,9 +138,10 @@ The findings:
   ladder. Not foldable without losing the shapes that make each
   correct.
 
-The verdict: the accept-ladder leg is landed (the family's refusal
-texts and the session opener have one home); the rest of the surface
-drift is at parity or declined with the reasons above.
+The verdict: the accept ladder and the session opener have one home
+(the landed legs: [history/family-drift.md](history/family-drift.md));
+the rest of the surface drift is at parity or declined with the
+reasons above.
 
 ## The knobs drift — the four registries side by side
 
@@ -218,25 +198,6 @@ four registries; 31 names carry in all four:
 
 The findings:
 
-- **The audit rotation bounds are family-wide (landed — the
-  audit-family wave).** `common/runtime/audit.py` holds the constants
-  (`AUDIT_FILES` 1..100, `AUDIT_MAX_MB` 0..1048576), all four
-  registries' rows repeat them, and `check_options` cross-checks the
-  repetition — `set audit rotate files 0` refuses identically
-  everywhere.
-- **The `audit-daily` knob is one shape (landed).** The live name
-  `audit/rotate/daily` and the `$AUDIT_DAILY` env twin agree on all
-  four, and the fake's live dispatch flips the same bit; its
-  remaining audit rows (log/max-mb/files/disable) stay startup-only
-  by posture — no live name, the env twin carries them.
-- **The env layer is complete under the env-or-note rule (landed).**
-  Every knob carries its env twin or an explicit `no-env` note, and
-  `check_options` gates the pair. The no-env census: the fake's 13
-  (the F11 simulator surface — env-less by posture, their flags
-  reachable from the config file since the config-file wave), the
-  dashboard's 1 (`log-queries` — the live toggle exists, the startup
-  stays flag-only), the cache and the scraper none; the nodes and
-  the command rows are env-free by nature.
 - **The `auth` name collision.** The dashboard's `auth` is a NODE
   (the page's auth namespace), the other three's is the modbus auth
   enum (`suite|none`). One spelling, two meanings in the family's
@@ -250,6 +211,10 @@ The findings:
   silent: an ops policy accepting a verb the grammar refuses, or the
   reverse. Candidate: derive `KNOWN_VERBS` from the registry's
   command rows at load.
+
+The landed knob legs (the audit rotation bounds family-wide, the
+`audit-daily` one shape, the env-or-note completion):
+[history/family-drift.md](history/family-drift.md).
 
 ## The wire-text sweep — the log/audit canon
 
@@ -540,25 +505,6 @@ files cite it — the promise ledger against the code.
 | F14 | No TLS on the HTTP endpoint (plain HTTP): the bearer token and the metrics trave | dashboard |
 | F15 | The metrics expose production values (generation, consumption, battery SoC) | — |
 | F17 | The `/config` volume holds live config in plaintext; the entrypoint seeds copies | — |
-| F2 | audit-trail injection: a newline in a control command wrote a forged second trai | — |
-| F3 | the register allow-list failed open on unparseable write frames | — |
-| F4 | uncapped pre-auth control line buffer | — |
-| F5 | token-less TCP control was fully unauthenticated | cache, common, dashboard, inverter, scraper |
-| F6 | the metrics endpoint without a token exposed register values; no handler timeout | — |
-| F7 | the compose stack published every listener on all host interfaces | — |
-| F8 | the unix control socket's mode was umask-derived | cache, common |
-| F9 | token flags are visible in `ps` / `/proc/*/cmdline` | — |
-| F10 | the audit trail was append-only but not integrity-protected | cache, common, dashboard, scraper |
-| F11 | the fake's Modbus surface: no client limit/timeout/ACL, oversized replies | common, inverter |
-| F12 | token files were not permission-checked | cache, common |
-| F13 | `/metrics` unauthenticated by default; the loopback bind the only control | cache, common, dashboard, inverter, scraper |
-| F16 | no automated alerting | cache |
-| F18 | the state dump was config-equivalent trust at rest with an umask-derived mode | cache, common |
-| F19 | the release landed before the CI gate reported | — |
-| F20 | the ctl/cli help promised token-file env vars the clients never read | — |
-| F21 | the HTTP surface served without authentication, bound `0 | dashboard |
-| F22 | the control plane had no role separation | — |
-| F23 | the reload state file was config-equivalent trust at rest with an umask-derived  | — |
 
 The findings:
 
@@ -670,16 +616,9 @@ between the four tools finds the same knobs, the same words, the same
 refusals and the same env layer; the code behind them lives once in
 `common/`. Each TODO states the consistent outcome and the plane it
 serves. Ordered by the user's exposure; the code plane rides along.
-
-Landed (the audit-family wave): the audit rotation bounds
-family-wide (the constants in `common/runtime/audit.py`, every registry
-repeating them, `check_options` cross-checking); the `audit-daily`
-knob one shape (the live `audit/rotate/daily` + the `$AUDIT_DAILY`
-twin on all four); the env twins completed (the env-or-note rule —
-a knob carries its twin or an explicit `no-env` note, the gate
-enforces); the accept-ladder extraction (`common/modbus/server.py`
-`serve_modbus` — the discipline, the session opener and the
-malformed-frame policy hook with it).
+The landed legs (the audit rotation bounds, the `audit-daily` shape,
+the env-or-note completion, the accept-ladder extraction):
+[history/family-drift.md](history/family-drift.md).
 
 1. **The `auth` name collision resolved** — one spelling, one
    meaning: the dashboard's `auth` node (the page's namespace)

@@ -68,9 +68,7 @@ NO_TREE_DEFAULT = {
                     **{'metrics-spec': 'empty = the built-in lib/metrics.json block'}),
     'inverter': dict(_COMMON_NO_TREE_DEFAULT,
                      **{'seed': 'a per-run choice — no default',
-                        'time': 'empty = the clock runs',
-                        'grid-voltage': "the tree's grid block (voltage_v), read via statics.GRID",
-                        'grid-frequency': "the tree's grid block (frequency_hz), read via statics.GRID"}),
+                        'time': 'empty = the clock runs'}),
     'dashboard': dict(_COMMON_NO_TREE_DEFAULT),
 }
 

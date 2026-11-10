@@ -117,7 +117,7 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--dump-interval` | `0` | seconds between the automatic state dumps, `0` = on request; live-settable |
 | `--restore-on-start` | off | load the state dump when the daemon starts |
 | **Metrics** | | |
-| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint — live-settable (`set metrics-server on/off`); **refuses to start beyond loopback without `--metrics-token`** (F13) |
+| `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint — live-settable (`set metrics enable on/off`); **refuses to start beyond loopback without `--metrics-token`** (F13) |
 | `--metrics-listen` | `127.0.0.1:9351` | the metrics bind address (`0.0.0.0:PORT` = every interface, token mandatory beyond loopback) |
 | `--metrics-token` | off | `Authorization: Bearer <token>` on `/metrics`; mandatory beyond loopback (F13); `file:<path>` welcome |
 | `--metrics-acl` | `any` | clients allowed to connect to `/metrics` (the connect-acl grammar); checked at accept |
@@ -275,7 +275,7 @@ shared schema the [fake inverter](../inverter/README.md) serves and the
 [scraper](../scraper/README.md) scrapes; the shipped profiles live in the
 suite's [`profiles/`](../profiles/) subproject (`sun2000.json` by default).
 The format is documented in [profiles/README.md](../profiles/README.md).
-Resolution: `--profile` flag, env `PROFILE`, config `set profile`,
+Resolution: `--profile` flag, env `PROFILE`, config `set modbus profile`,
 then the bundled copy; the file is re-read on `SIGHUP`.
 
 - Entry `type` gives the width and the space: `i16`/`u16` (one word),
@@ -293,7 +293,7 @@ then the bundled copy; the file is re-read on `SIGHUP`.
 
 Which registers are actually **fetched** comes from a selection file —
 `{"registers": ["pv-power", ...]}`, profile names only — resolved as
-`--selection` flag, env `SELECTION`, config `set selection`; the
+`--selection` flag, env `SELECTION`, config `set modbus selection`; the
 default fetches **every** profile entry (`all`), and **`none`** empties the
 map: every read forwards and nothing is stored. The shipped
 `examples/selection.json` is the essential SUN2000 monitoring set. The
@@ -398,7 +398,7 @@ way:
   rides as `file:/run/credentials/...`); the same `file:` reference form
   works on every secret value. Without a key a dump path stays plaintext
   **by design** — and says so (a `WARNING` at start, a note on the
-  `set dump-path` reply).
+  `set dump path` reply).
 
 ## Metrics
 
@@ -406,11 +406,11 @@ way:
 Prometheus `/metrics` on `--metrics-listen` (default `127.0.0.1:9351`). The
 bearer token is **mandatory beyond loopback** — a token-less non-loopback
 bind refuses to start (the F13 posture); beside the token the endpoint
-carries the **metrics ACL** (`--metrics-acl`, live `set metrics-acl`),
-checked at accept. The whole surface is live: `set metrics-listen` rebinds
+carries the **metrics ACL** (`--metrics-acl`, live `set metrics acl`),
+checked at accept. The whole surface is live: `set metrics listen` rebinds
 the endpoint, the `metrics limits` caps apply to the running gate, and
-`set metrics-token` rotates the credential without a restart (the value
-never renders back; `set metrics-token off` takes the endpoint tokenless on
+`set metrics token` rotates the credential without a restart (the value
+never renders back; `set metrics token off` takes the endpoint tokenless on
 the loopback listen). A scrape job reads it like any bearer endpoint —
 `authorization: {type: Bearer, credentials_file: …}` in the job config (the
 docker demo's `prometheus.yml` wires the job for the exporter this way).

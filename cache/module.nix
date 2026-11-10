@@ -26,92 +26,92 @@ let
     "# rendered by services.modbus-cache; the flags and the env still win over this file"
     ""
     "# --- the device (upstream inverter) and the register map ---"
-    (setLine "upstream" cfg.upstream)
-    (setLine "unit" (toString cfg.unitId))
-    (setLine "timeout" (toString cfg.timeout))
-    (lib.optionals (cfg.modbusAuth != null) [ (setLine "modbus-auth" cfg.modbusAuth) ])
-    (lib.optionals (cfg.authKey != null) [ (setLine "auth-key" cfg.authKey) ])
-    (lib.optionals (cfg.authUpstream != null) [ (setLine "auth-upstream" cfg.authUpstream) ])
-    (lib.optionals (cfg.authUpstreamKey != null) [ (setLine "auth-upstream-key" cfg.authUpstreamKey) ])
-    (setLine "listen" "${cfg.listenHost}:${toString cfg.listenPort}")
-    (setLine "interval" (toString cfg.interval))
-    (setLine "read-delay" (toString cfg.readDelay))
-    (setLine "merge-gap" (toString cfg.mergeGap))
-    (lib.optionals (cfg.profile != null) [ (setLine "profile" (toString cfg.profile)) ])
+    (setLine "modbus upstream" cfg.upstream)
+    (setLine "modbus unit" (toString cfg.unitId))
+    (setLine "modbus timeout" (toString cfg.timeout))
+    (lib.optionals (cfg.modbusAuth != null) [ (setLine "modbus auth" cfg.modbusAuth) ])
+    (lib.optionals (cfg.authKey != null) [ (setLine "modbus auth key" cfg.authKey) ])
+    (lib.optionals (cfg.authUpstream != null) [ (setLine "modbus auth-upstream" cfg.authUpstream) ])
+    (lib.optionals (cfg.authUpstreamKey != null) [ (setLine "modbus auth-upstream-key" cfg.authUpstreamKey) ])
+    (setLine "system listen" "${cfg.listenHost}:${toString cfg.listenPort}")
+    (setLine "modbus interval" (toString cfg.interval))
+    (setLine "modbus read-delay" (toString cfg.readDelay))
+    (setLine "modbus merge-gap" (toString cfg.mergeGap))
+    (lib.optionals (cfg.profile != null) [ (setLine "modbus profile" (toString cfg.profile)) ])
     (lib.optionals (cfg.selection != null) [
-      (setLine "selection" (if lib.isList cfg.selection then toString selectionFile else toString cfg.selection))
+      (setLine "modbus selection" (if lib.isList cfg.selection then toString selectionFile else toString cfg.selection))
     ])
-    (lib.optionals (cfg.cacheTtl != null) [ (setLine "cache-ttl" (toString cfg.cacheTtl)) ])
-    (setLine "allow-write" (lib.boolToString cfg.allowWrite))
-    (lib.optionals (cfg.writeRegisters != null) [ (setLine "write-registers" cfg.writeRegisters) ])
-    (lib.optionals (cfg.connectAcl != null) [ (setLine "connect-acl" cfg.connectAcl) ])
-    (lib.optionals (cfg.writeAcl != null) [ (setLine "write-acl" cfg.writeAcl) ])
+    (lib.optionals (cfg.cacheTtl != null) [ (setLine "cache ttl" (toString cfg.cacheTtl)) ])
+    (setLine "write allow" (lib.boolToString cfg.allowWrite))
+    (lib.optionals (cfg.writeRegisters != null) [ (setLine "write registers" cfg.writeRegisters) ])
+    (lib.optionals (cfg.connectAcl != null) [ (setLine "acl connect" cfg.connectAcl) ])
+    (lib.optionals (cfg.writeAcl != null) [ (setLine "acl write" cfg.writeAcl) ])
     ""
     "# --- what the tool serves and where ---"
     (setLine "local-time" (lib.boolToString cfg.localTime))
     ""
     "# --- the connection caps ---"
-    (lib.optionals (cfg.maxClients != null) [ (setLine "max-clients" (toString cfg.maxClients)) ])
-    (lib.optionals (cfg.clientTimeout != null) [ (setLine "client-timeout" (toString cfg.clientTimeout)) ])
-    (lib.optionals (cfg.maxConnPerIp != null) [ (setLine "max-conn-per-ip" (toString cfg.maxConnPerIp)) ])
+    (lib.optionals (cfg.maxClients != null) [ (setLine "limits max-clients" (toString cfg.maxClients)) ])
+    (lib.optionals (cfg.clientTimeout != null) [ (setLine "limits client-timeout" (toString cfg.clientTimeout)) ])
+    (lib.optionals (cfg.maxConnPerIp != null) [ (setLine "limits max-conn-per-ip" (toString cfg.maxConnPerIp)) ])
     ""
     "# --- the control plane ---"
-    (lib.optionals (cfg.controlPort != null) [ (setLine "control-port" (toString cfg.controlPort)) ])
-    (lib.optionals (cfg.controlToken != null) [ (setLine "control-token" cfg.controlToken) ])
+    (lib.optionals (cfg.controlPort != null) [ (setLine "control port" (toString cfg.controlPort)) ])
+    (lib.optionals (cfg.controlToken != null) [ (setLine "control token" cfg.controlToken) ])
     (lib.optionals (cfg.controlTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      (setLine "control-token" "file:/run/credentials/modbus-cache/control-token")
+      (setLine "control token" "file:/run/credentials/modbus-cache/control-token")
     ])
-    (lib.optionals (cfg.controlOpsToken != null) [ (setLine "control-ops-token" cfg.controlOpsToken) ])
+    (lib.optionals (cfg.controlOpsToken != null) [ (setLine "control ops token" cfg.controlOpsToken) ])
     (lib.optionals (cfg.controlOpsTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      (setLine "control-ops-token" "file:/run/credentials/modbus-cache/control-ops-token")
+      (setLine "control ops token" "file:/run/credentials/modbus-cache/control-ops-token")
     ])
-    (lib.optionals (cfg.controlOpsVerbs != null) [ (setLine "control-ops-verbs" cfg.controlOpsVerbs) ])
-    (lib.optionals (cfg.controlTrustUids != null) [ (setLine "control-trust-uids" cfg.controlTrustUids) ])
-    (setLine "control-socket-group" (lib.boolToString cfg.controlSocketGroup))
+    (lib.optionals (cfg.controlOpsVerbs != null) [ (setLine "control ops verbs" cfg.controlOpsVerbs) ])
+    (lib.optionals (cfg.controlTrustUids != null) [ (setLine "control trust-uids" cfg.controlTrustUids) ])
+    (setLine "control socket-group" (lib.boolToString cfg.controlSocketGroup))
     ""
     "# --- the own Prometheus /metrics endpoint ---"
-    (lib.optionals (cfg.metricsMaxClients != null) [ (setLine "metrics-max-clients" (toString cfg.metricsMaxClients)) ])
-    (lib.optionals (cfg.metricsClientTimeout != null) [ (setLine "metrics-client-timeout" (toString cfg.metricsClientTimeout)) ])
-    (lib.optionals (cfg.metricsMaxConnPerIp != null) [ (setLine "metrics-max-conn-per-ip" (toString cfg.metricsMaxConnPerIp)) ])
+    (lib.optionals (cfg.metricsMaxClients != null) [ (setLine "metrics limits max-clients" (toString cfg.metricsMaxClients)) ])
+    (lib.optionals (cfg.metricsClientTimeout != null) [ (setLine "metrics limits timeout" (toString cfg.metricsClientTimeout)) ])
+    (lib.optionals (cfg.metricsMaxConnPerIp != null) [ (setLine "metrics limits max-conn-per-ip" (toString cfg.metricsMaxConnPerIp)) ])
     ""
     "# --- the audit trail ---"
-    (setLine "no-audit-log" (lib.boolToString cfg.noAuditLog))
-    (setLine "audit-log" (if cfg.auditLog == null then "-" else cfg.auditLog))
-    (setLine "audit-forward" (if cfg.auditForward == null then "none" else cfg.auditForward))
-    (lib.optionals (cfg.auditForwardFormat != null) [ (setLine "audit-forward-format" cfg.auditForwardFormat) ])
-    (setLine "audit-max-mb" (toString cfg.auditMaxMb))
-    (setLine "audit-daily" (lib.boolToString cfg.auditDaily))
-    (setLine "audit-files" (toString cfg.auditFiles))
-    (setLine "requests-audit" (toString cfg.requestsAudit))
+    (setLine "audit disable" (lib.boolToString cfg.noAuditLog))
+    (setLine "audit log-file" (if cfg.auditLog == null then "-" else cfg.auditLog))
+    (setLine "audit forward" (if cfg.auditForward == null then "none" else cfg.auditForward))
+    (lib.optionals (cfg.auditForwardFormat != null) [ (setLine "audit forward format" cfg.auditForwardFormat) ])
+    (setLine "audit rotate max-size" (toString cfg.auditMaxMb))
+    (setLine "audit rotate daily" (lib.boolToString cfg.auditDaily))
+    (setLine "audit rotate files" (toString cfg.auditFiles))
+    (setLine "audit requests" (toString cfg.requestsAudit))
     ""
     "# --- the log surface ---"
     (setLine "log-level" cfg.logLevel)
-    (setLine "log-access" (lib.boolToString cfg.logAccess))
+    (setLine "system log-access" (lib.boolToString cfg.logAccess))
     ""
     "# --- the state dump (write-behind) ---"
     (lib.optionals (cfg.dumpPath != null) [
-      (setLine "dump-path" cfg.dumpPath)
-      (setLine "dump-with-cache" (lib.boolToString cfg.dumpWithCache))
-      (setLine "restore-on-start" (lib.boolToString cfg.restoreOnStart))
+      (setLine "dump path" cfg.dumpPath)
+      (setLine "dump with-cache" (lib.boolToString cfg.dumpWithCache))
+      (setLine "dump restore-on-start" (lib.boolToString cfg.restoreOnStart))
     ])
     (lib.optionals (cfg.dumpPath != null && cfg.dumpKey != null) [
-      (setLine "dump-key" cfg.dumpKey)
+      (setLine "dump key" cfg.dumpKey)
     ])
     (lib.optionals (cfg.dumpPath != null && cfg.dumpInterval != null) [
       (setLine "dump-interval" (toString cfg.dumpInterval))
     ])
     (lib.optionals (cfg.metricsServer != null) [
-      (setLine "metrics-server" (lib.boolToString cfg.metricsServer))
-      (setLine "metrics-listen" cfg.metricsListen)
+      (setLine "metrics enable" (lib.boolToString cfg.metricsServer))
+      (setLine "metrics listen" cfg.metricsListen)
     ])
-    (lib.optionals (cfg.metricsToken != null) [ (setLine "metrics-token" cfg.metricsToken) ])
+    (lib.optionals (cfg.metricsToken != null) [ (setLine "metrics token" cfg.metricsToken) ])
     (lib.optionals (cfg.metricsTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      (setLine "metrics-token" "file:/run/credentials/modbus-cache/metrics-token")
+      (setLine "metrics token" "file:/run/credentials/modbus-cache/metrics-token")
     ])
-    (lib.optionals (cfg.metricsAcl != null) [ (setLine "metrics-acl" cfg.metricsAcl) ])
+    (lib.optionals (cfg.metricsAcl != null) [ (setLine "metrics acl" cfg.metricsAcl) ])
   ]));
 in
 {

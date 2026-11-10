@@ -82,16 +82,17 @@ The kinds — every row of the tables below carries one:
 
 ## Knobs
 
-The tables spell the knob's registry key — the one name the config file, the
-wire and the dump all take; the set / clear column spells the flat words a
-running daemon answers (the console also completes the live/alias path
-spellings and translates them). The namespaces group them.
+The tables spell the knob's registry key — the one internal name the wire,
+the replies and the dispatch take; the set / clear column spells the console
+words (the live path as words — the config files and the state dumps speak
+them; the flat registry name answers the same set everywhere, the ctls
+translate). The namespaces group them.
 
 ### general
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `cache-ttl` | `set cache-ttl` | settable | `s\|off` | `--cache-ttl` / `TTL` | per-register cache TTL: older entries are refetched |
+| `cache-ttl` | `set cache ttl` | settable | `s\|off` | `--cache-ttl` / `TTL` | per-register cache TTL: older entries are refetched |
 | `local-time` | `set local-time` | settable | `on\|off` | `--local-time` / `LOCAL_TIME` | log timestamps in the system time zone instead of UTC |
 | `log-level` | `set log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
 | `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the cached words + the setting overrides) |
@@ -102,8 +103,8 @@ the access-control lists: who may connect, who may write
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `connect-acl` | `set connect-acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--connect-acl` / `CONNECT_ACL` | clients allowed to connect: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
-| `write-acl` | `set write-acl` (the console also takes `set write acl`) | settable | `any\|none\|IP,...\|file:\<path>` | `--write-acl` / `WRITE_ACL` | clients allowed to write (requires allow-write): "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
+| `connect-acl` | `set acl connect` | settable | `any\|none\|IP,...\|file:\<path>` | `--connect-acl` / `CONNECT_ACL` | clients allowed to connect: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
+| `write-acl` | `set acl write` (the console also takes `set write acl`) | settable | `any\|none\|IP,...\|file:\<path>` | `--write-acl` / `WRITE_ACL` | clients allowed to write (requires allow-write): "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
 
 ### modbus
 
@@ -112,18 +113,18 @@ map, the auth schemes both directions
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `upstream` | `set upstream` | settable (restart) | `HOST:PORT` | `--upstream` / `UPSTREAM` | the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502) |
-| `unit` | `set unit` | settable | `ID` | `--unit` / `UNIT` | the Modbus unit id the session speaks |
-| `timeout` | `set timeout` | settable | `s` | `--timeout` / `TIMEOUT` | upstream Modbus connect/read timeout in seconds |
-| `modbus-auth` | `set modbus-auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth scheme the cache's own Modbus clients must speak: suite (the crypt handshake) or none |
+| `upstream` | `set modbus upstream` | settable (restart) | `HOST:PORT` | `--upstream` / `UPSTREAM` | the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502) |
+| `unit` | `set modbus unit` | settable | `ID` | `--unit` / `UNIT` | the Modbus unit id the session speaks |
+| `timeout` | `set modbus timeout` | settable | `s` | `--timeout` / `TIMEOUT` | upstream Modbus connect/read timeout in seconds |
+| `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth scheme the cache's own Modbus clients must speak: suite (the crypt handshake) or none |
 | `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key for the cache's clients, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
-| `auth-upstream` | `set auth-upstream` | settable | `suite\|waveshare\|none` | `--auth-upstream` / `AUTH_UPSTREAM` | the auth scheme the cache speaks to the upstream inverter: suite (the crypt handshake), waveshare (the gateway connection password) or none |
+| `auth-upstream` | `set modbus auth-upstream` | settable | `suite\|waveshare\|none` | `--auth-upstream` / `AUTH_UPSTREAM` | the auth scheme the cache speaks to the upstream inverter: suite (the crypt handshake), waveshare (the gateway connection password) or none |
 | `auth-upstream-key` | — | startup-only (secret) | `KEY` | `--auth-upstream-key` / `AUTH_UPSTREAM_KEY` | the key the cache presents upstream: the suite handshake's shared key (min 16 characters) or the Waveshare gateway password (`file:<path>` reads an owner-only file) *(hidden)* |
-| `interval` | `set interval` | settable | `s` | `--interval` / `INTERVAL` | seconds between cache polls of the device |
-| `read-delay` | `set read-delay` | settable | `s` | `--read-delay` / `READ_DELAY` | seconds between consecutive device reads within a poll cycle |
-| `merge-gap` | `set merge-gap` | settable | `registers` | `--merge-gap` / `MERGE_GAP` | max register gap when merging ranges into block reads; the plan rebuilds |
-| `profile` | `set profile` | settable | `\<file>` | `--profile` / `PROFILE` | device profile JSON: the register ranges to cache (a bare name resolves in profiles/profiles/) |
-| `selection` | `set selection` | settable | `\<file>\|all\|none` | `--selection` / `SELECTION` | selection JSON: which profile names to fetch ("all" = every entry, "none" = cache nothing) |
+| `interval` | `set modbus interval` | settable | `s` | `--interval` / `INTERVAL` | seconds between cache polls of the device |
+| `read-delay` | `set modbus read-delay` | settable | `s` | `--read-delay` / `READ_DELAY` | seconds between consecutive device reads within a poll cycle |
+| `merge-gap` | `set modbus merge-gap` | settable | `registers` | `--merge-gap` / `MERGE_GAP` | max register gap when merging ranges into block reads; the plan rebuilds |
+| `profile` | `set modbus profile` | settable | `\<file>` | `--profile` / `PROFILE` | device profile JSON: the register ranges to cache (a bare name resolves in profiles/profiles/) |
+| `selection` | `set modbus selection` | settable | `\<file>\|all\|none` | `--selection` / `SELECTION` | selection JSON: which profile names to fetch ("all" = every entry, "none" = cache nothing) |
 
 ### system
 
@@ -132,8 +133,8 @@ verbosity
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `listen` | `set listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
-| `log-access` | `set log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log client connects/disconnects at INFO instead of DEBUG *(hidden)* |
+| `listen` | `set system listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
+| `log-access` | `set system log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log client connects/disconnects at INFO instead of DEBUG *(hidden)* |
 
 ### control
 
@@ -142,10 +143,10 @@ trusted peers
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `control-port` | `set control-port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | control server target: unix socket path or TCP port on 127.0.0.1 |
+| `control-port` | `set control port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | control server target: unix socket path or TCP port on 127.0.0.1 |
 | `control-token` | — | startup-only (secret) | `TOKEN` | `--control-token` / `CONTROL_TOKEN` | require a token on control connections: the client authenticates with {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file) *(hidden)* |
-| `control-trust-uids` | `set control-trust-uids` | settable | `UID,...` | `--control-trust-uids` / `CONTROL_TRUST_UIDS` | extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted |
-| `control-socket-group` | `set control-socket-group` | settable | `on\|off` | `--control-socket-group` / `CONTROL_SOCKET_GROUP` | leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600) |
+| `control-trust-uids` | `set control trust-uids` | settable | `UID,...` | `--control-trust-uids` / `CONTROL_TRUST_UIDS` | extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted |
+| `control-socket-group` | `set control socket-group` | settable | `on\|off` | `--control-socket-group` / `CONTROL_SOCKET_GROUP` | leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600) |
 
 ### control/ops
 
@@ -155,7 +156,7 @@ configured verbs (the default: show,flush)
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show,flush) (no set/clear, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
-| `control-ops-verbs` | `set control-ops-verbs` | settable | `VERB,...` | `--control-ops-verbs` / `CONTROL_OPS_VERBS` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated |
+| `control-ops-verbs` | `set control ops verbs` | settable | `VERB,...` | `--control-ops-verbs` / `CONTROL_OPS_VERBS` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated |
 
 ### metrics
 
@@ -164,10 +165,10 @@ the bearer token and the connection caps
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `metrics-server` | `set metrics-server` | settable | `on\|off` | `--metrics-server` / `METRICS_SERVER` | the cache's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
-| `metrics-listen` | `set metrics-listen` | settable (restart) | `HOST:PORT` | `--metrics-listen` / `METRICS_LISTEN` | the metrics bind address HOST:PORT — the set records the value, the restart (request reload) applies it |
+| `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / `METRICS_SERVER` | the cache's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
+| `metrics-listen` | `set metrics listen` | settable (restart) | `HOST:PORT` | `--metrics-listen` / `METRICS_LISTEN` | the metrics bind address HOST:PORT — the set records the value, the restart (request reload) applies it |
 | `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | the metrics bearer token (Authorization: Bearer) — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
-| `metrics-acl` | `set metrics-acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
+| `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
 
 ### metrics/limits
 
@@ -176,9 +177,9 @@ limits
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `metrics-max-clients` | `set metrics-max-clients` | settable | `N` | `--metrics-max-clients` / `METRICS_MAX_CLIENTS` | simultaneous HTTP clients on /metrics; extras get an immediate 503 |
-| `metrics-client-timeout` | `set metrics-client-timeout` | settable | `s` | `--metrics-client-timeout` / `METRICS_CLIENT_TIMEOUT` | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
-| `metrics-max-conn-per-ip` | `set metrics-max-conn-per-ip` | settable | `N` | `--metrics-max-conn-per-ip` / `METRICS_MAX_CONN_PER_IP` | maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit |
+| `metrics-max-clients` | `set metrics limits max-clients` | settable | `N` | `--metrics-max-clients` / `METRICS_MAX_CLIENTS` | simultaneous HTTP clients on /metrics; extras get an immediate 503 |
+| `metrics-client-timeout` | `set metrics limits timeout` | settable | `s` | `--metrics-client-timeout` / `METRICS_CLIENT_TIMEOUT` | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
+| `metrics-max-conn-per-ip` | `set metrics limits max-conn-per-ip` | settable | `N` | `--metrics-max-conn-per-ip` / `METRICS_MAX_CONN_PER_IP` | maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit |
 
 ### audit
 
@@ -187,11 +188,11 @@ switch
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-log` | `set audit-log` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | the audit trail's file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home |
-| `audit-forward` | `set audit-forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
-| `audit-forward-format` | `set audit-forward-format` (the console also takes `set audit forward-format`) | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
-| `no-audit-log` | `set no-audit-log` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the audit trail entirely |
-| `requests-audit` | `set requests-audit` | settable | `s\|off` | `--requests-audit` / `REQUESTS_AUDIT` | audit one REQUESTS tally per client per this many seconds |
+| `audit-log` | `set audit log-file` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | the audit trail's file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home |
+| `audit-forward` | `set audit forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
+| `audit-forward-format` | `set audit forward format` (the console also takes `set audit forward-format`) | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
+| `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the audit trail entirely |
+| `requests-audit` | `set audit requests` | settable | `s\|off` | `--requests-audit` / `REQUESTS_AUDIT` | audit one REQUESTS tally per client per this many seconds |
 
 ### audit/rotate
 
@@ -200,9 +201,9 @@ the backup count
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-max-mb` | `set audit-max-mb` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit trail at this size in MB, 0 = no size rotation |
-| `audit-daily` | `set audit-daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit trail at UTC midnight |
-| `audit-files` | `set audit-files` | settable | `N` | `--audit-files` / `AUDIT_FILES` | the rotated audit backups kept |
+| `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit trail at this size in MB, 0 = no size rotation |
+| `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit trail at UTC midnight |
+| `audit-files` | `set audit rotate files` | settable | `N` | `--audit-files` / `AUDIT_FILES` | the rotated audit backups kept |
 
 ### dump
 
@@ -210,10 +211,10 @@ the state dump: the path, the cache words, the restore-on-start
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `dump-path` | `set dump-path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: written behind, on request dump and every dump-interval |
+| `dump-path` | `set dump path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: written behind, on request dump and every dump-interval |
 | `dump-key` | — | startup-only (secret) | `TEXT` | `--dump-key` / `DUMP_KEY` | the key that seals the state dumps (the words and the settings, the reload's state file too) (`file:<path>` reads an owner-only file) *(hidden)* |
-| `dump-with-cache` | `set dump-with-cache` | settable | `on\|off` | `--dump-with-cache` / `DUMP_WITH_CACHE` | the dump carries the cached register words too |
-| `restore-on-start` | `set restore-on-start` | settable (restart) | `on\|off` | `--restore-on-start` / `RESTORE_ON_START` | the dump loads on start (off: on demand with request restore) |
+| `dump-with-cache` | `set dump with-cache` | settable | `on\|off` | `--dump-with-cache` / `DUMP_WITH_CACHE` | the dump carries the cached register words too |
+| `restore-on-start` | `set dump restore-on-start` | settable (restart) | `on\|off` | `--restore-on-start` / `RESTORE_ON_START` | the dump loads on start (off: on demand with request restore) |
 
 ### limits
 
@@ -221,9 +222,9 @@ the connection caps: the simultaneous-client and per-IP limits
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous client limit |
-| `client-timeout` | `set client-timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | disconnect clients silent for this long |
-| `max-conn-per-ip` | `set max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous connections from one peer IP |
+| `max-clients` | `set limits max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous client limit |
+| `client-timeout` | `set limits client-timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | disconnect clients silent for this long |
+| `max-conn-per-ip` | `set limits max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous connections from one peer IP |
 
 ### write
 
@@ -231,8 +232,8 @@ the write gates: the forwarding toggle and the register ranges
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `allow-write` | `set allow-write` | settable | `on\|off` | `--allow-write` / `ALLOW_WRITE` | forward write requests (FC05/06/15/16/22/23) to the device |
-| `write-registers` | `set write-registers` | settable | `START:COUNT,...\|any\|none\|profile\|file:\<path>` | `--write-registers` / `WRITE_REGISTERS` | the address ranges a write may touch (FC06/16/22/23 registers, FC05/15 coils): START:COUNT,... or the device profile's acl |
+| `allow-write` | `set write allow` | settable | `on\|off` | `--allow-write` / `ALLOW_WRITE` | forward write requests (FC05/06/15/16/22/23) to the device |
+| `write-registers` | `set write registers` | settable | `START:COUNT,...\|any\|none\|profile\|file:\<path>` | `--write-registers` / `WRITE_REGISTERS` | the address ranges a write may touch (FC06/16/22/23 registers, FC05/15 coils): START:COUNT,... or the device profile's acl |
 
 ## Show reports
 

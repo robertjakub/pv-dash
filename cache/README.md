@@ -198,7 +198,7 @@ authenticated with.
 | `show connections` | connected clients: peer, connection age, requests served |
 | `show cache` / `show cache all` | cache contents / one row per profile range with values, ages, poll status |
 | `show uplink` | the inverter link: session counters plus one row per poll block — status, latency, failures |
-| `show write registers profile` | the write gate as its acl chain (show-only) |
+| `show write registers table` | the write gate as its acl chain (show-only) |
 | `show acl connect table` / `show acl write table` / `show metrics acl table` | the ACLs as their rule chains (show-only) |
 | `request dump` / `request restore` | write the write-behind state / load it back — see [Persistence](#persistence) |
 | `request flush cache` | drop all cached values (like SIGUSR1), repoll immediately |

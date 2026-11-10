@@ -74,7 +74,7 @@ The control server speaks JSON lines: one request
 .BR set ", " unset ", " show ", " help ,
 the reports
 .BR inspect ", " "show connections" ,
-.BR "show cache" " [all]" ", " "show write registers profile" ,
+.BR "show cache" " [all]" ", " "show write registers table" ,
 .BR "show uplink" ", " "show version" ,
 .BR "show acl connect table" ", " "show acl write table" ,
 .BR "show metrics acl table" ,
@@ -115,7 +115,7 @@ analyses the inverter link: session counters (connects, exchanges, bytes,
 errors) and one row per poll block with its status, latency (last/mean/max)
 and last error.
 .IP \\(bu 2
-.B show write registers profile
+.B show write registers table
 renders the write gate as its acl chain (show-only): \\fBallow any\\fR /
 \\fBdeny any\\fR, a range list as its whitelist (deny any, then one allow
 line per range), and in profile or file mode the gate's own rules \\(em
@@ -259,7 +259,7 @@ stdout, one per line. Every invocation lands in the audit trail (prefix
 The command grammar is the daemon's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
 \\fBhelp\\fR (the settings registry), \\fBinspect\\fR,
 \\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR],
-\\fBshow write registers profile\\fR, \\fBshow uplink\\fR,
+\\fBshow write registers table\\fR, \\fBshow uplink\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
 \\fBrequest flush cache\\fR, \\fBrequest reload\\fR, \\fBrequest restart\\fR,
 \\fBshutdown\\fR,

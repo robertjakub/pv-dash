@@ -169,7 +169,7 @@ def load_profile_write_acl(path, label=None):
 
 
 def render_write_acl(desc, rules):
-    """The parsed gate as the write/registers/profile show report's lines:
+    """The parsed gate as the write/registers/table show report's lines:
     the gate-level desc first as the '% ' line, then one
     '<verb> <range>[ # desc]' line per range — a list matcher fans out
     (the rule's desc repeats), the bare word 'any' stands alone, and the

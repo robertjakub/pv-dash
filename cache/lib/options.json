@@ -274,7 +274,7 @@
       "setting-help": "the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***)" },
     { "name": "knobs", "live": "knobs",
       "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes" },
-    { "name": "write-registers-profile", "live": "write/registers/profile",
+    { "name": "write-registers-table", "live": "write/registers/table",
       "setting-help": "the write-registers gate as its acl chain: one allow/deny line per range (the profile's rules with their descs when the knob rides profile)" },
     { "name": "connect-acl-table", "live": "acl/connect/table",
       "setting-help": "the connect ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs" },

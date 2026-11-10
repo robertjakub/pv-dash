@@ -61,7 +61,7 @@ class Proxy:
         self.audit = audit   # the CACHE audit trail (common.audit), None = off
         self.allow_write = bool(self.config.get('allow_write', False))
         self.write_registers = self.config.get('write_registers')   # the knob: None = any, () = none, 'profile' = the profile's acl, 'file:<path>' = the standalone acl file
-        self.write_gate_rules = None   # the profile/file gate's parsed rules (the write/registers/profile show report), None = not in profile/file mode
+        self.write_gate_rules = None   # the profile/file gate's parsed rules (the write/registers/table show report), None = not in profile/file mode
         self.write_gate_warn = None    # the acl file's permission warning (set on a resolved file: gate, None otherwise)
         try:
             self.write_ranges = self._resolve_write_ranges(self.write_registers)   # the effective gate
@@ -384,7 +384,7 @@ class Proxy:
         the standalone acl file (the same gate object a profile carries
         under "acl"/"write") — both ValueError on a missing or bad gate
         (the start re-raises as SystemExit, the wire answers err) and keep
-        the parsed rules for the write/registers/profile show report, the
+        the parsed rules for the write/registers/table show report, the
         stash swapping only on a successful resolve so a bad gate leaves
         the old one AND its report standing; everything else passes
         through unchanged. A group/world-readable acl file warns — the

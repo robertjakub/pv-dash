@@ -74,7 +74,7 @@ ALIAS_NAMES = tuple(alias_names)                  # the ?/TAB pools ride them be
 # the set/unset vocabulary: the KNOB rows only — a show report's live path
 # never joins it, so it cannot shadow a knob VALUE on the wire: `set write
 # registers profile` is the write-registers knob taking 'profile', while
-# `show write registers profile` answers the write/registers/profile
+# `show write registers table` answers the write/registers/table
 # report — one spelling per side of the verb
 _KNOB_SETTINGS = settings_of(OPTIONS)
 SET_BY_NAME = {s.name: s for s in _KNOB_SETTINGS}

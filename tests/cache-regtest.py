@@ -1973,30 +1973,30 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           'outside the write allow-list profile (127:2,148:30)' in pal_log, pal_log[-200:])
     r = ctl_cmd('show write registers', 15586 + BASE)
     check('profile acl: show answers the profile spelling', r == 'ok write/registers=profile', r[:80])
-    r = ctl_cmd('show write registers profile', 15586 + BASE)
+    r = ctl_cmd('show write registers table', 15586 + BASE)
     check('profile acl: the show report renders the profile rules (the comments aligned)',
-          r == 'ok write-registers-profile\n'
+          r == 'ok write-registers-table\n'
                '% Time-of-Use schedule slots (148-177) and operational mode registers (127-128)\n'
                'allow 127:2  # operational mode registers\n'
                'allow 148:30 # Time-of-Use schedule slots', repr(r[:220]))
-    r = ctl_cmd('show write-registers-profile', 15586 + BASE)
+    r = ctl_cmd('show write-registers-table', 15586 + BASE)
     check('profile acl: the word spelling answers the same report',
-          r.startswith('ok write-registers-profile'), r[:80])
+          r.startswith('ok write-registers-table'), r[:80])
     r = ctl_cmd('set write registers 100:1', 15586 + BASE)
     check('profile acl: explicit ranges still set', r.startswith('ok write/registers=100:1'), r[:80])
-    r = ctl_cmd('show write registers profile', 15586 + BASE)
+    r = ctl_cmd('show write registers table', 15586 + BASE)
     check('profile acl: a range knob renders as its whitelist',
-          r == 'ok write-registers-profile\ndeny any\nallow 100:1', repr(r[:80]))
+          r == 'ok write-registers-table\ndeny any\nallow 100:1', repr(r[:80]))
     b = wr6(130, 1, port=15585 + BASE)
     check('profile acl: the explicit range gates instead', b[0] == 0x86 and b[1] == 1, b.hex())
     r = ctl_cmd('set write registers none', 15586 + BASE)
     check('profile acl: the none knob renders deny any',
           r.startswith('ok write/registers=none')
-          and ctl_cmd('show write registers profile', 15586 + BASE) == 'ok write-registers-profile\ndeny any', r[:80])
+          and ctl_cmd('show write registers table', 15586 + BASE) == 'ok write-registers-table\ndeny any', r[:80])
     r = ctl_cmd('set write registers any', 15586 + BASE)
     check('profile acl: the any knob renders allow any',
           r.startswith('ok write/registers=any')
-          and ctl_cmd('show write registers profile', 15586 + BASE) == 'ok write-registers-profile\nallow any', r[:80])
+          and ctl_cmd('show write registers table', 15586 + BASE) == 'ok write-registers-table\nallow any', r[:80])
     r = ctl_cmd('clear write registers', 15586 + BASE)
     check('profile acl: clear restores the configured profile mode',
           r.startswith('ok write/registers=profile'), r[:80])
@@ -2034,9 +2034,9 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     pdl_log = open('/tmp/reg_profile_deny.log').read()
     check('profile acl deny: the refusal names the carved gate',
           'outside the write allow-list profile (0:127,129:19,178:65358)' in pdl_log, pdl_log[-200:])
-    r = ctl_cmd('show write registers profile', 15588 + BASE)
+    r = ctl_cmd('show write registers table', 15588 + BASE)
     check('profile acl deny: the show report renders the deny chain (the comments aligned)',
-          r == 'ok write-registers-profile\n'
+          r == 'ok write-registers-table\n'
                'allow any\n'
                'deny 127:2  # the deye write spans\n'
                'deny 148:30 # the deye write spans', repr(r[:160]))
@@ -2110,9 +2110,9 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     r = ctl_cmd('show write registers', 15601)
     check('acl file: show answers the file spelling (re-appliable)',
           r == 'ok write/registers=file:%s' % aclf, r[:120])
-    r = ctl_cmd('show write registers profile', 15601)
+    r = ctl_cmd('show write registers table', 15601)
     check('acl file: the show report renders the file rules (the comments aligned)',
-          r == 'ok write-registers-profile\n'
+          r == 'ok write-registers-table\n'
                '% the regtest gate\n'
                'allow 148:30 # the TOU slots\n'
                'deny 148:1   # carved back', repr(r[:160]))

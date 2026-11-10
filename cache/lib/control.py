@@ -82,7 +82,7 @@ class ControlServer(_ControlServer):
     SHOW_REPORTS = {'show cache-all': 'cache_all_report',
                     'show uplink': 'uplink_report',
                     'show cache': 'cache_report',
-                    'show write-registers-profile': 'write_registers_profile_report',
+                    'show write-registers-table': 'write_registers_table_report',
                     'show connect-acl-table': ('acl_table_report', 'connect'),
                     'show write-acl-table': ('acl_table_report', 'write'),
                     'show metrics-acl-table': ('acl_table_report', 'metrics')}
@@ -117,7 +117,7 @@ class ControlServer(_ControlServer):
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, clear <setting>, inspect, show <setting|connections|cache|'
-                'uplink|version|config|knobs|write-registers-profile|acl-connect-table|acl-write-table>')
+                'uplink|version|config|knobs|write-registers-table|acl-connect-table|acl-write-table>')
         if self.proxy.dump_path:
             cmds += ', request dump [with-cache], request restore'
         cmds += ', request flush cache, request reload, request reload-config, request restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
@@ -640,8 +640,8 @@ class ControlServer(_ControlServer):
                    ', oldest %s' % (self._oldest() or 'n/a'),
                    secs(c.cache_ttl), c.map_version, failed, self.proxy.cache_hits, self.proxy.cache_misses))
 
-    def write_registers_profile_report(self):
-        """The write/registers/profile show report (the show-only view of
+    def write_registers_table_report(self):
+        """The write/registers/table show report (the show-only view of
         the write gate): 'allow any' when the knob is any, 'deny any' when
         it is none; a range list renders as its whitelist — 'deny any' and
         one allow line per range; a string knob ('profile' or the
@@ -650,13 +650,13 @@ class ControlServer(_ControlServer):
         range, the comments aligned (the live gate: the rules the running
         gate resolved from, not the file's current state)."""
         p = self.proxy
-        lines = ['ok write-registers-profile']
+        lines = ['ok write-registers-table']
         wr = p.write_registers
         if wr is None:
             lines.append('allow any')
         elif isinstance(wr, str):   # 'profile' or the file:<path> acl reference
             if p.write_gate_rules is None:
-                return 'err write/registers/profile: the gate is not resolved'
+                return 'err write/registers/table: the gate is not resolved'
             lines.extend(render_write_acl(*p.write_gate_rules))
         elif not wr:
             lines.append('deny any')

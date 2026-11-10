@@ -158,11 +158,10 @@ class ControlServer(_ControlServer):
                  audit_params=None):
         super().__init__(target, audit=audit, token=token, defaults=defaults, trust_uids=trust_uids,
                          socket_group=socket_group, ops_token=ops_token, ops_verbs=ops_verbs,
-                         config_path=config_path, dump_path=dump_path,
+                         audit_params=audit_params, config_path=config_path, dump_path=dump_path,
                          restore_on_start=restore_on_start, dump_key=dump_key, dump_interval=dump_interval)
         self.log_replies = log_replies   # DEBUG also logs the full command output
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
-        self.audit_params = dict(audit_params or {})   # the audit family's live swaps rebuild from these
         self.simulator = simulator
         self.chaos = chaos
         self.fake = fake
@@ -754,8 +753,7 @@ class ControlServer(_ControlServer):
             'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
             'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control/socket-group': 'on' if self.socket_group else 'off',
-            'audit/forward': self.audit_params.get('forward') or 'none',
-            'audit/forward/format': self.audit_params.get('forward_format') or 'rfc5424',
+            **self.audit_dump_rows(),
         }
         for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
             if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:

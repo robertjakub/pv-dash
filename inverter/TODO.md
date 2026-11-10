@@ -5,6 +5,17 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The audit family live family-wide (the cache's shape): the sink and the
+rotation knobs join the wire — `set audit log-file <path|-|none>` swaps
+the trail, `set audit rotate max-size`/`set audit rotate files`
+re-chain the rotation live, `set audit disable` is the kill switch
+(`clear` restores the configured value, the defaults spell the raw
+`-`/`none`, not the display words). `audit_params` rides the base
+constructor now and the dump carries the shared `audit_dump_rows()` —
+a state dump keeps a live `audit/rotate/daily` override where it
+dropped it before, and the trail swap keeps the path's case (the raw
+spelling, not the fake's lowercased value word).
+
 The family-wide code sweep (the shared-live-knobs wave): the control
 plane (the port rebind, the ops policy, the trusted peers, the socket
 group), the audit family's seven swaps, the log level, the local-time

@@ -320,10 +320,12 @@ default at the **XDG state home**
 (`~/.local/state/fake-inverter/audit.log`); `--audit-log <file>` renames
 it, `--no-audit-log` turns it off, `--audit-log -` sends it to stdout (the
 docker logs / journald way — the shipped Dockerfile runs with it). The
-rotation rides the family knobs: the size trigger (`--audit-max-mb`, the
-backups kept `--audit-files`) and the UTC-midnight trigger
-(`--audit-daily` — live on this tool too: `set audit rotate daily on/off`);
-the env twins spell the same names upper-snake. `--audit-forward` mirrors
+whole family is live-settable on the control wire (the cache's shape):
+`set audit log-file <path|-|none>` swaps the sink, `set audit rotate
+max-size <MB>` and `set audit rotate files <N>` re-chain the rotation
+live, `set audit rotate daily on/off` rides too and `set audit disable
+on/off` is the kill switch (`clear <setting>` restores the configured
+value); the env twins spell the same names upper-snake. `--audit-forward` mirrors
 every line — the per-writer hash chain included — onward: `syslog` (the
 local socket auto-scan), `syslog:/path` (an explicit socket),
 `udp://host[:514]` (RFC5426, best-effort) or `tcp://host[:514]` (RFC6587

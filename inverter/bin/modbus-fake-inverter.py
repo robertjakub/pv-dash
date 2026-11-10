@@ -41,7 +41,7 @@ import logging
 import math
 import threading
 
-from common.runtime.audit import AuditLog
+from common.runtime.audit import AuditLog, default_path
 from common.settings.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
     parse_secret, resolve_control_target, resolve_metrics_acl
 from common.wire.cred import parse_trust_uids
@@ -157,15 +157,12 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'metrics-max-clients': str(args.metrics_max_clients),
         'metrics-client-timeout': '%g' % args.metrics_client_timeout,
         'metrics-max-conn-per-ip': str(args.metrics_max_conn_per_ip),
-        'audit-log': 'off' if args.no_audit_log else ('stdout' if args.audit_log == '-'
-                                                      else ('remote' if args.audit_log == 'none'
-                                                            and args.audit_forward not in (None, '', 'none')
-                                                            else ('off' if args.audit_log == 'none'
-                                                                  else (args.audit_log or 'the XDG state home')))),
-        'audit-max-mb': '%g' % args.audit_max_mb,
+        # the live audit family — what `clear` restores (the cache's model)
+        'audit/log-file': 'off' if args.no_audit_log else (args.audit_log or default_path('fake-inverter')),
+        'audit/rotate/max-size': '%g' % args.audit_max_mb,
         'audit/rotate/daily': 'on' if args.audit_daily else 'off',
-        'audit-files': str(args.audit_files),
-        'no-audit-log': 'on' if args.no_audit_log else 'off',
+        'audit/rotate/files': str(args.audit_files),
+        'audit/disable': 'on' if args.no_audit_log else 'off',
     }
 
 

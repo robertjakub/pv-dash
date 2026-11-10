@@ -137,7 +137,7 @@ level by nature and stay in the compose files: the dashboard's published
 port and its `PROM_URL`, the exporter's bearer token and the Modbus
 suite key (the `environment:` blocks — environment beats env_file, so
 the env files cannot override the stacks' auth story; a plain-docker
-`AUTH_TOKEN=file:...` or `AUTH=suite` in the env file is fine for
+`AUTH_TOKEN=file:...` or `MODBUS_AUTH=suite` in the env file is fine for
 standalone runs). The fake's simulation envs (`CHAOS`, `MAX_KWP`,
 `STRICT`, `TIME`, `TIME_SCALE`) are ordinary env twins — they apply at
 start (flag > env > the image's bundled conf) and SIGHUP re-applies
@@ -181,7 +181,7 @@ for the stacks; the F11 trusted-LAN posture stays the standalone
 default):
 
 - **the Modbus hops** — the suite handshake (the PVA1/HMAC-SHA256 crypt
-  handshake, `AUTH=suite`): one shared key, generated into the volume as
+  handshake, `MODBUS_AUTH=suite`): one shared key, generated into the volume as
   `/config/modbus-auth.token` on the first seed (random, 0600, owner
   pvsuite — the same mechanism as the tokens; whichever Modbus container
   seeds first generates, the rest keep). In the demo the fake demands it
@@ -191,7 +191,7 @@ default):
   `AUTH_UPSTREAM*` in `env/cache.env`, or none for a device without
   auth). The `environment:` blocks pin scheme + `file:` reference;
   opening a hop is a compose edit (an explicit operator act, the F7
-  shape). Standalone runs stay auth-less — pass `-e AUTH=suite -e
+  shape). Standalone runs stay auth-less — pass `-e MODBUS_AUTH=suite -e
   AUTH_KEY=file:/config/modbus-auth.token` on a shared named volume to
   mirror the stacks by hand.
 - **the metrics hop** — the exporter never serves unauthenticated: the
@@ -305,7 +305,7 @@ docker run --rm -p 127.0.0.1:9350:9350 \
 
 Standalone runs stay token-less and auth-less by default — the compose
 stacks are what wire the secrets (`AUTH_TOKEN=file:...`,
-`AUTH=suite`); pass the env pairs by hand to mirror them.
+`MODBUS_AUTH=suite`); pass the env pairs by hand to mirror them.
 
 ### prometheus (`Dockerfile.prometheus`)
 

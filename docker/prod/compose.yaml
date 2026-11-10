@@ -63,7 +63,7 @@ services:
       # this block to run the cache's Modbus open (an explicit operator
       # act); the upstream side (AUTH_UPSTREAM*) stays the env file's —
       # the device's credential, see the header
-      AUTH: suite
+      MODBUS_AUTH: suite
       AUTH_KEY: file:/config/modbus-auth.token
     env_file:
       # REQUIRED (no required: false): UPSTREAM is the operator's decision
@@ -89,7 +89,7 @@ services:
     environment:
       # the client side: the scraper proves the stack's suite key to the
       # cache on every connect (the poller keeps retrying on ERR)
-      AUTH: suite
+      MODBUS_AUTH: suite
       AUTH_KEY: file:/config/modbus-auth.token
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the exporter never serves unauthenticated (the audit's F13) —

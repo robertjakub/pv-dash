@@ -64,7 +64,7 @@ services:
     environment:
       # the server side: every client proves the stack's suite key right
       # after connect — ERR and the client is dropped
-      AUTH: suite
+      MODBUS_AUTH: suite
       AUTH_KEY: file:/config/modbus-auth.token
     env_file:
       - path: ../env/fake.env
@@ -91,7 +91,7 @@ services:
       AUTH_UPSTREAM: suite
       AUTH_UPSTREAM_KEY: file:/config/modbus-auth.token
       # the server side: the scraper (any client) proves it to the cache
-      AUTH: suite
+      MODBUS_AUTH: suite
       AUTH_KEY: file:/config/modbus-auth.token
     env_file:
       - path: ../env/cache.env
@@ -117,7 +117,7 @@ services:
     environment:
       # the client side: the scraper proves the stack's suite key to the
       # cache on every connect (the poller keeps retrying on ERR)
-      AUTH: suite
+      MODBUS_AUTH: suite
       AUTH_KEY: file:/config/modbus-auth.token
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the demo exporter never serves unauthenticated (the audit's F13) —

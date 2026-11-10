@@ -68,7 +68,6 @@ class ControlServer(_ControlServer):
     CFG_KEYS = CFG_KEYS               # the registry's knob -> cfg-key renames (show config)
     CFG_FORMATTERS = CFG_FORMATTERS   # the structured values (the ACLs, the write map, the selection)
     APP = 'modbus-cache'
-    RELOAD_CONFIG = False   # the reload-config row decision stays open (docs/TODO.md) — the verb never answers here
     COMMANDS = COMMANDS
     COMMAND_HELP = COMMAND_HELP
     COMMAND_GROUPS = COMMAND_GROUPS
@@ -118,7 +117,7 @@ class ControlServer(_ControlServer):
                 'uplink|version|config|knobs|write-registers-profile|acl-connect-table|acl-write-table>')
         if self.proxy.dump_path:
             cmds += ', request dump [with-cache], request restore'
-        cmds += ', request clear cache, request reload, request restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
+        cmds += ', request clear cache, request reload, request reload-config, request restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
         return cmds
 
     def command_tool(self, low, cmd):
@@ -447,7 +446,7 @@ class ControlServer(_ControlServer):
             self._rebuild_audit()
             return '%d' % v
         if key == 'audit/forward':
-            if val not in AUDIT_FORWARD_CHOICES:
+            if val not in ('none', 'syslog'):
                 raise ValueError('audit/forward must be one of %s' % ', '.join(AUDIT_FORWARD_CHOICES))
             p.audit_params['forward'] = None if val == 'none' else val
             p.config['audit_forward'] = val

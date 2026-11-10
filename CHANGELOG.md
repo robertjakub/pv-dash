@@ -12,6 +12,15 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **cache, inverter** — **two registry renames (breaking on the wire)**:
+  the cache's `show write-registers-profile` report is now
+  **`write-registers-table`** (live `write/registers/table` — the
+  `write-acl-table` naming; the knob's `profile` value and the
+  `set write registers profile` spelling stay), and the inverter's
+  profile knob's live path moves from the bare `profile` to
+  **`modbus/profile`** (the show-config tree nests it under the modbus
+  section; the flag/env stay — a pre-rename dump's `profile` key no
+  longer restores).
 - **everywhere** — **the defaults.json defaults trees carry every value
   knob's default, and a gate keeps them honest**: the resolvers' last
   rung names the tree entry it resolves instead of an inline literal —

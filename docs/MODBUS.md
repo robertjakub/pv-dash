@@ -434,7 +434,7 @@ profile may carry a top-level `acl.write` gate — an optional `desc` and
 the ordered `rules` list (one `{"type": "allow"|"deny", "range": ...}`
 object per rule; a whitelist: the last matching rule decides, a register
 no rule decides refuses) — which the cache's write gate compiles to
-register ranges, and its `show write registers profile` answers back as
+register ranges, and its `show write registers table` answers back as
 the chain; `--write-registers file:<path>` reads the same gate object
 from a standalone acl file instead.
 

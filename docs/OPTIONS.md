@@ -104,7 +104,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `modbus-unit` |  | `set modbus unit` |  | ✓ live |  |  |
 | c | `mppt` |  | `set mppt` |  |  | ✓ live |  |
 | k | `no-audit-log` |  | `set audit disable` | **✓** live | **✓** live | **✓** live | **✓** live |
-| k | `profile` |  | `set modbus profile`, `set profile` | ✓ live | ✓ live | ✓ live |  |
+| k | `profile` |  | `set modbus profile` | ✓ live | ✓ live | ✓ live |  |
 | k | `prom-prefix` |  | *(startup-only)* |  |  |  | ✓ |
 | c | `pv` |  | `set pv` |  |  | ✓ live |  |
 | k | `read-delay` |  | `set modbus read-delay` | ✓ live |  |  |  |
@@ -131,7 +131,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `write-acl` |  | `set acl write` | ✓ live |  |  |  |
 | s | `write-acl-table` |  | `show write-acl-table` | ✓ |  |  |  |
 | k | `write-registers` |  | `set write registers` | ✓ live |  |  |  |
-| s | `write-registers-profile` |  | `show write-registers-profile` | ✓ |  |  |  |
+| s | `write-registers-table` |  | `show write-registers-table` | ✓ |  |  |  |
 
 Legend: `k` = a knob — the flag/env/config-file rows; `c` = control-only — a setting that lives on the control wire alone (the fake's pins and machines — no flag, no env, no config-file row); `s` = a show command — a report the wire answers with (`show <name>`; not a knob, nothing to set, the registry's `show` section); ✓ = the tool has the row (**bold** = all four do); the `live` column is the control command itself — `set <name>` over the control plane, the wire name the registry gives the knob (it can differ from the flag: the cache's `cache-ttl` sets `ttl`) — a show row spells `show <name>`; *(startup-only)* = no live form, a restart applies the knob; a trailing `, restart` = the knob is startup-only too — the set records the value (the wire answers the restart note), the restart applies it; every secret is restart-marked and renders `startup-only — pass it by flag/env/config` — the wire refuses set/clear on it outright; a cell's `live` mark says the tool takes the knob live (a cell without one = that tool applies the knob at startup only); `group` = the row's display bucket — the tool's surfaces file the knob under it (blank = ungrouped, rendered bare); `hidden` = the command stays out of the wire's listings (it still answers); `secret` = a token — `show config` and the dumps render the knob as `*** SECRET REMOVED ***` (the value never does; the `-file` form renders the same placeholder when the row is set). The knob descriptions stay in the registries — `--help`, the man pages, `show knobs` and `help config` render them per tool.
 

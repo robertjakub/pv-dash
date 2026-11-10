@@ -159,7 +159,7 @@ re-deciding what an earlier allow opened) ride the **files**; the inline
 grammar stays the three fixed chains. `show acl connect table` and
 `show acl write table` render either form as its chain — a file gate
 renders its own rules behind the `% ` desc header, the comments aligned —
-and `show write registers profile` does the same for the register gate.
+and `show write registers table` does the same for the register gate.
 `show metrics acl table` is the third report, same renderer. A `set acl
 connect table` (the show word typed into the set verb) answers the
 pointer to the report.

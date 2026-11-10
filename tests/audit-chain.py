@@ -16,11 +16,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V = os.path.join(REPO, 'scripts', 'audit_verify.py')
 sys.path.insert(0, REPO)
-from common.runtime.audit import AuditLog   # noqa: E402
+from common.runtime.audit import AuditLog, entry_hash, GENESIS   # noqa: E402
 
 FAILURES = []
 
@@ -140,6 +141,7 @@ def main():
         # failure stops the mirroring quietly, a socket-less spelling refuses
         import io
         import socket as sockmod
+        import threading
         from contextlib import redirect_stderr
 
         import common.runtime.audit as audit_mod
@@ -159,18 +161,34 @@ def main():
                 last = fh.read().rstrip().splitlines()[-1]
             check('the syslog mirror carries the tag + the finished line (chain hash included)',
                   mirrored == 'modbus-cache: %s' % last, '%r vs %r' % (mirrored, last))
-            ok, out = verify(log, contain=['OK'])
-            check('the sink stays the authority (the mirrored trail verifies)', ok, out)
 
+            # 9b. the explicit socket (syslog:/path): the same mirror without
+            # the auto-scan — and the socket-type probe (a stream-only
+            # listener is served by a stream handler)
             ssock.close()
             os.unlink(ssock_path)
+            explicit_path = os.path.join(tmp, 'explicit.sock')
+            esock = sockmod.socket(sockmod.AF_UNIX, sockmod.SOCK_DGRAM)
+            esock.bind(explicit_path)
+            esock.settimeout(5)
+            fwd2 = AuditLog(log + '.x', 'CACHE', app='modbus-cache', forward='syslog:' + explicit_path)
+            fwd2.event('COMMAND', "'show version' -> ok")
+            data = esock.recv(65536).decode('utf-8')
+            mirrored = re.sub(r'^<\d+>', '', data).rstrip('\x00')
+            with open(log + '.x') as fh:
+                last = fh.read().rstrip().splitlines()[-1]
+            check('the explicit syslog:/path mirror carries the finished line',
+                  mirrored == 'modbus-cache: %s' % last, '%r vs %r' % (mirrored, last))
+            esock.close()
+            os.unlink(explicit_path)
+
             err = io.StringIO()
             with redirect_stderr(err):
                 fwd.event('COMMAND', "'set pv 2000' -> ok")
                 fwd.event('COMMAND', "'quit' -> bye")
             ok, out = verify(log, contain=['OK'])
             check('a send failure stops the forwarding (one note, the trail keeps the chain)',
-                  ok and fwd._syslog is None and 'syslog forwarding stopped' in err.getvalue(),
+                  ok and fwd._syslog is None and 'forwarding stopped' in err.getvalue(),
                   err.getvalue())
 
             audit_mod.SYSLOG_SOCKETS = ()
@@ -183,16 +201,265 @@ def main():
                 AuditLog(log, 'CACHE', forward='udp')
                 check('a foreign forward spelling refuses', False, 'no ValueError')
             except ValueError as e:
-                check('a foreign forward spelling refuses', 'must be one of' in str(e), str(e))
+                check('a foreign forward spelling refuses', 'must be none, syslog' in str(e), str(e))
         finally:
             audit_mod.SYSLOG_SOCKETS = saved_sockets
 
+        # 9c. the remote targets (the F10 finish line): a TCP collector
+        # speaks RFC6587 (the octet-count framing), the envelope is RFC5424
+        # with the chain riding the SD-ELEMENT and the native line verbatim
+        # in the MSG; CEF wraps additively; UDP is best-effort; a dead
+        # collector re-arms lazily; the remote-only mode leaves no local
+        # file and reseeds at GENESIS
+        class TcpCollector:
+            """A minimal octet-count collector: one thread accepts the
+            forwarders' connections, one reader per connection parses the
+            `<len> ` frames into self.frames."""
+
+            def __init__(self, port=None):
+                # no SO_REUSEADDR on the first bind: the ephemeral port is
+                # this process's alone; the up() rebind below keeps it (the
+                # TIME_WAIT pairs on the same port)
+                self.srv = sockmod.socket()
+                self.srv.bind(('127.0.0.1', port or 0))
+                self.srv.listen(64)
+                self.port = self.srv.getsockname()[1]
+                self.frames = []
+                self.conns = []
+                self._run = True
+                self._thread = threading.Thread(target=self._loop, daemon=True)
+                self._thread.start()
+
+            def _loop(self):
+                while self._run:
+                    try:
+                        c, _ = self.srv.accept()
+                    except OSError:
+                        return
+                    self.conns.append(c)
+                    threading.Thread(target=self._read, args=(c,), daemon=True).start()
+
+            def _read(self, c):
+                c.settimeout(10)
+                buf = b''
+                while True:
+                    try:
+                        chunk = c.recv(65536)
+                    except OSError:
+                        return
+                    if not chunk:
+                        return
+                    buf += chunk
+                    while b' ' in buf:
+                        raw, rest = buf.split(b' ', 1)
+                        if not raw.isdigit():
+                            return
+                        if len(rest) < int(raw):
+                            break
+                        self.frames.append(rest[:int(raw)])
+                        buf = rest[int(raw):]
+
+            def down(self):
+                self._run = False
+                for c in self.conns:
+                    try:
+                        c.close()
+                    except OSError:
+                        pass
+                self.srv.close()
+                self._thread.join(5)
+
+            def up(self):   # the same port again — the re-arm's connect succeeds
+                self.__init__(self.port)
+
+        def chain_of(frame):
+            """The pieces of one remote frame: the native line's stamp, the
+            SD-ELEMENT's prefix + chain hash and the hashed body — the
+            envelope's extracted fields, exactly what a collector's
+            chain-verifying search reads."""
+            text = frame.decode('utf-8', 'replace')
+            sd = text.split('[pvDash@1 ', 1)[1].split(']', 1)[0]
+            prefix = sd.split('prefix="')[1].split('"')[0]
+            chain = sd.split('chain="')[1].split('"')[0]
+            native = text.split('] ', 1)[1]
+            parts = native.split(' ')
+            return parts[0], prefix, chain, ' '.join(parts[3:4] + parts[5:])
+
+        col = TcpCollector()
+        try:
+            tlog = os.path.join(tmp, 'tcp.log')
+            w = AuditLog(tlog, 'CACHE', app='modbus-cache', forward='tcp://127.0.0.1:%d' % col.port)
+            w.event('COMMAND', "'show version' -> ok")
+            deadline = time.time() + 10
+            while not col.frames and time.time() < deadline:
+                time.sleep(0.05)
+            frame = col.frames[0].decode()
+            stamp, prefix, chain, body = chain_of(col.frames[0])
+            last = open(tlog).read().rstrip().splitlines()[-1]
+            ok = (frame.startswith('<28>1 ') and frame.split(' ')[5] == 'COMMAND'
+                  and '[pvDash@1 prefix="CACHE" chain="' in frame
+                  and frame.split('] ', 1)[1] == last
+                  and chain == entry_hash(GENESIS, stamp, prefix, body))
+            check('the tcp:// mirror: RFC6587 framing + the RFC5424 envelope + the chain in the SD', ok, frame[:160])
+
+            # 9d. CEF: the additive wrapping, msg= verbatim, the severity table
+            w2 = AuditLog(tlog + '.cef', 'CACHE', app='modbus-cache',
+                          forward='tcp://127.0.0.1:%d' % col.port, forward_format='cef')
+            w2.event('COMMAND', "'show version' -> ok")
+            w2.event('COMMAND', "'set x\\\\1=y' -> err")
+            deadline = time.time() + 10
+            while len(col.frames) < 3 and time.time() < deadline:
+                time.sleep(0.05)
+            okc, oke = False, False
+            for fr in col.frames[1:]:
+                cef = fr.decode('utf-8', 'replace')
+                if 'CEF:0|pv-dash|modbus-cache|' in cef and '|COMMAND|COMMAND|4| rt=' in cef \
+                        and ' cs1Label=AuditChain cs1=' in cef and ' cs2Label=AuditPrefix cs2=CACHE msg=' in cef \
+                        and cef.split('msg=', 1)[1] == last:
+                    okc = True
+                if '|COMMAND|COMMAND|7|' in cef and 'msg=' in cef and '\\\\1\\=y' in cef.split('msg=', 1)[1]:
+                    oke = True
+            check('the CEF envelope: the header fields + cs1/cs2 + the msg verbatim', okc, b''.join(col.frames).decode('utf-8', 'replace'))
+            check('the CEF severity table (err = 7) + the backslash/equals escaping', oke)
+
+            # 9e. UDP: one datagram per line, best-effort (RFC5426)
+            usock = sockmod.socket(sockmod.AF_INET, sockmod.SOCK_DGRAM)
+            usock.bind(('127.0.0.1', 0))
+            uport = usock.getsockname()[1]
+            usock.settimeout(10)
+            w3 = AuditLog(tlog + '.udp', 'CACHE', app='modbus-cache', forward='udp://127.0.0.1:%d' % uport)
+            w3.event('COMMAND', "'show version' -> ok")
+            uframe = usock.recv(65536).decode()
+            usock.close()
+            check('the udp:// mirror: one datagram, the RFC5424 envelope',
+                  uframe.startswith('<28>1 ') and '[pvDash@1 prefix="CACHE" chain="' in uframe, uframe[:120])
+        finally:
+            col.down()
+
+        # 9f. the lazy re-arm: a send failure notes once, the next event
+        # re-opens, the success notes the dropped count
+        err = io.StringIO()
+        col2 = TcpCollector()
+        try:
+            rlog = os.path.join(tmp, 'rearm.log')
+            wr = AuditLog(rlog, 'CACHE', app='modbus-cache', forward='tcp://127.0.0.1:%d' % col2.port)
+            with redirect_stderr(err):
+                wr.event('COMMAND', 'one -> ok')
+                col2.down()
+                wr.event('COMMAND', 'two -> ok')    # the buffered send may still pass
+                wr.event('COMMAND', 'three -> ok')  # the RST lands — the stop note
+                wr.event('COMMAND', 'four -> ok')   # the rearm: the connect refuses (the collector is down)
+                col2.up()
+                wr.event('COMMAND', 'five -> ok')   # the rearm connects — the re-armed note
+            notes = err.getvalue()
+            deadline = time.time() + 10
+            while len(col2.frames) < 1 and time.time() < deadline:
+                time.sleep(0.05)
+            check('a dead collector: the fail-stop note, then the lazy re-arm with the dropped count',
+                  notes.count('forwarding stopped') == 1
+                  and notes.count('re-armed after') == 1
+                  and 're-armed after ' in notes and 're-arming on the next event' in notes
+                  and len(col2.frames) == 1, notes)
+        finally:
+            col2.down()
+
+        # 9g. the remote-only mode: no local file, the lines arrive, the
+        # chain reseeds at GENESIS (per run — the restart is a documented
+        # discontinuity the collector's alert whitelists)
+        col3 = TcpCollector()
+        try:
+            never = os.path.join(tmp, 'never', 'audit.log')
+            rlog2 = os.path.join(tmp, 'remote.log')
+            with redirect_stderr(io.StringIO()) as rerr:
+                wr2 = AuditLog('none', 'INV', app='fake-inverter', forward='tcp://127.0.0.1:%d' % col3.port)
+            wr2.event('START', 'version=test')
+            wr2.event('COMMAND', 'x -> ok')
+            deadline = time.time() + 10
+            while len(col3.frames) < 2 and time.time() < deadline:
+                time.sleep(0.05)
+            s1, p1, h1, b1 = chain_of(col3.frames[0])
+            s2, p2, h2, b2 = chain_of(col3.frames[1])
+            check('the remote-only mode: no local file, the lines arrive, the chain runs',
+                  not os.path.exists(never) and wr2.path == 'none'
+                  and h1 == entry_hash(GENESIS, s1, p1, b1) and h2 == entry_hash(h1, s2, p2, b2),
+                  b''.join(col3.frames).decode('utf-8', 'replace'))
+            wr3 = AuditLog('none', 'INV', app='fake-inverter', forward='tcp://127.0.0.1:%d' % col3.port)
+            wr3.event('START', 'version=test2')   # the "restart": the fresh writer reseeds
+            deadline = time.time() + 10
+            while len(col3.frames) < 3 and time.time() < deadline:
+                time.sleep(0.05)
+            s3, p3, h3, b3 = chain_of(col3.frames[2])
+            check('the restart reseeds at GENESIS (the collector sees the discontinuity)',
+                  h3 == entry_hash(GENESIS, s3, p3, b3), col3.frames[2][:120])
+            # 9h. the full-off fold: none without a forward = --no-audit-log's state
+            err2 = io.StringIO()
+            with redirect_stderr(err2):
+                wr4 = AuditLog('none', 'CACHE', app='modbus-cache')
+            wr4.event('COMMAND', 'x -> ok')
+            check('none without a forward folds to the audit disabled (the warn line)',
+                  wr4.disabled and not os.path.exists(os.path.join(tmp, 'none'))
+                  and 'the audit is disabled' in err2.getvalue(), err2.getvalue())
+
+            # 9i. the real bins, remote-only end to end: the fake's trail
+            # lands at the collector, no XDG state dir is created
+            xdg = os.path.join(tmp, 'xdg-e2e')
+            flog2 = os.path.join(tmp, 'fake-e2e.log')
+            proc = subprocess.Popen([sys.executable, fake, '--static', '--listen', '127.0.0.1:15987',
+                                     '--control-port', '15988', '--audit-log', 'none',
+                                     '--audit-forward', 'tcp://127.0.0.1:%d' % col3.port],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    env=dict(os.environ, XDG_STATE_HOME=xdg))
+            ctl2 = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py')
+            try:
+                time.sleep(1.2)
+                subprocess.run([sys.executable, ctl2, '--control-port', '15988', 'set', 'pv', '2000'],
+                               capture_output=True, text=True, timeout=15)
+                subprocess.run([sys.executable, ctl2, '--control-port', '15988', 'quit'],
+                               capture_output=True, text=True, timeout=15)
+            finally:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            deadline = time.time() + 10
+            while time.time() < deadline and not any(
+                    (b'INV START' in fr and b'version=' in fr) and b'INV COMMAND' in b''.join(col3.frames)
+                    for fr in col3.frames):
+                time.sleep(0.1)
+            events = [tuple(chain_of(fr)[1:3]) + (chain_of(fr)[3].split(' ')[0],) for fr in col3.frames]
+            check('the fake, remote-only: the INV trail arrives at the collector, no local state',
+                  any(e[0] == 'INV' and e[2] == 'START' for e in events)
+                  and any(e[0] == 'INV' and e[2] == 'COMMAND' for e in events)
+                  and not os.path.exists(os.path.join(xdg, 'fake-inverter')))
+        finally:
+            col3.down()
+
+        # 9i. the grammar gates: the remote/none spellings through the real bins
         fake = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
         r = subprocess.run([sys.executable, fake, '--static', '--dry-run', '--audit-forward', 'bogus'],
                            capture_output=True, text=True, timeout=15)
         check('a bad --audit-forward answers with one clean ERROR line (rc 1, no traceback)',
-              r.returncode == 1 and 'audit-forward must be one of syslog, none' in r.stderr
+              r.returncode == 1 and 'audit-forward must be none, syslog, syslog:/path' in r.stderr
               and 'Traceback' not in r.stderr, r.stderr)
+        r = subprocess.run([sys.executable, fake, '--static', '--dry-run', '--audit-forward', 'syslog:/no/such/socket'],
+                           capture_output=True, text=True, timeout=15)
+        check('a missing explicit syslog socket refuses (rc 1, no traceback)',
+              r.returncode == 1 and 'does not exist' in r.stderr and 'Traceback' not in r.stderr, r.stderr)
+        r = subprocess.run([sys.executable, fake, '--static', '--dry-run', '--audit-forward', 'udp://host:0'],
+                           capture_output=True, text=True, timeout=15)
+        check('a bad port refuses with the grammar one-liner',
+              r.returncode == 1 and 'udp://host[:port] or tcp://host[:port]' in r.stderr, r.stderr)
+        r = subprocess.run([sys.executable, fake, '--static', '--dry-run', '--audit-forward-format', 'gelf'],
+                           capture_output=True, text=True, timeout=15)
+        check('a bad format refuses (rc 1, no traceback)',
+              r.returncode == 1 and 'audit-forward-format must be one of rfc5424, cef' in r.stderr
+              and 'Traceback' not in r.stderr, r.stderr)
+        r = subprocess.run([sys.executable, fake, '--static', '--dry-run', '--audit-log', 'none'],
+                           env=dict(os.environ, XDG_STATE_HOME=os.path.join(tmp, 'xdg')),
+                           capture_output=True, text=True, timeout=15)
+        check('--audit-log none without a forward: the start warns, the fold disables (rc 0)',
+              r.returncode == 0 and 'the audit is disabled' in r.stderr, r.stderr)
 
         # 10. exit code and stdin
         r = subprocess.run([sys.executable, V, os.path.join(tmp, 'missing.log')],

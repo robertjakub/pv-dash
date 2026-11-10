@@ -1446,11 +1446,12 @@ try:
     r = ctl_cmd('show audit rotate max-size', 15530)
     check('audit rotate: show answers the configured MB', r == 'ok audit/rotate/max-size=10', r)
     listing = '\n'.join([
-        '    disable  disable the audit trail entirely',
-        '    forward  also mirror every audit line to the local syslog (journald picks them up, chain hash included)',
-        "    log-file the audit trail's file: a path, - for stdout, empty = the XDG state home",
-        '    requests audit one REQUESTS tally per client per this many seconds',
-        "    rotate   the audit trail's rotation: the size trigger, the UTC-midnight trigger and the backup count"])
+        '    disable        disable the audit trail entirely',
+        '    forward        also forward every audit line: the local syslog mirror or a remote collector (the off-box copy)',
+        '    forward-format the remote forward\'s envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send',
+        '    log-file       the audit trail\'s file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home',
+        '    requests       audit one REQUESTS tally per client per this many seconds',
+        '    rotate         the audit trail\'s rotation: the size trigger, the UTC-midnight trigger and the backup count'])
     r = ctl_cmd('show audit', 15530)
     check('audit node: the listing mimics the ? output byte for byte', r == 'ok ' + listing, r)
     r = ctl_cmd('show audit rotate', 15530)
@@ -1502,6 +1503,25 @@ try:
     ctl_cmd('show version', 15530)
     check('audit disable: the commands land again', len(open(live_audit).read().splitlines()) > n_lines,
           open(live_audit).read()[-120:])
+    r = ctl_cmd('set audit forward tcp://127.0.0.1:19799', 15530)
+    check('audit forward: the remote target takes the grammar (the soft bind warns, the set lands)',
+          r.startswith('ok audit/forward=tcp://127.0.0.1:19799'), r[:120])
+    r = ctl_cmd('show audit forward-format', 15530)
+    check('audit forward-format: the default renders', r == 'ok audit/forward-format=rfc5424', r)
+    r = ctl_cmd('set audit forward-format cef', 15530)
+    check('audit forward-format: cef takes', r.startswith('ok audit/forward-format=cef'), r)
+    r = ctl_cmd('set audit forward-format gelf', 15530)
+    check('audit forward-format: a foreign format refuses',
+          r.startswith('fail audit/forward-format must be one of rfc5424, cef'), r)
+    r = ctl_cmd('set audit forward bogus', 15530)
+    check('audit forward: a bad spelling refuses with the grammar one-liner',
+          r.startswith('fail audit/forward must be none, syslog, syslog:/path'), r)
+    r = ctl_cmd('set audit log-file none', 15530)
+    check('audit log-file: none with a forward spells the remote-only mode',
+          r.startswith('ok audit/log-file=remote'), r)
+    ctl_cmd('set audit forward none', 15530)
+    r = ctl_cmd('show audit log-file', 15530)
+    check('audit log-file: none without a forward folds to off', r == 'ok audit/log-file=off', r)
     r = ctl_cmd('unset audit log-file', 15530)
     check('audit log-file: unset restores the configured sink', r.startswith('ok audit/log-file=')
           and 'modbus-cache/audit.log' in r, r[:120])

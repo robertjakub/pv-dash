@@ -1,60 +1,94 @@
 {
-"control": {
-  "line_cap_bytes": 1048576
-},
-"control-plane": {
-  "cli_keepalive_s": 55.0,
-  "cli_timeout_s": 5.0,
-  "cli_reconnect": 3,
-  "cli_reconnect_wait_s": 10.0
-},
+  "control": {
+    "line_cap_bytes": 1048576
+  },
+  "control-plane": {
+    "cli_keepalive_s": 55.0,
+    "cli_timeout_s": 5.0,
+    "cli_reconnect": 3,
+    "cli_reconnect_wait_s": 10.0
+  },
   "protocol": {
     "max_pdu": 260,
     "max_registers": 65536,
     "max_count": 125,
     "max_bits": 2000
   },
-
   "diagnostics": {
     "base": 65000,
     "count": 4,
     "magic": 51966
   },
-
-  "sun": { "sunrise": 6.0, "sunset": 18.0 },
+  "sun": {
+    "sunrise": 6.0,
+    "sunset": 18.0
+  },
   "mppt": {
-    "east": { "sunrise": 6.0, "sunset": 16.0 },
-    "west": { "sunrise": 8.0, "sunset": 18.0 }
+    "east": {
+      "sunrise": 6.0,
+      "sunset": 16.0
+    },
+    "west": {
+      "sunrise": 8.0,
+      "sunset": 18.0
+    }
   },
   "peak_ratio": 0.75,
-
   "cloud_machines": {
-    "autumn": [0.45, 2.5, 0.60, 0.05, 0.95],
-    "spring": [0.25, 2.0, 0.50, 0.02, 0.80],
-    "winter": [0.75, 0.8, 0.35, 0.10, 1.00]
+    "autumn": [
+      0.45,
+      2.5,
+      0.6,
+      0.05,
+      0.95
+    ],
+    "spring": [
+      0.25,
+      2.0,
+      0.5,
+      0.02,
+      0.8
+    ],
+    "winter": [
+      0.75,
+      0.8,
+      0.35,
+      0.1,
+      1.0
+    ]
   },
-
   "load_curve": {
     "base_w": 250.0,
     "bells": [
-      [700.0, 7.5, 1.0],
-      [400.0, 13.0, 1.5],
-      [1400.0, 19.0, 1.8]
+      [
+        700.0,
+        7.5,
+        1.0
+      ],
+      [
+        400.0,
+        13.0,
+        1.5
+      ],
+      [
+        1400.0,
+        19.0,
+        1.8
+      ]
     ]
   },
-
   "grid": {
     "voltage_v": 230.0,
-    "voltage_wander": 0.10,
+    "voltage_wander": 0.1,
     "frequency_hz": 50.0,
     "frequency_wander": 0.2
   },
-
   "meter_export_kwh": 12500.0,
   "meter_import_kwh": 9800.0,
-
-  "grid_outage": { "fail_per_h": 0.75, "repair_per_min": 3.0 },
-
+  "grid_outage": {
+    "fail_per_h": 0.75,
+    "repair_per_min": 3.0
+  },
   "battery": {
     "max_w": 2500.0,
     "reserve_soc": 10.0,
@@ -65,7 +99,6 @@
     "self_disch_h": 0.01,
     "discharge_cap": 0.8
   },
-
   "defaults": {
     "listen": "127.0.0.1:5502",
     "unit": 1,
@@ -106,8 +139,7 @@
     "INFO",
     "WARNING",
     "ERROR"
-  ]
-,
+  ],
   "scenarios": {
     "morning": 8.5,
     "noon": 12.0,

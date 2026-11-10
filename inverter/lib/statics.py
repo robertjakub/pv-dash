@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The fake's static configuration: the numbers a demo device is born with,
-kept in one JSON file (lib/static.json) instead of being scattered over the
+kept in one JSON file (lib/defaults.json) instead of being scattered over the
 modules — the Modbus protocol limits, the diagnostics block, the solar
 times (the day window, the east/west strings), the PV peak ratio, the cloud
 state machines, the home-load day curve, the grid nominals and their
@@ -11,7 +11,7 @@ import json
 import os
 
 _here = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(_here, 'static.json'), encoding='utf-8') as _f:
+with open(os.path.join(_here, 'defaults.json'), encoding='utf-8') as _f:
     STATIC = json.load(_f)
 
 PROTOCOL = STATIC['protocol']

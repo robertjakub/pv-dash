@@ -9,7 +9,7 @@ live-settable (a '/'-path — `inverter/profile` spells as its words on the
 wire: `set inverter profile <value>`), and the secret flag. This module
 loads the JSON into the
 common Option rows and keeps the Python-side wiring: the control-grammar
-vocabulary and the choice vocabularies (log-level from static.json, the
+vocabulary and the choice vocabularies (log-level from defaults.json, the
 timezone from the settings registry's values). The fake takes the family's
 config file now (--config, the set grammar — inverter/examples/inverter.conf
 is the bundled sample): the CLI defaults stay out of the parser (a
@@ -34,11 +34,11 @@ def _load_options():
     (a static-wired default would shadow the env/config layers — the flag
     never looks unset): they ladder flag > env > config > static in
     lib/config.py like every serving tool's resolver; only the choice
-    vocabularies ride here (log-level from static.json, the timezone —
+    vocabularies ride here (log-level from defaults.json, the timezone —
     read directly so the module also imports flat
     (scripts/check_options.py walks lib/ on sys.path))."""
     here = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
+    with open(os.path.join(here, 'defaults.json'), encoding='utf-8') as f:
         static = json.load(f)
     choices = {'log-level': tuple(static['log_levels']), 'timezone': ('utc', 'local')}
     rows, sections, options = load_registry(here, choices=choices)

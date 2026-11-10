@@ -419,8 +419,8 @@ inverter/
     ├── audit.py        # the append-only audit trail (AUDIT INV/CLI/CTL lines)
     ├── chaos.py        # seeded hostile-reply dice layer
     ├── signals.py      # SIGHUP/SIGUSR1/SIGTERM handling
-    ├── statics.py      # static configuration loader (lib/static.json)
-    ├── static.json     # the statics: solar times, cloud machines, battery limits
+    ├── statics.py      # static configuration loader (lib/defaults.json)
+    ├── defaults.json   # the statics: solar times, cloud machines, battery limits
     └── paths.py        # default control-socket path
 ```
 

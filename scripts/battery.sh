@@ -19,8 +19,8 @@
 # Every run works inside its own dedicated dir: /tmp/pvbattery/<run-id>/
 # (the suites' /tmp scratch is rewritten into it, except the daemon-derived
 # unix sockets, which stay at /tmp/modbus-*.socket — their paths are the
-# daemons' own constants). The live status: /tmp/pvbattery/latest/ is a
-# symlink to the current run — `tail -f /tmp/pvbattery/latest/status.txt`.
+# daemons' own constants). The live status: /tmp/pvbattery/current/ is a
+# symlink to the current run — `tail -f /tmp/pvbattery/current/status.txt`.
 #
 # One suite at a time within a run; a suite's verdict = its own ALL PASS
 # with no FAIL lines; the tally lands at the end of the status file, and
@@ -48,8 +48,9 @@ RUNDIR=$LOGROOT/$RUNID
 mkdir -p "$RUNDIR/tmp"
 export PV_RUN_DIR="$RUNDIR/tmp"   # the suites' gate marker (a standalone run refuses)
 export PV_SUITE_PROFILE=$([ "$PROFILE" = full ] && echo full || echo quick)   # the suites' depth (quick default; full = the nightly depth)
-[ -e "$LOGROOT/latest" ] && ln -sfn "$(readlink "$LOGROOT/latest")" "$LOGROOT/previous"   # the run before this one
-ln -sfn "$RUNDIR" $LOGROOT/latest
+[ -e "$LOGROOT/latest" ] && ln -sfn "$(readlink "$LOGROOT/latest")" "$LOGROOT/previous"   # the run before this one (the old latest spelling migrates too)
+[ -e "$LOGROOT/latest" ] && [ ! -e "$LOGROOT/current" ] && ln -sfn "$(readlink "$LOGROOT/latest")" "$LOGROOT/current" && rm "$LOGROOT/latest"
+ln -sfn "$RUNDIR" $LOGROOT/current
 STATUS=$RUNDIR/status.txt
 
 say() { echo "$1"; echo "$1" >> $STATUS; }

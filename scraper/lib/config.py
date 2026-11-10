@@ -213,7 +213,7 @@ def resolve_config(args, script_dir=None):
     resolve = r.resolve
 
     profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'PROFILE',
-                                                'profile', DEFAULTS['modbus_profile'], str))
+                                                'profile', DEFAULTS['profile'], str))
     profile = load_device_profile(profile_path)
     prefix_default = DEFAULTS['metric_prefix']
     metric_prefix = (resolve(getattr(args, 'metric_prefix', None), 'METRIC_PREFIX',
@@ -248,17 +248,17 @@ def resolve_config(args, script_dir=None):
         'auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
                           or '').strip() or None, 'auth-key'), 'auth-key'),
-        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
+        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout'], float),
         'max_kwp': resolve(args.max_kwp, 'MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float),
         'max_grid_kw': resolve(args.max_grid_kw, 'MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float),
         'grid_positive_import': resolve(args.grid_positive_import or None, 'GRID_POSITIVE_IMPORT',
                                         'grid_positive_import', DEFAULTS['grid_positive_import'], str_to_bool),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
-        'interval': resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval_s'], float),
+        'interval': resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval'], float),
         'max_clients': resolve(args.max_clients, 'MAX_CLIENTS', 'max_clients',
                                DEFAULTS['max_clients'], int),
         'client_timeout': resolve(args.client_timeout, 'CLIENT_TIMEOUT', 'client_timeout',
-                                  DEFAULTS['client_timeout_s'], float),
+                                  DEFAULTS['client_timeout'], float),
         'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MAX_CONN_PER_IP',
                                    'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
         'metrics_acl': (resolve(getattr(args, 'metrics_acl', None), 'METRICS_ACL',

@@ -26,7 +26,9 @@ DIAG_MAX = DIAGNOSTICS['max_age']              # the age/uptime clamp (0xFFFF)
 
 LOG_LEVELS = tuple(STATIC['log_levels'])
 
-DEFAULTS = STATIC['defaults']
+from .options import OPTIONS   # the registry rows — the defaults' one home (the rows' `default`)
+DEFAULTS = {o.name.replace('-', '_'): o.static_default
+            for o in OPTIONS if o.static_default is not None}
 DEFAULT_LISTEN_PORT = int(DEFAULTS['listen'].rsplit(':', 1)[1])
 AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
 AUDIT_FILES = DEFAULTS['audit_files']

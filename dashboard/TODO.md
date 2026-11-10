@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The README moved to the gated skeleton: `scripts/lint_readmes.py --check`
+pins the `##` canon family-wide — the dashboard's `Features` retitled
+`How it works` (the auto-refresh and the energy-integration detail folded
+into the feature bullets) and the `Notes` section dissolved into the
+homes that already owned its claims (Security's offline line, Usage's
+static-mode CORS note).
+
 The audit family live family-wide (the cache's shape): the sink and the
 rotation knobs join the wire — `set audit log-file <path|-|none>` swaps
 the trail, `set audit rotate max-size`/`set audit rotate files`

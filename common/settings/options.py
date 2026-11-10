@@ -731,7 +731,7 @@ def setting_path_pool(typed, names, by_name):
 def command_path_pool(typed, names):
     """The completion pool for a command word list — the settings'
     setting_path_pool's sibling: the command rows are '/'-paths spelled as
-    words on the wire (`request/clear/cache` is `request clear cache`),
+    words on the wire (`request/flush/cache` is `request flush cache`),
     and the pool is the distinct next path segment of `names` under the
     '/'-joined prefix so far (the pool's order kept) — the first position
     offers the verbs (`request` completes its children: dump, reload,

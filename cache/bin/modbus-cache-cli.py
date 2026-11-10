@@ -3,7 +3,7 @@
 
 A session front-end on top of the control socket: prompt with the connected
 port, TAB completion and `?` in every position, `show` commands print the
-state lines, `request clear cache` and `request restart` confirm with a
+state lines, `request flush cache` and `request restart` confirm with a
 plain `ok`, and `shutdown` asks before it stops the proxy.
 
 The session itself (connect/disconnect, the local commands like quit and
@@ -82,7 +82,7 @@ def _render_special(low, reply):
 
 SPEC = dict(label='the cache proxy', daemon_label='modbus-cache control server',
             cli_name='modbus-cache-cli', app='modbus-cache', self_note='the proxy itself',
-            command_help='e.g. inspect, show config, show cache, request clear cache, request reload-config, request restart, shutdown',
+            command_help='e.g. inspect, show config, show cache, request flush cache, request reload-config, request restart, shutdown',
             prompt_word='cache', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,

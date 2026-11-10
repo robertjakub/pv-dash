@@ -59,7 +59,7 @@ The sweep types — what we are sweeping:
 10. THE F-LEDGER SWEEP. docs/AUDIT.md's F-numbers vs the tree: which
     tools' files cite each F, and the F's title. The promise ledger
     against the code.
-11. THE STATICS SWEEP. The four lib/static.json blocks diffed by
+11. THE STATICS SWEEP. The four lib/defaults.json blocks diffed by
     key-path: the shared paths whose values disagree, the
     only-there paths.
 12. THE SCHEMA/EXAMPLE SWEEP. The JSON Schemas' properties against
@@ -403,12 +403,12 @@ def nixos(rows):
 
 def knob_ports(rows):
     """The ports the registries back: the listen/metrics-listen knobs'
-    defaults (lib/static.json's defaults dict — the resolver's last rung)
+    defaults (lib/defaults.json's defaults dict — the resolver's last rung)
     -> the port set. A published port outside this set is the lie the
     sweep exists for."""
     backed = {}
     for t in TOOLS:
-        with open(os.path.join(REPO, t, 'lib', 'static.json'), encoding='utf-8') as f:
+        with open(os.path.join(REPO, t, 'lib', 'defaults.json'), encoding='utf-8') as f:
             defaults = json.load(f).get('defaults') or {}
         for n, r in rows[t].items():
             live = r.get('live') or ''
@@ -499,10 +499,10 @@ def coverage(rows, cmds, canon):
 
 
 def statics():
-    """The four lib/static.json key-path matrices."""
+    """The four lib/defaults.json key-path matrices."""
     maps = {}
     for t in TOOLS:
-        with open(os.path.join(REPO, t, 'lib', 'static.json'), encoding='utf-8') as f:
+        with open(os.path.join(REPO, t, 'lib', 'defaults.json'), encoding='utf-8') as f:
             flat = {}
             def walk(obj, prefix):
                 if isinstance(obj, dict):
@@ -673,9 +673,9 @@ Each F-number's title from the audit doc, and which of the family's
 files cite it — the promise ledger against the code."""
 
 STATICS_HEAD = """\
-## The statics sweep — the four static.json blocks
+## The statics sweep — the four defaults.json blocks
 
-Every leaf key-path of the four `lib/static.json` files: the shared
+Every leaf key-path of the four `lib/defaults.json` files: the shared
 paths whose values disagree, the only-there paths (the audit
 defaults, the caps, the grid constants the loaders wire via
 `static_defaults`)."""
@@ -883,7 +883,7 @@ The findings:
 STATICS_FINDINGS = """\
 The findings:
 
-- **The static.json blocks are the tools' personalities** (the
+- **The defaults.json blocks are the tools' personalities** (the
   simulators' grid constants, the caps' defaults) — the drift that
   matters is the FAMILY defaults (the audit rotation, the log
   levels, the cap defaults) disagreeing: those wire through
@@ -1076,7 +1076,7 @@ def emit():
     ap('   canon phrases) grepped against the tests.')
     ap('10. **The F-ledger sweep** — docs/AUDIT.md\'s F-numbers vs the')
     ap('    tree\'s enforcement markers.')
-    ap('11. **The statics sweep** — the four static.json blocks by')
+    ap('11. **The statics sweep** — the four defaults.json blocks by')
     ap('    key-path.')
     ap('12. **The schema/example sweep** — the JSON Schemas vs the')
     ap('    registries; the shipped examples re-parsed.')

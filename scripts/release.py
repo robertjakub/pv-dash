@@ -23,10 +23,12 @@ still go out. Stdlib only, like the rest of the family.
 import argparse
 import datetime
 import json
+import os
 import pathlib
 import re
 import subprocess
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHANGELOG = ROOT / 'CHANGELOG.md'
@@ -155,9 +157,12 @@ def tests(which, dry):
     if which == 'none':
         print('release: skipping the suites (--tests none)')
         return
+    rundir = tempfile.mkdtemp(prefix='pvrelease-')
+    env = {**os.environ, 'PV_RUN_DIR': rundir}   # the suites' battery marker (they refuse the standalone runs)
     for suite in (SUITES_QUICK if which == 'quick' else SUITES_FULL):
         print('release: %s' % suite)
-        r = run(['python3', suite], dry=dry)
+        # the release always runs full depth — the quick battery is dev feedback only
+        r = run(['python3', suite, 'full'], dry=dry, env=env)
         if not dry and 'ALL PASS' not in r.stdout:
             sys.exit('release: %s did not report ALL PASS' % suite)
 

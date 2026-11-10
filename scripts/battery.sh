@@ -23,19 +23,55 @@
 # symlink to the current run — `tail -f /tmp/pvbattery/latest/status.txt`.
 #
 # One suite at a time within a run; a suite's verdict = its own ALL PASS
-# with no FAIL lines; the tally lands at the end of the status file.
+# with no FAIL lines; the tally lands at the end of the status file, and
+# the whole run archives to backups/<run-id>.tar.gz (the newest 8 kept —
+# the green runs drop the tmp scratch after, the failed ones keep it to
+# post-mortem).
 
 cd "$(dirname "$0")/.." || exit 1
 LOGROOT=/tmp/pvbattery
 mkdir -p $LOGROOT/slots
+# the housekeeping: the run dirs pile up fast (the stress dumps, the
+# rewritten scratch — ~2G a busy day), so a run keeps the newest 4 and
+# sweeps the rest; the stale slots (the owning pid gone — killed runs,
+# the reclaim-on-demand is not enough for a recycled pid) go too
+ls -1dt $LOGROOT/2* 2>/dev/null | tail -n +5 | xargs rm -rf 2>/dev/null
+for d in $LOGROOT/slots/slot*; do
+  [ -d "$d" ] || continue
+  pid=$(cat "$d/pid" 2>/dev/null)
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && continue
+  rm -rf "$d"
+done
 PROFILE="${1:-commit}"
 RUNID="$(date +%Y%m%d-%H%M%S)-$PROFILE"
 RUNDIR=$LOGROOT/$RUNID
 mkdir -p "$RUNDIR/tmp"
+export PV_RUN_DIR="$RUNDIR/tmp"   # the suites' gate marker (a standalone run refuses)
+export PV_SUITE_PROFILE=$([ "$PROFILE" = full ] && echo full || echo quick)   # the suites' depth (quick default; full = the nightly depth)
+[ -e "$LOGROOT/latest" ] && ln -sfn "$(readlink "$LOGROOT/latest")" "$LOGROOT/previous"   # the run before this one
 ln -sfn "$RUNDIR" $LOGROOT/latest
 STATUS=$RUNDIR/status.txt
 
 say() { echo "$1"; echo "$1" >> $STATUS; }
+
+# the perf stats: a suite's wall time (and the battery's) reads mm:ss over
+# the minute, plain seconds under it
+fmt() {
+  [ "$1" -ge 60 ] && printf '%dm%02ds' $(($1 / 60)) $(($1 % 60)) || printf '%ss' "$1"
+}
+
+# the batch estimate: the newest prior same-profile tally predicts the whole
+# batch; every completed suite's actual sharpens the remaining eta
+dursec() {  # '3m25s' | '45s' -> seconds
+  case "$1" in
+    *m*) m=${1%%m*}; rest=${1#*m}; printf '%s' $((m * 60 + ${rest%s})) ;;
+    *)   printf '%s' "${1%s}" ;;
+  esac
+}
+
+etatime() {  # seconds-from-now -> the wall clock (falls back to ~minutes)
+  t=$(date -v+"$1"S '+%H:%M' 2>/dev/null) && printf '%s' "$t" || printf '~%dm' $(($1 / 60))
+}
 
 QUICK_ALL="cache-regtest inverter-regtest scrape-regtest audit-chain cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz"
 
@@ -62,7 +98,7 @@ for n in 0 1 2 3 4 5 6 7; do
   fi
   pid=$(cat "$d/pid" 2>/dev/null)
   if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
-    rmdir "$d" 2>/dev/null && mkdir "$d" 2>/dev/null && { SLOT=$n; echo $$ > "$d/pid"; break; }
+    rm -rf "$d" && mkdir "$d" && { SLOT=$n; echo $$ > "$d/pid"; break; }
   fi
 done
 if [ "$PARALLEL" = 1 ] && [ -z "$SLOT" ]; then
@@ -76,10 +112,30 @@ else
   BASE=0
 fi
 export PYTHONUNBUFFERED=1   # the daemons' stderr (their logs) must not sit in a lost block buffer
-trap 'rmdir $LOGROOT/slots/slot$SLOT 2>/dev/null' EXIT INT TERM
+trap '[ -n "$SLOT" ] && rm -rf $LOGROOT/slots/slot$SLOT' EXIT INT TERM
 
 say "battery $RUNID (pid $$) profile=$PROFILE budget=${BUDGET:-suite defaults} slot=${SLOT:-none} base=$BASE"
 say "suites: $SUITES"
+say "previous: $(basename "$(readlink "$LOGROOT/previous" 2>/dev/null)" 2>/dev/null || echo none)"
+TOTAL=$(echo $SUITES | wc -w | tr -d ' ')
+N=0
+BT0=$(date +%s)
+
+# the eta: the complete prior tally of the same profile predicts the batch;
+# each finished suite's actual time is subtracted as it lands
+ETAFILE=$LOGROOT/eta-$PROFILE.txt   # the per-suite wall times; every run's tally rewrites it
+REMAIN=
+if [ -f "$ETAFILE" ]; then
+  total=0; have=all
+  for s in $SUITES; do
+    d=$(awk -v s="$s" '$1 == s { print $2; exit }' "$ETAFILE" 2>/dev/null)
+    if [ -n "$d" ]; then total=$((total + d)); else have=missing; break; fi
+  done
+  [ "$have" = all ] && REMAIN=$total
+fi
+[ -n "$REMAIN" ] && say "estimate: ~$(fmt "$REMAIN") total, done ~$(etatime "$REMAIN") (the $PROFILE eta history)" \
+                 || say "estimate: none (no complete $PROFILE eta history yet)"
+ETANEW=$RUNDIR/tmp/eta.txt; : > "$ETANEW"
 
 # the quiet window: the parallel profiles wait only for daemons whose
 # ports fall inside their own shifted range (the other slots' daemons
@@ -141,37 +197,68 @@ kill_daemons() {
 }
 
 for s in $SUITES; do
-  [ -f "tests/$s.py" ] || { say "$(date '+%H:%M:%S') SKIP $s (no such suite)"; continue; }
+  N=$((N + 1))
+  [ -f "tests/$s.py" ] || { say "$(date '+%H:%M:%S') SKIP $N/$TOTAL $s (no such suite)"; continue; }
   quiet
   [ "$PARALLEL" = 1 ] || { kill_daemons; sleep 2; }
-  say "$(date '+%H:%M:%S') START $s"
+  [ -n "$REMAIN" ] && say "$(date '+%H:%M:%S') START $N/$TOTAL $s eta ${REMAIN}s ($(etatime "$REMAIN"))" \
+                   || say "$(date '+%H:%M:%S') START $N/$TOTAL $s"
   cp "tests/$s.py" tests/zz_bx.py
   # the /tmp scratch moves into the run dir — EXCEPT the unix-socket paths:
   # the daemons derive /tmp/<family>-*.socket from their own constants in
   # common/ (modbus-cache, fake-inverter, dashboard...), so every .socket
-  # path stays put and the default-socket checks stat the real thing
-  sed -i '' "s#/tmp/#$RUNDIR/tmp/#g; s#$RUNDIR/tmp/\([a-z0-9.-]*\.socket\)#/tmp/\1#g" tests/zz_bx.py
-  if [ -n "$BUDGET" ] && [ "$s" = "cache-fuzz" -o "$s" = "scrape-fuzz" ]; then
-    python3 tests/zz_bx.py "$BUDGET" > "$RUNDIR/$s.log" 2>&1
+  # path stays put and the default-socket checks stat the real thing (the
+  # basename rides %-formatting — '%d' % (port + BASE) — so the exception
+  # matches any non-slash basename, not just the literal ones)
+  sed -i '' "s#/tmp/#$RUNDIR/tmp/#g; s#$RUNDIR/tmp/\([^/]*\.socket\)#/tmp/\1#g" tests/zz_bx.py
+  t0=$(date +%s)
+  if [ "$s" = "cache-fuzz" -o "$s" = "scrape-fuzz" ]; then
+    # the fuzz budget + the mode: quick pools the basic shapes, full the
+    # nightly spread (both fuzz suites take [iterations] [quick|full])
+    FUZZPROF=quick; [ "$PROFILE" = full ] && FUZZPROF=full
+    python3 tests/zz_bx.py "${BUDGET:-3000}" "$FUZZPROF" > "$RUNDIR/$s.log" 2>&1
   else
     python3 tests/zz_bx.py > "$RUNDIR/$s.log" 2>&1
   fi
-  if [ $? -eq 0 ]; then
-    say "$(date '+%H:%M:%S') SUITE $s: PASS"
+  rc=$?
+  ds=$(( $(date +%s) - t0 ))
+  dur=$(fmt $ds)
+  echo "$s $ds" >> "$ETANEW"
+  if [ -n "$REMAIN" ]; then
+    r=$((REMAIN - ds))
+    [ $r -ge 0 ] && REMAIN=$r || REMAIN=0
+  fi
+  if [ $rc -eq 0 ]; then
+    say "$(date '+%H:%M:%S') SUITE $N/$TOTAL $s: PASS ($dur)"
   else
-    say "$(date '+%H:%M:%S') SUITE $s: FAILED"
+    say "$(date '+%H:%M:%S') SUITE $N/$TOTAL $s: FAILED ($dur)"
     tail -6 "$RUNDIR/$s.log"
   fi
 done
 [ "$PARALLEL" = 1 ] || kill_daemons
 rm -f tests/zz_bx.py
-say "=== TALLY $(date '+%H:%M:%S')"
+BT1=$(date +%s)
+say "=== TALLY $(date '+%H:%M:%S') (the battery: $(fmt $((BT1 - BT0))))"
 fail=0
+N=0
 for s in $SUITES; do
+  N=$((N + 1))
   if grep -q "^ALL PASS" "$RUNDIR/$s.log" 2>/dev/null && ! grep -q "^FAIL" "$RUNDIR/$s.log" 2>/dev/null; then
-    say "$s: PASS"
+    say "$N/$TOTAL $s: PASS"
   else
-    fail=$((fail+1)); say "$s: NOT-GREEN"
+    fail=$((fail+1)); say "$N/$TOTAL $s: NOT-GREEN"
   fi
 done
 [ $fail -eq 0 ] && say "BATTERY: ALL PASS" || say "BATTERY: $fail NOT GREEN"
+cp "$ETANEW" "$ETAFILE"   # the eta history for the next run
+
+# the archive: the run's evidence (the status, the logs, the scratch) into
+# one tarball under backups/ — the scratch is text and compresses hard; the
+# green runs drop tmp/ after (nothing to post-mortem), the failed ones keep
+# it live. The backups keep the newest 8 (the keep-4 housekeeping ages the
+# run dirs separately)
+BACKUPS=$LOGROOT/backups
+mkdir -p $BACKUPS
+COPYFILE_DISABLE=1 tar --exclude='._*' -czf "$BACKUPS/$RUNID.tar.gz" -C $LOGROOT $RUNID 2>/dev/null
+[ $fail -eq 0 ] && rm -rf $RUNDIR/tmp
+ls -1dt $BACKUPS/*.tar.gz 2>/dev/null | tail -n +9 | xargs rm -f 2>/dev/null

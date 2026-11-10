@@ -28,6 +28,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 tests/${{ matrix.suite }}
+        env:
+          PV_RUN_DIR: /tmp/pvbattery-ci
 
   build:
     name: nix build (all four packages)

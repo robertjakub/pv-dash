@@ -12,6 +12,21 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the static.json defaults trees carry every value
+  knob's default, and a gate keeps them honest**: the resolvers' last
+  rung names the tree entry it resolves instead of an inline literal —
+  the cache's connect/write/metrics ACLs, the write-register and
+  selection words, the audit forward pair and the dump interval; the
+  scraper's Modbus offset, metric prefix, the audit forward pair and
+  the dump interval; the dashboard's audit forward pair and dump
+  interval; the fake's connect ACL, the audit forward pair, the
+  timezone. The dead `metrics_server` entries left the cache's and
+  the fake's trees (the bool native False is the default), and
+  `check_options.py` gains the static-defaults gates: every defaults
+  key some lib/ module reads (a dead letter fails), every flag knob's
+  default a tree key or a named no-entry (the bool native, the secret
+  None, the empty/derived shapes).
+
 - **everywhere** — **the four tool READMEs speak the one skeleton, and a
   gate keeps them speaking it**: `scripts/lint_readmes.py --check` pins
   the `##` canon (how it works → usage → configuration → runtime control
@@ -92,6 +107,19 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   per-tool markers verdict.
 
 ### Fixed
+
+- **everywhere** — **the `audit-forward-format` env and config layers
+  come alive on all four tools**: the registry row baked
+  `"default": "rfc5424"` onto the flag, so `AUDIT_FORWARD_FORMAT` and
+  the config line never fell through (the resolver's first layer saw
+  the flag set). The default is the resolver's static rung now — the
+  flag layer starts empty, the tree entry backs it
+  (`AUDIT_FORWARD_FORMAT=cef` resolves on all four).
+- **dashboard** — **the `LISTEN` env is honored again**: the loader
+  wired the static listen default onto the flag, the flag was never
+  empty and the env layer never ran (the compose `LISTEN:` lines only
+  worked because the image CMD pins the flag); the static-defaults
+  wiring is gone, the resolver's static rung owns the default.
 
 - **scraper** — **every audit live-set crashed the control handler**
   (`control handler crashed ('disabled')`, the connection closed): the

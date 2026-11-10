@@ -26,23 +26,32 @@ defaults, the live-run refusal texts).
    Outcome: the F21 move-refusal template, verbatim, in the scraper's
    restart preamble.
 2. **`audit-forward-format` ignores its env and config layers on all
-   four tools** — every registry row declares `AUDIT_FORWARD_FORMAT`
-   *and* bakes `"default": "rfc5424"` into the row
+   four tools** — every registry row declared `AUDIT_FORWARD_FORMAT`
+   *and* baked `"default": "rfc5424"` into the row
    (`cache/lib/options.json:206`, `scraper:138`, `inverter:232`,
-   `dashboard:119`), `build_parser` puts the default on the flag
+   `dashboard:119`), `build_parser` put the default on the flag
    (`common/settings/options.py:119-121`), so the resolver's first
-   layer never falls through: the env twin and the config line are
-   dead (verified live on cache/scraper/inverter). Outcome: the row
-   default moves to the resolver call; the flag layer goes empty.
-3. **The dashboard's `LISTEN` env is dead** — its loader injects
+   layer never fell through: the env twin and the config line were
+   dead (verified live on cache/scraper/inverter). Outcome: LANDED
+   2026-11-10, the static.json defaults sweep — the row default is
+   gone; the default is the resolver's static rung, the tree's
+   `audit_forward_format` entry (`DEFAULTS['audit_forward_format']` on
+   cache/scraper/dashboard; the fake's
+   `STATIC_DEFAULTS['audit-forward-format']` reads the same entry —
+   without it the ladder would end at `None` and `AuditLog` refuses
+   the start, `common/runtime/audit.py:369`). Verified live:
+   `AUDIT_FORWARD_FORMAT=cef` resolves on all four.
+3. **The dashboard's `LISTEN` env is dead** — its loader injected
    `static_defaults = {'listen': defaults['listen']}`
-   (`dashboard/lib/options.py:42`), the flag is never empty, the env
-   layer never runs (verified: `LISTEN=0.0.0.0:9999` honored by the
+   (`dashboard/lib/options.py:42`), the flag was never empty, the env
+   layer never ran (verified: `LISTEN=0.0.0.0:9999` honored by the
    other three, ignored by the dashboard). The compose files set
    `LISTEN: 0.0.0.0:8080` (`docker/demo/compose.yaml:176`,
-   `docker/prod/compose.yaml:140`) and only work because the image
-   CMD pins the flag. Outcome: drop the `listen` entry; the resolver
-   default already covers it.
+   `docker/prod/compose.yaml:140`) and only worked because the image
+   CMD pins the flag. Outcome: LANDED 2026-11-10, the static.json
+   defaults sweep — the `static_defaults` wiring is gone, the
+   resolver's static rung (`DEFAULT_LISTEN`) owns the default; the
+   env resolves again.
 4. **The cache's `metrics-token` has no config layer** — the bin
    reads flag/env only (`cache/bin/modbus-cache.py:162`); a config
    line `set metrics token ...` parses and is silently dropped, while
@@ -389,7 +398,10 @@ defaults, the live-run refusal texts).
 - a **concept key** for the knob sweep (near-miss names, tool-absent
   rows) — without it every knob item above re-drifts silently.
 - the sweep reads **`static.json` defaults** (the dashboard's 16 vs
-  64 class).
+  64 class) — the tree-honesty half is the **static-defaults gate**
+  (`check_options.py`, LANDED 2026-11-10 with the defaults sweep):
+  every defaults key some lib/ module reads (a dead letter fails),
+  every flag knob's default a tree key or a named no-entry.
 - `check_options.py` (or family_drift) diffs the **registry env twins
   against `docker/env/*.env.example`** and the image CMD/ENV lines.
 - `lint_texts.py` flags a **literal that equals a leaf** after

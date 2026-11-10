@@ -50,8 +50,9 @@ compared two ways: the exact pass groups identical bodies (the
 copy-paste twins), the similarity pass pairs cross-file bodies over the
 0.72 ratio (the near-copies that already drifted).
 
-**The exact pass**: 0 duplicate group(s) in >= 2 files.
+**The exact pass**: 1 duplicate group(s) in >= 2 files.
 
+- 24L `_load_options`: `dashboard/lib/options.py:25`, `scraper/lib/options.py:26`
 
 **The similarity pass**: 51 cross-file pair(s) over the ratio
 floor (30 of them the man-page prose, per-tool by
@@ -59,15 +60,15 @@ design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
+| 1.00 | `scraper/lib/options.py:26` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.94 | `scraper/lib/control.py:145` `command_help` <-> `dashboard/lib/control.py:110` `command_help` |
 | 0.94 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:26` `_load_options` |
+| 0.94 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
-| 0.93 | `scraper/lib/options.py:26` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.89 | `scraper/bin/modbus-scraper.py:251` `graceful_stop` <-> `dashboard/bin/dashboard.py:483` `graceful_stop` |
 | 0.88 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
-| 0.88 | `scraper/lib/options.py:26` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.88 | `inverter/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.87 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
+| 0.88 | `scraper/lib/options.py:26` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:1223` `run_dump_interval` |
@@ -533,7 +534,7 @@ paths whose values disagree, the only-there paths (the audit
 defaults, the caps, the grid constants the loaders wire via
 `static_defaults`).
 
-97 leaf paths; 14 in all four; 1 shared with differing values.
+105 leaf paths; 18 in all four; 1 shared with differing values.
 
 | key-path | per-tool values |
 |---|---|

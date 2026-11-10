@@ -11,10 +11,12 @@ node/startup-only/commands row); `hidden`/`restart`/`secret` name the row's
 flags, present only when true. The hierarchy-node rows (`"node": true`, the
 bare namespace words) stay hidden unless `--nodes` asks for them. Every tool
 prints into the one flat table. With no arguments every registry prints in
-registry order; name the projects to print a subset, `--sort` orders the
-table by knob name (same-name rows keep their tool order), `--hide` drops
-the named sections and `--show` keeps only them — one or more, comma
-separated (options | show | commands); the two refuse each other:
+registry order; name the projects to print a subset — positionally or via
+`--tool` (one or more comma separated, `all` = the default; the two forms
+refuse each other) — `--sort` orders the table by knob name (same-name rows
+keep their tool order), `--hide` drops the named sections and `--show` keeps
+only them — one or more, comma separated (options | show | commands); the
+two refuse each other:
 
   python3 scripts/list_options.py            # all four
   python3 scripts/list_options.py cache      # one
@@ -22,9 +24,10 @@ separated (options | show | commands); the two refuse each other:
   python3 scripts/list_options.py --sort     # by knob name
   python3 scripts/list_options.py --hide commands,show    # the knobs only
   python3 scripts/list_options.py --show commands         # the commands only
+  python3 scripts/list_options.py --tool cache,inverter   # the two tools
 
-Exit 0 = printed; rc 2 = a bad --hide/--show section, a missing value, or
-both flags together. Stdlib only."""
+Exit 0 = printed; rc 2 = a bad --hide/--show section, an unknown --tool, a
+missing value, or the mutually exclusive flags together. Stdlib only."""
 import json
 import os
 import sys
@@ -50,24 +53,34 @@ def main():
     nodes = '--nodes' in args
     sort = '--sort' in args
     hide, show = set(), set()
+    tool_flag = []
     tools = []
     pending = None
     for a in args:
-        if pending:
-            (hide if pending == '--hide' else show).update(s.strip() for s in a.split(','))
+        if pending == '--tool':
+            tool_flag.extend(s.strip() for s in a.split(',') if s.strip())
             pending = None
-        elif a in ('--hide', '--show'):
+        elif pending:
+            (hide if pending == '--hide' else show).update(
+                s.strip() for s in a.split(',') if s.strip())
+            pending = None
+        elif a in ('--hide', '--show', '--tool'):
             pending = a
         elif a.startswith('--hide='):
-            hide.update(s.strip() for s in a[7:].split(','))
+            hide.update(s.strip() for s in a[7:].split(',') if s.strip())
         elif a.startswith('--show='):
-            show.update(s.strip() for s in a[7:].split(','))
+            show.update(s.strip() for s in a[7:].split(',') if s.strip())
+        elif a.startswith('--tool='):
+            tool_flag.extend(s.strip() for s in a[7:].split(',') if s.strip())
         elif a.startswith('--'):
             continue
         else:
             tools.append(a)
     if pending:
-        print('list_options.py: %s needs a section: %s' % (pending, ', '.join(SECTIONS)))
+        if pending == '--tool':
+            print('list_options.py: --tool needs a tool: %s, or all' % ', '.join(TOOLS))
+        else:
+            print('list_options.py: %s needs a section: %s' % (pending, ', '.join(SECTIONS)))
         return 2
     bad = sorted((hide | show) - set(SECTIONS))
     if bad:
@@ -78,6 +91,19 @@ def main():
         return 2
     keep = ([s for s in SECTIONS if s in show] if show
             else [s for s in SECTIONS if s not in hide])
+    if tool_flag:
+        if tools:
+            print('list_options.py: --tool and the named tools refuse each other')
+            return 2
+        bad = sorted({t for t in tool_flag if t != 'all'} - set(TOOLS))
+        if bad:
+            print('list_options.py: unknown tool: %s (%s, or all)' % (', '.join(bad), ', '.join(TOOLS)))
+            return 2
+        if 'all' in tool_flag:
+            tools = list(TOOLS)
+        else:
+            seen = set()
+            tools = [t for t in tool_flag if not (t in seen or seen.add(t))]
     tools = tools or TOOLS
     blocks = []
     for tool in tools:

@@ -30,7 +30,8 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   env twins — the merged-knob census view; the hierarchy-node rows
   stay hidden unless `--nodes`, `--sort` orders by knob name,
   `--hide` drops whole sections / `--show` keeps only them, comma
-  separated).
+  separated, `--tool` names the tools comma separated with `all`
+  the default).
 
 ## The checks (the shipped artifacts)
 

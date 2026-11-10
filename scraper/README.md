@@ -388,7 +388,7 @@ scraper/
 ├── schema/
 │   └── metrics.schema.json  # the metrics spec's JSON Schema (draft 2020-12)
 └── lib/
-    ├── static.json        # the static constants: protocol limits, diagnostics block, defaults
+    ├── defaults.json      # the static constants: protocol limits, diagnostics block, defaults
     ├── metrics.json       # the built-in inputs + the four canonical metrics + the scraper_* specs
     ├── statics.py         # its loader (the STATIC dict + the named aliases)
     ├── protocol.py        # Modbus TCP client (hardened framing)

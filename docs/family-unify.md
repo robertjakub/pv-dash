@@ -54,7 +54,7 @@ defaults, the live-run refusal texts).
    env resolves again.
 4. **The cache's `metrics-token` has no config layer** — the bin
    reads flag/env only (`cache/bin/modbus-cache.py:162`); a config
-   line `set metrics token ...` parses and is silently dropped, while
+   line `set metrics-token ...` parses and is silently dropped, while
    scraper/inverter/dashboard resolve the token through the full
    ladder. Outcome: resolve it in `cache/lib/config.py`, drop the
    bin-local read.
@@ -100,7 +100,7 @@ defaults, the live-run refusal texts).
 - **`metrics/listen` means two sockets** `[cache]` `[scraper]` — the
   cache's `metrics/listen` is the /metrics bind; the scraper's
   `listen` carries `"alias": "metrics/listen"`
-  (`scraper/lib/options.json:53`), so `set metrics listen` moves the
+  (`scraper/lib/options.json:53`), so `set metrics-listen` moves the
   *main* HTTP listen there. The worst same-words-different-socket in
   the family. Outcome: the alias dies; `metrics/listen` is the
   /metrics bind only.

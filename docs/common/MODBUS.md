@@ -109,10 +109,10 @@ independently):
 
 | Tool | Knobs | Role |
 |---|---|---|
-| scraper | `modbus/auth` + `modbus/auth/key` | client toward the inverter |
-| cache | `modbus/auth` + `modbus/auth/key` | server: its own clients must prove |
-| cache | `modbus/auth-upstream` + `modbus/auth-upstream-key` | client toward the inverter |
-| fake inverter | `modbus/auth` + `modbus/auth/key` | server: its clients must prove |
+| scraper | `modbus-auth` + `auth-key` | client toward the inverter |
+| cache | `modbus-auth` + `auth-key` | server: its own clients must prove |
+| cache | `auth-upstream` + `auth-upstream-key` | client toward the inverter |
+| fake inverter | `modbus-auth` + `auth-key` | server: its clients must prove |
 
 Security properties, stated plainly: the key is symmetric and the client
 proves only — the server proves nothing to the client; the `OK`/`ERR`
@@ -325,7 +325,7 @@ PDU shapes as validated by the shared parser (`common/modbus/writes.py` `describ
 
 The fake inverter implements **FC5, FC6, FC15 and FC16** (into write
 overlays on top of the simulated maps: FC6/16 the holding registers,
-FC5/15 the coil space) — behind its write gate: `write/allow` off (the
+FC5/15 the coil space) — behind its write gate: `allow-write` off (the
 default) refuses every write with exception 01 and audits
 `WRITE-REFUSED`, `--allow-write` opens it (audited `WRITE`); the cache's
 gate, mirrored. Every other write gets exception 01. A malformed write
@@ -334,9 +334,9 @@ FC5's coil value must be `0x0000` or `0xFF00` (the spec's rule; anything
 else is exception 03), and FC15's byte count must equal
 `(count + 7) // 8`.
 
-The cache forwards writes only when **both** gates pass: `write/allow`
+The cache forwards writes only when **both** gates pass: `allow-write`
 must be on *and* the client must pass the write ACL *and* the write span
-must sit inside the register allow-list (`write/registers`) — both default
+must sit inside the register allow-list (`write-registers`) — both default
 to closed; a bulk write (FC15/16) whose byte count disagrees with its
 declared register count is refused at the cache itself (exception 03,
 audited — the device never sees it). Every write outcome is audited:
@@ -374,7 +374,7 @@ or hostile reply becoming 11. A bad MBAP `length` closes the connection
 without a reply.
 
 **Fake inverter decision table** (`inverter/lib/inverter.py`): bad
-`length` → log and close; writes disabled (`write/allow` off — the
+`length` → log and close; writes disabled (`allow-write` off — the
 default) with a well-addressed write frame → 01, audited
 `WRITE-REFUSED`; FC3/4 count outside `1..125` or address
 overflow → 03; FC1/2 count outside `1..2000` → 03; strict mode with any
@@ -385,7 +385,7 @@ implemented FC with a malformed shape — **including a frame too short
 to carry its address** — → 03; any other FC → 01. The fake does **not**
 validate the unit id — it serves any requested unit and echoes it back.
 The cache's cached and diag replies echo the client's unit too; the
-configured `modbus/unit` governs only its own poll reads.
+configured unit knob (`unit` / `modbus-unit`) governs only its own poll reads.
 
 Shared client error texts: `transaction id mismatch`,
 `unexpected protocol id %d`, `reply from unit id %d, expected %d`,
@@ -433,7 +433,7 @@ profile may carry a top-level `acl.write` gate — an optional `desc` and
 the ordered `rules` list (one `{"type": "allow"|"deny", "range": ...}`
 object per rule; a whitelist: the last matching rule decides, a register
 no rule decides refuses) — which the cache's write gate compiles to
-register ranges, and its `show write registers table` answers back as
+register ranges, and its `show write-registers-table` answers back as
 the chain; `--write-registers file:<path>` reads the same gate object
 from a standalone acl file instead.
 
@@ -466,7 +466,7 @@ Pacing and caps, not rate limiting: one serialized upstream connection;
 `read-delay` sleeps between consecutive device reads in a healthy cycle
 (after a failure the sweep runs unpaced); pass-through reads wait for a
 free slot between poll reads; `max_clients` / per-IP caps gate the
-listeners (`common/serve/connlimit.py`); the connect ACL (`acl/connect`,
+listeners (`common/serve/connlimit.py`); the connect ACL (`connect-acl`,
 default any, `none` refuses all — the inline grammar or the standalone
 ip-prefix acl file via `file:<path>`; see docs/ACL.md) filters before
 auth; audit `REQUESTS`
@@ -478,23 +478,24 @@ the client idle timeout, so a silent plain client lingers until it drops.
 ## 10. Configuration surface
 
 Precedence everywhere: **flag > env > config script > default**. The
-config file speaks the set grammar; both the flat knob name and the live
-path as words normalize to the canonical key.
+config file speaks the set grammar in the flat knob names (the console's
+live/alias path spellings parse too — the canonical key comes back
+either way).
 
-| Knob | Flag | Env | Live path | Tools |
+| Knob | Flag | Env | Console spelling | Tools |
 |---|---|---|---|---|
-| `modbus-auth` | `--modbus-auth suite\|none` | `MODBUS_AUTH` | `modbus/auth` | all three |
-| `auth-key` *(secret)* | `--auth-key` | `AUTH_KEY` | `modbus/auth/key` | all three |
-| `auth-upstream` | `--auth-upstream suite\|waveshare\|none` | `AUTH_UPSTREAM` | `modbus/auth-upstream` | cache |
-| `auth-upstream-key` *(secret)* | `--auth-upstream-key` | `AUTH_UPSTREAM_KEY` | `modbus/auth-upstream-key` | cache |
-| `upstream` | `--upstream HOST:PORT` | `UPSTREAM` | `modbus/upstream` | cache, scraper |
+| `modbus-auth` | `--modbus-auth suite\|none` | `MODBUS_AUTH` | `modbus-auth` | all three |
+| `auth-key` *(secret)* | `--auth-key` | `AUTH_KEY` | `auth-key` | all three |
+| `auth-upstream` | `--auth-upstream suite\|waveshare\|none` | `AUTH_UPSTREAM` | `auth-upstream` | cache |
+| `auth-upstream-key` *(secret)* | `--auth-upstream-key` | `AUTH_UPSTREAM_KEY` | `auth-upstream-key` | cache |
+| `upstream` | `--upstream HOST:PORT` | `UPSTREAM` | `upstream` | cache, scraper |
 | `unit` / `modbus-unit` | `--unit` / `--modbus-unit` | `UNIT` / `MODBUS_UNIT` | `modbus/unit` | cache, scraper, fake (flag only) |
-| `timeout` | `--timeout` | `TIMEOUT` | `modbus/timeout` | cache, scraper |
-| `offset` | `--modbus-offset` | `MODBUS_OFFSET` | `modbus/offset` | scraper |
-| `allow-write` | `--allow-write` | `ALLOW_WRITE` | `write/allow` | cache, fake |
-| `write-registers` | `--write-registers` | `WRITE_REGISTERS` | `write/registers` (`show write registers table` answers the acl-chain report) | cache |
-| `connect-acl` | `--connect-acl` | `CONNECT_ACL` | `acl/connect` (the fake's is the bare `connect-acl`) | cache, fake |
-| `write-acl` | `--write-acl` | `WRITE_ACL` | `acl/write` | cache |
+| `timeout` | `--timeout` | `TIMEOUT` | `timeout` | cache, scraper |
+| `offset` | `--modbus-offset` | `MODBUS_OFFSET` | `modbus-offset` | scraper |
+| `allow-write` | `--allow-write` | `ALLOW_WRITE` | `allow-write` | cache, fake |
+| `write-registers` | `--write-registers` | `WRITE_REGISTERS` | `write-registers` (`show write-registers-table` answers the acl-chain report) | cache |
+| `connect-acl` | `--connect-acl` | `CONNECT_ACL` | `connect-acl` (the fake's is the bare `connect-acl`) | cache, fake |
+| `write-acl` | `--write-acl` | `WRITE_ACL` | `write-acl` | cache |
 
 Validation: `parse_auth_type` accepts the leg's schemes — `suite`
 everywhere, the cache's upstream leg also `waveshare` — or `none`/empty
@@ -509,8 +510,8 @@ owner-only `0600` file). Starting with a scheme and no key refuses at
 start; the live `set` enforces the same (including going `suite` while a
 short waveshare password stands as the key).
 
-Secret behavior: the keys never render — `show modbus auth key` answers
-`err modbus/auth/key is a secret — it never shows`; the rendered script
+Secret behavior: the keys never render — `show auth-key` answers
+`err auth-key is a secret — it never shows`; the rendered script
 (`show config`) shows the knob as `set <name> *** SECRET REMOVED ***`
 (the value never does), the parser and the wire `set` refuse that
 placeholder back, and the state dumps cannot carry a secret at all —
@@ -521,9 +522,9 @@ flag/env/config edit plus a restart. The scheme itself still sets live:
 a scheme change re-proves the NEW connections (the cache's inbound
 scheme change does **not** drop standing sessions; they keep theirs).
 
-Useful verbs (`modbus-*-ctl` / `modbus-*-cli`): `set modbus auth suite`,
-`set modbus auth key <KEY|file:path>`, `set modbus auth-upstream …`,
-`show modbus auth`, `show modbus auth-upstream` (the two legs' schemes),
+Useful verbs (`modbus-*-ctl` / `modbus-*-cli`): `set modbus-auth suite`,
+`set auth-key <KEY|file:path>`, `set auth-upstream …`,
+`show modbus-auth`, `show auth-upstream` (the two legs' schemes),
 plus the ordinary `set modbus upstream/unit/timeout/
 interval/...` rows. Startup logs name the schemes
 (`client auth: suite, upstream auth: suite`).

@@ -26,11 +26,6 @@ only the **Done/history** records for their tool —
   all while   `modbus/auth` spells `suite|none` — walk every row in the
   four registries, align the hints (the missing value words in, the
   stale words out) and decide the bool rule once (a hint or not).
-- **internally key on the flattened name, not the live** `[common]` —
-  the internal lookups still spell the bare live name
-  (`'timeout': cfg['timeout']`); switch them to the flattened form
-  (`'modbus/timeout': cfg['timeout']`): the live name is editable on
-  the wire, for identification use the flattened name (not editable).
 
 ## The security wave (the audit follow-ups)
 

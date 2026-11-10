@@ -33,7 +33,7 @@ trust of their own.
 
 | Surface | cache/ | scraper/ | inverter/ | dashboard/ | Auth |
 |---|---|---|---|---|---|
-| Modbus TCP listener | `--listen`, default `127.0.0.1:15502`; `acl/connect` on top | n/a (outbound only) | `--listen`, default `127.0.0.1:5502` (Docker `0.0.0.0:5502`); the connect-acl (inline grammar only) | n/a | none (protocol-inherent, F1) |
+| Modbus TCP listener | `--listen`, default `127.0.0.1:15502`; `connect-acl` on top | n/a (outbound only) | `--listen`, default `127.0.0.1:5502` (Docker `0.0.0.0:5502`); the connect-acl (inline grammar only) | n/a | none (protocol-inherent, F1) |
 | HTTP surface | `/metrics`: `--metrics-server` (live-settable), off; `--metrics-listen` default `127.0.0.1:9351`; `metrics/acl` at accept | the exporter: `--listen` default `127.0.0.1:9350`, two GET routes (`/`, `/metrics`), `Cache-Control: no-store`, `metrics/acl` at accept | `/metrics`: `--metrics-server`, off, default `127.0.0.1:9352`; `metrics/acl` at accept | page + proxy: `--listen` default `127.0.0.1:8080`, GET-only, the realpath-guarded static tree; own `/metrics` default `127.0.0.1:9353` | bearer token (`hmac.compare_digest`) mandatory beyond loopback on every HTTP surface (F13/F21); the loopback bind serves tokenless; `metrics/acl` sits at accept ahead of the caps — never instead of the token |
 | control server (JSON lines) | unix `/tmp/modbus-cache-<port>.socket`, `0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix `/tmp/modbus-scraper-<port>.socket`, same | unix socket, same; the TCP control exempt (F11 — a tokenless rebind succeeds live) | unix `/tmp/dashboard-<port>.socket`, same; **refuses tokenless TCP** | ONE listener tier for the family (`common/wire/control.py`): token on TCP (refused without — at start AND on the live rebind), peer-cred on unix (root, the daemon's own user, `--control-trust-uids`), the signed wire wherever a token is held, the live `control/port` rebind (bind-first, the failed bind rolls back, the sessions keep serving) |
 | state dump | `--dump-path`: the setting overrides (plus the cached words on `with-cache`) as one atomic JSON | n/a | n/a | n/a | created `0600` explicitly + a sha256 integrity hash, fail-closed restore (F18); sealed under `dump/key` when set |
@@ -73,7 +73,7 @@ the intended demo feature, gated by control-server access only.
   its policy's verbs (the default derives from the registry's command
   rows: show, plus clear where the grammar speaks it), gated once in
   `role_allows`, audited
-  `role=ops`/`role=admin` (F22); `metrics/acl` at accept ahead of the caps
+  `role=ops`/`role=admin` (F22); `metrics-acl` at accept ahead of the caps
   (`common/serve/connlimit.py` hooks, `common/settings/config.py`
   `acl_admits`); all
   non-Modbus listeners default 127.0.0.1 and speak the F13 token shape

@@ -70,14 +70,14 @@ design); the top non-man pairs:
 | 0.88 | `scraper/lib/options.py:27` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
-| 0.82 | `cache/bin/modbus-cache.py:337` `watch_dump` <-> `common/wire/control.py:1305` `run_dump_interval` |
-| 0.82 | `inverter/lib/control.py:108` `__init__` <-> `dashboard/lib/control.py:78` `__init__` |
+| 0.82 | `cache/bin/modbus-cache.py:337` `watch_dump` <-> `common/wire/control.py:1306` `run_dump_interval` |
+| 0.82 | `inverter/lib/control.py:102` `__init__` <-> `dashboard/lib/control.py:72` `__init__` |
 | 0.78 | `inverter/lib/signals.py:77` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:468` `acl_table_report` <-> `dashboard/lib/control.py:294` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:463` `acl_table_report` <-> `dashboard/lib/control.py:288` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:89` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.74 | `scraper/lib/control.py:115` `__init__` <-> `dashboard/lib/control.py:78` `__init__` |
+| 0.74 | `scraper/lib/control.py:114` `__init__` <-> `dashboard/lib/control.py:72` `__init__` |
 | 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:421` `load_write_gate_file` |
-| 0.73 | `scraper/lib/control.py:115` `__init__` <-> `inverter/lib/control.py:108` `__init__` |
+| 0.73 | `scraper/lib/control.py:114` `__init__` <-> `inverter/lib/control.py:102` `__init__` |
 | 0.72 | `common/settings/config.py:14` `resolve_target` <-> `common/runtime/daemon.py:44` `default_config_path` |
 
 ## The surface sweep — the listeners, the wire and the loops
@@ -282,18 +282,19 @@ message args — the family's refusal canon):
 
 The refusal texts (the literal SystemExit args, sorted):
 
-- `"table" is not a metrics/acl value — the table is the show: show metrics acl table`
+- `"table" is not a metrics-acl value — the table is the show: show metrics-acl-table`
 - `?`
 - `auth handshake rejected by the peer (key mismatch?)`
 - `bad auth handshake reply`
 - `battery-kwh must be a positive kWh value`
 - `battery-state must be auto|charging|discharging`
 - `connection closed by peer`
-- `fails its seal — the wrong dump/key, or edited content (nothing restored)`
+- `fails its seal — the wrong dump-key, or edited content (nothing restored)`
 - `grid-outage must be on|off|outage`
+- `listen cannot move beyond loopback while the page serves without a token (F21 in docs/AUDIT.md) — pass auth-token by flag/env/config and restart`
 - `max-kwp must be a positive kW value`
+- `metrics-listen cannot move beyond loopback while the endpoint serves without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart`
 - `metrics-server must be on or off`
-- `metrics/listen cannot move beyond loopback while the endpoint serves without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart`
 - `mppt must be both|east|west|none`
 - `no http server attached`
 - `no modbus device attached`
@@ -301,10 +302,9 @@ The refusal texts (the literal SystemExit args, sorted):
 - `not a boolean`
 - `refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind 127.0.0.1:PORT`
 - `short response: function byte only`
-- `system/listen cannot move beyond loopback while the page serves without a token (F21 in docs/AUDIT.md) — pass auth-token by flag/env/config and restart`
 - `the Waveshare password must be ASCII`
-- `the metrics endpoint serves register values: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind metrics/listen on 127.0.0.1`
-- `the metrics endpoint serves the request counters: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind metrics/listen on 127.0.0.1`
+- `the metrics endpoint serves register values: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind metrics-listen on 127.0.0.1`
+- `the metrics endpoint serves the request counters: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind metrics-listen on 127.0.0.1`
 - `the ops token must differ from the admin token (the same secret would hand every holder the role the server picks first)`
 - `time out of range (00:00-23:59)`
 - `timezone must be utc|local`
@@ -465,7 +465,7 @@ list is the TODO seed, not a verdict.
 
 **The live knobs no suite mentions** (word-bounded grep):
 
-- cache: every live knob named somewhere in the suites
+- cache: `metrics-max-conn-per-ip`
 - scraper: every live knob named somewhere in the suites
 - inverter: every live knob named somewhere in the suites
 - dashboard: `static-dir`
@@ -480,7 +480,7 @@ list is the TODO seed, not a verdict.
 **The canon phrases no suite pins**: 11
 
 **The graduation path**: the seeds carry stable IDs in
-[docs/family-drift-seeds.json](family-drift-seeds.json) (12
+[docs/family-drift-seeds.json](family-drift-seeds.json) (13
 open promise(s), the suggested suite per seed); a test wave
 consumes entries, the regeneration drops them, the shrinkage is
 the wave's proof; `--check` fails when a NEW promise ships

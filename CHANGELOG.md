@@ -12,6 +12,32 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the wire speaks the flattened registry names
+  (breaking)**: every knob's one internal name is now its options.json
+  `name` (the flat dashed key — `interval`, `max-conn-per-ip`,
+  `write-acl`), and the same flat name is the wire grammar: set/clear/
+  show/help take it, the replies render it (`ok interval=2.00s`), the
+  state dumps, the reload state files and the restart folds key it, the
+  bins' configured-value tables (`clear`'s restore base) key it, and
+  `show config` / `help config` / `show knobs` / the bare-show and node
+  listings render it (the namespace walk survives as the prose
+  hierarchy — `show audit rotate` still answers, listing the flat
+  names). The row's `live` path and `alias` become the CONSOLE
+  spellings: the cli completes and accepts them beside the flat names
+  and translates to the flat name before it sends (`set limits
+  max-conn-per-ip 9` rides the wire as `set max-conn-per-ip 9`; the
+  alias `set write acl any` as `set write-acl any`) — the wire itself
+  refuses the path words (a raw ctl or a piped script spells the flat
+  names; the config files always did). Old state dumps restore: a
+  pre-flat dump's live-path keys fold through the registry on the way
+  back in. The acl-table pointer errors, the audit-forward grammar
+  text, the F5 tokenless line and the dump-family texts spell the flat
+  names; docs/common/MODBUS.md's table column re-heads to the console
+  spelling, docs/common/ACL.md and the four READMEs follow the flat
+  forms, the man pages + MANUAL.md + OPTIONS.md regenerate, the ten
+  suites speak the flat wire. Closes the family-TODO item "internally
+  key on the flattened name, not the live".
+
 - **everywhere** — **the family code sweep: the stale code out, the
   similar code into `common/`**: the dead symbols die (the nine
   functions, the unreachable ops-token/rc-2 branches, the orphaned

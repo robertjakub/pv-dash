@@ -57,17 +57,23 @@ SECRET_REMOVED = '*** SECRET REMOVED ***'
 
 def dump_filter(overridden, raw, by_name):
     """The family-wide dump shape: the overridden settings sorted, as raw
-    re-appliable values. An overridden secret has no raw value (the raw
-    dict carries none by construction) — it rides as SECRET_REMOVED, so
-    the dump renders the knob without the value."""
+    re-appliable values. The keys speak the CONSOLE spellings — the row's
+    live path (`acl/write`, `modbus/auth`), the flat registry name only on
+    a row without a live — the state files are external artifacts (the
+    config files' rule); the readers fold both spellings back through
+    option_by_live (the flat name rides beside the live path there). An
+    overridden secret has no raw value (the raw dict carries none by
+    construction) — it rides as SECRET_REMOVED, so the dump renders the
+    knob without the value."""
     out = {}
     for k in sorted(overridden):
+        s = by_name.get(k)
+        key = (s.live or k) if s is not None else k
         if k in raw:
-            out[k] = raw[k]
+            out[key] = raw[k]
         else:
-            opt = by_name.get(k)
-            if opt is not None and getattr(opt, 'secret', False):
-                out[k] = SECRET_REMOVED
+            if s is not None and getattr(s, 'secret', False):
+                out[key] = SECRET_REMOVED
     return out
 
 

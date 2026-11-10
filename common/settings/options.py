@@ -349,7 +349,10 @@ def render_config_script(options, values, comment=None):
             v = values.get(o.name)
             if v is None or v == '':
                 continue
-            word = o.name   # the flat registry name — the line pastes onto the wire or into a config file
+            # the console spelling — the live path as words (the flat
+            # registry name on a no-live row): the line pastes onto the
+            # console, a ctl (it translates) or into a config file
+            word = ' '.join(o.live.split('/')) if o.live else o.name
             rows_left.append('set %s %s' % (word, v))
         if rows_left:
             if key:
@@ -386,19 +389,19 @@ def config_value(name, cfg, by_name, cfg_keys=None, formatters=None):
 
 def control_command(opt):
     """The knob -> control-command mapper: the command that changes this knob
-    on a running daemon — `set <flat-name> <value>` (the wire, the config
-    file and the console all take the flat registry name; the console
-    additionally accepts the row's live/alias spellings and translates), or
-    the note that the knob is startup-only (restart to apply). A knob the
-    registry marks restart carries ', restart' on its recipe — the set
-    records the value, the restart applies it. A restart-marked SECRET
-    renders no recipe at all: the wire refuses set/clear on it (a secret can
-    never ride the reload state, so it has no pending form) — it passes by
+    on a running daemon — `set <live-words> <value>` (the console's spelling
+    — the live path as words; the flat registry name answers the same set on
+    the wire, the config files and the ctls, which translate), or the note
+    that the knob is startup-only (restart to apply). A knob the registry
+    marks restart carries ', restart' on its recipe — the set records the
+    value, the restart applies it. A restart-marked SECRET renders no
+    recipe at all: the wire refuses set/clear on it (a secret can never
+    ride the reload state, so it has no pending form) — it passes by
     flag/env/config and a restart."""
     if opt.live:
         if opt.restart and opt.secret:
             return 'startup-only — pass it by flag/env/config (set/clear refuse)'
-        cmd = 'set %s <value>' % opt.name
+        cmd = 'set %s <value>' % ' '.join(opt.live.split('/'))
         if opt.restart:
             cmd += ', restart'
         return cmd

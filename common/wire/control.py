@@ -1068,9 +1068,11 @@ class ControlServer:
         An unknown setting or a value the current config rejects is skipped,
         never fatal; a *** SECRET REMOVED *** placeholder (the dump renders
         an overridden secret's knob) is skipped and named — the secret keeps
-        its current value. A PRE-FLAT dump's keys (the old live-path
-        spellings — 'audit/rotate/max-size') fold through option_by_live to
-        the flat wire names, so an older state file still restores.
+        its current value. The dump keys speak the console spellings (the
+        rows' live paths — 'audit/rotate/max-size'); the flat registry
+        names read beside them (older files): both fold through
+        option_by_live to the flat wire names, so any era's state file
+        still restores.
         APPLY_FIRST names apply before the rest (the fake's scenario: a
         preset release is the state the pins were pinned after — the pins
         must land on top of it, never under it)."""
@@ -1112,9 +1114,10 @@ class ControlServer:
         restart note true: a `set` of a restart-marked knob records the
         pending value (the dump/reload state carries it), and the execv'd
         restart applies it only if the fresh process reads it before the
-        binds. Returns the {live-name: value} of the fresh state's
-        non-secret restart knobs (a secret never rides the state — the
-        placeholder rule). Read-only: the file is left for
+        binds. Returns the {flat-name: value} of the fresh state's
+        non-secret restart knobs (the file's live-path keys fold through
+        the registry; a secret never rides the state — the placeholder
+        rule). Read-only: the file is left for
         _restore_reload_state to consume; unreadable or stale, {} (the
         restore at start() reports it)."""
         if config_path:
@@ -1132,10 +1135,15 @@ class ControlServer:
                 return {}   # stale: the restore at start() discards it and logs
         except (OSError, ValueError):
             return {}
+        by_live = {o.live: o for o in cls.OPTIONS if o.live}
         out = {}
         for name, value in (state_obj.get('settings') or {}).items():
-            opt = cls.SETTINGS.get(name)
-            if opt is not None and opt.restart and not opt.secret:
+            row = cls.SETTINGS.get(name)
+            if row is None:
+                row = by_live.get(name)   # a live-path key — the dump files' spelling
+                if row is not None:
+                    name = row.name
+            if row is not None and row.restart and not row.secret:
                 out[name] = value
         return out
 
@@ -1148,7 +1156,8 @@ class ControlServer:
         in the file either way). Returns (settings, lost-secret-names);
         raises OSError on an unwritable home."""
         settings = self.dump_settings()
-        lost = sorted(k for k in self.overridden if settings.get(k) == SECRET_REMOVED)
+        lost = sorted(k for k in self.overridden
+                      if settings.get((self.SETTINGS[k].live or k)) == SECRET_REMOVED)
         path = self._reload_state_path()
         d = os.path.dirname(path)
         if d and not os.path.isdir(d):

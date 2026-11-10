@@ -32,21 +32,23 @@ KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
 _SPEC = None   # the tool's specifics — set by run_cli() before anything reads it
 
 
-def translate(cmd):
+def translate(cmd, spellings=None):
     """The typed line's knob words -> the flat registry names. The wire
     speaks the flattened options.json names (the daemon's match map takes
     no other spelling); the console accepts the rows' live/alias path
     spellings beside the flat names and translates here — the longest
     spelling that prefixes the words wins, the rest of the line (the
-    value words) rides along. Names no setting (the command paths, the
-    node walks, the fake's `set register` words): the line passes
-    through untouched."""
+    value words) rides along. `spellings` is the tool's console-spelling
+    map (the cli passes its spec's; the one-shot ctl passes the loader's
+    SETTING_SPELLINGS — a piped config script's live-word lines translate
+    the same way). Names no setting (the command paths, the node walks,
+    the fake's `set register` words): the line passes through untouched."""
     parts = cmd.split()
     if len(parts) < 2:
         return cmd
     if parts[0].lower() not in ('set', 'clear', 'show', 'help'):
         return cmd
-    key, rest = match_setting_path(parts[1:], _SPEC['spellings'])
+    key, rest = match_setting_path(parts[1:], spellings if spellings is not None else _SPEC['spellings'])
     if key is None:
         return cmd
     return ' '.join([parts[0], key] + list(rest))

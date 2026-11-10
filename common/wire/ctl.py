@@ -14,18 +14,24 @@ import sys
 from common.runtime.audit import AUDIT_FORWARD_FORMATS, AuditLog
 from common.settings.config import parse_secret, resolve_target
 from common.render.texts import T
+from common.wire.cli import translate
 from common.wire.wiresec import sign_request, verify_reply
 
 
 def run_ctl(daemon, bin_name, app, self_note, command_help,
             ctl_socket, timeout_s, audit_max_mb, audit_files, ctl_page,
-            max_line_bytes):
+            max_line_bytes, spellings=None):
     """The whole ctl ladder: the parser (the tool's name, socket, examples),
     the batch stdin strip (comments and blanks stay comments), the token
     parse, the connect, the CONNECT audit, the signed exchange closure, the
     auth handshake and the command loop (the daemon-exit bye short-circuits
     it). `ctl_socket` is the tool's default control socket path — the
-    --control-port flag and the CTL environment override it."""
+    --control-port flag and the CTL environment override it. `spellings`
+    is the tool's console-spelling map (lib.options SETTING_SPELLINGS):
+    the console's live/alias knob spellings translate to the flat registry
+    names here exactly as the interactive cli's — a config script's
+    live-word lines pipe through the ctl unchanged (the bundled confs'
+    claim)."""
     p = argparse.ArgumentParser(description='Send commands to the %s control server (TCP or unix socket).' % daemon)
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (env CTL when unset) — same flag as %s' % self_note)
     p.add_argument('command', nargs='*', help='control command, %s' % command_help)
@@ -130,7 +136,7 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
                 raise SystemExit(1)
             required_auth = True   # the handshake holds: every reply from here is signed and verified
         for cmd in commands:
-            st, tx = exchange(s, cmd)
+            st, tx = exchange(s, translate(cmd, spellings))
             if st == 'bye' and tx.startswith('daemon-exit'):
                 print(T('ctl.daemon_exit_done') % tx.replace('daemon-exit', 'daemon exit', 1))
                 break

@@ -6,7 +6,8 @@
 
 The dialog: the knob index is the menu — arrows walk it, Enter opens the
 row as a form; arrows walk the fields, Enter edits an editable one
-(group, live, alias, setting-help, hint, the marks: internal keeps a
+(group, live, alias, setting-help, hint, the conv-typed default — the
+static rung, a secret refused categorically — the marks: internal keeps a
 command row off the cli (the wire answers), hidden hides the row
 from the ?/TAB pools, restart marks the startup-only knob; value-help
 opens its own key menu —
@@ -15,7 +16,7 @@ input line empty-handed, s saves the row (surgically: the touched row
 re-renders in the house format, the rest of the file stays
 byte-for-byte; parse-back guarded), c cancels back to the menu, q quits —
 warned away while a row holds unsaved edits. The view-only fields (flag,
-env, conv, default, help — the one-knob-one-source surfaces
+env, conv, help — the one-knob-one-source surfaces
 render them elsewhere) show with the rest; edited fields are marked.
 A live RENAME is a wave, not an edit: the daemon's _apply/defaults
 dispatch keys the live name (docs/TODO.md). An alias is an edit: the
@@ -41,7 +42,7 @@ except ImportError:
 
 PROJECTS = ('cache', 'scraper', 'inverter', 'dashboard')
 INLINE = ('name', 'flag', 'env', 'conv', 'group', 'live', 'alias', 'negates')
-EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hint', 'value-help', 'hidden', 'restart')
+EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hint', 'value-help', 'default', 'hidden', 'restart')
 SHOW_EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hidden')   # the registry's `show` rows: the
                                                                        # bucket, the live hierarchy, the
                                                                        # alias, the word's description, the mark
@@ -380,6 +381,40 @@ class Editor:
                 return False, 'err %s is a command row — only %s edit' % (name, ' | '.join(CMD_EDITABLE))
         if self.row.get('node') and key not in ('setting-help', 'group'):
             return False, 'err %s is a hierarchy node — only its setting-help and group edit' % name
+        if key == 'default':
+            # the static rung (the resolver's last ladder layer): conv-typed
+            # JSON — int/float/bool/str, never a spelling — the empty input
+            # clears (the None ladder-end); a secret refuses one outright
+            # (its default is None, categorically); min/max stay off the
+            # check (the static rung may sit below the live floor — the
+            # dump-interval 0 against the row's live min 1)
+            if self.row.get('secret'):
+                return False, 'err %s is a secret — its default is the None ladder-end, categorically' % name
+            text = (value or '').strip()
+            conv = self.row.get('conv', 'str')
+            was = self.row.get(key)
+            if not text:
+                if key not in self.row:
+                    return False, 'err %s carries no default (nothing to clear)' % name
+                del self.row[key]
+                return True, 'ok %s.default cleared (the None ladder-end)' % name
+            try:
+                if conv == 'bool':
+                    v = {'true': True, 'on': True, 'false': False, 'off': False}[text.lower()]
+                elif conv == 'int':
+                    v = int(text)
+                elif conv == 'float':
+                    v = float(text)
+                    if v != v or v in (float('inf'), float('-inf')):
+                        raise ValueError('not finite')
+                else:
+                    v = text
+            except (KeyError, ValueError):
+                return False, 'err %s.default must parse as %s (got %r)' % (name, conv, text)
+            if v == was and type(v) is type(was):
+                return False, '%s: default already %r' % (name, was)
+            self.row[key] = v
+            return True, 'ok %s.default = %s' % (name, json.dumps(v, ensure_ascii=False))
         if value:
             if key == 'group' and (any(c.isspace() for c in value) or '/' in value):
                 return False, 'err group must be one clean word'

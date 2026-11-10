@@ -13,7 +13,6 @@ name unique and one word-path, every `group` a clean word).
 
 Exit 0 = everything agrees, 1 = drift (the report says what and where).
 Stdlib only."""
-import json
 import os
 import re
 import subprocess
@@ -42,27 +41,11 @@ NIX_NAMES = {
     'dashboard': {'listen': 'listenHost', 'upstream': 'prometheusUrl', 'config-js': 'configFile'},
 }
 
-# knob -> the defaults.json defaults key when the plain name.replace('-', '_')
-# spelling is not it (the resolver picks the _s-suffixed key)
-DEFAULT_KEYS = {
-    'cache': {'timeout': 'timeout_s', 'interval': 'interval_s', 'read-delay': 'read_delay_s',
-              'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s',
-              'requests-audit': 'requests_audit_s', 'profile': 'modbus_profile'},
-    'scraper': {'timeout': 'timeout_s', 'interval': 'interval_s',
-                'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s',
-                'profile': 'modbus_profile'},
-    'inverter': {'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s',
-                 'profile': 'modbus_profile'},
-    'dashboard': {'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s'},
-}
-
-# the knobs whose default is deliberately no tree entry — a reason each
-# (the secret None is banned outright by its own row). The defaults
-# sweep graduated every named entry (the control socket's empty word,
-# the ops verbs, the metrics spec, the fake's time): the map sits
-# empty but for the fake's per-run seed — a future no-entry names its
-# reason here.
-NO_TREE_DEFAULT = {
+# the knobs whose row carries deliberately no `default` — a reason each
+# (the secrets are banned outright by their own check). The fake's
+# per-run seed is the one entry — a future no-default names its reason
+# here.
+NO_ROW_DEFAULT = {
     'cache': {},
     'scraper': {},
     'inverter': {'seed': 'a per-run choice — no default'},
@@ -148,49 +131,47 @@ def check_tool(tool):
     unnoted = sorted(o.name for o in options if o.flag and not o.node and not o.env and not o.no_env)
     rows.append((not unnoted, '%s: every flag row carries an env twin or a no-env note%s'
                  % (tool, ' — unnoted: %s' % ', '.join(unnoted) if unnoted else '')))
-    # the static defaults tree (lib/defaults.json's defaults — the resolver's
-    # last rung): every tree key some lib/ module reads (a dead letter
-    # fails — an entry nothing resolves is a lie waiting to rot), and every
-    # flag knob's default traceable — its tree key (the plain underscore
-    # spelling or a rename) or a named no-entry reason
+    # the static defaults ride the rows now (the row's `default` — the
+    # resolver's last rung, lib/config.py's DEFAULTS map reads them): every
+    # non-secret flag knob carries one (or a named no-entry reason), a
+    # secret never does (the None ladder-end, categorically), and every
+    # given default parses as the row's conv — a str-typed int or a JSON
+    # NaN would poison the resolver and the renderers downstream
     lib_dir = os.path.join(REPO, tool_dir, 'lib')
-    with open(os.path.join(lib_dir, 'defaults.json'), encoding='utf-8') as f:
-        tree = json.load(f).get('defaults') or {}
-    tree_keys = set(tree.keys())
-    referenced = set()
-    for name in sorted(os.listdir(lib_dir)):
-        if name.endswith('.py'):
-            src = open(os.path.join(lib_dir, name), encoding='utf-8').read()
-            referenced |= set(re.findall(r"DEFAULTS(?:\.get\(|\[)'([a-z0-9_]+)'", src))
-    dead = sorted(tree_keys - referenced)
-    rows.append((not dead, '%s: every defaults.json defaults key is read by lib/%s'
-                 % (tool, ' — dead: %s' % ', '.join(dead) if dead else '')))
-    keys = DEFAULT_KEYS.get(tool, {})
-    reasons = NO_TREE_DEFAULT.get(tool, {})
-    unbacked = sorted('--' + o.name for o in options
-                      if o.flag and not o.node
-                      and not (o.secret
-                               or keys.get(o.name, o.name.replace('-', '_')) in tree_keys
-                               or o.name in reasons))
-    rows.append((not unbacked, '%s: every flag knob\'s default is a defaults-tree key or a named no-entry%s'
-                 % (tool, ' — unbacked: %s' % ', '.join(unbacked) if unbacked else '')))
-    # the ops-verbs policy: the tree literal is the resolver's static rung,
-    # the registry's default_ops_verbs the derivation the prose renders —
-    # the gate pins the two together (one truth, two faces)
+    reasons = NO_ROW_DEFAULT.get(tool, {})
+    nodefaul = sorted('--' + o.name for o in options
+                      if o.flag and not o.node and not o.secret
+                      and o.static_default is None and o.name not in reasons)
+    rows.append((not nodefaul, '%s: every non-secret flag knob\'s row carries its default%s'
+                 % (tool, ' — nodefault: %s' % ', '.join(nodefaul) if nodefaul else '')))
+    secret_defaults = sorted('--' + o.name for o in options
+                             if o.secret and o.static_default is not None)
+    rows.append((not secret_defaults, '%s: no secret row carries a default (the default is None, never a settable default)%s'
+                 % (tool, ' — secret defaults: %s' % ', '.join(secret_defaults) if secret_defaults else '')))
+    bad_typed = []
+    for o in options:
+        d = o.static_default
+        if d is None or o.node:
+            continue
+        ok_type = ((o.conv is bool and isinstance(d, bool))
+                   or (o.conv is int and isinstance(d, int) and not isinstance(d, bool))
+                   or (o.conv is float and isinstance(d, (int, float)) and not isinstance(d, bool)
+                       and d == d and d not in (float('inf'), float('-inf')))
+                   or (o.conv is str and isinstance(d, str)))
+        if not ok_type:
+            bad_typed.append('--' + o.name)
+    rows.append((not bad_typed, '%s: every row default parses as the row\'s conv%s'
+                 % (tool, ' — mistyped: %s' % ', '.join(bad_typed) if bad_typed else '')))
+    # the ops-verbs policy: the row's `default` is the resolver's static
+    # rung, the registry's default_ops_verbs the derivation the prose
+    # renders — the gate pins the two together (one truth, two faces)
     expected_verbs = default_ops_verbs(verbs)
-    got_verbs = tree.get('control_ops_verbs')
+    ops_row = next((o for o in options if o.name == 'control-ops-verbs'), None)
+    got_verbs = ops_row.static_default if ops_row else None
     rows.append((got_verbs == expected_verbs,
-                 '%s: the tree\'s control_ops_verbs matches the registry\'s default_ops_verbs%s'
+                 '%s: the ops-verbs row\'s default matches the registry\'s default_ops_verbs%s'
                  % (tool, '' if got_verbs == expected_verbs
-                    else ' — tree: %r, derived: %r' % (got_verbs, expected_verbs))))
-    # a secret never takes a settable default: its default is the None
-    # ladder-end, categorically — a tree entry naming one fails even
-    # before a resolver could wire it (a shipped secret default rides
-    # every install)
-    secret_keys = sorted('--' + o.name for o in options if o.secret
-                         and keys.get(o.name, o.name.replace('-', '_')) in tree_keys)
-    rows.append((not secret_keys, '%s: no defaults-tree key names a secret (the default is None, never a settable default)%s'
-                 % (tool, ' — secret tree keys: %s' % ', '.join(secret_keys) if secret_keys else '')))
+                    else ' — row: %r, derived: %r' % (got_verbs, expected_verbs))))
     # the family's unit-id range (common/modbus/protocol.json): every tool
     # with a unit knob checks the configured unit against it — the
     # dashboard (no unit knob) sits out

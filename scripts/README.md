@@ -13,9 +13,9 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
 - **`check_options.py`** — the option gates, per tool: every live
   setting unique and word-path clean, every flag/env/secret/restart
   row honest, the show/commands vocabularies, the README-flag and the
-  NixOS-option parity, the defaults.json defaults tree read (no dead
-  letters) with every flag knob's default a tree key or a named
-  no-entry, the bundled configs naming registry options
+  NixOS-option parity, the row defaults present and conv-typed (a
+  secret carries none), the ops-verbs default pinned to the
+  derivation, the bundled configs naming registry options
   only. `python3 scripts/check_options.py` (the ten-suite battery's
   precondition).
 - **`lint_options.py`** — lint + reformat the four

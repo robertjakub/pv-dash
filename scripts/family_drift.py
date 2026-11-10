@@ -59,7 +59,8 @@ The sweep types — what we are sweeping:
 10. THE F-LEDGER SWEEP. docs/AUDIT.md's F-numbers vs the tree: which
     tools' files cite each F, and the F's title. The promise ledger
     against the code.
-11. THE STATICS SWEEP. The four lib/defaults.json blocks diffed by
+11. THE STATICS SWEEP. The four lib/defaults.json blocks (the non-knob
+    statics since the defaults moved into the registry rows) diffed by
     key-path: the shared paths whose values disagree, the
     only-there paths.
 12. THE SCHEMA/EXAMPLE SWEEP. The JSON Schemas' properties against
@@ -403,17 +404,15 @@ def nixos(rows):
 
 def knob_ports(rows):
     """The ports the registries back: the listen/metrics-listen knobs'
-    defaults (lib/defaults.json's defaults dict — the resolver's last rung)
-    -> the port set. A published port outside this set is the lie the
-    sweep exists for."""
+    defaults (the rows' `default` — the resolver's static rung) -> the
+    port set. A published port outside this set is the lie the sweep
+    exists for."""
     backed = {}
     for t in TOOLS:
-        with open(os.path.join(REPO, t, 'lib', 'defaults.json'), encoding='utf-8') as f:
-            defaults = json.load(f).get('defaults') or {}
         for n, r in rows[t].items():
             live = r.get('live') or ''
             if n in ('listen', 'metrics-listen') or live.endswith('/listen'):
-                d = defaults.get(n.replace('-', '_'))
+                d = r.get('default')
                 if isinstance(d, str) and ':' in d:
                     backed.setdefault(int(d.rsplit(':', 1)[1]), []).append(f'{t}:{n}')
     return backed
@@ -499,7 +498,9 @@ def coverage(rows, cmds, canon):
 
 
 def statics():
-    """The four lib/defaults.json key-path matrices."""
+    """The four lib/defaults.json key-path matrices — the non-knob statics
+    since the defaults moved into the registry rows (the knobs' `default`
+    fields)."""
     maps = {}
     for t in TOOLS:
         with open(os.path.join(REPO, t, 'lib', 'defaults.json'), encoding='utf-8') as f:
@@ -675,10 +676,10 @@ files cite it — the promise ledger against the code."""
 STATICS_HEAD = """\
 ## The statics sweep — the four defaults.json blocks
 
-Every leaf key-path of the four `lib/defaults.json` files: the shared
-paths whose values disagree, the only-there paths (the audit
-defaults, the caps, the grid constants the loaders wire via
-`static_defaults`)."""
+Every leaf key-path of the four `lib/defaults.json` files (the non-knob
+statics since the knobs' defaults moved into the registry rows'
+`default` fields): the shared paths whose values disagree, the
+only-there paths."""
 
 SCHEMA_HEAD = """\
 ## The schema/example sweep — the derived sources
@@ -883,12 +884,11 @@ The findings:
 STATICS_FINDINGS = """\
 The findings:
 
-- **The defaults.json blocks are the tools' personalities** (the
-  simulators' grid constants, the caps' defaults) — the drift that
-  matters is the FAMILY defaults (the audit rotation, the log
-  levels, the cap defaults) disagreeing: those wire through
-  `static_defaults`/`choices` into the registries and the set
-  grammar. The shared-path matrix is the ruling surface."""
+- **The defaults.json blocks are the non-knob statics' home** (the
+  simulators' grid constants, the diagnostics block, the log levels)
+  — the knobs' defaults live in the registry rows' `default` fields
+  now (edit_options edits them; check_options validates them). The
+  shared-path matrix is the ruling surface for what remains."""
 
 SCHEMA_FINDINGS = """\
 The findings:

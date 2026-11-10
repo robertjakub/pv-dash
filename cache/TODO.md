@@ -5,6 +5,12 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The audit family live family-wide (the template's role): the dump's
+seven audit rows fold the shared `audit_dump_rows()` — one shape on all
+four tools (the scraper/fake/dashboard gained the daily row) — and
+`clear audit/log-file`'s default spells the apply-valid raw `-`/`none`
+instead of the display words (`stdout`/`remote` re-applied as paths).
+
 The family-wide code sweep (the shared-live-knobs wave): the control
 plane (the port rebind, the ops policy, the trusted peers, the socket
 group), the audit family's seven swaps, the log level, the local-time

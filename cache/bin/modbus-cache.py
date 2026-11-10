@@ -309,7 +309,7 @@ def main():
                     'control/ops/verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
                     'control/trust-uids': ','.join(str(u) for u in sorted(cfg['control_trust_uids'] or [])) or 'off',
                     'control/socket-group': 'on' if cfg['control_socket_group'] else 'off',
-                    'audit/log-file': audit_display,
+                    'audit/log-file': 'off' if cfg['no_audit_log'] else (cfg['audit_log'] or default_audit_path('modbus-cache')),
                     'audit/rotate/max-size': '%g' % cfg['audit_max_mb'],
                     'audit/rotate/daily': 'on' if cfg['audit_daily'] else 'off',
                     'audit/rotate/files': '%d' % cfg['audit_files'],

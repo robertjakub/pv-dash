@@ -727,7 +727,6 @@ class ControlServer(_ControlServer):
         SECRET_REMOVED placeholder occurs; the dump filter's secret branch
         stays as the class invariant's guard."""
         p = self.proxy
-        prm = p.audit_params
         raw = {
             'modbus/interval': p.interval, 'cache/ttl': p.cache.cache_ttl,
             'modbus/read-delay': p.read_delay,
@@ -754,13 +753,7 @@ class ControlServer(_ControlServer):
             'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
             'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control/socket-group': 'on' if self.socket_group else 'off',
-            'audit/log-file': ('off' if (p.audit is None or p.audit.disabled) else p.audit.path),
-            'audit/forward': p.audit_params.get('forward') or 'none',
-            'audit/forward/format': p.audit_params.get('forward_format') or 'rfc5424',
-            'audit/rotate/max-size': '%g' % prm['max_mb'],
-            'audit/rotate/daily': 'on' if prm['daily'] else 'off',
-            'audit/rotate/files': '%d' % prm['files'],
-            'audit/disable': 'on' if prm['disabled'] else 'off',
+            **self.audit_dump_rows(),
             'dump/path': p.dump_path or 'off',
             'dump/with-cache': 'on' if p.dump_with_cache else 'off',
             'dump/restore-on-start': 'on' if getattr(p, 'restore_on_start', False) else 'off',

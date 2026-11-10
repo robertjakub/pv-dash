@@ -40,7 +40,8 @@ signed commands are mandatory. The command string folds to the grammar's
 printable 8-bit before the server decides on it (NFKD, then the
 printable-ascii range only \\(em \\fBshöw\\fR runs as \\fBshow\\fR); the mac
 still certifies the client's exact bytes. A second, read-only token
-(\\fB--control-ops-token\\fR) authenticates into the show/clear verbs only
+(\\fB--control-ops-token\\fR) authenticates into its policy's verbs
+only (the default policy: show)
 \\(em the ops shift against the admin key, both roles audited."""
     signals = """.SH SIGNALS
 .TP
@@ -100,8 +101,9 @@ control surface is loopback-only (TCP) or a 0600 unix socket (0660 with
 \\fB--control-socket-group\\fR); a TCP
 control port without a token refuses to start (F5); with a token the wire
 is signed and the commands/replies verify end to end; a second, read-only
-ops token (\\fB--control-ops-token\\fR) scopes its sessions to the
-show/clear verbs. The audit trail (in the XDG state home when
+ops token (\\fB--control-ops-token\\fR) scopes its sessions to its
+policy's verbs (the default policy: show). The audit trail (in the XDG
+state home when
 \\fB--audit-log\\fR is unset, prefix DSH) records the control commands with
 their roles, the auth failures, the reloads and the shutdowns. With
 \\fB--audit-forward\\fR every line \\(em the per\\-writer hash chain

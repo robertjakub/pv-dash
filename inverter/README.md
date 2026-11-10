@@ -158,7 +158,7 @@ the config names one and the start refuses. The flags:
 | `--metrics-token` / `--metrics-acl` | off / `any` | the /metrics bearer token (`file:<path>` welcome) / the connect ACL (the ip-prefix grammar) |
 | `--metrics-max-clients` / `--metrics-client-timeout` / `--metrics-max-conn-per-ip` | `64` / `5` / `0` | the metrics caps |
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
-| `--control-token` / `--control-ops-token` / `--control-ops-verbs` | off / off / `show,clear` | the control tokens (a secret, `file:<path>` welcome) / the ops role's RBAC policy |
+| `--control-token` / `--control-ops-token` / `--control-ops-verbs` | off / off / `show` | the control tokens (a secret, `file:<path>` welcome) / the ops role's RBAC policy (`clear` is not a verb here) |
 | `--control-trust-uids` / `--control-socket-group` / `--control-log-replies` | none / off / off | the extra trusted uids (`SO_PEERCRED`) / the socket's 0660 mode / DEBUG-log the control replies |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the pins, the machines — the tokens apart; every `--dump-interval` seconds) |
 | `--chaos` / `--seed` | `0` / random | the chaos probability / the RNG seed — see [Chaos injection](#chaos-injection---chaos) |

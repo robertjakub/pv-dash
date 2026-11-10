@@ -14,7 +14,7 @@ handshake). With a token configured the wire is HMAC-signed: every command
 and reply carries the full sha256 HMAC of its payload, keyed by the token
 (common/wire/wiresec.py) — a token-holding client verifies both directions; over
 TCP the signed commands are mandatory. A second, read-only token
-(--control-ops-token) authenticates into the show/clear verbs only — the
+(--control-ops-token) authenticates into its policy's verbs only (the
 ops shift against the admin key, both audited."""
 import logging
 import os
@@ -22,7 +22,7 @@ import time
 
 from common.render.human import secs
 from common.runtime.version import version_string
-from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, command_verb, role_allows, role_tag
 from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
 from common.settings.config import acl_table, acl_value_text, is_loopback_host, parse_listen, \
     resolve_metrics_acl
@@ -48,7 +48,7 @@ class ControlServer(_ControlServer):
     replaced, unlinked on shutdown). A TCP connection must authenticate with
     the token first when one is configured; the unix socket relies on
     filesystem permissions. A second, read-only token (ops_token) may be
-    configured beside the admin token: it authenticates into the show/clear
+    configured beside the admin token: it authenticates into its policy's
     verbs only — no set/unset, no request reload-config, no request reload,
     no request dump/restore, no shutdown
     (common/wire/wiresec.py's roles). `stopper` is the graceful-stop callback

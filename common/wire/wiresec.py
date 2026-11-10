@@ -34,10 +34,13 @@ role gate and the command run.
 
 A daemon may carry a **second token, the read-only ops role**
 (ROLE_ADMIN / ROLE_OPS): the admin key keeps every verb, the ops key
-authenticates into its policy's verbs only — by default the show/clear
-verbs (ROLE_POLICIES, per daemon configurable with --control-ops-verbs) —
-no set/unset, no request dump/restore or reload, no restart, no shutdown
-(the ops shift can look, flush a cache, and leave; the admin key steers).
+authenticates into its policy's verbs only — the default policy derives
+from the registry's command rows (default_ops_verbs: `show`, plus
+`clear` where the grammar speaks it — the cache's show/clear; the
+per-daemon override rides --control-ops-verbs) — no set/unset, no
+request dump/restore or reload, no restart, no shutdown (the ops shift
+can look, flush a cache where one exists, and leave; the admin key
+steers).
 The gate is the command's head verb against the role's policy
 (role_allows), the session's replies are mac'd with the key it
 authenticated with, and the audit trail names the role on every COMMAND
@@ -60,7 +63,7 @@ OPS_VERBS = frozenset(('show', 'clear'))
 SESSION_VERBS = frozenset(('help', '?', 'ping', 'quit'))
 ROLE_POLICIES = {
     ROLE_ADMIN: None,            # None = the full verb set
-    ROLE_OPS: OPS_VERBS,         # the read-only shift's default policy
+    ROLE_OPS: OPS_VERBS,         # the family fallback (a daemon's parsed policy always rides explicit)
 }
 
 

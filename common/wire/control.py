@@ -26,9 +26,9 @@ from common.runtime.logutil import UtcFormatter
 from common.wire.cred import peer_uid, parse_trust_uids
 from common.settings.config import parse_control_target
 from common.settings.dump import SECRET_REMOVED
-from common.settings.options import config_value, control_command, describe_command_node, describe_node, \
-    describe_root, grouped_rows, knob_dictionary, known_verbs, make_describe, match_setting_path, \
-    render_config_script
+from common.settings.options import config_value, control_command, default_ops_verbs, describe_command_node, \
+    describe_node, describe_root, grouped_rows, knob_dictionary, known_verbs, make_describe, \
+    match_setting_path, render_config_script
 from common.render.human import secs
 from common.render.texts import T
 from common.runtime.version import version_string
@@ -121,7 +121,8 @@ class ControlServer:
         self.audit = audit               # the audit trail (common.audit), None = off
         self.token = token               # the TCP auth token (the admin role); None = no auth (the unix = the perms)
         self.ops_token = ops_token       # the read-only ops token (the ops role); None = off
-        self.ops_verbs = frozenset(v.lower() for v in (ops_verbs or OPS_VERBS))   # the ops role's RBAC policy
+        # the ops role's RBAC policy — the fallback derives from this server's own command rows
+        self.ops_verbs = frozenset(v.lower() for v in (ops_verbs or default_ops_verbs(known_verbs(self.COMMANDS))))
         self.audit_params = {}           # the audit family's live swaps rebuild from these (the subclass re-homes)
         self.config_path = config_path   # the config script the daemon started from — the reload state lives beside it
         self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
@@ -378,7 +379,7 @@ class ControlServer:
 
     def framed(self, line, who, role):
         """One wire frame in, one out: parse {"cmd": ...}, gate the TCP auth,
-        gate the ops role (show/clear only), verify the frame mac keyed by
+        gate the ops role (the policy's verbs), verify the frame mac keyed by
         the session's token, fold the client's utf-8 to the grammar's
         printable 8-bit, run the command. Returns (cmd, reply-obj,
         internal-reply, role) — the role so the auth reply can promote the

@@ -151,10 +151,10 @@ file:/run/credentials/...)
 .TP
 .B \-\-control\-ops\-token
 a second, read\-only control token: sessions authenticating with it may
-run the show/clear verbs only (no set/unset, no reset, no shutdown) —
-the ops shift against the admin key, both audited; the value may be
-`file:<path>` — the first line of an owner\-only 0600 file (a systemd
-LoadCredential rides as file:/run/credentials/...) (env
+run its policy's verbs only (the default policy: show) (no set/unset, no
+reset, no shutdown) — the ops shift against the admin key, both audited;
+the value may be `file:<path>` — the first line of an owner\-only 0600
+file (a systemd LoadCredential rides as file:/run/credentials/...) (env
 CONTROL_OPS_TOKEN)
 .TP
 .B \-\-control\-ops\-verbs

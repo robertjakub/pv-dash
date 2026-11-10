@@ -22,7 +22,7 @@ from common.settings.config import auth_key_floor_error, default_profile_path, i
 from common.settings.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
 from common.render.human import secs
-from common.wire.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.wire.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, command_verb, role_allows, role_tag
 from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
 from common.settings.options import control_command, grouped_rows
 from common.render.texts import T

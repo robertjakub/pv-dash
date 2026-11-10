@@ -51,8 +51,9 @@ control token configured the wire is HMAC-signed: every command and reply
 carries the full sha256 of its payload, keyed by the token
 (common/wire/wiresec.py) \\(em a token-holding client verifies both directions,
 and over TCP the signed commands are mandatory. A second, read-only token
-(\\fB--control-ops-token\\fR) authenticates into the show/clear verbs only
-\\(em the ops shift against the admin key, both roles audited."""
+(\\fB--control-ops-token\\fR) authenticates into its policy's verbs
+only (the default policy: show) \(em the ops shift against the admin
+key, both roles audited."""
     signals = """.SH SIGNALS
 .TP
 .B SIGHUP
@@ -97,7 +98,8 @@ caps on. The control surface is loopback-only (TCP) or a 0600 unix socket;
 a TCP control port without a token refuses to start (F5); with a token the
 wire is signed and the commands/replies verify end to end; a second,
 read-only ops token (\\fB--control-ops-token\\fR) scopes its sessions to
-the show/clear verbs. The audit trail (in the XDG state home when
+its policy's verbs (the default policy: show). The audit trail (in the
+XDG state home when
 \\fB--audit-log\\fR is unset, prefix SCR) records the control commands
 with their roles, the auth failures, the reloads and the shutdowns. With
 \\fB--audit-forward\\fR every line \\(em the per\\-writer hash chain

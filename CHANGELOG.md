@@ -12,6 +12,19 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the family-wide documentation regeneration and the
+  stale sweep**: every generated surface re-emitted (`docs/OPTIONS.md`
+  was two waves stale — the audit-forward pair was missing from the
+  common-knob census, 29 -> 31), the three tools' `--control-ops-verbs`
+  default rows speak the derived policy (`show` — the READMEs claimed
+  the family's old `show,clear`; the cache keeps it), the ops-role
+  prose (the registries' control-ops-token rows, the control module
+  docstrings, the man prose, the wiresec module doc, AUDIT.md's F22
+  paragraph) scopes the ops shift to "its policy's verbs" instead of
+  the show/clear spelling, and the scraper's set row lists
+  `control ops verbs`/`control trust-uids` as the settable knobs they
+  now are.
+
 - **everywhere** — **the family-wide code sweep**: the shared live
   knobs (the control plane — the port rebind, the ops policy, the
   trusted peers, the socket group; the audit family's seven swaps;

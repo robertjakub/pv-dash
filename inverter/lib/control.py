@@ -10,7 +10,7 @@ json module): the request = {"cmd": "<command>"}, the reply =
 handshake when --control-token is set ({"cmd": "auth", "token": ...}); over
 the unix socket a kernel-vouched peer (root, the daemon's own user or
 --control-trust-uids — SO_PEERCRED) skips the handshake. A second,
-read-only token (--control-ops-token) authenticates into the show/clear
+read-only token (--control-ops-token) authenticates into its policy's verbs (the
 verbs only — the ops shift against the admin key, both audited."""
 import json
 import logging
@@ -25,7 +25,7 @@ from common.settings.config import acl_table, acl_text, acl_value_text, parse_ac
     parse_listen, resolve_metrics_acl
 from common.render.human import secs
 from common.modbus import AUTH_MIN_KEY
-from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
+from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, command_verb, role_allows, role_tag
 from common.wire.control import ControlServer as _ControlServer, num, on_off
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
@@ -57,7 +57,7 @@ class ControlServer(_ControlServer):
     is configured — over the unix socket a kernel-vouched peer (root, the
     daemon's own user or trust_uids — SO_PEERCRED) skips the handshake. A
     second, read-only token (ops_token) may be configured beside the admin
-    token: it authenticates into the show/clear verbs only —     no set/unset,
+    token: it authenticates into its policy's verbs —     no set/unset,
     no reset, no reload, no shutdown (common/wire/wiresec.py's roles). The
     listener rides the base's rebind family: a live `set control/port`
     swaps the socket (bind first, the failed bind rolls back, the sessions

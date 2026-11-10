@@ -14,7 +14,7 @@ Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`
 here. The ctl/cli clients speak the control plane only
 (`--control-port`, the token file/env pair) and are not compared.
 
-Common to **all four** tools (29): `audit`, `audit-daily`, `audit-files`, `audit-log`, `audit-max-mb`, `audit/rotate`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`. The control-plane block is
+Common to **all four** tools (31): `audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-log`, `audit-max-mb`, `audit/rotate`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`. The control-plane block is
 shared nearly verbatim; the audit, limits and metrics blocks follow the
 family shape with per-tool defaults. The show commands `config`, `connections`, `knobs`, `metrics-acl-table`, `version` ride
 on all four too (the per-tool extras carry their own rows below).
@@ -26,6 +26,8 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `audit` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `audit-daily` |  | `set audit rotate daily` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** live | **✓** | **✓** |
+| k | `audit-forward` |  | `set audit forward` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `audit-forward-format` |  | `set audit forward-format` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** live | **✓** | **✓** |
 | k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** live | **✓** | **✓** |
 | c | `audit/rotate` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |

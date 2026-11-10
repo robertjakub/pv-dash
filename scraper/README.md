@@ -225,7 +225,7 @@ set log-level INFO
 | `--metrics-acl` | `any` | the clients allowed to **connect** to /metrics: `any`, `none`, comma-separated IPs/prefixes, `file:<path>` (the ip-prefix acl file — the grammar lives in [docs/ACL.md](../docs/ACL.md)); checked at accept; live-settable |
 | `--control-port` | `/tmp/modbus-scraper-<listen-port>.socket` | the JSON-lines control server target (unix socket path or TCP port), `0` = off |
 | `--control-token` / `--control-ops-token` | off | the control tokens (a TCP control port refuses to start without the admin token, F5); `file:<path>` welcome |
-| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy |
+| `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`clear` is not a verb here — there is nothing to flush) |
 | `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
 | `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | XDG state | the SCR audit trail: a file path, `-` for stdout (the docker/journald way) or `none` (no local file — the forward carries the trail); the forward mirrors every line onward (F10) |
@@ -284,7 +284,7 @@ command, settable (`set`/`unset`) or show-only — is tabled in
 
 | Command | Effect |
 |---|---|
-| `set` / `unset` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `modbus auth` (the scheme swaps live), `metrics acl`, the control verbs/socket-group, `control port` (rebinds the listener live) — `system listen` (the serve address, `show system listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
+| `set` / `unset` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show system listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
 | `poll now` | the loop wakes immediately |
 | `show connections` | the live HTTP clients of /metrics |
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |

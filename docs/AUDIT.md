@@ -69,8 +69,10 @@ the intended demo feature, gated by control-server access only.
   (`common/wire/control.py` `trusted_peer`, `common/wire/cred.py`);
   wherever a token is held the
   wire is signed both directions (`common/wire/wiresec.py`, constant-time
-  `hmac.compare_digest`); the read-only ops role scopes its sessions to the
-  show/clear verbs, gated once in `role_allows`, audited
+  `hmac.compare_digest`); the read-only ops role scopes its sessions to
+  its policy's verbs (the default derives from the registry's command
+  rows: show, plus clear where the grammar speaks it), gated once in
+  `role_allows`, audited
   `role=ops`/`role=admin` (F22); `metrics/acl` at accept ahead of the caps
   (`common/serve/connlimit.py` hooks, `common/settings/config.py`
   `acl_admits`); all

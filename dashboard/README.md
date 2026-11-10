@@ -151,7 +151,7 @@ control server.
 | `--metrics-max-clients` / `--metrics-client-timeout` / `--metrics-max-conn-per-ip` | `16` / `5` / `0` | the metrics caps |
 | `--control-port` | `/tmp/dashboard-<port>.socket` | the control server target (unix path or TCP port), `0` = off |
 | `--control-token` / `--control-ops-token` | off | the control tokens (a TCP control port refuses to start without the admin token, F5); `file:<path>` welcome |
-| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy |
+| `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`clear` is not a verb here) |
 | `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
 | `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | the XDG state home | the DSH audit trail: a file path, `-` for stdout (the docker logs / journald way) or `none` (no local file — the forward carries the trail) + the rotation/off + the forward (F10) |

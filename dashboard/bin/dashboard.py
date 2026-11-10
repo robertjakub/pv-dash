@@ -40,7 +40,7 @@ from lib.config import CONTROL_SOCKET_TEMPLATE, resolve_config
 from lib.control import ControlServer
 from lib.man import daemon_page
 from lib.metrics import MetricsServer, describe_metrics
-from lib.options import KNOWN_VERBS, OPTIONS
+from lib.options import DEFAULT_OPS_VERBS, KNOWN_VERBS, OPTIONS
 from lib.statics import DEFAULTS, PROXY_TIMEOUT_S
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -307,14 +307,14 @@ def main():
     control_token = cfg['control_token'] or None
     control_ops_token = cfg['control_ops_token'] or None
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
-    ops_verbs = parse_ops_verbs(cfg['control_ops_verbs'], KNOWN_VERBS)
+    ops_verbs = parse_ops_verbs(cfg['control_ops_verbs'], KNOWN_VERBS, default=DEFAULT_OPS_VERBS)
     metrics_token = parse_secret(args.metrics_token or cfg.get('metrics_token'), 'metrics/token')
-    metrics_listen = parse_listen(cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9353'))
+    metrics_listen = parse_listen(cfg.get('metrics_listen') or DEFAULTS['metrics_listen'])
     metrics_acl, metrics_acl_warn = resolve_metrics_acl(cfg.get('metrics_acl') or 'any', 'metrics/acl')
     if cfg['metrics_server'] and not metrics_token and not is_loopback_host(metrics_listen[0]):
         logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
                      'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
-                     % (cfg.get('metrics_listen') or DEFAULTS.get('metrics_listen', '127.0.0.1:9353')))
+                     % (cfg.get('metrics_listen') or DEFAULTS['metrics_listen']))
         raise SystemExit(2)
     if not cfg['auth_token'] and not is_loopback_host(listen_host):
         logger.error('refusing to expose the page beyond loopback without a token (F21 in docs/AUDIT.md): '
@@ -322,8 +322,9 @@ def main():
         raise SystemExit(2)
     metrics_desc = 'off'
     if cfg['metrics_server']:
-        metrics_desc = describe_metrics(metrics_listen, metrics_token, cfg.get('metrics_max_clients', 16),
-                                        cfg.get('metrics_max_conn_per_ip', 0))
+        metrics_desc = describe_metrics(metrics_listen, metrics_token,
+                                        cfg.get('metrics_max_clients', DEFAULTS['metrics_max_clients']),
+                                        cfg.get('metrics_max_conn_per_ip', DEFAULTS['metrics_max_conn_per_ip']))
     audit_params = {'path': None if cfg['no_audit_log'] else cfg['audit_log'],
                     'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],
                     'daily': cfg['audit_daily'],

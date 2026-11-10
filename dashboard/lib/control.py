@@ -21,16 +21,15 @@ import os
 import time
 
 from common.render.human import secs
-from common.runtime.audit import AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward
 from common.runtime.version import version_string
 from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.wire.control import ControlServer as _ControlServer, num, numi
-from common.settings.config import acl_table, acl_value_text, is_loopback_host, parse_control_target, parse_listen, \
+from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
+from common.settings.config import acl_table, acl_value_text, is_loopback_host, parse_listen, \
     resolve_metrics_acl
-from common.wire.cred import parse_trust_uids
 from common.settings.dump import SECRET_REMOVED, dump_filter
+from common.render.texts import T
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
-    COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN, KNOWN_VERBS
+    COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .statics import CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
@@ -64,6 +63,11 @@ class ControlServer(_ControlServer):
     RELOAD_TEXT = 'the dashboard is reloading — the daemon restarts with the saved configuration'
     CFG_KEYS = CFG_KEYS   # the registry's knob -> cfg-key renames (show config)
     APP = 'dashboard'
+    AUDIT_PREFIX = 'DSH'
+    AUDIT_APP = 'dashboard'
+    CONTROL_PORT_DEFAULT = DEFAULT_LISTEN_PORT
+    CONTROL_SOCKET_TEMPLATE = CONTROL_SOCKET_TEMPLATE
+    LOG_LEVELS = LOG_LEVELS
     COMMANDS = COMMANDS
     COMMAND_HELP = COMMAND_HELP
     COMMAND_GROUPS = COMMAND_GROUPS
@@ -98,6 +102,11 @@ class ControlServer(_ControlServer):
         self.metrics_acl_warn = None     # the metrics/acl file's permission warning (the stash, None = no warning standing)
         self.metrics_caps = None         # the /metrics caps the entry configured (the re-enable reads them — the cache's p.metrics_caps reading)
         self.metrics_desc = 'off'        # the status/inspect one-liner
+
+    def record_cfg(self, updates):
+        """The live truth rides the startup values (the show-config-writeback
+        contract — show_config_cfg renders them)."""
+        self.startup_values.update(updates)
 
     def command_help(self):
         """The one-line command reference: the state-dump commands appear
@@ -134,12 +143,10 @@ class ControlServer(_ControlServer):
         rs = SETTING_BY_NAME.get(key)
         if rs is not None and rs.restart:   # a startup-only knob: validate + record the pending value
             if rs.secret:
-                raise ValueError('restart required (startup-only knob)')
-            if key == 'dump/restore-on-start':
-                if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
-                    raise ValueError('dump/restore-on-start must be on or off')
-                self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
-                return self.defaults[key]
+                raise ValueError(T('wire.restart_required'))
+            handled, shown = self.apply_restart_key(key, val)
+            if handled:
+                return shown
             if key == 'system/listen':
                 try:
                     t = parse_listen(val)
@@ -151,7 +158,11 @@ class ControlServer(_ControlServer):
                                      'flag/env/config and restart')
                 self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
-            raise ValueError('unknown setting %s' % key)
+            raise ValueError(T('wire.unknown_setting_bare') % key)
+
+        handled, shown = self.apply_family_key(key, val)   # the family's shared knobs (the control plane,
+        if handled:                                        # the audit family, the log level, the dump pair)
+            return shown
 
         if key == 'max-clients':
             v = numi(val, 'max-clients', 'clients')
@@ -169,17 +180,11 @@ class ControlServer(_ControlServer):
             self.httpd.gate.max_per_ip = v
             return '%d' % v
         if key == 'log-access':
-            if val not in ('on', 'off', 'true', 'false', '1', '0', 'yes', 'no'):
-                raise ValueError('log-access must be on or off')
-            on = val in ('on', 'true', '1', 'yes')
-            self.httpd.RequestHandlerClass.log_access = on
-            return 'on' if on else 'off'
+            self.httpd.RequestHandlerClass.log_access = on_off(val, 'log-access')
+            return 'on' if self.httpd.RequestHandlerClass.log_access else 'off'
         if key == 'log-queries':
-            if val not in ('on', 'off', 'true', 'false', '1', '0', 'yes', 'no'):
-                raise ValueError('log-queries must be on or off')
-            on = val in ('on', 'true', '1', 'yes')
-            self.httpd.RequestHandlerClass.log_queries = on
-            return 'on' if on else 'off'
+            self.httpd.RequestHandlerClass.log_queries = on_off(val, 'log-queries')
+            return 'on' if self.httpd.RequestHandlerClass.log_queries else 'off'
         if key == 'metrics/enable':
             from .statics import DEFAULT_METRICS_CAPS
             if val in ('on', 'true', '1', 'yes'):
@@ -212,83 +217,9 @@ class ControlServer(_ControlServer):
                     self.metrics_desc = 'off'
                 return 'off'
             raise ValueError('metrics-server must be on or off')
-        if key == 'log-level':
-            lvl = val.upper()
-            if lvl not in LOG_LEVELS:
-                raise ValueError('log-level must be one of %s' % ', '.join(LOG_LEVELS))
-            logging.getLogger().setLevel(getattr(logging, lvl))
-            return lvl
-        if key == 'audit/rotate/daily':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('audit/rotate/daily must be on or off')
-            self.audit_params['daily'] = on
-            self._rebuild_audit()
-            return 'on' if on else 'off'
-        if key == 'audit/forward':
-            try:
-                parse_forward(val)
-            except ValueError:
-                raise ValueError('audit/forward must be %s' % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
-            self.audit_params['forward'] = None if val in ('', 'none') else val
-            self._rebuild_audit()
-            return val
-        if key == 'audit/forward-format':
-            if val not in AUDIT_FORWARD_FORMATS:
-                raise ValueError('audit/forward-format must be one of %s' % ', '.join(AUDIT_FORWARD_FORMATS))
-            self.audit_params['forward_format'] = val
-            self._rebuild_audit()
-            return val
-        if key == 'control/port':
-            try:
-                target = parse_control_target(val, DEFAULT_LISTEN_PORT, CONTROL_SOCKET_TEMPLATE)
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if val in ('off', 'none', '0'):
-                target = None
-            if target is not None and not self.stopped and self._is_target(target):
-                return self.describe()   # the same target: nothing to rebind
-            self.refuse_tokenless_rebind(target)
-            shown = self._rebind_control(target)
-            self.startup_values['control_port'] = '0' if target is None else str(target)
-            return shown
-        if key == 'control/ops/verbs':
-            verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
-            unknown = sorted(v for v in verbs if v not in KNOWN_VERBS)
-            if not verbs or unknown:
-                raise ValueError('the ops policy needs at least one verb the grammar speaks%s: %s'
-                                 % ('' if not unknown else ' (unknown: %s)' % ', '.join(unknown),
-                                    ', '.join(sorted(KNOWN_VERBS))))
-            self.ops_verbs = verbs
-            self.startup_values['control_ops_verbs'] = ','.join(sorted(verbs))
-            return ','.join(sorted(verbs))
-        if key == 'control/trust-uids':
-            try:
-                uids = parse_trust_uids('none' if val == 'off' else val, 'control/trust-uids')
-            except SystemExit as e:
-                raise ValueError(str(e))
-            self.trust_uids = uids or frozenset()
-            self.startup_values['control_trust_uids'] = ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
-            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
-        if key == 'control/socket-group':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('control/socket-group must be on or off')
-            self.socket_group = on
-            self.startup_values['control_socket_group'] = on
-            if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
-                os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
-            return 'on' if on else 'off'
         if key == 'metrics/acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError('"table" is not a metrics/acl value — the table is the show: '
-                                 'show metrics acl table')
+                raise ValueError(T('wire.acl_table_value') % ('a metrics/acl', 'metrics acl'))
             try:
                 gate, warn = resolve_metrics_acl(val)
             except SystemExit as e:
@@ -303,27 +234,6 @@ class ControlServer(_ControlServer):
             if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % warn
             return shown
-        if key == 'dump-interval':
-            if not self.dump_path:
-                raise ValueError('dump-interval needs a dump path (set dump/path or --dump-path)')
-            if val in ('off', 'none', '0'):
-                self.dump_interval = 0
-                self.dump_wake.set()
-                return 'off'
-            v = num(val, 'dump-interval', 'seconds or off')
-            self._gate_range(key, v, 'seconds')
-            self.dump_interval = v
-            self.dump_wake.set()
-            return secs(v)
-        if key == 'dump/path':
-            if val in ('off', 'none', ''):
-                self.dump_path = None
-                return 'off'
-            self.dump_path = val   # request dump and the graceful shutdown write it from here on
-            # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
-            return val if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
-        raise ValueError('unknown setting %s' % key)
-
     def _metrics_caps(self):
         """The caps the describe line renders: the running server's when it
         is up, the configured ones otherwise (the defaults only when the
@@ -332,16 +242,11 @@ class ControlServer(_ControlServer):
         return ((self.metrics_srv.max_clients, self.metrics_srv.client_timeout, self.metrics_srv.max_per_ip)
                 if self.metrics_srv else (self.metrics_caps or DEFAULT_METRICS_CAPS))
 
-    def _rebuild_audit(self):
-        """Swap the DSH audit trail for one rebuilt from the params (the
-        shared rebuild re-chains from the file's own tail). The old trail
-        is NOT closed — a session still holding it writes its last
-        commands there."""
-        self.audit = self.rebuild_audit(self.audit_params, 'DSH', 'dashboard')
-        return self.audit.path if self.audit else 'off'
-
     def _get(self, key):
         h = self.httpd.RequestHandlerClass
+        handled, value = self.get_family_key(key)   # the family's shared knobs (the control plane,
+        if handled:                                 # the audit family, the log level, the dump pair)
+            return value
         if key == 'max-clients':
             return '%d' % self.httpd.gate.max_total
         if key == 'client-timeout':
@@ -349,34 +254,14 @@ class ControlServer(_ControlServer):
             return 'off' if not ct else secs(ct)
         if key == 'max-conn-per-ip':
             return '%d' % self.httpd.gate.max_per_ip
-        if key == 'audit/rotate/daily':
-            return 'on' if self.audit_params['daily'] else 'off'
-        if key == 'audit/forward':
-            return self.audit_params.get('forward') or 'none'
-        if key == 'audit/forward-format':
-            return self.audit_params.get('forward_format') or 'rfc5424'
+        if key == 'metrics/enable':
+            return 'on' if self.metrics_srv else 'off'
         if key == 'log-access':
             return 'on' if h.log_access else 'off'
         if key == 'log-queries':
             return 'on' if h.log_queries else 'off'
-        if key == 'metrics/enable':
-            return 'on' if self.metrics_srv else 'off'
-        if key == 'control/port':
-            return 'off' if self.stopped else self.describe()
-        if key == 'control/ops/verbs':
-            return ','.join(sorted(self.ops_verbs)) or 'off'
-        if key == 'control/trust-uids':
-            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
-        if key == 'control/socket-group':
-            return 'on' if self.socket_group else 'off'
         if key == 'metrics/acl':
             return acl_value_text(self.metrics_acl)
-        if key == 'dump/path':
-            return self.dump_path or 'off'
-        if key == 'dump-interval':
-            return 'off' if not self.dump_interval else secs(self.dump_interval)
-        if key == 'log-level':
-            return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         s = SETTING_BY_NAME.get(key)
         if s is not None and s.restart:   # a startup-only knob: the configured value
             return self.defaults.get(key, '?')   # the secrets never reach here — the show gate refuses them

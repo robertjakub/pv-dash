@@ -13,7 +13,7 @@ format is gone (the breaking wave in docs/TODO.md).
 import logging
 import os
 
-from .options import OPTIONS
+from .options import DEFAULT_OPS_VERBS, OPTIONS
 from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 from common.settings.config import check_control_tokens, check_token_chars, load_config_script, parse_listen, parse_secret, \
     resolve_metrics_acl, Resolver, str_to_bool
@@ -129,7 +129,8 @@ def resolve_config(args, script_dir=None):
     if cfg['level'] not in LOG_LEVELS:
         raise SystemExit('invalid log_level = %r: must be one of %s' % (cfg['level'], ', '.join(LOG_LEVELS)))
     cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
-                                        'control_ops_verbs', 'show,clear', str) or 'show,clear').strip() or 'show,clear'
+                                        'control_ops_verbs', DEFAULT_OPS_VERBS,
+                                        str) or DEFAULT_OPS_VERBS).strip() or DEFAULT_OPS_VERBS
     cfg['metrics_server'] = resolve(getattr(args, 'metrics_server', False) or None, 'METRICS_SERVER',
                                     'metrics_server', False, str_to_bool)
     cfg['metrics_listen'] = resolve(getattr(args, 'metrics_listen', None), 'METRICS_LISTEN',

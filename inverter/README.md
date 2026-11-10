@@ -129,14 +129,14 @@ the config names one and the start refuses. The flags:
 | `--grid-voltage-wander` / `--grid-frequency-wander` | `0.1` / `0.2` | the voltage machine's wander fraction (±10 % by default; 0 = the flat grid) / the frequency machine's clamp in Hz (±0.2 by default) |
 | `--time` / `--time-scale` / `--timezone` | real clock / `1` / `utc` | freeze simulated time `HH:MM` / the N× time-lapse factor / the machines' clock |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the Modbus caps (refuse past the count / kick the silent / per-IP cap; `0` = no limit; `$MAX_CLIENTS` / `$CLIENT_TIMEOUT` / `$MAX_CONN_PER_IP`) |
-| `--connect-acl` | any | the Modbus clients allowed to connect: `any`, `none`, or a comma-separated IP/CIDR list — the family ACL map lives in [docs/ACL.md](../docs/ACL.md) |
+| `--connect-acl` | any | the Modbus clients allowed to connect: `any`, `none`, or a comma-separated IP/CIDR list — the family ACL map lives in [docs/common/ACL.md](../docs/common/ACL.md) |
 | `--allow-write` | off | accept Modbus writes (FC05/06/15/16): a write lands in the write overlay, logged and audited; off = every write refused with exception 01 |
-| `--auth` / `--auth-key` | `none` | the auth scheme the fake's Modbus clients must speak: `suite` = the crypt handshake (the scraper takes the matching `--auth suite --auth-key …`); the key is a secret, `file:<path>` welcome |
+| `--modbus-auth` / `--auth-key` | `none` | the auth scheme the fake's Modbus clients must speak: `suite` = the crypt handshake (the scraper takes the matching `--modbus-auth suite --auth-key …`); the key is a secret, `file:<path>` welcome |
 | `--metrics-server` / `--metrics-listen` | off / `127.0.0.1:9352` | the fake's own Prometheus `/metrics` (live-settable `set metrics enable on/off`; refuses to start beyond loopback without `--metrics-token` — the F13 shape) |
 | `--metrics-token` / `--metrics-acl` | off / `any` | the /metrics bearer token (`file:<path>` welcome) / the connect ACL (the ip-prefix grammar) |
 | `--metrics-max-clients` / `--metrics-client-timeout` / `--metrics-max-conn-per-ip` | `64` / `5` / `0` | the metrics caps |
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
-| `--control-token` / `--control-ops-token` / `--control-ops-verbs` | off / off / `show` | the control tokens (a secret, `file:<path>` welcome) / the ops role's RBAC policy (`clear` is not a verb here) |
+| `--control-token` / `--control-ops-token` / `--control-ops-verbs` | off / off / `show` | the control tokens (a secret, `file:<path>` welcome) / the ops role's RBAC policy (`flush` is not a verb here) |
 | `--control-trust-uids` / `--control-socket-group` / `--control-log-replies` | none / off / off | the extra trusted uids (`SO_PEERCRED`) / the socket's 0660 mode / DEBUG-log the control replies |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the pins, the machines — the tokens apart; every `--dump-interval` seconds) |
 | `--chaos` / `--seed` | `0` / random | the chaos probability / the RNG seed — see [Chaos injection](#chaos-injection---chaos) |
@@ -173,14 +173,14 @@ show-only — is tabled in [MANUAL.md](MANUAL.md) (generated from the
 registry).
 
 The wire is the family's JSON lines (one request object per line, one
-reply per line: `{"cmd": …}` → `{"status": "ok|fail|bye", "text": …}`;
+reply per line: `{"cmd": …}` → `{"status": "ok|fail|note|bye", "text": …}`;
 ping/pong keepalive) with the family's security shape: connections
 authenticate when `--control-token` is set, the signed frames carry the
 full HMAC of their payload over TCP (verify-if-present on the unix
 socket), the trusted peers (root, the daemon's own user,
 `--control-trust-uids` — `SO_PEERCRED`) skip the token, and the
 **read-only ops token** (`--control-ops-token`) authenticates into the
-`show` verbs only — the fake has no `clear` verb; watching is what the ops
+`show` verbs only — the fake has no `flush` verb; watching is what the ops
 shift does here. Both roles are audited. The fake is a test tool: token
 flags land in `ps`, so prefer the `file:<path>` reference — but the flag
 form is legitimate here in a way it never is on the daemons.
@@ -382,11 +382,9 @@ The fake is the suites' workhorse — it is exercised from the suite-root
 [`tests/`](../tests/):
 
 ```bash
-python3 tests/inverter-regtest.py  # the fake's own battery (the F11/F13 surface,
-                                   #   the caps, the control family, the dump)
-python3 tests/control-fuzz.py      # hostile JSON against the control server
-python3 tests/scrape-regtest.py    # the fake's machines ride the scraper's battery
-python3 tests/audit-chain.py       # the audit trails' hash chains
+scripts/battery.sh inverter        # the inverter profile: the fake's regtest, the
+                                   #   control fuzz, the audit chain (the suites refuse
+                                   #   without the runner's PV_RUN_DIR)
 ```
 
 Every scenario must end with the fake alive and **zero tracebacks** in the

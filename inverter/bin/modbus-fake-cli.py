@@ -33,29 +33,9 @@ from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_MAX_LINE
     CLI_TIMEOUT_S, DEFAULT_CONTROL_SOCKET
 
 
-POOL_NAMES = tuple(n for n in SETTING_NAMES + ALIAS_NAMES if n not in HIDDEN_SETTINGS
-                   and (n in LIVE_SETTINGS or n in ALIAS_NAMES))   # a not-yet-live knob never lists
-
-describe_word = cli.make_describe_word(NODE_BY_NAME, COMMAND_HELP, SETTING_BY_NAME)
-
-
-def command_pool():
-    """The first words the daemon offers right now (the hidden and the
-    internal rows never list)."""
-    return tuple(n for n in COMMANDS if n not in COMMAND_HIDDEN and n not in COMMAND_INTERNAL)
-
-
-def setting_pool():
-    """The show-branch pool: the live-named settings + the alias spellings
-    (a not-yet-live knob never lists)."""
-    return POOL_NAMES
-
-
-def welcome(sock):
-    """The first-connect greeting: the console's two fixed lines — the
-    daemon's name and the one-line navigation hint."""
-    print(T('banner.welcome') % 'fake-inverter')
-    print(T('banner.hint'))
+POOL_NAMES, describe_word, command_pool, setting_pool, welcome = cli.pools(
+    COMMANDS, COMMAND_INTERNAL, COMMAND_HIDDEN, SETTING_BY_NAME, NODE_BY_NAME, COMMAND_HELP,
+    SETTING_NAMES, ALIAS_NAMES, LIVE_SETTINGS, 'fake-inverter')
 
 
 SPEC = dict(label='the fake inverter', daemon_label='fake inverter control server',

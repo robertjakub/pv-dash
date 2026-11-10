@@ -378,7 +378,7 @@ The read-only control role: a second token
 `INV_CONTROL_OPS_TOKEN(_FILE)`) beside the admin one, and its sessions
 run the show verbs only — the reports yes, `set`/`unset`/`reset`/
 `shutdown` no (`err forbidden: … needs the admin token`; the fake has no
-`clear` verb — watching is what the ops shift does here): the ops shift
+`flush` verb — watching is what the ops shift does here): the ops shift
 versus the admin key, both audited (`role=ops`/`role=admin` in the INV
 COMMAND entries, the denials included), each session's frames mac'd with
 the key it authenticated with.
@@ -388,6 +388,8 @@ The token-file env vars honored: `INV_CONTROL_TOKEN_FILE` and
 of `--control-token-file` / `--metrics-token-file` on the fake and both
 clients (flag over env, the file over the plain token, giving both is the
 familiar mutual-exclusion error; F12's 0600 gate applies either way).
+(Since retired: the env prefixes and the `*_FILE` twins died — the bare
+env twin with `file:<path>` inside the plain value is the spelling.)
 
 The **signed wire**: with a control token configured every command and
 reply on the control socket carries the full sha256 HMAC of its payload

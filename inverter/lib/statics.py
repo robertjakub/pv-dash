@@ -7,12 +7,9 @@ state machines, the home-load day curve, the grid nominals and their
 wander, the lifetime meter totals, the grid-outage machine, the battery
 limits and every shipped CLI default. Loaded once at import; everything
 reads the STATIC dict (or the named aliases below). Stdlib only."""
-import json
-import os
+from common.settings.options import load_static_json, static_defaults
 
-_here = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(_here, 'defaults.json'), encoding='utf-8') as _f:
-    STATIC = json.load(_f)
+STATIC = load_static_json(__file__)
 
 from common.modbus.protocol import PROTOCOL    # the family's one protocol tree
 MAX_PDU = PROTOCOL['max_pdu']                  # the largest accepted Modbus frame
@@ -27,13 +24,9 @@ DIAG_COUNT = DIAGNOSTICS['count']
 DIAG_MAGIC = DIAGNOSTICS['magic']
 
 from .options import OPTIONS   # the registry rows — the defaults' one home (the rows' `default`)
-DEFAULTS = {o.name.replace('-', '_'): o.static_default
-            for o in OPTIONS if o.static_default is not None}
+DEFAULTS = static_defaults(OPTIONS)
 DEFAULT_LISTEN_PORT = int(DEFAULTS['listen'].rsplit(':', 1)[1])
-DEFAULT_UNIT = DEFAULTS['unit']
-DEFAULT_MAX_KWP = DEFAULTS['max_kwp']
 DEFAULT_BATTERY_KWH = DEFAULTS['battery_kwh']
-DEFAULT_TIME_SCALE = DEFAULTS['time_scale']
 TIME_SCALE_MAX = STATIC['time_scale_max']      # a day per minute (the knob's live-set bound stays
                                                # a plain static — no row of its own)
 
@@ -42,26 +35,12 @@ TIME_SCALE_MAX = STATIC['time_scale_max']      # a day per minute (the knob's li
 # the default listen port)
 CONTROL_SOCKET_TEMPLATE = '/tmp/fake-inverter-%d.socket'
 DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_LISTEN_PORT
-DEFAULT_CHAOS = DEFAULTS['chaos']
-DEFAULT_MAX_CLIENTS = DEFAULTS['max_clients']
-DEFAULT_CLIENT_TIMEOUT_S = DEFAULTS['client_timeout']
-DEFAULT_MAX_CONN_PER_IP = DEFAULTS['max_conn_per_ip']
-DEFAULT_METRICS_LISTEN = DEFAULTS['metrics_listen']
-DEFAULT_METRICS_MAX_CLIENTS = DEFAULTS['metrics_max_clients']
-DEFAULT_METRICS_CLIENT_TIMEOUT_S = DEFAULTS['metrics_client_timeout']
-DEFAULT_METRICS_MAX_CONN_PER_IP = DEFAULTS['metrics_max_conn_per_ip']
 LOG_LEVELS = tuple(STATIC['log_levels'])
-DEFAULT_LOG_LEVEL = DEFAULTS['log_level']
 SCENARIOS = {k: float(v) for k, v in STATIC['scenarios'].items()}
 AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
 AUDIT_FILES = DEFAULTS['audit_files']
-from common.wire.control import CONTROL_WIRE_DEFAULTS  # the shared wire tree (flat: the cli_* keys)
-CLI_KEEPALIVE_S = CONTROL_WIRE_DEFAULTS['cli_keepalive_s']
-CLI_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_timeout_s']
-CLI_RECONNECT = CONTROL_WIRE_DEFAULTS['cli_reconnect']
-CLI_RECONNECT_WAIT_S = CONTROL_WIRE_DEFAULTS['cli_reconnect_wait_s']
-CLI_IDLE_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_idle_timeout_s']
-CLI_MAX_LINE_BYTES_S = CONTROL_WIRE_DEFAULTS['cli_max_line_bytes_s']
+from common.wire.control import CLI_IDLE_TIMEOUT_S, CLI_KEEPALIVE_S, CLI_MAX_LINE_BYTES_S, \
+    CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S   # the clients' wire constants (the shared tree)
 
 SUNRISE = STATIC['sun']['sunrise']             # the simulated day's window
 SUNSET = STATIC['sun']['sunset']               # (the battery day plan)

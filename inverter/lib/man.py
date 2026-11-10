@@ -4,7 +4,7 @@ sections render from the tools' argparse parsers, the prose sections live
 here as roff (ported from the original hand-written pages). scripts/gen_man.py
 writes the shipped man/*.1 from these; `modbus-fake-inverter --man` (and the
 ctl/cli's --man) prints the same page."""
-from common.render.manpage import options_section, page
+from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_CTL, EXIT_STATUS_DAEMON, options_section, page
 
 DATE = '2026-11-05'
 VERSION = 'pv-suite 0.4.2'
@@ -68,8 +68,8 @@ are dropped.
 graceful shutdown with a session summary."""
     control = """.SH CONTROL
 The control server speaks JSON lines
-(\\fB{"cmd": "..."}\\fR -> \\fB{"status": "ok|fail|bye", "text": "..."}\\fR;
-TCP requires the token when configured). Commands: \\fBset\\fR/\\fBunset\\fR/
+(\\fB{"cmd": "..."}\\fR -> \\fB{"status": "ok|fail|note|bye", "text": "..."}\\fR;
+TCP requires the token when configured). Commands: \\fBset\\fR/\\fBclear\\fR/
 \\fBshow\\fR/\\fBhelp\\fR (the settings: pv, load, batt, grid, grid-voltage,
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
 scenario, chaos, seed, battery-state, strict, static, max-kwp,
@@ -172,16 +172,7 @@ the control socket used when \\fB--control-port\\fR is unset.
 .TP
 .I ~/.local/state/fake-inverter/audit.log
 the audit trail when \\fB--audit-log\\fR is unset."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-success (\\fB--dry-run\\fR: valid configuration).
-.TP
-.B 1
-invalid configuration or a failed bind (reason on stderr).
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_DAEMON
     return page(
         'simulated PV inverter for testing the pv-suite stack',
         'modbus-fake-inverter', 1, DATE, VERSION, MANUAL,
@@ -200,7 +191,7 @@ Sends one control command (or a batch piped on stdin, one per line) to the
 replies on stdout, one per line. Every invocation lands in the audit trail
 (prefix \\fBCTL\\fR).
 .PP
-The command grammar is the fake's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
+The command grammar is the fake's: \\fBset\\fR/\\fBclear\\fR/\\fBshow\\fR/
 \\fBhelp\\fR (the settings registry),
 \\fBshow connections\\fR (the live Modbus clients: peer, age, requests),
 \\fBshow registers\\fR, \\fBshow version\\fR,
@@ -221,16 +212,7 @@ CONTROL."""
 .TP
 .B CTL ", " CONTROL_TOKEN
 the control target and the TCP token when the flags are unset."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-every command answered \\fBok\\fR.
-.TP
-.B 1
-connection or control error.
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_CTL
     return page(
         'one-shot control client for the fake inverter',
         'modbus-fake-ctl', 1, DATE, VERSION, MANUAL,
@@ -265,16 +247,7 @@ idle ping interval, seconds; \\fB0\\fR = off.
 .TP
 .B CTL ", " CONTROL_TOKEN
 the control target and TCP token when the flags are unset."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-the session ended cleanly.
-.TP
-.B 1
-connection or control error.
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_CLI
     return page(
         'console-style control session for the fake inverter',
         'modbus-fake-cli', 1, DATE, VERSION, MANUAL,

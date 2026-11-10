@@ -12,32 +12,25 @@ the unix socket a kernel-vouched peer (root, the daemon's own user or
 --control-trust-uids — SO_PEERCRED) skips the handshake. A second,
 read-only token (--control-ops-token) authenticates into its policy's verbs (the
 verbs only — the ops shift against the admin key, both audited."""
-import json
 import logging
 import math
-import os
-import socket
-import sys
-import threading
 import time
 
 from common.settings.config import acl_table, acl_text, acl_value_text, parse_acl, parse_auth_type, \
     parse_listen, resolve_metrics_acl
 from common.render.human import secs
 from common.modbus import AUTH_MIN_KEY
-from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, command_verb, role_allows, role_tag
-from common.wire.control import ControlServer as _ControlServer, num, on_off
+from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
 from .signals import parse_time
-from common.settings.dump import SECRET_REMOVED, dump_filter
 from common.runtime.version import version_string
 from common.render.texts import T
-from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, \
+from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, \
     SHOW_OPTIONS, NODE_BY_NAME, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
-from .statics import CLI_IDLE_TIMEOUT_S, CLI_MAX_LINE_BYTES_S, CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, \
-    LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
+from .statics import CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, \
+    LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX
 
 logger = logging.getLogger('fake-inverter')
 
@@ -63,59 +56,19 @@ class ControlServer(_ControlServer):
     swaps the socket (bind first, the failed bind rolls back, the sessions
     keep serving, off retires) — tokenless TCP included (F11)."""
 
-    def handle(self, client, addr):
-        who = self.peer(addr)
-        logger.debug('control client connected from %s', who)
-        role = self.trusted_peer(client, who)   # the peer-cred shortcut = the admin role; TCP starts unauthenticated
-        with self.clients_lock:
-            self.clients.add(client)
-        try:
-            client.settimeout(CLI_IDLE_TIMEOUT_S)
-            buf = b''
-            while True:
-                if b'\n' not in buf:      # buffered reads: a 1 MB frame must not
-                    chunk = client.recv(65536)   # cost a syscall per byte
-                    if not chunk:
-                        break
-                else:
-                    chunk = b''
-                buf += chunk
-                if len(buf) > CLI_MAX_LINE_BYTES_S:   # no newline = no frame: drop the amplifier
-                    logger.warning('control client from %s: the line exceeded %d bytes, dropping it', who, CLI_MAX_LINE_BYTES_S)
-                    break
-                if b'\n' not in buf:
-                    continue
-                line, buf = buf.split(b'\n', 1)
-                cmd, obj, reply, role = self.framed(line.decode('utf-8', 'replace').strip(), who, role)
-                if cmd == 'auth':
-                    ok = reply.startswith('ok')
-                    if not ok and self.audit:
-                        self.audit.event('AUTH-FAIL', 'peer=%s' % who)
-                elif self.audit and cmd.lower() != 'ping':
-                    self.audit.event('COMMAND', "peer=%s%s '%s'%s -> %s"
-                                     % (who, role_tag(role), cmd, proof_tag(obj), reply.split(' ', 1)[0]))
-                if self.log_replies:
-                    logger.debug('control from %s: %s -> %s', who, cmd, reply)
-                else:
-                    logger.debug('control from %s: %s', who, cmd)
-                client.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())
-                if reply.startswith('bye'):
-                    break
-                if self.reload_pending:
-                    break   # the reply is out — the post-loop hook re-execs
-            if self.shutdown_pending and self.signalbox:
-                self.signalbox.shutdown('control')   # reply is out, now really stop
-            if self.reload_pending:
-                self._exec_reload()               # reply is out, now really re-exec
-        except (ConnectionError, OSError):
-            pass
-        except Exception as e:
-            logger.error('control handler crashed (%s)', e)
-        finally:
-            logger.debug('control client from %s disconnected', who)
-            with self.clients_lock:
-                self.clients.discard(client)
-            client.close()
+    def log_exchange(self, who, cmd, reply):
+        """The reply text is demo state: logged only when --log-replies
+        (the base line carries it unconditionally)."""
+        if self.log_replies:
+            self.LOG.debug('control from %s: %s -> %s', who, cmd, reply)
+        else:
+            self.LOG.debug('control from %s: %s', who, cmd)
+
+    def _signalbox_stop(self, source='control command'):
+        """The base's post-loop stopper: hand the shutdown to the
+        signalbox when the entry has set one."""
+        if self.signalbox:
+            self.signalbox.shutdown('control')
 
     # every configurable of the fake: the shared registry (lib.settings)
     SETTING_KEYS = SETTING_NAMES
@@ -159,7 +112,8 @@ class ControlServer(_ControlServer):
         super().__init__(target, audit=audit, token=token, defaults=defaults, trust_uids=trust_uids,
                          socket_group=socket_group, ops_token=ops_token, ops_verbs=ops_verbs,
                          audit_params=audit_params, config_path=config_path, dump_path=dump_path,
-                         restore_on_start=restore_on_start, dump_key=dump_key, dump_interval=dump_interval)
+                         restore_on_start=restore_on_start, dump_key=dump_key, dump_interval=dump_interval,
+                         stopper=self._signalbox_stop)
         self.log_replies = log_replies   # DEBUG also logs the full command output
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
         self.simulator = simulator
@@ -168,13 +122,11 @@ class ControlServer(_ControlServer):
         self.signalbox = None       # set by the entry; 'shutdown' hands over to it
         self.scenario = None        # last applied preset, or None = 'custom'
         self.metrics_acl_warn = None   # the metrics/acl file's permission warning (the stash, None = no warning standing)
-        self.target = str(target)
 
     def show_config(self):
         """The startup options as a set-grammar script — the argv that would
         restart this fake (the configured secrets render as *** SECRET
         REMOVED ***; the live `set` values are runtime state, not here)."""
-        from .options import OPTIONS
         from common.settings.options import render_config_script
         script = render_config_script(OPTIONS, dict(self.startup_values),
                                       comment='generated by show config — the argv that would restart this fake '
@@ -210,10 +162,12 @@ class ControlServer(_ControlServer):
                 return val
             if key == 'cloud':
                 sim.set_cloud_mode(None)   # 'clear' = clear sky: the machine is off
-            sim.override(key, None if auto else float(val))
             if auto:
+                sim.override(key, None)   # the word releases the pin before any parse
                 return 'clear' if key == 'cloud' else 'auto'
-            return '%g' % float(val)
+            v = num(val, key, 'a number')
+            sim.override(key, v)
+            return '%g' % v
         if key == 'timezone':
             if val not in ('utc', 'local'):
                 raise ValueError('timezone must be utc|local')
@@ -230,7 +184,7 @@ class ControlServer(_ControlServer):
             if auto:
                 sim.set_time_scale(1.0)
                 return 'x1 (real time)'
-            v = float(val)
+            v = num(val, 'time-scale', 'a multiplier')
             if not math.isfinite(v) or v <= 0 or v > TIME_SCALE_MAX:
                 raise ValueError('time-scale must be 0 < N <= %g (a day per minute)' % TIME_SCALE_MAX)
             sim.set_time_scale(v)
@@ -239,14 +193,15 @@ class ControlServer(_ControlServer):
             if val in ('off', 'none'):
                 chaos.set_probability(0.0)
             else:
-                chaos.set_probability(float(val))
+                chaos.set_probability(num(val, 'chaos', 'a probability 0..1'))
             return '%.2f' % chaos.p
         if key == 'seed':
             if val in ('random', 'none', 'auto'):
                 chaos.reseed(None)
                 return 'random'
-            chaos.reseed(int(val))
-            return str(int(val))
+            v = numi(val, 'seed', 'an integer')
+            chaos.reseed(v)
+            return str(v)
         if key == 'mppt':
             if val not in ('both', 'east', 'west', 'none'):
                 raise ValueError('mppt must be both|east|west|none')
@@ -258,22 +213,22 @@ class ControlServer(_ControlServer):
             sim.batt_state = None if val == 'auto' else val
             return val
         if key == 'grid-voltage':
-            v = float(val)
+            v = num(val, 'grid-voltage', 'V')
             self._gate_range(key, v, 'V')
             sim.grid_voltage = v
             return '%g' % v
         if key == 'grid-frequency':
-            v = float(val)
+            v = num(val, 'grid-frequency', 'Hz')
             self._gate_range(key, v, 'Hz')
             sim.grid_frequency = v
             return '%g' % v
         if key == 'grid-voltage-wander':
-            v = float(val)
+            v = num(val, 'grid-voltage-wander', 'a fraction')
             self._gate_range(key, v, 'fraction')
             sim.grid_voltage_wander = v
             return '%g' % v
         if key == 'grid-frequency-wander':
-            v = float(val)
+            v = num(val, 'grid-frequency-wander', 'Hz')
             self._gate_range(key, v, 'Hz')
             sim.grid_frequency_wander = v
             return '%g' % v
@@ -289,13 +244,13 @@ class ControlServer(_ControlServer):
                 return sim.outage_display()
             raise ValueError('grid-outage must be on|off|outage')
         if key == 'strict':
-            fake.strict = val in ('on', 'true', '1', 'yes')
+            fake.strict = on_off(val, 'strict')
             return 'on' if fake.strict else 'off'
         if key == 'static':
-            sim.static = val in ('on', 'true', '1', 'yes')
+            sim.static = on_off(val, 'static')
             return 'on' if sim.static else 'off'
         if key == 'max-kwp':
-            v = float(val)
+            v = num(val, 'max-kwp', 'a number')
             if not math.isfinite(v) or v <= 0:
                 raise ValueError('max-kwp must be a positive kW value')
             sim.peak_w = PEAK_RATIO * v * 1000.0
@@ -309,20 +264,20 @@ class ControlServer(_ControlServer):
             sim.set_profile(m)
             return '%s (%s)' % (m.description, profile_label(m.path))
         if key == 'battery-kwh':
-            v = float(val)
+            v = num(val, 'battery-kwh', 'a number')
             if not math.isfinite(v) or v <= 0:
                 raise ValueError('battery-kwh must be a positive kWh value')
             sim.battery_kwh = v
             return '%g' % v
         if key == 'max-clients':
-            v = int(float(val))
+            v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
             if fake:
                 fake.max_clients = v
                 return str(v)
             raise ValueError('no modbus device attached')
         if key == 'max-conn-per-ip':
-            v = int(float(val))
+            v = numi(val, 'max-conn-per-ip', 'connections')
             self._gate_range(key, v)
             if fake:
                 fake.conn_gate.max_per_ip = v
@@ -384,18 +339,12 @@ class ControlServer(_ControlServer):
                 return 'off'
             raise ValueError('metrics-server must be on or off')
         if key == 'client-timeout':
-            v = float(val)
+            v = num(val, 'client-timeout', 'seconds')
             self._gate_range(key, v, 'seconds')
             if fake:
                 fake.client_timeout = v
                 return '%gs' % v if v else 'never'
             raise ValueError('no modbus device attached')
-        if key == 'log-level':
-            level = val.upper()
-            if level not in LOG_LEVELS:
-                raise ValueError('log level must be one of %s' % ', '.join(LOG_LEVELS))
-            logging.getLogger('fake-inverter').setLevel(level)
-            return level
         if key == 'scenario':
             if val == 'custom':
                 sim.freeze(None)
@@ -534,11 +483,8 @@ class ControlServer(_ControlServer):
         configured (there is nothing to dump into otherwise)."""
         cmds = ('commands: set <%s> <value|auto|on|off>, clear <setting>, show <setting|connections|config|knobs>, '
                 'reset' % '|'.join(self.SETTING_KEYS))
-        if self.dump_path:
-            cmds += ', request dump, request restore'
-        cmds += ', request reload, request reload-config, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, '
-        cmds += 'show knobs prints the full dictionary'
-        return cmds
+        cmds += ', request reload, request reload-config, shutdown, quit'
+        return self.command_help_tail(cmds)
 
     def command_tool(self, low, cmd):
         """The fake's own verb: reset clears the pins, the machines'
@@ -646,15 +592,10 @@ class ControlServer(_ControlServer):
 
     def connections_line(self):
         """The fake's live Modbus clients: peer, connection age, requests
-        served (the cache's show connections, pointed at the simulator)."""
+        served (the base's reading, pointed at the simulator)."""
         if not self.fake:
             return 'err no modbus device attached'
-        with self.fake.client_lock:
-            if not self.fake.clients:
-                return 'none'
-            now = time.monotonic()
-            return '; '.join('%s connected %s requests %d' % (k, secs(now - v['since']), v['requests'])
-                             for k, v in sorted(self.fake.clients.items()))
+        return self.modbus_connections_line(self.fake.clients, self.fake.client_lock)
 
     def inspect(self):
         """One pretty dump of everything — the status, the machines' states,
@@ -721,7 +662,7 @@ class ControlServer(_ControlServer):
     def dump_settings(self):
         """The live-overridden settings as raw, re-appliable values. No
         secret can be overridden (the wire refuses them — startup-only),
-        so no SECRET_REMOVED placeholder occurs; the dump filter's secret
+        so no secret placeholder occurs; the dump filter's secret
         branch stays as the class invariant's guard. The scenario rides as
         its truth ('custom' when the pins took over — the restore applies
         it first and re-pins on top)."""
@@ -771,10 +712,7 @@ class ControlServer(_ControlServer):
             'control/socket-group': 'on' if self.socket_group else 'off',
             **self.audit_dump_rows(),
         }
-        for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
-            if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:
-                raw[opt.live] = self.defaults[opt.live]
-        return dump_filter(self.overridden, raw, SETTING_BY_NAME)
+        return self.dump_settings_tail(raw)
 
     # --- the whole-daemon reload (`reload`) and the dump family ride the
     # base (_save/_restore/_reload_state_path/apply_dump_settings/reload_daemon):

@@ -5,7 +5,6 @@ SIGTERM/SIGINT shut down gracefully with a session summary."""
 import logging
 import os
 import signal
-import sys
 import threading
 import time
 

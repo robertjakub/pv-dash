@@ -252,6 +252,7 @@ rotated audit backups to keep
 disable the INV audit trail
 .TP
 .B \-\-log\-level
+the log verbosity: DEBUG adds client traffic and per\-poll detail
 .TP
 .B \-\-dump\-path
 the state dump: the live setting overrides (the pins, the machines, the
@@ -306,8 +307,8 @@ graceful shutdown with a session summary.
 
 .SH CONTROL
 The control server speaks JSON lines
-(\fB{"cmd": "..."}\fR -> \fB{"status": "ok|fail|bye", "text": "..."}\fR;
-TCP requires the token when configured). Commands: \fBset\fR/\fBunset\fR/
+(\fB{"cmd": "..."}\fR -> \fB{"status": "ok|fail|note|bye", "text": "..."}\fR;
+TCP requires the token when configured). Commands: \fBset\fR/\fBclear\fR/
 \fBshow\fR/\fBhelp\fR (the settings: pv, load, batt, grid, grid-voltage,
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
 scenario, chaos, seed, battery-state, strict, static, max-kwp,

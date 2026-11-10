@@ -41,7 +41,7 @@ import logging
 import math
 import threading
 
-from common.runtime.audit import AuditLog, default_path
+from common.runtime.audit import audit_params_of, build_audit, default_path
 from common.settings.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
     parse_secret, resolve_control_target, resolve_metrics_acl
 from common.wire.cred import parse_trust_uids
@@ -110,10 +110,10 @@ def validate(args):
 
 def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
                         control_target, ops_verbs, trust_uids, metrics_acl):
-    """Every setting's configured startup value — what `unset <setting>`
+    """Every setting's configured startup value — what `clear <setting>`
     restores (the connect ACL, the auth type and the control family ride
     in, parsed once in main). The secret rows (control/token,
-    control/ops/token, metrics/token, auth-key) carry NO entry: `unset`
+    control/ops/token, metrics/token, auth-key) carry NO entry: `clear`
     refuses them (the metrics/token treatment) — a secret never renders,
     never re-applies."""
     return {
@@ -146,7 +146,7 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'dump/path': args.dump_path or 'off',
         'dump/restore-on-start': 'on' if args.restore_on_start else 'off',
         'dump-interval': 'off' if not args.dump_interval else '%g' % args.dump_interval,
-        # the live control family — what `unset` restores (the cache's model)
+        # the live control family — what `clear` restores (the cache's model)
         'control/port': control_target,
         'control/ops/verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
         'control/trust-uids': ','.join(str(u) for u in sorted(trust_uids or ())) or 'off',
@@ -201,7 +201,6 @@ def main():
     import faulthandler
     import signal as _sig
     faulthandler.register(_sig.SIGUSR2)
-    import sys
     if '--version' in sys.argv:
         print(version_string())
         raise SystemExit(0)
@@ -283,20 +282,8 @@ def main():
         logger.warning('the state dump %s is not sealed (the integrity hash only — plaintext at rest): '
                        'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '
                        'to encrypt it', args.dump_path)
-    try:
-        audit = None if args.no_audit_log else AuditLog(args.audit_log, 'INV', app='fake-inverter',
-                                                        max_mb=args.audit_max_mb,
-                                                        daily=args.audit_daily, files=args.audit_files,
-                                                        forward=args.audit_forward,
-                                                        forward_format=args.audit_forward_format)
-    except ValueError as e:
-        logger.error(str(e))
-        raise SystemExit(1)
-    audit_params = {'path': args.audit_log, 'max_mb': args.audit_max_mb,
-                    'files': args.audit_files, 'daily': args.audit_daily,
-                    'forward': None if args.audit_forward in (None, '', 'none') else args.audit_forward,
-                    'forward_format': args.audit_forward_format,
-                    'disabled': bool(args.no_audit_log)}
+    audit = build_audit(vars(args), 'INV', 'fake-inverter', logger)
+    audit_params = audit_params_of(vars(args))
     if args.dry_run:
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')
@@ -405,7 +392,7 @@ def main():
     except OSError as e:
         if box.stop:
             return   # the signal box closed the listener; it logs the shutdown
-        logger.error('cannot serve on %s:%d: %s', listen_host, listen_port, e)
+        logger.error('cannot bind %s:%d: %s', listen_host, listen_port, e)
         raise SystemExit(1)
 
 

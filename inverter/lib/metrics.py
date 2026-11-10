@@ -17,7 +17,7 @@ import time
 
 from common.settings.config import acl_admits
 from common.serve.metrics_server import MetricsServer as _MetricsServer
-from common.serve.metrics_server import describe_metrics
+from common.serve.metrics_server import describe_metrics, metric
 
 
 class MetricsServer(_MetricsServer):
@@ -65,44 +65,30 @@ class MetricsServer(_MetricsServer):
     def render(self):
         st = self.snapshot()
         rows = [
-            '# HELP fake_inverter_uptime_seconds The fake-inverter process uptime.',
-            '# TYPE fake_inverter_uptime_seconds gauge',
-            'fake_inverter_uptime_seconds %d' % st['uptime'],
-            '# HELP fake_inverter_time_scale The simulated clock speed (N× real time).',
-            '# TYPE fake_inverter_time_scale gauge',
-            'fake_inverter_time_scale %g' % st['time_scale'],
-            '# HELP fake_inverter_grid_outage 1 = the simulated grid is down (the outage machine).',
-            '# TYPE fake_inverter_grid_outage gauge',
-            'fake_inverter_grid_outage %g' % st['grid_outage'],
-            '# HELP fake_inverter_power_watts The simulated powers: pv, load, grid (+export), battery (+charge).',
-            '# TYPE fake_inverter_power_watts gauge',
-            'fake_inverter_power_watts{kind="pv"} %g' % st['pv_w'],
-            'fake_inverter_power_watts{kind="load"} %g' % st['load_w'],
-            'fake_inverter_power_watts{kind="grid"} %g' % st['grid_w'],
-            'fake_inverter_power_watts{kind="battery"} %g' % st['batt_w'],
-            '# HELP fake_inverter_soc_percent The battery state of charge.',
-            '# TYPE fake_inverter_soc_percent gauge',
+            *metric('fake_inverter_uptime_seconds', 'The fake-inverter process uptime.', 'gauge',
+                    '%d' % st['uptime']),
+            *metric('fake_inverter_time_scale', 'The simulated clock speed (N× real time).', 'gauge',
+                    '%g' % st['time_scale']),
+            *metric('fake_inverter_grid_outage', '1 = the simulated grid is down (the outage machine).', 'gauge',
+                    '%g' % st['grid_outage']),
+            *metric('fake_inverter_power_watts',
+                    'The simulated powers: pv, load, grid (+export), battery (+charge).', 'gauge',
+                    ('kind="pv"', '%g' % st['pv_w']), ('kind="load"', '%g' % st['load_w']),
+                    ('kind="grid"', '%g' % st['grid_w']), ('kind="battery"', '%g' % st['batt_w'])),
+            *metric('fake_inverter_soc_percent', 'The battery state of charge.', 'gauge'),
         ]
         if st['soc'] is not None:
             rows.append('fake_inverter_soc_percent %g' % st['soc'])
+        rows += metric('fake_inverter_grid_phase_volts', 'The per-phase grid voltage machine.', 'gauge',
+                       *(('phase="%s"' % p, '%g' % v) for p, v in zip('abc', st['v_phases'])))
         rows += [
-            '# HELP fake_inverter_grid_phase_volts The per-phase grid voltage machine.',
-            '# TYPE fake_inverter_grid_phase_volts gauge',
-        ]
-        rows += ['fake_inverter_grid_phase_volts{phase="%s"} %g' % (p, v)
-                 for p, v in zip('abc', st['v_phases'])]
-        rows += [
-            '# HELP fake_inverter_grid_frequency_hz The grid frequency machine.',
-            '# TYPE fake_inverter_grid_hz gauge',
-            'fake_inverter_grid_hz %g' % st['grid_frequency'],
-            '# HELP fake_inverter_chaos_hits_total The hostile-reply chaos counter.',
-            '# TYPE fake_inverter_chaos_hits_total counter',
-            'fake_inverter_chaos_hits_total %d' % st['chaos_hits'],
-            '# HELP fake_inverter_modbus_requests_total The Modbus requests served.',
-            '# TYPE fake_inverter_modbus_requests_total counter',
-            'fake_inverter_modbus_requests_total %d' % st['requests'],
-            '# HELP fake_inverter_modbus_connections_total The Modbus connections accepted.',
-            '# TYPE fake_inverter_modbus_connections_total counter',
-            'fake_inverter_modbus_connections_total %d' % st['conns'],
+            *metric('fake_inverter_grid_hz', 'The grid frequency machine.', 'gauge',
+                    '%g' % st['grid_frequency']),
+            *metric('fake_inverter_chaos_hits_total', 'The hostile-reply chaos counter.', 'counter',
+                    '%d' % st['chaos_hits']),
+            *metric('fake_inverter_modbus_requests_total', 'The Modbus requests served.', 'counter',
+                    '%d' % st['requests']),
+            *metric('fake_inverter_modbus_connections_total', 'The Modbus connections accepted.', 'counter',
+                    '%d' % st['conns']),
         ]
         return '\n'.join(rows) + '\n'

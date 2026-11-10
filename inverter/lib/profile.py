@@ -31,6 +31,7 @@ import json
 import os
 import struct
 
+from common.modbus.protocol import PROTOCOL
 from common.settings.config import resolve_profile_file
 
 # The suite's shared device profiles live in the profiles/profiles/ data dir
@@ -66,8 +67,7 @@ def profile_label(path):
 # entry may override. The addresses live in the profile JSON files.
 # The bit types answer on FC1/FC2 (one packed bit per address), the word
 # types on FC3/FC4; a 32-bit type spans two consecutive addresses.
-WIDTHS = {'i16': 1, 'u16': 1, 'i32': 2, 'u32': 2,
-          'i32swap': 2, 'u32swap': 2, 'f32': 2, 'f32swap': 2, 'bit': 1}
+WIDTHS = PROTOCOL['registers_type']   # the family's one type->words map (the shared tree)
 
 
 def encode_value(regs, typ, addr, value, scale):

@@ -76,6 +76,7 @@ import difflib
 import hashlib
 import importlib
 import json
+import lint_readmes
 import os
 import re
 import subprocess
@@ -818,9 +819,11 @@ The findings:
   flags by the .SH ladder changing.
 - **The README skeleton** is the one-skeleton wave's shape (how it
   works -> usage -> configuration -> runtime control -> the features
-  -> security -> testing -> nix -> source layout -> license); a
-  tool that grows a section the others lack is the drift this
-  catches."""
+  -> security -> testing -> nix -> source layout -> license) and
+  `scripts/lint_readmes.py --check` pins it: the canon H2s in order,
+  the tool's own sections only in the slot between runtime control
+  and security, and a `### Signals` block leading the Runtime-control
+  H3s — this sweep prints the gate's verdict beside the ladders."""
 
 NIXOS_FINDINGS = """\
 The findings:
@@ -1229,6 +1232,13 @@ def emit():
     ap('')
     for t in TOOLS:
         ap(f'- {t}: ' + (' -> '.join(readmes.get(t) or ['NO README'])))
+    ap('')
+    ap('The skeleton verdict (`scripts/lint_readmes.py --check` gates it):')
+    ap('')
+    for t in TOOLS:
+        rel = f'{t}/README.md'
+        findings = lint_readmes.readme_findings(rel)
+        ap(f'- {t}: ' + ('OK' if not findings else '; '.join(findings)))
     ap('')
     ap(RENDER_FINDINGS)
     ap('')

@@ -51,6 +51,14 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   [docs/family-drift.md](../docs/family-drift.md); the verdict prose
   lives in the script's blocks. `--check` exits 1 when the doc is
   stale.
+- **`lint_readmes.py`** — the four tool READMEs' skeleton gate: the
+  `##` canon in order (how it works → usage → configuration → runtime
+  control → the tool's own sections in the feature slot → security →
+  testing → Nix / NixOS → source layout → license) and a `### Signals`
+  block leading the Runtime-control H3s. Report only — the findings
+  name the moves, the edits stay human. `--check` is the gate
+  spelling; `family_drift.py` prints the same verdict beside the
+  ladders.
 
 ## The generators
 
@@ -79,6 +87,7 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
 
 ```bash
 python3 scripts/check_options.py && python3 scripts/lint_options.py --check
+python3 scripts/lint_readmes.py --check    # the READMEs' skeleton gate
 python3 scripts/family_drift.py            # regenerate the drift doc
 python3 scripts/family_drift.py --check    # stale doc fails
 ```

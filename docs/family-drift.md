@@ -343,10 +343,17 @@ READMEs' `##` skeletons.
 
 **The README `##` skeletons:**
 
-- cache: How it works -> Diagnostics registers -> Register map (device profile) -> Usage -> Configuration -> Runtime control -> Access control -> Modbus auth -> Persistence -> Metrics -> Audit logging -> Security -> Testing -> Nix / NixOS -> Source layout -> License
-- scraper: How it works -> Metrics -> Alerting -> Device profile -> Battery -> Configuration -> Runtime control -> What /metrics leaks (the privacy note, F15) -> Logging and audit trail -> Test inverter -> Testing -> Nix / NixOS -> Source layout -> License
-- inverter: Simulation -> Served registers (the default profile) -> Internal registers (not in the profile) -> Usage -> Configuration -> Runtime control -> Chaos injection (`--chaos`) -> Signals -> Docker -> Audit trail -> Security -> Testing -> Nix / NixOS -> Source layout -> License
-- dashboard: Features -> Usage -> Configuration -> Runtime control -> Behind a reverse proxy -> Metrics source -> Notes -> Security -> Testing -> Nix / NixOS -> Source layout -> License
+- cache: How it works -> Usage -> Configuration -> Runtime control -> Diagnostics registers -> Register map (device profile) -> Access control -> Modbus auth -> Persistence -> Metrics -> Audit logging -> Security -> Testing -> Nix / NixOS -> Source layout -> License
+- scraper: How it works -> Usage -> Configuration -> Runtime control -> Metrics -> Alerting -> Device profile -> Battery -> Logging and audit trail -> Test inverter -> Security -> Testing -> Nix / NixOS -> Source layout -> License
+- inverter: How it works -> Usage -> Configuration -> Runtime control -> Served registers (the default profile) -> Internal registers (not in the profile) -> Chaos injection (`--chaos`) -> Audit trail -> Security -> Testing -> Nix / NixOS -> Source layout -> License
+- dashboard: How it works -> Usage -> Configuration -> Runtime control -> Behind a reverse proxy -> Metrics source -> Security -> Testing -> Nix / NixOS -> Source layout -> License
+
+The skeleton verdict (`scripts/lint_readmes.py --check` gates it):
+
+- cache: OK
+- scraper: OK
+- inverter: OK
+- dashboard: OK
 
 The findings:
 
@@ -356,9 +363,11 @@ The findings:
   flags by the .SH ladder changing.
 - **The README skeleton** is the one-skeleton wave's shape (how it
   works -> usage -> configuration -> runtime control -> the features
-  -> security -> testing -> nix -> source layout -> license); a
-  tool that grows a section the others lack is the drift this
-  catches.
+  -> security -> testing -> nix -> source layout -> license) and
+  `scripts/lint_readmes.py --check` pins it: the canon H2s in order,
+  the tool's own sections only in the slot between runtime control
+  and security, and a `### Signals` block leading the Runtime-control
+  H3s — this sweep prints the gate's verdict beside the ladders.
 
 ## The NixOS-parity sweep — the modules vs the registries
 

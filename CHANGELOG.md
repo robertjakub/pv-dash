@@ -12,6 +12,21 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the four tool READMEs speak the one skeleton, and a
+  gate keeps them speaking it**: `scripts/lint_readmes.py --check` pins
+  the `##` canon (how it works → usage → configuration → runtime control
+  → the tool's own sections in the feature slot → security → testing →
+  Nix / NixOS → source layout → license) with a `### Signals` block
+  leading the Runtime-control H3s; `family_drift.py` prints the verdict
+  beside the ladders it reports. The READMEs came to the canon: the
+  scraper gained `Usage` (split from `How it works`) and `Security` (the
+  F15 privacy note is the security story), the inverter's `Simulation`
+  retitled `How it works` (its `Signals` H2 folded into Runtime control,
+  its Docker story into `Usage`), the dashboard's `Features` retitled
+  (the `Notes` dissolved into the bullets that already owned their
+  claims), and the register/profile reference sections (the cache's two,
+  the scraper's four, the fake's two) sit inside the feature slot.
+
 - **everywhere** — **the audit family's sink + rotation knobs are live
   settable on all four tools** (the cache's shape, the family handler):
   `set audit log-file` (the sink swap — a path, `-` for stdout, `none`

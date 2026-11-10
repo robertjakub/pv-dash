@@ -88,6 +88,10 @@ class Option:
         self.node = bool(node)    # a hierarchy node: no flag/env/conv/live — the row
                                   # names a live-path prefix and carries its setting-help
         self.hidden = bool(hidden)   # never lists in the ?/TAB pools (the wire still answers)
+        self.static_default = None   # the registry row's `default` — the resolver's
+                                     # static rung (the ladder's last layer); the argparse
+                                     # `default` above stays unset so the flag reads unset
+                                     # (a wired parser default would shadow the env layer)
 
     @property
     def optname(self):
@@ -455,17 +459,17 @@ def as_bool(v):
 _CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 
 
-def load_registry(here, choices=None, static_defaults=None):
+def load_registry(here, choices=None):
     """The one registry load the four lib/options.py share: options.json
-    next to the loader — the rows through option_rows (the static defaults
-    and the choices wired per tool), the `show`/`commands` sections through
-    parse_registry_sections (the caller folds them into its globals).
-    Returns (rows, sections, options); the module imports flat (the loaders
-    walk lib/ on sys.path — scripts/check_options.py)."""
+    next to the loader — the rows through option_rows (the choices wired
+    per tool; the rows carry their defaults), the `show`/`commands`
+    sections through parse_registry_sections (the caller folds them into
+    its globals). Returns (rows, sections, options); the module imports
+    flat (the loaders walk lib/ on sys.path — scripts/check_options.py)."""
     with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
         meta = json.load(f)
     return meta['options'], parse_registry_sections(meta), \
-        option_rows(meta['options'], static_defaults=static_defaults, choices=choices or {})
+        option_rows(meta['options'], choices=choices or {})
 
 
 CONSOLE_VERBS = frozenset(('exit', 'logout'))
@@ -559,15 +563,18 @@ def parse_registry_sections(meta):
     }
 
 
-def option_rows(rows, static_defaults=None, choices=None):
-    """The registry's option rows -> the common Option tuples. The default
-    ladder: the defaults.json-wired default wins, then the row's explicit
-    `default`, then the bool native (False) — a negates row (the --no-x
-    form) stays None so the negating flag defaults off. `choices` is the
-    tool's name -> word-tuple map from defaults.json; the log-level's word
+def option_rows(rows, choices=None):
+    """The registry's option rows -> the common Option tuples. The row's
+    `default` is the ONE home of the static rung — the resolver's last
+    ladder layer (flag > env > config > the row's default, read through
+    each tool's DEFAULTS map in lib/config.py) — and lands on
+    `static_default`. The argparse-facing `default` stays unset (None; a
+    non-negates bool's native False): a wired parser default would shadow
+    the env/config layers — the flag would never read unset. A negates
+    row (the --no-x form) takes neither. `choices` is the tool's
+    name -> word-tuple map from defaults.json; the log-level's word
     list doubles as the control grammar's completable values (the values
     ride the choices)."""
-    static_defaults = static_defaults or {}
     choices = choices or {}
     out = []
     for row in rows:
@@ -582,10 +589,8 @@ def option_rows(rows, static_defaults=None, choices=None):
                      min=row.get('min'), max=row.get('max'), check=row.get('check'), hidden=as_bool(row.get('hidden')),
                      restart=as_bool(row.get('restart')), no_env=row.get('no-env'),
                      node=as_bool(row.get('node')))
-        if opt.name in static_defaults:
-            opt.default = static_defaults[opt.name]
-        elif 'default' in row:
-            opt.default = row['default']
+        if 'default' in row:
+            opt.static_default = row['default']
         elif opt.conv is bool and not opt.negates:
             opt.default = False
         if opt.name in choices:

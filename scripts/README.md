@@ -25,8 +25,12 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
 - **`set_group.py` / `set_live.py`** — the one-field surgical
   setters (an option row's `group` / `live`), riding `scriptlib.py`'s
   row-locator and the live-name rule.
-- **`list_options.py`** — the knobs' one-line listing (the live
-  names, the flags, the env twins — the merged-knob census view).
+- **`list_options.py`** — the knobs' one-line listing, one flat table
+  with the tool as the first column (the live names, the flags, the
+  env twins — the merged-knob census view; the hierarchy-node rows
+  stay hidden unless `--nodes`, `--sort` orders by knob name,
+  `--hide` drops whole sections / `--show` keeps only them, comma
+  separated).
 
 ## The checks (the shipped artifacts)
 

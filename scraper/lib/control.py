@@ -37,7 +37,7 @@ from .config import CONTROL_SOCKET_TEMPLATE, build_sources, load_device_profile,
 from .metrics import Metrics
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, \
     NODE_BY_NAME, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
-from .statics import CONTROL_LINE_CAP, DEFAULT_LISTEN_PORT, LOG_LEVELS
+from .statics import DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('scraper')
 
@@ -57,7 +57,6 @@ def _short_help(text):
         out = word if not out else '%s %s' % (out, word)
     return out.rstrip(' (=;') + ' …'
 
-MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
 
 # The registry-driven dispatch: a typed row (int/float/str conv) sets,
 # shows and clears itself — the conv parses, the config key takes it, no

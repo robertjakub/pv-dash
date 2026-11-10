@@ -200,6 +200,9 @@ def fold_listen(argv, pending):
 
 
 def main():
+    import faulthandler
+    import signal as _sig
+    faulthandler.register(_sig.SIGUSR2)
     import sys
     if '--version' in sys.argv:
         print(version_string())

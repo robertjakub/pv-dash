@@ -400,6 +400,48 @@ def nixos(rows):
 # ----------------------------------------------------- the docker sweep
 
 
+def knob_ports(rows):
+    """The ports the registries back: the listen/metrics-listen knobs'
+    defaults (lib/static.json's defaults dict — the resolver's last rung)
+    -> the port set. A published port outside this set is the lie the
+    sweep exists for."""
+    backed = {}
+    for t in TOOLS:
+        with open(os.path.join(REPO, t, 'lib', 'static.json'), encoding='utf-8') as f:
+            defaults = json.load(f).get('defaults') or {}
+        for n, r in rows[t].items():
+            live = r.get('live') or ''
+            if n in ('listen', 'metrics-listen') or live.endswith('/listen'):
+                d = defaults.get(n.replace('-', '_'))
+                if isinstance(d, str) and ':' in d:
+                    backed.setdefault(int(d.rsplit(':', 1)[1]), []).append(f'{t}:{n}')
+    return backed
+
+
+def docker_ports():
+    """The docker surface's ports: the Dockerfile EXPOSE + CMD --listen
+    ports and the compose `ports:` container-side ports."""
+    exposed, published = {}, {}
+    d = os.path.join(REPO, 'docker')
+    for root, dirs, files in os.walk(d):
+        for f in sorted(files):
+            p = os.path.join(root, f)
+            rel = os.path.relpath(p, REPO)
+            txt = open(p, encoding='utf-8', errors='replace').read()
+            if f.startswith('Dockerfile.'):
+                if f == 'Dockerfile.prometheus':
+                    continue   # the collector is third-party — 9090 is its own default, no pv knob backs it
+                ex = sorted({int(m) for m in re.findall(r'^EXPOSE\s+(\d{4,5})', txt, re.M)})
+                lp = sorted({int(m) for m in re.findall(r'--listen[= ](?:[\d\.]+:)?\[?[\d\.]+\]?:(\d{4,5})', txt)})
+                if ex or lp:
+                    exposed[rel] = (ex, lp)
+            elif f.endswith('.yaml'):
+                pub = sorted({int(m.group(2)) for m in re.finditer(r"['\"]?(?:[\d\.]+):(\d{4,5}):(\d{4,5})['\"]?", txt)})
+                if pub:
+                    published[rel] = pub
+    return exposed, published
+
+
 def docker_env():
     """Text-scan docker/**: the env-var names (UPPER_SNAKE tokens) and
     the published ports per compose/env file."""
@@ -732,13 +774,15 @@ The findings:
   set-grammar space — legal (the registries are per-tool), but the
   merged-knob view (docs/OPTIONS.md) and any future family-wide
   grammar should note it.
-- **`KNOWN_VERBS` is hand-maintained.** The RBAC vocabulary lives as
-  a Python tuple in each `lib/options.py` beside the registry that
-  defines the same verbs as rows — two homes for one truth (the
-  commands-lint gates the registry, not the tuple). A drift here is
-  silent: an ops policy accepting a verb the grammar refuses, or the
-  reverse. Candidate: derive `KNOWN_VERBS` from the registry's
-  command rows at load.
+- **`KNOWN_VERBS` derives from the rows** (the landed leg): the
+  loaders build the RBAC vocabulary from the registry's command rows
+  (`known_verbs` in common/settings/options.py — the live path's
+  first segment past `request`, the node rows out, the
+  hidden/internal flags in, the console-eaten `exit`/`logout` out)
+  and the default ops policy derives with it
+  (`default_ops_verbs`: `clear` only where the grammar speaks it —
+  the old family-wide `show,clear` accepted a verb three tools'
+  wires refuse). One home; the drift class is dead.
 
 The landed knob legs (the audit rotation bounds family-wide, the
 `audit-daily` one shape, the env-or-note completion):
@@ -801,9 +845,12 @@ The findings:
   demo needs fewer knobs), sometimes a gap. The split wave's wiring
   list (the prod = three services + the external collector, the
   demo's in-stack shapes) is the expected drift.
-- **The published ports** should map 1:1 to the registry defaults
-  (the 935x block) — a port in a compose file that no knob backs is
-  the lie this sweep exists for."""
+- **The published ports map 1:1 to the registry defaults** (the
+  935x block) — the port map above is the standing gate: every
+  EXPOSE, every CMD `--listen` and every compose `ports:` container
+  side names a port a listen knob backs. A port no knob backs is the
+  lie this sweep exists for; the regeneration prints it and the
+  `--check` fails on it."""
 
 COVER_FINDINGS = """\
 The findings:
@@ -886,11 +933,6 @@ the env-or-note completion, the accept-ladder extraction):
    proposal + the migration note (the alias map carries the old
    spellings one release).
 
-2. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
-   the RBAC vocabulary from the registry's command rows (the
-   hidden/internal flags included). One home; the silent drift
-   (a policy accepting a verb the grammar refuses) dies.
-
 3. **The coverage TODOs graduate** — the seeds carry stable IDs in
     docs/family-drift-seeds.json (`family_drift.py --seeds`, the
     suggested suite per seed); a test wave consumes entries, the
@@ -898,11 +940,13 @@ the env-or-note completion, the accept-ladder extraction):
     `--check` fails when a NEW promise ships uncovered (the list may
     only shrink).
 
-4. **The parity gates wired** — the NixOS-parity and docker/env
-    sweeps join `check_options`/the release gates as machine checks
-    (the module.nix type/default vs the registry, the env-file
-    coverage vs the env twins). The drift doc's `--check` already
-    shows the pattern: a stale claim fails the gate.
+4. **The parity gates wired** — the docker-ports gate LANDED (the
+    sweep above: every EXPOSE/CMD/compose port rides a registry
+    listen default); the remaining half is the NixOS-parity +
+    env-file coverage as machine checks (the module.nix type/default
+    vs the registry, the env-file coverage vs the env twins). The
+    drift doc's `--check` already shows the pattern: a stale claim
+    fails the gate.
 
 Not-todo (the ruling recorded): the fake's `request/restart` verb
 stays absent (its reload execs and re-reads the conf — the
@@ -1087,15 +1131,22 @@ def emit():
         ap(f'| {t} | {", ".join(f"`{n}`" for n in only)} |')
     ap('')
     deltas = knobs_deltas(rows, shared)
+    n_fields = sum(len(by_field) for _, by_field in deltas)
     ap(f'**The shared knobs whose fields disagree** ({len(deltas)} of')
-    ap(f'{len(shared)}):')
+    ap(f'{len(shared)} knobs, {n_fields} drifted field(s)) — one row per')
+    ap('knob+field, the tools grouped by the value each carries:')
     ap('')
-    ap('| knob | the drifted fields (cache / scraper / inverter / dashboard) |')
-    ap('|---|---|')
+    ap('| knob | field | the values (the tools carrying each) |')
+    ap('|---|---|---|')
     for n, by_field in deltas:
-        parts = ['%s: %s' % (f, ' | '.join(f'{t[0]}={json.dumps(vals[t], ensure_ascii=False)}' for t in TOOLS))
-                 for f, vals in by_field.items()]
-        ap(f'| `{n}` | {" <br> ".join(parts)} |')
+        for f, vals in by_field.items():
+            groups = {}
+            for t in TOOLS:
+                groups.setdefault(json.dumps(vals[t], ensure_ascii=False), []).append(t)
+            cell = ' · '.join(f'`{json.loads(v)}` ({", ".join(ts)})' if v != 'null'
+                              else f'*absent* ({", ".join(ts)})'
+                              for v, ts in groups.items())
+            ap(f'| `{n}` | `{f}` | {cell} |')
     ap('')
     ap('**The command vocabularies** (the wire words per tool):')
     ap('')
@@ -1219,6 +1270,36 @@ def emit():
         ap(f'| `{rel}` | {", ".join(f"`{e}`" for e in envs[:14])}'
            f'{" …" if len(envs) > 14 else ""} | {", ".join(ports) or "—"} |')
     ap('')
+    backed = knob_ports(rows)
+    exposed, published = docker_ports()
+    ap('**The port map 1:1** — the registries back every port the docker')
+    ap('surface names (a port here that no knob backs is the lie this')
+    ap('sweep exists for):')
+    ap('')
+    ap('| port | the knobs backing it | where the docker surface names it |')
+    ap('|---|---|---|')
+    liars = []
+    for port in sorted(set(backed) | {p for ex in exposed.values() for p in ex[0] + ex[1]}
+                       | {p for pub in published.values() for p in pub}):
+        who = ', '.join(backed.get(port, [])) or None
+        sites = []
+        for rel, (ex, lp) in sorted(exposed.items()):
+            if port in ex:
+                sites.append(f'{rel} EXPOSE')
+            if port in lp:
+                sites.append(f'{rel} CMD --listen')
+        for rel, pub in sorted(published.items()):
+            if port in pub:
+                sites.append(f'{rel} ports:')
+        if who is None:
+            liars.append(port)
+        ap(f'| {port} | {who or "**NO KNOB**"} | {"; ".join(sites) or "—"} |')
+    ap('')
+    if liars:
+        ap(f'**The lie(s)**: {", ".join(str(p) for p in liars)} — published or')
+        ap('exposed with no registry knob behind them. The gate fails')
+        ap('until the port maps or the mapping dies.')
+        ap('')
     ap(DOCKER_FINDINGS)
     ap('')
 
@@ -1322,6 +1403,22 @@ def emit():
     for (n, live, restart, hidden), ts in sorted(groups.items()):
         tools = 'all four' if len(ts) == len(TOOLS) else ', '.join(sorted(ts))
         ap(f'| `{n}` | {tools} | {"yes" if live else "no"} | {"yes" if restart else "no"} | {"yes" if hidden else "no"} |')
+    ap('')
+    broken = [(t, n) for t, n, live, restart, hidden in matrix if not restart or not hidden]
+    if broken:
+        ap('**The posture break(s)**: ' + ', '.join(f'`{t}/{n}`' for t, n in broken)
+           + ' — a secret row off the secret+restart+hidden shape.')
+        ap('')
+    ap('**The markers per tool** (the F-trust surface: the loader parses,')
+    ap('the dumps placeholder, the examples and configs reference):')
+    ap('')
+    ap('| tool | parse_secret | SECRET_REMOVED | file: |')
+    ap('|---|---|---|---|')
+    for t in TOOLS:
+        hits = {m for rel, mm in markers.items() if rel.startswith(t + '/') for m in mm}
+        ap(f'| {t} | {"yes" if "parse_secret" in hits else "**MISSING**"} | '
+           f'{"yes" if "placeholder" in hits else "**MISSING**"} | '
+           f'{"yes" if "file-scheme" in hits else "**MISSING**"} |')
     ap('')
     ap(SECRET_FINDINGS)
     ap('')

@@ -11,7 +11,7 @@
   "properties": {
     "desc": {
       "type": "string",
-      "description": "The gate's terse-ASCII description — the % line of the show write registers profile report."
+      "description": "The gate's terse-ASCII description — the % line of the show write registers table report."
     },
     "type": {
       "const": "write-registers",

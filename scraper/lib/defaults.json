@@ -8,16 +8,6 @@
     "cli_reconnect": 3,
     "cli_reconnect_wait_s": 10.0
   },
-  "protocol": {
-    "max_pdu": 253,
-    "max_count": 125,
-    "max_registers": 65535,
-    "max_bits": 2000,
-    "unit_id_range": [
-      1,
-      247
-    ]
-  },
   "diagnostics": {
     "base": 65000,
     "count": 4,

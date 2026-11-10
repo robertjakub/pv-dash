@@ -1269,7 +1269,7 @@ try:
           and b'peak PV 4500W' in r.stderr)
     r = subprocess.run([sys.executable, F, '--dry-run', '--unit', '300'], capture_output=True)
     check('fake dry-run: invalid rc=1, clean message', r.returncode == 1
-          and b'--unit out of range (1-247): 300' in r.stderr
+          and b'--unit must be 1..247 (Modbus unit id), got 300' in r.stderr
           and b'Traceback' not in r.stderr)
     r = subprocess.run([sys.executable, F, '--dry-run', '--time', '25:00'], capture_output=True)
     check('fake dry-run: bad time rc=1', r.returncode == 1 and b'--time invalid' in r.stderr)

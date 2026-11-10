@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Modbus TCP wire format and the single-client poller connection (stdlib only).
-The limits come from lib/static.json (see statics.py); the framing and the
+The limits come from lib/defaults.json (see statics.py); the framing and the
 reply ladders are the shared common.modbus ones."""
 import struct
 

@@ -76,30 +76,32 @@ pv-suite/
 
 ## Testing
 
-Every suite is standalone (stdlib only, scratch ports, self-cleaning) —
-run them from the repo root:
+The suites always run through the battery — `scripts/battery.sh` owns the
+run dir (the suites' /tmp scratch rewrites into it), the port-space slot
+(concurrent batteries take disjoint port spaces), the daemon reaping
+between suites and the tally; a suite run outside it refuses (the marker
+env `PV_RUN_DIR` — the standalone runs share /tmp scratch and collide
+across sessions). The release verification and the CI matrix set the same
+marker for their legs.
 
 ```bash
-python3 tests/cache-regtest.py        # the cache: the full functional battery
-python3 tests/inverter-regtest.py    # the fake: the F11/F13 surface (client caps, timeouts, per-IP, the count gate)
-python3 tests/scrape-regtest.py      # the scraper + the fake's machines
-python3 tests/audit-chain.py         # the audit trails' hash chains + scripts/audit_verify.py
-python3 tests/cache-stress.py        # the cache: 100 clients / 15 s load
-python3 tests/cache-fuzz.py [n]      # the cache: n hostile client frames
-python3 tests/scrape-fuzz.py [n]     # the scraper: n hostile HTTP frames
-python3 tests/cache-control-fuzz.py  # the cache: hostile JSON on the control server
-python3 tests/control-fuzz.py        # the fake inverter: hostile JSON on the control server
-python3 tests/dashboard-control-fuzz.py  # the dashboard: hostile JSON on the control server
+scripts/battery.sh                    # the commit loop: the fast set, the fuzz budgets at 100 (~3 min)
+scripts/battery.sh quick              # all ten, the fuzz budgets at 300 (~13 min) — the pre-push loop
+scripts/battery.sh full               # all ten, the suite defaults (~40 min) — the nightly
+scripts/battery.sh cache              # the cache's commit set (~5 min); scraper, inverter, dashboard, common likewise
+scripts/battery.sh control-fuzz       # named suite(s) — e.g. the one you are iterating on
 ```
 
-The dev-side loop runs them through `scripts/battery.sh` — one suite at
-a time (the family shares the scratch port spaces), the stray daemons
-reaped between suites, a tally at the end: `scripts/battery.sh` (the
-commit loop — the fast set, the fuzz budgets at 100, ~3 min), a tool
-name (`cache` ~5 min, `scraper` ~6 min, `inverter`, `dashboard`,
-`common` — the tool-facing commit sets with their own regtest),
-`quick` (all ten, the fuzz budgets at 300, ~13 min — the pre-push loop)
-and `full` (the suite defaults, ~40 min — the nightly).
+The ten suites (stdlib only, scratch ports, self-cleaning; each prints
+ALL PASS or a FAILURES list):
+
+- `cache-regtest` — the cache: the full functional battery
+- `inverter-regtest` — the fake: the F11/F13 surface (client caps, timeouts, per-IP, the count gate)
+- `scrape-regtest` — the scraper + the fake's machines
+- `audit-chain` — the audit trails' hash chains + `scripts/audit_verify.py`
+- `cache-stress` — the cache: 100 clients / 15 s load
+- `cache-fuzz` [n] / `scrape-fuzz` [n] — n hostile client / HTTP frames
+- `cache-control-fuzz` / `control-fuzz` / `dashboard-control-fuzz` — hostile JSON on the control servers
 
 Every scenario must end with the process under test alive and **zero
 tracebacks** in the logs.

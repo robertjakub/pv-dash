@@ -59,11 +59,11 @@ design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
-| 0.94 | `scraper/lib/control.py:142` `command_help` <-> `dashboard/lib/control.py:101` `command_help` |
+| 0.94 | `scraper/lib/control.py:142` `command_help` <-> `dashboard/lib/control.py:102` `command_help` |
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.92 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:34` `_load_options` |
 | 0.91 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.89 | `scraper/bin/modbus-scraper.py:251` `graceful_stop` <-> `dashboard/bin/dashboard.py:479` `graceful_stop` |
+| 0.89 | `scraper/bin/modbus-scraper.py:251` `graceful_stop` <-> `dashboard/bin/dashboard.py:483` `graceful_stop` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
 | 0.85 | `inverter/lib/options.py:35` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
 | 0.85 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
@@ -71,13 +71,13 @@ design); the top non-man pairs:
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.83 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
 | 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:928` `run_dump_interval` |
-| 0.81 | `inverter/lib/control.py:151` `__init__` <-> `dashboard/lib/control.py:78` `__init__` |
+| 0.80 | `inverter/lib/control.py:151` `__init__` <-> `dashboard/lib/control.py:78` `__init__` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:606` `acl_table_report` <-> `dashboard/lib/control.py:443` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:606` `acl_table_report` <-> `dashboard/lib/control.py:445` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
 | 0.75 | `inverter/lib/control.py:67` `handle` <-> `common/wire/control.py:262` `handle` |
 | 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:420` `load_write_gate_file` |
-| 0.73 | `inverter/lib/control.py:617` `command_help` <-> `dashboard/lib/control.py:101` `command_help` |
+| 0.73 | `inverter/lib/control.py:617` `command_help` <-> `dashboard/lib/control.py:102` `command_help` |
 | 0.73 | `scraper/lib/control.py:142` `command_help` <-> `inverter/lib/control.py:617` `command_help` |
 
 ## The surface sweep — the listeners, the wire and the loops
@@ -92,9 +92,9 @@ The listener census (ten listeners):
 |---|---|---|---|---|
 | inverter | Modbus TCP (the device) | `serve_modbus` (common/modbus/server.py) under the fake's face object | backlog 128 | the shared ladder; the face's hooks carry the tool (the chaos injector, the counters) |
 | cache | Modbus TCP (the client face) | `serve_modbus` (common/modbus/server.py) under the proxy's face object | backlog 128 | the shared ladder; the write-gate layers in `respond()` (shape -> allow-write -> write ACL -> register gate); the requests audit rides `on_disconnect` |
-| inverter | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | `common/serve/metrics_server` — the snapshot() hook is the tool's |
-| cache | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | the common server; the snapshot() hook |
-| dashboard | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | the common server; the snapshot() hook |
+| inverter | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | the common server; the snapshot() hook is the tool's |
+| cache | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | the common server; the snapshot() hook is the tool's |
+| dashboard | /metrics | `MetricsServer` (lib/metrics.py) | the F13 floor | the common server; the snapshot() hook is the tool's |
 | scraper | /metrics (the exposition) | `Server` + `Handler` (lib/server.py) | the caps + the metrics/acl | its own Handler — the family's exposition shape (bearer, the spec render, the upstream relay) |
 | dashboard | the page (static + proxy) | `Server` + `Handler` (bin/dashboard.py) | the caps | its own Handler — the cookies, the static tier, the /prom proxy, /config.js |
 | all four | the control socket (unix, opt TCP) | `ControlServer` (common/wire/control.py) | 0600/0660 | the one shared wire: the token/RBAC roles, the HMAC frames, the caps live here |

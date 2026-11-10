@@ -10,7 +10,61 @@ This file keeps **Unreleased and the current release** only — the release
 history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Unreleased
+### Fixed
+
+- **dashboard** — **a live `metrics/enable on` honors the configured
+  caps**: the control's re-enable read the static `DEFAULT_METRICS_CAPS`,
+  silently dropping the startup-configured `--metrics-max-clients`/
+  `--metrics-client-timeout`/`--metrics-max-conn-per-ip` (the cache's
+  `p.metrics_caps` reading is the family's golden shape — the entry now
+  carries the tuple, the rebind and the describe line consume it). The
+  dashboard's and the fake's own `/metrics` endpoints take the cache's
+  two-hook shape (the `snapshot()` state dict + the `render()` consumer;
+  the fake's private `_uptime()` retires into its snapshot), and the
+  drift census's three `/metrics` rows read as the one shape they are.
+- **tests** — **control-fuzz waits the ports it drives**: the
+  SUITE_PORT_BASE rewrite pointed the token/reference/ops sections'
+  startup waits at the plain server's already-bound port, so every
+  check raced its fresh daemon's python startup and answered
+  connection-refused (latent since the battery runner landed; the
+  family's startup-weight growth widened the window past losing).
+  Each section waits its own daemon's control port now, the cache and
+  dashboard fuzzers' shape.
+
+- **tests** — **the suites always run through the battery**: every suite
+  refuses a standalone invocation (`PV_RUN_DIR` — the marker
+  `scripts/battery.sh` exports; the release verification and the CI
+  matrix set it for their legs) — the standalone runs shared /tmp
+  scratch across sessions and collided. The battery gained the perf
+  stats (per-suite wall time + the battery total in the tally), the
+  keep-4 run-dir housekeeping (a busy day piled ~2G), the dead-slot
+  scrub with a working `rm -rf` reclaim (the `rmdir` never removed a
+  non-empty slot dir — the slots only ever accumulated), and the
+  socket-exception rewrite now covers the %-formatted socket names
+  (inverter-regtest's mode checks and the dashboard's rebind wait
+  crashed on the run-dir rewrite). control-fuzz and
+  cache-control-fuzz dial the ports they spawn (the SUITE_PORT_BASE
+  sweep had left the token/reference/ops sections raw — the checks
+  raced fresh daemons and answered connection-refused), and the three
+  regtests took their `SUITE_PORT_BASE` blocks (cache-regtest's
+  describe/audit pins included).
+
 ### Added
+
+- **tests** — **the battery learns quick/full and tells time**: every
+  suite takes a `quick|full` profile (`PV_SUITE_PROFILE` — the runner
+  exports it per its own profile, the release verification pins `full`)
+  — quick runs each suite's core sections and the whole ten finish in
+  ~3 minutes, full keeps the nightly depth (the seal, the auth
+  handshake, the metrics parity, the rotation and syslog rounds, the
+  wide fuzz pools). The suite logs open with `NOTE started at`, close
+  with a blank line, `NOTE finished at` and the one verdict, and the
+  runner predicts the batch: the per-suite wall times live in
+  `eta-<profile>.txt` (rewritten at every tally), the header prints
+  the estimate, and every START line carries
+  `eta <seconds> (HH:MM)` refined by each actual. The backup archives
+  drop the macOS `._` members and a `previous` link names the run
+  before `latest`.
 
 - **everywhere** — **a wedged daemon dumps its threads on `SIGUSR2`**:
   every daemon's `main()` registers `faulthandler` for `SIGUSR2` — one

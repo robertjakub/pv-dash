@@ -220,7 +220,7 @@ A JSON-lines control server runs **by default on the unix socket
 `127.0.0.1:PORT` instead, or `0` to switch it off. Both the proxy and the
 CLI tool resolve the target the same way: flag > the **`CTL`** environment
 variable > the default socket. Every command and knob the wire answers —
-command, settable (`set`/`unset`) or show-only — is tabled in
+command, settable (`set`/`clear`) or show-only — is tabled in
 [MANUAL.md](MANUAL.md) (generated from the registry).
 
 One command per line, one reply per line: `{"cmd": …}` →
@@ -244,7 +244,7 @@ authenticated with.
 | Command | Effect |
 |---|---|
 | `set <setting> <value>` | configure a setting **live** — the poll plan, the write gates, the ACLs, the limits, the auth schemes, `control port` (rebinds the listener live), `audit log-file`/`audit rotate …`, `dump path`/`dump with-cache`/`dump restore-on-start` |
-| `unset <setting>` | restore a setting to its **configured** startup value |
+| `clear <setting>` | restore a setting to its **configured** startup value |
 | `show <setting>` | the bare live value of one tunable (a **secret knob refuses to show**) |
 | `help <setting>` | the registry description of one setting |
 | `inspect` | one pretty dump of everything — the baton for a bug report |
@@ -254,7 +254,7 @@ authenticated with.
 | `show write registers profile` | the write gate as its acl chain (show-only) |
 | `show acl connect table` / `show acl write table` / `show metrics acl table` | the ACLs as their rule chains (show-only) |
 | `request dump` / `request restore` | write the write-behind state / load it back — see [Persistence](#persistence) |
-| `request clear cache` | drop all cached values (like SIGUSR1), repoll immediately |
+| `request flush cache` | drop all cached values (like SIGUSR1), repoll immediately |
 | `request restart` | drop the upstream connection **and** the cache, repoll now |
 | `request reload` | **restart the whole daemon with the configuration kept**: the live overrides save to `<config>.reload`, the process re-execs, the fresh daemon re-applies them once (the `restart: true` knobs take their configured values); the cache starts empty |
 | `request reload-config` | re-read the config file without the restart — the same re-apply as `SIGHUP` (the map swaps atomically, the overrides clear, a broken file keeps the previous settings) |
@@ -297,7 +297,7 @@ Proceed with shutdown? [confirm] y
 % bye shutdown
 ```
 
-TAB completes commands, settings and their values; `set`/`unset` confirm
+TAB completes commands, settings and their values; `set`/`clear` confirm
 `% changed`, errors print `% error: <message>`, the ok replies print bare.
 While idle the CLI sends wire pings (every 55 s, `CLI_KEEPALIVE` to tune);
 when the connection dies it retries `--reconnect` times (default 3) with

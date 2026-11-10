@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render <tool>/MANUAL.md — one page per daemon: every command, knob and
 show report its control wire answers, the kind of each (command, settable
-— set/unset — or show-only), the flag and the env twin, the value shape
+— set/clear — or show-only), the flag and the env twin, the value shape
 and the description — from the per-tool registries (lib/options.json via
 lib/options.py, the one-knob-one-source rows). The files are GENERATED:
 edit the registry and re-run, never the markdown.
@@ -134,7 +134,7 @@ def shape(opt):
 def knob_kind(opt):
     """The kind cell of a knob row: settable (the restart and the secret
     markers) or startup-only (the secret dump-key refuses outright — its
-    set/unset/show all answer the restart error)."""
+    set/clear/show all answer the restart error)."""
     if not opt.live:
         kind = 'startup-only'
         if opt.secret:
@@ -153,7 +153,7 @@ def knob_kind(opt):
 
 def knob_row(opt):
     """One knob table row: the registry key, the wire spelling a running
-    daemon takes (the set/unset/show words; the alias beside it), the
+    daemon takes (the set/clear/show words; the alias beside it), the
     kind, the value shape, the flag / env twins and the description (the
     setting-help — the wire's own wording)."""
     set_cell = '—'
@@ -194,7 +194,7 @@ def knobs_section(rows):
         buckets.setdefault(best, []).append(o)
     out = ['## Knobs', '',
            wrap('The tables spell the knob\'s registry key (the config-file '
-                'name and the dump\'s key); the set / unset column spells the '
+                'name and the dump\'s key); the set / clear column spells the '
                 'wire words a running daemon takes. The namespaces group '
                 'them.'), '']
     order = [''] + [n.name for n in nodes if n.name in buckets]
@@ -213,7 +213,7 @@ def knobs_section(rows):
         else:
             out.append('### general')
             out.append('')
-        out.append('| knob | set / unset | kind | value | flag / env | description |')
+        out.append('| knob | set / clear | kind | value | flag / env | description |')
         out.append('|---|---|---|---|---|---|')
         out.extend(knob_row(o) for o in buckets[key])
     return out
@@ -341,17 +341,17 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
     w(bullet('**namespace** — a word that groups deeper words: the console '
              'walk lists its children, `help <namespace>` describes them.'))
     w(bullet('**settable** — the knob is live: `set <words> <value>` applies '
-             'at once, `unset <words>` returns the configured value, '
+             'at once, `clear <words>` returns the configured value, '
              '`show <words>` prints the live value. *(restart)* — the set '
              'records a pending value and `request reload` applies it. '
              '*(secret)* — the value never renders back (show answers '
              'err); pass it by flag/env or as `file:<path>`. *(hidden)* — '
              'never lists in the ?/TAB pools; the wire still answers.'))
     w(bullet('**startup-only** — flag/env/config at start, a restart applies '
-             'a change; the wire has no set/unset/show for it (it renders '
+             'a change; the wire has no set/clear/show for it (it renders '
              'in `show config` only). Every secret is startup-only now (the '
              'tokens, the auth keys, the dump key): the wire refuses '
-             'set/unset outright, the value passes by flag/env/config or as '
+             'set/clear outright, the value passes by flag/env/config or as '
              '`file:<path>` and a restart applies it.'))
     w(bullet('**show-only** — a runtime report: `show <report>` answers, '
              'nothing to set.'))

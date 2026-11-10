@@ -125,9 +125,9 @@
       "node": true },
     { "name": "control-ops-token", "flag": "--control-ops-token", "env": "CONTROL_OPS_TOKEN", "conv": "str",
       "live": "control/ops/token",
-      "setting-help": "a second, read-only control token: sessions authenticating with it may run the show/clear verbs only (no set/unset, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file)",
+      "setting-help": "a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show,flush) (no set/clear, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file)",
       "hint": "TOKEN",
-      "help": "a second, read-only control token: sessions authenticating with it may run the show/clear verbs only (no set/unset, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
+      "help": "a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show,flush) (no set/clear, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
       "secret": true, "hidden": true, "restart": true },
     { "name": "control-ops-verbs", "flag": "--control-ops-verbs", "env": "CONTROL_OPS_VERBS", "conv": "str",
       "live": "control/ops/verbs",
@@ -291,9 +291,9 @@
     { "name": "request",
       "help": "the state machinery: the dump written and restored, the cache dropped, the daemon reloaded",
       "node": true },
-    { "name": "request/clear", "help": "drop the cached registers and repoll now", "node": true },
-    { "name": "request-clear-cache", "live": "request/clear/cache",
-      "help": "drop the cached registers, repoll now (request clear cache)" },
+    { "name": "request/flush", "help": "drop the cached registers and repoll now", "node": true },
+    { "name": "request-flush-cache", "live": "request/flush/cache",
+      "help": "drop the cached registers, repoll now (request flush cache)" },
     { "name": "request-dump", "live": "request/dump",
       "help": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)",
       "hidden": true },
@@ -313,6 +313,6 @@
     { "name": "set", "help": "configure a setting live: set <setting> <value>" },
     { "name": "show", "help": "runtime state: show <setting|connections|cache|uplink|version|knobs>" },
     { "name": "shutdown", "help": "stop the proxy gracefully (asks to confirm)" },
-    { "name": "unset", "help": "restore a setting to its configured value: unset <setting>" }
+    { "name": "clear", "help": "restore a setting to its configured value: clear <setting>" }
   ]
 }

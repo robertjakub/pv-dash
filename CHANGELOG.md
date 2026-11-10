@@ -12,6 +12,18 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **BREAKING: the wire verbs rename** — `unset <setting>`
+  becomes **`clear <setting>`** (restore the configured value) and the
+  cache's flush becomes **`request flush cache`** (was `request clear
+  cache`). The RBAC vocabulary derives with the rows: the ops default
+  policy is `show,flush` on the cache (was `show,clear`) and `show`
+  elsewhere; a stored `show,clear` policy now VALIDATES but names
+  `clear` — the setting-reset — not the flush: re-spell it `show,flush`
+  (the release note; the ops shift's flush rides `flush`, its denial of
+  the setting-reset is unchanged). The audit trail's COMMAND verb spells
+  `clear`/`flush` from the rename on; the ctl/cli completion and the
+  word-help follow the registries.
+
 - **everywhere** — **the family-wide documentation regeneration and the
   stale sweep**: every generated surface re-emitted (`docs/OPTIONS.md`
   was two waves stale — the audit-forward pair was missing from the

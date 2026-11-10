@@ -50,7 +50,7 @@ hours and moving the clock (`set time 18:00`) acts as time-lapse control.
   self-discharge, discharge capped at 80 % of the rating,
   temperature-derated (below 0 °C half power, below 10 °C 80 %, above
   40 °C 90 %, above 50 °C 70 %). `set soc <pct>` seeds the machine, `set
-  battery-state charging|discharging` forces it, `auto`/`unset` hands the
+  battery-state charging|discharging` forces it, `auto`/`clear` hands the
   decision back; `--battery-kwh` sizes the pack.
 - **Grid setpoint** — `set grid <W>` pins the grid line: the battery
   balances to hold it (`set grid 0` = zero-export home); `auto` returns to
@@ -80,7 +80,7 @@ and the **inverter profile** maps each name onto a register address and
 encoding. The format, the semantics and the shipped devices are documented
 once in [profiles/README.md](../profiles/README.md). `show registers`
 prints the loaded profile as a table, `set profile <name|path>` swaps it
-live, `--profile` / `PROFILE` pick it at start; `unset profile` returns to
+live, `--profile` / `PROFILE` pick it at start; `clear profile` returns to
 the configured map.
 
 ## Served registers (the default profile)
@@ -182,7 +182,7 @@ the target the same way: flag > **`CTL`** environment variable > the
 default socket. The target also **rebinds live** — `set control port` —
 and on the fake a **tokenless TCP rebind succeeds** (the F11 test-tool
 posture; every other tool in the family refuses it — F5). Every command
-and knob the wire answers — command, settable (`set`/`unset`) or
+and knob the wire answers — command, settable (`set`/`clear`) or
 show-only — is tabled in [MANUAL.md](MANUAL.md) (generated from the
 registry).
 
@@ -201,7 +201,7 @@ form is legitimate here in a way it never is on the daemons.
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` / `unset <setting>` | configure a setting (below) / restore its **configured startup value** |
+| `set <setting> <value>` / `clear <setting>` | configure a setting (below) / restore its **configured startup value** |
 | `show <setting>` / `show knobs` | the setting's current value / the whole knob registry |
 | `show connections` | the fake's live **Modbus** clients: peer, connection age, requests served |
 | `show registers` | the loaded profile's register map: `name \| register \| type \| value` — the value = what the registers serve right now, `NaN` = not calculated; the overlay rows are marked `*` |
@@ -231,7 +231,7 @@ form is legitimate here in a way it never is on the daemons.
 | `max-kwp` / `battery-kwh` | kW / kWh | the array size / the usable battery capacity |
 | `max-clients` / `client-timeout` / `max-conn-per-ip` / `connect-acl` | — | the Modbus caps + who may connect (the flags above, tunable live) |
 | `write/allow` | `on` \| `off` | the write gate (off refuses every write with exception 01) |
-| `modbus auth` / `modbus auth key` | `suite` \| `none` / key | the auth scheme + key (secrets: `show` and `unset` refuse them) |
+| `modbus auth` / `modbus auth key` | `suite` \| `none` / key | the auth scheme + key (secrets: `show` and `clear` refuse them) |
 | `metrics enable` / `metrics token` / `metrics acl` | — | the /metrics endpoint, its bearer, its connect ACL (live) |
 | `control port` / `control token` / `control ops token` / `control ops verbs` / `control trust-uids` / `control socket-group` | — | the control plane's live knobs (the listener rebinds, the tokens rotate, the socket re-modes) |
 | `dump path` / `dump restore-on-start` / `dump-interval` | — | the state dump's file, its restore mark, the automatic rewrite interval |
@@ -278,7 +278,7 @@ Proceed with shutdown? [confirm] y
 
 TAB completes commands, settings **and their values** (one candidate per
 line with the short descriptions from the shared registry); `?` prints the
-same list anywhere. `set`/`unset` print the `% changed` confirmation, `show`
+same list anywhere. `set`/`clear` print the `% changed` confirmation, `show`
 prints the bare value. While idle the CLI sends wire pings (every 55 s,
 `CLI_KEEPALIVE` to tune); when the connection dies it retries `--reconnect`
 times (default 3) with `--reconnect-wait` seconds (default 10) and resumes
@@ -414,7 +414,7 @@ inverter/
     ├── simulator.py    # day curves, runtime overrides, named values, cloud machines
     ├── battery.py      # the battery state machine (SoC state, decision, integration)
     ├── inverter.py     # Modbus TCP server: FC1-FC4 reads, writes behind the write gate, chaos
-    ├── control.py      # JSON-lines control server (set/unset/show, scenarios)
+    ├── control.py      # JSON-lines control server (set/clear/show, scenarios)
     ├── metrics.py      # the fake's own Prometheus /metrics endpoint
     ├── audit.py        # the append-only audit trail (AUDIT INV/CLI/CTL lines)
     ├── chaos.py        # seeded hostile-reply dice layer

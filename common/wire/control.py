@@ -142,7 +142,7 @@ class ControlServer:
         self.stopper = stopper
         self.shutdown_pending = False
         self.defaults = defaults or {}   # setting -> configured value (the restart-marked knobs' pending writes land here)
-        self.baseline = dict(self.defaults)   # the startup-resolved values — what `unset` restores
+        self.baseline = dict(self.defaults)   # the startup-resolved values — what `clear` restores
         self.overridden = set()          # settings changed live (the dumps carry the overrides)
         self.clients = set()             # the live control sockets (announce_exit)
         self.clients_lock = threading.Lock()
@@ -480,7 +480,7 @@ class ControlServer:
     def command(self, cmd):
         """The family's wire grammar, one walk (the four tools' copies died
         into it): the help/topic ladder, the quit/ping keepalives, the
-        set/unset pair, the show reports and the show walk, then the tool's
+        set/clear pair, the show reports and the show walk, then the tool's
         own verbs and the family's request namespace. The hooks the
         subclasses use: SHOW_REPORTS (the tool's show words, beside show
         knobs), RELOAD_CONFIG (request/reload-config answers — the
@@ -488,7 +488,7 @@ class ControlServer:
         Modbus-write set words), _after_set (the fake's pin bookkeeping),
         show_root_hidden (the bare-show pool's extra hidden words),
         show_walk_tail (the walk's no-match tail), command_tool (the tool
-        verbs: poll now, reset, request clear cache / restart, the dump
+        verbs: poll now, reset, request flush cache / restart, the dump
         with-cache spelling) and unknown_command (the final err's
         spelling)."""
         cmd = cmd.strip()
@@ -523,18 +523,18 @@ class ControlServer:
             return 'bye'
         if low == 'ping':                 # keep-alive from the tool's ctl
             return 'ok pong'
-        if cmd.startswith('unset'):
+        if cmd.startswith('clear'):
             args = cmd.split()[1:]
             if not args:
-                return 'err ' + T('wire.unset_needs_setting')
-            key, rest = match_setting_path(args, self.SET_BY_NAME)   # the knobs: the show reports have nothing to unset
+                return 'err ' + T('wire.clear_needs_setting')
+            key, rest = match_setting_path(args, self.SET_BY_NAME)   # the knobs: the show reports have nothing to clear
             s = self.SET_BY_NAME.get(key) if key is not None else None
             if s is not None and not rest and s.restart:
                 if s.secret:   # a secret never rides the reload state — the wire refuses it
                     return 'err ' + T('wire.restart_required')
                 self.defaults[key] = self.baseline.get(key, self.defaults.get(key))
                 self.overridden.discard(key)
-                self.LOG.info('control: unset %s (the restart re-applies the configured value)', key)
+                self.LOG.info('control: clear %s (the restart re-applies the configured value)', key)
                 return 'note ' + T('wire.restart_required')
             if key is None or rest or key not in self.defaults:
                 return 'err ' + (T('wire.unknown_setting') % ' '.join(args))
@@ -543,7 +543,7 @@ class ControlServer:
             except ValueError as e:
                 return 'err %s' % e
             self.overridden.discard(key)
-            self.LOG.info('control: unset %s -> ok %s=%s', key, key, shown)
+            self.LOG.info('control: clear %s -> ok %s=%s', key, key, shown)
             return 'ok %s=%s %s' % (key, shown, self.summary())
         if cmd.startswith('set'):
             args = cmd.split()[1:]
@@ -658,7 +658,7 @@ class ControlServer:
 
     def command_tool(self, low, cmd):
         """The tool's own verbs, checked before the family's request
-        namespace (poll now, reset, request clear cache / restart, the
+        namespace (poll now, reset, request flush cache / restart, the
         dump with-cache spelling). None = not one of them."""
         return None
 

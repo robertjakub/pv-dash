@@ -98,16 +98,16 @@ docs/TODO.md's security section.
 
 `file:<path>` on a consuming knob points at a file whose root object IS
 the gate (the same object a profile carries under `acl`/`write`). The
-file is read at start and on every `set`/`unset`:
+file is read at start and on every `set`/`clear`:
 
 - a missing or bad file **refuses the start** and answers `err` on the
   wire **with the old gate standing** — a broken edit never widens a
   running daemon;
 - the `file:<path>` spelling is the re-appliable form — it round-trips
-  through `unset`, the state dumps and `show config`;
+  through `clear`, the state dumps and `show config`;
 - a **group/world-readable acl file warns** (the gate is config trust any
   local user could have loosened): in the log, the audit trail's
-  `ACL-FILE` event, and as the suffix of the `set`/`unset` reply. A `0600`
+  `ACL-FILE` event, and as the suffix of the `set`/`clear` reply. A `0600`
   file is silent.
 
 Two tools keep the files honest — `scripts/lint_acl.py` (the loader's
@@ -214,10 +214,10 @@ speaks `read_registers`/`read_bits`), so there is nothing read-side for
 an acl to decide.
 
 `--metrics-acl` (env `METRICS_ACL`, live `set metrics acl <value>` /
-`unset metrics acl`, config `metrics_acl`, NixOS `metricsAcl` +
+`clear metrics acl`, config `metrics_acl`, NixOS `metricsAcl` +
 `metricsAclFile` — the split options, the file rides a LoadCredential
 mount) takes the same one value grammar as the cache's IP knobs. The acl
-file re-resolves on every `set`/`unset` and on SIGHUP, a bad file keeps
+file re-resolves on every `set`/`clear` and on SIGHUP, a bad file keeps
 the old gate standing, and a group/world-readable file warns (the log,
 the audit trail's `ACL-FILE` event, the `set` reply's suffix). The chain
 renders as `show metrics acl table` — the three fixed chains for the

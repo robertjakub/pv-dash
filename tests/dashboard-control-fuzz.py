@@ -264,7 +264,7 @@ def main():
         check('fuzz: real command after the flood', st == 'ok', '%s %s' % (st, tx))
 
         # 5b. the wire's help branch speaks the commands (the rider)
-        st, tx = roundtrip(CTRL_PORT, signed('help unset'))
+        st, tx = roundtrip(CTRL_PORT, signed('help clear'))
         check('rider: the wire help describes a command row',
               st == 'ok' and 'restore a setting' in tx, '%s %s' % (st, tx))
         st, tx = roundtrip(CTRL_PORT, signed('help request'))
@@ -554,7 +554,7 @@ def main():
         st, tx = roundtrip(PAGES_CTL, signed('show audit rotate daily'))
         check('dash audit-daily: show audit rotate daily answers on',
               st == 'ok' and tx == 'audit/rotate/daily=on', '%s %s' % (st, tx))
-        st, tx = roundtrip(PAGES_CTL, signed('unset audit rotate daily'))
+        st, tx = roundtrip(PAGES_CTL, signed('clear audit rotate daily'))
         check('dash audit-daily: the daily trigger unsets to the configured off',
               st == 'ok' and tx.startswith('audit/rotate/daily=off'), '%s %s' % (st, tx))
         env = dict(os.environ, AUDIT_FILES='0')
@@ -627,8 +627,8 @@ def main():
         tx = rctl('show version', port=str(REB_TCP), token='rtok2')
         check('family listener: the new TCP port speaks (signed with the token)',
               tx.startswith('ok dashboard'), tx[:120])
-        tx = rctl('unset control port', port=str(REB_TCP), token='rtok2')
-        check('family listener: unset restores the configured target',
+        tx = rctl('clear control port', port=str(REB_TCP), token='rtok2')
+        check('family listener: clear restores the configured target',
               tx.startswith('ok control/port=127.0.0.1:%d' % (15982 + BASE)), tx[:120])
         tx = rctl('show version', port=str(15982 + BASE), token='rtok2')
         check('family listener: the restored port speaks', tx.startswith('ok dashboard'), tx[:120])
@@ -669,8 +669,8 @@ def main():
         st, tx = roundtrip(CTRL_PORT, signed('set metrics acl 127.0.0.1'))
         check('metrics acl: the whitelist set canonicalizes', st == 'ok' and tx.startswith('metrics/acl=127.0.0.1/32'), '%s %s' % (st, tx[:80]))
         check('metrics acl: the whitelist serves the lab', metrics_raw().startswith(b'HTTP/1.0 200'))
-        st, tx = roundtrip(CTRL_PORT, signed('unset metrics acl'))
-        check('metrics acl: unset restores the configured value', st == 'ok' and tx.startswith('metrics/acl=any'), '%s %s' % (st, tx[:80]))
+        st, tx = roundtrip(CTRL_PORT, signed('clear metrics acl'))
+        check('metrics acl: clear restores the configured value', st == 'ok' and tx.startswith('metrics/acl=any'), '%s %s' % (st, tx[:80]))
         check('metrics acl: any serves again', metrics_raw().startswith(b'HTTP/1.0 200'))
 
         # 9. clean shutdown

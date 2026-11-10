@@ -52,7 +52,7 @@ class ControlServer(_ControlServer):
     the token first when one is configured; the unix socket relies on
     filesystem permissions. A second, read-only token (ops_token) may be
     configured beside the admin token: it authenticates into the show/clear
-    verbs only — no set/unset, no request dump/restore, no reload, no
+    verbs only — no set/clear, no request dump/restore, no reload, no
     restart, no shutdown (common/wire/wiresec.py's roles). `stopper` is the graceful-stop
     callback shared with the signal handlers; it runs after the shutdown
     reply left the wire."""
@@ -117,18 +117,18 @@ class ControlServer(_ControlServer):
         """The one-line command reference: the state-dump commands appear
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
-        cmds = ('commands: set <setting> <value>, unset <setting>, inspect, show <setting|connections|cache|'
+        cmds = ('commands: set <setting> <value>, clear <setting>, inspect, show <setting|connections|cache|'
                 'uplink|version|config|knobs|write-registers-profile|acl-connect-table|acl-write-table>')
         if self.proxy.dump_path:
             cmds += ', request dump [with-cache], request restore'
-        cmds += ', request clear cache, request reload, request reload-config, request restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
+        cmds += ', request flush cache, request reload, request reload-config, request restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
         return cmds
 
     def command_tool(self, low, cmd):
         """The cache's own verbs beside the family's request namespace:
         the cache clear (the words drop, the poll wakes), the dump
         with-cache spelling and the upstream session restart."""
-        if low == 'request clear cache':
+        if low == 'request flush cache':
             dropped = self.proxy.cache.clear()
             self.proxy.poll_wake.set()
             logger.info('control: cache cleared (%d register word(s) dropped), repolling now', dropped)
@@ -487,7 +487,7 @@ class ControlServer(_ControlServer):
     @staticmethod
     def _acl_text(acl):
         """'any' | 'none' | the normalized network list | the file: reference
-        (what `unset` re-parses)."""
+        (what `clear` re-parses)."""
         return acl_value_text(acl)
 
     def _get(self, key):
@@ -559,7 +559,7 @@ class ControlServer(_ControlServer):
         self.overridden.clear()
 
     def summary(self):
-        """The compact state summary appended to the set/unset replies."""
+        """The compact state summary appended to the set/clear replies."""
         p = self.proxy
         now = time.monotonic()
         age = 'never' if p.last_ok is None else secs(max(0, now - p.last_ok))

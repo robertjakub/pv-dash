@@ -61,7 +61,7 @@ client-timeout, max-conn-per-ip, log-access, log-queries,
 log-level, metrics acl \\(em the /metrics IP gate at accept, the table
 show \\fBshow metrics acl table\\fR \\(em and the startup-only secrets:
 control token, the ops token, metrics token \\(em the wire refuses
-set/unset, the value never rendering \\(em
+set/clear, the value never rendering \\(em
 \\fBshow <secret>\\fR refuses), \\fBshow connections\\fR
 (the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
 (the dictionary of the registry), \\fBinspect\\fR,

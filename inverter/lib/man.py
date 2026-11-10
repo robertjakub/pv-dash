@@ -78,7 +78,7 @@ metrics enable, metrics acl, register, coil, discrete, profile,
 log-level, modbus auth (the suite
 scheme; the key
 \\(em modbus auth key \\(em is a startup-only secret: \\fBshow\\fR refuses
-it, the wire refuses set/unset) \\(em and the token lives: control token,
+it, the wire refuses set/clear) \\(em and the token lives: control token,
 the ops token, metrics token, each startup-only, the value never
 rendering \\(em \\fBshow <secret>\\fR refuses),
 \\fBshow connections\\fR (the live Modbus clients: peer,

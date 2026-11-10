@@ -16,7 +16,7 @@ default. From this one row the surfaces are built or checked:
   (or the restart note) and the secret marker (`knob_dictionary` below —
   registry data only, no values render);
 - the **control grammar's live settings** — the `Setting` rows the `set`/
-  `unset` verbs, the console completions and the word-help speak, derived
+  `clear` verbs, the console completions and the word-help speak, derived
   from the same rows (`settings_of`/`make_describe`: a row's `live` name —
   a `/`-path, `inverter/profile` — its `setting_help`, its completable
   `values`, the value-shape `hint` and the per-value `value_help`; a
@@ -167,8 +167,8 @@ def parse_config_script(text, label, options=None):
                               'comments start with #') % (label, no))
         if line.startswith('set ') or line == 'set':
             body = line[4:].strip()
-        elif line.startswith('unset '):
-            raise ValueError('%s:%d: unset is a control-session verb, not a config verb: %r'
+        elif line.startswith('clear '):
+            raise ValueError('%s:%d: clear is a control-session verb, not a config verb: %r'
                              % (label, no, line))
         else:
             body = line
@@ -397,12 +397,12 @@ def control_command(opt):
     too), or the note that the knob is startup-only (restart to apply). A
     knob the registry marks restart carries ', restart' on its recipe — the
     set records the value, the restart applies it. A restart-marked SECRET
-    renders no recipe at all: the wire refuses set/unset on it (a secret can
+    renders no recipe at all: the wire refuses set/clear on it (a secret can
     never ride the reload state, so it has no pending form) — it passes by
     flag/env/config and a restart."""
     if opt.live:
         if opt.restart and opt.secret:
-            return 'startup-only — pass it by flag/env/config (set/unset refuse)'
+            return 'startup-only — pass it by flag/env/config (set/clear refuse)'
         cmd = 'set %s <value>' % opt.live.replace('/', ' ')
         if opt.alias:
             cmd += ' (alias: %s)' % opt.alias.replace('/', ' ')
@@ -498,10 +498,11 @@ def known_verbs(commands):
 
 def default_ops_verbs(verbs):
     """The read-only shift's default policy, derived from the same rows:
-    `show` everywhere, `clear` only where the grammar actually speaks it
-    (the old family-wide `show,clear` accepted a verb three tools' wires
-    refuse — the policy the registry could not back)."""
-    return 'show,clear' if 'clear' in verbs else 'show'
+    `show` everywhere, `flush` only where the grammar actually speaks it
+    (the cache's cache-drop; the old family-wide `show,clear` accepted a
+    verb three tools' wires refuse — the policy the registry could not
+    back)."""
+    return 'show,flush' if 'flush' in verbs else 'show'
 
 
 def parse_registry_sections(meta):
@@ -615,7 +616,7 @@ class Setting:
         self.value_help = value_help or {}   # per-value short description
         self.group = group                # the display bucket; None = ungrouped (bare)
         self.alias = alias                # the row's second wire spelling (the canonical renders)
-        self.restart = restart            # startup-only: set/unset answers the restart note
+        self.restart = restart            # startup-only: set/clear answers the restart note
         self.secret = secret              # a token: the dump/show-config placeholder rule, the paste-back gate
 
     @property
@@ -639,7 +640,7 @@ def settings_of(options):
     `live` name — a live-settable knob or a control-only setting — in
     registry order; a repeated live name (two knobs steering one setting)
     keeps the first row's vocabulary. A `restart` knob (the wire answers
-    its set/unset attempt with the restart note) joins under its live
+    its set/clear attempt with the restart note) joins under its live
     name, or under its flat name when the row carries none yet."""
     seen = set()
     out = []
@@ -684,7 +685,7 @@ def word_groups(words, groups):
 
 
 def match_setting_path(words, by_name):
-    """The live setting a set/unset/show/help word list names: a `live` path
+    """The live setting a set/clear/show/help word list names: a `live` path
     (`inverter/profile`) spells as its segments' words on the wire — the
     longest '/'-joined prefix of `words` that `by_name` answers wins, the
     remaining words belong to the value (`set inverter profile <value>`;
@@ -701,7 +702,7 @@ def match_setting_path(words, by_name):
 
 
 def setting_path_pool(typed, names, by_name):
-    """The completion pool for a set/unset/show word list: the Setting the
+    """The completion pool for a set/clear/show word list: the Setting the
     words already name (exact — the caller completes its values) or the
     distinct next path segments of `names` under the '/'-joined prefix so
     far (the pool's order kept — `inverter` completes before `profile`).

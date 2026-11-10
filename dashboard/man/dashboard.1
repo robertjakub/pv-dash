@@ -87,7 +87,7 @@ file:/run/credentials/...)
 .TP
 .B \-\-control\-ops\-token
 a second, read\-only control token: sessions authenticating with it may
-run its policy's verbs only (the default policy: show) (no set/unset, no
+run its policy's verbs only (the default policy: show) (no set/clear, no
 request reload, no shutdown) — the ops shift against the admin key, both
 audited; the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
@@ -242,7 +242,7 @@ client-timeout, max-conn-per-ip, log-access, log-queries,
 log-level, metrics acl \(em the /metrics IP gate at accept, the table
 show \fBshow metrics acl table\fR \(em and the startup-only secrets:
 control token, the ops token, metrics token \(em the wire refuses
-set/unset, the value never rendering \(em
+set/clear, the value never rendering \(em
 \fBshow <secret>\fR refuses), \fBshow connections\fR
 (the live HTTP clients), \fBshow version\fR, \fBshow knobs\fR
 (the dictionary of the registry), \fBinspect\fR,

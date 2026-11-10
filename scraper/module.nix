@@ -316,7 +316,7 @@ in
       default = null;
       description = ''
         A second, read-only control token: sessions authenticating with it
-        run the show/clear verbs only (no set/unset, no poll now, no
+        run its policy's verbs only (the default policy: show) (no set/clear, no poll now, no
         request reload-config, no request reload, no request restart, no
         shutdown) — the ops shift against
         the admin key. Needs controlToken/controlTokenFile. WARNING: it is
@@ -340,7 +340,7 @@ in
       default = null;
       description = ''
         The read-only ops role's RBAC policy: the verbs its sessions may
-        run, comma-separated (default: show,clear). Validated against the
+        run, comma-separated (default: show). Validated against the
         control grammar at start; needs controlOpsToken/controlOpsTokenFile.
       '';
     };

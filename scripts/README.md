@@ -56,7 +56,7 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   one-table knob census).
 - **`gen_manual.py`** — the four `<tool>/MANUAL.md` pages from the
   registries: every command, knob and show report the tool's control
-  wire answers, the kind of each (command, settable — set/unset — or
+  wire answers, the kind of each (command, settable — set/clear — or
   show-only; the startup-only knobs marked), the flag/env twin, the
   value shape. `--check` fails a stale page.
 - **`gen_sbom.py`** — the CycloneDX 1.5 SBOM (docs/sbom/), the

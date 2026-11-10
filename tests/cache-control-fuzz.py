@@ -295,8 +295,8 @@ def main():
         st, tx, macok = ops_roundtrip('set modbus interval 5')
         check('ops: set is forbidden', st == 'fail' and 'forbidden' in tx and 'admin' in tx and macok,
               '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('unset modbus interval')
-        check('ops: unset is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('clear modbus interval')
+        check('ops: clear is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request restore')
         check('ops: request restore is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request restart')

@@ -279,12 +279,12 @@ ops role, the F5 token rule) is the family's — one paragraph per piece in
 [docs/ACL.md](../docs/ACL.md) (the control-plane row) and
 [docs/AUDIT.md](../docs/AUDIT.md); a token value never renders back
 (`show <secret>` refuses). Every command and knob the wire answers —
-command, settable (`set`/`unset`) or show-only — is tabled in
+command, settable (`set`/`clear`) or show-only — is tabled in
 [MANUAL.md](MANUAL.md) (generated from the registry). The commands:
 
 | Command | Effect |
 |---|---|
-| `set` / `unset` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show system listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
+| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show system listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
 | `poll now` | the loop wakes immediately |
 | `show connections` | the live HTTP clients of /metrics |
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |

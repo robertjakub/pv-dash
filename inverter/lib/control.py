@@ -57,7 +57,7 @@ class ControlServer(_ControlServer):
     is configured — over the unix socket a kernel-vouched peer (root, the
     daemon's own user or trust_uids — SO_PEERCRED) skips the handshake. A
     second, read-only token (ops_token) may be configured beside the admin
-    token: it authenticates into its policy's verbs —     no set/unset,
+    token: it authenticates into its policy's verbs —     no set/clear,
     no reset, no reload, no shutdown (common/wire/wiresec.py's roles). The
     listener rides the base's rebind family: a live `set control/port`
     swaps the socket (bind first, the failed bind rolls back, the sessions
@@ -519,7 +519,7 @@ class ControlServer(_ControlServer):
         """The one-line command reference: the fake's verb list speaks the
         pin names; the state-dump commands appear only when a dump path is
         configured (there is nothing to dump into otherwise)."""
-        cmds = ('commands: set <%s> <value|auto|on|off>, unset <setting>, show <setting|connections|config|knobs>, '
+        cmds = ('commands: set <%s> <value|auto|on|off>, clear <setting>, show <setting|connections|config|knobs>, '
                 'reset' % '|'.join(self.SETTING_KEYS))
         if self.dump_path:
             cmds += ', request dump, request restore'
@@ -627,7 +627,7 @@ class ControlServer(_ControlServer):
         return 'ok registers (%d)\n%s' % (len(rows), table)
 
     def summary(self):
-        """The status line is the fake's set/unset suffix (the family's
+        """The status line is the fake's set/clear suffix (the family's
         summary hook)."""
         return self.status()
 

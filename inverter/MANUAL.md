@@ -44,15 +44,15 @@ The kinds — every row of the tables below carries one:
 - **namespace** — a word that groups deeper words: the console walk lists its
   children, `help <namespace>` describes them.
 - **settable** — the knob is live: `set <words> <value>` applies at once,
-  `unset <words>` returns the configured value, `show <words>` prints the live
+  `clear <words>` returns the configured value, `show <words>` prints the live
   value. *(restart)* — the set records a pending value and `request reload`
   applies it. *(secret)* — the value never renders back (show answers err);
   pass it by flag/env or as `file:<path>`. *(hidden)* — never lists in the
   ?/TAB pools; the wire still answers.
 - **startup-only** — flag/env/config at start, a restart applies a change; the
-  wire has no set/unset/show for it (it renders in `show config` only). Every
+  wire has no set/clear/show for it (it renders in `show config` only). Every
   secret is startup-only now (the tokens, the auth keys, the dump key): the
-  wire refuses set/unset outright, the value passes by flag/env/config or as
+  wire refuses set/clear outright, the value passes by flag/env/config or as
   `file:<path>` and a restart applies it.
 - **show-only** — a runtime report: `show <report>` answers, nothing to set.
 
@@ -75,7 +75,7 @@ The kinds — every row of the tables below carries one:
 | `set` | command | configure a setting (set soc auto, set scenario noon) |
 | `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the fake inverter (asks to confirm) |
-| `unset` | command | restore a setting to its configured value (unset pv, unset seed) |
+| `clear` | command | restore a setting to its configured value (clear pv, clear seed) |
 | `set register \<addr> \<value>` | command | the Modbus write emulation: plant a register value in the write overlay — reads answer it, reset clears it |
 | `set coil \<addr> \<0\|1>` | command | the write emulation: plant a coil value (the coil space, FC1/FC5/FC15 see it, reset clears it) |
 | `set discrete \<addr> \<0\|1>` | command | the write emulation: plant a discrete-input value (the discrete space, FC2 sees it, reset clears it) |
@@ -83,12 +83,12 @@ The kinds — every row of the tables below carries one:
 ## Knobs
 
 The tables spell the knob's registry key (the config-file name and the
-dump's key); the set / unset column spells the wire words a running daemon
+dump's key); the set / clear column spells the wire words a running daemon
 takes. The namespaces group them.
 
 ### general
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `pv` | `set pv` | settable | `W\|auto` | — / — | pin the PV power in W, or auto |
 | `load` | `set load` | settable | `W\|auto` | — / — | pin the home load in W, or auto |
@@ -133,7 +133,7 @@ takes. The namespaces group them.
 
 the daemon's own serving socket: the Modbus listen address
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `listen` | `set system listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
 
@@ -141,7 +141,7 @@ the daemon's own serving socket: the Modbus listen address
 
 the Modbus session the fake serves: the auth scheme its clients must speak
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `auth` | `set modbus auth` | settable | `suite\|none` | `--auth` / `AUTH` | the auth scheme the fake's Modbus clients must speak: suite (the crypt handshake) or none |
 | `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
@@ -150,7 +150,7 @@ the Modbus session the fake serves: the auth scheme its clients must speak
 
 the Modbus writes the fake accepts from its clients
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `allow-write` | `set write allow` | settable | `on\|off` | `--allow-write` / `ALLOW_WRITE` | accept Modbus writes (FC05/06/15/16) from clients; off = every write refused |
 
@@ -158,7 +158,7 @@ the Modbus writes the fake accepts from its clients
 
 the control plane: the tokens, the ops role's RBAC policy, the trusted peers
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `control-port` | `set control port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | control server target: unix socket path |
 | `control-token` | — | startup-only (secret) | `TOKEN` | `--control-token` / `CONTROL_TOKEN` | require a token on control connections: the client authenticates with {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file) *(hidden)* |
@@ -170,9 +170,9 @@ the control plane: the tokens, the ops role's RBAC policy, the trusted peers
 the read-only ops role: the second token that scopes its sessions to the
 configured verbs (the default: show and clear)
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/unset, no reset, no shutdown) — the ops shift against the admin key, both audited (env CONTROL_OPS_TOKEN) (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/clear, no reset, no shutdown) — the ops shift against the admin key, both audited (env CONTROL_OPS_TOKEN) (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `control-ops-verbs` | `set control ops verbs` | settable | `VERB,...` | `--control-ops-verbs` / `CONTROL_OPS_VERBS` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated |
 
 ### metrics
@@ -180,7 +180,7 @@ configured verbs (the default: show and clear)
 the fake's /metrics endpoint's auth and access: the bearer token the scrape
 presents and the client ACL checked at accept
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / — | the fake's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
 | `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | require Authorization: Bearer \<token> on the /metrics endpoint (the same scheme the scraper speaks) — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
@@ -190,7 +190,7 @@ presents and the client ACL checked at accept
 
 the INV audit trail: the sink, the forwarding, the rotation, the kill switch
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `audit-forward` | `set audit forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
 | `audit-forward-format` | `set audit forward-format` | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
@@ -200,7 +200,7 @@ the INV audit trail: the sink, the forwarding, the rotation, the kill switch
 the audit trail's rotation: the size trigger, the UTC-midnight trigger and
 the backup count
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit log at UTC midnight |
 
@@ -208,7 +208,7 @@ the backup count
 
 the state dump: the live overrides' file, the restore-on-start
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `dump-path` | `set dump path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval |
 | `dump-key` | — | startup-only (secret) | `TEXT` | `--dump-key` / `DUMP_KEY` | the key that seals the state dumps (the reload's state file too) (`file:<path>` reads an owner-only file) *(hidden)* |

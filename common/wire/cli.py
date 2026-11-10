@@ -100,7 +100,7 @@ def _sections(head, done_len, matches, values=False, base=''):
     if values:
         return [('', matches)]   # bare: the value words need no [values] header — the
                                  # values branch is always the listing's sole section
-    if head in ('set', 'unset', 'show') and done_len >= 1:
+    if head in ('set', 'clear', 'show') and done_len >= 1:
         return _grouped(matches, base)
     return [('', matches)]
 
@@ -193,10 +193,10 @@ def candidates(buf):
     the values of one setting ([values]), the commands bare). The branches:
     the first position offers the commands (the spec's command_pool — the
     '/'-path rows walk segment-wise: `request` completes its children,
-    `request clear` the leaf's own), set/unset walk the setting paths (the
+    `request flush` the leaf's own), set/clear walk the setting paths (the
     spec's setting_pool minus the show reports), show walks the
     setting paths including the reports. A live setting's name may be a
-    '/'-path (`inverter/profile`): set/unset/show spell it as words — the
+    '/'-path (`inverter/profile`): set/clear/show spell it as words — the
     completion offers the next segment until the path is whole, then the
     values."""
     end_space = buf.endswith(' ')
@@ -211,7 +211,7 @@ def candidates(buf):
         # settings' rule: `request` offers itself, then its children; a
         # slash never renders or inserts
         pool, hint, desc = command_path_pool(done, _SPEC['command_pool']()), None, _SPEC['describe']
-    elif head in ('set', 'unset'):
+    elif head in ('set', 'clear'):
         names = tuple(n for n in _SPEC['setting_pool']() if n not in _SPEC['show_lives'])
         by = {n: _SPEC['settings'][n] for n in names if n in _SPEC['settings']}   # the exact match obeys the pool:
         s, segs = setting_path_pool(done[1:], names, by)                          # a show report never offers a value
@@ -220,8 +220,8 @@ def candidates(buf):
             if s is not None and s.name not in _SPEC['live_settings'] - _SPEC['show_lives']:
                 s = None   # a show report never offers a value
         if s is not None:
-            if head == 'unset':
-                return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole; unset takes no value — ? describes it
+            if head == 'clear':
+                return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole; clear takes no value — ? describes it
             values_mode = True
             pool = tuple(s.values)
             words = set(pool)
@@ -467,7 +467,7 @@ def typed_loop(sock, prompt, audit=None):
             raise
         if reply is None:
             raise ConnectionLost(T('cli.closed_without_bye'))
-        if low.startswith(('set ', 'unset ')):
+        if low.startswith(('set ', 'clear ')):
             if reply.startswith('note ') or 'restart required' in reply:
                 print(T('shared.plain_face') % reply.split(' ', 1)[1])   # the startup-only knob: the note type, or the refused secret's fail — a note face, not a verdict
             elif reply.startswith('ok'):

@@ -21,7 +21,7 @@ The command grammar is the daemon's: \fBset\fR/\fBunset\fR/\fBshow\fR/
 \fBshow connections\fR, \fBshow cache\fR [\fBall\fR],
 \fBshow write registers profile\fR, \fBshow uplink\fR,
 \fBshow version\fR, \fBshow knobs\fR (the dictionary of the registry),
-\fBrequest clear cache\fR, \fBrequest reload\fR, \fBrequest restart\fR,
+\fBrequest flush cache\fR, \fBrequest reload\fR, \fBrequest restart\fR,
 \fBshutdown\fR,
 \fBquit\fR. See
 .BR modbus-cache (1)
@@ -72,9 +72,9 @@ disable the audit trail
 .IP \(bu 2
 .B modbus-cache-ctl show connections
 .IP \(bu 2
-.B modbus-cache-ctl request clear cache
+.B modbus-cache-ctl request flush cache
 .IP \(bu 2
-.B printf 'show cache\enrequest clear cache\en' | modbus-cache-ctl
+.B printf 'show cache\enrequest flush cache\en' | modbus-cache-ctl
 .RE
 
 .SH ENVIRONMENT

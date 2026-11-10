@@ -168,7 +168,7 @@ handshake (`SO_PEERCRED`). The **read-only ops token**
 (`--control-ops-token`) authenticates into the `show` verbs only — the
 ops shift against the admin key, both audited (the DSH trail's COMMAND
 entries carry `role=ops`/`role=admin`). Every command and knob the wire
-answers — command, settable (`set`/`unset`) or show-only — is tabled in
+answers — command, settable (`set`/`clear`) or show-only — is tabled in
 [MANUAL.md](MANUAL.md) (generated from the registry).
 
 ```bash
@@ -181,7 +181,7 @@ python3 bin/dashboard-cli.py                        # the console: TAB completio
 
 | Command | Effect |
 |---|---|
-| `set` / `unset` | the live settings: the caps, `log-access`, `log-queries`, `log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — `system listen` (the serve address, `show system listen` answers it) is startup-only and answers the restart note like the tokens (`control token`, `control ops token`, `metrics token`, `auth token`): pass them by flag/env/config |
+| `set` / `clear` | the live settings: the caps, `log-access`, `log-queries`, `log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — `system listen` (the serve address, `show system listen` answers it) is startup-only and answers the restart note like the tokens (`control token`, `control ops token`, `metrics token`, `auth token`): pass them by flag/env/config |
 | `show <setting>` / `show knobs` / `show connections` | the value / the registry / the live HTTP clients per peer IP |
 | `inspect` | the one-page dump for a bug report |
 | `request reload-config` | re-read `server.conf` (the SIGHUP path; the listen address and port are bound and stay) |

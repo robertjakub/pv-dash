@@ -47,12 +47,12 @@ only the **Done/history** records for their tool —
 - **the RBAC rewrite** `[common]` — the role gate decides on the head
   verb (`command_verb` = the first word, `common/wire/wiresec.py`) with the
   flat verb-set policies (`ROLE_POLICIES`); the request-namespace grammar
-  (`request clear cache` — the ctl/cli drift wave's rename) already needs
+  (`request flush cache` — the flush/unset rename wave) already needs
   the "skip the prefix" rule patched into the extraction, and the
-  per-child authority (the ops shift may `request clear`, never
+  per-child authority (the ops shift may `request flush`, never
   `request reload`) is policy-shaped, not extraction-shaped: rewrite the
   gate to decide on the command PATH — the leaf units with per-child
-  policies (`request/clear` in the ops set, `request/reload` out) —
+  policies (`request/flush` in the ops set, `request/reload` out) —
   instead of patching the head-word verb; the audit `role=` entries and
   the `--control-ops-verbs` validation follow the same units.
 - **a connect ACL for the control plane** `[common]` `[cache]`

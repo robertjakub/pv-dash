@@ -184,17 +184,17 @@ def main():
         exchange(c3, read_req(8, 3, 32064, 2), 8)
         tx = ctl(A_CTL, 'show connections')
         check('both clients tracked after the live raise', tx.count('127.0.0.1:') == 2, tx)
-        tx = ctl(A_CTL, 'unset max-clients')
-        check('unset max-clients restores 1', 'ok max-clients=1' in tx, tx)
+        tx = ctl(A_CTL, 'clear max-clients')
+        check('clear max-clients restores 1', 'ok max-clients=1' in tx, tx)
         c1.close(); c3.close()
         time.sleep(0.4)
         tx = ctl(A_CTL, 'show connections')
         check('show connections -> none after the exits', tx == 'ok connections none', tx)
 
         # ---- the wire's help branch speaks the commands (the rider)
-        tx = ctl(A_CTL, 'help unset')
+        tx = ctl(A_CTL, 'help clear')
         check('help <command>: the row describes itself',
-              tx == 'ok restore a setting to its configured value (unset pv, unset seed)', tx)
+              tx == 'ok restore a setting to its configured value (clear pv, clear seed)', tx)
         tx = ctl(A_CTL, 'help request')
         check('help <command node>: the namespace lists its visible children',
               tx == 'ok     reload        save the live overrides and restart the whole daemon (the flags and the env are re-resolved)\n'
@@ -483,8 +483,8 @@ def main():
         r = ctl(B_CTL, 'set metrics acl file:' + ACLGATE)
         check('metrics acl: a bad file answers err with the old gate standing',
               r.startswith('% error:') and 'spell the network' in r and acl_raw().startswith(b'HTTP/1.0 200'), r[:140])
-        r = ctl(B_CTL, 'unset metrics acl')
-        check('metrics acl: unset restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
+        r = ctl(B_CTL, 'clear metrics acl')
+        check('metrics acl: clear restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
         check('metrics acl: any serves again', acl_raw().startswith(b'HTTP/1.0 200'))
         g = connect(G_MODBUS)
         txn, unit, body = exchange(g, read_req(1, 3, 32064, 2), 1)
@@ -508,8 +508,8 @@ def main():
         ins = ctl(A_CTL, 'inspect')
         check('connect-acl: inspect carries connect-acl=', 'connect-acl 1 network(s)' in ins,
               [l for l in ins.splitlines() if l.startswith('modbus')])
-        tx = ctl(A_CTL, 'unset connect-acl')
-        check('connect-acl: unset restores any', 'ok connect-acl=any' in tx, tx)
+        tx = ctl(A_CTL, 'clear connect-acl')
+        check('connect-acl: clear restores any', 'ok connect-acl=any' in tx, tx)
         c9.close()
         time.sleep(0.4)   # the slot frees (max-clients 1 on this instance)
         c11 = connect(A_MODBUS)
@@ -577,12 +577,12 @@ def main():
         aud = open('/tmp/inv_regtest_audit.log').read()
         check('signed wire: the audit COMMAND line carries the wire mac', "'show version' wire=h" in aud, aud[-200:])
 
-        # ---- the secrets: startup-only (the dump/key treatment) — set/unset
+        # ---- the secrets: startup-only (the dump/key treatment) — set/clear
         #      refuse on the wire, the show verb refuses them — a secret never renders
         tx = ctl(H_CTL, 'show control token', token='tok')
         check('secrets: the control token never shows', tx.startswith('% error: control/token is a secret'), tx)
-        tx = ctl(H_CTL, 'unset control token', token='tok')
-        check('secrets: unset refuses a secret (startup-only)',
+        tx = ctl(H_CTL, 'clear control token', token='tok')
+        check('secrets: clear refuses a secret (startup-only)',
               tx.startswith('% error: restart required (startup-only knob)'), tx)
         tx = ctl(H_CTL, 'set control token tok2', token='tok')
         check('secrets: the control token is startup-only — the set refuses',
@@ -595,8 +595,8 @@ def main():
               tx.startswith('% error: restart required (startup-only knob)'), tx)
         tx = ctl(H_CTL, 'show metrics token', token='tok')
         check('secrets: the metrics token never shows', tx.startswith('% error: metrics/token is a secret'), tx)
-        tx = ctl(H_CTL, 'unset metrics token', token='tok')
-        check('secrets: unset refuses the metrics token too',
+        tx = ctl(H_CTL, 'clear metrics token', token='tok')
+        check('secrets: clear refuses the metrics token too',
               tx.startswith('% error: restart required (startup-only knob)'), tx)
         tx = ctl(H_CTL, 'show config', token='tok')
         check('secrets: show config renders the secret knob as the placeholder',
@@ -1042,8 +1042,8 @@ def main():
         tx = ctl(L_CTL, 'show control ops')
         check('node walk: the intermediate node lists its live children',
               tx.startswith('ok') and 'verbs' in tx and 'read-only ops role' in tx, tx[:80])
-        tx = ctl(L_CTL, 'unset modbus auth key')
-        check('suite auth: unset refuses the key (startup-only)',
+        tx = ctl(L_CTL, 'clear modbus auth key')
+        check('suite auth: clear refuses the key (startup-only)',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:80])
         tx = ctl(L_CTL, 'set modbus auth key short')
         check('suite auth: startup-only — the short-key set refuses with the rest',
@@ -1086,7 +1086,7 @@ def main():
         #      tokenless TCP included (the F11 posture INVERTS the family's
         #      F5 refusal: a tokenless TCP rebind succeeds here), the old
         #      target closes, off retires while the session keeps serving,
-        #      unset restores the configured socket, the socket-group
+        #      clear restores the configured socket, the socket-group
         #      re-modes live, the ops policy and the trust uids ride the wire
         M_MODBUS, M_TCP1, M_TCP2 = 15994, 15995, 15996
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (M_MODBUS)],
@@ -1122,9 +1122,9 @@ def main():
         except OSError:
             gone = True
         check('fake control: no new connection lands on the retired port', gone)
-        m.sendall(b'{"cmd": "unset control port"}\n')
+        m.sendall(b'{"cmd": "clear control port"}\n')
         unset_reply = m.recv(4096)
-        check('fake control: unset restores the configured target', b'unix:%s' % msock.encode() in unset_reply,
+        check('fake control: clear restores the configured target', b'unix:%s' % msock.encode() in unset_reply,
               unset_reply[:120])
         m.close()
         tx = ctl(msock, 'show version')
@@ -1144,7 +1144,7 @@ def main():
         tx = ctl(msock, 'set control ops verbs show, ping')
         check('fake control: the ops policy sets live (the family spelling)',
               tx.startswith('ok control/ops/verbs=ping,show'), tx[:90])
-        tx = ctl(msock, 'unset control ops verbs')
+        tx = ctl(msock, 'clear control ops verbs')
         check('fake control: the ops policy unsets', tx.startswith('ok control/ops/verbs='), tx[:90])
         tx = ctl(msock, 'set control trust-uids 1000,1001')
         check('fake control: the trust uids set live', tx.startswith('ok control/trust-uids=1000,1001'), tx[:90])
@@ -1177,7 +1177,7 @@ def main():
         tx = ctl(msock, 'show audit rotate daily')
         check('fake audit-daily: show audit rotate daily answers on',
               tx == 'ok audit/rotate/daily=on', tx[:90])
-        tx = ctl(msock, 'unset audit rotate daily')
+        tx = ctl(msock, 'clear audit rotate daily')
         check('fake audit-daily: the daily trigger unsets to the configured off',
               tx.startswith('ok audit/rotate/daily=off'), tx[:90])
         tx = ctl(msock, 'set audit rotate daily maybe')
@@ -1234,8 +1234,8 @@ def main():
         tx = ctl(15967, 'show max-kwp')
         check('fake config: the conf value answers on the wire', tx == 'ok max-kwp=20', tx[:90])
         ctl(15967, 'set max-kwp 2')
-        tx = ctl(15967, 'unset max-kwp')
-        check('fake config: unset returns the conf value', tx.startswith('ok max-kwp=20 '), tx[:90])
+        tx = ctl(15967, 'clear max-kwp')
+        check('fake config: clear returns the conf value', tx.startswith('ok max-kwp=20 '), tx[:90])
         with open(conf, 'w') as fh:
             fh.write('set pv 100\n')
         r = subprocess.run([sys.executable, F, '--config', conf, '--control-port', '0', '--dry-run'],

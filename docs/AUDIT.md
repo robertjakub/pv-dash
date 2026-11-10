@@ -136,7 +136,7 @@ the intended demo feature, gated by control-server access only.
   dropped before exec; the compose demo internal-only and publishes nothing
   (F7).
 - **Resilience** — reconnect with split-on-failure polling, per-leaf fault
-  isolation, write-through invalidation, `clear cache`/`restart`/`reset`
+  isolation, write-through invalidation, `flush cache`/`restart`/`reset`
   verbs; the state dump as the write-behind for a gated restart; fuzz and
   stress suites exercise the wire paths.
 - **Scraper request surface** — a missing/invalid bearer answers 401 with

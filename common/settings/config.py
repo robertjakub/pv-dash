@@ -242,7 +242,7 @@ def parse_acl(text, label):
 
 
 def acl_text(acl):
-    """The ACL normalized for `unset` to re-parse: 'any' | 'none' | the network list."""
+    """The ACL normalized for `clear` to re-parse: 'any' | 'none' | the network list."""
     if acl is None:
         return 'any'
     if not acl:
@@ -508,7 +508,7 @@ def resolve_metrics_acl(val, label='metrics/acl'):
 
 
 def acl_value_text(acl):
-    """The IP-kind acl knob's value as its set-grammar text (what `unset`
+    """The IP-kind acl knob's value as its set-grammar text (what `clear`
     re-parses and show config renders): 'any', 'none', the network list —
     or the file: reference (a raw string value or the resolved IPGate)."""
     if isinstance(acl, IPGate):

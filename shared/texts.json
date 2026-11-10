@@ -39,7 +39,7 @@
 },
 "wire": {
   "empty_command": "empty command",
-  "unset_needs_setting": "unset needs a setting (try help)",
+  "clear_needs_setting": "clear needs a setting (try help)",
   "set_needs_value": "set needs a setting and a value (try help)",
   "unknown_help_topic": "unknown command or setting %s (try ?)",
   "unknown_setting": "unknown setting %s (try help)",

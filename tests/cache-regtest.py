@@ -382,7 +382,7 @@ try:
           'Traceback' not in evil_log and 'poll of' in evil_log)
     evil.stop()
 
-    # 5. control server: show config/connections/cache, request clear cache,
+    # 5. control server: show config/connections/cache, request flush cache,
     #    request restart,
     #    cache_cli, shutdown (+ the default unix socket / CTL)
     K = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py')
@@ -452,7 +452,7 @@ try:
           and r.startswith('ok connections 127.0.0.1:'), r)
     r = ctl_cmd('show cache', 15514 + BASE)
     check('control: show cache counters', 'hits 1' in r and 'range(s)' in r and 'map v0' in r, r)
-    r = ctl_cmd('request clear cache', 15514 + BASE)
+    r = ctl_cmd('request flush cache', 15514 + BASE)
     check('control: clear cache', r.startswith('ok cache cleared (') and 'repolling now' in r, r)
     b = rd(32064, 2, port=15513 + BASE)
     check('control: cache refills after clear', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
@@ -570,8 +570,8 @@ try:
     r = cli('show modbus upstream\nquit\n')
     check('cache_cli: the per-setting show prints the bare value', r.returncode == 0
           and '\ncache:%d > 127.0.0.1:%d' % (15514 + BASE, 15512 + BASE) in r.stdout, repr(r.stdout[-160:]))
-    r = cli('request clear cache\nquit\n')
-    check('cache_cli: request clear cache confirms silently', r.returncode == 0
+    r = cli('request flush cache\nquit\n')
+    check('cache_cli: request flush cache confirms silently', r.returncode == 0
           and '\ncache:%d > \ncache:%d > ' % (15514 + BASE, 15514 + BASE) in r.stdout, repr(r.stdout[-120:]))
     r = cli('show control token ?\nshow control ops ?\nset connections ?\nrequest?\nquit\n')
     check("cache_cli: ? at a hidden leaf describes it (the wire's help answer)",
@@ -643,12 +643,12 @@ try:
     check('cache_ctl: one-shot per-setting show', r.returncode == 0
           and r.stdout.startswith('ok modbus/upstream=127.0.0.1:%d' % (15512 + BASE)), repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, ctl, '--control-port', '%d' % (15520 + BASE)],
-                       input='show cache\nrequest clear cache\n', capture_output=True, text=True,
+                       input='show cache\nrequest flush cache\n', capture_output=True, text=True,
                        timeout=30, env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     check('cache_ctl: piped batch with the token env', r.returncode == 0
           and r.stdout.startswith('ok cache ') and 'ok cache cleared' in r.stdout, repr(r.stdout[:160]))
 
-    # 5d. set/unset/show: the live settings registry (the inverter's pattern)
+    # 5d. set/clear/show: the live settings registry (the inverter's pattern)
     r = ctl_cmd('set modbus interval 2', 15514 + BASE)
     check('set: interval applied with the state summary', r.startswith('ok modbus/interval=2.00s upstream=127.0.0.1:%d' % (15512 + BASE))
           and 'poll=' in r and 'hits=' in r, r[:120])
@@ -666,9 +666,9 @@ try:
     check('show <setting>: the path spelling answers the live', r == 'ok cache/ttl=3.00s', r)
     r = ctl_cmd('help cache ttl', 15514 + BASE)
     check('help <setting>: the registry description', r.startswith('ok cache/ttl - per-register cache TTL'), r[:110])
-    r = ctl_cmd('help unset', 15514 + BASE)
+    r = ctl_cmd('help clear', 15514 + BASE)
     check('help <command>: the row describes itself',
-          r == 'ok restore a setting to its configured value: unset <setting>', r)
+          r == 'ok restore a setting to its configured value: clear <setting>', r)
     r = ctl_cmd('help request', 15514 + BASE)
     check('help <command node>: the namespace lists its children (the ? shape)',
           r == 'ok     clear         drop the cached registers and repoll now\n'
@@ -683,16 +683,16 @@ try:
     r = ctl_cmd('help bogus', 15514 + BASE)
     check('help <unknown topic>: the reworded two-space error',
           r == 'fail unknown command or setting bogus (try ?)', r)
-    r = ctl_cmd('unset modbus interval', 15514 + BASE)
-    check('unset: restores the configured value', r.startswith('ok modbus/interval=1.00s'), r[:110])
+    r = ctl_cmd('clear modbus interval', 15514 + BASE)
+    check('clear: restores the configured value', r.startswith('ok modbus/interval=1.00s'), r[:110])
     r = ctl_cmd('set modbus timeout 5', 15514 + BASE)
     check('set: modbus timeout applied (the rekeyed branch)', r.startswith('ok modbus/timeout=5.00s upstream='), r[:120])
     r = ctl_cmd('show modbus timeout', 15514 + BASE)
     check('show: modbus timeout answers the bare value', r == 'ok modbus/timeout=5.00s', r)
     r = ctl_cmd('set modbus timeout 99', 15514 + BASE)
     check('set: modbus timeout range-gated', r.startswith('fail timeout must be 0 < N <= 60'), r[:100])
-    r = ctl_cmd('unset modbus timeout', 15514 + BASE)
-    check('unset: modbus timeout restores the configured value', r.startswith('ok modbus/timeout=3.00s'), r[:110])
+    r = ctl_cmd('clear modbus timeout', 15514 + BASE)
+    check('clear: modbus timeout restores the configured value', r.startswith('ok modbus/timeout=3.00s'), r[:110])
     r = ctl_cmd('set config 5', 15514 + BASE)
     check('set: a show report is not a setting', r.startswith('fail unknown setting config'), r[:100])
     r = ctl_cmd('set connections 5', 15514 + BASE)
@@ -703,8 +703,8 @@ try:
     check('show: local-time answers the bare value', r == 'ok local-time=on', r)
     r = ctl_cmd('set local-time bogus', 15514 + BASE)
     check('set: local-time validates on|off', r.startswith('fail local-time must be on|off'), r[:100])
-    r = ctl_cmd('unset local-time', 15514 + BASE)
-    check('unset: local-time restores the configured value', r.startswith('ok local-time=off'), r[:110])
+    r = ctl_cmd('clear local-time', 15514 + BASE)
+    check('clear: local-time restores the configured value', r.startswith('ok local-time=off'), r[:110])
     r = ctl_cmd('show cache-all', 15514 + BASE)
     check('show cache-all: per-entry rows with age, expiry and status', r.startswith('ok cache-all\n')
           and 'pv-power' in r and 'expires' in r and 'fc3' in r and '2/2' in r, r[:200])
@@ -746,9 +746,9 @@ try:
                         capture_output=True, text=True).stdout.strip()
     check('selection none: repeat reads forward, nothing is stored', int(m2) == int(m1) + 2,
           '%s -> %s' % (m1, m2))
-    ctl_cmd('unset modbus selection', 15514 + BASE)
+    ctl_cmd('clear modbus selection', 15514 + BASE)
     r = ctl_cmd('show cache', 15514 + BASE)
-    check('unset selection: the map refills', '49 range(s)' in r
+    check('clear selection: the map refills', '49 range(s)' in r
           and ctl_cmd('show modbus selection', 15514 + BASE) == 'ok modbus/selection=all', r[:160])
 
     # --selection none at startup: the same, straight from the command line
@@ -857,7 +857,7 @@ try:
     d = _json.load(open(dumpfile))
     check('request dump: the settings-only dump keeps the words out', d.get('registers') == []
           and d.get('settings', {}).get('modbus/interval') == 2.0, str(d.get('settings')))
-    ctl_cmd('request clear cache', 15537 + BASE)
+    ctl_cmd('request flush cache', 15537 + BASE)
     r = ctl_cmd('show cache', 15537 + BASE)
     check('request restore: the clear emptied the cache first', '0 word(s) cached' in r, r[:80])
     r = ctl_cmd('request restore', 15537 + BASE)
@@ -865,7 +865,7 @@ try:
           r.startswith('ok restored 0 word(s), 1 setting(s)'), r[:120])
     time.sleep(1.4)   # the poller refills (interval 1 s) before the with-cache dump
     ctl_cmd('request dump with-cache', 15537 + BASE)
-    ctl_cmd('request clear cache', 15537 + BASE)
+    ctl_cmd('request flush cache', 15537 + BASE)
     r = ctl_cmd('request restore', 15537 + BASE)
     check('request restore: the with-cache dump brings the words back',
           r.startswith('ok restored 91 word(s), 1 setting(s)'), r[:120])
@@ -1095,7 +1095,7 @@ try:
     r = ctl_cmd('request dump', 15537 + BASE)
     check('dump-with-cache: the flag turns the plain request dump full', r.startswith('ok dumped 91 word(s)'),
           r[:120])
-    ctl_cmd('request clear cache', 15537 + BASE)
+    ctl_cmd('request flush cache', 15537 + BASE)
     r = ctl_cmd('request restore', 15537 + BASE)
     check('restore-on-start: the manual request restore still works', r.startswith('ok restored 91 word(s), ')
           and 'setting(s) from' in r, r[:120])
@@ -1116,7 +1116,7 @@ try:
     check('restore-on-start: the gate loads the dump', '91 word(s) cached' in r, r[:80])
     r = ctl_cmd('show modbus interval', 15537 + BASE)
     check('restore-on-start: the override came back with the gate', r == 'ok modbus/interval=3.00s', r)
-    ctl_cmd('unset modbus interval', 15537 + BASE)
+    ctl_cmd('clear modbus interval', 15537 + BASE)
     ctl_cmd('shutdown', 15537 + BASE)
     p_dump.wait(timeout=10)
 
@@ -1191,16 +1191,16 @@ try:
     idle.close()
     check('metrics client-timeout: the silent peer is dropped on the timer', dropped,
           'the idle socket stayed open past the cap')
-    r = ctl_cmd('unset metrics limits timeout', 15530 + BASE)
-    check('metrics client-timeout: unset restores the default cap', r.startswith('ok metrics/limits/timeout=5.00s'), r[:90])
+    r = ctl_cmd('clear metrics limits timeout', 15530 + BASE)
+    check('metrics client-timeout: clear restores the default cap', r.startswith('ok metrics/limits/timeout=5.00s'), r[:90])
     # the read-delay: the poll paces between the upstream blocks (the wire round-trip;
     # the pacing itself shows in the poll-duration gauge when the spec splits)
     r = ctl_cmd('set modbus read-delay 0.25', 15530 + BASE)
     check('read-delay: set takes the seconds value', r.startswith('ok modbus/read-delay=250.00ms'), r[:90])
     r = ctl_cmd('show modbus read-delay', 15530 + BASE)
     check('read-delay: the show renders it', r == 'ok modbus/read-delay=250.00ms', r)
-    r = ctl_cmd('unset modbus read-delay', 15530 + BASE)
-    check('read-delay: unset restores the configured default', r.startswith('ok modbus/read-delay=50.00ms'), r[:90])
+    r = ctl_cmd('clear modbus read-delay', 15530 + BASE)
+    check('read-delay: clear restores the configured default', r.startswith('ok modbus/read-delay=50.00ms'), r[:90])
     # the live metrics enable switch: off stops the endpoint, on restarts it
     r = ctl_cmd('set metrics enable off', 15530 + BASE)
     check('metrics enable: set off stops the endpoint', r.startswith('ok metrics/enable=off'), r[:80])
@@ -1237,9 +1237,9 @@ try:
     r = ctl_cmd('show config', 15530 + BASE)
     check('show config: the live cache ttl and the file marker ride',
           'set cache ttl 55.0' in r and 'set write registers file:/tmp/reg_acl_write.json' in r, r[:220])
-    ctl_cmd('unset cache ttl', 15530 + BASE)
+    ctl_cmd('clear cache ttl', 15530 + BASE)
     r = ctl_cmd('show config', 15530 + BASE)
-    check('show config: the unset ttl returns the configured value',
+    check('show config: the clear ttl returns the configured value',
           'set cache ttl 3.0' in r, r[:160])   # the default rides factor x interval = 3 x 1 s
     ctl_cmd('set write registers any', 15530 + BASE)
     # audit/requests: the live name is the wire spelling (the branch keys it)
@@ -1247,7 +1247,7 @@ try:
     check('audit requests: the live set answers the path name', r.startswith('ok audit/requests='), r[:90])
     r = ctl_cmd('show audit requests', 15530 + BASE)
     check('audit requests: the show answers the tally seconds', r == 'ok audit/requests=2.00m', r)
-    ctl_cmd('unset audit requests', 15530 + BASE)
+    ctl_cmd('clear audit requests', 15530 + BASE)
     # the live caps: raising the cap serves the second concurrent client, lowering 503s it again
     r = ctl_cmd('set metrics limits max-clients 2', 15530 + BASE)
     check('metrics limits: the live cap set', r.startswith('ok metrics/limits/max-clients=2'), r[:90])
@@ -1271,7 +1271,7 @@ try:
           reply.split(b'\r\n')[0].decode() if reply else 'empty reply')
     over.close()
     parked.close()
-    # the secrets are startup-only (the dump/key treatment): the set/unset
+    # the secrets are startup-only (the dump/key treatment): the set/clear
     # refuse on the wire, the configured token keeps serving
     r = ctl_cmd('set metrics token sekrit2', 15530 + BASE)
     check('metrics token: startup-only — the set refuses',
@@ -1292,11 +1292,11 @@ try:
     check('metrics listen: the running endpoint kept the old address (the restart applies it)', st == 200, str(st))
     r = ctl_cmd('set metrics listen bogus', 15530 + BASE)
     check('metrics listen: a bad value still fails the set', r.startswith('fail'), r[:90])
-    r = ctl_cmd('unset metrics listen', 15530 + BASE)
-    check('metrics listen: the unset answers the note too',
+    r = ctl_cmd('clear metrics listen', 15530 + BASE)
+    check('metrics listen: the clear answers the note too',
           r.startswith('note restart required (startup-only knob)'), r[:90])
     r = ctl_cmd('show metrics listen', 15530 + BASE)
-    check('metrics listen: the unset restored the configured value',
+    check('metrics listen: the clear restored the configured value',
           r.startswith('ok metrics/listen=127.0.0.1:%d' % (15529 + BASE)), r[:90])
     # the tokenless metrics endpoint (the F13 shapes on the live wire): the
     # tokenless loopback serve is the auth, the enable dance works without a
@@ -1407,12 +1407,12 @@ try:
     check('metrics acl: a bad file answers err with the old gate standing',
           r.startswith('fail') and 'spell the network' in r
           and metrics_acl_raw('sekrit').startswith(b'HTTP/1.0 200'), r[:140])
-    r = ctl_cmd('unset metrics acl', 15530 + BASE)
-    check('metrics acl: unset restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
+    r = ctl_cmd('clear metrics acl', 15530 + BASE)
+    check('metrics acl: clear restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
     check('metrics acl: any serves again', metrics_acl_raw('sekrit').startswith(b'HTTP/1.0 200'))
 
     # the control plane, audit trail and dump lives (the same metrics pattern:
-    # set/show/unset on the wire, the secrets never render, the rebind moves it)
+    # set/show/clear on the wire, the secrets never render, the rebind moves it)
     def ctl_tok(cmd, port, tok):
         """ctl_cmd with a custom token (the rotation pins re-key the session)."""
         mac = hmac.new(tok.encode(), cmd.encode(), hashlib.sha256).hexdigest()
@@ -1437,24 +1437,24 @@ try:
         return '%s %s' % (obj.get('status'), obj.get('text', ''))
 
     r = ctl_cmd('show control ops verbs', 15530 + BASE)
-    check('control ops verbs: show answers the policy', r == 'ok control/ops/verbs=clear,show', r)
+    check('control ops verbs: show answers the policy', r == 'ok control/ops/verbs=flush,show', r)
     r = ctl_cmd('set control ops verbs show, ping', 15530 + BASE)
     check('control ops verbs: set takes the comma list', r.startswith('ok control/ops/verbs=ping,show'), r[:90])
     r = ctl_cmd('set control ops verbs bogus', 15530 + BASE)
     check('control ops verbs: an unknown verb is a clean err', r.startswith('fail the ops policy needs at least one'),
           r[:80])
-    ctl_cmd('unset control ops verbs', 15530 + BASE)
+    ctl_cmd('clear control ops verbs', 15530 + BASE)
     r = ctl_cmd('show control token', 15530 + BASE)
     check('control token: the secret never renders back', r.startswith('fail control/token is a secret'), r)
-    r = ctl_cmd('unset control token', 15530 + BASE)
-    check('control token: unset refuses (startup-only)', r.startswith('fail restart required (startup-only knob)'), r[:80])
+    r = ctl_cmd('clear control token', 15530 + BASE)
+    check('control token: clear refuses (startup-only)', r.startswith('fail restart required (startup-only knob)'), r[:80])
     r = ctl_cmd('set control trust-uids 1000, 1001', 15530 + BASE)
     check('control trust-uids: set takes the uid list', r.startswith('ok control/trust-uids=1000,1001'), r[:90])
-    r = ctl_cmd('unset control trust-uids', 15530 + BASE)
-    check('control trust-uids: unset restores the configured none', r.startswith('ok control/trust-uids=off'), r[:90])
+    r = ctl_cmd('clear control trust-uids', 15530 + BASE)
+    check('control trust-uids: clear restores the configured none', r.startswith('ok control/trust-uids=off'), r[:90])
     r = ctl_cmd('set control socket-group on', 15530 + BASE)
     check('control socket-group: set answers on', r.startswith('ok control/socket-group=on'), r[:90])
-    ctl_cmd('unset control socket-group', 15530 + BASE)
+    ctl_cmd('clear control socket-group', 15530 + BASE)
     r = ctl_cmd('show audit rotate max-size', 15530 + BASE)
     check('audit rotate: show answers the configured MB', r == 'ok audit/rotate/max-size=10', r)
     listing = '\n'.join([
@@ -1534,8 +1534,8 @@ try:
     ctl_cmd('set audit forward none', 15530 + BASE)
     r = ctl_cmd('show audit log-file', 15530 + BASE)
     check('audit log-file: none without a forward folds to off', r == 'ok audit/log-file=off', r)
-    r = ctl_cmd('unset audit log-file', 15530 + BASE)
-    check('audit log-file: unset restores the configured sink', r.startswith('ok audit/log-file=')
+    r = ctl_cmd('clear audit log-file', 15530 + BASE)
+    check('audit log-file: clear restores the configured sink', r.startswith('ok audit/log-file=')
           and 'modbus-cache/audit.log' in r, r[:120])
     live_dump = '/tmp/reg_live_dump.json'
     r = ctl_cmd('set dump/path %s' % live_dump, 15530)
@@ -1548,17 +1548,17 @@ try:
     check('dump path: request dump writes the live path', r.startswith('ok dumped') and live_dump in r, r[:90])
     r = ctl_cmd('set dump with-cache on', 15530 + BASE)
     check('dump with-cache: set answers on', r.startswith('ok dump/with-cache=on'), r[:90])
-    r = ctl_cmd('unset dump with-cache', 15530 + BASE)
-    check('dump with-cache: unset restores off', r.startswith('ok dump/with-cache=off'), r[:90])
+    r = ctl_cmd('clear dump with-cache', 15530 + BASE)
+    check('dump with-cache: clear restores off', r.startswith('ok dump/with-cache=off'), r[:90])
     r = ctl_cmd('set dump restore-on-start on', 15530 + BASE)
     check('dump restore-on-start: the set answers the restart note (the value records pending)',
           r.startswith('note restart required (startup-only knob)'), r[:90])
     r = ctl_cmd('show dump restore-on-start', 15530 + BASE)
     check('dump restore-on-start: show renders the recorded pending value',
           r.startswith('ok dump/restore-on-start=on'), r[:90])
-    ctl_cmd('unset dump restore-on-start', 15530 + BASE)
-    r = ctl_cmd('unset dump/path', 15530 + BASE)
-    check('dump path: unset restores off', r.startswith('ok dump/path=off'), r[:90])
+    ctl_cmd('clear dump restore-on-start', 15530 + BASE)
+    r = ctl_cmd('clear dump/path', 15530 + BASE)
+    check('dump path: clear restores off', r.startswith('ok dump/path=off'), r[:90])
     r = ctl_cmd('show', 15530 + BASE)
     words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
@@ -1576,8 +1576,8 @@ try:
     check('control port: the old port is closed', old_gone)
     r = ctl_cmd('show version', 15536 + BASE)
     check('control port: the new port speaks', r.startswith('ok modbus-cache'), r[:60])
-    r = ctl_cmd('unset control port', 15536 + BASE)
-    check('control port: unset restores the configured target', r.startswith('ok control/port=127.0.0.1:%d' % (15530 + BASE)), r[:90])
+    r = ctl_cmd('clear control port', 15536 + BASE)
+    check('control port: clear restores the configured target', r.startswith('ok control/port=127.0.0.1:%d' % (15530 + BASE)), r[:90])
     r = ctl_cmd('show version', 15530 + BASE)
     check('control port: the restored target speaks', r.startswith('ok modbus-cache'), r[:60])
     r = ctl_cmd('set control token sekrit2', 15530 + BASE)
@@ -1639,15 +1639,15 @@ try:
     n_after = r_after.split('poll plan ')[1].split(' block(s)')[0]
     check('set merge-gap: the poll plan rebuilds live', int(n_after) > int(n_before),
           '%s -> %s' % (n_before, n_after))
-    ctl_cmd('unset modbus merge-gap', 15514 + BASE)
+    ctl_cmd('clear modbus merge-gap', 15514 + BASE)
 
     r = ctl_cmd('set write allow on', 15514 + BASE)
     check('set allow-write: the gate opens', r.startswith('ok write/allow=on'), r[:100])
     b = wr6(47415, 3, port=15513 + BASE)
     check('set allow-write: the forwarded write passes', b == bytes.fromhex('06b9370003'), b.hex())
-    ctl_cmd('unset write allow', 15514 + BASE)
+    ctl_cmd('clear write allow', 15514 + BASE)
     b = wr6(47415, 4, port=15513 + BASE)
-    check('unset allow-write: the gate closes again', b[0] == 0x86 and b[1] == 1, b.hex())
+    check('clear allow-write: the gate closes again', b[0] == 0x86 and b[1] == 1, b.hex())
     r = cli('shutdown\n\n', 15515 + BASE, {'CTL': '/tmp/modbus-cache-%d.socket' % (15515 + BASE)}, use_flag=False)
     time.sleep(1)
     check('cache_cli: RETURN at [confirm] stops the proxy', r.returncode == 0
@@ -1926,8 +1926,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     b = wr6(47415, 5, port=15531 + BASE)
     check('write-acl any + write-registers any: the write passes',
           b == bytes.fromhex('06b9370005'), b.hex())
-    r = ctl_cmd('unset acl write', 15532 + BASE)
-    check('unset write-acl restores the default none', r.startswith('ok acl/write=none'), r[:80])
+    r = ctl_cmd('clear acl write', 15532 + BASE)
+    check('clear write-acl restores the default none', r.startswith('ok acl/write=none'), r[:80])
     b = wr6(47415, 5, port=15531 + BASE)
     check('write-acl none again: refused', b[0] == 0x86 and b[1] == 1, b.hex())
 
@@ -1938,8 +1938,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('alias: set write acl any', r.startswith('ok acl/write=any'), r[:80])
     b = wr6(47415, 5, port=15531 + BASE)
     check('alias: the write passes through the aliased set', b == bytes.fromhex('06b9370005'), b.hex())
-    r = ctl_cmd('unset write acl', 15532 + BASE)
-    check('alias: unset write acl restores none', r.startswith('ok acl/write=none'), r[:80])
+    r = ctl_cmd('clear write acl', 15532 + BASE)
+    check('alias: clear write acl restores none', r.startswith('ok acl/write=none'), r[:80])
     r = ctl_cmd('help write acl', 15532 + BASE)
     check('alias: help write acl describes the row', r.startswith('ok acl/write -'), r[:80])
     r = ctl_cmd('show write', 15532 + BASE)
@@ -1997,8 +1997,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('profile acl: the any knob renders allow any',
           r.startswith('ok write/registers=any')
           and ctl_cmd('show write registers profile', 15586 + BASE) == 'ok write-registers-profile\nallow any', r[:80])
-    r = ctl_cmd('unset write registers', 15586 + BASE)
-    check('profile acl: unset restores the configured profile mode',
+    r = ctl_cmd('clear write registers', 15586 + BASE)
+    check('profile acl: clear restores the configured profile mode',
           r.startswith('ok write/registers=profile'), r[:80])
     r = ctl_cmd('set write registers profile', 15586 + BASE)
     check('profile acl: the wire set answers the profile spelling',
@@ -2086,7 +2086,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
         _json.dump({'desc': 'the regtest gate',
                     'rules': [{'type': 'allow', 'range': '148:30', 'desc': 'the TOU slots'},
                               {'type': 'deny', 'range': '148:1', 'desc': 'carved back'}]}, fh)
-    os.chmod(aclf, 0o644)   # group/world-readable: the permission warning fires at start and on the set/unset replies
+    os.chmod(aclf, 0o644)   # group/world-readable: the permission warning fires at start and on the set/clear replies
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
            '--listen', '127.0.0.1:%d' % (15600 + BASE), '--interval', '1',
            '--allow-write', '--write-acl', 'any', '--write-registers', 'file:' + aclf,
@@ -2121,8 +2121,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           r.startswith('ok write/registers=file:%s' % aclf)
           and 'the acl file %s is group/world-readable, mode 644 — chmod 0600' % aclf in r, r[:200])
     os.chmod(aclf, 0o600)
-    r = ctl_cmd('unset write registers', 15601)
-    check('acl file: a 0600 acl file is silent (the unset restores the file gate)',
+    r = ctl_cmd('clear write registers', 15601)
+    check('acl file: a 0600 acl file is silent (the clear restores the file gate)',
           r.startswith('ok write/registers=file:%s' % aclf)
           and 'group/world-readable' not in r, r[:160])
     r = ctl_cmd('set write registers file:/nonexistent/acl.json', 15601)
@@ -2131,8 +2131,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           and ctl_cmd('show write registers', 15601) == 'ok write/registers=file:%s' % aclf, r[:120])
     r = ctl_cmd('set write registers 100:1', 15601)
     check('acl file: the explicit ranges take over', r.startswith('ok write/registers=100:1'), r[:80])
-    r = ctl_cmd('unset write registers', 15601)
-    check('acl file: unset restores the configured file gate',
+    r = ctl_cmd('clear write registers', 15601)
+    check('acl file: clear restores the configured file gate',
           r.startswith('ok write/registers=file:%s' % aclf), r[:100])
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
                         '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
@@ -2231,11 +2231,11 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     r = ctl_cmd('show acl write table', 15540 + BASE)
     check('acl write table: the file gate renders its rules',
           r.startswith('ok acl-write-table') and 'allow 127.0.0.0/8 # the loopback lab' in r, r[:160])
-    r = ctl_cmd('unset acl write', 15540 + BASE)
-    check('unset acl write restores the default none', r.startswith('ok acl/write=none'), r[:80])
+    r = ctl_cmd('clear acl write', 15540 + BASE)
+    check('clear acl write restores the default none', r.startswith('ok acl/write=none'), r[:80])
     # the system forms spell the chain they implement
     r = ctl_cmd('show acl connect table', 15540 + BASE)
-    check('acl connect table: the file gate still renders (unset write untouched)',
+    check('acl connect table: the file gate still renders (clear write untouched)',
           r.startswith('ok acl-connect-table') and 'allow 127.0.0.0/8' in r, r[:120])
     r = ctl_cmd('set acl connect any', 15540 + BASE)
     r = ctl_cmd('show acl connect table', 15540 + BASE)
@@ -2246,8 +2246,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     r = ctl_cmd('show acl connect table', 15540 + BASE)
     check('acl connect table: the whitelist spells deny any + the allows',
           r == 'ok acl-connect-table\ndeny 0.0.0.0/0\nallow 127.0.0.0/8\nallow 10.48.0.0/16', repr(r[:120]))
-    r = ctl_cmd('unset acl connect', 15540 + BASE)
-    check('acl connect: unset restores the configured default (none here)',
+    r = ctl_cmd('clear acl connect', 15540 + BASE)
+    check('acl connect: clear restores the configured default (none here)',
           r.startswith('ok acl/connect=none'), r[:120])
     ctl_cmd('set acl connect any', 15540 + BASE)
     r = ctl_cmd('set acl connect none', 15540 + BASE)
@@ -2468,8 +2468,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('suite auth: show modbus auth-upstream reads suite', r == 'ok modbus/auth-upstream=suite', r[:80])
     r = ctl_auth('show', 'modbus', 'auth', 'key')
     check('suite auth: the client key never shows', r.startswith('% error: modbus/auth/key is a secret'), r[:80])
-    r = ctl_auth('unset', 'modbus', 'auth-upstream-key')
-    check('suite auth: unset refuses the upstream key (startup-only)',
+    r = ctl_auth('clear', 'modbus', 'auth-upstream-key')
+    check('suite auth: clear refuses the upstream key (startup-only)',
           r.startswith('% error: restart required (startup-only knob)'), r[:80])
     r = ctl_auth('set', 'modbus', 'auth', 'key', 'short')
     check('suite auth: startup-only — the key set refuses with the rest',

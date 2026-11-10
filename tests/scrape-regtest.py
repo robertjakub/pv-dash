@@ -291,7 +291,7 @@ try:
     # 1a-bis-2. the modbus offset: the live set reaches the client and the
     # next poll reads the shifted addresses — a large offset moves the whole
     # window off the device map (the poll must fail loudly, not silently),
-    # unset reads the map true again. The shipped sun2000 map anchors the reads.
+    # clear reads the map true again. The shipped sun2000 map anchors the reads.
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--strict', '--listen', '127.0.0.1:%d' % (15608 + BASE),
                                    '--control-port', '0'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
@@ -324,8 +324,8 @@ try:
           str({k: m.get(k) for k in ('scraper_up', 'scraper_modbus_errors_total')}))
     r = subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py'),
                         '--control-port', '15610', '--control-token', 'offstok',
-                        'unset', 'modbus', 'offset'], capture_output=True, text=True, timeout=15)
-    check('modbus offset: unset restores the configured zero', r.stdout.startswith('ok modbus/offset=0'),
+                        'clear', 'modbus', 'offset'], capture_output=True, text=True, timeout=15)
+    check('modbus offset: clear restores the configured zero', r.stdout.startswith('ok modbus/offset=0'),
           repr(r.stdout[:90]))
     for _ in range(30):
         status, m = wait_metrics(9368, want='scraper_up')
@@ -617,7 +617,7 @@ try:
     check('fake audit: --control-log-replies logs the full command output',
           ': set soc 30 -> ok' in ctl_full and ': show version -> ok fake-inverter' in ctl_full, ctl_full[-200:])
 
-    # 2f. CTL environment (short name) drives both tools when the flag is unset
+    # 2f. CTL environment (short name) drives both tools when the flag is clear
     r = subprocess.run([sys.executable, C, 'set', 'pv', '2200'], capture_output=True, text=True,
                        env={**os.environ, 'CTL': '15571'})
     check('fake_ctl: CTL env picks the target', r.returncode == 0
@@ -694,9 +694,9 @@ try:
     r = read3(37113, 2, 15580)
     check('grid setpoint: the grid register serves the pinned 0',
           r[0] == 3 and struct.unpack('>i', r[2:6])[0] == 0, r.hex())
-    ctl('unset grid', 15583)
+    ctl('clear grid', 15583)
     ins = ctl('inspect', 15583)
-    check('grid setpoint: unset returns to the balance', 'grid 300 W' in ins
+    check('grid setpoint: clear returns to the balance', 'grid 300 W' in ins
           and 'pv=3000.0; load=1000.0; soc=80.0' in ins.split('\npinned', 1)[1], ins)
     # 2g2b. mppt strings: string-1 = the east array (the morning peak), string-2 =
     # the west array (the afternoon peak); the setting enables/assigns them
@@ -717,9 +717,9 @@ try:
     r = read3(32016, 4, 15580)
     check('mppt: none = PV 0, both strings dark',
           all(w == 0 for w in struct.unpack('>4H', r[2:10])), r.hex())
-    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'unset', 'mppt'],
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'clear', 'mppt'],
                        capture_output=True, text=True)
-    check('mppt: unset restores both', r.returncode == 0 and 'ok mppt=both' in r.stdout, r.stdout.strip())
+    check('mppt: clear restores both', r.returncode == 0 and 'ok mppt=both' in r.stdout, r.stdout.strip())
     ins = ctl('inspect', 15583)
     pv_w = float(ins.split('pv ', 1)[1].split(' W', 1)[0])
     check('mppt: the day curve doubles the shoulder with both strings',
@@ -738,9 +738,9 @@ try:
     vs = [float(regs[k]) for k in ('meter-voltage-a', 'meter-voltage-b', 'meter-voltage-c')]
     check('grid voltage: 120 V nominal, the phases wander apart within +-10 %',
           all(108 <= v <= 132 for v in vs) and len(set(vs)) == 3, str(vs))
-    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'unset', 'grid-voltage'],
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'clear', 'grid-voltage'],
                        capture_output=True, text=True)
-    check('grid voltage: unset restores the 230 V nominal', 'ok grid-voltage=230' in r.stdout, r.stdout.strip())
+    check('grid voltage: clear restores the 230 V nominal', 'ok grid-voltage=230' in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15583', 'show', 'registers'],
                        capture_output=True, text=True)
     regs = {l.split(' | ')[0].strip(): l.split(' | ')[-1].strip()
@@ -788,9 +788,9 @@ try:
             for l in r.stdout.splitlines() if ' | ' in l}
     hz = float(regs.get('grid-frequency', '0'))
     check('grid frequency: the machine wanders inside 60 +-0.2 Hz', 59.8 <= hz <= 60.2, str(hz))
-    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'unset', 'grid-frequency'],
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'clear', 'grid-frequency'],
                        capture_output=True, text=True)
-    check('grid frequency: unset restores 50 Hz', 'ok grid-frequency=50' in r.stdout, r.stdout.strip())
+    check('grid frequency: clear restores 50 Hz', 'ok grid-frequency=50' in r.stdout, r.stdout.strip())
 
     # 2g2f. inspect: the pretty dump of everything
     r = subprocess.run([sys.executable, C, '--control-port', '15583', 'inspect'],
@@ -860,9 +860,9 @@ try:
     tz = ctl('show timezone', 15583)
     check('timezone: local = the wall clock', tz.startswith('ok timezone=local')
           and int(ins.split('\nnow', 1)[1].lstrip()[:2]) == time.localtime().tm_hour % 24, ins)
-    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'unset', 'timezone'],
+    r = subprocess.run([sys.executable, C, '--control-port', '15583', 'clear', 'timezone'],
                        capture_output=True, text=True)
-    check('timezone: unset restores UTC', 'ok timezone=utc' in r.stdout, r.stdout.strip())
+    check('timezone: clear restores UTC', 'ok timezone=utc' in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, F, '--dry-run', '--timezone', 'local'], capture_output=True, text=True)
     check('timezone: --timezone flag accepted (dry-run rc 0)', r.returncode == 0, r.stderr[-80:])
     ctl('set time 13:30', 15583)   # re-freeze: the scenario integrates the same path as before
@@ -1047,24 +1047,24 @@ try:
           and 'SIGTERM' in inv_rows
           and 'ping' not in inv_rows, inv_rows)
 
-    # 2g1b. unset command + scenario custom (server side, shared registry)
-    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'pv'], capture_output=True, text=True)
-    check('control: unset releases the pin back to the simulation', r.returncode == 0
+    # 2g1b. clear command + scenario custom (server side, shared registry)
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'clear', 'pv'], capture_output=True, text=True)
+    check('control: clear releases the pin back to the simulation', r.returncode == 0
           and r.stdout.startswith('ok pv=auto '), r.stdout.strip())
     time.sleep(1.5)
     m = metrics_dict(get('/metrics', 19455 + BASE)[1])
-    check('control: unset really releases (metrics back to the static base)',
+    check('control: clear really releases (metrics back to the static base)',
           m.get('huawei_pv_generation_watts') == 4000, str(m.get('huawei_pv_generation_watts')))
     subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'pv', '2700'], capture_output=True)
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'scenario', 'custom'],
                        capture_output=True, text=True)
     check('control: scenario custom releases pins + clock', r.returncode == 0
           and r.stdout.startswith('ok scenario=custom ') and 'pinned' not in r.stdout, r.stdout.strip())
-    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'seed'], capture_output=True, text=True)
-    check('control: unset seed restores the random RNG', r.returncode == 0
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'clear', 'seed'], capture_output=True, text=True)
+    check('control: clear seed restores the random RNG', r.returncode == 0
           and r.stdout.startswith('ok seed=random '), r.stdout.strip())
-    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'bogus'], capture_output=True, text=True)
-    check('control: unset of an unknown setting is rejected', r.returncode == 0
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'clear', 'bogus'], capture_output=True, text=True)
+    check('control: clear of an unknown setting is rejected', r.returncode == 0
           and r.stdout.startswith('% error: unknown setting bogus'), r.stdout.strip())
 
     # 2f. register-map profiles: the fake serves the SUN2000 layout from
@@ -1138,9 +1138,9 @@ try:
                        capture_output=True, text=True)
     check('control: set profile of a bad file is rejected', r.returncode == 0
           and r.stdout.startswith('% error: '), r.stdout.strip())
-    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'profile'],
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'clear', 'profile'],
                        capture_output=True, text=True)
-    check('control: unset profile restores the configured map (its description shows)', r.returncode == 0
+    check('control: clear profile restores the configured map (its description shows)', r.returncode == 0
           and 'profile=SUN2000 with optional LUNA2000 battery and meter' in r.stdout
           and 'pv=4000W' in r.stdout, r.stdout.strip())
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'profile', 'sun2000'],
@@ -1163,9 +1163,9 @@ try:
                        capture_output=True, text=True)
     check('cloud: a pinned factor overrides the machine', r.returncode == 0
           and 'cloud=0' in r.stdout, r.stdout.strip())
-    subprocess.run([sys.executable, C, '--control-port', '15571', 'unset', 'cloud'], capture_output=True)
+    subprocess.run([sys.executable, C, '--control-port', '15571', 'clear', 'cloud'], capture_output=True)
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'inspect'], capture_output=True, text=True)
-    check('cloud: unset returns to a clear sky', '\ncloud     clear' in r.stdout, r.stdout.strip())
+    check('cloud: clear returns to a clear sky', '\ncloud     clear' in r.stdout, r.stdout.strip())
     subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'cloud', 'winter'], capture_output=True)
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'time', '12:00'],
                        capture_output=True, text=True)
@@ -1797,8 +1797,8 @@ try:
           and 'huawei_pv_generation_watts' not in m, str(sorted(m))[:80])
     r = sctl('set metrics prefix 9bad', 15597)
     check('control: an invalid prefix refuses', r.startswith('fail invalid metric_prefix'), r[:80])
-    r = sctl('unset metrics prefix', 15597)
-    check('control: the prefix unset re-applies huawei', r.startswith('ok metrics/prefix=huawei'), r[:80])
+    r = sctl('clear metrics prefix', 15597)
+    check('control: the prefix clear re-applies huawei', r.startswith('ok metrics/prefix=huawei'), r[:80])
     m = {}
     for _ in range(10):
         m = metrics_dict(get('/metrics', 19457 + BASE)[1])
@@ -1824,9 +1824,9 @@ try:
     check('scraper control: show interval', r.startswith('ok metrics/interval=5.00s'), r[:80])
     r = sctl('set metrics interval 0', 15597)
     check('scraper control: a bad value refused', r.startswith('fail interval must be'), r[:80])
-    r = sctl('help unset', 15597)
+    r = sctl('help clear', 15597)
     check('scraper control: help <command> describes the row',
-          r == 'ok restore a setting to its configured value (unset metrics interval, unset log-level)', r)
+          r == 'ok restore a setting to its configured value (clear metrics interval, clear log-level)', r)
     r = sctl('help request', 15597)
     check('scraper control: help <command node> lists the namespace (the ? shape)',
           r.startswith('ok ') and all(w in r for w in ('dump', 'reload', 'reload-config', 'restart', 'restore')), r[:200])
@@ -1835,8 +1835,8 @@ try:
     r = sctl('help bogus', 15597)
     check('scraper control: help <unknown topic> is the reworded two-space error',
           r == 'fail unknown command or setting bogus (try ?)', r)
-    r = sctl('unset metrics interval', 15597)
-    check('scraper control: unset restores the configured value', r.startswith('ok metrics/interval='), r[:80])
+    r = sctl('clear metrics interval', 15597)
+    check('scraper control: clear restores the configured value', r.startswith('ok metrics/interval='), r[:80])
     r = sctl('set log-access on', 15597)
     check('scraper control: set log-access', r.startswith('ok log-access=on'), r[:80])
     r = sctl('set metrics limits max-conn-per-ip 2', 15597)
@@ -1867,8 +1867,8 @@ try:
           r.startswith('fail ') and 'pv_generation_watts' in r, r[:160])
     r = sctl('set modbus profile /tmp/scr_no_such_profile.json', 15597)
     check('scraper control: a missing profile file is refused', r.startswith('fail cannot read'), r[:120])
-    r = sctl('unset modbus profile', 15597)
-    check('scraper control: unset profile restores the configured profile',
+    r = sctl('clear modbus profile', 15597)
+    check('scraper control: clear profile restores the configured profile',
           r.startswith('ok modbus/profile=') and 'sun2000.json' in r, r[:120])
     r = sctl('show settings', 15597)
     check('scraper control: show settings is retired (fail)', r.startswith('fail'), r[:80])
@@ -1895,13 +1895,13 @@ try:
     r = sctl('request reload-config', 15597)
     check('scraper control: request reload-config', r.startswith('ok reloaded'), r[:80])
     # 6b-3. the secrets on the wire: startup-only (the dump/key treatment) —
-    #       set/unset refuse on the wire, the show verb refuses them — a
+    #       set/clear refuse on the wire, the show verb refuses them — a
     #       secret never renders
     r = sctl('show metrics auth token', 15597)
     check('scraper control: the auth token is a secret that never shows',
           r.startswith('fail metrics/auth/token is a secret'), r[:90])
-    r = sctl('unset metrics auth token', 15597)
-    check('scraper control: unset refuses a secret (startup-only)',
+    r = sctl('clear metrics auth token', 15597)
+    check('scraper control: clear refuses a secret (startup-only)',
           r.startswith('fail restart required (startup-only knob)'), r[:90])
     r = sctl('show control token', 15597)
     check('scraper control: the control token never shows', r.startswith('fail control/token is a secret'), r[:90])
@@ -1950,8 +1950,8 @@ try:
     r = sctl('request restore', 15597)
     check('scraper control: a tampered dump fails closed', r.startswith('fail restore failed')
           and 'integrity' in r, r[:120])
-    r = sctl('unset dump/path', 15597)
-    check('scraper control: the dump path unset back to off', r.startswith('ok dump/path=off'), r[:80])
+    r = sctl('clear dump/path', 15597)
+    check('scraper control: the dump path clear back to off', r.startswith('ok dump/path=off'), r[:80])
     # 6b-4c. the dump-interval (the family knob, the cache's golden shape):
     #        the set/show/describe gate on the dump path, the dumper loop
     #        rewrites the file on the timer (the thread parks while off)
@@ -1976,8 +1976,8 @@ try:
     check('scraper control: the dumper rewrote the file on the timer', m2 > m1, '%.2f -> %.2f' % (m1, m2))
     r = sctl('set dump-interval off', 15597)
     check('scraper control: the interval off again', r.startswith('ok dump-interval=off'), r[:80])
-    r = sctl('unset dump/path', 15597)
-    check('scraper control: the dump path unset back to off again', r.startswith('ok dump/path=off'), r[:80])
+    r = sctl('clear dump/path', 15597)
+    check('scraper control: the dump path clear back to off again', r.startswith('ok dump/path=off'), r[:80])
     # 6b-4b. the sealed dump (the DUMP_KEY env twin): the state rides encrypted,
     #        the restore fails closed without the key (the restart matrix lives
     #        in the inverter and cache regtests — the same open_dump gate)
@@ -2228,7 +2228,7 @@ try:
           r.returncode == 1 and 'TCP control port' in r.stderr and 'Traceback' not in r.stderr,
           r.stderr[-160:])
     # the live rebind (`set control port`): the listener swaps by identity,
-    # the old port closes, unset restores the configured target
+    # the old port closes, clear restores the configured target
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'set', 'control', 'port', '15603'], capture_output=True, text=True, timeout=15)
     check('scraper control: the control rebinds live', r.stdout.startswith('ok control/port=127.0.0.1:%d' % (15603 + BASE)),
@@ -2244,8 +2244,8 @@ try:
     check('scraper control: the new port speaks', r.returncode == 0 and r.stdout.startswith('ok modbus-scraper'),
           repr(r.stdout[:60]) + repr(r.stderr[-80:]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15603', '--control-token', STOK,
-                        'unset', 'control', 'port'], capture_output=True, text=True, timeout=15)
-    check('scraper control: unset restores the configured target',
+                        'clear', 'control', 'port'], capture_output=True, text=True, timeout=15)
+    check('scraper control: clear restores the configured target',
           r.stdout.startswith('ok control/port=127.0.0.1:%d' % (15597 + BASE)), repr(r.stdout[:90]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'show', 'version'], capture_output=True, text=True, timeout=15)
@@ -2269,14 +2269,14 @@ try:
     check('scraper audit-daily: the daily trigger switches on', r.startswith('ok audit/rotate/daily=on'), repr(r[:110]))
     check('scraper audit-daily: show audit rotate daily answers on',
           sctl('show', 'audit', 'rotate', 'daily') == 'ok audit/rotate/daily=on')
-    r = sctl('unset', 'audit', 'rotate', 'daily')
+    r = sctl('clear', 'audit', 'rotate', 'daily')
     check('scraper audit-daily: the daily trigger unsets to the configured off',
           r.startswith('ok audit/rotate/daily=off'), repr(r[:110]))
     r = sctl('set', 'audit', 'rotate', 'files', '7')
     check('scraper audit: the live set writes the config back (the fresh show config)',
           'set audit rotate files 7' in sctl('show', 'config'), sctl('show', 'config')[:80])
-    r = sctl('unset', 'audit', 'disable')
-    check('scraper audit: the live bool rows unset (the defaults loop)',
+    r = sctl('clear', 'audit', 'disable')
+    check('scraper audit: the live bool rows clear (the defaults loop)',
           r.startswith('ok audit/disable='), repr(r[:110]))
     env = dict(os.environ, AUDIT_MAX_MB='77', AUDIT_DAILY='1', AUDIT_FILES='9')
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
@@ -2513,8 +2513,8 @@ try:
     r = acl_ctl('set metrics acl file:' + ACLGATE)
     check('metrics acl: a bad file answers err with the old gate standing',
           r.startswith('fail') and 'spell the network' in r and acl_raw().startswith(b'HTTP/1.1 200'), r[:140])
-    r = acl_ctl('unset metrics acl')
-    check('metrics acl: unset restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
+    r = acl_ctl('clear metrics acl')
+    check('metrics acl: clear restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
     check('metrics acl: any serves again', acl_raw().startswith(b'HTTP/1.1 200'))
 
     # the accept ladder's order: the ACL first, then the caps — the cap
@@ -2532,8 +2532,8 @@ try:
           acl_raw() == b'', repr(acl_raw()[:40]))
     hold.close()
     time.sleep(0.3)
-    acl_ctl('unset metrics acl')
-    r = acl_ctl('unset metrics limits max-clients')
+    acl_ctl('clear metrics acl')
+    r = acl_ctl('clear metrics limits max-clients')
     check('metrics acl order: the cap unsets back', r.startswith('ok'), r[:80])
     check('metrics acl order: any serves after the ladder', acl_raw().startswith(b'HTTP/1.1 200'))
     os.remove(ACLGATE)

@@ -79,7 +79,7 @@ the reports
 .BR "show acl connect table" ", " "show acl write table" ,
 .BR "show metrics acl table" ,
 the ops
-.BR "request dump" ", " "request restore" ", " "request clear cache" ,
+.BR "request dump" ", " "request restore" ", " "request flush cache" ,
 .BR "request reload" ", " "request reload-config" ", " "request restart" ", " shutdown ", " quit .
 .RS
 .IP \\(bu 2
@@ -99,11 +99,11 @@ audit disable, dump path, dump with-cache); a SIGHUP \\(em or the wire's
 .B restart: true
 answers the note
 .B restart required (startup-only knob)
-from set/unset \\-\\- the set records the value (show renders it; the
+from set/clear \\-\\- the set records the value (show renders it; the
 whole-daemon reload folds it into the fresh process before the binds),
 the config (and a SIGHUP) changes it too. Every secret in the registry
 is restart-marked (the tokens, the auth keys, dump/key) and refuses
-set/unset outright: a secret never rides the reload state (a secret knob
+set/clear outright: a secret never rides the reload state (a secret knob
 refuses to show at all \\-\\- the value renders nowhere) \\-\\- it passes
 by flag/env/config and a restart.
 .IP \\(bu 2
@@ -143,7 +143,7 @@ refuses a wrong or missing key). The dump
 commands \\(em and the \\fBdump-interval\\fR setting \\(em show up in the
 listings only when a dump path is configured.
 .IP \\(bu 2
-.B request clear cache
+.B request flush cache
 / SIGUSR1, \\fBrequest restart\\fR (drop the upstream + the cache, repoll),
 \\fBrequest reload\\fR (save the live overrides to a state file and re-exec the
 whole daemon \\(em the fresh process re-resolves the config, so the
@@ -165,8 +165,9 @@ The control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
 control port without a token refuses to start (F5); with a token the
 wire is signed and the commands/replies verify end to end; a second,
 read-only ops token (\\fB--control-ops-token\\fR) authenticates sessions
-into the show/clear verbs only \\(em no set/unset, no request
-dump/restore, no request reload, no request restart, no shutdown \\(em
+into its policy's verbs only \\(em the default policy: show,flush \\(em
+no set/clear, no request dump/restore, no request reload, no request
+restart, no shutdown \\(em
 the ops shift against the admin key, both roles audited. A secret knob
 (control token, the ops token, the metrics token, modbus auth key, dump
 key) never shows its value: \\fBshow\\fR answers \\fBerr <name> is a
@@ -226,7 +227,7 @@ the packaged sample config, the example selection and the example acl
 file at the repo root (the deye write policy for \\fB--write-registers
 file:<path>\\fR \\(em
 a group/world-readable acl file warns in the log, the audit trail
-(ACL-FILE) and on the set/unset reply; chmod 0600 silences it)."""
+(ACL-FILE) and on the set/clear reply; chmod 0600 silences it)."""
     exit_status = """.SH EXIT STATUS
 .TP
 .B 0
@@ -260,7 +261,7 @@ The command grammar is the daemon's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
 \\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR],
 \\fBshow write registers profile\\fR, \\fBshow uplink\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
-\\fBrequest clear cache\\fR, \\fBrequest reload\\fR, \\fBrequest restart\\fR,
+\\fBrequest flush cache\\fR, \\fBrequest reload\\fR, \\fBrequest restart\\fR,
 \\fBshutdown\\fR,
 \\fBquit\\fR. See
 .BR modbus-cache (1)
@@ -270,9 +271,9 @@ CONTROL."""
 .IP \\(bu 2
 .B modbus-cache-ctl show connections
 .IP \\(bu 2
-.B modbus-cache-ctl request clear cache
+.B modbus-cache-ctl request flush cache
 .IP \\(bu 2
-.B printf 'show cache\\enrequest clear cache\\en' | modbus-cache-ctl
+.B printf 'show cache\\enrequest flush cache\\en' | modbus-cache-ctl
 .RE"""
     exit_status = """.SH EXIT STATUS
 .TP
@@ -311,7 +312,7 @@ own groups \\(em ungrouped rows render bare, no header \\(em, with
 \\fB?\\fR prints the same in any position; \\fBset\\fR/\\fBunset\\fR confirm
 \\fB% changed\\fR (the errors print \\fB% error: <message>\\fR, the ok
 replies' messages print bare);
-\\fBrequest clear cache\\fR/\\fBrequest restart\\fR
+\\fBrequest flush cache\\fR/\\fBrequest restart\\fR
 confirm silently; \\fBshutdown\\fR asks
 \\fBProceed with shutdown? [confirm]\\fR first.
 .PP

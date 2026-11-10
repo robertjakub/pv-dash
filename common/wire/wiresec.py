@@ -36,8 +36,8 @@ A daemon may carry a **second token, the read-only ops role**
 (ROLE_ADMIN / ROLE_OPS): the admin key keeps every verb, the ops key
 authenticates into its policy's verbs only — the default policy derives
 from the registry's command rows (default_ops_verbs: `show`, plus
-`clear` where the grammar speaks it — the cache's show/clear; the
-per-daemon override rides --control-ops-verbs) — no set/unset, no
+`flush` where the grammar speaks it — the cache's show/flush; the
+per-daemon override rides --control-ops-verbs) — no set/clear, no
 request dump/restore or reload, no restart, no shutdown (the ops shift
 can look, flush a cache where one exists, and leave; the admin key
 steers).
@@ -59,7 +59,7 @@ import unicodedata
 # counts as ROLE_ADMIN.
 ROLE_ADMIN = 'admin'
 ROLE_OPS = 'ops'
-OPS_VERBS = frozenset(('show', 'clear'))
+OPS_VERBS = frozenset(('show', 'flush'))
 SESSION_VERBS = frozenset(('help', '?', 'ping', 'quit'))
 ROLE_POLICIES = {
     ROLE_ADMIN: None,            # None = the full verb set

@@ -44,15 +44,15 @@ The kinds — every row of the tables below carries one:
 - **namespace** — a word that groups deeper words: the console walk lists its
   children, `help <namespace>` describes them.
 - **settable** — the knob is live: `set <words> <value>` applies at once,
-  `unset <words>` returns the configured value, `show <words>` prints the live
+  `clear <words>` returns the configured value, `show <words>` prints the live
   value. *(restart)* — the set records a pending value and `request reload`
   applies it. *(secret)* — the value never renders back (show answers err);
   pass it by flag/env or as `file:<path>`. *(hidden)* — never lists in the
   ?/TAB pools; the wire still answers.
 - **startup-only** — flag/env/config at start, a restart applies a change; the
-  wire has no set/unset/show for it (it renders in `show config` only). Every
+  wire has no set/clear/show for it (it renders in `show config` only). Every
   secret is startup-only now (the tokens, the auth keys, the dump key): the
-  wire refuses set/unset outright, the value passes by flag/env/config or as
+  wire refuses set/clear outright, the value passes by flag/env/config or as
   `file:<path>` and a restart applies it.
 - **show-only** — a runtime report: `show <report>` answers, nothing to set.
 
@@ -75,17 +75,17 @@ The kinds — every row of the tables below carries one:
 | `set` | command | configure a setting (set metrics interval 5, set log-access on) |
 | `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the scraper (asks to confirm) |
-| `unset` | command | restore a setting to its configured value (unset metrics interval, unset log-level) |
+| `clear` | command | restore a setting to its configured value (clear metrics interval, clear log-level) |
 
 ## Knobs
 
 The tables spell the knob's registry key (the config-file name and the
-dump's key); the set / unset column spells the wire words a running daemon
+dump's key); the set / clear column spells the wire words a running daemon
 takes. The namespaces group them.
 
 ### general
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `local-time` | `set local-time` | settable | `on\|off` | `--local-time` / `LOCAL_TIME` | log timestamps in the system time zone instead of UTC |
 | `log-access` | `set log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log every HTTP request at INFO |
@@ -96,7 +96,7 @@ takes. The namespaces group them.
 
 the inverter Modbus settings
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `upstream` | `set modbus upstream` | settable | `HOST:PORT` | `--upstream` / `UPSTREAM` | the inverter Modbus endpoint |
 | `modbus-unit` | `set modbus unit` | settable | `ID` | `--modbus-unit` / `MODBUS_UNIT` | Modbus unit ID |
@@ -113,7 +113,7 @@ the Prometheus /metrics exposition: the listen address, the poll interval,
 the serving limits, the bearer auth, the connect ACL, the spec and the
 prefix
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `metrics-spec` | `set metrics filter` | settable | `PATH\|-` | `--metrics-spec` / `METRICS_SPEC` | metrics spec JSON, sectioned: {inputs: {name: {help}}, metrics: {key: {profile?, expr?, when?, help, type?}}, scraper:...} — the metrics entries are register- (profile) or expression-fed (expr/when) over the declared inputs (show inputs), merged in memory over the built-in lib/metrics.json scraper_* block |
 | `metric-prefix` | `set metrics prefix` | settable | `PREFIX` | `--metric-prefix` / `METRIC_PREFIX` | the prefix on the profile- and compute-fed metric names |
@@ -125,7 +125,7 @@ prefix
 the display caps the percentages clamp to: the PV array and the grid
 ceilings
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `max-kwp` | `set caps max-pv` | settable | `KW` | `--max-kwp` / `MAX_KWP` | maximum PV array kWp |
 | `max-grid-kw` | `set caps max-grid` | settable | `KW` | `--max-grid-kw` / `MAX_GRID_KW` | maximum grid kW, either direction |
@@ -134,7 +134,7 @@ ceilings
 
 the daemon's own serving socket: the listen address
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `listen` | `set system listen` (alias: `set metrics listen`) | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
 
@@ -142,7 +142,7 @@ the daemon's own serving socket: the listen address
 
 the /metrics serving limits (the client caps and the idle timeouts)
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `max-clients` | `set metrics limits max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous HTTP clients on /metrics; extras get an immediate 503 |
 | `client-timeout` | `set metrics limits timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | kick idle keep-alive HTTP clients after this long |
@@ -152,7 +152,7 @@ the /metrics serving limits (the client caps and the idle timeouts)
 
 the control plane: the tokens, the ops role's RBAC policy, the trusted peers
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `control-port` | `set control port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | JSON-lines control server target: unix socket path |
 | `control-token` | — | startup-only (secret) | `TOKEN` | `--control-token` / `CONTROL_TOKEN` | require a token on control connections: the client authenticates with {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file) *(hidden)* |
@@ -164,16 +164,16 @@ the control plane: the tokens, the ops role's RBAC policy, the trusted peers
 the read-only ops role: the second token that scopes its sessions to the
 configured verbs (the default: show and clear)
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/unset, no poll now, no request reload, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/clear, no poll now, no request reload, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `control-ops-verbs` | `set control ops verbs` | settable | `VERB,...` | `--control-ops-verbs` / `CONTROL_OPS_VERBS` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated |
 
 ### metrics/auth
 
 the /metrics bearer auth: the token the exposition endpoint requires
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `auth-token` | — | startup-only (secret) | `TOKEN` | `--auth-token` / `AUTH_TOKEN` | require Authorization: Bearer \<token> on all requests — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
 
@@ -181,7 +181,7 @@ the /metrics bearer auth: the token the exposition endpoint requires
 
 the SCR audit trail: the sink, the forwarding, the rotation, the kill switch
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `audit-log` | `set audit log-file` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | SCR audit trail: a file path or - for stdout (the docker/journald way); `none` = no local file (the forward carries the trail); default: the XDG state home (~/.local/state/modbus-scraper/audit.log) |
 | `audit-forward` | `set audit forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
@@ -192,7 +192,7 @@ the SCR audit trail: the sink, the forwarding, the rotation, the kill switch
 
 the audit trail's rotation: the size trigger and the backup count
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation |
 | `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit log at UTC midnight |
@@ -202,7 +202,7 @@ the audit trail's rotation: the size trigger and the backup count
 
 the state dump: the live overrides' file, the restore-on-start
 
-| knob | set / unset | kind | value | flag / env | description |
+| knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `dump-path` | `set dump path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval |
 | `dump-key` | — | startup-only (secret) | `TEXT` | `--dump-key` / `DUMP_KEY` | the key that seals the state dumps (the reload's state file too) (`file:<path>` reads an owner-only file) *(hidden)* |

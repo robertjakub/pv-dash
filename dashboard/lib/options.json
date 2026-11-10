@@ -50,9 +50,9 @@
       "node": true },
     { "name": "control-ops-token", "flag": "--control-ops-token", "env": "CONTROL_OPS_TOKEN", "conv": "str",
       "live": "control/ops/token",
-      "setting-help": "a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/unset, no request reload, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file)",
+      "setting-help": "a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/clear, no request reload, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file)",
       "hint": "TOKEN",
-      "help": "a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/unset, no request reload, no shutdown) — the ops shift against the admin key, both audited; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
+      "help": "a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/clear, no request reload, no shutdown) — the ops shift against the admin key, both audited; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
       "secret": true, "hidden": true, "restart": true },
     { "name": "control-trust-uids", "flag": "--control-trust-uids", "env": "CONTROL_TRUST_UIDS", "conv": "str",
       "live": "control/trust-uids",
@@ -204,6 +204,6 @@
     { "name": "set", "help": "configure a setting (set battery on, set log-queries on)" },
     { "name": "show", "help": "print a setting's live value, or a report" },
     { "name": "shutdown", "help": "stop the dashboard server (asks to confirm)" },
-    { "name": "unset", "help": "restore a setting to its configured value (unset battery, unset log-level)" }
+    { "name": "clear", "help": "restore a setting to its configured value (clear battery, clear log-level)" }
   ]
 }

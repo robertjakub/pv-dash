@@ -65,14 +65,14 @@ def live_cell(rows_by_tool):
     joined when they diverge, the `, restart` suffix when every tool holds
     the knob restart-marked (the set records the value, the restart applies
     it). A restart-marked SECRET renders no set recipe — the wire refuses
-    set/unset on it (startup-only: pass it by flag/env/config). No live
+    set/clear on it (startup-only: pass it by flag/env/config). No live
     name = *(startup-only)*: a restart applies it."""
     names = sorted({opt.live for opt in rows_by_tool.values() if opt.live})
     if not names:
         return '*(startup-only)*'
     lives = [opt for opt in rows_by_tool.values() if opt.live]
     if all(opt.restart for opt in lives) and all(opt.secret for opt in lives):
-        return '`startup-only — pass it by flag/env/config (set/unset refuse)`'
+        return '`startup-only — pass it by flag/env/config (set/clear refuse)`'
     suffix = ', restart' if lives and all(opt.restart for opt in lives) else ''
     return ', '.join('`set %s%s`' % (n.replace('/', ' '), suffix) for n in names)
 
@@ -159,7 +159,7 @@ def main():
                '`, restart` = the knob is startup-only too — the set records the value '
                '(the wire answers the restart note), the restart applies it; every '
                'secret is restart-marked and renders `startup-only — pass it by '
-               'flag/env/config` — the wire refuses set/unset on it outright; a cell\'s '
+               'flag/env/config` — the wire refuses set/clear on it outright; a cell\'s '
                '`live` mark says the tool takes the knob live (a cell without one = '
                'that tool applies the knob at startup only); '
                '`group` = the row\'s display bucket — the tool\'s '

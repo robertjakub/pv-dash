@@ -186,10 +186,10 @@ knob+field, the tools grouped by the value each carries:
 
 **The command vocabularies** (the wire words per tool):
 
-- cache: `help`, `inspect`, `ping`, `quit`, `request`, `request/clear`, `request/clear/cache`, `request/dump`, `request/dump`, `request/dump/with-cache`, `request/reload`, `request/reload-config`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `unset`
-- scraper: `help`, `inspect`, `ping`, `poll`, `poll/now`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `unset`
-- inverter: `exit`, `help`, `inspect`, `logout`, `ping`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restore`, `reset`, `set`, `show`, `shutdown`, `unset`
-- dashboard: `help`, `inspect`, `ping`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restore`, `set`, `show`, `shutdown`, `unset`
+- cache: `help`, `inspect`, `ping`, `quit`, `request`, `request/flush`, `request/flush/cache`, `request/dump`, `request/dump`, `request/dump/with-cache`, `request/reload`, `request/reload-config`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `clear`
+- scraper: `help`, `inspect`, `ping`, `poll`, `poll/now`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `clear`
+- inverter: `exit`, `help`, `inspect`, `logout`, `ping`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restore`, `reset`, `set`, `show`, `shutdown`, `clear`
+- dashboard: `help`, `inspect`, `ping`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restore`, `set`, `show`, `shutdown`, `clear`
 
 **The command deltas worth a ruling:**
 

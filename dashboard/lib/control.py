@@ -49,7 +49,7 @@ class ControlServer(_ControlServer):
     the token first when one is configured; the unix socket relies on
     filesystem permissions. A second, read-only token (ops_token) may be
     configured beside the admin token: it authenticates into its policy's
-    verbs only — no set/unset, no request reload-config, no request reload,
+    verbs only — no set/clear, no request reload-config, no request reload,
     no request dump/restore, no shutdown
     (common/wire/wiresec.py's roles). `stopper` is the graceful-stop callback
     shared with the signal handlers; it runs after the shutdown reply left
@@ -112,7 +112,7 @@ class ControlServer(_ControlServer):
         """The one-line command reference: the state-dump commands appear
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
-        cmds = ('commands: set <setting> <value>, unset <setting>, inspect, '
+        cmds = ('commands: set <setting> <value>, clear <setting>, inspect, '
                 'show <setting|connections|version|config|knobs>, request reload-config')
         if self.dump_path:
             cmds += ', request dump, request restore'
@@ -311,7 +311,7 @@ class ControlServer(_ControlServer):
     # of the base, the state file is consumed, nothing lingers. ---
 
     def summary(self):
-        """The compact state summary appended to the set/unset replies."""
+        """The compact state summary appended to the set/clear replies."""
         total, _ = self.httpd.gate.snapshot()
         return ('upstream=%s upstream_ok=%s clients=%d'
                 % (self.httpd.RequestHandlerClass.upstream,

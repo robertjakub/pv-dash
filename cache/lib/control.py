@@ -16,21 +16,19 @@ import os
 import socket
 import time
 
-from common.runtime.audit import AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward
 from common.runtime.version import version_string
-from common.settings.config import auth_key_floor_error, default_profile_path, is_loopback_host, parse_auth_type, parse_control_target, \
+from common.settings.config import auth_key_floor_error, default_profile_path, is_loopback_host, parse_auth_type, \
     parse_upstream, resolve_profile_file
 from common.settings.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
-from common.wire.cred import parse_trust_uids
 from common.render.human import secs
-from common.runtime.logutil import UtcFormatter
 from common.wire.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.wire.control import ControlServer as _ControlServer, num, numi
+from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
 from common.settings.options import control_command, grouped_rows
+from common.render.texts import T
 from .statics import CONTROL_LINE_CAP, DEFAULT_LISTEN_PORT, LOG_LEVELS
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
-    KNOWN_VERBS, CFG_KEYS, CFG_FORMATTERS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
+    CFG_KEYS, CFG_FORMATTERS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .cache import build_blocks
 from .config import CONTROL_SOCKET_TEMPLATE, parse_write_registers, acl_value_text, acl_gate_summary, acl_table, parse_selection, parse_listen, \
     render_write_acl
@@ -68,6 +66,11 @@ class ControlServer(_ControlServer):
     CFG_KEYS = CFG_KEYS               # the registry's knob -> cfg-key renames (show config)
     CFG_FORMATTERS = CFG_FORMATTERS   # the structured values (the ACLs, the write map, the selection)
     APP = 'modbus-cache'
+    AUDIT_PREFIX = 'CACHE'
+    AUDIT_APP = 'modbus-cache'
+    CONTROL_PORT_DEFAULT = DEFAULT_LISTEN_PORT
+    CONTROL_SOCKET_TEMPLATE = CONTROL_SOCKET_TEMPLATE
+    LOG_LEVELS = LOG_LEVELS
     COMMANDS = COMMANDS
     COMMAND_HELP = COMMAND_HELP
     COMMAND_GROUPS = COMMAND_GROUPS
@@ -108,6 +111,7 @@ class ControlServer(_ControlServer):
         super().__init__(target, stopper=stopper, audit=audit, token=token, defaults=defaults,
                          trust_uids=trust_uids, socket_group=socket_group, ops_token=ops_token,
                          ops_verbs=ops_verbs, config_path=config_path)
+        self.audit_params = proxy.audit_params   # the family handler rebuilds from the proxy's params
 
     def command_help(self):
         """The one-line command reference: the state-dump commands appear
@@ -165,7 +169,10 @@ class ControlServer(_ControlServer):
         s = SETTING_BY_NAME.get(key)
         if s is not None and s.restart:   # a startup-only knob: validate + record the pending value
             if s.secret:
-                raise ValueError('restart required (startup-only knob)')
+                raise ValueError(T('wire.restart_required'))
+            handled, shown = self.apply_restart_key(key, val)
+            if handled:
+                return shown
             if key == 'modbus/upstream':
                 try:
                     host, port = parse_upstream(val, label='modbus/upstream')
@@ -184,7 +191,7 @@ class ControlServer(_ControlServer):
                     try:
                         probe.bind(t)
                     except OSError as e:
-                        raise ValueError('cannot bind %s:%d: %s' % (t[0], t[1], e))
+                        raise ValueError(T('wire.cannot_bind') % (t[0], t[1], e))
                     finally:
                         probe.close()
                     if p.metrics_srv is not None and not p.metrics_token and not is_loopback_host(t[0]):
@@ -193,17 +200,40 @@ class ControlServer(_ControlServer):
                                          'pass metrics-token by flag/env/config and restart')
                 self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
-            if key == 'dump/restore-on-start':
-                if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
-                    raise ValueError('dump/restore-on-start must be on or off')
-                self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
-                return self.defaults[key]
-            raise ValueError('unknown setting %s' % key)
+            raise ValueError(T('wire.unknown_setting_bare') % key)
+
+        if key == 'dump-interval':   # the proxy's homes — the family handler's attrs are not
+            if not p.dump_path:
+                raise ValueError(T('wire.dump_interval_needs_path'))
+            if val in ('off', 'none', '0'):
+                p.dump_interval = 0
+                p.config['dump_interval'] = 0
+                p.dump_wake.set()
+                return 'off'
+            v = num(val, 'dump-interval', 'seconds or off')
+            self._gate_range(key, v, 'seconds')
+            p.dump_interval = v
+            p.config['dump_interval'] = v
+            p.dump_wake.set()
+            return secs(v)
+        if key == 'dump/path':
+            if val in ('off', 'none', ''):
+                p.dump_path = None
+                p.config['dump_path'] = ''
+                return 'off'
+            p.dump_path = val   # the dump loop, request dump and the shutdown write it from here on
+            p.config['dump_path'] = val
+            # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
+            return val if p.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
+
+        handled, shown = self.apply_family_key(key, val)   # the family's shared knobs (the control plane,
+        if handled:                                        # the audit family, the log level, local-time)
+            return shown
 
         if key == 'modbus/interval':
             v = num(val, 'interval', 'seconds')
             if not 0 < v <= 86400:
-                raise ValueError('interval must be 0 < N <= 86400 seconds')
+                raise ValueError(T('wire.interval_range'))
             p.interval = v
             p.config['interval'] = v   # the live overrides ride show config (show_config_cfg's contract)
             p.poll_wake.set()
@@ -245,8 +275,7 @@ class ControlServer(_ControlServer):
             except SystemExit as e:
                 raise ValueError(str(e))
             if v and not p.config.get('auth_key'):
-                raise ValueError('the suite auth needs a key: pass auth-key by flag/env/config '
-                                 '(min %d characters) and restart' % AUTH_MIN_KEY)
+                raise ValueError(T('wire.suite_auth_needs_key') % AUTH_MIN_KEY)
             p.config['auth'] = v   # the next connection handshakes; the standing ones keep their session
             return v or 'none'
         if key == 'modbus/auth-upstream':
@@ -268,12 +297,7 @@ class ControlServer(_ControlServer):
             p.upstream.close()   # the session re-proves the new scheme on the next exchange
             return v or 'none'
         if key == 'write/allow':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('allow-write must be on or off')
+            on = on_off(val, 'allow-write')
             p.allow_write = on
             p.config['allow_write'] = on
             return 'on' if on else 'off'
@@ -305,51 +329,8 @@ class ControlServer(_ControlServer):
             p.conn_gate.max_per_ip = v
             p.config['max_conn_per_ip'] = v
             return '%d' % v
-        if key == 'control/port':
-            try:
-                target = parse_control_target(val, DEFAULT_LISTEN_PORT, CONTROL_SOCKET_TEMPLATE)
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if val in ('off', 'none', '0'):
-                target = None
-            if target is not None and not self.stopped and self._is_target(target):
-                return self.describe()   # the same target: nothing to rebind
-            self.refuse_tokenless_rebind(target)
-            shown = self._rebind_control(target)
-            p.config['control_port'] = '0' if target is None else str(target)
-            return shown
-        if key == 'control/ops/verbs':
-            verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
-            unknown = sorted(v for v in verbs if v not in KNOWN_VERBS)
-            if not verbs or unknown:
-                raise ValueError('the ops policy needs at least one verb the grammar speaks%s: %s'
-                                 % ('' if not unknown else ' (unknown: %s)' % ', '.join(unknown),
-                                    ', '.join(sorted(KNOWN_VERBS))))
-            self.ops_verbs = verbs
-            p.config['control_ops_verbs'] = ','.join(sorted(verbs))
-            return ','.join(sorted(verbs))
-        if key == 'control/trust-uids':
-            try:
-                uids = parse_trust_uids('none' if val == 'off' else val, 'control/trust-uids')
-            except SystemExit as e:
-                raise ValueError(str(e))
-            self.trust_uids = uids or frozenset()
-            p.config['control_trust_uids'] = self.trust_uids
-            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
-        if key == 'control/socket-group':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('control/socket-group must be on or off')
-            self.socket_group = on
-            p.config['control_socket_group'] = on
-            if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
-                os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
-            return 'on' if on else 'off'
         if key == 'metrics/enable':
-            if val in ('on', 'true', '1', 'yes'):
+            if val in ON_OFF_WORDS:
                 if p.metrics_srv:
                     return 'on'
                 if not p.metrics_token:
@@ -366,7 +347,7 @@ class ControlServer(_ControlServer):
                     srv.start()
                 except SystemExit:
                     host, port = p.metrics_listen
-                    raise ValueError('cannot bind %s:%d: %s' % (host, port, srv.bind_error))
+                    raise ValueError(T('wire.cannot_bind') % (host, port, srv.bind_error))
                 p.metrics_srv = srv
                 p.config['metrics_server'] = True
                 p.metrics_desc = describe_metrics(p.metrics_listen, p.metrics_token,
@@ -379,7 +360,7 @@ class ControlServer(_ControlServer):
                     p.metrics_desc = 'off'
                 p.config['metrics_server'] = False
                 return 'off'
-            raise ValueError('metrics enable must be on or off')
+            on_off(val, 'metrics enable')   # raises the refusal
         if key == 'metrics/limits/max-clients':
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
@@ -407,82 +388,6 @@ class ControlServer(_ControlServer):
                 p.metrics_srv.max_per_ip = v
                 p.metrics_srv._http.gate.max_per_ip = v
             return '%d' % v
-        if key == 'audit/log-file':
-            if val == 'none' and p.audit_params.get('forward'):
-                # remote-only: the collector is the sole holder (the chain
-                # reseeds at GENESIS on the next restart)
-                p.audit_params['path'] = 'none'
-                p.audit_params['disabled'] = False
-                p.config['audit_log'] = 'none'
-                p.config['no_audit_log'] = False
-                self._rebuild_audit()
-                return 'remote'
-            if val in ('off', 'none'):
-                # the full off — none without a forward folds to it (the
-                # same state --no-audit-log spells)
-                p.audit_params['disabled'] = True
-                p.config['audit_log'] = 'none' if val == 'none' else ''
-                p.config['no_audit_log'] = True
-                self._rebuild_audit()
-                return 'off'
-            p.audit_params['path'] = None if val in ('-', 'stdout') else val
-            p.audit_params['disabled'] = False
-            p.config['audit_log'] = '' if p.audit_params['path'] is None else val
-            p.config['no_audit_log'] = False
-            self._rebuild_audit()
-            return p.audit.path if p.audit else 'off'
-        if key == 'audit/rotate/max-size':
-            v = num(val, 'max-size', 'MB')
-            self._gate_range(key, v, 'MB')
-            p.audit_params['max_mb'] = v
-            p.config['audit_max_mb'] = v
-            self._rebuild_audit()
-            return '%g' % v
-        if key == 'audit/rotate/daily':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('audit/rotate/daily must be on or off')
-            p.audit_params['daily'] = on
-            p.config['audit_daily'] = on
-            self._rebuild_audit()
-            return 'on' if on else 'off'
-        if key == 'audit/rotate/files':
-            v = numi(val, 'files', 'backups')
-            self._gate_range(key, v, 'backups')
-            p.audit_params['files'] = v
-            p.config['audit_files'] = v
-            self._rebuild_audit()
-            return '%d' % v
-        if key == 'audit/forward':
-            try:
-                parse_forward(val)
-            except ValueError:
-                raise ValueError('audit/forward must be %s' % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
-            p.audit_params['forward'] = None if val in ('', 'none') else val
-            p.config['audit_forward'] = val
-            self._rebuild_audit()
-            return val
-        if key == 'audit/forward-format':
-            if val not in AUDIT_FORWARD_FORMATS:
-                raise ValueError('audit/forward-format must be one of %s' % ', '.join(AUDIT_FORWARD_FORMATS))
-            p.audit_params['forward_format'] = val
-            p.config['audit_forward_format'] = val
-            self._rebuild_audit()
-            return val
-        if key == 'audit/disable':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('audit/disable must be on or off')
-            p.audit_params['disabled'] = on
-            p.config['no_audit_log'] = on
-            self._rebuild_audit()
-            return 'on' if on else 'off'
         if key == 'audit/requests':
             if val in ('off', 'none', '0'):
                 p.requests_audit_s = 0
@@ -493,101 +398,40 @@ class ControlServer(_ControlServer):
             p.requests_audit_s = v
             p.config['requests_audit_s'] = v
             return secs(v)
-        if key == 'dump-interval':
-            if not p.dump_path:
-                raise ValueError('dump-interval needs a dump path (set dump/path or --dump-path)')
-            if val in ('off', 'none', '0'):
-                p.dump_interval = 0
-                p.config['dump_interval'] = 0
-                p.dump_wake.set()
-                return 'off'
-            v = num(val, 'dump-interval', 'seconds or off')
-            self._gate_range(key, v, 'seconds')
-            p.dump_interval = v
-            p.config['dump_interval'] = v
-            p.dump_wake.set()
-            return secs(v)
-        if key == 'dump/path':
-            if val in ('off', 'none', ''):
-                p.dump_path = None
-                p.config['dump_path'] = ''
-                return 'off'
-            p.dump_path = val   # the dump loop, request dump and the shutdown write it from here on
-            p.config['dump_path'] = val
-            # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
-            return val if p.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
         if key == 'dump/with-cache':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('dump/with-cache must be on or off')
+            on = on_off(val, 'dump/with-cache')
             p.dump_with_cache = on
             p.config['dump_with_cache'] = on
             return 'on' if on else 'off'
-        if key == 'local-time':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('local-time must be on|off')
-            swapped = 0
-            for h in logging.getLogger().handlers:
-                f = h.formatter
-                if f is None or not getattr(f, '_fmt', None):
-                    continue
-                h.setFormatter(logging.Formatter(f._fmt) if on else UtcFormatter(f._fmt))
-                swapped += 1
-            if not swapped:
-                raise ValueError('no log handler to re-format')
-            p.config['local_time'] = on
-            return 'on' if on else 'off'
         if key == 'system/log-access':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('system/log-access must be on or off')
+            on = on_off(val, 'system/log-access')
             p.log_access = on   # the next connect/disconnect log line picks it up
             p.config['log_access'] = on
             return 'on' if on else 'off'
-        if key == 'log-level':
-            lvl = val.upper()
-            if lvl not in LOG_LEVELS:
-                raise ValueError('log-level must be one of %s' % ', '.join(LOG_LEVELS))
-            logging.getLogger().setLevel(getattr(logging, lvl))
-            p.config['level'] = lvl
-            return lvl
         if key == 'modbus/timeout':
             v = num(val, 'timeout', 'seconds')
             if not 0 < v <= 60:
-                raise ValueError('timeout must be 0 < N <= 60 seconds')
+                raise ValueError(T('wire.timeout_range'))
             p.upstream.timeout = v
             p.config['timeout'] = v
             return secs(v)
         if key == 'acl/connect':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError('"table" is not an acl/connect value — the table is the show: '
-                                 'show acl connect table')
+                raise ValueError(T('wire.acl_table_value') % ('an acl/connect', 'acl connect'))
             shown = p.set_connect_acl(val)
             if p.connect_acl_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % p.connect_acl_warn
             return shown
         if key == 'acl/write':
             if val.lower() == 'table':
-                raise ValueError('"table" is not an acl/write value — the table is the show: '
-                                 'show acl write table')
+                raise ValueError(T('wire.acl_table_value') % ('an acl/write', 'acl write'))
             shown = p.set_write_acl(val)
             if p.write_acl_warn:
                 shown += ' (%s)' % p.write_acl_warn
             return shown
         if key == 'metrics/acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError('"table" is not a metrics/acl value — the table is the show: '
-                                 'show metrics acl table')
+                raise ValueError(T('wire.acl_table_value') % ('a metrics/acl', 'metrics acl'))
             shown = p.set_metrics_acl(val)
             if p.metrics_acl_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % p.metrics_acl_warn
@@ -628,15 +472,17 @@ class ControlServer(_ControlServer):
                    host=p.upstream.host, port=p.upstream.port, unit=p.upstream.unit)
         return cfg
 
+    def record_cfg(self, updates):
+        """The live truth rides the proxy's resolved-config dict (the
+        show-config-writeback contract — show_config_cfg returns it)."""
+        self.proxy.config.update(updates)
+
     def _rebuild_audit(self):
-        """Swap the CACHE audit trail for one rebuilt from the proxy's audit
-        params (the live path/rotation changes): the shared rebuild re-chains
-        from the file's own tail, the chain verifiable across the swap. The
-        old trail is NOT closed — a session still holding it writes its last
-        commands there, and an in-flight writer must never hit a closed file."""
-        p = self.proxy
-        p.audit = self.rebuild_audit(p.audit_params, 'CACHE', 'modbus-cache')
-        self.audit = p.audit   # this server's new sessions (and this one) audit the new trail
+        """The family rebuild, mirrored onto the proxy — the requests' audit
+        and the summary read the proxy's view."""
+        shown = super()._rebuild_audit()
+        self.proxy.audit = self.audit
+        return shown
 
     @staticmethod
     def _acl_text(acl):
@@ -646,6 +492,11 @@ class ControlServer(_ControlServer):
 
     def _get(self, key):
         p = self.proxy
+        if key == 'dump-interval':   # the proxy's home — the family handler's attr is not
+            return 'off' if not p.dump_interval else secs(p.dump_interval)
+        handled, value = self.get_family_key(key)   # the family's shared knobs (the control plane,
+        if handled:                                 # the audit family, the log level, local-time, dump/path)
+            return value
         if key == 'modbus/interval':
             return secs(p.interval)
         if key == 'cache/ttl':
@@ -670,14 +521,6 @@ class ControlServer(_ControlServer):
             return 'none' if not p.client_timeout else secs(p.client_timeout)
         if key == 'limits/max-conn-per-ip':
             return '%d' % p.conn_gate.max_per_ip
-        if key == 'control/port':
-            return 'off' if self.stopped else self.describe()
-        if key == 'control/ops/verbs':
-            return ','.join(sorted(self.ops_verbs)) or 'off'
-        if key == 'control/trust-uids':
-            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
-        if key == 'control/socket-group':
-            return 'on' if self.socket_group else 'off'
         if key == 'metrics/enable':
             return 'on' if p.metrics_srv else 'off'
         if key == 'metrics/limits/max-clients':
@@ -686,40 +529,14 @@ class ControlServer(_ControlServer):
             return secs(p.metrics_caps[1])
         if key == 'metrics/limits/max-conn-per-ip':
             return '%d' % p.metrics_caps[2]
-        if key == 'audit/log-file':
-            if p.audit is None or p.audit.disabled:
-                return 'off'
-            return 'remote' if p.audit.path == 'none' else p.audit.path
-        if key == 'audit/forward':
-            return p.audit_params.get('forward') or 'none'
-        if key == 'audit/forward-format':
-            return p.audit_params.get('forward_format') or 'rfc5424'
-        if key == 'audit/rotate/max-size':
-            return '%g' % p.audit_params['max_mb']
-        if key == 'audit/rotate/daily':
-            return 'on' if p.audit_params['daily'] else 'off'
-        if key == 'audit/rotate/files':
-            return '%d' % p.audit_params['files']
-        if key == 'audit/disable':
-            return 'on' if p.audit_params['disabled'] else 'off'
-        if key == 'dump/path':
-            return p.dump_path or 'off'
         if key == 'dump/with-cache':
             return 'on' if p.dump_with_cache else 'off'
         if key == 'audit/requests':
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
         if key == 'dump-interval':
             return 'off' if not p.dump_interval else secs(p.dump_interval)
-        if key == 'local-time':
-            for h in logging.getLogger().handlers:
-                f = h.formatter
-                if f is not None and getattr(f, '_fmt', None):
-                    return 'off' if isinstance(f, UtcFormatter) else 'on'
-            return 'off'
         if key == 'system/log-access':
             return 'on' if p.log_access else 'off'
-        if key == 'log-level':
-            return logging.getLevelName(logging.getLogger().getEffectiveLevel())
         if key == 'modbus/timeout':
             return secs(p.upstream.timeout)
         if key == 'acl/connect':

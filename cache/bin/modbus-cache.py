@@ -32,7 +32,7 @@ from common.runtime.daemon import apply_restart_state, default_config_path, fold
 from common.settings.options import build_parser
 from common.runtime.version import version_string
 from lib.config import CONTROL_SOCKET_TEMPLATE, load_registers_file, load_selection, resolve_config, acl_value_text, acl_gate_summary
-from lib.options import KNOWN_VERBS, OPTIONS
+from lib.options import DEFAULT_OPS_VERBS, KNOWN_VERBS, OPTIONS
 from lib.metrics import MetricsServer, describe_metrics
 from lib import persist
 from lib.upstream import Upstream
@@ -153,7 +153,7 @@ def main():
         logger.error('the ops token must differ from the admin token (the same secret would hand '
                      'every holder the role the server picks first)')
         raise SystemExit(2)
-    ops_verbs = parse_ops_verbs(cfg['control_ops_verbs'], KNOWN_VERBS)
+    ops_verbs = parse_ops_verbs(cfg['control_ops_verbs'], KNOWN_VERBS, default=DEFAULT_OPS_VERBS)
     if isinstance(control_target, int) and not control_token:
         logger.error('the TCP control port %d without a token is open to every local process; '
                      'set --control-token (the default unix socket needs none), '

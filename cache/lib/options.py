@@ -18,7 +18,7 @@ build_parser) and scripts/check_options.py all read this table."""
 import json
 import os
 
-from common.settings.options import as_bool, load_registry, make_describe, settings_of
+from common.settings.options import as_bool, default_ops_verbs, known_verbs, load_registry, make_describe, settings_of
 
 
 def _load_options():
@@ -36,15 +36,10 @@ def _load_options():
     rows, sections, options = load_registry(here, choices={'log-level': log_levels})
     for key, value in sections.items():
         globals()[key] = value
+    globals()['KNOWN_VERBS'] = known_verbs(sections['COMMANDS'])   # the RBAC vocabulary — the registry's rows are its one home
+    globals()['DEFAULT_OPS_VERBS'] = default_ops_verbs(globals()['KNOWN_VERBS'])
     return options
 
-
-# The verbs the control grammar speaks (the RBAC vocabulary — an ops verb
-# set must name verbs this server knows). `request` is the namespace
-# prefix, not a verb: the verb is the word past it (`request clear cache`
-# decides on `clear`).
-KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'dump', 'restore', 'clear', 'reload', 'reload-config', 'restart',
-               'shutdown', 'help', 'ping', 'quit')
 
 # the control commands (the registries' `commands` rows — _load_options
 # fills these from lib/options.json; the module-level empties keep the
@@ -119,7 +114,10 @@ def cfg_write_registers(v):
 
 
 def cfg_trust_uids(v):
-    """The trusted-peer uid list as its csv text (empty = nothing renders)."""
+    """The trusted-peer uid list as its csv text (empty = nothing renders;
+    a csv string — the live set's recorded spelling — rides through)."""
+    if isinstance(v, str):
+        return v or None
     return ','.join(str(u) for u in v) if v else None
 
 

@@ -7,7 +7,7 @@ file speaks the control grammar (common/settings/options.py): every line a
 import json
 import logging
 
-from .options import OPTIONS
+from .options import DEFAULT_OPS_VERBS, OPTIONS
 from common.settings.config import (ANY_NET, IPGate, _GATE_TYPES, _acl_desc, _prefix_matcher, _write_gate_object,
                            acl_admits, acl_file_warn, acl_gate_summary, acl_summary, acl_table, acl_text,
                            acl_value_text, check_auth_key, default_profile_path, load_config_script,
@@ -451,7 +451,7 @@ def resolve_config(args, script_dir=None):
         'control_ops_token': parse_secret(resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
                                                   'control_ops_token', '', str), 'control-ops-token'),
         'control_ops_verbs': resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
-                                     'control_ops_verbs', 'show,clear', str),
+                                     'control_ops_verbs', DEFAULT_OPS_VERBS, str),
         'audit_log': resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', '', str),
         'audit_forward': resolve(getattr(args, 'audit_forward', None), 'AUDIT_FORWARD',
                                  'audit_forward', 'none', str),

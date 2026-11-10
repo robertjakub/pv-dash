@@ -15,6 +15,7 @@
     "upstream": "127.0.0.1:5502",
     "modbus_unit": 1,
     "modbus_offset": 0,
+    "modbus_auth": "none",
     "timeout_s": 3.0,
     "listen": "127.0.0.1:9350",
     "interval_s": 10.0,

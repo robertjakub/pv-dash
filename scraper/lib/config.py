@@ -244,7 +244,7 @@ def resolve_config(args, script_dir=None):
                                'modbus_unit', DEFAULTS['modbus_unit'], int),
         'modbus_offset': resolve(args.modbus_offset, 'MODBUS_OFFSET', 'modbus_offset',
                                  DEFAULTS['modbus_offset'], int),
-        'auth': parse_auth_type(resolve(getattr(args, 'auth', None), 'AUTH', 'auth', '', str), 'auth'),
+        'auth': parse_auth_type(resolve(getattr(args, 'modbus_auth', None), 'MODBUS_AUTH', 'modbus-auth', DEFAULTS['modbus_auth'], str), 'modbus-auth'),
         'auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
                           or '').strip() or None, 'auth-key'), 'auth-key'),

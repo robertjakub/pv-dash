@@ -10,7 +10,7 @@
     { "name": "modbus-offset", "flag": "--modbus-offset", "env": "MODBUS_OFFSET", "conv": "int",
       "live": "modbus/offset", "setting-help": "added to register addresses", "hint": "N",
       "help": "added to register addresses", "min": -100000, "max": 100000 },
-    { "name": "auth", "flag": "--auth", "env": "AUTH", "conv": "str", "live": "modbus/auth",
+    { "name": "modbus-auth", "flag": "--modbus-auth", "env": "MODBUS_AUTH", "conv": "str", "live": "modbus/auth",
       "setting-help": "the auth settings: the Modbus scheme the poll session speaks (modbus auth — suite or none) and the bearer token the metrics endpoint requires (auth token)",
       "values": [ "suite", "none" ], "hint": "suite|none",
       "value-help": { "suite": "after every connect, prove the shared key with the suite handshake — the peer answers OK, or ERR and the connection fails",

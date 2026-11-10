@@ -28,7 +28,7 @@ the poller) and names the register in the log. A modbus-cache in front of
 the device is detected automatically (its synthesized diagnostics block)
 and adds the device-up / cache-age / cache-uptime gauges.
 .PP
-Modbus auth (\\fB--auth\\fR): with \\fBsuite\\fR the session proves the
+Modbus auth (\\fB--modbus-auth\\fR): with \\fBsuite\\fR the session proves the
 shared key (\\fB--auth-key\\fR, min 16 characters) with a crypt handshake
 right after every connect \\(em 52 bytes: magic, fresh nonce,
 HMAC\\-SHA256 proof; the peer answers \\fBOK\\fR and plain Modbus follows,

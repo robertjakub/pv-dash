@@ -2328,12 +2328,12 @@ try:
 
     SKEY = 'scr-suite-key-16chars!'
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15910 + BASE),
-                                   '--control-port', '0', '--auth', 'suite', '--auth-key', SKEY],
+                                   '--control-port', '0', '--modbus-auth', 'suite', '--auth-key', SKEY],
                                   stdout=open('/tmp/scr_auth_fake.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
                                    '--listen', '127.0.0.1:%d' % (19461 + BASE), '--interval', '1',
-                                   '--control-port', '0', '--auth', 'suite', '--auth-key', SKEY],
+                                   '--control-port', '0', '--modbus-auth', 'suite', '--auth-key', SKEY],
                                   stdout=open('/tmp/scr_auth.log', 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
         try:
@@ -2350,7 +2350,7 @@ try:
     # the wrong key: the handshake is refused — the connector fails, the poll stays down
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
                                    '--listen', '127.0.0.1:%d' % (19462 + BASE), '--interval', '1',
-                                   '--control-port', '0', '--auth', 'suite',
+                                   '--control-port', '0', '--modbus-auth', 'suite',
                                    '--auth-key', 'wrong-key-16chars00'],
                                   stdout=open('/tmp/scr_auth_wrong.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(3.0)
@@ -2364,7 +2364,7 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
                                    '--listen', '127.0.0.1:%d' % (19468 + BASE), '--interval', '1',
                                    '--control-port', '19469', '--control-token', 'ctok-a',
-                                   '--auth', 'suite', '--auth-key', 'wrong-key-16chars00'],
+                                   '--modbus-auth', 'suite', '--auth-key', 'wrong-key-16chars00'],
                                   stdout=open('/tmp/scr_auth_rot.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2.0)
     r = subprocess.run([sys.executable, CTLB, '--control-port', '19469', '--control-token', 'ctok-a',
@@ -2377,7 +2377,7 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
                                    '--listen', '127.0.0.1:%d' % (19468 + BASE), '--interval', '1',
                                    '--control-port', '19469', '--control-token', 'ctok-a',
-                                   '--auth', 'suite', '--auth-key', SKEY],
+                                   '--modbus-auth', 'suite', '--auth-key', SKEY],
                                   stdout=open('/tmp/scr_auth_rot.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2.0)
     for _ in range(30):
@@ -2391,15 +2391,15 @@ try:
     status, m = wait_metrics(19468, want='scraper_up')
     check('suite auth: the configured key polls (a fresh start applies it)', m.get('scraper_up') == 1,
           str(m.get('scraper_up')))
-    r = subprocess.run([sys.executable, P, '--dry-run', '--auth', 'bogus'], capture_output=True,
+    r = subprocess.run([sys.executable, P, '--dry-run', '--modbus-auth', 'bogus'], capture_output=True,
                        text=True, timeout=15)
     check('suite auth: a bogus scheme fails the config fast',
           r.returncode == 1 and "use 'suite'" in r.stderr, r.stderr[-160:])
-    r = subprocess.run([sys.executable, P, '--dry-run', '--auth', 'suite'], capture_output=True,
+    r = subprocess.run([sys.executable, P, '--dry-run', '--modbus-auth', 'suite'], capture_output=True,
                        text=True, timeout=15)
     check('suite auth: suite without a key fails the config fast',
           r.returncode == 1 and 'needs a key' in r.stderr, r.stderr[-160:])
-    r = subprocess.run([sys.executable, P, '--dry-run', '--auth', 'suite', '--auth-key', 'short'],
+    r = subprocess.run([sys.executable, P, '--dry-run', '--modbus-auth', 'suite', '--auth-key', 'short'],
                        capture_output=True, text=True, timeout=15)
     check('suite auth: a short key fails the config fast',
           r.returncode == 1 and 'at least 16 characters' in r.stderr, r.stderr[-160:])
@@ -2411,7 +2411,7 @@ try:
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15911 + BASE),
                                    '--listen', '127.0.0.1:%d' % (19464 + BASE), '--interval', '1',
-                                   '--control-port', '0', '--auth', 'suite', '--auth-key', SKEY],
+                                   '--control-port', '0', '--modbus-auth', 'suite', '--auth-key', SKEY],
                                   stdout=open('/tmp/scr_auth_plain.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(3.0)
     status, m = wait_metrics(19464, want='scraper_up')

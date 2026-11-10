@@ -101,7 +101,7 @@ the inverter Modbus settings
 | `upstream` | `set modbus upstream` | settable | `HOST:PORT` | `--upstream` / `UPSTREAM` | the inverter Modbus endpoint |
 | `modbus-unit` | `set modbus unit` | settable | `ID` | `--modbus-unit` / `MODBUS_UNIT` | Modbus unit ID |
 | `modbus-offset` | `set modbus offset` | settable | `N` | `--modbus-offset` / `MODBUS_OFFSET` | added to register addresses |
-| `auth` | `set modbus auth` | settable | `suite\|none` | `--auth` / `AUTH` | the auth settings: the Modbus scheme the poll session speaks (modbus auth — suite or none) and the bearer token the metrics endpoint requires (auth token) |
+| `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth settings: the Modbus scheme the poll session speaks (modbus auth — suite or none) and the bearer token the metrics endpoint requires (auth token) |
 | `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 | `timeout` | `set modbus timeout` | settable | `s` | `--timeout` / `TIMEOUT` | Modbus connect/read timeout |
 | `profile` | `set modbus profile` | settable | `\<file>` | `--profile` / `PROFILE` | device profile JSON: the registers the metrics read (a bare name resolves in profiles/profiles/) |

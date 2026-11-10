@@ -21,7 +21,7 @@ let
     (setLine "upstream" cfg.upstream)
     (setLine "modbus-unit" (toString cfg.modbusUnit))
     (setLine "modbus-offset" (toString cfg.modbusOffset))
-    (lib.optionals (cfg.auth != null) [ (setLine "auth" cfg.auth) ])
+    (lib.optionals (cfg.modbusAuth != null) [ (setLine "modbus-auth" cfg.modbusAuth) ])
     (lib.optionals (cfg.authKey != null) [ (setLine "auth-key" cfg.authKey) ])
     (setLine "timeout" (toString cfg.timeout))
     (setLine "max-kwp" (toString cfg.maxKwp))
@@ -115,7 +115,7 @@ in
       description = "Offset added to register addresses (set -1 for gateways that need 0-based addressing).";
     };
 
-    auth = lib.mkOption {
+    modbusAuth = lib.mkOption {
       type = lib.types.nullOr (lib.types.enum [ "suite" ]);
       default = null;
       description = ''

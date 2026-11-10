@@ -89,6 +89,7 @@
     "static": false,
     "strict": false,
     "timezone": "utc",
+    "time": "",
     "dump_interval": 0.0,
     "dump_path": "",
     "max_clients": 64,
@@ -118,6 +119,8 @@
     "control_log_replies": false,
     "control_socket_group": false,
     "control_trust_uids": "",
+    "control_port": "",
+    "control_ops_verbs": "show",
     "restore_on_start": false,
     "modbus_profile": "sun2000"
   },

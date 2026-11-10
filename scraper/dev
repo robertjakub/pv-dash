@@ -2,10 +2,10 @@
 # the dev launcher: the daemon straight from the checkout against the
 # shipped samples — the packaged-root defaults don't exist in a source
 # tree (the loader never reaches into examples/ on its own). The upstream
-# is the fake inverter: $SCRAPER_UPSTREAM overrides. Extra flags/env pass
+# is the fake inverter: $UPSTREAM overrides. Extra flags/env pass
 # through: scraper/dev --dry-run, scraper/dev --profile deye-sg04lp3
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
 exec python3 "$DIR/bin/modbus-scraper.py" \
     --config "$DIR/examples/scraper.conf" \
     --metrics-spec "$DIR/examples/metrics.json" \
-    --upstream "${SCRAPER_UPSTREAM:-127.0.0.1:15502}" "$@"
+    --upstream "${UPSTREAM:-127.0.0.1:15502}" "$@"

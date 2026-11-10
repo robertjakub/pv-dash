@@ -6,7 +6,6 @@ Starts its own fake inverter + scraper instances on scratch ports and
 cleans up after itself.
 """
 import json as _json
-import getpass
 import os
 import random
 import signal
@@ -2323,9 +2322,6 @@ try:
     #     polls, the wrong key fails the connector (ERR), the live `set`
     #     drops the session; then a plain fake under an authed scraper
     #     fails the same way (the peer must speak the scheme)
-    sys.path.insert(0, REPO)
-    from common.modbus import auth_handshake_client
-
     SKEY = 'scr-suite-key-16chars!'
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15910 + BASE),
                                    '--control-port', '0', '--modbus-auth', 'suite', '--auth-key', SKEY],

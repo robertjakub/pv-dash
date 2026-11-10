@@ -404,6 +404,9 @@ clients' help always promised — the env form of `--control-token-file`
 on `scraper_ctl`/`scraper_cli` (the daemon's config resolved it from the
 start; flag over env, the file over the plain token, both together the
 mutual-exclusion error).
+(Since retired: the env prefixes and the `*_FILE` twins died — the bare
+env twin with `file:<path>` inside the plain value is the spelling.)
+
 
 The control surface (the last family tool without one): the JSON-lines
 control server on the cache's pattern (the unix socket by default, the

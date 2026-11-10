@@ -4,12 +4,9 @@ cache diagnostics block it reads, the log levels and the shipped defaults —
 kept in one JSON file (lib/defaults.json) instead of being scattered over the
 modules. Loaded once at import; everything reads the STATIC dict (or the
 named aliases below). Stdlib only."""
-import json
-import os
+from common.settings.options import load_static_json, static_defaults
 
-_here = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(_here, 'defaults.json'), encoding='utf-8') as _f:
-    STATIC = json.load(_f)
+STATIC = load_static_json(__file__)
 
 from common.modbus.protocol import PROTOCOL    # the family's one protocol tree
 MAX_PDU = PROTOCOL['max_pdu']                  # the largest Modbus PDU
@@ -27,15 +24,9 @@ DIAG_MAX = DIAGNOSTICS['max_age']              # the age/uptime clamp (0xFFFF)
 LOG_LEVELS = tuple(STATIC['log_levels'])
 
 from .options import OPTIONS   # the registry rows — the defaults' one home (the rows' `default`)
-DEFAULTS = {o.name.replace('-', '_'): o.static_default
-            for o in OPTIONS if o.static_default is not None}
+DEFAULTS = static_defaults(OPTIONS)
 DEFAULT_LISTEN_PORT = int(DEFAULTS['listen'].rsplit(':', 1)[1])
 AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
 AUDIT_FILES = DEFAULTS['audit_files']
-from common.wire.control import CONTROL_WIRE_DEFAULTS  # the shared wire tree (flat: the cli_* keys)
-CLI_KEEPALIVE_S = CONTROL_WIRE_DEFAULTS['cli_keepalive_s']
-CLI_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_timeout_s']
-CLI_RECONNECT = CONTROL_WIRE_DEFAULTS['cli_reconnect']
-CLI_RECONNECT_WAIT_S = CONTROL_WIRE_DEFAULTS['cli_reconnect_wait_s']
-CLI_IDLE_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_idle_timeout_s']
-CLI_MAX_LINE_BYTES_S = CONTROL_WIRE_DEFAULTS['cli_max_line_bytes_s']
+from common.wire.control import CLI_IDLE_TIMEOUT_S, CLI_KEEPALIVE_S, CLI_MAX_LINE_BYTES_S, \
+    CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S   # the clients' wire constants (the shared tree)

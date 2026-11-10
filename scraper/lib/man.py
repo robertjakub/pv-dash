@@ -3,7 +3,7 @@
 sections render from the tools' argparse parsers, the prose sections live
 here as roff. scripts/gen_man.py writes the shipped man/*.1 from these;
 `modbus-scraper --man` (and the ctl/cli's --man) prints the same page."""
-from common.render.manpage import esc, options_section, page
+from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_CTL, EXIT_STATUS_DAEMON, options_section, page
 
 DATE = '2026-11-05'
 VERSION = 'pv-suite 0.4.2'
@@ -65,13 +65,13 @@ config keeps the previous settings.
 graceful shutdown."""
     control = """.SH CONTROL
 The control server speaks JSON lines ({"cmd": "..."} ->
-{"status": "ok|fail|bye", "text": "..."}; TCP requires the token when
+{"status": "ok|fail|note|bye", "text": "..."}; TCP requires the token when
 configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: metrics
 interval, modbus timeout, the metrics limits caps, caps max-pv/max-grid,
 log-access, log-level, control socket-group (re-modes the live unix socket
 0600/0660) \\(em and the startup-only secrets: control token, the ops
-token, metrics auth token \\(em the wire refuses set/unset, the value
+token, metrics auth token \\(em the wire refuses set/clear, the value
 never rendering \\(em \\fBshow <secret>\\fR refuses), \\fBshow connections\\fR
 (the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
 (the dictionary of the registry), \\fBpoll now\\fR,
@@ -132,16 +132,7 @@ control target for the daemon's clients when the flag is unset (flag
 .B UPSTREAM ", " LISTEN ", " INTERVAL ", " AUTH_TOKEN ", " ...
 every flag has an environment twin of the same bare name (no tool
 prefix); the flag wins over the env, the env over the config script."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-success (\\fB--dry-run\\fR: valid configuration).
-.TP
-.B 1
-invalid configuration or a failed bind (reason on stderr).
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_DAEMON
     return page(
         'Prometheus exporter for PV inverters (Modbus TCP, stdlib only)',
         'modbus-scraper', 1, DATE, VERSION, MANUAL,
@@ -175,16 +166,7 @@ the frame, keyed by the token)."""
 .TP
 .B CTL ", " CONTROL_TOKEN
 the control target and the TCP token when the flags are unset."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-every command answered \\fBok\\fR.
-.TP
-.B 1
-connection or control error.
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_CTL
     return page(
         "send commands to the modbus-scraper control server (one-shot / batch)",
         'modbus-scraper-ctl', 1, DATE, VERSION, MANUAL,
@@ -215,16 +197,7 @@ the control target when \\fB--control-port\\fR is unset.
 .TP
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off)."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-the session ended cleanly.
-.TP
-.B 1
-connection or control error.
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_CLI
     return page(
         "console-style session on the modbus-scraper control server",
         'modbus-scraper-cli', 1, DATE, VERSION, MANUAL,

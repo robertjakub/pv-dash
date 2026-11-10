@@ -85,7 +85,7 @@ set log-level INFO
 |---|---|---|
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--modbus-unit` / `--modbus-offset` | `1` / `0` | Modbus unit id / added to register addresses (`-1` for gateways that need 0-based addressing) |
-| `--modbus-auth` / `--auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/MODBUS.md](../docs/MODBUS.md) |
+| `--modbus-auth` / `--auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/common/MODBUS.md](../docs/common/MODBUS.md) |
 | `--profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set modbus profile` |
 | `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
 | `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
@@ -94,10 +94,10 @@ set log-level INFO
 | `--timeout` / `--interval` | `3` / `10` | Modbus timeout, seconds / seconds between Modbus polls |
 | `--listen` | `127.0.0.1:9350` | exporter bind address `HOST:PORT` (loopback by default; beyond loopback `--auth-token` is mandatory, F13) |
 | `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; compared timing-safe); the value may be `file:<path>` — **re-read on every SIGHUP**: rotate by rewriting the file and reloading |
-| `--metrics-acl` | `any` | the clients allowed to **connect** to /metrics: `any`, `none`, comma-separated IPs/prefixes, `file:<path>` (the ip-prefix acl file — the grammar lives in [docs/ACL.md](../docs/ACL.md)); checked at accept; live-settable |
+| `--metrics-acl` | `any` | the clients allowed to **connect** to /metrics: `any`, `none`, comma-separated IPs/prefixes, `file:<path>` (the ip-prefix acl file — the grammar lives in [docs/common/ACL.md](../docs/common/ACL.md)); checked at accept; live-settable |
 | `--control-port` | `/tmp/modbus-scraper-<listen-port>.socket` | the JSON-lines control server target (unix socket path or TCP port), `0` = off |
 | `--control-token` / `--control-ops-token` | off | the control tokens (a TCP control port refuses to start without the admin token, F5); `file:<path>` welcome |
-| `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`clear` is not a verb here — there is nothing to flush) |
+| `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`flush` is not a verb here — there is nothing to flush) |
 | `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
 | `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | XDG state | the SCR audit trail: a file path, `-` for stdout (the docker/journald way) or `none` (no local file — the forward carries the trail); the forward mirrors every line onward (F10) |
@@ -129,7 +129,7 @@ in flags:
 
 | Signal | Effect |
 |---|---|
-| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, caps, the device profile, auth token (+ file re-read = rotation), client limits, the Modbus auth scheme/key and the upstream take effect immediately. An invalid value keeps the previous settings. The listen address, log level and `metrics.json` need a restart. |
+| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, caps, the device profile, auth token (+ file re-read = rotation), client limits, the Modbus auth scheme/key and the upstream take effect immediately. An invalid value keeps the previous settings. The listen address and `metrics.json` need a restart (`log-level` is live — `set log-level`). |
 | `SIGTERM` / `SIGINT` | **Graceful shutdown** with a session summary (duration + poll-error count). |
 
 ### The control server
@@ -148,7 +148,7 @@ python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
 
 The wire (the signed frames, the peer-cred trusted peers, the read-only
 ops role, the F5 token rule) is the family's — one paragraph per piece in
-[docs/ACL.md](../docs/ACL.md) (the control-plane row) and
+[docs/common/ACL.md](../docs/common/ACL.md) (the control-plane row) and
 [docs/AUDIT.md](../docs/AUDIT.md); a token value never renders back
 (`show <secret>` refuses). Every command and knob the wire answers —
 command, settable (`set`/`clear`) or show-only — is tabled in
@@ -262,10 +262,12 @@ cares about). The four **canonical** entries — the power math's inputs
 `battery_soc_percent`) — are built-in: always declared, always bound,
 always fetched. Every profile-bound metric beyond them is read once per
 poll, softly: a rejected read keeps its metric absent instead of failing
-the poll. Metric names, help texts and types are loaded at startup from
-`scraper/examples/metrics.json` (bundled next to the script) — edit it to
-rename metrics or reword `# HELP` lines without touching the code; a
-missing or corrupt spec fails cleanly at startup (one-line error, exit 1).
+the poll. Metric names, help texts and types are loaded at startup from the
+packaged `metrics.json` (the lib dir's default; a checkout resolves the
+`scraper/metrics.json` → `examples/` dev symlink) — point
+`--metrics-spec` elsewhere (or `set metrics spec`) to rename metrics or
+reword `# HELP` lines without touching the code; a missing or corrupt
+spec fails cleanly at startup (one-line error, exit 1).
 `show inputs` / `show inputs metrics` (ctl/cli) render the declared inputs
 and the exported metrics.
 
@@ -351,13 +353,9 @@ stdlib only, each starts its own fake inverter + exporters on scratch
 ports and cleans up after itself:
 
 ```bash
-python3 tests/scrape-regtest.py   # the functional battery (values, export/import
-                                  #   split, caps 503 + recovery,
-                                  #   auth + token rotation, limits, diagnostics,
-                                  #   SIGHUP, inverter death, hostile-inverter
-                                  #   phase, dry-run exit codes — plus the fake's
-                                  #   own control/machine coverage)
-python3 tests/scrape-fuzz.py [n]  # n client-garbage HTTP frames (default 3000)
+scripts/battery.sh scraper        # the scraper profile: the regtest, the fuzz, the
+                                  #   audit chain (the suites refuse without the
+                                  #   runner's PV_RUN_DIR)
 ```
 
 Every scenario must end with the exporter serving correct metrics and
@@ -388,9 +386,9 @@ scraper/
 ├── schema/
 │   └── metrics.schema.json  # the metrics spec's JSON Schema (draft 2020-12)
 └── lib/
-    ├── defaults.json      # the static constants: protocol limits, diagnostics block, log levels
+    ├── defaults.json      # the static constants: diagnostics block, log levels (the protocol
     ├── metrics.json       # the built-in inputs + the four canonical metrics + the scraper_* specs
-    ├── statics.py         # its loader (the STATIC dict + the named aliases)
+    ├── statics.py         #   limits live in common/modbus/protocol.json)
     ├── protocol.py        # Modbus TCP client (hardened framing)
     ├── config.py          # settings resolution + validation
     ├── metrics.py         # metrics.json loader

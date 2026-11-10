@@ -6,8 +6,8 @@ name), the flag, the env twin(s), the optional display group (a row may
 carry a `group` — the surfaces bucket it under it; ungrouped rows render
 bare), the knob's description (the shared help text
 --help and the man pages render), the live control name when the knob is
-live-settable (a '/'-path — `inverter/profile` spells as its words on the
-wire: `set inverter profile <value>`), and the secret flag. This module
+live-settable (a '/'-path — `modbus/profile` spells as its words on the
+wire: `set modbus profile <value>`), and the secret flag. This module
 loads the JSON into the
 common Option rows and keeps the Python-side wiring: the control-grammar
 vocabulary and the choice vocabularies (log-level from defaults.json), the
@@ -20,7 +20,7 @@ table."""
 import json
 import os
 
-from common.settings.options import as_bool, default_ops_verbs, known_verbs, load_registry, make_describe, settings_of
+from common.settings.options import default_ops_verbs, known_verbs, load_registry, make_describe, registry_view, settings_of
 
 
 
@@ -66,42 +66,24 @@ OPTION_BY_NAME = {o.name: o for o in OPTIONS}
 CFG_KEYS = {'log-level': 'level'}
 
 # the control grammar's live settings — the SAME rows, viewed from the wire
-# (the `set`/`unset` vocabulary, the console completions and word-help)
-SETTINGS = settings_of(OPTIONS) + settings_of(SHOW_OPTIONS)
-SETTING_BY_NAME = {s.name: s for s in SETTINGS}
-alias_names = []
-for s in SETTINGS:   # the row's `alias` spelling answers the same Setting — the canonical renders
-    if s.alias and s.alias not in SETTING_BY_NAME:
-        SETTING_BY_NAME[s.alias] = s
-        alias_names.append(s.alias)
-SETTING_NAMES = tuple(s.name for s in SETTINGS)   # the canonical spellings — the dump keys and the unset defaults iterate these
-ALIAS_NAMES = tuple(alias_names)                  # the ?/TAB pools ride them beside the canonicals
-
-# the set/unset vocabulary: the KNOB rows only — a show report's live path
-# never joins it, so it cannot shadow a knob VALUE on the wire: `set metrics
-# acl table` takes 'table' as the value (the acl branch points at the
-# report), while `show metrics acl table` answers the metrics/acl/table
-# report — one spelling per side of the verb
-_KNOB_SETTINGS = settings_of(OPTIONS)
-SET_BY_NAME = {s.name: s for s in _KNOB_SETTINGS}
-for s in _KNOB_SETTINGS:   # the aliases ride the set vocabulary beside the canonicals
-    if s.alias and s.alias not in SET_BY_NAME:
-        SET_BY_NAME[s.alias] = s
-SHOW_LIVES = frozenset(o.live for o in SHOW_OPTIONS)   # the show reports' lives: show answers them, set/unset never offers them
-LIVE_SETTINGS = frozenset(o.live for o in OPTIONS if o.live) | SHOW_LIVES   # the live-named settings: the pools list these — a row the registry spells
-# without a `live` name (the restart-marked startup knobs, mid-grant) never lists
-# The custom show words ride the registry's `show` section (the loader
-# reads them into SHOW_COMMANDS/SHOW_WORDS/SHOW_HIDDEN/SHOW_VALUES): the
-# non-knob, non-control-grammar views the show verb answers — the hidden
-# ones answer on the wire but never list in the ?/TAB pools.
-
-NODE_BY_NAME = {o.name: o for o in OPTIONS if o.node}   # the hierarchy nodes (help-only)
-HIDDEN_SETTINGS = frozenset(o.live for o in OPTIONS if o.hidden and o.live) \
-    | frozenset(o.live for o in SHOW_OPTIONS if o.hidden and o.live) \
-    | frozenset(o.alias for o in OPTIONS if o.hidden and o.alias) \
-    | frozenset(o.alias for o in SHOW_OPTIONS if o.hidden and o.alias) \
-    | frozenset(o.name for o in OPTIONS if o.hidden and not o.live)   # the flat hidden knobs (the restart ones)
-describe_setting, describe_value = make_describe(SETTING_BY_NAME)
+# (the `set`/`clear` vocabulary, the console completions and word-help).
+# The registry_view builds the tables once for the family: SET_BY_NAME is
+# the KNOB rows only — a show report's live path never joins it, so it
+# cannot shadow a knob VALUE on the wire: `set metrics acl table` takes
+# 'table' as the value (the acl branch points at the report), while
+# `show metrics acl table` answers the metrics/acl/table report — one
+# spelling per side of the verb
+_VIEW = registry_view(OPTIONS, SHOW_OPTIONS)
+SETTINGS = _VIEW.settings
+SETTING_BY_NAME = _VIEW.setting_by_name
+SETTING_NAMES = _VIEW.setting_names
+ALIAS_NAMES = _VIEW.alias_names
+SET_BY_NAME = _VIEW.set_by_name
+SHOW_LIVES = _VIEW.show_lives
+LIVE_SETTINGS = _VIEW.live_settings   # a row the registry spells without a `live` name (the restart-marked
+HIDDEN_SETTINGS = _VIEW.hidden_settings   # startup knobs, mid-grant) never lists; the wire still answers
+NODE_BY_NAME = _VIEW.node_by_name
+describe_setting, describe_value = _VIEW.describe
 
 
 # The custom show words: the non-knob, non-control-grammar views the show

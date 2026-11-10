@@ -18,23 +18,16 @@ TCP the signed commands are mandatory. A second, read-only token
 (--control-ops-token) authenticates into its policy's verbs only (the
 ops shift against the admin key, both audited."""
 import logging
-import os
-import re
-import socket
-import threading
 import time
 
 from common.render.human import secs
 from common.runtime.version import version_string
-from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, command_verb, role_allows, role_tag
 from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
-from common.settings.config import acl_table, acl_value_text, default_profile_path, parse_auth_type, \
-    parse_listen, parse_upstream, resolve_profile_file
-from common.settings.dump import SECRET_REMOVED, dump_filter
+from common.settings.config import acl_table, acl_value_text, parse_auth_type, \
+    parse_listen, parse_upstream
 from common.modbus import AUTH_MIN_KEY
 from common.render.texts import T
-from .config import CONTROL_SOCKET_TEMPLATE, build_sources, load_device_profile, resolve_metrics_acl
-from .metrics import Metrics
+from .config import CONTROL_SOCKET_TEMPLATE, resolve_metrics_acl
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, \
     NODE_BY_NAME, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .statics import DEFAULT_LISTEN_PORT, LOG_LEVELS
@@ -80,12 +73,6 @@ def _check_upstream(text):
 
 
 CHECKS = {'upstream': _check_upstream}
-
-# The hierarchy nodes (`help modbus`): the rows that name a live-path
-# prefix and describe the namespace — never knobs, never on the wire
-# grammar, help-only.
-NODE_BY_NAME = {o.name: o for o in OPTIONS if o.node}
-
 
 class ControlServer(_ControlServer):
     """JSON-lines control socket for the scraper. The target is either a TCP
@@ -147,12 +134,8 @@ class ControlServer(_ControlServer):
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, clear <setting>, inspect, show <setting|connections|'
                 'version|config|knobs>, poll now, request reload-config')
-        if self.dump_path:
-            cmds += ', request dump, request restore'
-        cmds += ', request reload, request restart, shutdown, quit; '
-        cmds += 'help <setting> describes it, help config maps every knob to its control command, '
-        cmds += 'show knobs prints the full dictionary'
-        return cmds
+        cmds += ', request reload, request restart, shutdown, quit'
+        return self.command_help_tail(cmds)
 
     def show_config_cfg(self):
         """The resolved startup config dict — the scraper's live one home."""
@@ -195,14 +178,7 @@ class ControlServer(_ControlServer):
                     t = parse_listen(val)
                 except SystemExit as e:
                     raise ValueError(str(e))
-                probe = socket.socket()   # fail fast: the bind at restart is too late to complain
-                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                try:
-                    probe.bind(t)
-                except OSError as e:
-                    raise ValueError(T('wire.cannot_bind') % (t[0], t[1], e))
-                finally:
-                    probe.close()
+                self.probe_bind(t, key)
                 self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
             raise ValueError(T('wire.unknown_setting_bare') % key)
@@ -325,7 +301,8 @@ class ControlServer(_ControlServer):
         try:
             v = opt.conv(val)
         except ValueError:
-            raise ValueError('%s must be %s' % (key, {int: 'an integer', float: 'a number'}.get(opt.conv, 'text')))
+            raise ValueError('%s must be %s, got %r'
+                             % (key, {int: 'an integer', float: 'a number'}.get(opt.conv, 'text'), val))
         if opt.check:
             updates = CHECKS[opt.check](v)
         else:
@@ -382,15 +359,10 @@ class ControlServer(_ControlServer):
         with self.scraper.lock:
             self.scraper.cfg.update(updates)
 
-    def clear_overrides(self):
-        """The config was re-applied (SIGHUP/request reload): nothing is
-        live-overridden anymore."""
-        self.overridden.clear()
-
     def dump_settings(self):
         """The live-overridden settings as raw, re-appliable values. No
         secret can be overridden (the wire refuses them — startup-only),
-        so no SECRET_REMOVED placeholder occurs; the dump filter's secret
+        so no secret placeholder occurs; the dump filter's secret
         branch stays as the class invariant's guard."""
         s = self.scraper
         with s.lock:
@@ -422,10 +394,7 @@ class ControlServer(_ControlServer):
             'dump/restore-on-start': 'on' if self.dump_restore else 'off',
             'dump-interval': self.dump_interval,
         }
-        for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
-            if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:
-                raw[opt.live] = self.defaults[opt.live]
-        return dump_filter(self.overridden, raw, SETTING_BY_NAME)
+        return self.dump_settings_tail(raw)
 
     # --- the whole-daemon reload (`reload`) and the dump family ride the
     # base (_save/_restore/_reload_state_path/apply_dump_settings/reload_daemon):
@@ -444,14 +413,9 @@ class ControlServer(_ControlServer):
                    'ok' if s.up else 'down', age, s.errors))
 
     def connections_line(self):
-        """The live HTTP clients of the exposition endpoint: the gate's
-        counters, one row per peer IP."""
-        total, per_ip = self.httpd.gate.snapshot() if self.httpd else (0, {})
-        if not total:
-            return 'none'
-        rows = ['%d active' % total]
-        rows += ['%s: %d' % (ip, n) for ip, n in sorted(per_ip.items())]
-        return '; '.join(rows)
+        """The live HTTP clients of the exposition endpoint (the base's
+        gate reading)."""
+        return self.gate_connections_line(self.httpd)
 
     def _aligned(self, rows):
         """[(name, bracket, help)] -> the aligned `name  [bracket]  help`

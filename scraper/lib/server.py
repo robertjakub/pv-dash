@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler
 
 from common.settings.config import acl_admits
 from common.serve.connlimit import GatedHTTPServer, rate_limit_503
+from common.serve.metrics_server import metric
 
 logger = logging.getLogger('scraper')
 
@@ -66,15 +67,9 @@ class Handler(BaseHTTPRequestHandler):
             return '%d' % round(v) if float(v).is_integer() else '%.3f' % v
 
         lines = [
-            '# HELP %s %s' % (up_name, spec.help[up_name]),
-            '# TYPE %s %s' % (up_name, spec.type[up_name]),
-            '%s %d' % (up_name, int(up)),
-            '# HELP %s %s' % (errors_name, spec.help[errors_name]),
-            '# TYPE %s %s' % (errors_name, spec.type[errors_name]),
-            '%s %d' % (errors_name, errors),
-            '# HELP %s %s' % (last_name, spec.help[last_name]),
-            '# TYPE %s %s' % (last_name, spec.type[last_name]),
-            '%s %.3f' % (last_name, last_poll),
+            *metric(up_name, spec.help[up_name], spec.type[up_name], '%d' % int(up)),
+            *metric(errors_name, spec.help[errors_name], spec.type[errors_name], '%d' % errors),
+            *metric(last_name, spec.help[last_name], spec.type[last_name], '%.3f' % last_poll),
         ]
         # the poll-latency gauges (last/mean/max) — present in the bundled spec
         s = self.scraper
@@ -85,13 +80,10 @@ class Handler(BaseHTTPRequestHandler):
             v = {'scraper_poll_duration_seconds': s.poll_secs_last,
                  'scraper_poll_duration_mean_seconds': s.poll_secs_sum / s.poll_count if s.poll_count else 0.0,
                  'scraper_poll_duration_max_seconds': s.poll_secs_max}[name]
-            lines.append('# HELP %s %s' % (name, spec.help[name]))
-            lines.append('# TYPE %s %s' % (name, spec.type[name]))
-            lines.append('%s %s' % (name, fmt(v)))
+            lines.extend(metric(name, spec.help[name], spec.type[name], fmt(v)))
         for name in sorted(values):
-            lines.append('# HELP %s %s' % (name, spec.help.get(name, name)))
-            lines.append('# TYPE %s %s' % (name, spec.type.get(name, 'gauge')))
-            lines.append('%s %s' % (name, fmt(values[name])))
+            lines.extend(metric(name, spec.help.get(name, name), spec.type.get(name, 'gauge'),
+                                fmt(values[name])))
         return ('\n'.join(lines) + '\n').encode()
 
     def relay(self, status, body, ctype, www_auth=False):

@@ -249,13 +249,13 @@ graceful shutdown.
 
 .SH CONTROL
 The control server speaks JSON lines ({"cmd": "..."} ->
-{"status": "ok|fail|bye", "text": "..."}; TCP requires the token when
+{"status": "ok|fail|note|bye", "text": "..."}; TCP requires the token when
 configured and refuses to start without one). Commands:
 \fBset\fR/\fBunset\fR/\fBshow\fR/\fBhelp\fR (the settings: metrics
 interval, modbus timeout, the metrics limits caps, caps max-pv/max-grid,
 log-access, log-level, control socket-group (re-modes the live unix socket
 0600/0660) \(em and the startup-only secrets: control token, the ops
-token, metrics auth token \(em the wire refuses set/unset, the value
+token, metrics auth token \(em the wire refuses set/clear, the value
 never rendering \(em \fBshow <secret>\fR refuses), \fBshow connections\fR
 (the live HTTP clients), \fBshow version\fR, \fBshow knobs\fR
 (the dictionary of the registry), \fBpoll now\fR,

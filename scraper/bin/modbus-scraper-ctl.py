@@ -10,7 +10,7 @@ require the token first ({"cmd": "auth", "token": ...}) — pass it with
   printf 'set interval 5\\nshow config\\n' | python3 modbus-scraper-ctl.py --control-port 15509
 
 Commands (see the server's help): show <connections|version>,
-set/unset, poll now, request reload-config, request reload, request restart,
+set/clear, poll now, request reload-config, request reload, request restart,
 shutdown, quit.
 
 Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.

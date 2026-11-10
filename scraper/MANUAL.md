@@ -27,10 +27,9 @@ unix socket a trusted peer (root, the daemon's own user or
 `--control-trust-uids` — SO_PEERCRED) speaks without it.
 
 The optional ops token (`--control-ops-token`) scopes a session to the
-read-only verbs (the default: show and clear). Every command is audited. The
-clients take `--control-port` (env `CTL`), `--timeout`, `--control-token`,
-the audit flags and `--man`; the cli adds `--reconnect` /
-`--reconnect-wait`.
+read-only verbs (the default: show). Every command is audited. The clients
+take `--control-port` (env `CTL`), `--timeout`, `--control-token`, the audit
+flags and `--man`; the cli adds `--reconnect` / `--reconnect-wait`.
 
 A knob's value resolves at start as flag > env > config script > default;
 the config file (the bundled `scraper/examples/scraper.conf`) speaks the
@@ -162,7 +161,7 @@ the control plane: the tokens, the ops role's RBAC policy, the trusted peers
 ### control/ops
 
 the read-only ops role: the second token that scopes its sessions to the
-configured verbs (the default: show and clear)
+configured verbs (the default: show)
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|

@@ -71,7 +71,3 @@ class ModbusTCP(ClientBase):
         got = body[1]
         check_data_bytes(got, expect(count))
         return body[2:2 + got]
-
-    def read_i32(self, addr, fc=3):
-        hi, lo = self.read_registers(addr, 2, fc=fc)
-        return struct.unpack('>i', struct.pack('>HH', hi, lo))[0]

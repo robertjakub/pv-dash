@@ -21,11 +21,12 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.runtime.audit import AuditLog, default_path
+from common.runtime.audit import audit_params_of, build_audit, default_path
 from common.settings.config import parse_listen, resolve_control_target
 from common.wire.cred import parse_trust_uids
 from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, install_signal_handlers, log_state_dumps, \
     parse_ops_verbs, setup_logging
+from common.serve.connlimit import limits_words
 from common.settings.options import build_parser
 from common.runtime.version import version_string
 from lib.config import CONTROL_SOCKET_TEMPLATE, resolve_config, resolve_metrics_acl
@@ -59,9 +60,7 @@ def parse_args():
 def describe(cfg, args, control_desc):
     caps = (['pv cap %gW' % (cfg['max_kwp'] * 1000.0)] if cfg['max_kwp'] > 0 else []) + \
            (['grid cap %gW' % (cfg['max_grid_kw'] * 1000.0)] if cfg['max_grid_kw'] > 0 else [])
-    limits = (['max-clients %d' % cfg['max_clients']] if cfg['max_clients'] else []) + \
-             (['client-timeout %gs' % cfg['client_timeout']] if cfg['client_timeout'] else []) + \
-             (['max-conn-per-ip %d' % cfg['max_conn_per_ip']] if cfg['max_conn_per_ip'] else []) + \
+    limits = limits_words(cfg['max_clients'], cfg['client_timeout'], cfg['max_conn_per_ip']) + \
              (['metrics-acl %s' % cfg['metrics_acl']] if cfg['metrics_acl'] not in ('any', '') else [])
     listen_host, listen_port = parse_listen(cfg['listen'])
     return ('polling %s:%d unit %d (profile %s, %d registers, positive=%s, modbus auth %s) every %gs; '
@@ -111,20 +110,8 @@ def main():
     control_ops_token = cfg['control_ops_token'] or None
     ops_verbs = parse_ops_verbs(cfg.get('control_ops_verbs'), KNOWN_VERBS, default=DEFAULT_OPS_VERBS)
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
-    audit_params = {'path': None if cfg['no_audit_log'] else cfg['audit_log'],
-                    'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],
-                    'daily': cfg['audit_daily'],
-                    'forward': None if cfg['audit_forward'] in (None, '', 'none') else cfg['audit_forward'],
-                    'forward_format': cfg['audit_forward_format'],
-                    'disabled': bool(cfg['no_audit_log'])}
-    try:
-        audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'], 'SCR', app='modbus-scraper',
-                                                          max_mb=cfg['audit_max_mb'], daily=cfg['audit_daily'],
-                                                          files=cfg['audit_files'], forward=cfg['audit_forward'],
-                                                          forward_format=cfg['audit_forward_format'])
-    except ValueError as e:
-        logger.error(str(e))
-        raise SystemExit(1)
+    audit_params = audit_params_of(cfg)
+    audit = build_audit(cfg, 'SCR', 'modbus-scraper', logger)
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target) \
         + (', read-only ops token accepted' if control_ops_token else '')
@@ -154,7 +141,7 @@ def main():
 
     control = None
     if control_target != '0':
-        # `unset` restores these: the typed knobs read straight from the
+        # `clear` restores these: the typed knobs read straight from the
         # registry rows (live name, config key, conv), the choice/bool
         # knobs stay hand-rendered (their convs do not round-trip a string)
         defaults = {'log-access': 'on' if cfg['log_access'] else 'off',
@@ -172,7 +159,7 @@ def main():
                     defaults[o.live] = str(cfg[key])
             elif o.live and o.conv is bool and not o.secret:
                 key = o.name.replace('-', '_')
-                if key in cfg:   # the live bools: `unset` needs a configured value too
+                if key in cfg:   # the live bools: `clear` needs a configured value too
                     defaults[o.live] = 'on' if cfg[key] else 'off'
             if o.restart and not o.secret:   # the startup-only knobs: what `show <knob>` answers
                 key = o.name.replace('-', '_')
@@ -194,7 +181,7 @@ def main():
         #   ^ the off canonical: str(0.0) is not a live-set spelling (the cache's defaults model)
         # the secret rows (control/token, control/ops/token, auth/token,
         # auth-key, dump-key) carry NO
-        # defaults entry: `unset` refuses them (the metrics/token treatment) — a
+        # defaults entry: `clear` refuses them (the metrics/token treatment) — a
         # secret never renders, never re-applies
         control = ControlServer(scraper, httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,

@@ -12,7 +12,7 @@ import re
 from .options import DEFAULT_OPS_VERBS, OPTIONS
 from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 from common.settings.config import (check_auth_key, check_token_chars, check_control_tokens,
-                           is_loopback_host, load_config_script, parse_acl, parse_auth_type, parse_listen,
+                           is_loopback_host, load_config_script, parse_auth_type, parse_listen,
                            parse_secret, parse_upstream, resolve_metrics_acl, resolve_profile_file, Resolver,
                            str_to_bool)
 from .metrics import Metrics
@@ -62,7 +62,7 @@ def validate_config(cfg):
     if not 1 <= cfg['modbus_port'] <= 65535:
         fail('modbus_port', 'must be 1..65535')
     if not UNIT_ID_RANGE[0] <= cfg['modbus_unit'] <= UNIT_ID_RANGE[1]:
-        fail('modbus-unit', 'must be %d..%d (Modbus unit id)' % UNIT_ID_RANGE)
+        fail('modbus_unit', 'must be %d..%d (Modbus unit id)' % UNIT_ID_RANGE)
     if not -100000 <= cfg['modbus_offset'] <= 100000:
         fail('modbus_offset', 'must be within +/-100000')
     if cfg['timeout'] <= 0:
@@ -105,7 +105,7 @@ def validate_config(cfg):
         raise SystemExit('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
                          'listen = %r — set --auth-token (or file:<path>) or bind 127.0.0.1:PORT' % cfg['listen'])
     control_port = str(cfg.get('control_port') or '').strip()
-    if control_port.isdigit() and control_port != '0' and not cfg.get('control_token'):
+    if control_port.isdigit() and control_port != '0' and int(control_port) <= 65535 and not cfg.get('control_token'):
         raise SystemExit('the TCP control port %s without a token is open to every local process; '
                          'set --control-token (the default unix socket needs none), '
                          'or disable it with --control-port 0' % control_port)
@@ -157,26 +157,6 @@ def load_device_profile(path):
                              '(the decode divides the wire value by it)' % (label, entry['name'], scale))
         check_register(register, '%s (%s) register' % (label, entry['name']))
         out[str(entry['name'])] = (register, typ, scale, fc)
-    return out
-
-
-def load_mapping(path):
-    """mapping.json: profile register name -> metrics.json catalog key (the
-    four register-fed keys: pv, grid, batt_net, batt_soc)."""
-    try:
-        with open(path, encoding='utf-8') as fh:
-            data = json.load(fh)
-    except (OSError, ValueError) as e:
-        raise SystemExit('cannot read mapping spec %s: %s' % (path, e))
-    if not isinstance(data, dict):
-        raise SystemExit('mapping spec %s must be a JSON object' % path)
-    valid = ('pv', 'grid', 'batt_net', 'batt_soc')
-    out = {}
-    for name, key in data.items():
-        if key not in valid:
-            raise SystemExit('mapping spec %s: %r maps to %r (valid targets: %s)'
-                             % (path, name, key, ', '.join(valid)))
-        out[str(name)] = key
     return out
 
 

@@ -152,15 +152,16 @@ def knob_kind(opt):
 
 
 def knob_row(opt):
-    """One knob table row: the registry key, the flat wire spelling a
-    running daemon takes (the set/clear/show words; the console's live/
-    alias path spellings beside it — the cli translates them), the kind,
+    """One knob table row: the registry key, the console spelling a running
+    daemon takes (the live path as words — the config files and the dumps
+    speak it; the flat registry name answers the same set/clear/show words
+    on the wire and the ctls translate), the kind,
     the value shape, the flag / env twins and the description (the
     setting-help — the wire's own wording)."""
     set_cell = '—'
     kind = knob_kind(opt)
     if opt.live and not kind.startswith('startup-only'):
-        set_cell = '`set %s`' % opt.name
+        set_cell = '`set %s`' % ' '.join(opt.live.split('/'))
         if opt.alias:
             set_cell += ' (the console also takes `set %s`)' % ' '.join(opt.alias.split('/'))
     flag = '`%s`' % opt.flag if opt.flag else '—'
@@ -193,11 +194,12 @@ def knobs_section(rows):
                 best = n.name
         buckets.setdefault(best, []).append(o)
     out = ['## Knobs', '',
-           wrap('The tables spell the knob\'s registry key — the one name the '
-                'config file, the wire and the dump all take; the set / '
-                'clear column spells the flat words a running daemon '
-                'answers (the console also completes the live/alias path '
-                'spellings and translates them). The namespaces group '
+           wrap('The tables spell the knob\'s registry key — the one internal '
+                'name the wire, the replies and the dispatch take; the set / '
+                'clear column spells the console words (the live path as '
+                'words — the config files and the state dumps speak them; '
+                'the flat registry name answers the same set everywhere, '
+                'the ctls translate). The namespaces group '
                 'them.'), '']
     order = [''] + [n.name for n in nodes if n.name in buckets]
     by_name = {n.name: n for n in nodes}

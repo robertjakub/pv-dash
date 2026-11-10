@@ -13,6 +13,7 @@ name unique and one word-path, every `group` a clean word).
 
 Exit 0 = everything agrees, 1 = drift (the report says what and where).
 Stdlib only."""
+import json
 import os
 import re
 import subprocess
@@ -38,6 +39,48 @@ NIX_NAMES = {
     'cache': {'unit': 'unitId', 'listen': 'listenHost'},
     'scraper': {'modbus-unit': 'modbusUnit', 'listen': 'listenHost'},
     'dashboard': {'listen': 'listenHost', 'upstream': 'prometheusUrl', 'config-js': 'configFile'},
+}
+
+# knob -> the static.json defaults key when the plain name.replace('-', '_')
+# spelling is not it (the resolver picks the _s-suffixed key)
+DEFAULT_KEYS = {
+    'cache': {'timeout': 'timeout_s', 'interval': 'interval_s', 'read-delay': 'read_delay_s',
+              'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s',
+              'requests-audit': 'requests_audit_s'},
+    'scraper': {'timeout': 'timeout_s', 'interval': 'interval_s',
+                'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s'},
+    'inverter': {'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s'},
+    'dashboard': {'client-timeout': 'client_timeout_s', 'metrics-client-timeout': 'metrics_client_timeout_s'},
+}
+
+# the knobs whose default is deliberately no tree entry — a reason each
+# (the bool native False and the secret None pass without one): the empty
+# word, the derived path, the registry-computed vocabulary
+_COMMON_NO_TREE_DEFAULT = {
+    'auth': 'empty = no auth',
+    'control-port': 'empty — the control socket derives from the listen port',
+    'control-ops-verbs': "the registry's default_ops_verbs",
+    'control-trust-uids': 'empty = nobody trusted',
+    'audit-log': 'empty = the XDG state home',
+    'dump-path': 'empty = the state dump is off',
+}
+NO_TREE_DEFAULT = {
+    'cache': dict(_COMMON_NO_TREE_DEFAULT,
+                  **{'auth-upstream': 'empty = no upstream auth',
+                     'cache-ttl': 'the default derives: cache_ttl_factor x interval',
+                     'profile': 'the bundled profile resolves next to the bin'}),
+    'scraper': dict(_COMMON_NO_TREE_DEFAULT,
+                    **{'metrics-spec': 'empty = the built-in lib/metrics.json block',
+                       'profile': 'the bundled profile resolves next to the bin'}),
+    'inverter': dict(_COMMON_NO_TREE_DEFAULT,
+                     **{'profile': "the bin's bundled sun2000 profile",
+                        'seed': 'a per-run choice — no default',
+                        'time': 'empty = the clock runs',
+                        'grid-voltage': "the tree's grid block (voltage_v), read via statics.GRID",
+                        'grid-frequency': "the tree's grid block (frequency_hz), read via statics.GRID"}),
+    'dashboard': dict(_COMMON_NO_TREE_DEFAULT,
+                      **{'static-dir': 'resolves next to the script',
+                         'config-js': 'resolves next to the script'}),
 }
 
 
@@ -119,6 +162,31 @@ def check_tool(tool):
     unnoted = sorted(o.name for o in options if o.flag and not o.node and not o.env and not o.no_env)
     rows.append((not unnoted, '%s: every flag row carries an env twin or a no-env note%s'
                  % (tool, ' — unnoted: %s' % ', '.join(unnoted) if unnoted else '')))
+    # the static defaults tree (lib/static.json's defaults — the resolver's
+    # last rung): every tree key some lib/ module reads (a dead letter
+    # fails — an entry nothing resolves is a lie waiting to rot), and every
+    # flag knob's default traceable — its tree key (the plain underscore
+    # spelling or a rename) or a named no-entry reason
+    lib_dir = os.path.join(REPO, tool_dir, 'lib')
+    with open(os.path.join(lib_dir, 'static.json'), encoding='utf-8') as f:
+        tree_keys = set((json.load(f).get('defaults') or {}).keys())
+    referenced = set()
+    for name in sorted(os.listdir(lib_dir)):
+        if name.endswith('.py'):
+            src = open(os.path.join(lib_dir, name), encoding='utf-8').read()
+            referenced |= set(re.findall(r"DEFAULTS(?:\.get\(|\[)'([a-z0-9_]+)'", src))
+    dead = sorted(tree_keys - referenced)
+    rows.append((not dead, '%s: every static.json defaults key is read by lib/%s'
+                 % (tool, ' — dead: %s' % ', '.join(dead) if dead else '')))
+    keys = DEFAULT_KEYS.get(tool, {})
+    reasons = NO_TREE_DEFAULT.get(tool, {})
+    unbacked = sorted('--' + o.name for o in options
+                      if o.flag and not o.node
+                      and not (o.conv is bool or o.secret
+                               or keys.get(o.name, o.name.replace('-', '_')) in tree_keys
+                               or o.name in reasons))
+    rows.append((not unbacked, '%s: every flag knob\'s default is a defaults-tree key or a named no-entry%s'
+                 % (tool, ' — unbacked: %s' % ', '.join(unbacked) if unbacked else '')))
     # the audit rotation bounds are the audit module's one constants — the
     # registries repeat them (the _gate_range reads the rows), never drift
     bad_bounds = sorted(o.name for o in options

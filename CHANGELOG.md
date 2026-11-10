@@ -12,6 +12,12 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **dashboard** — **`static-dir` and `config-js` are startup-only
+  secrets** (secret, hidden, restart; lives `static-dir`/`config-js`):
+  the wire refuses set/show (flag/env/config and restart — the
+  dump-key shape), the vocabulary walk never lists them, the
+  show-config tree renders the placeholder and the config fold
+  re-resolves them at the restart.
 - **everywhere** — **four more defaults graduate into the trees**: the
   three Modbus tools' `modbus_profile` `"sun2000"` (the bin's and the
   resolvers' `default_profile_path()` literals die — the bare name

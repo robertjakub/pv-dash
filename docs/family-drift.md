@@ -474,7 +474,7 @@ list is the TODO seed, not a verdict.
 - cache: every live knob named somewhere in the suites
 - scraper: every live knob named somewhere in the suites
 - inverter: every live knob named somewhere in the suites
-- dashboard: every live knob named somewhere in the suites
+- dashboard: `static-dir`
 
 **The command words no suite mentions:**
 
@@ -486,7 +486,7 @@ list is the TODO seed, not a verdict.
 **The canon phrases no suite pins**: 17
 
 **The graduation path**: the seeds carry stable IDs in
-[docs/family-drift-seeds.json](family-drift-seeds.json) (17
+[docs/family-drift-seeds.json](family-drift-seeds.json) (18
 open promise(s), the suggested suite per seed); a test wave
 consumes entries, the regeneration drops them, the shrinkage is
 the wave's proof; `--check` fails when a NEW promise ships
@@ -598,17 +598,19 @@ tool is the visible gap). The secret-posture markers (`parse_secret`,
 the `SECRET_REMOVED` placeholder, the `file:` scheme) across the
 tree.
 
-21 secret-marked row(s) across 7 knob(s), consolidated by posture:
+23 secret-marked row(s) across 9 knob(s), consolidated by posture:
 
 | knob | tools | live | restart | hidden |
 |---|---|---|---|---|
 | `auth-key` | cache, inverter, scraper | yes | yes | yes |
 | `auth-token` | dashboard, scraper | yes | yes | yes |
 | `auth-upstream-key` | cache | yes | yes | yes |
+| `config-js` | dashboard | yes | yes | yes |
 | `control-ops-token` | all four | yes | yes | yes |
 | `control-token` | all four | yes | yes | yes |
 | `dump-key` | all four | yes | yes | yes |
 | `metrics-token` | cache, dashboard, inverter | yes | yes | yes |
+| `static-dir` | dashboard | yes | yes | yes |
 
 **The markers per tool** (the F-trust surface: the loader parses,
 the dumps placeholder, the examples and configs reference):

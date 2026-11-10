@@ -69,7 +69,7 @@ exemption, so a bool without its tree entry fails.
 | all four | `auth` — empty = no auth · `control-port` — derives from the listen port · `control-ops-verbs` — the registry's `default_ops_verbs` |
 | scraper | + `metrics-spec` — empty = the built-in `lib/metrics.json` block |
 | inverter | + `seed` — a per-run choice · `time` — empty = the clock runs · `grid-voltage` / `grid-frequency` — the tree's `grid` block (`voltage_v` / `frequency_hz`), read via `statics.GRID` |
-| dashboard | + `static-dir`, `config-js` — resolve next to the script |
+| dashboard | + `static-dir`, `config-js` — the startup-only secrets (flag/env/config and restart; the values never ride the wire, the dump or the tree) |
 
 The secrets are absent from the table by ruling: **a secret never
 takes a settable default** — its default is the None ladder-end,
@@ -86,9 +86,8 @@ gate's `NO_TREE_DEFAULT` map (the common three in
 secrets fail the outright ban.
 
 The audit rotation bounds (`audit_max_mb`, `audit_files`) ride both
-sides — the daemons configure from them, the client scripts render
-them — so they are daemon defaults and stay out of the trees
-too.
+sides — the daemons' static rungs read their tree entries, the client
+scripts render the same entries.
 
 The four graduates carry the empty string as their tree value:
 `control_trust_uids` `""` = nobody trusted, `dump_path` `""` = the
@@ -97,6 +96,23 @@ audit.log** (the one dynamic default — the tree cannot hold a
 per-user path, the falsy chain resolves it at start), and the three
 Modbus tools' `modbus_profile` `"sun2000"` (the bare name, resolved
 through the shared profiles/ walk).
+
+### The graduation ledger — the proposals for what remains
+
+The empty-string convention is the pattern: the tree value spells the
+knob's own off/derived semantics, the falsy chains resolve it exactly
+as the inline literals did, the rung names the entry.
+
+| Knob | Proposal | Ruling |
+|---|---|---|
+| `auth` (all four) | `"auth": ""` — the empty stays no-auth (the scheme parse treats `none` as off already; `""` keeps every falsy chain behavior-neutral) | TODO — the last common knob that can graduate |
+| `control-port` (all four) | `"control_port": ""` — the empty = the derived socket (the template against the listen port; the one derived default the tree cannot hold verbatim, the audit-log shape) | TODO |
+| `control-ops-verbs` (all four) | `"control_ops_verbs": "<the concrete csv>"` — the registry keeps the parse/validate; a gate row would diff the tree's literal against `default_ops_verbs` so the two cannot drift | TODO — needs the drift-diff gate row first |
+| `metrics-spec` (scraper) | `"metrics_spec": ""` — the empty = the built-in `lib/metrics.json` block | TODO |
+| `time` (inverter) | `"time": ""` — the empty = the clock runs | TODO |
+| `seed` (inverter) | — | STAYS OUT — a per-run choice; no default exists to ship |
+| `grid-voltage`, `grid-frequency` (inverter) | — | BACKED — the tree's `grid` block (`voltage_v` / `frequency_hz`) via `statics.GRID`; the row only documents the indirect read |
+| `static-dir`, `config-js` (dashboard) | — | STAYS OUT — the startup-only secrets; the outright ban holds (a shipped path default would ride every install) |
 
 ## The gate
 

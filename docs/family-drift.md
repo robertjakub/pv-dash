@@ -52,7 +52,7 @@ copy-paste twins), the similarity pass pairs cross-file bodies over the
 
 **The exact pass**: 1 duplicate group(s) in >= 2 files.
 
-- 24L `_load_options`: `dashboard/lib/options.py:25`, `scraper/lib/options.py:26`
+- 25L `_load_options`: `dashboard/lib/options.py:25`, `scraper/lib/options.py:27`
 
 **The similarity pass**: 51 cross-file pair(s) over the ratio
 floor (30 of them the man-page prose, per-tool by
@@ -60,15 +60,15 @@ design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
-| 1.00 | `scraper/lib/options.py:26` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
+| 1.00 | `scraper/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.94 | `scraper/lib/control.py:144` `command_help` <-> `dashboard/lib/control.py:109` `command_help` |
-| 0.94 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:26` `_load_options` |
+| 0.94 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:27` `_load_options` |
 | 0.94 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.89 | `scraper/bin/modbus-scraper.py:251` `graceful_stop` <-> `dashboard/bin/dashboard.py:483` `graceful_stop` |
 | 0.88 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.88 | `inverter/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.88 | `scraper/lib/options.py:26` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
+| 0.88 | `scraper/lib/options.py:27` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:1227` `run_dump_interval` |
@@ -165,13 +165,15 @@ four registries; 30 names carry in all four:
 | inverter | `allow-write`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `control-log-replies`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
 | dashboard | `auth`, `auth-token`, `config-js`, `local-time`, `log-access`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
-**The shared knobs whose fields disagree** (3 of
-30 knobs, 3 drifted field(s)) — one row per
+**The shared knobs whose fields disagree** (5 of
+30 knobs, 5 drifted field(s)) — one row per
 knob+field, the tools grouped by the value each carries:
 
 | knob | field | the values (the tools carrying each) |
 |---|---|---|
 | `client-timeout` | `live` | `limits/client-timeout` (cache) · `metrics/limits/timeout` (scraper) · `client-timeout` (inverter, dashboard) |
+| `control-ops-verbs` | `default` | `show,flush` (cache) · `show` (scraper, inverter, dashboard) |
+| `listen` | `default` | `127.0.0.1:15502` (cache) · `127.0.0.1:9350` (scraper) · `127.0.0.1:5502` (inverter) · `127.0.0.1:8080` (dashboard) |
 | `max-clients` | `live` | `limits/max-clients` (cache) · `metrics/limits/max-clients` (scraper) · `max-clients` (inverter, dashboard) |
 | `max-conn-per-ip` | `live` | `limits/max-conn-per-ip` (cache) · `metrics/limits/max-conn-per-ip` (scraper) · `max-conn-per-ip` (inverter, dashboard) |
 
@@ -523,26 +525,20 @@ The findings:
 
 ## The statics sweep — the four defaults.json blocks
 
-Every leaf key-path of the four `lib/defaults.json` files: the shared
-paths whose values disagree, the only-there paths (the audit
-defaults, the caps, the grid constants the loaders wire via
-`static_defaults`).
+Every leaf key-path of the four `lib/defaults.json` files (the non-knob
+statics since the knobs' defaults moved into the registry rows'
+`default` fields): the shared paths whose values disagree, the
+only-there paths.
 
-100 leaf paths; 21 in all four; 2 shared with differing values.
-
-| key-path | per-tool values |
-|---|---|
-| `defaults.control_ops_verbs` | c: "show,flush" | s: "show" | i: "show" | d: "show" |
-| `defaults.listen` | c: "127.0.0.1:15502" | s: "127.0.0.1:9350" | i: "127.0.0.1:5502" | d: "127.0.0.1:8080" |
+35 leaf paths; 1 in all four; 0 shared with differing values.
 
 The findings:
 
-- **The defaults.json blocks are the tools' personalities** (the
-  simulators' grid constants, the caps' defaults) — the drift that
-  matters is the FAMILY defaults (the audit rotation, the log
-  levels, the cap defaults) disagreeing: those wire through
-  `static_defaults`/`choices` into the registries and the set
-  grammar. The shared-path matrix is the ruling surface.
+- **The defaults.json blocks are the non-knob statics' home** (the
+  simulators' grid constants, the diagnostics block, the log levels)
+  — the knobs' defaults live in the registry rows' `default` fields
+  now (edit_options edits them; check_options validates them). The
+  shared-path matrix is the ruling surface for what remains.
 
 ## The schema/example sweep — the derived sources
 

@@ -12,6 +12,24 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the knob defaults move into the registry rows**
+  (the one-knob-one-source closure): every non-secret flag knob's
+  `lib/options.json` row carries its `default` now — conv-typed JSON,
+  edited with `edit_options.py` (the conv-typed parse, the secret
+  refused categorically), validated by `check_options` (presence, the
+  conv type, the secret ban, and the ops-verbs row pinned to the
+  `default_ops_verbs` derivation). The resolvers' last rungs read the
+  rows: each `lib/statics.py` builds `DEFAULTS` off the loaded
+  `OPTIONS` (`o.static_default` — the argparse-facing default stays
+  unset so the flag reads unset), `lib/config.py` reads the
+  row-spelled keys (the `DEFAULT_KEYS` rename map dies —
+  `DEFAULTS['timeout']`, `DEFAULTS['interval']`, `DEFAULTS['profile']`
+  …), and the inverter's manual 45-line `STATIC_DEFAULTS` dict is a
+  one-line derivation. `lib/defaults.json` keeps the non-knob statics
+  only (the `defaults` dict is gone; the fake's `time_scale_max` and
+  the dashboard's `proxy_timeout_s` re-home to the top level — bounds
+  with no row of their own). Breaking for the tree readers only: the
+  `defaults` key no longer exists in the four files.
 - **everywhere** — **the defaults sweep closes: every settable default
   now names its tree entry** — `control_port` `""` (the socket derives
   from the listen port) family-wide, the scraper's `metrics_spec` `""`

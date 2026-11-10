@@ -451,7 +451,7 @@ def resolve_config(args, script_dir=None):
         'dump_path': resolve(getattr(args, 'dump_path', None), 'DUMP_PATH',
                              'dump_path', DEFAULTS['dump_path'], str),
         'dump_key': parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY',
-                                          'dump_key', None, str) or '').strip() or None, 'dump/key'),
+                                          'dump_key', None, str) or '').strip() or None, 'dump-key'),
         'dump_interval': resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
                                  'dump_interval', DEFAULTS['dump_interval'], float),
         'dump_with_cache': resolve_bool(getattr(args, 'dump_with_cache', False) or None,

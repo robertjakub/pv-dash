@@ -16,7 +16,7 @@ truncated, foreign or pre-hash dumps (fail closed — F18 in docs/AUDIT.md),
 and a group/world-writable dump is refused outright: whoever can write the
 dump holds config trust, so the write bits stay owner-only.
 
-With a key (the startup-only dump/key knob — flag/env/config; the reload
+With a key (the startup-only dump-key knob — flag/env/config; the reload
 re-exec re-resolves the same argv, so the key is identical on both sides)
 the dump is **sealed** via the shared seal (common/settings/dump.py): the whole
 state — the words included — rides as the `box` of a version-2 envelope,

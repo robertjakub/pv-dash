@@ -66,7 +66,7 @@ def fold_metrics_listen(cfg, pending):
 
 
 def fold_upstream(cfg, pending):
-    fold_host, fold_port = parse_upstream(pending, label='modbus/upstream')
+    fold_host, fold_port = parse_upstream(pending, label='upstream')
     cfg['upstream'], cfg['host'], cfg['port'] = '%s:%d' % (fold_host, fold_port), fold_host, fold_port
 
 
@@ -138,8 +138,8 @@ def main():
     setup_logging(cfg)
 
     apply_restart_state(cfg, args.config, cfg['dump_key'], ControlServer,
-                        extra={'system/listen': fold_listen, 'metrics/listen': fold_metrics_listen,
-                               'modbus/upstream': fold_upstream})
+                        extra={'listen': fold_listen, 'metrics-listen': fold_metrics_listen,
+                               'upstream': fold_upstream})
 
     listen_host, listen_port = parse_listen(cfg['listen'])
     control_target = parse_control_target(cfg['control_port'], listen_port, CONTROL_SOCKET_TEMPLATE)
@@ -151,7 +151,7 @@ def main():
                      'set --control-token (the default unix socket needs none), '
                      'or disable it with --control-port 0', control_target)
         raise SystemExit(2)
-    metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics/token')
+    metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics-token')
     metrics_listen = parse_listen(cfg['metrics_listen'], '--metrics-listen')
     if cfg['metrics_server'] and not metrics_token and not is_loopback_host(metrics_listen[0]):
         logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
@@ -257,49 +257,49 @@ def main():
 
     stop = install_signal_handlers(proxy, cache, apply_reload)
     if control_target is not None:
-        defaults = {'modbus/interval': '%g' % cfg['interval'],
-                    'cache/ttl': 'off' if not cfg['cache_ttl'] else '%g' % cfg['cache_ttl'],
-                    'modbus/read-delay': '%g' % cfg['read_delay'],
-                    'modbus/merge-gap': '%d' % cfg['merge_gap'],
-                    'modbus/upstream': cfg['upstream'],
-                    'modbus/unit': '%d' % cfg['unit'],
-                    'write/allow': 'on' if cfg['allow_write'] else 'off',
-                    'write/registers': proxy.describe_write_ranges(),
-                    'limits/max-clients': '%d' % cfg['max_clients'],
-                    'limits/client-timeout': '%g' % cfg['client_timeout'],
-                    'limits/max-conn-per-ip': '%d' % cfg['max_conn_per_ip'],
-                    'metrics/enable': 'on' if cfg['metrics_server'] else 'off',
-                    'metrics/listen': '%s:%d' % metrics_listen,
-                    'metrics/limits/max-clients': '%d' % cfg['metrics_max_clients'],
-                    'metrics/limits/timeout': '%g' % cfg['metrics_client_timeout'],
-                    'metrics/limits/max-conn-per-ip': '%d' % cfg['metrics_max_conn_per_ip'],
-                    'audit/requests': 'off' if not cfg['requests_audit_s'] else '%g' % cfg['requests_audit_s'],
+        defaults = {'interval': '%g' % cfg['interval'],
+                    'cache-ttl': 'off' if not cfg['cache_ttl'] else '%g' % cfg['cache_ttl'],
+                    'read-delay': '%g' % cfg['read_delay'],
+                    'merge-gap': '%d' % cfg['merge_gap'],
+                    'upstream': cfg['upstream'],
+                    'unit': '%d' % cfg['unit'],
+                    'allow-write': 'on' if cfg['allow_write'] else 'off',
+                    'write-registers': proxy.describe_write_ranges(),
+                    'max-clients': '%d' % cfg['max_clients'],
+                    'client-timeout': '%g' % cfg['client_timeout'],
+                    'max-conn-per-ip': '%d' % cfg['max_conn_per_ip'],
+                    'metrics-server': 'on' if cfg['metrics_server'] else 'off',
+                    'metrics-listen': '%s:%d' % metrics_listen,
+                    'metrics-max-clients': '%d' % cfg['metrics_max_clients'],
+                    'metrics-client-timeout': '%g' % cfg['metrics_client_timeout'],
+                    'metrics-max-conn-per-ip': '%d' % cfg['metrics_max_conn_per_ip'],
+                    'requests-audit': 'off' if not cfg['requests_audit_s'] else '%g' % cfg['requests_audit_s'],
                     'dump-interval': 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval'],
                     'log-level': cfg['level'],
                     'local-time': 'on' if cfg['local_time'] else 'off',
-                    'modbus/profile': cfg['profile'],
-                    'modbus/selection': cfg['selection'] or 'all',
-                    'acl/connect': acl_value_text(cfg['connect_acl']),
-                    'acl/write': acl_value_text(cfg['write_acl']),
-                    'metrics/acl': acl_value_text(cfg['metrics_acl']),
-                    'modbus/timeout': '%g' % cfg['timeout'],
-                    'modbus/auth': cfg['auth'] or 'none',
-                    'modbus/auth-upstream': cfg['auth_upstream'] or 'none',
-                    'control/port': control_target,
-                    'control/ops/verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
-                    'control/trust-uids': ','.join(str(u) for u in sorted(cfg['control_trust_uids'] or [])) or 'off',
-                    'control/socket-group': 'on' if cfg['control_socket_group'] else 'off',
-                    'audit/log-file': 'off' if cfg['no_audit_log'] else (cfg['audit_log'] or default_audit_path('modbus-cache')),
-                    'audit/rotate/max-size': '%g' % cfg['audit_max_mb'],
-                    'audit/rotate/daily': 'on' if cfg['audit_daily'] else 'off',
-                    'audit/rotate/files': '%d' % cfg['audit_files'],
-                    'audit/disable': 'on' if cfg['no_audit_log'] else 'off',
-                    'dump/path': cfg['dump_path'] or 'off',
-                    'dump/with-cache': 'on' if cfg['dump_with_cache'] else 'off',
-                    'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
-                    'system/listen': cfg['listen'],
-                    'system/log-access': 'on' if cfg['log_access'] else 'off'}
-        # the secret rows (control/token, control/ops/token, metrics/token)
+                    'profile': cfg['profile'],
+                    'selection': cfg['selection'] or 'all',
+                    'connect-acl': acl_value_text(cfg['connect_acl']),
+                    'write-acl': acl_value_text(cfg['write_acl']),
+                    'metrics-acl': acl_value_text(cfg['metrics_acl']),
+                    'timeout': '%g' % cfg['timeout'],
+                    'modbus-auth': cfg['auth'] or 'none',
+                    'auth-upstream': cfg['auth_upstream'] or 'none',
+                    'control-port': control_target,
+                    'control-ops-verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
+                    'control-trust-uids': ','.join(str(u) for u in sorted(cfg['control_trust_uids'] or [])) or 'off',
+                    'control-socket-group': 'on' if cfg['control_socket_group'] else 'off',
+                    'audit-log': 'off' if cfg['no_audit_log'] else (cfg['audit_log'] or default_audit_path('modbus-cache')),
+                    'audit-max-mb': '%g' % cfg['audit_max_mb'],
+                    'audit-daily': 'on' if cfg['audit_daily'] else 'off',
+                    'audit-files': '%d' % cfg['audit_files'],
+                    'no-audit-log': 'on' if cfg['no_audit_log'] else 'off',
+                    'dump-path': cfg['dump_path'] or 'off',
+                    'dump-with-cache': 'on' if cfg['dump_with_cache'] else 'off',
+                    'restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
+                    'listen': cfg['listen'],
+                    'log-access': 'on' if cfg['log_access'] else 'off'}
+        # the secret rows (control-token, control-ops-token, metrics-token)
         # carry NO defaults entry: `clear` refuses them
         # (the metrics/token treatment) — a secret never renders, never re-applies
         proxy.control = ControlServer(proxy, control_target, stop, audit=audit,

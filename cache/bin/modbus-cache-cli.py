@@ -29,7 +29,7 @@ from common.wire import cli
 from common.render.texts import T
 from lib.config import DEFAULT_CONTROL_SOCKET
 from lib.man import cli_page
-from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
+from lib.options import COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, NODE_BY_NAME, POOL_NAMES, SETTING_SPELLINGS, SHOW_LIVES
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_MAX_LINE_BYTES_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
 
 SESSION = {'dump': False}
@@ -50,21 +50,21 @@ def command_pool():
 
 def setting_pool():
     """The words the daemon offers right now (the hidden rows never list;
-    an aliased row completes and lists under its second spelling too;
-    a not-yet-live knob — a restart-marked row awaiting its live name —
-    never lists either)."""
-    return tuple(n for n in SETTING_NAMES + ALIAS_NAMES
-                 if n not in HIDDEN_SETTINGS and (n in LIVE_SETTINGS or n in ALIAS_NAMES)
+    the console spellings list — the cli translates them to the flat
+    registry names when it sends; a not-yet-live knob — a restart-marked
+    row awaiting its live name — never lists either)."""
+    return tuple(n for n in POOL_NAMES
+                 if n not in HIDDEN_SETTINGS
                  and (n != 'dump-interval' or SESSION['dump']))
 
 
-describe_word = cli.make_describe_word(NODE_BY_NAME, COMMAND_HELP, SETTING_BY_NAME)
+describe_word = cli.make_describe_word(NODE_BY_NAME, COMMAND_HELP, SETTING_SPELLINGS)
 
 
 def welcome(sock):
     """The first-connect greeting: probe the dump state (the dump-gated
     command/setting rows pool by it) and print the navigation hint."""
-    reply = cli.exchange(sock, cli.wire('show dump path'))
+    reply = cli.exchange(sock, cli.wire('show dump-path'))
     val = reply[3:].split('=', 1)[-1].strip() if reply and reply.startswith('ok ') else ''
     SESSION['dump'] = val not in ('', 'off', 'none')
     print(T('banner.welcome') % 'modbus-cache')
@@ -87,8 +87,8 @@ SPEC = dict(label='the cache proxy', daemon_label='modbus-cache control server',
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             max_line_bytes=CLI_MAX_LINE_BYTES_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,
-            ctl_socket=DEFAULT_CONTROL_SOCKET, settings=SETTING_BY_NAME, nodes=NODE_BY_NAME,
-            live_settings=LIVE_SETTINGS, show_lives=SHOW_LIVES,
+            ctl_socket=DEFAULT_CONTROL_SOCKET, spellings=SETTING_SPELLINGS, nodes=NODE_BY_NAME,
+            show_lives=SHOW_LIVES,
             command_pool=command_pool, setting_pool=setting_pool,
             describe=describe_word,
             welcome=welcome, loop=cli.typed_loop,

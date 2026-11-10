@@ -23,7 +23,7 @@ from common.render.human import secs
 from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
 from common.render.texts import T
 from .statics import DEFAULT_LISTEN_PORT, LOG_LEVELS
-from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
+from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_OPTIONS, NODE_BY_NAME, \
     CFG_KEYS, CFG_FORMATTERS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .cache import build_blocks
 from .config import CONTROL_SOCKET_TEMPLATE, parse_write_registers, acl_value_text, acl_gate_summary, acl_table, parse_selection, parse_listen, \
@@ -32,11 +32,6 @@ from .metrics import MetricsServer, describe_metrics
 from . import persist
 
 logger = logging.getLogger('modbus-cache')
-
-# The registry-driven bounds: the row's min/max (inclusive) are the one
-# home for a knob's range — the branches parse and plumb, the row gates.
-OPTION_BY_LIVE = {o.live: o for o in OPTIONS if o.live}
-TYPED_CONVS = (int, float, str)
 
 
 
@@ -72,8 +67,6 @@ class ControlServer(_ControlServer):
     COMMAND_HIDDEN = COMMAND_HIDDEN
     NODE_BY_NAME = NODE_BY_NAME
     SET_BY_NAME = SET_BY_NAME
-    SHOW_BY_LIVE = SHOW_BY_LIVE
-    OPTION_BY_LIVE = OPTION_BY_LIVE
     SHOW_OPTIONS = SHOW_OPTIONS
     SHOW_REPORTS = {'show cache-all': 'cache_all_report',
                     'show uplink': 'uplink_report',
@@ -85,7 +78,7 @@ class ControlServer(_ControlServer):
 
     @property
     def dump_path(self):
-        """The state dump file's one home is the proxy's (set dump/path
+        """The state dump file's one home is the proxy's (set dump-path
         applies there) — the base's dump-family reads and the command
         spine's dump-interval gates ride this view."""
         return self.proxy.dump_path
@@ -166,22 +159,22 @@ class ControlServer(_ControlServer):
             handled, shown = self.apply_restart_key(key, val)
             if handled:
                 return shown
-            if key == 'modbus/upstream':
+            if key == 'upstream':
                 try:
-                    host, port = parse_upstream(val, label='modbus/upstream')
+                    host, port = parse_upstream(val, label='upstream')
                 except SystemExit as e:
                     raise ValueError(str(e))
                 self.defaults[key] = '%s:%d' % (host, port)
                 return self.defaults[key]
-            if key in ('system/listen', 'metrics/listen'):
+            if key in ('listen', 'metrics-listen'):
                 try:
                     t = parse_listen(val)
                 except SystemExit as e:
                     raise ValueError(str(e))
-                if key == 'metrics/listen':
+                if key == 'metrics-listen':
                     self.probe_bind(t, key)
                     if p.metrics_srv is not None and not p.metrics_token and not is_loopback_host(t[0]):
-                        raise ValueError('metrics/listen cannot move beyond loopback while the endpoint '
+                        raise ValueError('metrics-listen cannot move beyond loopback while the endpoint '
                                          'serves without a token (F13 in docs/AUDIT.md) — '
                                          'pass metrics-token by flag/env/config and restart')
                 self.defaults[key] = '%s:%d' % t
@@ -202,7 +195,7 @@ class ControlServer(_ControlServer):
             p.config['dump_interval'] = v
             p.dump_wake.set()
             return secs(v)
-        if key == 'dump/path':
+        if key == 'dump-path':
             if val in ('off', 'none', ''):
                 p.dump_path = None
                 p.config['dump_path'] = ''
@@ -216,7 +209,7 @@ class ControlServer(_ControlServer):
         if handled:                                        # the audit family, the log level, local-time)
             return shown
 
-        if key == 'modbus/interval':
+        if key == 'interval':
             v = num(val, 'interval', 'seconds')
             if not 0 < v <= 86400:
                 raise ValueError(T('wire.interval_range'))
@@ -224,7 +217,7 @@ class ControlServer(_ControlServer):
             p.config['interval'] = v   # the live overrides ride show config (show_config_cfg's contract)
             p.poll_wake.set()
             return secs(v)
-        if key == 'cache/ttl':
+        if key == 'cache-ttl':
             if val in ('off', 'none', '0'):
                 p.cache.cache_ttl = 0
                 p.config['cache_ttl'] = 0
@@ -234,13 +227,13 @@ class ControlServer(_ControlServer):
             p.cache.cache_ttl = v
             p.config['cache_ttl'] = v
             return secs(v)
-        if key == 'modbus/read-delay':
+        if key == 'read-delay':
             v = num(val, 'read-delay', 'seconds')
             self._gate_range(key, v, 'seconds')
             p.read_delay = v
             p.config['read_delay'] = v
             return secs(v)
-        if key == 'modbus/merge-gap':
+        if key == 'merge-gap':
             v = numi(val, 'merge-gap', 'registers')
             self._gate_range(key, v, 'registers')
             p.merge_gap = v
@@ -248,25 +241,25 @@ class ControlServer(_ControlServer):
             p.blocks = build_blocks(p.cache.ranges, v)
             p.poll_wake.set()
             return '%d' % v
-        if key == 'modbus/unit':
+        if key == 'unit':
             v = numi(val, 'unit', 'unit id')
             self._gate_range(key, v)
             p.upstream.unit = v
             p.upstream.close()   # the in-flight session spoke the old unit
             p.config['unit'] = v
             return '%d' % v
-        if key == 'modbus/auth':
+        if key == 'modbus-auth':
             try:
-                v = parse_auth_type(val, 'modbus/auth')
+                v = parse_auth_type(val, 'modbus-auth')
             except SystemExit as e:
                 raise ValueError(str(e))
             if v and not p.config.get('auth_key'):
                 raise ValueError(T('wire.suite_auth_needs_key') % AUTH_MIN_KEY)
             p.config['auth'] = v   # the next connection handshakes; the standing ones keep their session
             return v or 'none'
-        if key == 'modbus/auth-upstream':
+        if key == 'auth-upstream':
             try:
-                v = parse_auth_type(val, 'modbus/auth-upstream', schemes=('suite', 'waveshare'))
+                v = parse_auth_type(val, 'auth-upstream', schemes=('suite', 'waveshare'))
             except SystemExit as e:
                 raise ValueError(str(e))
             standing = p.config.get('auth_upstream_key')
@@ -276,18 +269,18 @@ class ControlServer(_ControlServer):
             if v and standing is not None:
                 err = auth_key_floor_error(v, standing)
                 if err:
-                    raise ValueError('the %s auth rejects the standing key (modbus/auth-upstream-key %s) — '
+                    raise ValueError('the %s auth rejects the standing key (auth-upstream-key %s) — '
                                      'pass auth-upstream-key by flag/env/config and restart' % (v, err))
             p.config['auth_upstream'] = v
             p.upstream.auth = v
             p.upstream.close()   # the session re-proves the new scheme on the next exchange
             return v or 'none'
-        if key == 'write/allow':
+        if key == 'allow-write':
             on = on_off(val, 'allow-write')
             p.allow_write = on
             p.config['allow_write'] = on
             return 'on' if on else 'off'
-        if key == 'write/registers':
+        if key == 'write-registers':
             try:
                 p.set_write_registers(parse_write_registers(val, 'write-registers'))
             except SystemExit as e:
@@ -297,25 +290,25 @@ class ControlServer(_ControlServer):
             if p.write_gate_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % p.write_gate_warn
             return shown
-        if key == 'limits/max-clients':
+        if key == 'max-clients':
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
             p.max_clients = v
             p.config['max_clients'] = v
             return '%d' % v
-        if key == 'limits/client-timeout':
+        if key == 'client-timeout':
             v = num(val, 'client-timeout', 'seconds')
             self._gate_range(key, v, 'seconds')
             p.client_timeout = v
             p.config['client_timeout'] = v
             return secs(v)
-        if key == 'limits/max-conn-per-ip':
+        if key == 'max-conn-per-ip':
             v = numi(val, 'max-conn-per-ip', 'connections')
             self._gate_range(key, v)
             p.conn_gate.max_per_ip = v
             p.config['max_conn_per_ip'] = v
             return '%d' % v
-        if key == 'metrics/enable':
+        if key == 'metrics-server':
             if val in ('on', 'true', '1', 'yes'):
                 if p.metrics_srv:
                     return 'on'
@@ -325,7 +318,7 @@ class ControlServer(_ControlServer):
                         raise ValueError('the metrics endpoint serves register values: refusing to expose '
                                          '/metrics beyond loopback without a token (F13 in docs/AUDIT.md) — '
                                          'pass metrics-token by flag/env/config and restart, or bind '
-                                         'metrics/listen on 127.0.0.1')
+                                         'metrics-listen on 127.0.0.1')
                 srv = MetricsServer(p, p.metrics_listen, token=p.metrics_token,
                                     max_clients=p.metrics_caps[0], client_timeout=p.metrics_caps[1],
                                     max_per_ip=p.metrics_caps[2])
@@ -346,8 +339,8 @@ class ControlServer(_ControlServer):
                     p.metrics_desc = 'off'
                 p.config['metrics_server'] = False
                 return 'off'
-            on_off(val, 'metrics enable')   # raises the refusal
-        if key == 'metrics/limits/max-clients':
+            on_off(val, 'metrics-server')   # raises the refusal
+        if key == 'metrics-max-clients':
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
             p.metrics_caps = (v, p.metrics_caps[1], p.metrics_caps[2])
@@ -356,7 +349,7 @@ class ControlServer(_ControlServer):
                 p.metrics_srv.max_clients = v
                 p.metrics_srv._http.gate.max_total = v   # the gate reads its caps per admit
             return '%d' % v
-        if key == 'metrics/limits/timeout':
+        if key == 'metrics-client-timeout':
             v = num(val, 'client-timeout', 'seconds')
             self._gate_range(key, v, 'seconds')
             p.metrics_caps = (p.metrics_caps[0], v, p.metrics_caps[2])
@@ -365,7 +358,7 @@ class ControlServer(_ControlServer):
                 p.metrics_srv.client_timeout = v
                 p.metrics_srv._Handler.timeout = v or 5   # 0 = the built-in slowloris cap
             return secs(v)
-        if key == 'metrics/limits/max-conn-per-ip':
+        if key == 'metrics-max-conn-per-ip':
             v = numi(val, 'max-conn-per-ip', 'connections')
             self._gate_range(key, v)
             p.metrics_caps = (p.metrics_caps[0], p.metrics_caps[1], v)
@@ -374,7 +367,7 @@ class ControlServer(_ControlServer):
                 p.metrics_srv.max_per_ip = v
                 p.metrics_srv._http.gate.max_per_ip = v
             return '%d' % v
-        if key == 'audit/requests':
+        if key == 'requests-audit':
             if val in ('off', 'none', '0'):
                 p.requests_audit_s = 0
                 p.config['requests_audit_s'] = 0
@@ -384,47 +377,47 @@ class ControlServer(_ControlServer):
             p.requests_audit_s = v
             p.config['requests_audit_s'] = v
             return secs(v)
-        if key == 'dump/with-cache':
-            on = on_off(val, 'dump/with-cache')
+        if key == 'dump-with-cache':
+            on = on_off(val, 'dump-with-cache')
             p.dump_with_cache = on
             p.config['dump_with_cache'] = on
             return 'on' if on else 'off'
-        if key == 'system/log-access':
-            on = on_off(val, 'system/log-access')
+        if key == 'log-access':
+            on = on_off(val, 'log-access')
             p.log_access = on   # the next connect/disconnect log line picks it up
             p.config['log_access'] = on
             return 'on' if on else 'off'
-        if key == 'modbus/timeout':
+        if key == 'timeout':
             v = num(val, 'timeout', 'seconds')
             if not 0 < v <= 60:
                 raise ValueError(T('wire.timeout_range'))
             p.upstream.timeout = v
             p.config['timeout'] = v
             return secs(v)
-        if key == 'acl/connect':
+        if key == 'connect-acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError(T('wire.acl_table_value') % ('an acl/connect', 'acl connect'))
+                raise ValueError(T('wire.acl_table_value') % ('a connect-acl', 'connect-acl-table'))
             shown = p.set_connect_acl(val)
             if p.connect_acl_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % p.connect_acl_warn
             return shown
-        if key == 'acl/write':
+        if key == 'write-acl':
             if val.lower() == 'table':
-                raise ValueError(T('wire.acl_table_value') % ('an acl/write', 'acl write'))
+                raise ValueError(T('wire.acl_table_value') % ('a write-acl', 'write-acl-table'))
             shown = p.set_write_acl(val)
             if p.write_acl_warn:
                 shown += ' (%s)' % p.write_acl_warn
             return shown
-        if key == 'metrics/acl':
+        if key == 'metrics-acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError(T('wire.acl_table_value') % ('a metrics/acl', 'metrics acl'))
+                raise ValueError(T('wire.acl_table_value') % ('a metrics-acl', 'metrics-acl-table'))
             shown = p.set_metrics_acl(val)
             if p.metrics_acl_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % p.metrics_acl_warn
             return shown
-        if key in ('modbus/profile', 'modbus/selection'):
+        if key in ('profile', 'selection'):
             cfg = self._live_cfg()
-            if key == 'modbus/profile':
+            if key == 'profile':
                 cfg['profile'] = default_profile_path() if val in ('default', 'auto') \
                     else resolve_profile_file(val)
             else:
@@ -440,7 +433,7 @@ class ControlServer(_ControlServer):
                 p.config = saved
                 p.write_registers, p.write_ranges = saved_gate
                 raise
-            return cfg['profile'] if key == 'modbus/profile' else (cfg['selection'] or 'all')
+            return cfg['profile'] if key == 'profile' else (cfg['selection'] or 'all')
         raise ValueError('unknown setting %s' % key)
 
     def _live_cfg(self):
@@ -483,55 +476,55 @@ class ControlServer(_ControlServer):
         handled, value = self.get_family_key(key)   # the family's shared knobs (the control plane,
         if handled:                                 # the audit family, the log level, local-time, dump/path)
             return value
-        if key == 'modbus/interval':
+        if key == 'interval':
             return secs(p.interval)
-        if key == 'cache/ttl':
+        if key == 'cache-ttl':
             return 'off' if not p.cache.cache_ttl else secs(p.cache.cache_ttl)
-        if key == 'modbus/read-delay':
+        if key == 'read-delay':
             return secs(p.read_delay)
-        if key == 'modbus/merge-gap':
+        if key == 'merge-gap':
             return '%d' % p.merge_gap
-        if key == 'modbus/unit':
+        if key == 'unit':
             return '%d' % p.upstream.unit
-        if key == 'modbus/auth':
+        if key == 'modbus-auth':
             return p.config.get('auth') or 'none'
-        if key == 'modbus/auth-upstream':
+        if key == 'auth-upstream':
             return p.config.get('auth_upstream') or 'none'
-        if key == 'write/allow':
+        if key == 'allow-write':
             return 'on' if p.allow_write else 'off'
-        if key == 'write/registers':
+        if key == 'write-registers':
             return p.describe_write_ranges()
-        if key == 'limits/max-clients':
+        if key == 'max-clients':
             return '%d' % p.max_clients
-        if key == 'limits/client-timeout':
+        if key == 'client-timeout':
             return 'none' if not p.client_timeout else secs(p.client_timeout)
-        if key == 'limits/max-conn-per-ip':
+        if key == 'max-conn-per-ip':
             return '%d' % p.conn_gate.max_per_ip
-        if key == 'metrics/enable':
+        if key == 'metrics-server':
             return 'on' if p.metrics_srv else 'off'
-        if key == 'metrics/limits/max-clients':
+        if key == 'metrics-max-clients':
             return '%d' % p.metrics_caps[0]
-        if key == 'metrics/limits/timeout':
+        if key == 'metrics-client-timeout':
             return secs(p.metrics_caps[1])
-        if key == 'metrics/limits/max-conn-per-ip':
+        if key == 'metrics-max-conn-per-ip':
             return '%d' % p.metrics_caps[2]
-        if key == 'dump/with-cache':
+        if key == 'dump-with-cache':
             return 'on' if p.dump_with_cache else 'off'
-        if key == 'audit/requests':
+        if key == 'requests-audit':
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
-        if key == 'system/log-access':
+        if key == 'log-access':
             return 'on' if p.log_access else 'off'
-        if key == 'modbus/timeout':
+        if key == 'timeout':
             return secs(p.upstream.timeout)
-        if key == 'acl/connect':
+        if key == 'connect-acl':
             return self._acl_text(p.connect_acl)
-        if key == 'acl/write':
+        if key == 'write-acl':
             return self._acl_text(p.write_acl)
-        if key == 'metrics/acl':
+        if key == 'metrics-acl':
             return self._acl_text(p.metrics_acl)
-        if key == 'modbus/profile':
+        if key == 'profile':
             return p.config.get('profile') or p.profile
-        if key == 'modbus/selection':
+        if key == 'selection':
             return p.config.get('selection') or 'all'
         s = SETTING_BY_NAME.get(key)
         if s is not None and s.restart:   # a startup-only knob: the configured value
@@ -632,7 +625,7 @@ class ControlServer(_ControlServer):
             lines.append('allow any')
         elif isinstance(wr, str):   # 'profile' or the file:<path> acl reference
             if p.write_gate_rules is None:
-                return 'err write/registers/table: the gate is not resolved'
+                return 'err write-registers-table: the gate is not resolved'
             lines.extend(render_write_acl(*p.write_gate_rules))
         elif not wr:
             lines.append('deny any')
@@ -703,35 +696,35 @@ class ControlServer(_ControlServer):
         stays as the class invariant's guard."""
         p = self.proxy
         raw = {
-            'modbus/interval': p.interval, 'cache/ttl': p.cache.cache_ttl,
-            'modbus/read-delay': p.read_delay,
-            'modbus/merge-gap': p.merge_gap, 'write/allow': 'on' if p.allow_write else 'off',
-            'write/registers': p.describe_write_ranges(), 'limits/max-clients': p.max_clients,
-            'limits/client-timeout': p.client_timeout, 'limits/max-conn-per-ip': p.conn_gate.max_per_ip,
-            'metrics/enable': 'on' if p.metrics_srv else 'off',
-            'metrics/listen': '%s:%d' % p.metrics_listen,
-            'metrics/limits/max-clients': p.metrics_caps[0],
-            'metrics/limits/timeout': p.metrics_caps[1],
-            'metrics/limits/max-conn-per-ip': p.metrics_caps[2],
-            'audit/requests': p.requests_audit_s,
+            'interval': p.interval, 'cache-ttl': p.cache.cache_ttl,
+            'read-delay': p.read_delay,
+            'merge-gap': p.merge_gap, 'allow-write': 'on' if p.allow_write else 'off',
+            'write-registers': p.describe_write_ranges(), 'max-clients': p.max_clients,
+            'client-timeout': p.client_timeout, 'max-conn-per-ip': p.conn_gate.max_per_ip,
+            'metrics-server': 'on' if p.metrics_srv else 'off',
+            'metrics-listen': '%s:%d' % p.metrics_listen,
+            'metrics-max-clients': p.metrics_caps[0],
+            'metrics-client-timeout': p.metrics_caps[1],
+            'metrics-max-conn-per-ip': p.metrics_caps[2],
+            'requests-audit': p.requests_audit_s,
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
-            'modbus/profile': p.config.get('profile'), 'modbus/selection': p.config.get('selection') or 'all',
-            'acl/connect': self._acl_text(p.connect_acl), 'acl/write': self._acl_text(p.write_acl),
-            'metrics/acl': self._acl_text(p.metrics_acl),
-            'modbus/auth': p.config.get('auth') or 'none',
-            'modbus/auth-upstream': p.config.get('auth_upstream') or 'none',
-            'modbus/upstream': '%s:%d' % (p.upstream.host, p.upstream.port),
-            'modbus/unit': p.upstream.unit,
-            'modbus/timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,
+            'profile': p.config.get('profile'), 'selection': p.config.get('selection') or 'all',
+            'connect-acl': self._acl_text(p.connect_acl), 'write-acl': self._acl_text(p.write_acl),
+            'metrics-acl': self._acl_text(p.metrics_acl),
+            'modbus-auth': p.config.get('auth') or 'none',
+            'auth-upstream': p.config.get('auth_upstream') or 'none',
+            'upstream': '%s:%d' % (p.upstream.host, p.upstream.port),
+            'unit': p.upstream.unit,
+            'timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,
             'local-time': self._get('local-time'),
-            'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
-            'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
-            'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
-            'control/socket-group': 'on' if self.socket_group else 'off',
+            'control-port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
+            'control-ops-verbs': ','.join(sorted(self.ops_verbs)) or 'off',
+            'control-trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
+            'control-socket-group': 'on' if self.socket_group else 'off',
             **self.audit_dump_rows(),
-            'dump/path': p.dump_path or 'off',
-            'dump/with-cache': 'on' if p.dump_with_cache else 'off',
-            'dump/restore-on-start': 'on' if getattr(p, 'restore_on_start', False) else 'off',
+            'dump-path': p.dump_path or 'off',
+            'dump-with-cache': 'on' if p.dump_with_cache else 'off',
+            'restore-on-start': 'on' if getattr(p, 'restore_on_start', False) else 'off',
         }
         return self.dump_settings_tail(raw)
 
@@ -760,7 +753,7 @@ class ControlServer(_ControlServer):
             with_cache = self.proxy.dump_with_cache
         path = self.proxy.dump_path
         if not path:
-            return 'err no dump path configured (set dump/path or --dump-path)'
+            return 'err no dump path configured (set dump-path or --dump-path)'
         settings = self.dump_settings()
         try:
             n = persist.write_dump(path, self.proxy.cache, settings, with_cache=with_cache,
@@ -781,7 +774,7 @@ class ControlServer(_ControlServer):
         sealed dump restores only under the configured dump/key)."""
         path = self.proxy.dump_path
         if not path:
-            return 'err no dump path configured (set dump/path or --dump-path)'
+            return 'err no dump path configured (set dump-path or --dump-path)'
         if not os.path.exists(path):
             return 'err no dump at %s yet (run dump first)' % path
         try:

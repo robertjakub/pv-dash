@@ -28,7 +28,7 @@ one \\fBtype\\fR allow/deny and a \\fBrange\\fR per rule \\(em the last
 matching rule decides, a register no rule decides refuses, the word
 \\fBany\\fR = all registers), or reads a standalone acl file
 (\\fBfile:<path>\\fR \\(em the same gate object a profile carries under
-acl/write, compiled at start and on every set). Every function code crossing the
+write-acl, compiled at start and on every set). Every function code crossing the
 wire is named in the log and the audit trail (all standard FCs, FC1
 through FC43). A synthesized diagnostics block at registers
 65000\\(en65003 lets clients tell cached data from live data.
@@ -74,26 +74,25 @@ The control server speaks JSON lines: one request
 .BR set ", " clear ", " show ", " help ,
 the reports
 .BR inspect ", " "show connections" ,
-.BR "show cache" " [all]" ", " "show write registers table" ,
+.BR "show cache" " [all]" ", " "show write-registers-table" ,
 .BR "show uplink" ", " "show version" ,
-.BR "show acl connect table" ", " "show acl write table" ,
-.BR "show metrics acl table" ,
+.BR "show connect-acl-table" ", " "show write-acl-table" ,
+.BR "show metrics-acl-table" ,
 the ops
 .BR "request dump" ", " "request restore" ", " "request flush cache" ,
 .BR "request reload" ", " "request reload-config" ", " "request restart" ", " shutdown ", " quit .
 .RS
 .IP \\(bu 2
 .B set <setting> <value>
-changes a setting live (modbus interval, cache ttl, modbus read-delay,
-modbus merge-gap, write allow, write registers, limits max-clients,
-limits client-timeout, modbus upstream, modbus unit, metrics enable,
-metrics listen, the metrics limits caps, metrics acl,
-audit requests, dump-interval, log-level, local-time, modbus profile,
-modbus selection, acl connect, acl write, modbus timeout, modbus auth,
-modbus auth-upstream, control port, control ops verbs, control
-trust-uids, control socket-group, audit log-file, audit forward, audit
-rotate max-size,
-audit disable, dump path, dump with-cache); a SIGHUP \\(em or the wire's
+changes a setting live (interval, cache-ttl, read-delay,
+merge-gap, allow-write, write-registers, max-clients,
+client-timeout, upstream, unit, metrics-server,
+metrics-listen, the metrics caps, metrics-acl,
+requests-audit, dump-interval, log-level, local-time, profile,
+selection, connect-acl, write-acl, timeout, modbus-auth,
+auth-upstream, control-port, control-ops-verbs, control-trust-uids,
+control-socket-group, audit-log, audit-forward, audit-max-mb,
+no-audit-log, dump-path, dump-with-cache); a SIGHUP \\(em or the wire's
 \\fBrequest reload-config\\fR \\(em re-applies the config
 (the file always wins). A knob the registry marks
 .B restart: true
@@ -102,12 +101,12 @@ answers the note
 from set/clear \\-\\- the set records the value (show renders it; the
 whole-daemon reload folds it into the fresh process before the binds),
 the config (and a SIGHUP) changes it too. Every secret in the registry
-is restart-marked (the tokens, the auth keys, dump/key) and refuses
+is restart-marked (the tokens, the auth keys, dump-key) and refuses
 set/clear outright: a secret never rides the reload state (a secret knob
 refuses to show at all \\-\\- the value renders nowhere) \\-\\- it passes
 by flag/env/config and a restart.
 .IP \\(bu 2
-.B show cache all
+.B show cache-all
 prints every cached entry: name, words, values, age, expiry, poll status.
 .IP \\(bu 2
 .B show uplink
@@ -115,7 +114,7 @@ analyses the inverter link: session counters (connects, exchanges, bytes,
 errors) and one row per poll block with its status, latency (last/mean/max)
 and last error.
 .IP \\(bu 2
-.B show write registers table
+.B show write-registers-table
 renders the write gate as its acl chain (show-only): \\fBallow any\\fR /
 \\fBdeny any\\fR, a range list as its whitelist (deny any, then one allow
 line per range), and in profile or file mode the gate's own rules \\(em
@@ -123,7 +122,7 @@ the gate's desc as the % line, then one allow/deny line per range with
 its desc, the comments aligned.
 .IP \\(bu 2
 .B show acl connect table
-/ \\fBshow acl write table\\fR / \\fBshow metrics acl table\\fR render the
+/ \\fBshow write-acl-table\\fR / \\fBshow metrics-acl-table\\fR render the
 IP ACL as its chain, one
 entry per line (show-only): \\fBallow 0.0.0.0/0\\fR (any), \\fBdeny
 0.0.0.0/0\\fR (none), \\fBdeny 0.0.0.0/0\\fR then one \\fBallow\\fR line
@@ -162,7 +161,7 @@ and
 for the clients."""
     security = """.SH SECURITY
 The control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
-control port without a token refuses to start (F5); with a token the
+control-port without a token refuses to start (F5); with a token the
 wire is signed and the commands/replies verify end to end; a second,
 read-only ops token (\\fB--control-ops-token\\fR) authenticates sessions
 into its policy's verbs only \\(em the default policy: show,flush \\(em
@@ -178,11 +177,11 @@ parser refuses the placeholder \\(em it is never a value).
 .PP
 The Modbus port is read-only until the write gate says otherwise:
 writes ride \\fB--write-registers\\fR (the direct ranges, the profile's
-acl/write chain or a \\fBfile:<path>\\fR acl) and every accepted or
+write-acl chain or a \\fBfile:<path>\\fR acl) and every accepted or
 refused write lands in the audit trail (WRITE / WRITE\\-REFUSED). The
-\\fB--connect-acl\\fR IP gate (acl/connect) filters who may connect at
+\\fB--connect-acl\\fR IP gate (connect-acl) filters who may connect at
 all; the metrics endpoint carries the family's one /metrics stack (F13):
-a token-less non-loopback bind refuses to start, the metrics acl IP
+a token-less non-loopback bind refuses to start, the metrics-acl IP
 gate narrows who reaches the endpoint, the caps bound the concurrency.
 With \\fB--dump-key\\fR the state file is sealed (an HMAC\\-SHA256
 counter\\-mode keystream, authenticated \\(em a restore refuses a wrong
@@ -252,7 +251,7 @@ stdout, one per line. Every invocation lands in the audit trail (prefix
 The command grammar is the daemon's: \\fBset\\fR/\\fBclear\\fR/\\fBshow\\fR/
 \\fBhelp\\fR (the settings registry), \\fBinspect\\fR,
 \\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR],
-\\fBshow write registers table\\fR, \\fBshow uplink\\fR,
+\\fBshow write-registers-table\\fR, \\fBshow uplink\\fR,
 \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
 \\fBrequest flush cache\\fR, \\fBrequest reload\\fR, \\fBrequest restart\\fR,
 \\fBshutdown\\fR,

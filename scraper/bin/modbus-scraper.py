@@ -83,6 +83,9 @@ def describe(cfg, args, control_desc):
 
 
 def main():
+    import faulthandler
+    import signal as _sig
+    faulthandler.register(_sig.SIGUSR2)
     if '--version' in sys.argv:
         print(version_string())
         raise SystemExit(0)

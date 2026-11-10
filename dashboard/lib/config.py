@@ -124,7 +124,7 @@ def resolve_config(args, script_dir=None):
                                                   'metrics_token', None, str) or '').strip() or None, 'metrics/token')
     cfg['metrics_acl'] = resolve(getattr(args, 'metrics_acl', None), 'METRICS_ACL',
                                  'metrics_acl', DEFAULTS['metrics_acl'], str) or 'any'
-    resolve_metrics_acl(cfg['metrics_acl'], 'metrics/acl')   # a bad acl value or gate file refuses the start
+    resolve_metrics_acl(cfg['metrics_acl'], 'metrics-acl')   # a bad acl value or gate file refuses the start
     cfg['auth_token'] = parse_secret((resolve(getattr(args, 'auth_token', None), 'AUTH_TOKEN',
                                               'auth_token', None, str) or '').strip() or None, 'auth/token')
     check_token_chars(cfg['auth_token'], 'auth_token')

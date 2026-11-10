@@ -5,6 +5,14 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The wire speaks the flattened registry names: the dispatch, the
+dumps, the defaults and every reply key/render the options.json `name`
+(`listen`, `auth-token`, `metrics-server`, `metrics-acl`) — the live
+paths are the console spellings the cli translates before it sends,
+and the raw wire refuses them. `show config`, `help config` and the
+node/bare-show listings render the flat names; the old dumps restore
+(the live-path keys fold on the way back in).
+
 The README moved to the gated skeleton: `scripts/lint_readmes.py --check`
 pins the `##` canon family-wide — the dashboard's `Features` retitled
 `How it works` (the auto-refresh and the energy-integration detail folded

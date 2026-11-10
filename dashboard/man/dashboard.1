@@ -241,8 +241,8 @@ The control server speaks JSON lines ({"cmd": "..."} ->
 configured and refuses to start without one). Commands:
 \fBset\fR/\fBclear\fR/\fBshow\fR/\fBhelp\fR (the settings: max-clients,
 client-timeout, max-conn-per-ip, log-access, log-queries,
-log-level, metrics acl \(em the /metrics IP gate at accept, the table
-show \fBshow metrics acl table\fR \(em and the startup-only secrets:
+log-level, metrics-acl \(em the /metrics IP gate at accept, the table
+show \fBshow metrics-acl-table\fR \(em and the startup-only secrets:
 control token, the ops token, metrics token \(em the wire refuses
 set/clear, the value never rendering \(em
 \fBshow <secret>\fR refuses), \fBshow connections\fR
@@ -258,7 +258,7 @@ encrypted, a restore refuses a wrong or missing key;
 \fB--restore-on-start\fR loads it at start, \fB--dump-interval\fR
 rewrites it on a timer),
 \fBshutdown\fR, \fBquit\fR. The control listener rides the family's
-live rebind: \fBset control port\fR (a unix path, a TCP port on
+live rebind: \fBset control-port\fR (a unix path, a TCP port on
 127.0.0.1, or off) swaps the socket without dropping the connected
 sessions \(em a tokenless TCP bind still refuses (F5) \(em and the
 family's control knobs all set live: \fBcontrol ops verbs\fR (the
@@ -283,7 +283,7 @@ an authenticating reverse proxy for anything beyond localhost (plain HTTP
 carries the token in the clear \(em the F14 answer). The
 control surface is loopback-only (TCP) or a 0600 unix socket (0660 with
 \fB--control-socket-group\fR); a TCP
-control port without a token refuses to start (F5); with a token the wire
+control-port without a token refuses to start (F5); with a token the wire
 is signed and the commands/replies verify end to end; a second, read-only
 ops token (\fB--control-ops-token\fR) scopes its sessions to its
 policy's verbs (the default policy: show). The audit trail (in the XDG

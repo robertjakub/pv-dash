@@ -130,7 +130,7 @@ env twins are the knobs' bare upper-snake names (`LISTEN`,
 
 ```conf
 # the dashboard's server.conf — every line is a set command
-set system listen 127.0.0.1:8080
+set listen 127.0.0.1:8080
 # set auth-token file:/path/to/page.token   (mandatory beyond loopback, F21)
 set upstream http://localhost:9090
 set prom-prefix /prom
@@ -186,7 +186,7 @@ python3 bin/dashboard-cli.py                        # the console: TAB completio
 
 | Command | Effect |
 |---|---|
-| `set` / `clear` | the live settings: the caps, `log-access`, `log-queries`, `log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — `system listen` (the serve address, `show system listen` answers it) is startup-only and answers the restart note like the tokens (`control token`, `control ops token`, `metrics token`, `auth token`): pass them by flag/env/config |
+| `set` / `clear` | the live settings: the caps, `log-access`, `log-queries`, `log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — `system listen` (the serve address, `show listen` answers it) is startup-only and answers the restart note like the tokens (`control token`, `control ops token`, `metrics token`, `auth token`): pass them by flag/env/config |
 | `show <setting>` / `show knobs` / `show connections` | the value / the registry / the live HTTP clients per peer IP |
 | `inspect` | the one-page dump for a bug report |
 | `request reload-config` | re-read `server.conf` (the SIGHUP path; the listen address and port are bound and stay) |
@@ -199,10 +199,10 @@ control command, auth failure, reload and shutdown lands in the audit
 trail (prefix `DSH`, default `~/.local/state/dashboard/audit.log`;
 `--audit-log -` for stdout — the journald way; the ctl/cli keep their own
 `CTL`/`CLI` trails). The family is live-settable on the control wire
-(the cache's shape): `set audit log-file <path|-|none>` swaps the sink,
-`set audit rotate max-size <MB>` / `set audit rotate files <N>` /
-`set audit rotate daily on/off` steer the rotation live and
-`set audit disable on/off` is the kill switch. `--audit-forward` mirrors every line — the
+(the cache's shape): `set audit-log <path|-|none>` swaps the sink,
+`set audit-max-mb <MB>` / `set audit-files <N>` /
+`set audit-daily on/off` steer the rotation live and
+`set no-audit-log on/off` is the kill switch. `--audit-forward` mirrors every line — the
 per-writer hash chain included — onward: `syslog` (the local socket
 auto-scan), `syslog:/path`, `udp://host[:514]` (RFC5426, best-effort) or
 `tcp://host[:514]` (RFC6587 framing) — the **off-box copy** (the F10

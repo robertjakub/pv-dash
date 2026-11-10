@@ -25,16 +25,12 @@ from common.wire.control import ControlServer as _ControlServer, num, numi, on_o
 from common.settings.config import acl_table, acl_value_text, is_loopback_host, parse_listen, \
     resolve_metrics_acl
 from common.render.texts import T
-from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
+from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
     COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .statics import CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
 
-# The registry-driven bounds: the row's min/max (inclusive) are the one
-# home for a knob's range — the branches parse and plumb, the row gates.
-OPTION_BY_LIVE = {o.live: o for o in OPTIONS if o.live}
-TYPED_CONVS = (int, float, str)
 
 
 
@@ -70,10 +66,8 @@ class ControlServer(_ControlServer):
     COMMAND_HIDDEN = COMMAND_HIDDEN
     NODE_BY_NAME = NODE_BY_NAME
     SET_BY_NAME = SET_BY_NAME
-    SHOW_BY_LIVE = SHOW_BY_LIVE
-    OPTION_BY_LIVE = OPTION_BY_LIVE
     SHOW_OPTIONS = SHOW_OPTIONS
-    SHOW_REPORTS = {'show metrics-acl-table': 'acl_table_report'}   # `show metrics acl table` (the live path's words) forwards here — the SHOW_BY_LIVE routing
+    SHOW_REPORTS = {'show metrics-acl-table': 'acl_table_report'}
 
     def __init__(self, httpd, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None,
@@ -90,7 +84,7 @@ class ControlServer(_ControlServer):
         self.metrics_token = None        # the /metrics bearer token (the entry passes it)
         self.metrics_listen = None       # the /metrics bind address (the entry passes it)
         self.metrics_acl = None          # the /metrics accept gate (the entry passes it; the hooks read it per connection)
-        self.metrics_acl_warn = None     # the metrics/acl file's permission warning (the stash, None = no warning standing)
+        self.metrics_acl_warn = None     # the metrics-acl file's permission warning (the stash, None = no warning standing)
         self.metrics_caps = None         # the /metrics caps the entry configured (the re-enable reads them — the cache's p.metrics_caps reading)
         self.metrics_desc = 'off'        # the status/inspect one-liner
 
@@ -133,13 +127,13 @@ class ControlServer(_ControlServer):
             handled, shown = self.apply_restart_key(key, val)
             if handled:
                 return shown
-            if key == 'system/listen':
+            if key == 'listen':
                 try:
                     t = parse_listen(val)
                 except SystemExit as e:
                     raise ValueError(str(e))
                 if not self.httpd.RequestHandlerClass.auth_token and not is_loopback_host(t[0]):
-                    raise ValueError('system/listen cannot move beyond loopback while the page serves '
+                    raise ValueError('listen cannot move beyond loopback while the page serves '
                                      'without a token (F21 in docs/AUDIT.md) — pass auth-token by '
                                      'flag/env/config and restart')
                 self.defaults[key] = '%s:%d' % t
@@ -171,7 +165,7 @@ class ControlServer(_ControlServer):
         if key == 'log-queries':
             self.httpd.RequestHandlerClass.log_queries = on_off(val, 'log-queries')
             return 'on' if self.httpd.RequestHandlerClass.log_queries else 'off'
-        if key == 'metrics/enable':
+        if key == 'metrics-server':
             from .statics import DEFAULT_METRICS_CAPS
             if val in ('on', 'true', '1', 'yes'):
                 if self.metrics_srv:
@@ -182,7 +176,7 @@ class ControlServer(_ControlServer):
                         raise ValueError('the metrics endpoint serves the request counters: refusing to expose '
                                          '/metrics beyond loopback without a token (F13 in docs/AUDIT.md) — '
                                          'pass metrics-token by flag/env/config and restart, or bind '
-                                         'metrics/listen on 127.0.0.1')
+                                         'metrics-listen on 127.0.0.1')
                 from .metrics import MetricsServer, describe_metrics
                 listen = self.metrics_listen
                 caps = self.metrics_caps or DEFAULT_METRICS_CAPS   # the CONFIGURED caps (the cache's rebind reading) — not the defaults
@@ -203,9 +197,9 @@ class ControlServer(_ControlServer):
                     self.metrics_desc = 'off'
                 return 'off'
             raise ValueError('metrics-server must be on or off')
-        if key == 'metrics/acl':
+        if key == 'metrics-acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError(T('wire.acl_table_value') % ('a metrics/acl', 'metrics acl'))
+                raise ValueError(T('wire.acl_table_value') % ('a metrics-acl', 'metrics-acl-table'))
             try:
                 gate, warn = resolve_metrics_acl(val)
             except SystemExit as e:
@@ -232,13 +226,13 @@ class ControlServer(_ControlServer):
             return 'off' if not ct else secs(ct)
         if key == 'max-conn-per-ip':
             return '%d' % self.httpd.gate.max_per_ip
-        if key == 'metrics/enable':
+        if key == 'metrics-server':
             return 'on' if self.metrics_srv else 'off'
         if key == 'log-access':
             return 'on' if h.log_access else 'off'
         if key == 'log-queries':
             return 'on' if h.log_queries else 'off'
-        if key == 'metrics/acl':
+        if key == 'metrics-acl':
             return acl_value_text(self.metrics_acl)
         s = SETTING_BY_NAME.get(key)
         if s is not None and s.restart:   # a startup-only knob: the configured value
@@ -257,16 +251,16 @@ class ControlServer(_ControlServer):
             'max-conn-per-ip': self.httpd.gate.max_per_ip,
             'log-access': 'on' if h.log_access else 'off',
             'log-queries': 'on' if h.log_queries else 'off',
-            'metrics/enable': 'on' if self.metrics_srv else 'off',
-            'metrics/acl': acl_value_text(self.metrics_acl),
+            'metrics-server': 'on' if self.metrics_srv else 'off',
+            'metrics-acl': acl_value_text(self.metrics_acl),
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
-            'dump/path': self.dump_path or 'off',
-            'dump/restore-on-start': 'on' if self.dump_restore else 'off',
+            'dump-path': self.dump_path or 'off',
+            'restore-on-start': 'on' if self.dump_restore else 'off',
             'dump-interval': self.dump_interval,
-            'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
-            'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
-            'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
-            'control/socket-group': 'on' if self.socket_group else 'off',
+            'control-port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
+            'control-ops-verbs': ','.join(sorted(self.ops_verbs)) or 'off',
+            'control-trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
+            'control-socket-group': 'on' if self.socket_group else 'off',
             **self.audit_dump_rows(),
         }
         return self.dump_settings_tail(raw)
@@ -292,7 +286,7 @@ class ControlServer(_ControlServer):
         return self.gate_connections_line(self.httpd)
 
     def acl_table_report(self):
-        """The metrics/acl/table show report (the show-only view of the
+        """The metrics-acl-table show report (the show-only view of the
         metrics ACL, one entry per line): the system forms spell the chain
         they implement — 'allow 0.0.0.0/0' (any), 'deny 0.0.0.0/0' (none),
         'deny 0.0.0.0/0' + one allow line per network (the whitelist); a

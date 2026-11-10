@@ -299,17 +299,17 @@ def main():
     setup_logging(cfg)
 
     apply_restart_state(cfg, args.config, cfg['dump_key'], ControlServer,
-                        extra={'system/listen': fold_listen})
+                        extra={'listen': fold_listen})
     listen_host, listen_port = parse_listen(cfg['listen'])   # the fold may have moved it
     control_target = resolve_control_target(cfg['control_port'], listen_port, CONTROL_SOCKET_TEMPLATE)
     control_token = cfg['control_token'] or None
     control_ops_token = cfg['control_ops_token'] or None
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
     ops_verbs = parse_ops_verbs(cfg['control_ops_verbs'], KNOWN_VERBS, default=DEFAULT_OPS_VERBS)
-    metrics_token = parse_secret(args.metrics_token or cfg.get('metrics_token'), 'metrics/token')
+    metrics_token = parse_secret(args.metrics_token or cfg.get('metrics_token'), 'metrics-token')
     metrics_listen = parse_listen(cfg.get('metrics_listen') or DEFAULTS['metrics_listen'],
                                  '--metrics-listen')
-    metrics_acl, metrics_acl_warn = resolve_metrics_acl(cfg.get('metrics_acl') or 'any', 'metrics/acl')
+    metrics_acl, metrics_acl_warn = resolve_metrics_acl(cfg.get('metrics_acl') or 'any', 'metrics-acl')
     if cfg['metrics_server'] and not metrics_token and not is_loopback_host(metrics_listen[0]):
         logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
                      'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
@@ -360,28 +360,28 @@ def main():
             'log-queries': 'on' if cfg['log_queries'] else 'off',
             'log-level': cfg['level'],
             # the startup-only knobs (restart: true) — what `show <knob>` answers
-            'system/listen': cfg['listen'],
+            'listen': cfg['listen'],
             'upstream': cfg['upstream'],
             'prom-prefix': cfg['prom_prefix'] or 'off',
             'static-dir': cfg['static_dir'] or 'off',
             'config-js': cfg['config_js'] or 'off',
-            'control/port': control_target,
-            'control/ops/verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
-            'control/trust-uids': ','.join(str(u) for u in sorted(trust_uids or [])) if trust_uids else 'off',
-            'control/socket-group': 'on' if cfg['control_socket_group'] else 'off',
+            'control-port': control_target,
+            'control-ops-verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
+            'control-trust-uids': ','.join(str(u) for u in sorted(trust_uids or [])) if trust_uids else 'off',
+            'control-socket-group': 'on' if cfg['control_socket_group'] else 'off',
             'metrics-listen': cfg['metrics_listen'],
-            'metrics/acl': acl_value_text(metrics_acl),
+            'metrics-acl': acl_value_text(metrics_acl),
             'metrics-max-clients': str(cfg['metrics_max_clients']),
             'metrics-client-timeout': '%g' % cfg['metrics_client_timeout'],
             'metrics-max-conn-per-ip': str(cfg['metrics_max_conn_per_ip']),
-            'dump/path': cfg['dump_path'] or 'off',
-            'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
+            'dump-path': cfg['dump_path'] or 'off',
+            'restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
             'dump-interval': 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval'],
-            'audit/log-file': 'off' if cfg['no_audit_log'] else (cfg['audit_log'] or default_path('dashboard')),
-            'audit/rotate/max-size': '%g' % cfg['audit_max_mb'],
-            'audit/rotate/daily': 'on' if cfg['audit_daily'] else 'off',
-            'audit/rotate/files': str(cfg['audit_files']),
-            'audit/disable': 'on' if cfg['no_audit_log'] else 'off',
+            'audit-log': 'off' if cfg['no_audit_log'] else (cfg['audit_log'] or default_path('dashboard')),
+            'audit-max-mb': '%g' % cfg['audit_max_mb'],
+            'audit-daily': 'on' if cfg['audit_daily'] else 'off',
+            'audit-files': str(cfg['audit_files']),
+            'no-audit-log': 'on' if cfg['no_audit_log'] else 'off',
             'local-time': 'on' if cfg['local_time'] else 'off',
         }
         # the secret rows (control/token, control/ops/token, metrics/token,

@@ -120,7 +120,7 @@ class ControlServer(_ControlServer):
     # every configurable of the fake: the shared registry (lib.settings)
     SETTING_KEYS = SETTING_NAMES
 
-    # the scenario presets live in static.json (lib.statics.SCENARIOS):
+    # the scenario presets live in defaults.json (lib.statics.SCENARIOS):
     # freeze the clock at a typical moment and release the value pins, so
     # the day simulation (and the battery machine) take over
 

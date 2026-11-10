@@ -257,7 +257,7 @@ class Simulator:
     def _outage(self, t):
         """The grid-outage machine: a two-state Markov chain over the
         simulated clock (connected --fail--> outage --repair--> connected;
-        the hazards live in static.json). 'outage' forces the down state
+        the hazards live in defaults.json). 'outage' forces the down state
         (the demo switch); a frozen clock holds the state, the time-lapse
         factor speeds the machine up like everything else."""
         if self.grid_outage == 'outage':
@@ -296,7 +296,7 @@ class Simulator:
         """One string's sine bell over the simulated clock: the east array
         (string-1) peaks late morning (06:00-16:00), the west array (string-2)
         early afternoon (08:00-18:00). Each carries half the array; the
-        windows come from the static configuration (lib/static.json)."""
+        windows come from the static configuration (lib/defaults.json)."""
         half = self.peak_w / 2.0
         lo, hi = MPPT_WINDOWS[which]
         if lo < t < hi:

@@ -14,11 +14,12 @@ _here = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(_here, 'defaults.json'), encoding='utf-8') as _f:
     STATIC = json.load(_f)
 
-PROTOCOL = STATIC['protocol']
+from common.modbus.protocol import PROTOCOL    # the family's one protocol tree
 MAX_PDU = PROTOCOL['max_pdu']                  # the largest accepted Modbus frame
 MAX_REGISTERS = PROTOCOL['max_registers']      # the 16-bit register space
 MAX_COUNT = PROTOCOL['max_count']              # max registers per FC3/FC4 read (the cache's cap)
 MAX_BITS = PROTOCOL['max_bits']                # max bits per FC1/FC2 read (the Modbus spec's 0x7D0)
+UNIT_ID_RANGE = tuple(PROTOCOL['unit_id_range'])  # the migrated cache support: the unit check
 
 DIAGNOSTICS = STATIC['diagnostics']
 DIAG_BASE = DIAGNOSTICS['base']                # the synthesized diagnostics block

@@ -54,7 +54,7 @@ from lib.control import ControlServer
 from lib.options import DEFAULT_OPS_VERBS, KNOWN_VERBS, OPTIONS
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
-from lib.statics import CONTROL_SOCKET_TEMPLATE, PEAK_RATIO, TIME_SCALE_MAX
+from lib.statics import CONTROL_SOCKET_TEMPLATE, PEAK_RATIO, TIME_SCALE_MAX, UNIT_ID_RANGE
 from lib.signals import SignalBox, apply_demo, parse_time
 from lib.metrics import MetricsServer, describe_metrics
 from lib.simulator import Simulator
@@ -78,8 +78,9 @@ def validate(args):
                     problems.append('--control-port out of range: %d' % int(ctl))
             elif len(ctl) > 100:
                 problems.append('--control-port socket path too long (max ~100 chars): %r' % ctl)
-    if not 1 <= args.unit <= 247:
-        problems.append('--unit out of range (1-247): %d' % args.unit)
+    if not UNIT_ID_RANGE[0] <= args.unit <= UNIT_ID_RANGE[1]:
+        problems.append('--unit must be %d..%d (Modbus unit id), got %d'
+                        % (*UNIT_ID_RANGE, args.unit))
     if not (math.isfinite(args.max_kwp) and args.max_kwp > 0):
         problems.append('--max-kwp must be a positive kW value, got %r' % args.max_kwp)
     if not (math.isfinite(args.battery_kwh) and args.battery_kwh > 0):

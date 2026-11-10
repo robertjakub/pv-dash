@@ -12,7 +12,8 @@ import time
 
 from common.settings.config import acl_admits
 from common.modbus import (describe_fc, describe_write, exception_frame,
-                           frame, pack_bits, serve_modbus, unpack_bits)
+                           frame, pack_bits, serve_modbus, unit_in_range,
+                           unpack_bits)
 from common.serve.connlimit import ConnGate
 from .statics import MAX_BITS, MAX_COUNT, MAX_PDU
 from common.runtime.version import version_string
@@ -132,6 +133,12 @@ class FakeInverter:
             addr_ = count = None
             if len(pdu) >= 5:
                 addr_, count = struct.unpack('>HH', pdu[1:5])
+            if not unit_in_range(unit):
+                # the family's unit-id range (protocol.json): 0 is the
+                # broadcast id, 248-255 reserved — the fake answers 03
+                logger.info('request for unit %d outside 1..247 -> exception 03 (illegal data value)', unit)
+                client.sendall(exception_frame(txn, 0, unit, func, 3))
+                return
             if unit != self.unit:
                 logger.debug('request for unit %d, serving %d', unit, self.unit)
             if self.chaos and self.chaos.hit():

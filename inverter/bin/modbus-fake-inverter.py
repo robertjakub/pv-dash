@@ -232,7 +232,7 @@ def main():
         for problem in problems:
             logger.error(problem)
         raise SystemExit(1)
-    profile_text = args.profile or 'sun2000'
+    profile_text = args.profile
     profile_path = resolve_profile(profile_text)
     simulator = Simulator(PEAK_RATIO * args.max_kwp * 1000.0, args.static, frozen,
                           battery_kwh=args.battery_kwh,
@@ -371,7 +371,7 @@ def main():
         labels = apply_demo(simulator, chaos, fake, {
             'chaos': args.chaos, 'max_kwp': args.max_kwp, 'strict': args.strict,
             'time': args.time or 'live', 'time_scale': args.time_scale,
-            'profile': resolve_profile(args.profile or 'sun2000'),
+            'profile': resolve_profile(args.profile),
             'log_level': args.log_level})
         summary = ', '.join(labels)
         control.reloaded(summary, dump_interval=args.dump_interval,

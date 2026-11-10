@@ -23,8 +23,7 @@ logger = logging.getLogger('fake-inverter')
 # would shadow the env/config layers — the flag never looks unset): the
 # same dict lib/options.py used to bake into build_parser, applied last in
 # the ladder instead. The bool rows read the tree's false entries like the
-# rest; the untwinned knobs left out stay None (profile falls to the
-# bin's 'sun2000', audit-log to the XDG state home, the secrets to off).
+# rest; the untwinned knobs left out stay None (the secrets to off).
 STATIC_DEFAULTS = {
     'listen': DEFAULTS['listen'],
     'unit': DEFAULTS['unit'],
@@ -54,6 +53,10 @@ STATIC_DEFAULTS = {
     'audit-forward-format': DEFAULTS['audit_forward_format'],
     'audit-daily': DEFAULTS['audit_daily'],
     'no-audit-log': DEFAULTS['no_audit_log'],
+    'audit-log': DEFAULTS['audit_log'],
+    'dump-path': DEFAULTS['dump_path'],
+    'control-trust-uids': DEFAULTS['control_trust_uids'],
+    'profile': DEFAULTS['modbus_profile'],
     'control-log-replies': DEFAULTS['control_log_replies'],
     'control-socket-group': DEFAULTS['control_socket_group'],
     'restore-on-start': DEFAULTS['restore_on_start'],

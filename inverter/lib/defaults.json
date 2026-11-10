@@ -96,6 +96,7 @@
     "strict": false,
     "timezone": "utc",
     "dump_interval": 0.0,
+    "dump_path": "",
     "max_clients": 64,
     "client_timeout_s": 300.0,
     "max_conn_per_ip": 0,
@@ -114,9 +115,12 @@
     "audit_forward_format": "rfc5424",
     "audit_daily": false,
     "no_audit_log": false,
+    "audit_log": "",
     "control_log_replies": false,
     "control_socket_group": false,
-    "restore_on_start": false
+    "control_trust_uids": "",
+    "restore_on_start": false,
+    "modbus_profile": "sun2000"
   },
   "log_levels": [
     "DEBUG",

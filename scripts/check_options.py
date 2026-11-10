@@ -41,7 +41,7 @@ NIX_NAMES = {
     'dashboard': {'listen': 'listenHost', 'upstream': 'prometheusUrl', 'config-js': 'configFile'},
 }
 
-# knob -> the static.json defaults key when the plain name.replace('-', '_')
+# knob -> the defaults.json defaults key when the plain name.replace('-', '_')
 # spelling is not it (the resolver picks the _s-suffixed key)
 DEFAULT_KEYS = {
     'cache': {'timeout': 'timeout_s', 'interval': 'interval_s', 'read-delay': 'read_delay_s',
@@ -160,13 +160,13 @@ def check_tool(tool):
     unnoted = sorted(o.name for o in options if o.flag and not o.node and not o.env and not o.no_env)
     rows.append((not unnoted, '%s: every flag row carries an env twin or a no-env note%s'
                  % (tool, ' — unnoted: %s' % ', '.join(unnoted) if unnoted else '')))
-    # the static defaults tree (lib/static.json's defaults — the resolver's
+    # the static defaults tree (lib/defaults.json's defaults — the resolver's
     # last rung): every tree key some lib/ module reads (a dead letter
     # fails — an entry nothing resolves is a lie waiting to rot), and every
     # flag knob's default traceable — its tree key (the plain underscore
     # spelling or a rename) or a named no-entry reason
     lib_dir = os.path.join(REPO, tool_dir, 'lib')
-    with open(os.path.join(lib_dir, 'static.json'), encoding='utf-8') as f:
+    with open(os.path.join(lib_dir, 'defaults.json'), encoding='utf-8') as f:
         tree_keys = set((json.load(f).get('defaults') or {}).keys())
     referenced = set()
     for name in sorted(os.listdir(lib_dir)):
@@ -174,7 +174,7 @@ def check_tool(tool):
             src = open(os.path.join(lib_dir, name), encoding='utf-8').read()
             referenced |= set(re.findall(r"DEFAULTS(?:\.get\(|\[)'([a-z0-9_]+)'", src))
     dead = sorted(tree_keys - referenced)
-    rows.append((not dead, '%s: every static.json defaults key is read by lib/%s'
+    rows.append((not dead, '%s: every defaults.json defaults key is read by lib/%s'
                  % (tool, ' — dead: %s' % ', '.join(dead) if dead else '')))
     keys = DEFAULT_KEYS.get(tool, {})
     reasons = NO_TREE_DEFAULT.get(tool, {})
@@ -193,6 +193,19 @@ def check_tool(tool):
                          and keys.get(o.name, o.name.replace('-', '_')) in tree_keys)
     rows.append((not secret_keys, '%s: no defaults-tree key names a secret (the default is None, never a settable default)%s'
                  % (tool, ' — secret tree keys: %s' % ', '.join(secret_keys) if secret_keys else '')))
+    # the family's unit-id range (common/modbus/protocol.json): every tool
+    # with a unit knob checks the configured unit against it — the
+    # dashboard (no unit knob) sits out
+    if any(o.name in ('unit', 'modbus-unit') for o in options):
+        tool_src = ''
+        for scan_dir in (lib_dir, os.path.join(REPO, tool_dir, 'bin')):
+            for name in sorted(os.listdir(scan_dir)):
+                if name.endswith('.py'):
+                    with open(os.path.join(scan_dir, name), encoding='utf-8') as f:
+                        tool_src += f.read()
+        range_checked = 'UNIT_ID_RANGE' in tool_src
+        rows.append((range_checked, '%s: the unit knob checks the shared unit-id range%s'
+                     % (tool, '' if range_checked else ' — no UNIT_ID_RANGE check in lib/ or bin/')))
     # the audit rotation bounds are the audit module's one constants — the
     # registries repeat them (the _gate_range reads the rows), never drift
     bad_bounds = sorted(o.name for o in options

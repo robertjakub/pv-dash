@@ -12,6 +12,13 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Added
 
+- **everywhere** — **a wedged daemon dumps its threads on `SIGUSR2`**:
+  every daemon's `main()` registers `faulthandler` for `SIGUSR2` — one
+  signal later stderr carries every thread's stack, and the daemon keeps
+  running. The dump writes straight to fd 2 (no logging machinery), so it
+  answers even when the logging lock is held by a stuck thread. The
+  ctl/cli tools are one-shot and skip it.
+
 - **alerts** — **the alert rules pack re-homed to `alerts/`, split per
   exporter**: the F16 pack leaves the scraper tree — one rule file per
   watched exporter (`alerts/scraper.yml`, `alerts/cache.yml`,

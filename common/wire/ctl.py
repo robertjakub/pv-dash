@@ -18,7 +18,8 @@ from common.wire.wiresec import sign_request, verify_reply
 
 
 def run_ctl(daemon, bin_name, app, self_note, command_help,
-            ctl_socket, timeout_s, audit_max_mb, audit_files, ctl_page):
+            ctl_socket, timeout_s, audit_max_mb, audit_files, ctl_page,
+            max_line_bytes):
     """The whole ctl ladder: the parser (the tool's name, socket, examples),
     the batch stdin strip (comments and blanks stay comments), the token
     parse, the connect, the CONNECT audit, the signed exchange closure, the
@@ -89,9 +90,16 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         the wire was tampered with or the server predates the signing."""
         obj = sign_request(token, cmd) if token else {'cmd': cmd}
         obj.update(extra)
-        sock.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())
+        wire = (json.dumps(obj, ensure_ascii=False) + '\n').encode()
+        if len(wire) > max_line_bytes:
+            # the client-side half of the daemon's line-cap guard: a clean
+            # local verdict instead of the daemon dropping the connection
+            return 'fail', T('ctl.command_too_long') % max_line_bytes
+        sock.sendall(wire)
         buf = b''
         while b'\n' not in buf:
+            if len(buf) > max_line_bytes:
+                return 'fail', T('ctl.reply_too_long') % max_line_bytes
             chunk = sock.recv(65536)
             if not chunk:
                 return 'fail', T('ctl.connection_closed')

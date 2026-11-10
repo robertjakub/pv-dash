@@ -35,6 +35,10 @@ from common.runtime.version import version_string
 from common.wire.wiresec import ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, proof_tag, role_allows, \
     role_tag, sanitize_command, sign_reply, verify_request_mac
 
+_here = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(_here, 'defaults.json'), encoding='utf-8') as _f:
+    CONTROL_WIRE_DEFAULTS = json.load(_f)    # the shared control-wire tree (flat: the cli_* keys)
+
 
 def num(text, label, what):
     """The `_apply` branches' float parser: the err message keeps the knob's
@@ -90,8 +94,8 @@ class ControlServer:
     RELOAD_NEEDS_CONFIG = True            # the reload verb needs --config
     XDG_STATE_NAME = None                 # set = the reload state falls back to the state home
     APPLY_FIRST = ()                      # the settings that apply first on a restore
-    LINE_CAP = 1048576                    # the pre-auth line-buffer cap (drop past it)
-    IDLE_TIMEOUT_S = 300                  # the control socket's idle timeout
+    CLI_MAX_LINE_BYTES_S = CONTROL_WIRE_DEFAULTS['cli_max_line_bytes_s']  # the pre-auth line-buffer cap (the shared tree)
+    CLI_IDLE_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_idle_timeout_s']  # the control session's idle cap (the shared tree)
     dump_key = None                       # the dump seal key — a subclass may property it
     CFG_KEYS = {}                         # the knob -> cfg-key renames — the subclass's registry wiring
     CFG_FORMATTERS = {}                   # the cfg key -> text map for the structured values
@@ -292,7 +296,7 @@ class ControlServer:
         with self.clients_lock:
             self.clients.add(client)
         try:
-            client.settimeout(self.IDLE_TIMEOUT_S)
+            client.settimeout(self.CLI_IDLE_TIMEOUT_S)
             buf = b''
             while True:
                 if b'\n' not in buf:      # buffered reads: a 1 MB frame must not
@@ -302,7 +306,7 @@ class ControlServer:
                 else:
                     chunk = b''
                 buf += chunk
-                if len(buf) > self.LINE_CAP:   # no newline = no frame: drop the amplifier
+                if len(buf) > self.CLI_MAX_LINE_BYTES_S:   # no newline = no frame: drop the amplifier
                     self.LOG.warning('control client from %s: the line exceeded %d bytes, dropping it', who, self.LINE_CAP)
                     break
                 if b'\n' not in buf:

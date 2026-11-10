@@ -32,6 +32,11 @@ organized into functional subpackages:
 
 ## `wire/` — the signed control wire, both ends
 
+The wire's own defaults tree is `defaults.json` beside the modules — a
+flat `cli_*` tree (the timeout/keepalive/reconnect cluster, the
+session's idle cap and the line cap; one home for the family, the
+tools' `statics.py` alias it).
+
 | module | what |
 |---|---|
 | `control.py` | the control server's base: the wire tier (the unix/TCP listener with the 0600/0660 mode, the peer-cred trusted peers, the admin/ops roles, the HMAC frame verification — the reply status speaks `ok`/`fail`/`bye`), the listener's live-rebind family (rev. 22: `set control/port` swaps the socket bind-first, the failed bind rolls back, the sessions keep serving; the F5 refusal guards the live wire through `refuse_tokenless_rebind`/`refuse_token_drop`), the buffered session handler, the registry surfaces (help config / show knobs / the golden `show config`), the family's `command()` walk (the spine: the help/topic ladder, the set/clear pair, the show reports, the request namespace — the subclasses ride the hooks) and the dump/reload family — the four tools subclass it with their grammar wiring and their reports |

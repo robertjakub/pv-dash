@@ -522,10 +522,16 @@ def exchange(sock, wire_text):
     actually waiting for (replies are strictly ordered on the wire)."""
     try:
         with _send_lock:
+            if len(wire_text) > _SPEC['max_line_bytes']:
+                # the client-side half of the daemon's line-cap guard: a
+                # clean local verdict instead of the daemon dropping us
+                return 'err %s' % (T('cli.command_too_long') % _SPEC['max_line_bytes'])
             sock.sendall((wire_text + '\n').encode())
         buf = b''
         while True:
             while b'\n' not in buf:
+                if len(buf) > _SPEC['max_line_bytes']:
+                    raise ConnectionLost(T('cli.reply_too_long') % _SPEC['max_line_bytes'])
                 chunk = sock.recv(65536)
                 if not chunk:
                     return None

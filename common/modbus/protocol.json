@@ -3,28 +3,24 @@
   "max_registers": 65536,
   "max_count": 125,
   "max_bits": 2000,
-  "unit_id_range": [
-    1,
-    247
-  ],
-  "read_funcs": [
-    1,
-    2,
-    3,
-    4
-  ],
-  "write_funcs": [
-    5,
-    6,
-    15,
-    16,
-    22,
-    23
-  ],
+  "unit_id_range": [1, 247],
+  "read_funcs": [1, 2, 3, 4],
+  "write_funcs": [5, 6, 15, 16, 22, 23],
   "exceptions": {
     "illegal_function": 1,
     "illegal_address": 2,
     "illegal_value": 3,
     "gateway_failed": 11
+  },
+  "registers_type": {
+    "i16": 1,
+    "u16": 1,
+    "i32": 2,
+    "u32": 2,
+    "i32swap": 2,
+    "u32swap": 2,
+    "f32": 2,
+    "f32swap": 2,
+    "bit": 1
   }
 }

@@ -1,0 +1,8 @@
+{
+  "cli_keepalive_s": 55.0,
+  "cli_timeout_s": 5.0,
+  "cli_reconnect": 3,
+  "cli_reconnect_wait_s": 10.0,
+  "cli_idle_timeout_s": 300,
+  "cli_max_line_bytes_s": 1048576
+}

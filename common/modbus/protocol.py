@@ -3,12 +3,26 @@ types, the recv-exact loop, the exception-frame builder, the MBAP framing
 helpers, the bit packing, the function code table, the suite auth
 handshake and the Waveshare connection-password handshake. The client
 (scraper, cache upstream) and the servers (cache listener, fake inverter)
-layer their own framing on top; the per-tool limits come from each tool's
-lib/static.json (see its statics.py)."""
+layer their own framing on top; the family's protocol limits live in
+protocol.json beside this module (one tree, no per-tool drift) — the
+tools' lib/statics.py alias them."""
 import hashlib
 import hmac
+import json
+import os
 import secrets
 import struct
+
+_here = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(_here, 'protocol.json'), encoding='utf-8') as _f:
+    PROTOCOL = json.load(_f)                 # the family's one protocol tree
+
+
+def unit_in_range(unit):
+    """The MBAP unit-id validity per protocol.json: 1..247 — 0 is the
+    broadcast id and 248-255 are reserved, and neither reaches a server."""
+    lo, hi = PROTOCOL['unit_id_range']
+    return lo <= unit <= hi
 
 
 class ModbusError(Exception):

@@ -3,7 +3,7 @@ auth-handshake and reply-validation sequences both client legs speak —
 the scraper's ModbusTCP polls through them, the cache's Upstream wraps
 them behind its own serialized connection. The error texts are pinned by
 the regtests; change them with the suites in hand. The per-tool limits
-come from each tool's lib/static.json."""
+come from each tool's lib/defaults.json."""
 import socket
 
 from .protocol import (DeviceError, ModbusError, auth_handshake_client,

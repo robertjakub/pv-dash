@@ -561,10 +561,10 @@ def parse_registry_sections(meta):
 
 def option_rows(rows, static_defaults=None, choices=None):
     """The registry's option rows -> the common Option tuples. The default
-    ladder: the static.json-wired default wins, then the row's explicit
+    ladder: the defaults.json-wired default wins, then the row's explicit
     `default`, then the bool native (False) — a negates row (the --no-x
     form) stays None so the negating flag defaults off. `choices` is the
-    tool's name -> word-tuple map from static.json; the log-level's word
+    tool's name -> word-tuple map from defaults.json; the log-level's word
     list doubles as the control grammar's completable values (the values
     ride the choices)."""
     static_defaults = static_defaults or {}

@@ -111,7 +111,7 @@ class ControlServer:
     AUDIT_APP = None                      # the audit trail's app voice ('modbus-cache')
     CONTROL_PORT_DEFAULT = None           # the ctl socket's default port (the subclass's statics)
     CONTROL_SOCKET_TEMPLATE = None        # the ctl unix-socket path template
-    LOG_LEVELS = ()                       # the log-level words (the subclass's static.json list)
+    LOG_LEVELS = ()                       # the log-level words (the subclass's defaults.json list)
 
     def __init__(self, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None,

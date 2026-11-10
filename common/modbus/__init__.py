@@ -7,6 +7,7 @@ from .protocol import (AUTH_DOMAIN, AUTH_ERR, AUTH_FRAME_LEN, AUTH_MAGIC,
                        ModbusError, auth_handshake_client,
                        auth_handshake_server, auth_mac, check_head,
                        describe_fc, exception_frame, frame, pack_bits,
+                       unit_in_range,
                        read_frame, recv_exact, unpack_bits,
                        waveshare_handshake_client)
 from .client import ClientBase, check_data_bytes, check_reply, open_socket

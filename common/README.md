@@ -69,7 +69,7 @@ Deliberately *not* here (still per-tool): the command grammars
 (`command`/`_apply`/`_get` — each tool's verbs and `_apply` branches) and
 the status/inspect reports (tool-specific wording), the metrics endpoints
 (snapshot()/render() over the common skeleton — tool-specific gauge
-wording), the static configuration (`static.json` / `statics.py` —
+wording), the static configuration (`defaults.json` / `statics.py` —
 different defaults and diagnostics per tool) and the config-script
 loaders (each tool resolves its own registry onto the common grammar).
 

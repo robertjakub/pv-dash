@@ -88,7 +88,7 @@ def resolve_config(args, script_dir=None):
         'level': resolve(args.log_level, 'LOG_LEVEL', 'log_level', DEFAULTS['log_level'], str).strip().upper(),
     }
     cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'CTL',
-                                  'control_port', None, str)
+                                  'control_port', DEFAULTS['control_port'], str)
     cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', DEFAULTS['audit_log'], str)
     cfg['audit_forward'] = resolve(getattr(args, 'audit_forward', None), 'AUDIT_FORWARD',
                                    'audit_forward', DEFAULTS['audit_forward'], str)
@@ -129,7 +129,7 @@ def resolve_config(args, script_dir=None):
     if cfg['level'] not in LOG_LEVELS:
         raise SystemExit('invalid log_level = %r: must be one of %s' % (cfg['level'], ', '.join(LOG_LEVELS)))
     cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
-                                        'control_ops_verbs', DEFAULT_OPS_VERBS,
+                                        'control_ops_verbs', DEFAULTS['control_ops_verbs'],
                                         str) or DEFAULT_OPS_VERBS).strip() or DEFAULT_OPS_VERBS
     cfg['metrics_server'] = resolve(getattr(args, 'metrics_server', False) or None, 'METRICS_SERVER',
                                     'metrics_server', DEFAULTS['metrics_server'], str_to_bool)

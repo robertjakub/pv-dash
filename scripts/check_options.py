@@ -185,6 +185,14 @@ def check_tool(tool):
                                or o.name in reasons))
     rows.append((not unbacked, '%s: every flag knob\'s default is a defaults-tree key or a named no-entry%s'
                  % (tool, ' — unbacked: %s' % ', '.join(unbacked) if unbacked else '')))
+    # a secret never takes a settable default: its default is the None
+    # ladder-end, categorically — a tree entry naming one fails even
+    # before a resolver could wire it (a shipped secret default rides
+    # every install)
+    secret_keys = sorted('--' + o.name for o in options if o.secret
+                         and keys.get(o.name, o.name.replace('-', '_')) in tree_keys)
+    rows.append((not secret_keys, '%s: no defaults-tree key names a secret (the default is None, never a settable default)%s'
+                 % (tool, ' — secret tree keys: %s' % ', '.join(secret_keys) if secret_keys else '')))
     # the audit rotation bounds are the audit module's one constants — the
     # registries repeat them (the _gate_range reads the rows), never drift
     bad_bounds = sorted(o.name for o in options

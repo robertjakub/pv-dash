@@ -24,8 +24,10 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   the fake's trees (the bool native False is the default), and
   `check_options.py` gains the static-defaults gates: every defaults
   key some lib/ module reads (a dead letter fails), every flag knob's
-  default a tree key or a named no-entry (the bool native, the secret
-  None, the empty/derived shapes). The cache's `cache/ttl` default is
+  default a tree key or a named no-entry (the bool native, the
+  empty/derived shapes), and no tree key names a secret — a secret
+  never takes a settable default (its default is the None ladder-end,
+  banned outright). The cache's `cache/ttl` default is
   the flat 30 s (was 3 × the poll interval — the tree's
   `cache_ttl_factor` is gone) and `modbus/auth-upstream`'s default is
   the explicit `none` — both now name their tree entries like the rest.

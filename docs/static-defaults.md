@@ -40,25 +40,34 @@ fake's trees — the bool native False is the family default.
 
 A flag knob's default is either a `defaults`-tree key or one of the
 no-entry shapes below; `scripts/check_options.py` fails the tool when
-neither holds. Three classes stay out deliberately:
+neither holds. Two classes stay out deliberately (the secrets are a
+third — banned outright, after the table):
 
-| Tool | Named no-entry — the reason each | Bools (native False) | Secrets (None) |
-|---|---|---|---|
+| Tool | Named no-entry — the reason each | Bools (native False) |
+|---|---|---|
 | all four | `auth` — empty = no auth · `control-port` — derives from the listen port · `control-ops-verbs` — the registry's `default_ops_verbs` · `control-trust-uids` — empty = nobody trusted · `audit-log` — empty = the XDG state home · `dump-path` — empty = the state dump is off | | |
-| cache | + `profile` — the bundled profile resolves next to the bin | `allow-write`, `local-time`, `control-socket-group`, `metrics-server`, `audit-daily`, `no-audit-log`, `log-access`, `dump-with-cache`, `restore-on-start` | `auth-key`, `auth-upstream-key`, `control-token`, `control-ops-token`, `metrics-token`, `dump-key` |
-| scraper | + `metrics-spec` — empty = the built-in `lib/metrics.json` block · `profile` — the bundled profile resolves next to the bin | `grid-positive-import`, `local-time`, `control-socket-group`, `audit-daily`, `no-audit-log`, `log-access`, `restore-on-start` | `auth-key`, `control-token`, `control-ops-token`, `auth-token`, `dump-key` |
-| inverter | + `profile` — the bin's bundled sun2000 profile · `seed` — a per-run choice · `time` — empty = the clock runs · `grid-voltage` / `grid-frequency` — the tree's `grid` block (`voltage_v` / `frequency_hz`), read via `statics.GRID` | `static`, `strict`, `allow-write`, `control-socket-group`, `control-log-replies`, `metrics-server`, `audit-daily`, `no-audit-log`, `restore-on-start` | `auth-key`, `control-token`, `control-ops-token`, `metrics-token`, `dump-key` |
-| dashboard | + `static-dir`, `config-js` — resolve next to the script | `control-socket-group`, `metrics-server`, `audit-daily`, `no-audit-log`, `log-queries`, `log-access`, `local-time`, `restore-on-start` | `auth-token`, `control-token`, `control-ops-token`, `metrics-token`, `dump-key` |
+| cache | + `profile` — the bundled profile resolves next to the bin | `allow-write`, `local-time`, `control-socket-group`, `metrics-server`, `audit-daily`, `no-audit-log`, `log-access`, `dump-with-cache`, `restore-on-start` |
+| scraper | + `metrics-spec` — empty = the built-in `lib/metrics.json` block · `profile` — the bundled profile resolves next to the bin | `grid-positive-import`, `local-time`, `control-socket-group`, `audit-daily`, `no-audit-log`, `log-access`, `restore-on-start` |
+| inverter | + `profile` — the bin's bundled sun2000 profile · `seed` — a per-run choice · `time` — empty = the clock runs · `grid-voltage` / `grid-frequency` — the tree's `grid` block (`voltage_v` / `frequency_hz`), read via `statics.GRID` | `static`, `strict`, `allow-write`, `control-socket-group`, `control-log-replies`, `metrics-server`, `audit-daily`, `no-audit-log`, `restore-on-start` |
+| dashboard | + `static-dir`, `config-js` — resolve next to the script | `control-socket-group`, `metrics-server`, `audit-daily`, `no-audit-log`, `log-queries`, `log-access`, `local-time`, `restore-on-start` |
+
+The secrets are absent from the table by ruling: **a secret never
+takes a settable default** — its default is the None ladder-end,
+categorically (six on the cache — `auth-key`, `auth-upstream-key`,
+`control-token`, `control-ops-token`, `metrics-token`, `dump-key` —
+five on the other three). The gate enforces it: a `defaults`-tree key
+naming a secret fails the tool even before a resolver could wire it —
+a shipped secret default would ride every install.
 
 The classes are enforced differently: the named no-entry knobs must
 appear in the gate's `NO_TREE_DEFAULT` map (the common six in
-`_COMMON_NO_TREE_DEFAULT`, the per-tool extras beside them), while the
-bools and the secrets pass the coverage gate without a reason — the
-converter (`o.conv is bool`) and the `o.secret` mark identify them.
+`_COMMON_NO_TREE_DEFAULT`, the per-tool extras beside them); the bools
+pass the coverage gate by their converter (`o.conv is bool`), the
+secrets by the outright ban.
 
 ## The gate
 
-`scripts/check_options.py` gained two rows per tool:
+`scripts/check_options.py` gained three rows per tool:
 
 - **every static.json defaults key is read by lib/** — a dead letter
   fails: a tree entry nothing resolves is a lie waiting to rot. The
@@ -72,10 +81,14 @@ converter (`o.conv is bool`) and the `o.secret` mark identify them.
   `metrics-client-timeout` → `metrics_client_timeout_s`,
   `requests-audit` → `requests_audit_s`), or a `NO_TREE_DEFAULT`
   reason.
+- **no defaults-tree key names a secret** — the secret's default is
+  None, never a settable default (the ruling above; proven to fail on
+  a doctored tree).
 
 ## Verified
 
-`check_options.py` ALL PASS (83 rows), `lint_options.py --check`,
+`check_options.py` ALL PASS (87 rows — the secret-ban row included,
+proven to fail on a doctored `auth_key` tree entry), `lint_options.py --check`,
 `lint_texts.py --check`, `gen_man.py --check` (the man pages byte-stable
 — `Option.default` feeds `build_parser` alone, no report surface), the
 `family_drift.py` regeneration, and the battery suites (the one

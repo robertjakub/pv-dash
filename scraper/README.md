@@ -75,10 +75,13 @@ Sign conventions and sanity caps:
 
 ## Alerting
 
-The exporter ships its **alert rules pack** — [`alerts.yml`](alerts.yml),
-the audit vocabulary's detection half (docs/AUDIT.md F16): every alert
-names the audit events and the log lines it correlates with, so a fired
-page tells the operator where the trail lives. Two groups, one per
+The family's **alert rules pack** lives at
+[`alerts/`](../alerts/README.md) — one rule file per watched exporter;
+this exporter's half is [`alerts/scraper.yml`](../alerts/scraper.yml),
+the cache's half (`alerts/cache.yml`) ships with the cache package. The
+pack is the audit vocabulary's detection half (docs/AUDIT.md F16): every
+alert names the audit events and the log lines it correlates with, so a
+fired page tells the operator where the trail lives. Two groups, one per
 exporter:
 
 | Alert | Fires when | The trail says |

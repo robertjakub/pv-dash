@@ -1,0 +1,60 @@
+# The pv-suite alert rules pack — the cache's half (alerts/cache.yml).
+# The detection half of the audit vocabulary (docs/AUDIT.md F16): every
+# alert names the audit events and the log lines it correlates with, so a
+# fired page tells the operator where the trail lives. This one watches
+# the modbus-cache's side (the modbus_cache_* gauges): poll down, age
+# spikes, write-refusal bursts.
+#
+# The cache's /metrics endpoint is off by default and this file stays
+# SILENT until a collector scrapes it — an absent series never fires; the
+# scraper's diag block (scraper_cache_device_up / _age_seconds) mirrors
+# two of the shapes for setups that do not scrape the cache.
+#
+# Wire-in: `rule_files: [/etc/prometheus/alerts/*.yml]` — the demo image
+# bakes it (docker/Dockerfile.prometheus); a NixOS Prometheus points
+# services.prometheus.ruleFiles at the packaged copy
+# (share/modbus-cache/alerts.yml — docs/NIXOS.md). Thresholds assume the
+# default 10 s poll interval — tune them to yours.
+groups:
+  - name: pv-suite-cache
+    rules:
+      - alert: CachePollDown
+        expr: modbus_cache_poll_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'modbus-cache: the last poll cycle of the device failed (poll_up 0)'
+          description: >-
+            The cache poll of the inverter failed — the cache serves its
+            last known words until the device answers again (that is the
+            cache job). The cache log names the failing block
+            (modbus_cache_uplink_block_fails_total shows which); the CACHE
+            audit trail records the session story around it.
+      - alert: CacheAgeSpike
+        expr: modbus_cache_age_seconds > 300
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'modbus-cache: the cache serves words older than the freshness budget'
+          description: >-
+            The oldest cached word (modbus_cache_age_seconds) is more than
+            300s old — reads keep succeeding with stale data behind them
+            (the cache-ttl budget is the knob). The exporter mirrors this
+            gauge through the diag block (scraper_cache_age_seconds); the
+            cache log names the upstream errors.
+      - alert: CacheWriteRefusalBurst
+        expr: increase(modbus_cache_write_refused_total[5m]) > 3
+        labels:
+          severity: critical
+        annotations:
+          summary: 'modbus-cache: a burst of refused Modbus writes (WRITE-REFUSED)'
+          description: >-
+            The write gate refused more than 3 writes in 5m — allow-write
+            off, the write ACL, the register allow-list or a malformed
+            frame answered Modbus exceptions. The CACHE audit trail records
+            each refusal as a WRITE-REFUSED event with the client, the
+            frame and the gate that refused it; a burst is a misconfigured
+            writer or a client poking the gate — NIS2 21.2(d) wants this
+            detection wired, not just logged.

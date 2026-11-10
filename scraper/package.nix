@@ -43,7 +43,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../common}/modbus/*.py $out/share/modbus-scraper/common/modbus/
     install -Dm644 examples/metrics.json $out/share/modbus-scraper/metrics.json
     install -Dm644 examples/scraper.conf $out/share/modbus-scraper/scraper.conf
-    install -Dm644 alerts.yml $out/share/modbus-scraper/alerts.yml
+    install -Dm644 ${../alerts}/scraper.yml $out/share/modbus-scraper/alerts.yml
     install -Dm644 ${../examples}/acl-ip-prefix.json $out/share/modbus-scraper/acl-ip-prefix.json
     install -Dm644 ${../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-scraper/acl-ip-prefix.schema.json
     install -dm755 $out/share/modbus-scraper/profiles

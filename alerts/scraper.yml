@@ -1,0 +1,57 @@
+# The pv-suite alert rules pack — the exporter's half (alerts/scraper.yml).
+# The detection half of the audit vocabulary (docs/AUDIT.md F16): every
+# alert names the audit events and the log lines it correlates with, so a
+# fired page tells the operator where the trail lives. One rule file per
+# watched exporter: this one watches the modbus-scraper's own poll story
+# (the scraper_* gauges); the cache's side lives in cache.yml beside it,
+# and alerts/README.md carries the pack's story and the install map.
+#
+# Wire-in: `rule_files: [/etc/prometheus/alerts/*.yml]` — the demo image
+# bakes it (docker/Dockerfile.prometheus); a NixOS Prometheus points
+# services.prometheus.ruleFiles at the packaged copy
+# (share/modbus-scraper/alerts.yml — docs/NIXOS.md). Thresholds assume
+# the default 10 s poll interval — tune them to yours. The exporter's
+# own death (the scrape itself failing) is the collector's stock
+# `up{job}` gauge and its scrape-failure hygiene, not this pack: this
+# pack watches the poll and the gates.
+groups:
+  - name: pv-suite-scraper
+    rules:
+      - alert: ScraperPollDown
+        expr: scraper_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'modbus-scraper: the Modbus poll of the device is down (scraper_up 0)'
+          description: >-
+            The last poll of the inverter failed; the exporter keeps
+            serving the last good values while the poller retries. The
+            scraper log names the failure per cycle (`inverter ...
+            unreachable`); the control commands and the auth failures ride
+            the SCR audit trail.
+      - alert: ScraperFreshnessGap
+        expr: time() - scraper_last_poll_timestamp_seconds > 120
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'modbus-scraper: the exported data is stale beyond the freshness budget'
+          description: >-
+            The last successful poll (scraper_last_poll_timestamp_seconds)
+            is more than 120s behind — 12 lost cycles at the default 10s
+            poll. Fires beside ScraperPollDown during an outage; alone it
+            means the poller is stalling — the slow-dongle gauges
+            (scraper_poll_duration_seconds, _mean, _max) tell which.
+      - alert: ScraperExceptionSpike
+        expr: increase(scraper_modbus_errors_total[10m]) > 30
+        labels:
+          severity: warning
+        annotations:
+          summary: 'modbus-scraper: the Modbus poll errors come in bursts'
+          description: >-
+            scraper_modbus_errors_total grew by more than 30 in 10m — at
+            the default 10s poll that is half the cycles failing. The
+            scraper log names the Modbus exception code per failed poll;
+            the SCR audit trail brackets the window with the control
+            commands around it.

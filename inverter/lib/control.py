@@ -290,7 +290,7 @@ class ControlServer(_ControlServer):
                 raise ValueError('max-kwp must be a positive kW value')
             sim.peak_w = PEAK_RATIO * v * 1000.0
             return '%g' % v
-        if key == 'profile':
+        if key == 'modbus/profile':
             path = resolve_profile('sun2000' if val in ('default', 'auto', 'none') else value.strip())
             try:
                 m = load_profile(path)
@@ -481,7 +481,7 @@ class ControlServer(_ControlServer):
             return ('on' if fake.metrics_srv else 'off') if fake else '?'
         if key == 'client-timeout':
             return ('%gs' % fake.client_timeout if fake.client_timeout else 'never') if fake else '?'
-        if key == 'profile':
+        if key == 'modbus/profile':
             return '%s (%s)' % (sim.profile.description, profile_label(sim.profile.path))
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel())
@@ -736,7 +736,7 @@ class ControlServer(_ControlServer):
             'grid-frequency': '%g' % sim.grid_frequency,
             'grid-outage': sim.grid_outage,
             'max-kwp': '%g' % (sim.peak_w / (1000.0 * PEAK_RATIO)),
-            'profile': sim.profile.path,
+            'modbus/profile': sim.profile.path,
             'max-clients': fake.max_clients,
             'client-timeout': fake.client_timeout,
             'max-conn-per-ip': fake.conn_gate.max_per_ip,

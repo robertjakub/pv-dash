@@ -1027,7 +1027,7 @@ def main():
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
         check('node walk: the modbus listing mimics the ? walk (the key never lists)',
-              words == ['auth'] and 'auth/key' not in tx, tx[:160])
+              words == ['auth', 'profile'] and 'auth/key' not in tx, tx[:160])
         tx = ctl(L_CTL, 'show')
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
@@ -1036,7 +1036,7 @@ def main():
                         'connect-acl', 'connections', 'control', 'dump', 'dump-interval', 'grid',
                         'grid-frequency', 'grid-outage',
                         'grid-voltage', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
-                        'metrics', 'modbus', 'mppt', 'profile', 'pv', 'registers', 'scenario', 'seed',
+                        'metrics', 'modbus', 'mppt', 'pv', 'registers', 'scenario', 'seed',
                         'soc', 'static', 'strict', 'time', 'time-scale', 'timezone', 'version',
                         'write'], tx[:220])
         tx = ctl(L_CTL, 'show control ops')

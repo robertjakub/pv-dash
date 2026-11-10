@@ -101,7 +101,6 @@ takes. The namespaces group them.
 | `battery-state` | `set battery-state` | settable | `auto\|charging\|discharging` | — / — | force the battery state machine, or auto |
 | `grid-outage` | `set grid-outage` | settable | `on\|off\|outage` | — / — | the grid-outage machine: random blackouts over the simulated clock |
 | `unit` | — | startup-only | `ID` | `--unit` / — | modbus unit id served |
-| `profile` | `set profile` | settable | `\<file>` | `--profile` / `PROFILE` | inverter profile (JSON: name -> register + optional type/scale) |
 | `max-kwp` | `set max-kwp` | settable | `kW` | `--max-kwp` / `MAX_KWP` | PV array size (peak = 75 % of it) |
 | `timezone` | `set timezone` | settable | `utc\|local` | `--timezone` / — | clock the state machines integrate over: UTC or the local wall clock |
 | `time` | `set time` | settable | `HH:MM\|auto` | `--time` / `TIME` | freeze the clock HH:MM (jumps integrate the battery), or auto |
@@ -139,6 +138,7 @@ the Modbus session the fake serves: the auth scheme its clients must speak
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
+| `profile` | `set modbus profile` | settable | `\<file>` | `--profile` / `PROFILE` | inverter profile (JSON: name -> register + optional type/scale) |
 | `auth` | `set modbus auth` | settable | `suite\|none` | `--auth` / `AUTH` | the auth scheme the fake's Modbus clients must speak: suite (the crypt handshake) or none |
 | `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 

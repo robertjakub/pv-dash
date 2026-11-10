@@ -49,7 +49,7 @@
       "hidden": true, "restart": true },
     { "name": "unit", "flag": "--unit", "env": null, "no-env": "F11 — the unit id is the demo's own, flags only",
       "conv": "int", "setting-help": "modbus unit id served", "hint": "ID", "help": "Modbus unit id served" },
-    { "name": "profile", "flag": "--profile", "env": "PROFILE", "conv": "str", "live": "profile",
+    { "name": "profile", "flag": "--profile", "env": "PROFILE", "conv": "str", "live": "modbus/profile",
       "setting-help": "inverter profile (JSON: name -> register + optional type/scale)", "hint": "<file>",
       "value-help": { "default": "the shipped sun2000 profile" },
       "help": "inverter profile JSON: name -> register (+ optional type/scale), e.g. profiles/profiles/sun2000.json; PROFILE when unset" },

@@ -325,11 +325,13 @@ def main():
                     'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],
                     'daily': cfg['audit_daily'],
                     'forward': None if cfg['audit_forward'] in (None, '', 'none') else cfg['audit_forward'],
+                    'forward_format': cfg['audit_forward_format'],
                     'disabled': bool(cfg['no_audit_log'])}
     try:
         audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'], 'DSH', app='dashboard',
                                                           max_mb=cfg['audit_max_mb'], daily=cfg['audit_daily'],
-                                                          files=cfg['audit_files'], forward=cfg['audit_forward'])
+                                                          files=cfg['audit_files'], forward=cfg['audit_forward'],
+                                                          forward_format=cfg['audit_forward_format'])
     except ValueError as e:
         logger.error(str(e))
         raise SystemExit(1)

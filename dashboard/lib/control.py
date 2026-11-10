@@ -21,7 +21,7 @@ import os
 import time
 
 from common.render.human import secs
-from common.runtime.audit import AUDIT_FORWARD_CHOICES
+from common.runtime.audit import AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward
 from common.runtime.version import version_string
 from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.wire.control import ControlServer as _ControlServer, num, numi
@@ -228,9 +228,17 @@ class ControlServer(_ControlServer):
             self._rebuild_audit()
             return 'on' if on else 'off'
         if key == 'audit/forward':
-            if val not in ('none', 'syslog'):
-                raise ValueError('audit/forward must be one of %s' % ', '.join(AUDIT_FORWARD_CHOICES))
-            self.audit_params['forward'] = None if val == 'none' else val
+            try:
+                parse_forward(val)
+            except ValueError:
+                raise ValueError('audit/forward must be %s' % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
+            self.audit_params['forward'] = None if val in ('', 'none') else val
+            self._rebuild_audit()
+            return val
+        if key == 'audit/forward-format':
+            if val not in AUDIT_FORWARD_FORMATS:
+                raise ValueError('audit/forward-format must be one of %s' % ', '.join(AUDIT_FORWARD_FORMATS))
+            self.audit_params['forward_format'] = val
             self._rebuild_audit()
             return val
         if key == 'control/port':
@@ -343,6 +351,8 @@ class ControlServer(_ControlServer):
             return 'on' if self.audit_params['daily'] else 'off'
         if key == 'audit/forward':
             return self.audit_params.get('forward') or 'none'
+        if key == 'audit/forward-format':
+            return self.audit_params.get('forward_format') or 'rfc5424'
         if key == 'log-access':
             return 'on' if h.log_access else 'off'
         if key == 'log-queries':
@@ -398,6 +408,7 @@ class ControlServer(_ControlServer):
             'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control/socket-group': 'on' if self.socket_group else 'off',
             'audit/forward': self.audit_params.get('forward') or 'none',
+            'audit/forward-format': self.audit_params.get('forward_format') or 'rfc5424',
         }
         for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
             if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:

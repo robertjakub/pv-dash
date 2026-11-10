@@ -5,6 +5,12 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The README moved to the gated skeleton: `scripts/lint_readmes.py --check`
+pins the `##` canon family-wide — the fake's `Simulation` retitled
+`How it works`, its `Signals` H2 folded into Runtime control as the
+leading H3 (the family shape), the Docker story folded into `Usage`, and
+the served/internal register sections moved into the feature slot.
+
 The audit family live family-wide (the cache's shape): the sink and the
 rotation knobs join the wire — `set audit log-file <path|-|none>` swaps
 the trail, `set audit rotate max-size`/`set audit rotate files`

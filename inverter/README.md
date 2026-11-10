@@ -22,7 +22,7 @@ It ships three tools:
 | `modbus-fake-ctl.py` | one-shot / batch client for the runtime control server (`modbus-fake-ctl`) |
 | `modbus-fake-cli.py` | console-style interactive session on the same control server (`modbus-fake-cli`) |
 
-## Simulation
+## How it works
 
 Everything integrates with a **simulated clock: UTC by default**
 (`--timezone local` / `set timezone local` for the host wall clock) that
@@ -83,40 +83,6 @@ prints the loaded profile as a table, `set profile <name|path>` swaps it
 live, `--profile` / `PROFILE` pick it at start; `clear profile` returns to
 the configured map.
 
-## Served registers (the default profile)
-
-- **32064** / **32080** — PV power / power limit (I32 W)
-- **32016+** — the string block: per-string voltage/current (a dark string
-  serves 0/0)
-- **37113** — grid power (I32 W, positive = feed-in)
-- **37100+** — smart meter block: status, per-phase voltages/currents, reactive
-  power, power factor, grid frequency, and 37119 exported / 37121 imported
-  kWh totals that grow through the simulated day
-- **32089** — device status (512 on-grid / 40960 standby at night)
-- **32087** — temperature (I16, °C×10); **32114** daily and **32106** total
-  yield (U32, kWh×100)
-- **37001+** — battery block (power, SoC, lifetime
-  totals)
-
-All of the above addresses come from the profile — remap them freely. The
-profile's per-entry **`fc`** picks each entry's address space (`3` holding
-/ `4` input for the word types, `1` coils / `2` discrete for `bit` — the
-four spaces are served separately). Writes stick in overlays: the register
-writes (FC06/FC16) overlay the holding registers, the coil writes
-(FC05/FC15) the coil space (FC5 demands the spec values
-`0x0000`/`0xFF00`); computed registers are recomputed per poll, overlay
-values win until cleared (`reset`, SIGUSR1, shutdown). A malformed frame
-on an implemented function code is answered with exception 03, never a
-silent disconnect.
-
-## Internal registers (not in the profile)
-
-**65000–65003** — the modbus-cache diagnostics block (magic `0xCAFE`,
-version, uptime, id): always mocked by the fake, never part of the
-profile — it exists so the scraper's `scraper_cache_*` auto-detection can
-be exercised without a cache. It is the only address range the fake
-hardcodes.
-
 ## Usage
 
 ```bash
@@ -129,6 +95,15 @@ python3 inverter/bin/modbus-fake-inverter.py --config inverter/examples/inverter
 
 Add **`--dry-run`** to validate the configuration and print the effective
 settings. Exit codes: `0` = valid; `1` = invalid; `2` = CLI misuse.
+
+The fake ships as an alpine container — stdlib-only, no pip, running as
+the unprivileged `pvsuite` user with the tools on `PATH`
+(`Dockerfile.fake-inverter` + `compose.yaml`; see
+[`docker/README.md`](../docker/README.md)). The image loads its own
+bundled conf (`/pv-suite/inverter/inverter.conf`, the built-in
+`--config` target) — the env file and the CMD flags override it. The
+version reports as `0.4.2` inside the image (no git metadata; a checkout
+shows `0.4.2-<short git>`).
 
 ## Configuration
 
@@ -174,6 +149,14 @@ start in the ladder — `CHAOS=0.9` at creation is honored, SIGHUP retunes
 a running fake.
 
 ## Runtime control
+
+### Signals
+
+| Signal | Effect |
+|---|---|
+| `SIGHUP` | **Re-apply the environment layer** — all-or-nothing (invalid value keeps the previous settings). Flags are startup-only; the env is the reloadable layer. |
+| `SIGUSR1` | **Reset the scenario**: all runtime pins, the cloud machine and the Modbus write overlay are dropped, the simulation continues. |
+| `SIGTERM` / `SIGINT` | **Graceful shutdown** with a session summary (duration, connections, requests, chaos hits). |
 
 A JSON-lines control server runs **by default on the unix socket
 `/tmp/fake-inverter-<listen-port>.socket`** — pass a TCP port number to
@@ -284,6 +267,40 @@ prints the bare value. While idle the CLI sends wire pings (every 55 s,
 times (default 3) with `--reconnect-wait` seconds (default 10) and resumes
 on the first success (`--reconnect 0` = die on loss).
 
+## Served registers (the default profile)
+
+- **32064** / **32080** — PV power / power limit (I32 W)
+- **32016+** — the string block: per-string voltage/current (a dark string
+  serves 0/0)
+- **37113** — grid power (I32 W, positive = feed-in)
+- **37100+** — smart meter block: status, per-phase voltages/currents, reactive
+  power, power factor, grid frequency, and 37119 exported / 37121 imported
+  kWh totals that grow through the simulated day
+- **32089** — device status (512 on-grid / 40960 standby at night)
+- **32087** — temperature (I16, °C×10); **32114** daily and **32106** total
+  yield (U32, kWh×100)
+- **37001+** — battery block (power, SoC, lifetime
+  totals)
+
+All of the above addresses come from the profile — remap them freely. The
+profile's per-entry **`fc`** picks each entry's address space (`3` holding
+/ `4` input for the word types, `1` coils / `2` discrete for `bit` — the
+four spaces are served separately). Writes stick in overlays: the register
+writes (FC06/FC16) overlay the holding registers, the coil writes
+(FC05/FC15) the coil space (FC5 demands the spec values
+`0x0000`/`0xFF00`); computed registers are recomputed per poll, overlay
+values win until cleared (`reset`, SIGUSR1, shutdown). A malformed frame
+on an implemented function code is answered with exception 03, never a
+silent disconnect.
+
+## Internal registers (not in the profile)
+
+**65000–65003** — the modbus-cache diagnostics block (magic `0xCAFE`,
+version, uptime, id): always mocked by the fake, never part of the
+profile — it exists so the scraper's `scraper_cache_*` auto-detection can
+be exercised without a cache. It is the only address range the fake
+hardcodes.
+
 ## Chaos injection (`--chaos`)
 
 `--chaos 0.4` (probability, `--seed` for reproducibility) makes the fake
@@ -293,25 +310,6 @@ the connection. Unlike the regression suites' scripted EvilInverter this
 runs unattended: point the scraper at it and watch
 `scraper_modbus_errors_total` climb while `scraper_up` flips, with the
 fake never dying. Tune or disable live (`set chaos off`).
-
-## Signals
-
-| Signal | Effect |
-|---|---|
-| `SIGHUP` | **Re-apply the environment layer** — all-or-nothing (invalid value keeps the previous settings). Flags are startup-only; the env is the reloadable layer. |
-| `SIGUSR1` | **Reset the scenario**: all runtime pins, the cloud machine and the Modbus write overlay are dropped, the simulation continues. |
-| `SIGTERM` / `SIGINT` | **Graceful shutdown** with a session summary (duration, connections, requests, chaos hits). |
-
-## Docker
-
-The fake ships as an alpine container — stdlib-only, no pip, running as
-the unprivileged `pvsuite` user with the tools on `PATH`
-(`Dockerfile.fake-inverter` + `compose.yaml`; see
-[`docker/README.md`](../docker/README.md)). The image loads its own
-bundled conf (`/pv-suite/inverter/inverter.conf`, the built-in
-`--config` target) — the env file and the CMD flags override it. The
-version reports as `0.4.2` inside the image (no git metadata; a checkout
-shows `0.4.2-<short git>`).
 
 ## Audit trail
 

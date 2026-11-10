@@ -68,22 +68,22 @@ design); the top non-man pairs:
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.92 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:34` `_load_options` |
 | 0.91 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.89 | `scraper/bin/modbus-scraper.py:246` `graceful_stop` <-> `dashboard/bin/dashboard.py:474` `graceful_stop` |
+| 0.89 | `scraper/bin/modbus-scraper.py:248` `graceful_stop` <-> `dashboard/bin/dashboard.py:476` `graceful_stop` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
 | 0.85 | `inverter/lib/options.py:35` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
 | 0.85 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
 | 0.85 | `scraper/lib/options.py:34` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.83 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.82 | `cache/bin/modbus-cache.py:350` `watch_dump` <-> `common/wire/control.py:925` `run_dump_interval` |
+| 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:928` `run_dump_interval` |
 | 0.81 | `inverter/lib/control.py:151` `__init__` <-> `dashboard/lib/control.py:78` `__init__` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:596` `acl_table_report` <-> `dashboard/lib/control.py:432` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:603` `acl_table_report` <-> `dashboard/lib/control.py:440` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
 | 0.75 | `inverter/lib/control.py:67` `handle` <-> `common/wire/control.py:262` `handle` |
 | 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:420` `load_write_gate_file` |
-| 0.73 | `inverter/lib/control.py:607` `command_help` <-> `dashboard/lib/control.py:101` `command_help` |
-| 0.73 | `scraper/lib/control.py:142` `command_help` <-> `inverter/lib/control.py:607` `command_help` |
+| 0.73 | `inverter/lib/control.py:614` `command_help` <-> `dashboard/lib/control.py:101` `command_help` |
+| 0.73 | `scraper/lib/control.py:142` `command_help` <-> `inverter/lib/control.py:614` `command_help` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -170,10 +170,10 @@ by semantic family — the knob layer is the one source --help, the man
 pages, the set grammar, the NixOS modules and the README checks read,
 so a drifted row travels wide.
 
-**The shape**: 219 knob rows across the
-four registries; 30 names carry in all four:
+**The shape**: 223 knob rows across the
+four registries; 31 names carry in all four:
 
-`audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-log`, `audit-max-mb`, `audit/rotate`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
+`audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-log`, `audit-max-mb`, `audit/rotate`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
 
 **The tool-specific remainder** (by nature):
 
@@ -185,7 +185,7 @@ four registries; 30 names carry in all four:
 | dashboard | `auth-token`, `config-js`, `local-time`, `log-access`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
 **The shared knobs whose fields disagree** (8 of
-30):
+31):
 
 | knob | the drifted fields (cache / scraper / inverter / dashboard) |
 |---|---|
@@ -420,9 +420,9 @@ LINES are quoted, the verdicts curated.
 | tool | mkOption blocks |
 |---|---|
 | cache | 12 |
-| scraper | 45 |
+| scraper | 46 |
 | inverter | no module.nix |
-| dashboard | 44 |
+| dashboard | 45 |
 
 **The module options NOT matching a registry knob name** (after
 the kebab/camel normalization; the `*File` suffix is the NixOS

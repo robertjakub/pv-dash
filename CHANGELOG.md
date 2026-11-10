@@ -12,6 +12,27 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Added
 
+- **common** — **the audit-forward targets (the off-box copy, the F10
+  finish line)**: `--audit-forward` spells one target now — `none`,
+  `syslog` (the local socket auto-scan), `syslog:/path` (an explicit
+  socket, must exist at bind), `udp://host[:514]` (RFC5426 datagrams,
+  best-effort) or `tcp://host[:514]` (RFC6587 octet-count framing). The
+  remote envelope rides the new `--audit-forward-format` (`rfc5424`, the
+  default, or `cef` as an additive wrapping) — both carry the native
+  line verbatim plus the prefix + chain hash as extracted fields
+  (`[pvDash@1 …]` / `cs1`/`cs2`), so a scheduled search at the collector
+  can chain-verify the off-box copy and alert on a break. A send failure
+  notes once and the next event re-arms lazily (no threads, no buffers;
+  the re-armed note carries the dropped count). `--audit-log none` turns
+  the local file off: with a forward spelled that is the remote-only
+  mode (the collector is the sole holder, the chain reseeds at GENESIS
+  per run), without one the audit is disabled (the state
+  `--no-audit-log` spells). The knob stays live family-wide
+  (`audit/forward`, `audit/forward-format`); the NixOS modules grew
+  `auditForward` (grammar-checked) + `auditForwardFormat`; the
+  audit-chain suite grew the collector harnesses (the TCP framing, CEF,
+  UDP, the re-arm cycle, the remote-only e2e).
+
 - **common** — **the audit trail forwarding** (`--audit-forward syslog`):
   every trail can mirror its lines to the local syslog socket as they
   land — stdlib `SysLogHandler` on `/dev/log` (or its macOS/journal
@@ -25,6 +46,8 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   `$AUDIT_FORWARD`, the dump/reload story carries it, the ctl/cli clients
   take the flag too), the NixOS modules grew `auditForward`, and the
   audit-chain suite pins the mirror, the fail-stop and the refusals.
+  Superseded in shape by the targets entry above (the same knob, the
+  full grammar).
 
 - **scraper** — **the alert rules pack ships next to the exporter** (the
   F16 closure): `scraper/alerts.yml`, six alerts in two groups, the

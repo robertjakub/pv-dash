@@ -112,6 +112,12 @@ only the **Done/history** records for their tool —
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a
   proxy-less LAN install defensible: the bearer token stops travelling in
   clear text. The Modbus side stays F1 (accepted, protocol-inherent).
+- **TLS on the audit forward** `[common]` — the target grammar's `tls://`
+  spelling (deliberately out of rev. 27): RFC5425 (TLS over the
+  octet-count framing) with the client certificates needs a real TLS
+  collector to test against (the suite cannot generate the certificates),
+  so the anchor lives here until one exists; `tls://…` today gets the
+  generic unknown-scheme refusal.
 - **the systemd unit hardening review** `[common]` — the NixOS modules
   ship `PrivateTmp`; a full sandbox pass (`ProtectSystem=strict`,
   `PrivateDevices`, `ProtectHome`, `RestrictAddressFamilies`,

@@ -56,8 +56,12 @@ All three modules behave the same way:
 - **The audit trail goes to stdout** (`auditLog` default = `-`): journald
   captures it — a hardened service cannot write the XDG state home. Set
   `auditLog` to a path (the module opens its `ReadWritePaths`) to keep a
-  file. `auditForward = "syslog"` mirrors every audit line into the
-  journal even with a file sink (the F10 external copy).
+  file. `auditForward` mirrors every audit line onward (the F10 external
+  copy): `"syslog"` into the journal even with a file sink, or
+  `"syslog:/path"`, `"udp://host[:514]"`, `"tcp://host[:514]"` for the
+  off-box collector (the envelope: `auditForwardFormat` =
+  `"rfc5424"`/`"cef"`; `"none"` with a forward spelled is the
+  remote-only mode).
 - **The control socket needs a path, not `/tmp`.** The services run with
   `PrivateTmp` — a `/tmp` socket is unreachable from outside (the module
   warns); give `controlPort` a path under `/run/<tool>/` and the module
@@ -109,7 +113,7 @@ services.modbus-scraper = {
 | `controlPort` | the control server target (unix path under `/run/modbus-scraper/`, or a TCP port) |
 | `controlToken` / `controlTokenFile` (+ `controlOpsToken`/`controlOpsTokenFile`, `controlOpsVerbs`, `controlTrustUids`, `controlSocketGroup`) | the control plane's secrets and posture |
 | `dumpPath` / `dumpKey` / `restoreOnStart` | the sealed state dump |
-| `auditLog` (+ `auditMaxMb`, `auditDaily`, `auditFiles`, `noAuditLog`, `auditForward`) | the SCR audit trail (default: stdout) |
+| `auditLog` (+ `auditMaxMb`, `auditDaily`, `auditFiles`, `noAuditLog`, `auditForward`, `auditForwardFormat`) | the SCR audit trail (default: stdout) |
 | `logLevel` / `logAccess` / `localTime` | the log surface |
 | `openFirewall` | open `listenPort` |
 
@@ -164,7 +168,7 @@ services.modbus-scraper = {
 | `controlToken` / `controlTokenFile` (+ `controlOpsToken`/`controlOpsTokenFile`, `controlOpsVerbs`, `controlTrustUids`, `controlSocketGroup`) | the control plane's secrets and posture |
 | `dumpPath` / `dumpWithCache` / `dumpKey` / `dumpInterval` / `restoreOnStart` | the sealed state dump |
 | `requestsAudit` | the per-client REQUESTS tally period (300 s) |
-| `auditLog` (+ `auditMaxMb`, `auditDaily`, `auditFiles`, `noAuditLog`, `auditForward`) | the CACHE audit trail (default: stdout) |
+| `auditLog` (+ `auditMaxMb`, `auditDaily`, `auditFiles`, `noAuditLog`, `auditForward`, `auditForwardFormat`) | the CACHE audit trail (default: stdout) |
 | `logLevel` / `logAccess` / `localTime` | the log surface |
 | `openFirewall` | open `listenPort` |
 
@@ -202,7 +206,7 @@ services.modbus-scraper = {
 | `controlPort` | the control server target (unix path under `/run/dashboard/`, or a TCP port) |
 | `controlToken` / `controlTokenFile` (+ `controlOpsToken`/`controlOpsTokenFile`, `controlOpsVerbs`, `controlTrustUids`, `controlSocketGroup`) | the control plane's secrets and posture |
 | `dumpPath` / `dumpKey` / `restoreOnStart` | the sealed state dump |
-| `auditLog` (+ `auditMaxMb`, `auditDaily`, `auditFiles`, `noAuditLog`, `auditForward`) | the DSH audit trail (default: stdout) |
+| `auditLog` (+ `auditMaxMb`, `auditDaily`, `auditFiles`, `noAuditLog`, `auditForward`, `auditForwardFormat`) | the DSH audit trail (default: stdout) |
 | `logLevel` / `logQueries` / `logAccess` / `localTime` | the log surface |
 | `openFirewall` | open `port` |
 

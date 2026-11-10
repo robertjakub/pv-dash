@@ -1,4 +1,4 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 26)
+# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 27)
 
 Scope: the `cache/`, `scraper/`, `inverter/` and `dashboard/` subprojects plus
 the shared `common/` package, `profiles/`, `docker/` and `scripts/`. Method:
@@ -13,6 +13,37 @@ findings there are weighted accordingly. Findings keep their numbers across
 revisions; open ones are in §3.1, closed ones in §3.2 with their fix and
 verification in [AUDIT-history.md](AUDIT-history.md) (next number: F24).
 
+**Rev. 27 — the audit-forward targets (the F10 finish line).** The trail
+is tamper-EVIDENT, not tamper-PROOF; the defense is now three tiers: (1)
+the local chain (the file of record, per-writer hashes, `audit_verify.py`),
+(2) the local mirror (rev. 26's journald copy — same box, better not
+strong) and (3) **the off-box copy** — `--audit-forward` spells one
+target: `none`, `syslog` (the local socket auto-scan), `syslog:/path` (an
+explicit socket, must exist at bind), `udp://host[:514]` (RFC5426
+datagrams, best-effort — drops are silent at the source and show as the
+per-prefix chain-hash gaps at the collector) or `tcp://host[:514]`
+(RFC6587 octet-count framing). The remote envelope rides
+`--audit-forward-format` (`rfc5424` — the default — or `cef` as an
+additive wrapping); both carry the native line verbatim (the chain
+verifies identically at the collector) and the prefix + chain hash as
+extracted fields (`[pvDash@1 …]` / `cs1`/`cs2`), so a scheduled search
+can run the chain-verify logic off-box and **alert on a chain break** —
+tamper-evidence stops being a property you check and becomes one that
+pages you. A send failure closes the mirror with one stderr note and the
+next event re-arms lazily (no threads, no buffers; the note carries the
+dropped count and the chain gap is the second tripwire on the same
+hole). Startup gates split: grammar errors and a missing explicit socket
+are hard (ERROR + rc 1), a remote target that does not resolve or
+refuses is soft (a warn, the lazy re-arm carries it — boot ordering
+never blocks the Modbus surface). `--audit-log none` turns the local
+file off: with a forward spelled that is the **remote-only mode** (the
+collector is the sole holder — no file, no XDG directory, the chain
+reseeds at GENESIS per run; the restart discontinuity is the collector
+alert's whitelist entry), without one the audit is disabled (the state
+`--no-audit-log` spells). TLS transport is deliberately out (the
+docs/TODO.md anchor: RFC5425 + certificates need a real collector to
+test against).
+
 **Rev. 26 — the audit trail forwarding (the F10 follow-through).** The
 chain is tamper-EVIDENT, not tamper-PROOF — trailing deletion and a
 rechain by whoever holds the algorithm stay outside its reach, and
@@ -26,7 +57,8 @@ stays the authority: a send failure stops the mirroring with one stderr
 note, never the trail; a socket-less spelling refuses to start (the
 clean ERROR + rc 1 shape). The file rotation and the journal retention
 together close the retention/immutability story (NIS2 21.2(b), DORA
-art. 11 — the logs an incident needs survive the box).
+art. 11 — the logs an incident needs survive the box). Rev. 27 extends
+the spelling to the full target grammar above.
 
 **Rev. 25 — the alert rules pack (F16 closed).** The exporter ships
 `scraper/alerts.yml` next to itself: six alerts in two groups — the
@@ -68,7 +100,7 @@ trust of their own.
 | state dump | `--dump-path`: the setting overrides (plus the cached words on `with-cache`) as one atomic JSON | n/a | n/a | n/a | created `0600` explicitly + a sha256 integrity hash, fail-closed restore (F18); sealed under `dump/key` when set (rev. 11) |
 | token files | every secret knob takes `file:<path>` | same | same | same | owner-only (0600) enforced at the shared loader (F12); the bare `-file` siblings removed rev. 13 |
 | upstream connection | outbound to the inverter/SDongle | outbound poll (the device or the cache), every 10 s by default | n/a (it *is* the device) | outbound HTTP to Prometheus (`--upstream`, default `http://localhost:9090`) | none (protocol-inherent) |
-| audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `scripts/audit_verify.py` (F10); the opt-in syslog forward mirrors every line to journald (rev. 26) |
+| audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `scripts/audit_verify.py` (F10); the opt-in forward mirrors every line to the local syslog or the off-box collector (rev. 27: the udp://tcp:// grammar + the RFC5424/CEF envelopes + the remote-only mode) |
 | compose demo stack | four services on one `internal: true` network, **nothing published on the host**, one shared `config` volume, the generated 0600 `metrics.token` | | | | the internal network is the boundary; the exporter bearer-gated in the demo (F7) |
 
 Deployment (docker/): all three Modbus images run the tool as the

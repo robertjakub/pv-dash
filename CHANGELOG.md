@@ -30,7 +30,12 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   banned outright). A later pass put every bool's native False in the
   trees too — the store_true flags resolved their False inline before —
   and the coverage gate dropped its bool-converter exemption, so a bool
-  without its tree entry fails like any other knob. The cache's
+  without its tree entry fails like any other knob. The ctl/cli
+  connection knobs left the `defaults` tree for static.json's own
+  `control-plane` section (the cli console's keepalive/reconnect pair,
+  the ctl+cli per-command timeout — the daemons never read them; the
+  `statics.py` aliases read the section).
+  The cache's
   `cache/ttl` default is
   the flat 30 s (was 3 × the poll interval — the tree's
   `cache_ttl_factor` is gone) and `modbus/auth-upstream`'s default is

@@ -86,25 +86,32 @@ gate's `NO_TREE_DEFAULT` map (the common six in
 `_COMMON_NO_TREE_DEFAULT`, the per-tool extras beside them); the
 secrets fail the outright ban.
 
-## The defaults outside the daemon — the ctl/cli's tree entries
+## The defaults outside the daemon — the ctl/cli's control-plane section
 
-The `defaults` tree serves every bin in the tool's `bin/` — but five
-entries exist for the client scripts alone (the daemon never reads
-them). The four tools share the shape:
+The ctl/cli connection knobs don't ride the `defaults` tree: they live
+in static.json's own `control-plane` section (the four tools carry the
+same four), and the daemon never reads them:
 
-| tree key | the CLI/CTL default | who reads it |
+| control-plane key | the CLI/CTL default | who reads it |
 |---|---|---|
 | `cli_timeout_s` | 5 s | the ctl and the cli — the per-command wait (`timeout_s=`) |
 | `cli_keepalive_s` | 55 s | the cli console — the keepalive ping period |
 | `cli_reconnect` | 3 | the cli console — the reconnect attempts after a drop |
 | `cli_reconnect_wait_s` | 10 s | the cli console — the wait between reconnects |
-| `control_idle_timeout_s` | 300 s | the daemon's control-session idle cap — but the **inverter only** reads the tree (`inverter/lib/control.py:73`); the cache's, scraper's and dashboard's daemons take `common/wire/control.py:94`'s hardcoded `IDLE_TIMEOUT_S = 300`, their tree entries (and the `statics.py` aliases) dead |
+
+One more knob the daemon should read but half the family doesn't:
+`control_idle_timeout_s` (the control session's idle cap) stays a
+`defaults`-tree entry, but the **inverter only** reads it
+(`inverter/lib/control.py:73`); the cache's, scraper's and dashboard's
+daemons take `common/wire/control.py:94`'s hardcoded
+`IDLE_TIMEOUT_S = 300`, their tree entries (and the `statics.py`
+aliases) dead.
 
 The ctl's socket target comes from `static.json`'s `control` section
-(the socket template), not the `defaults` tree. The audit rotation
-bounds (`audit_max_mb`, `audit_files`) ride both sides — the daemons
-configure from them, the client scripts render them — so they are
-daemon defaults and stay out of this table.
+(the socket template), not `control-plane`. The audit rotation bounds
+(`audit_max_mb`, `audit_files`) ride both sides — the daemons configure
+from them, the client scripts render them — so they are daemon
+defaults and stay out of this table.
 
 ## The gate
 

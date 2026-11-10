@@ -225,7 +225,7 @@ set log-level INFO
 | `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy |
 | `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
-| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward syslog`) | XDG state | the SCR audit trail: a file path or `-` for stdout (the docker/journald way); the syslog forward mirrors every line to journald (F10) |
+| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | XDG state | the SCR audit trail: a file path, `-` for stdout (the docker/journald way) or `none` (no local file — the forward carries the trail); the forward mirrors every line onward (F10) |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (overflow gets an immediate `503 # rate limited`) |
 | `--log-level` / `--log-access` / `--local-time` | `INFO` / off / UTC | the log surface |
 | `--config` / `--dry-run` / `--man` | — | the config file path / validate + print and exit / print the generated man page |
@@ -315,9 +315,19 @@ timestamp — journald adds one.
 The control commands (with their wire macs), the auth failures, the
 reloads and the shutdowns land in the **SCR audit trail** (`--audit-log`,
 the XDG state home by default — `scripts/audit_verify.py` walks it like
-the others). `--audit-forward syslog` mirrors every line — the per-writer
-hash chain included — to the local syslog socket, journald's sealed
-external copy beside the file/stdout sink (the F10 answer).
+the others). `--audit-forward` mirrors every line — the per-writer
+hash chain included — onward: `syslog` (the local socket auto-scan),
+`syslog:/path` (an explicit socket), `udp://host[:514]` (RFC5426,
+best-effort) or `tcp://host[:514]` (RFC6587 framing) — the **off-box
+copy** (the F10 answer): a scheduled search at the collector can
+chain-verify the extracted prefix/chain fields and alert on a break.
+The remote envelope rides `--audit-forward-format` (`rfc5424`, the
+default, or `cef` — the local forms keep the verbatim send). A send
+failure notes once and the next event re-arms. `--audit-log none` turns
+the local file off: with a forward spelled that is the **remote-only
+mode** (the collector is the sole holder, the chain reseeds at GENESIS
+per run), without one the audit is disabled (the state
+`--no-audit-log` spells).
 
 ## Test inverter
 

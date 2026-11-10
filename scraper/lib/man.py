@@ -100,9 +100,20 @@ read-only ops token (\\fB--control-ops-token\\fR) scopes its sessions to
 the show/clear verbs. The audit trail (in the XDG state home when
 \\fB--audit-log\\fR is unset, prefix SCR) records the control commands
 with their roles, the auth failures, the reloads and the shutdowns. With
-\\fB--audit-forward syslog\\fR every line \\(em the per\\-writer hash
-chain included \\(em is mirrored to the local syslog socket, journald's
-sealed external copy beside the file/stdout sink (F10)."""
+\\fB--audit-forward\\fR every line \\(em the per\\-writer hash chain
+included \\(em is mirrored onward: \\fBsyslog\\fR (the local socket
+auto\\-scan), \\fBsyslog:/path\\fR (an explicit socket),
+\\fBudp://host[:514]\\fR (RFC5426, best\\-effort) or
+\\fBtcp://host[:514]\\fR (RFC6587 framing) \\(em the off\\-box copy
+(F10): a scheduled search at the collector can chain\\-verify the
+extracted prefix/chain fields and alert on a break. The remote envelope
+rides \\fB--audit-forward-format\\fR (\\fBrfc5424\\fR, the default, or
+\\fBcef\\fR); the local forms keep the verbatim send. A send failure
+notes once and the next event re\\-arms. \\fB--audit-log none\\fR turns
+the local file off: with a forward spelled that is the remote\\-only
+mode (the collector is the sole holder, the chain reseeds at GENESIS
+per run), without one the audit is disabled (the state
+\\fB--no-audit-log\\fR spells)."""
     files = """.SH FILES
 .TP
 .I /tmp/modbus-scraper-<listen-port>.socket

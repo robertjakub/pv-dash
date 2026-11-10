@@ -25,7 +25,7 @@ import threading
 import time
 
 from common.render.human import secs
-from common.runtime.audit import AUDIT_FORWARD_CHOICES
+from common.runtime.audit import AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward
 from common.runtime.version import version_string
 from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
 from common.wire.control import ControlServer as _ControlServer, num, numi
@@ -385,10 +385,23 @@ class ControlServer(_ControlServer):
             # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
             return val if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
         if key == 'audit/log-file':
+            if val == 'none' and self.audit_params.get('forward'):
+                # remote-only: the collector is the sole holder (the chain
+                # reseeds at GENESIS on the next restart)
+                self.audit_params['path'] = 'none'
+                self.audit_params['disabled'] = False
+                with s.lock:
+                    s.cfg['audit_log'] = 'none'
+                    s.cfg['no_audit_log'] = False
+                return self._rebuild_audit()
             if val in ('off', 'none'):
+                # the full off — none without a forward folds to it (the
+                # same state --no-audit-log spells)
                 self.audit_params['disabled'] = True
                 with s.lock:
                     s.cfg['no_audit_log'] = True
+                    if val == 'none':
+                        s.cfg['audit_log'] = 'none'
                 return self._rebuild_audit()
             self.audit_params['path'] = val   # the raw spelling: a path, '-' (= stdout) or empty (the XDG state home)
             self.audit_params['disabled'] = False
@@ -425,11 +438,20 @@ class ControlServer(_ControlServer):
             self._rebuild_audit()
             return '%d' % v
         if key == 'audit/forward':
-            if val not in ('none', 'syslog'):
-                raise ValueError('audit/forward must be one of %s' % ', '.join(AUDIT_FORWARD_CHOICES))
-            self.audit_params['forward'] = None if val == 'none' else val
+            try:
+                parse_forward(val)
+            except ValueError:
+                raise ValueError('audit/forward must be %s' % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
+            self.audit_params['forward'] = None if val in ('', 'none') else val
             with s.lock:
                 s.cfg['audit_forward'] = val
+            return self._rebuild_audit()
+        if key == 'audit/forward-format':
+            if val not in AUDIT_FORWARD_FORMATS:
+                raise ValueError('audit/forward-format must be one of %s' % ', '.join(AUDIT_FORWARD_FORMATS))
+            self.audit_params['forward_format'] = val
+            with s.lock:
+                s.cfg['audit_forward_format'] = val
             return self._rebuild_audit()
         if key == 'audit/disable':
             if val in ('on', 'true', '1', 'yes'):
@@ -527,9 +549,13 @@ class ControlServer(_ControlServer):
         if key == 'control/socket-group':
             return 'on' if self.socket_group else 'off'
         if key == 'audit/log-file':
-            return self.audit.path if self.audit else 'off'
+            if self.audit is None or self.audit.disabled:
+                return 'off'
+            return 'remote' if self.audit.path == 'none' else self.audit.path
         if key == 'audit/forward':
             return self.audit_params.get('forward') or 'none'
+        if key == 'audit/forward-format':
+            return self.audit_params.get('forward_format') or 'rfc5424'
         if key == 'audit/rotate/max-size':
             return '%g' % self.audit_params['max_mb']
         if key == 'audit/rotate/daily':
@@ -566,7 +592,9 @@ class ControlServer(_ControlServer):
         commands there."""
         p = self.audit_params
         self.audit = self.rebuild_audit(p, 'SCR', 'modbus-scraper')
-        return self.audit.path if self.audit else 'off'
+        if self.audit is None or self.audit.disabled:
+            return 'off'
+        return 'remote' if self.audit.path == 'none' else self.audit.path
 
     def clear_overrides(self):
         """The config was re-applied (SIGHUP/request reload): nothing is
@@ -603,8 +631,9 @@ class ControlServer(_ControlServer):
             'local-time': self._get('local-time'),
             'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
             'control/socket-group': 'on' if self.socket_group else 'off',
-            'audit/log-file': self.audit.path if self.audit else 'off',
+            'audit/log-file': ('off' if (self.audit is None or self.audit.disabled) else self.audit.path),
             'audit/forward': self.audit_params.get('forward') or 'none',
+            'audit/forward-format': self.audit_params.get('forward_format') or 'rfc5424',
             'audit/rotate/max-size': '%g' % self.audit_params['max_mb'],
             'audit/rotate/files': '%d' % self.audit_params['files'],
             'audit/disable': 'on' if self.audit_params['disabled'] else 'off',

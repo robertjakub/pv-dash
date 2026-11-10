@@ -183,8 +183,9 @@ the SCR audit trail: the sink, the forwarding, the rotation, the kill switch
 
 | knob | set / unset | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-log` | `set audit log-file` | settable | `PATH\|-` | `--audit-log` / `AUDIT_LOG` | SCR audit trail: a file path or - for stdout (the docker/journald way); default: the XDG state home (~/.local/state/modbus-scraper/audit.log) |
-| `audit-forward` | `set audit forward` | settable | `syslog\|none` | `--audit-forward` / `AUDIT_FORWARD` | also mirror every audit line to the local syslog (journald picks them up, chain hash included) |
+| `audit-log` | `set audit log-file` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | SCR audit trail: a file path or - for stdout (the docker/journald way); `none` = no local file (the forward carries the trail); default: the XDG state home (~/.local/state/modbus-scraper/audit.log) |
+| `audit-forward` | `set audit forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
+| `audit-forward-format` | `set audit forward-format` | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
 | `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the SCR audit trail |
 
 ### audit/rotate

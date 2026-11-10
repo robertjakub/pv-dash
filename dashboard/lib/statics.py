@@ -2,14 +2,14 @@
 """The dashboard's static configuration: the shipped defaults for the static
 file server with the Prometheus proxy — the listen address,
 the upstream Prometheus URL, the proxy path prefix and timeout, the log
-level and the battery flag — kept in one JSON file (lib/static.json)
+level and the battery flag — kept in one JSON file (lib/defaults.json)
 instead of being scattered over the modules. Loaded once at import;
 everything reads the STATIC dict (or the named aliases below). Stdlib only."""
 import json
 import os
 
 _here = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(_here, 'static.json'), encoding='utf-8') as _f:
+with open(os.path.join(_here, 'defaults.json'), encoding='utf-8') as _f:
     STATIC = json.load(_f)
 
 LOG_LEVELS = tuple(STATIC['log_levels'])

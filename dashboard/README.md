@@ -310,7 +310,7 @@ option map, the secrets discipline, the reload story — documented once in
 | `lib/config.py` | settings resolution (CLI > env > the `server.conf` set grammar > defaults) + the control-target resolution |
 | `lib/options.json` + `lib/options.py` | the knob registry and its loader (one source for the wire, the completions and the docs) |
 | `lib/control.py` | the JSON-lines control server (the signed wire, the peer-cred shortcut) |
-| `lib/static.json` / `lib/statics.py` | the shipped server defaults (port, bind, upstream, proxy prefix/timeout) / its loader |
+| `lib/defaults.json` / `lib/statics.py` | the shipped server defaults (port, bind, upstream, proxy prefix/timeout) / its loader |
 | `examples/config.js` | the user-settings example (`SOLAR_CONFIG`), served at `/config.js` |
 | `man/*.1` | the man pages — **generated** (`--man`, `scripts/gen_man.py`) |
 | `package.nix` / `module.nix` | Nix packaging and service module (the flake entry point lives at the suite root) |

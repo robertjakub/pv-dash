@@ -26,13 +26,13 @@ def _load_options():
     """The rows from lib/options.json (next to this loader): the shared
     registry parser (common/settings/options.py parse_registry_sections — the
     show/commands sections, the control-grammar vocabulary) and the
-    shared row builder (option_rows). The static.json-wired bits ride
+    shared row builder (option_rows). The defaults.json-wired bits ride
     here too (the audit log's rotation defaults, the log-level choices)
-    so the constants keep their one home; the loader reads static.json
+    so the constants keep their one home; the loader reads defaults.json
     directly so the module also imports flat (scripts/check_options.py
     walks lib/ on sys.path)."""
     here = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
+    with open(os.path.join(here, 'defaults.json'), encoding='utf-8') as f:
         static = json.load(f)
     # no static default rides the argparse parser: a static-wired default
     # would shadow the env layer (the resolver never falls through a truthy

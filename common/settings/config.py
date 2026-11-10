@@ -164,18 +164,19 @@ def check_token_file_mode(path, label='token-file'):
                          % (label, path, mode, path))
 
 
-def parse_listen(text):
+def parse_listen(text, label='--listen'):
     """HOST:PORT -> (host, port); a malformed value exits with a clean
-    one-liner (the repo's config style — never a traceback)."""
+    one-liner (the repo's config style — never a traceback); the refusal
+    names the knob (label) — the default is the serving --listen."""
     host, sep, port = text.rpartition(':')
     if not sep:
-        raise SystemExit('--listen must be HOST:PORT, got %r' % text)
+        raise SystemExit('%s must be HOST:PORT, got %r' % (label, text))
     try:
         port = int(port)
     except ValueError:
-        raise SystemExit('--listen port must be a number, got %r' % port)
+        raise SystemExit('%s port must be a number, got %r' % (label, port))
     if not 0 <= port <= 65535:
-        raise SystemExit('--listen port out of range, got %d' % port)
+        raise SystemExit('%s port out of range, got %d' % (label, port))
     return host.strip('[]'), port
 
 

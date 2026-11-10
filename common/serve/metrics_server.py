@@ -23,6 +23,21 @@ METRICS_503 = (b'HTTP/1.1 503 Service Unavailable\r\n'
                b'# rate limited: too many concurrent clients\n')
 
 
+def metric(name, help, kind, *samples):
+    """One metric's exposition rows, structurally paired: the HELP/TYPE
+    pair once, then the sample lines — a bare value or a (labels, value)
+    pair per sample ('fc="3"', 3 -> `name{fc="3"} 3`). The four tools'
+    render()s are built from this (the pair cannot drift apart)."""
+    rows = ['# HELP %s %s' % (name, help), '# TYPE %s %s' % (name, kind)]
+    for s in samples:
+        if isinstance(s, tuple):
+            labels, value = s
+            rows.append('%s{%s} %s' % (name, labels, value))
+        else:
+            rows.append('%s %s' % (name, s))
+    return rows
+
+
 class _GatedMetricsHTTPServer(GatedHTTPServer):
     """The endpoint's server: the gate refusals and the acl hooks read the
     MetricsServer instance (metrics_server) — its LOG_NAME names the tool."""

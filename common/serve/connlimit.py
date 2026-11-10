@@ -25,6 +25,14 @@ def rate_limit_503(body):
             b'Connection: close\r\n\r\n' + body)
 
 
+def limits_words(max_clients, client_timeout, max_conn_per_ip):
+    """The caps' start-log words (the family's one rendering): each cap
+    speaks only when it is set (0 = unlimited / off)."""
+    return (['max-clients %d' % max_clients] if max_clients else []) + \
+           (['client-timeout %gs' % client_timeout] if client_timeout else []) + \
+           (['max-conn-per-ip %d' % max_conn_per_ip] if max_conn_per_ip else [])
+
+
 class ConnGate:
     """ admit(ip) -> (ok, reason): False with reason 'total' or 'per-ip' past
     the caps; release(ip) after serving (or after a refused admit that was

@@ -3,7 +3,9 @@
 One stdlib-only Python package (imported as `common`) used by
 [modbus-scraper](../scraper/README.md), [modbus-cache](../cache/README.md),
 the [fake inverter](../inverter/README.md) and the [dashboard](../dashboard/README.md),
-organized into functional subpackages:
+organized into functional subpackages. The shared layer's behavior specs
+live in [docs/common/](../docs/common/README.md) — the Modbus reference,
+the ACL map, the defaults ladder:
 
 ## `render/` — the human-facing rendering
 
@@ -39,9 +41,10 @@ tools' `statics.py` alias it).
 
 | module | what |
 |---|---|
-| `control.py` | the control server's base: the wire tier (the unix/TCP listener with the 0600/0660 mode, the peer-cred trusted peers, the admin/ops roles, the HMAC frame verification — the reply status speaks `ok`/`fail`/`bye`), the listener's live-rebind family (rev. 22: `set control/port` swaps the socket bind-first, the failed bind rolls back, the sessions keep serving; the F5 refusal guards the live wire through `refuse_tokenless_rebind`/`refuse_token_drop`), the buffered session handler, the registry surfaces (help config / show knobs / the golden `show config`), the family's `command()` walk (the spine: the help/topic ladder, the set/clear pair, the show reports, the request namespace — the subclasses ride the hooks) and the dump/reload family — the four tools subclass it with their grammar wiring and their reports |
+| `control.py` | the control server's base: the wire tier (the unix/TCP listener with the 0600/0660 mode, the peer-cred trusted peers, the admin/ops roles, the HMAC frame verification — the reply status speaks `ok`/`fail`/`note`/`bye`), the listener's live-rebind family (rev. 22: `set control/port` swaps the socket bind-first, the failed bind rolls back, the sessions keep serving; the F5 refusal guards the live wire through `refuse_tokenless_rebind`/`refuse_token_drop`), the buffered session handler, the registry surfaces (help config / show knobs / the golden `show config`), the family's `command()` walk (the spine: the help/topic ladder, the set/clear pair, the show reports, the request namespace — the subclasses ride the hooks) and the dump/reload family — the four tools subclass it with their grammar wiring and their reports |
 | `wiresec.py` | the control wire's integrity layer: the full-HMAC frame signing/verification, the token auth, the RBAC roles (admin / the read-only ops shift) |
 | `cred.py` | peer-credential lookup for the unix control sockets (`SO_PEERCRED`/`LOCAL_PEERCRED`) — the kernel-vouched trusted peers |
+| `protocol.json` | the Modbus family's one shared tree: the protocol limits (max_pdu/max_count/max_bits/max_registers), the unit range, the read/write FC policy, the exception codes and the registers' type->words map — the three Modbus tools' `statics.py` project it |
 | `ctl.py` | the ctl client, one ladder for the family: one command or a stdin batch, the signed exchange, the auth handshake, the daemon-exit bye — the four `*-ctl` bins keep only their prose and constants |
 | `cli.py` | the console-style cli client, one implementation: the signed session with its reconnect cycle, the keepalive thread, the readline TAB completion and the typed-command loop with the confirm guards — the four `*-cli` bins keep their pools, candidates ladder, welcome and (the fake) its verb-first loop, passed as a spec dict |
 

@@ -137,12 +137,13 @@ def apply_restart_state(target, config_path, dump_key, server, extra=None):
         logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
 
 
-def parse_ops_verbs(raw, known, rc=2, label='--control-ops-verbs', default='show,clear'):
+def parse_ops_verbs(raw, known, default, rc=2, label='--control-ops-verbs'):
     """The ops policy's csv -> the verb frozenset; empty or an unknown
     verb refuses the start (the ops policy needs at least one verb the
     grammar speaks). The default policy is the tool's derived
-    DEFAULT_OPS_VERBS (show, or show,clear where the grammar speaks
-    clear — lib/options.py known_verbs)."""
+    DEFAULT_OPS_VERBS (show, or show,flush where the grammar speaks
+    flush — lib/options.py known_verbs) — always passed, never
+    defaulted here."""
     ops_verbs = frozenset(v.strip().lower() for v in (raw or default).split(',') if v.strip())
     unknown = sorted(v for v in ops_verbs if v not in known)
     if not ops_verbs or unknown:

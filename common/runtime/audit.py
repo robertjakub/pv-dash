@@ -343,6 +343,33 @@ def default_path(app):
     return os.path.join(d, 'audit.log')
 
 
+def audit_params_of(cfg):
+    """The audit family's live-swap params off the resolved mapping (the
+    keys the resolver spells: audit_log, audit_max_mb, audit_files,
+    audit_daily, audit_forward, audit_forward_format, no_audit_log) —
+    the one shape the four bins pass their control servers."""
+    return {'path': None if cfg['no_audit_log'] else cfg['audit_log'],
+            'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],
+            'daily': cfg['audit_daily'],
+            'forward': None if cfg['audit_forward'] in (None, '', 'none') else cfg['audit_forward'],
+            'forward_format': cfg['audit_forward_format'],
+            'disabled': bool(cfg['no_audit_log'])}
+
+
+def build_audit(cfg, prefix, app, logger, rc=1):
+    """The start's AuditLog: None when the trail is off, the refuse-loud
+    SystemExit when the trail's parameters are invalid (the four bins'
+    one shape; `path` rides audit_params_of's None-when-disabled rule)."""
+    try:
+        return None if cfg['no_audit_log'] else AuditLog(
+            None if cfg['no_audit_log'] else (cfg['audit_log'] or None), prefix, app=app,
+            max_mb=cfg['audit_max_mb'], daily=cfg['audit_daily'], files=cfg['audit_files'],
+            forward=cfg['audit_forward'], forward_format=cfg['audit_forward_format'])
+    except ValueError as e:
+        logger.error(str(e))
+        raise SystemExit(rc)
+
+
 class AuditLog:
     """'<UTC stamp> AUDIT <PREFIX> <EVENT> <chain hash> [detail]' per line —
     the 12-hex hash chains the entry to this writer's previous one

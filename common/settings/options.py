@@ -18,10 +18,10 @@ default. From this one row the surfaces are built or checked:
 - the **control grammar's live settings** — the `Setting` rows the `set`/
   `clear` verbs, the console completions and the word-help speak, derived
   from the same rows (`settings_of`/`make_describe`: a row's `live` name —
-  a `/`-path, `inverter/profile` — its `setting_help`, its completable
+  a `/`-path, `modbus/profile` — its `setting_help`, its completable
   `values`, the value-shape `hint` and the per-value `value_help`; a
   flagless row is a control-only setting — the fake's pins and machines;
-  the path spells as its words on the wire: `set inverter profile <value>`,
+  the path spells as its words on the wire: `set modbus profile <value>`,
   however deep — `a/b/c` → `set a b c <value>`);
 - `scripts/check_options.py` — the CI gate that the four surfaces (the
   flags, the env names, the bundled config, the NixOS module and the README
@@ -48,7 +48,7 @@ class Option:
     the argparse value), `default` (the argparse default — None = unset, the
     resolution layers decide), `live` (the control `set` name when the knob
     is live-settable — a '/'-path whose segments spell as words on the wire:
-    `inverter/profile` is `set inverter profile <value>`), `secret` (a
+    `modbus/profile` is `set modbus profile <value>`), `secret` (a
     token: rendered into a config file only in its -file form), `choices`
     (the values the parser accepts) and `negates` (the name of the boolean
     knob this row switches off — the --no-x form of an --x flag). A
@@ -92,10 +92,6 @@ class Option:
                                      # static rung (the ladder's last layer); the argparse
                                      # `default` above stays unset so the flag reads unset
                                      # (a wired parser default would shadow the env layer)
-
-    @property
-    def optname(self):
-        return self.flag[2:] if self.flag and self.flag.startswith('--') else (self.flag or self.name)
 
     def env_names(self):
         return self.env if isinstance(self.env, tuple) else (self.env,)
@@ -397,7 +393,7 @@ def config_value(name, cfg, by_name, cfg_keys=None, formatters=None):
 def control_command(opt):
     """The knob -> control-command mapper: the command that changes this knob
     on a running daemon (`set interval 10`; a live path spells as its words:
-    `set inverter profile <value>`; an aliased row names its second spelling
+    `set modbus profile <value>`; an aliased row names its second spelling
     too), or the note that the knob is startup-only (restart to apply). A
     knob the registry marks restart carries ', restart' on its recipe — the
     set records the value, the restart applies it. A restart-marked SECRET
@@ -604,7 +600,7 @@ def option_rows(rows, choices=None):
 class Setting:
     """One live control setting — the registry's control-grammar view: the
     `set <name>` name (a '/'-path: the wire spells its segments as words —
-    `inverter/profile` is `set inverter profile <value>`), the short
+    `modbus/profile` is `set modbus profile <value>`), the short
     description the wire help answers with, the completable value words, the
     value-shape hint (shown after the words), the per-value short
     descriptions and the display group it renders in (the row's `group`,
@@ -662,20 +658,62 @@ def settings_of(options):
     return tuple(out)
 
 
-def setting_groups(names, by_name):
-    """The live settings grouped under their display groups (the row's
-    `group`, ungrouped — the '' bare bucket, no header — when it carries
-    none; the console word-help and the completions group by the `group`
-    field alone; the [values] group stays the caller's).
-    First-appearance order over the given names, only the non-empty groups;
-    a name no Setting answers for belongs to the caller's bare bucket,
-    never here."""
-    buckets = {}
-    for n in names:
-        s = by_name.get(n)
-        if s is not None:
-            buckets.setdefault(s.display_group, []).append(n)
-    return list(buckets.items())
+def load_static_json(tool_file):
+    """The tool's lib/defaults.json next to the caller's module file —
+    the constants audit's home (the log levels, the diagnostics block,
+    the per-tool statics)."""
+    here = os.path.dirname(os.path.abspath(tool_file))
+    with open(os.path.join(here, 'defaults.json'), encoding='utf-8') as f:
+        return json.load(f)
+
+
+def static_defaults(options):
+    """The rows' `default` as the resolver's static rung: {snake_name:
+    value} over the rows that carry one. The ONE derivation (the four
+    lib/statics.py re-derive nothing)."""
+    return {o.name.replace('-', '_'): o.static_default
+            for o in options if o.static_default is not None}
+
+
+def registry_view(options, show_options):
+    """The per-tool registry view, built once (the lib/options.py loaders
+    unpack it): the live Setting tables the wire, the consoles and the
+    dumps share — canonical + alias spellings folded into one map (the
+    canonical renders), the knob-only set vocabulary beside the full
+    space, the show lives, the hidden rows, the help-only nodes and the
+    describe pair. One implementation: the alias fold (the row's second
+    spelling answers the same Setting) used to live on two tools only —
+    `set audit forward-format` answered err where the fold was missing."""
+    from types import SimpleNamespace
+    settings = settings_of(options) + settings_of(show_options)
+    setting_by_name = {s.name: s for s in settings}
+    alias_names = []
+    for s in settings:   # the row's `alias` spelling answers the same Setting — the canonical renders
+        if s.alias and s.alias not in setting_by_name:
+            setting_by_name[s.alias] = s
+            alias_names.append(s.alias)
+    set_by_name = {s.name: s for s in settings_of(options)}
+    for s in settings_of(options):   # the aliases ride the set vocabulary beside the canonicals
+        if s.alias and s.alias not in set_by_name:
+            set_by_name[s.alias] = s
+    show_lives = frozenset(o.live for o in show_options)   # show answers them, set/clear never offers them
+    describe_setting, describe_value = make_describe(setting_by_name)
+    return SimpleNamespace(
+        settings=settings,
+        setting_by_name=setting_by_name,
+        setting_names=tuple(s.name for s in settings),   # the dump keys and the clear defaults iterate these
+        alias_names=tuple(alias_names),                  # the ?/TAB pools ride them beside the canonicals
+        set_by_name=set_by_name,
+        show_lives=show_lives,
+        live_settings=frozenset(o.live for o in options if o.live) | show_lives,   # the pools list these
+        hidden_settings=frozenset(o.live for o in options if o.hidden and o.live)
+        | frozenset(o.live for o in show_options if o.hidden and o.live)
+        | frozenset(o.alias for o in options if o.hidden and o.alias)
+        | frozenset(o.alias for o in show_options if o.hidden and o.alias)
+        | frozenset(o.name for o in options if o.hidden and not o.live),   # the flat hidden knobs
+        node_by_name={o.name: o for o in options if o.node},   # the hierarchy nodes (help-only)
+        describe=(describe_setting, describe_value),
+    )
 
 
 def word_groups(words, groups):
@@ -691,9 +729,9 @@ def word_groups(words, groups):
 
 def match_setting_path(words, by_name):
     """The live setting a set/clear/show/help word list names: a `live` path
-    (`inverter/profile`) spells as its segments' words on the wire — the
+    (`modbus/profile`) spells as its segments' words on the wire — the
     longest '/'-joined prefix of `words` that `by_name` answers wins, the
-    remaining words belong to the value (`set inverter profile <value>`;
+    remaining words belong to the value (`set modbus profile <value>`;
     however deep: `a/b/c` → `set a b c <value>`). The map also answers a
     row's `alias` spelling — the return is the CANONICAL live name either
     way (the replies, the dump keys and the defaults render one name).

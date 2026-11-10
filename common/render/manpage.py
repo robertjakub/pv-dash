@@ -30,6 +30,42 @@ def esc(text):
     return text.replace('-', '\\-')
 
 
+# the EXIT STATUS blocks, verbatim across the four tools' pages (the
+# per-tool man.py files splice them into their ctl/cli/daemon pages)
+EXIT_STATUS_DAEMON = """.SH EXIT STATUS
+.TP
+.B 0
+success (\\fB--dry-run\\fR: valid configuration).
+.TP
+.B 1
+invalid configuration or a failed bind (reason on stderr).
+.TP
+.B 2
+command-line misuse."""
+
+EXIT_STATUS_CTL = """.SH EXIT STATUS
+.TP
+.B 0
+every command answered \\fBok\\fR.
+.TP
+.B 1
+connection or control error.
+.TP
+.B 2
+command-line misuse."""
+
+EXIT_STATUS_CLI = """.SH EXIT STATUS
+.TP
+.B 0
+the session ended cleanly.
+.TP
+.B 1
+connection or control error.
+.TP
+.B 2
+command-line misuse."""
+
+
 def wrap(text, width=72):
     """The roff body re-flows, so a hard wrap is pure formatting: keep the
     generated pages under the 80-column lint the hand-written pages hold.

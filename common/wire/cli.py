@@ -23,7 +23,7 @@ except ImportError:
 from common.runtime.audit import AUDIT_FORWARD_FORMATS, AuditLog
 from common.settings.config import parse_secret, resolve_target
 from common.render.human import secs
-from common.settings.options import command_path_pool, render_word_sections, setting_path_pool, word_groups
+from common.settings.options import command_path_pool, render_word_sections, setting_path_pool
 from common.render.texts import T
 from common.wire.wiresec import sign_request, verify_reply
 
@@ -40,6 +40,37 @@ class ConnectionLost(Exception):
 class DaemonExit(Exception):
     """The daemon sent its bye daemon-exit frame: print the notice and leave —
     there is nothing on the other end to reconnect to."""
+
+
+def pools(commands, internal, hidden, settings, nodes, commands_help,
+          setting_names, alias_names, live, banner_name):
+    """The standard console's pool/describe/welcome furniture (the three
+    simple cli bins' one shape; the cache's dump-gated pools keep their
+    own): the completion/list pools speak the live-named settings + the
+    alias spellings (a not-yet-live knob never lists, the hidden and
+    internal rows never list) and the welcome prints the family banner.
+    Returns (pool_names, describe_word, command_pool, setting_pool, welcome)."""
+    pool_names = tuple(n for n in setting_names + alias_names if n not in hidden
+                       and (n in live or n in alias_names))   # a not-yet-live knob never lists
+    describe_word = make_describe_word(nodes, commands_help, settings)
+
+    def command_pool():
+        """The first words the daemon offers right now (the hidden and the
+        internal rows never list)."""
+        return tuple(n for n in commands if n not in hidden and n not in internal)
+
+    def setting_pool():
+        """The show-branch pool: the live-named settings + the alias
+        spellings (a not-yet-live knob never lists)."""
+        return pool_names
+
+    def welcome(sock):
+        """The first-connect greeting: the console's two fixed lines — the
+        daemon's name and the one-line navigation hint."""
+        print(T('banner.welcome') % banner_name)
+        print(T('banner.hint'))
+
+    return pool_names, describe_word, command_pool, setting_pool, welcome
 
 
 def make_describe_word(nodes, commands_help, settings):
@@ -196,7 +227,7 @@ def candidates(buf):
     `request flush` the leaf's own), set/clear walk the setting paths (the
     spec's setting_pool minus the show reports), show walks the
     setting paths including the reports. A live setting's name may be a
-    '/'-path (`inverter/profile`): set/clear/show spell it as words — the
+    '/'-path (`modbus/profile`): set/clear/show spell it as words — the
     completion offers the next segment until the path is whole, then the
     values."""
     end_space = buf.endswith(' ')

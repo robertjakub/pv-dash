@@ -32,12 +32,21 @@ from common.settings.options import config_value, control_command, default_ops_v
 from common.render.human import secs
 from common.render.texts import T
 from common.runtime.version import version_string
-from common.wire.wiresec import ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, proof_tag, role_allows, \
+from common.wire.wiresec import ROLE_ADMIN, ROLE_OPS, command_verb, proof_tag, role_allows, \
     role_tag, sanitize_command, sign_reply, verify_request_mac
 
 _here = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(_here, 'defaults.json'), encoding='utf-8') as _f:
     CONTROL_WIRE_DEFAULTS = json.load(_f)    # the shared control-wire tree (flat: the cli_* keys)
+
+# the clients' wire constants, off the same tree (the four lib/statics.py
+# re-export them beside their own statics)
+CLI_KEEPALIVE_S = CONTROL_WIRE_DEFAULTS['cli_keepalive_s']
+CLI_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_timeout_s']
+CLI_RECONNECT = CONTROL_WIRE_DEFAULTS['cli_reconnect']
+CLI_RECONNECT_WAIT_S = CONTROL_WIRE_DEFAULTS['cli_reconnect_wait_s']
+CLI_IDLE_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_idle_timeout_s']
+CLI_MAX_LINE_BYTES_S = CONTROL_WIRE_DEFAULTS['cli_max_line_bytes_s']
 
 
 def num(text, label, what):
@@ -320,7 +329,7 @@ class ControlServer:
                 elif self.audit and cmd.lower() != 'ping':
                     self.audit.event('COMMAND', "peer=%s%s '%s'%s -> %s"
                                      % (who, role_tag(role), cmd, proof_tag(obj), reply.split(' ', 1)[0]))
-                self.LOG.debug('control from %s: %s -> %s', who, cmd, reply)
+                self.log_exchange(who, cmd, reply)
                 if obj is not None:
                     client.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())
                 if reply.startswith('bye'):
@@ -340,6 +349,12 @@ class ControlServer:
             with self.clients_lock:
                 self.clients.discard(client)
             client.close()
+
+    def log_exchange(self, who, cmd, reply):
+        """The per-command debug line (the reply text rides it). A subclass
+        may shorten it — the fake hides the reply unless log_replies (the
+        words are demo state)."""
+        self.LOG.debug('control from %s: %s -> %s', who, cmd, reply)
 
     @staticmethod
     def peer(addr):
@@ -989,6 +1004,69 @@ class ControlServer:
             raise ValueError('%s must be %s..%s%s' % (key, opt.min, opt.max, (' ' + what) if what else ''))
 
     # --- the dump/reload family ---
+
+    def clear_overrides(self):
+        """The config was re-applied (the reload): nothing is
+        live-overridden anymore. The base owns `overridden` — the reload's
+        wholesale path calls this."""
+        self.overridden.clear()
+
+    def dump_settings_tail(self, raw):
+        """The dump_settings subclasses' shared tail: the restart-marked
+        knobs speak their CONFIGURED value (the pending override, not the
+        running one), then the filter keeps the overridden raw and
+        re-appliable."""
+        for opt in self.OPTIONS:
+            if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:
+                raw[opt.live] = self.defaults[opt.live]
+        from common.settings.dump import dump_filter
+        return dump_filter(self.overridden, raw, self.SETTINGS)
+
+    def command_help_tail(self, cmds, dump_words=', request dump, request restore'):
+        """The command_help subclasses' shared tail: the dump commands
+        appear only when a dump path is configured (there is nothing to
+        dump into otherwise), then the help/config pointers."""
+        if self.dump_path:
+            cmds += dump_words
+        cmds += ('; help <setting> describes it, help config maps every knob to '
+                 'its control command, show knobs prints the full dictionary')
+        return cmds
+
+    @staticmethod
+    def probe_bind(t, key):
+        """The live listen-move's bind probe: fail fast — the bind at
+        restart is too late to complain (the cannot_bind ValueError the
+        wire answers)."""
+        probe = socket.socket()
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind(t)
+        except OSError as e:
+            raise ValueError(T('wire.cannot_bind') % (t[0], t[1], e))
+        finally:
+            probe.close()
+
+    @staticmethod
+    def gate_connections_line(httpd):
+        """The exposition endpoint's live clients: the gate's counters, one
+        row per peer IP (the scraper's and dashboard's show connections)."""
+        total, per_ip = httpd.gate.snapshot() if httpd else (0, {})
+        if not total:
+            return 'none'
+        rows = ['%d active' % total]
+        rows += ['%s: %d' % (ip, n) for ip, n in sorted(per_ip.items())]
+        return '; '.join(rows)
+
+    @staticmethod
+    def modbus_connections_line(clients, lock):
+        """The Modbus surface's live clients: peer, connection age,
+        requests served (the cache's and fake's show connections)."""
+        with lock:
+            if not clients:
+                return 'none'
+            now = time.monotonic()
+            return '; '.join('%s connected %s requests %d' % (k, secs(now - v['since']), v['requests'])
+                             for k, v in sorted(clients.items()))
 
     def apply_dump_settings(self, settings):
         """Re-apply the dumped overrides; returns (applied, failed-name-list).

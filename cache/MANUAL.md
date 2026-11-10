@@ -75,6 +75,7 @@ word `profile`, `show write registers profile` answers the report.
 | `request dump` | namespace (hidden) | the state dump: the live overrides written sealed (with-cache carries the cached register words too) |
 | `request dump with-cache` | command (hidden) | the dump carries the cached register words too |
 | `request reload` | command | save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values) |
+| `request reload-config` | command | re-read the config file (the SIGHUP path) |
 | `request restart` | command (hidden) | restart the upstream session: connection + cache dropped, repoll |
 | `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
 | `set` | command | configure a setting live: set \<setting> \<value> |

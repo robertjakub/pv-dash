@@ -82,7 +82,7 @@ def _render_special(low, reply):
 
 SPEC = dict(label='the cache proxy', daemon_label='modbus-cache control server',
             cli_name='modbus-cache-cli', app='modbus-cache', self_note='the proxy itself',
-            command_help='e.g. inspect, show config, show cache, request clear cache, request restart, shutdown',
+            command_help='e.g. inspect, show config, show cache, request clear cache, request reload-config, request restart, shutdown',
             prompt_word='cache', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,

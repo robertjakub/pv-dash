@@ -5,6 +5,35 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The config re-read joins the wire family-wide (`request/reload-config`,
+the grammar follow-through): the SIGHUP body extracts into the bin's
+`apply_reload` — the map swap, the override-marker clear and the RELOAD
+audit — and the control server's `control.reloader` runs the same path
+on the wire; the dump loop re-reads the configured interval on that
+path now (the wake it was missing). The signal set rides the family's
+shared watcher (`common/runtime/daemon.py`): SIGHUP + SIGUSR1 + the
+graceful stop install from one call (the SIGTERM reason spells
+`SIGTERM` now), the reload-failure audit riding the hook. The registry
+row lands beside `request/reload`, `reload-config` joins KNOWN_VERBS
+(the ops default stays show,clear), the ctl/cli helps + the man prose
++ the README rows follow, and the spine's reload-config reply catches
+the resolvers' SystemExit (a broken config file answers
+`err reload failed` instead of killing the session).
+
+The audit forwarding (`--audit-forward syslog`, the F10 follow-through):
+the trail can mirror every line — the per-writer hash chain included —
+to the local syslog socket as it lands, journald picking them up sealed:
+the journal copy survives the box, the sink stays the authority. The
+machinery is shared (`common/runtime/audit.py`: the fail-loud
+`SysLogHandler` subclass — the stdlib swallows send failures into a
+per-event traceback —, the socket candidates, the one-note fail-stop),
+the row is live on the wire (`set audit forward syslog`, live
+`audit/forward`, env `AUDIT_FORWARD`), a socket-less spelling refuses to
+start with the family's one-clean-ERROR shape, and the live audit swaps
+now rebuild the running writer on every knob (the rotation sets updated
+the params but not the writer before — this tool already rebuilt, the
+family does now).
+
 The alert rules pack: the cache contributes its side to the exporter's
 shipped pack ([`../scraper/alerts.yml`](../scraper/alerts.yml), the F16
 closure) — and the missing metric landed first:

@@ -448,6 +448,9 @@ try:
     check('control: restart drops the upstream session', r.startswith('ok upstream session restarted'), r)
     b = rd(32064, 2, port=15513)
     check('control: upstream reconnects after restart', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
+    r = ctl_cmd('request reload-config', 15514)
+    check('control: request reload-config re-reads the config (the SIGHUP path)',
+          r.startswith('ok reloaded (') and 'range(s) from' in r, r[:120])
     r = ctl_cmd('bogus', 15514)
     check('control: unknown command', r.startswith('fail unknown command'), r)
     r = ctl_cmd('ping', 15514)
@@ -656,11 +659,15 @@ try:
           r == 'ok restore a setting to its configured value: unset <setting>', r)
     r = ctl_cmd('help request', 15514)
     check('help <command node>: the namespace lists its children (the ? shape)',
-          r == 'ok     clear  drop the cached registers and repoll now\n'
-               '    reload save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)', r)
+          r == 'ok     clear         drop the cached registers and repoll now\n'
+               '    reload        save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)\n'
+               '    reload-config re-read the config file (the SIGHUP path)', r)
     r = ctl_cmd('help request reload', 15514)
     check('help <deep command path>: the row describes itself',
           r == 'ok save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)', r)
+    r = ctl_cmd('help request reload-config', 15514)
+    check('help <the re-read deep path>: the row describes itself',
+          r == 'ok re-read the config file (the SIGHUP path)', r)
     r = ctl_cmd('help bogus', 15514)
     check('help <unknown topic>: the reworded two-space error',
           r == 'fail unknown command or setting bogus (try ?)', r)
@@ -1440,6 +1447,7 @@ try:
     check('audit rotate: show answers the configured MB', r == 'ok audit/rotate/max-size=10', r)
     listing = '\n'.join([
         '    disable  disable the audit trail entirely',
+        '    forward  also mirror every audit line to the local syslog (journald picks them up, chain hash included)',
         "    log-file the audit trail's file: a path, - for stdout, empty = the XDG state home",
         '    requests audit one REQUESTS tally per client per this many seconds',
         "    rotate   the audit trail's rotation: the size trigger, the UTC-midnight trigger and the backup count"])

@@ -43,8 +43,8 @@ def _load_options():
 # set must name verbs this server knows). `request` is the namespace
 # prefix, not a verb: the verb is the word past it (`request clear cache`
 # decides on `clear`).
-KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'dump', 'restore', 'clear', 'reload', 'restart', 'shutdown',
-               'help', 'ping', 'quit')
+KNOWN_VERBS = ('set', 'unset', 'show', 'inspect', 'dump', 'restore', 'clear', 'reload', 'reload-config', 'restart',
+               'shutdown', 'help', 'ping', 'quit')
 
 # the control commands (the registries' `commands` rows — _load_options
 # fills these from lib/options.json; the module-level empties keep the

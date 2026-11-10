@@ -298,6 +298,8 @@
       "help": "the dump carries the cached register words too", "hidden": true },
     { "name": "request-reload", "live": "request/reload",
       "help": "save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)" },
+    { "name": "request-reload-config", "live": "request/reload-config",
+      "help": "re-read the config file (the SIGHUP path)" },
     { "name": "request-restart", "live": "request/restart",
       "help": "restart the upstream session: connection + cache dropped, repoll", "hidden": true },
     { "name": "request-restore", "live": "request/restore",

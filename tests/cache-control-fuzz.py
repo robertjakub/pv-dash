@@ -264,6 +264,8 @@ def main():
         check('ops: request restart is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request reload')
         check('ops: request reload is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
+        st, tx, macok = ops_roundtrip('request reload-config')
+        check('ops: request reload-config is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('shutdown')
         check('ops: shutdown is forbidden', st == 'fail' and 'forbidden' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show version', unsigned=True)

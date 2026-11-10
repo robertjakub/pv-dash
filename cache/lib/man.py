@@ -80,7 +80,7 @@ the reports
 .BR "show metrics acl table" ,
 the ops
 .BR "request dump" ", " "request restore" ", " "request clear cache" ,
-.BR "request reload" ", " "request restart" ", " shutdown ", " quit .
+.BR "request reload" ", " "request reload-config" ", " "request restart" ", " shutdown ", " quit .
 .RS
 .IP \\(bu 2
 .B set <setting> <value>
@@ -93,7 +93,8 @@ modbus selection, acl connect, acl write, modbus timeout, modbus auth,
 modbus auth-upstream, control port, control ops verbs, control
 trust-uids, control socket-group, audit log-file, audit forward, audit
 rotate max-size,
-audit disable, dump path, dump with-cache); a SIGHUP re-applies the config
+audit disable, dump path, dump with-cache); a SIGHUP \\(em or the wire's
+\\fBrequest reload-config\\fR \\(em re-applies the config
 (the file always wins). A knob the registry marks
 .B restart: true
 answers the note
@@ -148,6 +149,9 @@ listings only when a dump path is configured.
 whole daemon \\(em the fresh process re-resolves the config, so the
 restart-marked knobs take their configured values, and the saved
 overrides re-apply once; the cache starts empty),
+\\fBrequest reload-config\\fR (re-read the config file without the
+restart \\(em the same re-apply as a SIGHUP; a broken file keeps the
+previous settings),
 \\fBshutdown\\fR (the same as SIGTERM).
 .RE
 .PP

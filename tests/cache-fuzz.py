@@ -19,7 +19,8 @@ CACHE_DIR = os.path.join(REPO, 'cache')
 
 P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
-PORT, CACHE_PORT = 15591, 15592
+BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
+PORT, CACHE_PORT = 15591 + BASE, 15592 + BASE
 ITERATIONS = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
 
 failures = []

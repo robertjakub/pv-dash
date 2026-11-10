@@ -23,15 +23,40 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 P = os.path.join(REPO, 'dashboard', 'bin', 'dashboard.py')
 FAILURES = []
 TOKEN = 'sekrit'
-PROM_PORT = 15970     # the stub Prometheus
-HTTP_PORT = 15971     # the dashboard's page/proxy surface
-CTRL_PORT = 15972     # the dashboard's control server (token'd: the F5 rule)
+BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
+PROM_PORT = 15970 + BASE     # the stub Prometheus
+HTTP_PORT = 15971 + BASE     # the dashboard's page/proxy surface
+CTRL_PORT = 15972 + BASE     # the dashboard's control server (token'd: the F5 rule)
 AUTH_PORT = CTRL_PORT
 OPS_TOKEN = 'opssecret'
-OPS_HTTP_PORT = 15973   # the ops-token'd dashboard (the read-only role, §6c)
-OPS_CTRL_PORT = 15974
-PAGES_PORT = 15975    # the token'd page (the F21 auth round)
-PAGES_CTL = 15977
+OPS_HTTP_PORT = 15973 + BASE   # the ops-token'd dashboard (the read-only role, §6c)
+OPS_CTRL_PORT = 15974 + BASE
+PAGES_PORT = 15975 + BASE    # the token'd page (the F21 auth round)
+PAGES_CTL = 15977 + BASE
+
+def wait_port(port, timeout=20):
+    """The daemon's startup race: the bind lands when it lands — poll-connect
+    instead of a blind sleep."""
+    end = time.monotonic() + timeout
+    while True:
+        try:
+            socket.create_connection(('127.0.0.1', port), timeout=1).close()
+            return
+        except OSError:
+            if time.monotonic() >= end:
+                raise
+            time.sleep(0.2)
+
+
+def wait_file(path, timeout=10):
+    """The control rebind's socket file: it exists when the rebound control
+    says it does — poll-stat instead of a blind sleep."""
+    end = time.monotonic() + timeout
+    while not os.path.exists(path):
+        if time.monotonic() >= end:
+            raise RuntimeError('the %s never came up' % path)
+        time.sleep(0.2)
+
 METRICS_PORT = 15976  # the main instance's /metrics (the metrics/acl round)
 
 
@@ -150,7 +175,7 @@ def main():
                                        '--control-port', str(CTRL_PORT), '--control-token', TOKEN,
                                        '--audit-log', '-'],
                                       stdout=open('/tmp/dash_ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(1.2)
+        wait_port(HTTP_PORT)
 
         # 1. malformed and hostile frames (pre-auth): always a well-formed err reply
         garbage = [
@@ -294,7 +319,7 @@ def main():
                                        '--control-port', str(OPS_CTRL_PORT), '--control-token', 'admintok2',
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
                                       stdout=open('/tmp/dash_ctl_fuzz_ops.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(1.2)
+        wait_port(OPS_HTTP_PORT)
         st, tx, macok = ops_roundtrip('show version')
         check('ops: the ops token authenticates, show version honored, mac\'d with the ops key',
               st == 'ok' and macok, '%s %s' % (st, tx))
@@ -453,7 +478,7 @@ def main():
                                        '--control-port', str(PAGES_CTL), '--control-token', TOKEN,
                                        '--audit-log', '-'],
                                       stdout=open('/tmp/dash_ctl_fuzz_pages.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(1.2)
+        wait_port(PAGES_PORT)
         r = page_get(PAGES_PORT, b'/config.js')
         check('page auth: the token-less read is a 401', r.startswith(b'HTTP/1.1 401')
               and b'WWW-Authenticate: Bearer' in r, r[:60])
@@ -475,12 +500,12 @@ def main():
         r = page_get(PAGES_PORT, b'/config.js', b'Authorization: Bearer ptok\r\n')
         check('page auth: the configured token still reads (no live rotation)', r.startswith(b'HTTP/1.1 200'), r[:40])
         # the tokenless loopback page serves (the bind is the auth — the F21 shape)
-        procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:15980',
+        procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (15980 + BASE),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js')],
                                       stdout=open('/tmp/dash_ctl_fuzz_tokless.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(1.2)
-        r = page_get(15980, b'/config.js')
+        wait_port(15980 + BASE)
+        r = page_get(15980 + BASE, b'/config.js')
         check('page auth: the tokenless loopback page serves', r.startswith(b'HTTP/1.1 200'), r[:40])
 
         # 8b2. the audit family's one shape on the DSH: the daily knob's live
@@ -506,13 +531,13 @@ def main():
         #     live rebind — the tokenless TCP rebind refuses on the live
         #     wire (F5), the token'd rebind swaps the socket, the old one
         #     closes, the group-accessible mode re-modes the unix socket live
-        REB_HTTP, REB_TCP = 15978, 15979
+        REB_HTTP, REB_TCP = 15978 + BASE, 15979 + BASE
         reb_sock = '/tmp/dashboard-%d.socket' % REB_HTTP
         procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (REB_HTTP),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--audit-log', '-'],
                                       stdout=open('/tmp/dash_ctl_fuzz_rebind.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(1.2)
+        wait_port(REB_HTTP)
 
         def rctl(*cmds, port=None, token=None):
             r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
@@ -521,6 +546,7 @@ def main():
                                capture_output=True, text=True, timeout=15)
             return r.stdout.strip()
 
+        wait_file(reb_sock)
         check('family listener: the default unix socket is 0600',
               os.stat(reb_sock).st_mode & 0o777 == 0o600, oct(os.stat(reb_sock).st_mode))
         tx = rctl('set control socket-group on')
@@ -541,16 +567,16 @@ def main():
         check('family listener: startup-only — the token set refuses (the instance stays tokenless)',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:120])
         # the token'd rebind: a spawned-token instance (the token is startup-only)
-        procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:15981',
+        procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (15981 + BASE),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
-                                       '--audit-log', '-', '--control-port', '15982',
+                                       '--audit-log', '-', '--control-port', '%d' % (15982 + BASE),
                                        '--control-token', 'rtok2'],
                                       stdout=open('/tmp/dash_ctl_fuzz_rebind2.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(1.2)
-        tx = rctl('set control port %d' % REB_TCP, port='15982', token='rtok2')
+        wait_port(15981 + BASE)
+        tx = rctl('set control port %d' % REB_TCP, port=str(15982 + BASE), token='rtok2')
         check('family listener: the tokenized TCP rebind succeeds', tx.startswith('ok control/port=127.0.0.1:%d' % REB_TCP),
               tx[:120])
-        tx = rctl('show version', port='15982')
+        tx = rctl('show version', port=str(15982 + BASE))
         check('family listener: the retired control port no longer answers', tx == '', tx[:120])
         tx = rctl('show version', port=str(REB_TCP), token='rtok2')
         check('family listener: the new TCP port speaks (signed with the token)',
@@ -558,7 +584,7 @@ def main():
         tx = rctl('unset control port', port=str(REB_TCP), token='rtok2')
         check('family listener: unset restores the configured target',
               tx.startswith('ok control/port=127.0.0.1:15982'), tx[:120])
-        tx = rctl('show version', port='15982', token='rtok2')
+        tx = rctl('show version', port=str(15982 + BASE), token='rtok2')
         check('family listener: the restored port speaks', tx.startswith('ok dashboard'), tx[:120])
 
         # 8b. the metrics/acl gate (the cache's logic, the dashboard's

@@ -19,7 +19,8 @@ P = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 # the suite's spec — via the env; examples/ is never a loader default
 os.environ['METRICS_SPEC'] = os.path.join(SCRAPER_DIR, 'examples', 'metrics.json')
-INV_PORT, PORT = 15545, 19455
+BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
+INV_PORT, PORT = 15545 + BASE, 19455 + BASE
 ROUNDS = 3000
 
 failures = []

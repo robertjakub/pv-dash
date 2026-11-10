@@ -21,7 +21,8 @@ CACHE_DIR = os.path.join(REPO, 'cache')
 
 P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
-PORT, CACHE_PORT = 15601, 15602
+BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
+PORT, CACHE_PORT = 15601 + BASE, 15602 + BASE
 CLIENTS, DURATION = 100, 15.0
 
 

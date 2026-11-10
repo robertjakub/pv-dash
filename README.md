@@ -89,6 +89,15 @@ python3 tests/control-fuzz.py        # the fake inverter: hostile JSON on the co
 python3 tests/dashboard-control-fuzz.py  # the dashboard: hostile JSON on the control server
 ```
 
+The dev-side loop runs them through `scripts/battery.sh` — one suite at
+a time (the family shares the scratch port spaces), the stray daemons
+reaped between suites, a tally at the end: `scripts/battery.sh` (the
+commit loop — the fast set, the fuzz budgets at 100, ~3 min), a tool
+name (`cache` ~5 min, `scraper` ~6 min, `inverter`, `dashboard`,
+`common` — the tool-facing commit sets with their own regtest),
+`quick` (all ten, the fuzz budgets at 300, ~13 min — the pre-push loop)
+and `full` (the suite defaults, ~40 min — the nightly).
+
 Every scenario must end with the process under test alive and **zero
 tracebacks** in the logs.
 

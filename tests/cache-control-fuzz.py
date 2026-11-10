@@ -23,10 +23,25 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 P = os.path.join(REPO, 'cache', 'bin', 'modbus-cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 FAILURES = []
+
+def wait_port(port, timeout=20):
+    """The daemon's startup race: the bind lands when it lands (the pyc, the
+    profile load, the audit init) — poll-connect instead of a blind sleep."""
+    end = time.monotonic() + timeout
+    while True:
+        try:
+            socket.create_connection(('127.0.0.1', port), timeout=1).close()
+            return
+        except OSError:
+            if time.monotonic() >= end:
+                raise
+            time.sleep(0.2)
+
 TOKEN = 'sekrit'
-AUTH_PORT = 15965   # the fuzz cache runs token'd (F5): roundtrip authenticates first there
+BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
+AUTH_PORT = 15965 + BASE   # the fuzz cache runs token'd (F5): roundtrip authenticates first there
 OPS_TOKEN = 'opssecret'
-OPS_PORT = 15969    # the ops-token'd cache (the read-only role, §6d)
+OPS_PORT = 15969 + BASE    # the ops-token'd cache (the read-only role, §6d)
 
 
 def wiremac(payload):
@@ -126,14 +141,14 @@ def roundtrip(port, wire_bytes, timeout=5.0):
 def main():
     procs = []
     try:
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15960',
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15960 + BASE),
                                        '--control-port', '0'], stdout=subprocess.DEVNULL,
                                       stderr=subprocess.DEVNULL))
-        procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:15960',
-                                       '--listen', '127.0.0.1:15964', '--interval', '1',
-                                       '--control-port', '15965', '--control-token', TOKEN],
+        procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
+                                       '--listen', '127.0.0.1:%d' % (15964 + BASE), '--interval', '1',
+                                       '--control-port', '%d' % AUTH_PORT, '--control-token', TOKEN],
                                       stdout=open('/tmp/cache_ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(1.5)
+        wait_port(AUTH_PORT)
 
         # 1. malformed and hostile frames: always a well-formed err reply
         garbage = [
@@ -207,7 +222,7 @@ def main():
                                        '--listen', '127.0.0.1:15966', '--interval', '1',
                                        '--control-port', '15967', '--control-token', 'sekrit'],
                                       stdout=open('/tmp/cache_ctl_fuzz2.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(1.5)
+        wait_port(AUTH_PORT)
         st, tx = roundtrip(15967, b'{"cmd": "show version"}\n')
         check('fuzz: token server rejects the unauthenticated', st == 'fail' and 'authenticate' in tx,
               '%s %s' % (st, tx))
@@ -244,7 +259,7 @@ def main():
                                        '--control-port', str(OPS_PORT), '--control-token', 'admintok2',
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
                                       stdout=open('/tmp/cache_ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(1.5)
+        wait_port(AUTH_PORT)
         st, tx, macok = ops_roundtrip('show version')
         check('ops: the ops token authenticates, show version honored, mac\'d with the ops key',
               st == 'ok' and macok, '%s %s' % (st, tx))

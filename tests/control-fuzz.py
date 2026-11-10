@@ -94,13 +94,28 @@ def authed_roundtrip(port, token, cmd, timeout=5.0):
         return {'status': 'boom', 'text': str(e)}
 
 
+
+def wait_port(port, timeout=20):
+    """The daemon's startup race: the bind lands when it lands (the pyc, the
+    profile load, the audit init) — poll-connect instead of a blind sleep."""
+    end = time.monotonic() + timeout
+    while True:
+        try:
+            socket.create_connection(('127.0.0.1', port), timeout=1).close()
+            return
+        except OSError:
+            if time.monotonic() >= end:
+                raise
+            time.sleep(0.2)
+
 def main():
+    BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
     procs = []
     try:
-        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15960',
-                                       '--control-port', '15961'],
+        procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15960 + BASE),
+                                       '--control-port', '%d' % (15961 + BASE)],
                                       stdout=open('/tmp/ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(0.9)
+        wait_port(15961 + BASE)
 
         # 1. malformed and hostile frames: always a well-formed err reply
         garbage = [
@@ -120,19 +135,19 @@ def main():
         ]
         expect_ok = {'deeply nested'}   # a valid command with the extra fields = honored
         for wire, label in garbage:
-            st, tx = roundtrip(15961, wire)
+            st, tx = roundtrip(15961 + BASE, wire)
             check('fuzz: %s answered with a JSON frame' % label, st in ('ok', 'fail'), '%s %s' % (st, tx))
             want = 'ok' if label in expect_ok else 'fail'
             check('fuzz: %s %s' % (label, 'honored' if label in expect_ok else 'rejected cleanly'),
                   st == want, '%s %s' % (st, tx))
 
         # 2. the overlong request (1 MB): answered or closed, never a crash
-        st, tx = roundtrip(15961, b'{"cmd": "show version", "pad": "' + b'a' * (1024 * 1024) + b'"}\n', timeout=10)
+        st, tx = roundtrip(15961 + BASE, b'{"cmd": "show version", "pad": "' + b'a' * (1024 * 1024) + b'"}\n', timeout=10)
         check('fuzz: 1 MB request handled', st in ('ok', 'fail', 'dead'), '%s %s' % (st, tx[:80]))
 
         # 3. split packets: one byte at a time, the server assembles the frame
         try:
-            s = connect(15961)
+            s = connect(15961 + BASE)
             for b in b'{"cmd": "show version"}\n':
                 s.sendall(bytes([b]))
                 time.sleep(0.001)
@@ -150,26 +165,26 @@ def main():
             check('fuzz: byte-by-byte request assembled', False, str(e))
 
         # 4. no newline, then close: no crash, the server keeps serving
-        s = connect(15961)
+        s = connect(15961 + BASE)
         s.sendall(b'{"cmd": "show version"}')
         s.close()
-        st, tx = roundtrip(15961, b'{"cmd": "show version"}\n')
+        st, tx = roundtrip(15961 + BASE, b'{"cmd": "show version"}\n')
         check('fuzz: frameless close does not wedge the server', st == 'ok', '%s %s' % (st, tx))
 
         # 5. ping flood: 100 keepalives, then a real command still works
         ok = True
         for _ in range(100):
-            st, tx = roundtrip(15961, b'{"cmd": "ping"}\n', timeout=10)
+            st, tx = roundtrip(15961 + BASE, b'{"cmd": "ping"}\n', timeout=10)
             ok = ok and st == 'ok'
         check('fuzz: ping flood survives (100x)', ok)
-        st, tx = roundtrip(15961, b'{"cmd": "show version"}\n')
+        st, tx = roundtrip(15961 + BASE, b'{"cmd": "show version"}\n')
         check('fuzz: real command after the flood', st == 'ok', '%s %s' % (st, tx))
 
         # 6. the token server: the auth abuse is rejected, the real token works
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15962',
                                        '--control-port', '15963', '--control-token', 'sekrit'],
                                       stdout=open('/tmp/ctl_fuzz2.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(0.9)
+        wait_port(15961 + BASE)
         st, tx = roundtrip(15963, b'{"cmd": "show version"}\n')
         check('fuzz: token server rejects the unauthenticated', st == 'fail' and 'authenticate' in tx,
               '%s %s' % (st, tx))
@@ -215,7 +230,7 @@ def main():
                                        '--control-port', '15964', '--control-token',
                                        'file:/tmp/ctl_fuzz_token'],
                                       stdout=open('/tmp/ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(0.9)
+        wait_port(15961 + BASE)
         st, tx = roundtrip(15964, b'{"cmd": "show version"}\n')
         check('fuzz: token reference server rejects the unauthenticated', st == 'fail' and 'authenticate' in tx,
               '%s %s' % (st, tx))
@@ -273,7 +288,7 @@ def main():
                                        '--control-port', '15982', '--control-token', 'admintok',
                                        '--control-ops-token', 'opstok', '--audit-log', OPS_AUDIT],
                                       stdout=open('/tmp/ctl_fuzz4.log', 'w'), stderr=subprocess.STDOUT))
-        time.sleep(0.9)
+        wait_port(15961 + BASE)
         r = authed_roundtrip(15982, 'opstok', 'show version')
         check('ops: the ops token authenticates and the reply is mac\'d with the ops key',
               r.get('status') == 'ok' and 'fake-inverter' in r.get('text', '') and r.get('_mac_ok'), str(r))
@@ -354,7 +369,7 @@ def main():
                     wire = b'{"cmd": "show version"}\n'
                 else:
                     wire = ('garbage %d\n' % i).encode()
-                st, tx = roundtrip(15961, wire, timeout=15)
+                st, tx = roundtrip(15961 + BASE, wire, timeout=15)
                 results.append((i, st))
             except OSError as e:
                 results.append((i, 'boom: %s' % e))
@@ -375,7 +390,7 @@ def main():
         check('fuzz: modbus side still answers after the fuzzing', len(r) >= 10, r.hex())
 
         # 9. clean shutdown
-        st, tx = roundtrip(15961, b'{"cmd": "shutdown"}\n')
+        st, tx = roundtrip(15961 + BASE, b'{"cmd": "shutdown"}\n')
         check('fuzz: shutdown still works', st == 'bye', '%s %s' % (st, tx))
         time.sleep(1)
         check('fuzz: fake exited cleanly', procs[0].poll() == 0, str(procs[0].poll()))

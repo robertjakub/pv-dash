@@ -115,7 +115,7 @@ class ControlServer:
 
     def __init__(self, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None,
-                 ops_verbs=None, config_path=None, dump_path=None,
+                 ops_verbs=None, audit_params=None, config_path=None, dump_path=None,
                  restore_on_start=False, dump_key=None, dump_interval=0.0):
         self.reloader = reloader         # request reload: re-resolve the config, apply, returns the summary
         self.audit = audit               # the audit trail (common.audit), None = off
@@ -123,7 +123,7 @@ class ControlServer:
         self.ops_token = ops_token       # the read-only ops token (the ops role); None = off
         # the ops role's RBAC policy — the fallback derives from this server's own command rows
         self.ops_verbs = frozenset(v.lower() for v in (ops_verbs or default_ops_verbs(known_verbs(self.COMMANDS))))
-        self.audit_params = {}           # the audit family's live swaps rebuild from these (the subclass re-homes)
+        self.audit_params = dict(audit_params or {})   # the audit family's live swaps rebuild from these (a subclass may re-home after super)
         self.config_path = config_path   # the config script the daemon started from — the reload state lives beside it
         self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
         self.dump_path = dump_path or None   # the state dump file (the dump family)
@@ -697,6 +697,23 @@ class ControlServer:
             return 'off'
         return 'remote' if self.audit.path == 'none' else self.audit.path
 
+    def audit_dump_rows(self):
+        """The audit family's dump rows, one shape family-wide (the four
+        dump_settings fold these): the re-appliable spellings — the raw
+        path/`-`/`none` under audit/log-file, never the display words
+        ('stdout', 'remote') a re-apply would take for a path. The daily
+        row rides even where a tool's status line folds it away."""
+        prm = self.audit_params
+        return {
+            'audit/log-file': ('off' if (self.audit is None or self.audit.disabled) else self.audit.path),
+            'audit/forward': prm.get('forward') or 'none',
+            'audit/forward/format': prm.get('forward_format') or 'rfc5424',
+            'audit/rotate/max-size': '%g' % prm['max_mb'],
+            'audit/rotate/daily': 'on' if prm.get('daily') else 'off',
+            'audit/rotate/files': '%d' % prm['files'],
+            'audit/disable': 'on' if prm['disabled'] else 'off',
+        }
+
     def apply_restart_key(self, key, val):
         """The restart preamble's shared block: the startup-only knobs every
         tool carries. Returns (True, shown) when key is one of them,
@@ -709,12 +726,15 @@ class ControlServer:
             return True, self.defaults[key]
         return False, None
 
-    def apply_audit_key(self, key, val):
+    def apply_audit_key(self, key, val, raw=None):
         """The audit family's live swaps (the log-file, the rotation, the
         forward pair, the kill switch): the params dict updates, the state
         records, the trail rebuilds. Returns (True, shown) / (False, None).
         The log-file spelling is raw — a path, '-' (= stdout) or empty (the
-        XDG state home; AuditLog owns both readings)."""
+        XDG state home; AuditLog owns both readings) — `raw` is the case-
+        kept spelling (the fake lowercases `val`; a path never lowers),
+        `val` carries the word comparisons."""
+        raw = val if raw is None else raw
         if key == 'audit/log-file':
             if val == 'none' and self.audit_params.get('forward'):
                 # remote-only: the collector is the sole holder (the chain
@@ -732,9 +752,9 @@ class ControlServer:
                     updates['audit_log'] = 'none'
                 self.record_cfg(updates)
                 return True, self._rebuild_audit()
-            self.audit_params['path'] = val
+            self.audit_params['path'] = raw
             self.audit_params['disabled'] = False
-            self.record_cfg({'audit_log': val, 'no_audit_log': False})
+            self.record_cfg({'audit_log': raw, 'no_audit_log': False})
             return True, self._rebuild_audit()
         if key == 'audit/rotate/max-size':
             v = num(val, 'max-size', 'MB')
@@ -758,11 +778,11 @@ class ControlServer:
             return True, '%d' % v
         if key == 'audit/forward':
             try:
-                parse_forward(val)
+                parse_forward(raw)
             except ValueError:
                 raise ValueError(T('wire.audit_forward_grammar') % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
-            self.audit_params['forward'] = None if val in ('', 'none') else val
-            self.record_cfg({'audit_forward': val})
+            self.audit_params['forward'] = None if val in ('', 'none') else raw
+            self.record_cfg({'audit_forward': raw})
             self._rebuild_audit()   # the fresh forward re-arms the sender, the collector-only fold re-chains
             return True, val
         if key == 'audit/forward/format':
@@ -873,7 +893,7 @@ class ControlServer:
             self.record_cfg({'dump_interval': v})
             self.dump_wake.set()
             return True, secs(v)
-        return self.apply_audit_key(key, val)
+        return self.apply_audit_key(key, val, raw=raw)
 
     def get_family_key(self, key):
         """The `_get` view of the family's shared knobs (get_family_key's

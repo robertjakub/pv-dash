@@ -2,6 +2,12 @@
 "control": {
   "line_cap_bytes": 1048576
 },
+"control-plane": {
+  "cli_keepalive_s": 55.0,
+  "cli_timeout_s": 5.0,
+  "cli_reconnect": 3,
+  "cli_reconnect_wait_s": 10.0
+},
   "protocol": {
     "max_pdu": 260,
     "max_registers": 65536,
@@ -93,10 +99,6 @@
     "control_log_replies": false,
     "control_socket_group": false,
     "restore_on_start": false,
-    "cli_keepalive_s": 55.0,
-    "cli_timeout_s": 5.0,
-    "cli_reconnect": 3,
-    "cli_reconnect_wait_s": 10.0,
     "control_idle_timeout_s": 300
   },
   "log_levels": [

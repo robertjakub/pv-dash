@@ -12,7 +12,13 @@ The dashboard never speaks Modbus.
 
 One scheme, three shapes: every tool runs the same Modbus TCP dialect —
 the same MBAP framing, the same exception rules, the same optional `suite`
-auth handshake — with per-tool limits from each tool's `lib/static.json`.
+auth handshake — with the family's one protocol tree
+(`common/modbus/protocol.json`): the limits (max_pdu 253,
+max_registers 65536, max_count 125, max_bits 2000), the unit-id range
+(1..247 — every tool checks the configured unit against it, and the two
+Modbus server faces refuse out-of-range unit ids in-band with exception
+03), the cacheable/read and write function-code lists and the exception
+codes.
 
 ---
 
@@ -183,7 +189,9 @@ renders `FC6 (write single register)` or bare `FC<n>` for unlisted codes.
 
 The cache's sets: `READ_FUNCS = (1, 2, 3, 4)` — the four address spaces,
 each cached separately — and `WRITE_FUNCS = {5, 6, 15, 16, 22, 23}`
-(`cache/lib/static.json`). Unknown codes forward untouched. The
+the shared
+`common/modbus/protocol.json`'s `read_funcs`/`write_funcs`). Unknown
+codes forward untouched. The
 scraper is **read-only** — it never issues writes (no write API — the
 shared client exposes reads only); only the cache originates them (when
 enabled), and the fake implements FC5/6/15/16 behind its write gate.
@@ -294,8 +302,8 @@ FC   byte_count   packed bits          # byte_count = (count + 7) // 8
 ```
 
 Bit `i` of the request span lives in byte `i >> 3`, bit position `i & 7`.
-Read quantity: 1..2000 bits (the spec's `0x7D0`; `MAX_BITS` in each
-tool's `lib/static.json`). The cache stores each bit as a 0/1 word in its
+Read quantity: 1..2000 bits (the spec's `0x7D0`; `MAX_BITS` in the
+shared `common/modbus/protocol.json`). The cache stores each bit as a 0/1 word in its
 `(fc, addr)` map and repacks on reply; the scraper's `read_bits` returns
 one 0/1 per address. The fake serves FC1 from its coil space (profile
 `bit`/`fc: 1` entries + the FC5/FC15 writes + `set coil`), FC2 from the
@@ -344,7 +352,7 @@ drop the coil space (FC1).
 
 The builder is `exception_frame` (`common/modbus/protocol.py`): a PDU of
 `[func | 0x80, code]`, `length = 3`. Codes the suite generates
-(`cache/lib/static.json`):
+(the `exceptions` block of the shared `common/modbus/protocol.json`):
 
 | Code | Name | When |
 |---|---|---|

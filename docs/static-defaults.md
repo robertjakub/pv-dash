@@ -1,6 +1,6 @@
-# The static.json defaults sweep (2026-11-10)
+# The defaults sweep (2026-11-10)
 
-Every value knob's default lives in its tool's `lib/static.json`
+Every value knob's default lives in its tool's `lib/defaults.json`
 `defaults` tree — the resolver ladder's last rung reads the tree entry
 by name (`DEFAULTS['key']`), and a gate keeps both directions honest.
 Before the sweep the trees carried only part of the defaults: the rest
@@ -89,7 +89,7 @@ secrets fail the outright ban.
 ## The defaults outside the daemon — the ctl/cli's control-plane section
 
 The ctl/cli connection knobs don't ride the `defaults` tree: they live
-in static.json's own `control-plane` section (the four tools carry the
+in defaults.json's own `control-plane` section (the four tools carry the
 same four), and the daemon never reads them:
 
 | control-plane key | the CLI/CTL default | who reads it |
@@ -107,7 +107,7 @@ daemons take `common/wire/control.py:94`'s hardcoded
 `IDLE_TIMEOUT_S = 300`, their tree entries (and the `statics.py`
 aliases) dead.
 
-The ctl's socket target comes from `static.json`'s `control` section
+The ctl's socket target comes from defaults.json's `control` section
 (the socket template), not `control-plane`. The audit rotation bounds
 (`audit_max_mb`, `audit_files`) ride both sides — the daemons configure
 from them, the client scripts render them — so they are daemon
@@ -117,7 +117,7 @@ defaults and stay out of this table.
 
 `scripts/check_options.py` gained three rows per tool:
 
-- **every static.json defaults key is read by lib/** — a dead letter
+- **every defaults.json defaults key is read by lib/** — a dead letter
   fails: a tree entry nothing resolves is a lie waiting to rot. The
   scan reads `DEFAULTS['k']` / `DEFAULTS.get('k')` shapes across the
   tool's `lib/*.py`.

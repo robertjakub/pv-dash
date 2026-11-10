@@ -35,7 +35,7 @@ The sweep types:
    canon phrases) grepped against the tests.
 10. **The F-ledger sweep** — docs/AUDIT.md's F-numbers vs the
     tree's enforcement markers.
-11. **The statics sweep** — the four static.json blocks by
+11. **The statics sweep** — the four defaults.json blocks by
     key-path.
 12. **The schema/example sweep** — the JSON Schemas vs the
     registries; the shipped examples re-parsed.
@@ -527,14 +527,14 @@ The findings:
   convention (the code comments cite `F13 in docs/AUDIT.md`) is the
   family's traceability habit; the sweep keeps it honest.
 
-## The statics sweep — the four static.json blocks
+## The statics sweep — the four defaults.json blocks
 
-Every leaf key-path of the four `lib/static.json` files: the shared
+Every leaf key-path of the four `lib/defaults.json` files: the shared
 paths whose values disagree, the only-there paths (the audit
 defaults, the caps, the grid constants the loaders wire via
 `static_defaults`).
 
-118 leaf paths; 22 in all four; 1 shared with differing values.
+106 leaf paths; 22 in all four; 1 shared with differing values.
 
 | key-path | per-tool values |
 |---|---|
@@ -542,7 +542,7 @@ defaults, the caps, the grid constants the loaders wire via
 
 The findings:
 
-- **The static.json blocks are the tools' personalities** (the
+- **The defaults.json blocks are the tools' personalities** (the
   simulators' grid constants, the caps' defaults) — the drift that
   matters is the FAMILY defaults (the audit rotation, the log
   levels, the cap defaults) disagreeing: those wire through

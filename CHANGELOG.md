@@ -12,7 +12,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
-- **everywhere** — **the static.json defaults trees carry every value
+- **everywhere** — **the defaults.json defaults trees carry every value
   knob's default, and a gate keeps them honest**: the resolvers' last
   rung names the tree entry it resolves instead of an inline literal —
   the cache's connect/write/metrics ACLs, the write-register and
@@ -31,7 +31,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   trees too — the store_true flags resolved their False inline before —
   and the coverage gate dropped its bool-converter exemption, so a bool
   without its tree entry fails like any other knob. The ctl/cli
-  connection knobs left the `defaults` tree for static.json's own
+  connection knobs left the `defaults` tree for defaults.json's own
   `control-plane` section (the cli console's keepalive/reconnect pair,
   the ctl+cli per-command timeout — the daemons never read them; the
   `statics.py` aliases read the section).
@@ -122,6 +122,21 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Fixed
 
+- **cache, scraper, inverter** — **the Modbus protocol limits are one
+  tree**: `common/modbus/protocol.json` (max_pdu **253**, max_registers
+  **65536**, max_count 125, max_bits 2000, unit_id_range 1..247) —
+  the scraper's 65535 and the fake's 260 PDU were per-tool drift, and
+  the cache's top-level `unit_id_range` met the scraper's
+  `protocol`-nested one. The cache's `defaults.json` keeps only its own
+  `protocol` block (the FC policy + the exception codes), and **every
+  tool with a unit knob checks the configured unit against the shared
+  range** (the fake's hardcoded 1..247 check reads the tree now — its
+  message the family's wording); the cache's and the fake's Modbus
+  server faces refuse **out-of-range unit ids in-band** (exception 03 —
+  0 is the broadcast id, 248-255 reserved, neither reaches a server);
+  `check_options.py` gates the check. The cache's FC policy and
+  exception codes joined the shared tree — its `defaults.json`'s
+  `protocol` section is gone.
 - **cache, scraper** — **the bool env twins run when the flag is
   absent**: the unguarded `resolve_bool(args.flag, …)` call passed the
   store_true `False` as a given value, the resolver's first layer saw

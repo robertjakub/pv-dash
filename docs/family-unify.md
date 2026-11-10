@@ -8,7 +8,7 @@ with the per-tool truth and the unified outcome stated per item. Open
 items graduate to [TODO.md](TODO.md) when a wave picks them up; the
 landed consistency legs live in [family-drift.md](family-drift.md)
 (this sweep adds what its name-intersection pass cannot see: the
-near-miss knob names, the tool-absent rows, the `static.json`
+near-miss knob names, the tool-absent rows, the `defaults.json`
 defaults, the live-run refusal texts).
 
 ## The short list — the user gets silently bitten
@@ -33,7 +33,7 @@ defaults, the live-run refusal texts).
    (`common/settings/options.py:119-121`), so the resolver's first
    layer never fell through: the env twin and the config line were
    dead (verified live on cache/scraper/inverter). Outcome: LANDED
-   2026-11-10, the static.json defaults sweep — the row default is
+   2026-11-10, the defaults.json defaults sweep — the row default is
    gone; the default is the resolver's static rung, the tree's
    `audit_forward_format` entry (`DEFAULTS['audit_forward_format']` on
    cache/scraper/dashboard; the fake's
@@ -48,7 +48,7 @@ defaults, the live-run refusal texts).
    other three, ignored by the dashboard). The compose files set
    `LISTEN: 0.0.0.0:8080` (`docker/demo/compose.yaml:176`,
    `docker/prod/compose.yaml:140`) and only worked because the image
-   CMD pins the flag. Outcome: LANDED 2026-11-10, the static.json
+   CMD pins the flag. Outcome: LANDED 2026-11-10, the defaults.json
    defaults sweep — the `static_defaults` wiring is gone, the
    resolver's static rung (`DEFAULT_LISTEN`) owns the default; the
    env resolves again.
@@ -94,7 +94,7 @@ defaults, the live-run refusal texts).
   (its caps are the base trio); the inverter has the rows but no
   live, no env, no bounds (`env: null` + the F11 note); the dashboard
   has envs but **defaults `metrics_max_clients` 16** vs 64
-  (`dashboard/lib/static.json:16`) and no live/bounds. Outcome: the
+  (`dashboard/lib/defaults.json:16`) and no live/bounds. Outcome: the
   cache's row shape family-wide, default vector {64, 0, 5.0}, the
   scraper's always-on endpoint documented as the exception.
 - **`metrics/listen` means two sockets** `[cache]` `[scraper]` — the
@@ -163,10 +163,10 @@ defaults, the live-run refusal texts).
   `family_drift.py` compares only the 31 names present in all four,
   so every near-miss pair above (`unit`/`modbus-unit`,
   `metrics-token`/`auth-token`) and every tool-absent row never
-  enters the table; the effective defaults live in `lib/static.json`
+  enters the table; the effective defaults live in `lib/defaults.json`
   and no gate reads them (the dashboard's 16 survived exactly there).
   Outcome: a concept key (an explicit equivalence map) per row, and
-  the sweep reads `static.json → defaults`.
+  the sweep reads `defaults.json → defaults`.
 
 ## The word plane — the same words everywhere
 
@@ -397,7 +397,7 @@ defaults, the live-run refusal texts).
 
 - a **concept key** for the knob sweep (near-miss names, tool-absent
   rows) — without it every knob item above re-drifts silently.
-- the sweep reads **`static.json` defaults** (the dashboard's 16 vs
+- the sweep reads **`defaults.json` defaults** (the dashboard's 16 vs
   64 class) — the tree-honesty half is the **static-defaults gate**
   (`check_options.py`, LANDED 2026-11-10 with the defaults sweep):
   every defaults key some lib/ module reads (a dead letter fails),

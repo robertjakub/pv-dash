@@ -54,7 +54,7 @@ DEFAULT_KEYS = {
 }
 
 # the knobs whose default is deliberately no tree entry — a reason each
-# (the bool native False and the secret None pass without one): the empty
+# (the secret None is banned outright by its own row): the empty
 # word, the derived path, the registry-computed vocabulary
 _COMMON_NO_TREE_DEFAULT = {
     'auth': 'empty = no auth',
@@ -180,7 +180,7 @@ def check_tool(tool):
     reasons = NO_TREE_DEFAULT.get(tool, {})
     unbacked = sorted('--' + o.name for o in options
                       if o.flag and not o.node
-                      and not (o.conv is bool or o.secret
+                      and not (o.secret
                                or keys.get(o.name, o.name.replace('-', '_')) in tree_keys
                                or o.name in reasons))
     rows.append((not unbacked, '%s: every flag knob\'s default is a defaults-tree key or a named no-entry%s'

@@ -76,10 +76,11 @@ The kinds — every row of the tables below carries one:
 
 ## Knobs
 
-The tables spell the knob's registry key — the one name the config file, the
-wire and the dump all take; the set / clear column spells the flat words a
-running daemon answers (the console also completes the live/alias path
-spellings and translates them). The namespaces group them.
+The tables spell the knob's registry key — the one internal name the wire,
+the replies and the dispatch take; the set / clear column spells the console
+words (the live path as words — the config files and the state dumps speak
+them; the flat registry name answers the same set everywhere, the ctls
+translate). The namespaces group them.
 
 ### general
 
@@ -108,7 +109,7 @@ the daemon's own serving socket: the page's listen address
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `listen` | `set listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
+| `listen` | `set system listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
 
 ### auth
 
@@ -125,10 +126,10 @@ the control plane: the tokens, the ops role's RBAC policy, the trusted peers
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `control-port` | `set control-port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | JSON-lines control server target: unix socket path |
+| `control-port` | `set control port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | JSON-lines control server target: unix socket path |
 | `control-token` | — | startup-only (secret) | `TOKEN` | `--control-token` / `CONTROL_TOKEN` | require a token on control connections: the client authenticates with {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file) *(hidden)* |
-| `control-trust-uids` | `set control-trust-uids` | settable | `UID,...` | `--control-trust-uids` / `CONTROL_TRUST_UIDS` | extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted |
-| `control-socket-group` | `set control-socket-group` | settable | `on\|off` | `--control-socket-group` / `CONTROL_SOCKET_GROUP` | leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600) |
+| `control-trust-uids` | `set control trust-uids` | settable | `UID,...` | `--control-trust-uids` / `CONTROL_TRUST_UIDS` | extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted |
+| `control-socket-group` | `set control socket-group` | settable | `on\|off` | `--control-socket-group` / `CONTROL_SOCKET_GROUP` | leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600) |
 
 ### control/ops
 
@@ -138,7 +139,7 @@ configured verbs (the default: show)
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/clear, no request reload, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
-| `control-ops-verbs` | `set control-ops-verbs` | settable | `VERB,...` | `--control-ops-verbs` / `CONTROL_OPS_VERBS` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated |
+| `control-ops-verbs` | `set control ops verbs` | settable | `VERB,...` | `--control-ops-verbs` / `CONTROL_OPS_VERBS` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated |
 
 ### metrics
 
@@ -147,9 +148,9 @@ scrape presents and the client ACL checked at accept
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `metrics-server` | `set metrics-server` | settable | `on\|off` | `--metrics-server` / `METRICS_SERVER` | the dashboard's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
+| `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / `METRICS_SERVER` | the dashboard's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
 | `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | require Authorization: Bearer \<token> on the /metrics endpoint — mandatory beyond loopback; startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
-| `metrics-acl` | `set metrics-acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
+| `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
 
 ### audit
 
@@ -157,10 +158,10 @@ the DSH audit trail: the sink, the forwarding, the rotation, the kill switch
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-log` | `set audit-log` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | DSH audit trail: a file path or - for stdout (the docker/journald way); `none` = no local file (the forward carries the trail); the XDG state home when unset |
-| `audit-forward` | `set audit-forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
-| `audit-forward-format` | `set audit-forward-format` (the console also takes `set audit forward-format`) | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
-| `no-audit-log` | `set no-audit-log` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the DSH audit trail |
+| `audit-log` | `set audit log-file` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | DSH audit trail: a file path or - for stdout (the docker/journald way); `none` = no local file (the forward carries the trail); the XDG state home when unset |
+| `audit-forward` | `set audit forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
+| `audit-forward-format` | `set audit forward format` (the console also takes `set audit forward-format`) | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
+| `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the DSH audit trail |
 
 ### audit/rotate
 
@@ -169,9 +170,9 @@ the backup count
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-max-mb` | `set audit-max-mb` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation |
-| `audit-daily` | `set audit-daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit log at UTC midnight |
-| `audit-files` | `set audit-files` | settable | `N` | `--audit-files` / `AUDIT_FILES` | rotated audit backups to keep |
+| `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation |
+| `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit log at UTC midnight |
+| `audit-files` | `set audit rotate files` | settable | `N` | `--audit-files` / `AUDIT_FILES` | rotated audit backups to keep |
 
 ### dump
 
@@ -179,9 +180,9 @@ the state dump: the live overrides' file, the restore-on-start
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `dump-path` | `set dump-path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval |
+| `dump-path` | `set dump path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval |
 | `dump-key` | — | startup-only (secret) | `TEXT` | `--dump-key` / `DUMP_KEY` | the key that seals the state dumps (the reload's state file too) (`file:<path>` reads an owner-only file) *(hidden)* |
-| `restore-on-start` | `set restore-on-start` | settable (restart) | `on\|off` | `--restore-on-start` / `RESTORE_ON_START` | the dump loads on start (off: on demand with request restore) |
+| `restore-on-start` | `set dump restore-on-start` | settable (restart) | `on\|off` | `--restore-on-start` / `RESTORE_ON_START` | the dump loads on start (off: on demand with request restore) |
 
 ## Show reports
 

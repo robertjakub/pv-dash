@@ -130,8 +130,8 @@ env twins are the knobs' bare upper-snake names (`LISTEN`,
 
 ```conf
 # the dashboard's server.conf — every line is a set command
-set listen 127.0.0.1:8080
-# set auth-token file:/path/to/page.token   (mandatory beyond loopback, F21)
+set system listen 127.0.0.1:8080
+# set auth token file:/path/to/page.token   (mandatory beyond loopback, F21)
 set upstream http://localhost:9090
 set prom-prefix /prom
 set log-level INFO
@@ -199,9 +199,9 @@ control command, auth failure, reload and shutdown lands in the audit
 trail (prefix `DSH`, default `~/.local/state/dashboard/audit.log`;
 `--audit-log -` for stdout — the journald way; the ctl/cli keep their own
 `CTL`/`CLI` trails). The family is live-settable on the control wire
-(the cache's shape): `set audit-log <path|-|none>` swaps the sink,
-`set audit-max-mb <MB>` / `set audit-files <N>` /
-`set audit-daily on/off` steer the rotation live and
+(the cache's shape): `set audit log-file <path|-|none>` swaps the sink,
+`set audit rotate max-size <MB>` / `set audit rotate files <N>` /
+`set audit rotate daily on/off` steer the rotation live and
 `set no-audit-log on/off` is the kill switch. `--audit-forward` mirrors every line — the
 per-writer hash chain included — onward: `syslog` (the local socket
 auto-scan), `syslog:/path`, `udp://host[:514]` (RFC5426, best-effort) or

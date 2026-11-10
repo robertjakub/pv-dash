@@ -255,6 +255,16 @@ def check_tool(tool):
     cmd_bad = sorted(set(cmd_dupes) | set(cmd_spaced) | set(cmd_bare))
     rows.append((not cmd_bad, '%s: every command row is a clean unique word-path with a description%s'
                  % (tool, ' — bad: %s' % ', '.join(cmd_bad) if cmd_bad else '')))
+    # the wire's one name space: the knobs' FLAT names are the wire grammar
+    # (the live/alias paths are the console spellings, translated client-side)
+    # — a flat name colliding with a show word, a command word or a node walk
+    # word would shadow it in the shared space
+    node_walk = {o.name.split('/')[0] for o in options if o.node}
+    flat_taken = ({o.name for o in show_opts}
+                  | set(cmd_words) | node_walk)
+    flat_bad = sorted({o.name for o in options if not o.node and o.name in flat_taken})
+    rows.append((not flat_bad, '%s: every flat knob name is free of the show/command/node walk words%s'
+                 % (tool, ' — taken: %s' % ', '.join(flat_bad) if flat_bad else '')))
 
     got, err = parser_flags(bin_script)
     if err:

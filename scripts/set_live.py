@@ -7,14 +7,14 @@
 resolves to <repo root>/<project>/lib/options.json (cache, scraper,
 inverter, dashboard); `<name>` is the row's option name (the exact "name"
 value, e.g. cache-ttl); `<live>` is the control-grammar name the knob is
-set/spelled under on the wire — one clean word-path, no whitespace
-(`a/b/c` spells `set a b c <value>`; the check_options gate) — or `-` to
-clear it so the knob becomes startup-only (restart required). The edit is
-surgical: the file's hand-wrapped formatting outside the touched row is
-preserved byte-for-byte. A live RENAME is a wave, not an edit: the
-daemon's `_apply`/defaults dispatch keys the flat live name, so the
-control.py branches, the dump settings and the suites follow (see
-docs/TODO.md's hierarchical item).
+console spelling the cli completes and translates — one clean
+word-path (`a/b/c`; the check_options gate) — or `-` to clear it so the
+knob becomes startup-only (restart required). The edit is surgical: the
+file's hand-wrapped formatting outside the touched row is preserved
+byte-for-byte. A live RENAME is now a CONSOLE-surface edit (the wire,
+the dispatch, the dumps and the suites all key the flat registry
+name) — the pool/listing pins in the suites follow it; a NAME change
+is the wave.
 
 Exit 0 = written, 1 = error. Stdlib only."""
 import json

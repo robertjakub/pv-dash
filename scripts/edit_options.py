@@ -18,10 +18,10 @@ byte-for-byte; parse-back guarded), c cancels back to the menu, q quits —
 warned away while a row holds unsaved edits. The view-only fields (flag,
 env, conv, help — the one-knob-one-source surfaces
 render them elsewhere) show with the rest; edited fields are marked.
-A live RENAME is a wave, not an edit: the daemon's _apply/defaults
-dispatch keys the live name (docs/TODO.md). An alias is an edit: the
-dispatch canonicalizes through the map, so a second spelling rides
-alone.
+A live RENAME is a console-surface edit (the wire keys the flat
+registry name; the suites' pool/listing pins follow). An alias is an
+edit: the cli translates it through the spellings map, so a second
+spelling rides alone.
 
 Exit 0 = done, 1 = error. Stdlib only."""
 import json

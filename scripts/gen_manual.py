@@ -152,17 +152,17 @@ def knob_kind(opt):
 
 
 def knob_row(opt):
-    """One knob table row: the registry key, the wire spelling a running
-    daemon takes (the set/clear/show words; the alias beside it), the
-    kind, the value shape, the flag / env twins and the description (the
+    """One knob table row: the registry key, the flat wire spelling a
+    running daemon takes (the set/clear/show words; the console's live/
+    alias path spellings beside it — the cli translates them), the kind,
+    the value shape, the flag / env twins and the description (the
     setting-help — the wire's own wording)."""
     set_cell = '—'
     kind = knob_kind(opt)
     if opt.live and not kind.startswith('startup-only'):
-        words = ' '.join(opt.live.split('/'))
-        set_cell = '`set %s`' % words
+        set_cell = '`set %s`' % opt.name
         if opt.alias:
-            set_cell += ' (alias: `set %s`)' % ' '.join(opt.alias.split('/'))
+            set_cell += ' (the console also takes `set %s`)' % ' '.join(opt.alias.split('/'))
     flag = '`%s`' % opt.flag if opt.flag else '—'
     envs = '/'.join('`%s`' % e for e in opt.env_names() if e) or '—'
     desc = opt.setting_help or opt.help
@@ -193,9 +193,11 @@ def knobs_section(rows):
                 best = n.name
         buckets.setdefault(best, []).append(o)
     out = ['## Knobs', '',
-           wrap('The tables spell the knob\'s registry key (the config-file '
-                'name and the dump\'s key); the set / clear column spells the '
-                'wire words a running daemon takes. The namespaces group '
+           wrap('The tables spell the knob\'s registry key — the one name the '
+                'config file, the wire and the dump all take; the set / '
+                'clear column spells the flat words a running daemon '
+                'answers (the console also completes the live/alias path '
+                'spellings and translates them). The namespaces group '
                 'them.'), '']
     order = [''] + [n.name for n in nodes if n.name in buckets]
     by_name = {n.name: n for n in nodes}
@@ -263,13 +265,13 @@ def commands_section(meta, tool):
 
 
 def show_section(shows):
-    """The show reports table: the registry's `show` rows — the wire
-    spelling is the live path's words (the flat name when the row spells
-    no hierarchy)."""
+    """The show reports table: the registry's `show` rows — the flat
+    wire word (the live path is the console spelling, the cli translates
+    it)."""
     out = ['## Show reports', '',
            '| report | kind | description |', '|---|---|---|']
     for o in shows:
-        wire = ' '.join(o.live.split('/'))
+        wire = o.name
         kind = 'show-only' + (' (hidden)' if o.hidden else '')
         out.append('| `show %s` | %s | %s |' % (esc(wire), esc(kind), esc(o.setting_help or o.help)))
     return out
@@ -344,9 +346,11 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
     w(bullet('**command** — a one-shot action, no value.'))
     w(bullet('**namespace** — a word that groups deeper words: the console '
              'walk lists its children, `help <namespace>` describes them.'))
-    w(bullet('**settable** — the knob is live: `set <words> <value>` applies '
-             'at once, `clear <words>` returns the configured value, '
-             '`show <words>` prints the live value. *(restart)* — the set '
+    w(bullet('**settable** — the knob is live: `set <name> <value>` applies '
+             'at once (the flat registry name; the console also completes '
+             'the row\'s live/alias path spellings and translates), '
+             '`clear <name>` returns the configured value, '
+             '`show <name>` prints the live value. *(restart)* — the set '
              'records a pending value and `request reload` applies it. '
              '*(secret)* — the value never renders back (show answers '
              'err); pass it by flag/env or as `file:<path>`. *(hidden)* — '
@@ -360,14 +364,6 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
     w(bullet('**show-only** — a runtime report: `show <report>` answers, '
              'nothing to set.'))
     w('')
-    if any(o.live == 'write/registers' for o in rows) \
-            and any(o.live == 'write/registers/table' for o in shows):
-        # the set/show spelling collision (the cache's pair): the legend note
-        w(wrap('A show report\'s path never shadows a knob value: one '
-               'spelling per side of the verb — `set write registers '
-               'profile` feeds the write-registers knob the word `profile`, '
-               '`show write registers profile` answers the report.'))
-        w('')
     out.extend(commands_section(meta, tool))
     w('')
     out.extend(knobs_section(rows))

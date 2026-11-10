@@ -58,22 +58,22 @@ def marks(rows_by_tool, show=False):
 
 def live_cell(rows_by_tool):
     """The live column: the control command the knob answers to on a running
-    daemon — `set <name>` from the registry's live field (the wire name,
-    which can differ from the flag: the cache's --cache-ttl sets ttl; a
-    '/'-path spells as its words: `set inverter profile`), the tools' names
-    joined when they diverge, the `, restart` suffix when every tool holds
+    daemon — `set <flat-name>` (the wire's one spelling = the registry's
+    flattened name; the console also completes the row's live/alias path
+    spellings and translates them), the tools' names joined when they
+    diverge, the `, restart` suffix when every tool holds
     the knob restart-marked (the set records the value, the restart applies
     it). A restart-marked SECRET renders no set recipe — the wire refuses
     set/clear on it (startup-only: pass it by flag/env/config). No live
     name = *(startup-only)*: a restart applies it."""
-    names = sorted({opt.live for opt in rows_by_tool.values() if opt.live})
+    names = sorted({opt.name for opt in rows_by_tool.values() if opt.live})
     if not names:
         return '*(startup-only)*'
     lives = [opt for opt in rows_by_tool.values() if opt.live]
     if all(opt.restart for opt in lives) and all(opt.secret for opt in lives):
         return '`startup-only — pass it by flag/env/config (set/clear refuse)`'
     suffix = ', restart' if lives and all(opt.restart for opt in lives) else ''
-    return ', '.join('`set %s%s`' % (n.replace('/', ' '), suffix) for n in names)
+    return ', '.join('`set %s%s`' % (n, suffix) for n in names)
 
 
 def group_cell(rows_by_tool):

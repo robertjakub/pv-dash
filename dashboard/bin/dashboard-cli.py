@@ -30,7 +30,7 @@ from common.render.texts import T
 from lib.config import DEFAULT_CONTROL_SOCKET
 from lib.man import cli_page
 from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
-from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
+from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_MAX_LINE_BYTES_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
 
 
 POOL_NAMES = tuple(n for n in SETTING_NAMES + ALIAS_NAMES if n not in HIDDEN_SETTINGS
@@ -63,6 +63,7 @@ SPEC = dict(label='the dashboard', daemon_label='dashboard control server',
             command_help='e.g. inspect, show config, set log-queries on, request reload-config, shutdown',
             prompt_word='dashboard', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
+            max_line_bytes=CLI_MAX_LINE_BYTES_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,
             ctl_socket=DEFAULT_CONTROL_SOCKET, settings=SETTING_BY_NAME, nodes=NODE_BY_NAME,
             live_settings=LIVE_SETTINGS, show_lives=SHOW_LIVES,

@@ -30,7 +30,7 @@ from common.settings.dump import SECRET_REMOVED, dump_filter
 from common.render.texts import T
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
     COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
-from .statics import CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, LOG_LEVELS
+from .statics import CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
 
@@ -39,7 +39,6 @@ logger = logging.getLogger('dashboard')
 OPTION_BY_LIVE = {o.live: o for o in OPTIONS if o.live}
 TYPED_CONVS = (int, float, str)
 
-MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
 
 
 class ControlServer(_ControlServer):

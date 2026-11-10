@@ -37,6 +37,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../common}/serve/*.py $out/share/dashboard/common/serve/
     install -dm755 $out/share/dashboard/common/wire
     install -m644 ${../common}/wire/*.py $out/share/dashboard/common/wire/
+    install -m644 ${../common}/wire/defaults.json $out/share/dashboard/common/wire/
     install -dm755 $out/share/dashboard/shared
     install -m644 ${../shared}/texts.json $out/share/dashboard/shared/
     install -dm755 $out/share/dashboard/common/modbus

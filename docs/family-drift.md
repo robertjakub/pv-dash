@@ -555,12 +555,12 @@ shipped example re-parsed through the tool's own set-grammar reader
 
 | example | the read |
 |---|---|
-| `cache/examples/modbus_cache.conf` | parse failed: name 't' is not defined |
+| `cache/examples/modbus_cache.conf` | ok (31 setting line(s)) |
 | `cache/examples/selection.json` | json ok |
 | `scraper/examples/metrics.json` | json ok |
-| `scraper/examples/scraper.conf` | parse failed: name 't' is not defined |
-| `inverter/examples/inverter.conf` | parse failed: name 't' is not defined |
-| `dashboard/examples/server.conf` | parse failed: name 't' is not defined |
+| `scraper/examples/scraper.conf` | ok (18 setting line(s)) |
+| `inverter/examples/inverter.conf` | ok (3 setting line(s)) |
+| `dashboard/examples/server.conf` | ok (19 setting line(s)) |
 | `examples/acl-ip-prefix.json` | json ok |
 | `examples/acl-write-registers.json` | json ok |
 

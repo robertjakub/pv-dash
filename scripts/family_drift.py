@@ -498,8 +498,9 @@ def examples(rows):
     tool-local examples/ dirs plus the shared root examples/ home."""
     out = []
     sys.path.insert(0, REPO)
-    for label, ed in [(f'{t}/examples', os.path.join(REPO, t, 'examples')) for t in TOOLS] + [
-            ('examples', os.path.join(REPO, 'examples'))]:
+    dirs = [(t, f'{t}/examples', os.path.join(REPO, t, 'examples')) for t in TOOLS]
+    dirs.append((None, 'examples', os.path.join(REPO, 'examples')))
+    for t, label, ed in dirs:
         if not os.path.isdir(ed):
             continue
         for f in sorted(os.listdir(ed)):

@@ -66,10 +66,9 @@ exemption, so a bool without its tree entry fails.
 
 | Tool | Named no-entry — the reason each |
 |---|---|
-| all four | `auth` — empty = no auth · `control-port` — derives from the listen port · `control-ops-verbs` — the registry's `default_ops_verbs` · `control-trust-uids` — empty = nobody trusted · `audit-log` — empty = the XDG state home · `dump-path` — empty = the state dump is off |
-| cache | + `profile` — the bundled profile resolves next to the bin |
-| scraper | + `metrics-spec` — empty = the built-in `lib/metrics.json` block · `profile` — the bundled profile resolves next to the bin |
-| inverter | + `profile` — the bin's bundled sun2000 profile · `seed` — a per-run choice · `time` — empty = the clock runs · `grid-voltage` / `grid-frequency` — the tree's `grid` block (`voltage_v` / `frequency_hz`), read via `statics.GRID` |
+| all four | `auth` — empty = no auth · `control-port` — derives from the listen port · `control-ops-verbs` — the registry's `default_ops_verbs` |
+| scraper | + `metrics-spec` — empty = the built-in `lib/metrics.json` block |
+| inverter | + `seed` — a per-run choice · `time` — empty = the clock runs · `grid-voltage` / `grid-frequency` — the tree's `grid` block (`voltage_v` / `frequency_hz`), read via `statics.GRID` |
 | dashboard | + `static-dir`, `config-js` — resolve next to the script |
 
 The secrets are absent from the table by ruling: **a secret never
@@ -82,7 +81,7 @@ a shipped secret default would ride every install.
 
 The enforcement is one rule plus two outs: every flag knob's default
 names its tree entry; the named no-entry knobs must appear in the
-gate's `NO_TREE_DEFAULT` map (the common six in
+gate's `NO_TREE_DEFAULT` map (the common three in
 `_COMMON_NO_TREE_DEFAULT`, the per-tool extras beside them); the
 secrets fail the outright ban.
 
@@ -90,6 +89,14 @@ The audit rotation bounds (`audit_max_mb`, `audit_files`) ride both
 sides — the daemons configure from them, the client scripts render
 them — so they are daemon defaults and stay out of the trees
 too.
+
+The four graduates carry the empty string as their tree value:
+`control_trust_uids` `""` = nobody trusted, `dump_path` `""` = the
+state dump is off, `audit_log` `""` = **the XDG state home's
+audit.log** (the one dynamic default — the tree cannot hold a
+per-user path, the falsy chain resolves it at start), and the three
+Modbus tools' `modbus_profile` `"sun2000"` (the bare name, resolved
+through the shared profiles/ walk).
 
 ## The gate
 

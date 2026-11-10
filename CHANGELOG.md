@@ -12,6 +12,15 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **four more defaults graduate into the trees**: the
+  three Modbus tools' `modbus_profile` `"sun2000"` (the bin's and the
+  resolvers' `default_profile_path()` literals die — the bare name
+  resolves through the shared profiles/ walk), and family-wide
+  `control_trust_uids` `""` (nobody trusted), `dump_path` `""` (the
+  state dump off) and `audit_log` `""` (the XDG state home's
+  audit.log — the one dynamic default the tree cannot hold verbatim);
+  every rung names its tree entry and the gate's `NO_TREE_DEFAULT`
+  map shrinks to the common three plus the per-tool extras.
 - **cache, inverter** — **two registry renames (breaking on the wire)**:
   the cache's `show write-registers-profile` report is now
   **`write-registers-table`** (live `write/registers/table` — the

@@ -86,64 +86,25 @@ gate's `NO_TREE_DEFAULT` map (the common six in
 `_COMMON_NO_TREE_DEFAULT`, the per-tool extras beside them); the
 secrets fail the outright ban.
 
-## The CLI defaults — what options.json doesn't carry
+## The defaults outside the daemon — the ctl/cli's tree entries
 
-The registries carry no defaults (the defaults purge — every help
-surface says so). What a bare `modbus-<tool> …` run therefore applies
-is the wave's subject: the trees' entries, plus the behavioral
-no-entry shapes above. This table is the reference — the value each
-tool resolves with no flag, no env, no config line.
+The `defaults` tree serves every bin in the tool's `bin/` — but five
+entries exist for the client scripts alone (the daemon never reads
+them). The four tools share the shape:
 
-| knob | the CLI default | where |
+| tree key | the CLI/CTL default | who reads it |
 |---|---|---|
-| `upstream` | `127.0.0.1:5502` | cache, scraper |
-| `upstream` | `http://localhost:9090` (the pull collector) | dashboard |
-| `unit` / `modbus-unit` | 1 | cache, inverter / scraper |
-| `modbus-offset` | 0 | scraper |
-| `timeout` | 3 s | cache, scraper |
-| `interval` | 10 s | cache, scraper |
-| `read-delay` / `merge-gap` | 0.05 s / 8 | cache |
-| `auth` | none — no auth | cache, scraper, inverter |
-| `auth-upstream` | none — no auth | cache |
-| `cache-ttl` | 30 s | cache |
-| `listen` | `127.0.0.1:15502` / `:9350` / `:5502` / `:8080` | cache / scraper / inverter / dashboard |
-| `max-clients` | 64 | all four |
-| `client-timeout` | 300 s | all four |
-| `max-conn-per-ip` | 0 — no per-IP limit | all four |
-| `metrics-listen` | `127.0.0.1:9351` / `:9352` / `:9353` | cache / inverter / dashboard (the scraper's /metrics rides its own listen) |
-| `metrics-max-clients` | 64 (cache, inverter) / 16 (dashboard) | cache, inverter, dashboard |
-| `metrics-client-timeout` | 5 s | cache, inverter, dashboard |
-| `metrics-max-conn-per-ip` | 0 — no per-IP limit | cache, inverter, dashboard |
-| `metrics/acl` | `any` | all four |
-| `metrics-server` | false — the /metrics listener is off | cache, inverter, dashboard |
-| `metric-prefix` / `prom-prefix` | `huawei` / `/prom` | scraper / dashboard |
-| `proxy-timeout` | 30 s | dashboard |
-| `max-kwp` / `max-grid-kw` | 6.0 kWp / 12.0 kW | scraper, inverter / scraper |
-| `write-registers` / `selection` / `allow-write` | `none` / `all` / false | cache (the fake's `allow-write` too) |
-| `control-port` | derived from the listen port | all four |
-| `control-token` / `control-ops-token` / `dump-key` / the auth keys | off — the secrets never take a default | all four |
-| `control-ops-verbs` | `show` | all four |
-| `control-trust-uids` | empty — nobody trusted | all four |
-| `control-socket-group` / `control-log-replies` | false | all four / inverter |
-| `control-idle-timeout` | 300 s | all four |
-| ctl's keepalive / timeout / reconnect / reconnect-wait | 55 s / 5 s / 3 / 10 s | all four |
-| `log-level` | `INFO` | all four |
-| `local-time` / `log-access` / `log-queries` | false | cache, scraper, dashboard / cache, scraper, dashboard / dashboard |
-| `audit-log` | the XDG state home | all four |
-| `audit-max-mb` / `audit-files` | 10 MB / 3 | all four |
-| `audit-daily` / `no-audit-log` / `restore-on-start` | false | all four |
-| `audit-forward` / `audit-forward-format` | `none` / `rfc5424` | all four |
-| `requests-audit` | 300 s | cache |
-| `dump-path` / `dump-interval` / `dump-with-cache` | empty (the dump is off) / 0 (off) / false | all four / cache |
-| `time-scale` / `chaos` / `static` / `strict` | 1.0 / 0.0 / false / false | inverter |
-| `battery-kwh` | 6.9 kWh | inverter |
-| `timezone` | `utc` | inverter |
-| `profile` | the bundled profile next to the bin | cache, scraper, inverter |
-| `seed` / `time` | a per-run choice / the clock runs | inverter |
-| `grid-voltage` / `grid-frequency` | 230 V / 50 Hz (the tree's `grid` block) | inverter |
-| `metrics-spec` | the built-in `lib/metrics.json` block | scraper |
-| `grid-positive-import` | false | scraper |
-| `static-dir` / `config-js` | resolve next to the script | dashboard |
+| `cli_timeout_s` | 5 s | the ctl and the cli — the per-command wait (`timeout_s=`) |
+| `cli_keepalive_s` | 55 s | the cli console — the keepalive ping period |
+| `cli_reconnect` | 3 | the cli console — the reconnect attempts after a drop |
+| `cli_reconnect_wait_s` | 10 s | the cli console — the wait between reconnects |
+| `control_idle_timeout_s` | 300 s | the daemon's control-session idle cap — but the **inverter only** reads the tree (`inverter/lib/control.py:73`); the cache's, scraper's and dashboard's daemons take `common/wire/control.py:94`'s hardcoded `IDLE_TIMEOUT_S = 300`, their tree entries (and the `statics.py` aliases) dead |
+
+The ctl's socket target comes from `static.json`'s `control` section
+(the socket template), not the `defaults` tree. The audit rotation
+bounds (`audit_max_mb`, `audit_files`) ride both sides — the daemons
+configure from them, the client scripts render them — so they are
+daemon defaults and stay out of this table.
 
 ## The gate
 

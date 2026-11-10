@@ -663,7 +663,7 @@ try:
     r = ctl_cmd('show modbus interval', 15514 + BASE)
     check('show <setting>: the bare value', r == 'ok modbus/interval=2.00s', r)
     r = ctl_cmd('show cache ttl', 15514 + BASE)
-    check('show <setting>: the path spelling answers the live', r == 'ok cache/ttl=3.00s', r)
+    check('show <setting>: the path spelling answers the live', r == 'ok cache/ttl=30.00s', r)
     r = ctl_cmd('help cache ttl', 15514 + BASE)
     check('help <setting>: the registry description', r.startswith('ok cache/ttl - per-register cache TTL'), r[:110])
     r = ctl_cmd('help clear', 15514 + BASE)
@@ -1240,7 +1240,7 @@ try:
     ctl_cmd('clear cache ttl', 15530 + BASE)
     r = ctl_cmd('show config', 15530 + BASE)
     check('show config: the clear ttl returns the configured value',
-          'set cache ttl 3.0' in r, r[:160])   # the default rides factor x interval = 3 x 1 s
+          'set cache ttl 30.0' in r, r[:160])   # the default is the tree's flat 30 s
     ctl_cmd('set write registers any', 15530 + BASE)
     # audit/requests: the live name is the wire spelling (the branch keys it)
     r = ctl_cmd('set audit requests 120', 15530 + BASE)

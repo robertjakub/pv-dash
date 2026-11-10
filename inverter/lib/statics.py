@@ -26,13 +26,16 @@ DIAG_BASE = DIAGNOSTICS['base']                # the synthesized diagnostics blo
 DIAG_COUNT = DIAGNOSTICS['count']
 DIAG_MAGIC = DIAGNOSTICS['magic']
 
-DEFAULTS = STATIC['defaults']
+from .options import OPTIONS   # the registry rows — the defaults' one home (the rows' `default`)
+DEFAULTS = {o.name.replace('-', '_'): o.static_default
+            for o in OPTIONS if o.static_default is not None}
 DEFAULT_LISTEN_PORT = int(DEFAULTS['listen'].rsplit(':', 1)[1])
 DEFAULT_UNIT = DEFAULTS['unit']
 DEFAULT_MAX_KWP = DEFAULTS['max_kwp']
 DEFAULT_BATTERY_KWH = DEFAULTS['battery_kwh']
 DEFAULT_TIME_SCALE = DEFAULTS['time_scale']
-TIME_SCALE_MAX = DEFAULTS['time_scale_max']    # a day per minute
+TIME_SCALE_MAX = STATIC['time_scale_max']      # a day per minute (the knob's live-set bound stays
+                                               # a plain static — no row of its own)
 
 # the control socket's name: the daemon's template (common.config's parsers
 # take it as the argument), the clients' default (the template spelled with
@@ -41,11 +44,11 @@ CONTROL_SOCKET_TEMPLATE = '/tmp/fake-inverter-%d.socket'
 DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_LISTEN_PORT
 DEFAULT_CHAOS = DEFAULTS['chaos']
 DEFAULT_MAX_CLIENTS = DEFAULTS['max_clients']
-DEFAULT_CLIENT_TIMEOUT_S = DEFAULTS['client_timeout_s']
+DEFAULT_CLIENT_TIMEOUT_S = DEFAULTS['client_timeout']
 DEFAULT_MAX_CONN_PER_IP = DEFAULTS['max_conn_per_ip']
 DEFAULT_METRICS_LISTEN = DEFAULTS['metrics_listen']
 DEFAULT_METRICS_MAX_CLIENTS = DEFAULTS['metrics_max_clients']
-DEFAULT_METRICS_CLIENT_TIMEOUT_S = DEFAULTS['metrics_client_timeout_s']
+DEFAULT_METRICS_CLIENT_TIMEOUT_S = DEFAULTS['metrics_client_timeout']
 DEFAULT_METRICS_MAX_CONN_PER_IP = DEFAULTS['metrics_max_conn_per_ip']
 LOG_LEVELS = tuple(STATIC['log_levels'])
 DEFAULT_LOG_LEVEL = DEFAULTS['log_level']

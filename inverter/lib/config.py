@@ -14,61 +14,16 @@ config file names one and the start refuses."""
 import logging
 
 from .options import OPTIONS
-from .statics import DEFAULTS
 from common.settings.config import Resolver, load_config_script, str_to_bool
 
 logger = logging.getLogger('fake-inverter')
 
 # the static defaults the parser no longer carries (a static-wired default
 # would shadow the env/config layers — the flag never looks unset): the
-# same dict lib/options.py used to bake into build_parser, applied last in
-# the ladder instead. The bool rows read the tree's false entries like the
-# rest; the untwinned knobs left out stay None (the secrets to off).
-STATIC_DEFAULTS = {
-    'listen': DEFAULTS['listen'],
-    'unit': DEFAULTS['unit'],
-    'max-kwp': DEFAULTS['max_kwp'],
-    'battery-kwh': DEFAULTS['battery_kwh'],
-    'time-scale': DEFAULTS['time_scale'],
-    'chaos': DEFAULTS['chaos'],
-    'static': DEFAULTS['static'],
-    'strict': DEFAULTS['strict'],
-    'timezone': DEFAULTS['timezone'],
-    'time': DEFAULTS['time'],
-    'dump-interval': DEFAULTS['dump_interval'],
-    'max-clients': DEFAULTS['max_clients'],
-    'client-timeout': DEFAULTS['client_timeout_s'],
-    'max-conn-per-ip': DEFAULTS['max_conn_per_ip'],
-    'connect-acl': DEFAULTS['connect_acl'],
-    'allow-write': DEFAULTS['allow_write'],
-    'metrics-listen': DEFAULTS['metrics_listen'],
-    'metrics-acl': DEFAULTS['metrics_acl'],
-    'metrics-max-clients': DEFAULTS['metrics_max_clients'],
-    'metrics-client-timeout': DEFAULTS['metrics_client_timeout_s'],
-    'metrics-max-conn-per-ip': DEFAULTS['metrics_max_conn_per_ip'],
-    'metrics-server': DEFAULTS['metrics_server'],
-    'log-level': DEFAULTS['log_level'],
-    'audit-max-mb': DEFAULTS['audit_max_mb'],
-    'audit-files': DEFAULTS['audit_files'],
-    'audit-forward': DEFAULTS['audit_forward'],
-    'audit-forward-format': DEFAULTS['audit_forward_format'],
-    'audit-daily': DEFAULTS['audit_daily'],
-    'modbus-auth': DEFAULTS['modbus_auth'],
-    'no-audit-log': DEFAULTS['no_audit_log'],
-    'audit-log': DEFAULTS['audit_log'],
-    'dump-path': DEFAULTS['dump_path'],
-    'control-trust-uids': DEFAULTS['control_trust_uids'],
-    'profile': DEFAULTS['modbus_profile'],
-    'control-log-replies': DEFAULTS['control_log_replies'],
-    'control-socket-group': DEFAULTS['control_socket_group'],
-    'control-port': DEFAULTS['control_port'],
-    'control-ops-verbs': DEFAULTS['control_ops_verbs'],
-    'restore-on-start': DEFAULTS['restore_on_start'],
-    'grid-voltage': DEFAULTS['grid_voltage'],
-    'grid-voltage-wander': DEFAULTS['grid_voltage_wander'],
-    'grid-frequency': DEFAULTS['grid_frequency'],
-    'grid-frequency-wander': DEFAULTS['grid_frequency_wander'],
-}
+# registry rows' `default` fields — the one home — applied last in the
+# ladder, keyed by the row name. The secrets and the fake's per-run seed
+# carry none: their rung is the None ladder-end.
+STATIC_DEFAULTS = {o.name: o.static_default for o in OPTIONS if o.static_default is not None}
 
 
 def load_config(path):

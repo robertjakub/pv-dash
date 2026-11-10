@@ -49,10 +49,12 @@ upstream Prometheus URL
 path under which Prometheus is proxied; empty string proxies everything
 .TP
 .B \-\-static\-dir
-directory to serve
+directory to serve (startup\-only: pass \-\-static\-dir by
+flag/env/config and restart)
 .TP
 .B \-\-config\-js
-config.js to serve at /config.js
+config.js to serve at /config.js (startup\-only: pass \-\-config\-js by
+flag/env/config and restart)
 .TP
 .BI \-\-max\-clients " N"
 maximum concurrent HTTP clients (pages + proxy); extras get an immediate

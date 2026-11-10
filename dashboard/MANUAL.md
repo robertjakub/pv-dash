@@ -86,8 +86,8 @@ takes. The namespaces group them.
 |---|---|---|---|---|---|
 | `upstream` | — | startup-only | `URL` | `--upstream` / `PROM_URL` | upstream Prometheus URL |
 | `prom-prefix` | — | startup-only | `PREFIX` | `--prom-prefix` / `PROM_PREFIX` | path under which Prometheus is proxied |
-| `static-dir` | — | startup-only | `PATH` | `--static-dir` / `STATIC_DIR` | directory to serve |
-| `config-js` | — | startup-only | `PATH` | `--config-js` / `CONFIG_JS` | config.js to serve at /config.js |
+| `static-dir` | — | startup-only (secret) | `PATH` | `--static-dir` / `STATIC_DIR` | directory to serve (startup-only: flag/env/config and restart) *(hidden)* |
+| `config-js` | — | startup-only (secret) | `PATH` | `--config-js` / `CONFIG_JS` | config.js to serve at /config.js (startup-only: flag/env/config and restart) *(hidden)* |
 | `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous HTTP clients (static pages + the proxy); extras get an immediate 503 |
 | `client-timeout` | `set client-timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | kick idle keep-alive HTTP clients after this long |
 | `max-conn-per-ip` | `set max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous HTTP connections from one peer IP |

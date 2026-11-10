@@ -11,7 +11,7 @@ import re
 
 from .options import DEFAULT_OPS_VERBS, OPTIONS
 from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
-from common.settings.config import (check_auth_key, check_token_chars, check_control_tokens, default_profile_path,
+from common.settings.config import (check_auth_key, check_token_chars, check_control_tokens,
                            is_loopback_host, load_config_script, parse_acl, parse_auth_type, parse_listen,
                            parse_secret, parse_upstream, resolve_metrics_acl, resolve_profile_file, Resolver,
                            str_to_bool)
@@ -213,7 +213,7 @@ def resolve_config(args, script_dir=None):
     resolve = r.resolve
 
     profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'PROFILE',
-                                                'profile', default_profile_path(), str))
+                                                'profile', DEFAULTS['modbus_profile'], str))
     profile = load_device_profile(profile_path)
     prefix_default = DEFAULTS['metric_prefix']
     metric_prefix = (resolve(getattr(args, 'metric_prefix', None), 'METRIC_PREFIX',
@@ -282,10 +282,10 @@ def resolve_config(args, script_dir=None):
                                         'control_ops_verbs', DEFAULT_OPS_VERBS,
                                         str) or DEFAULT_OPS_VERBS).strip() or DEFAULT_OPS_VERBS
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'CONTROL_TRUST_UIDS',
-                                        'control_trust_uids', None, str)
+                                        'control_trust_uids', DEFAULTS['control_trust_uids'], str)
     cfg['control_socket_group'] = resolve(getattr(args, 'control_socket_group', False) or None,
                                           'CONTROL_SOCKET_GROUP', 'control_socket_group', DEFAULTS['control_socket_group'], str_to_bool)
-    cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', None, str)
+    cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', DEFAULTS['audit_log'], str)
     cfg['audit_forward'] = resolve(getattr(args, 'audit_forward', None), 'AUDIT_FORWARD',
                                    'audit_forward', DEFAULTS['audit_forward'], str)
     cfg['audit_forward_format'] = resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
@@ -305,7 +305,7 @@ def resolve_config(args, script_dir=None):
     if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', cfg['metric_prefix']):
         raise SystemExit('invalid metric_prefix = %r: must be a valid metric-name start '
                          '(letters/digits/underscore, not starting with a digit)' % cfg['metric_prefix'])
-    cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', None, str)
+    cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', DEFAULTS['dump_path'], str)
     cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
                                             None, str) or '').strip() or None, 'dump/key')
     cfg['dump_interval'] = resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',

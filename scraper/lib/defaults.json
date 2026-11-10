@@ -35,8 +35,12 @@
     "audit_forward_format": "rfc5424",
     "audit_daily": false,
     "no_audit_log": false,
+    "audit_log": "",
     "dump_interval": 0.0,
     "restore_on_start": false,
-    "control_socket_group": false
+    "control_socket_group": false,
+    "control_trust_uids": "",
+    "dump_path": "",
+    "modbus_profile": "sun2000"
   }
 }

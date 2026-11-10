@@ -27,7 +27,11 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   default a tree key or a named no-entry (the bool native, the
   empty/derived shapes), and no tree key names a secret — a secret
   never takes a settable default (its default is the None ladder-end,
-  banned outright). The cache's `cache/ttl` default is
+  banned outright). A later pass put every bool's native False in the
+  trees too — the store_true flags resolved their False inline before —
+  and the coverage gate dropped its bool-converter exemption, so a bool
+  without its tree entry fails like any other knob. The cache's
+  `cache/ttl` default is
   the flat 30 s (was 3 × the poll interval — the tree's
   `cache_ttl_factor` is gone) and `modbus/auth-upstream`'s default is
   the explicit `none` — both now name their tree entries like the rest.
@@ -113,6 +117,14 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Fixed
 
+- **cache, scraper** — **the bool env twins run when the flag is
+  absent**: the unguarded `resolve_bool(args.flag, …)` call passed the
+  store_true `False` as a given value, the resolver's first layer saw
+  the flag set and the env never fell through (`LOCAL_TIME=1`,
+  `AUDIT_DAILY=1` and their siblings were dead unless the flag itself
+  was given). The call sites pass `or None` now — the flag-absent
+  `False` means unset, the env and config layers run, the tree's
+  `false` backs the ladder end.
 - **everywhere** — **the `audit-forward-format` env and config layers
   come alive on all four tools**: the registry row baked
   `"default": "rfc5424"` onto the flag, so `AUDIT_FORWARD_FORMAT` and

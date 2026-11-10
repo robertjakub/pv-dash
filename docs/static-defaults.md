@@ -17,39 +17,60 @@ the cache's two remaining derived defaults later the same day
 `none` (the tree's `auth_upstream` entry — `parse_auth_type` still
 normalizes it to `None`) and `cache/ttl` defaults to the flat 30 s
 (the tree's `cache_ttl` entry — the 3 × interval `cache_ttl_factor`
-derivation and its tree key are gone).
+derivation and its tree key are gone). A second follow-up put **every
+bool's native False in the trees too** (the store_true flags resolved
+their False inline before) and the coverage gate dropped its
+bool-converter exemption — a bool without its tree entry fails like
+any other knob.
 
 ## What entered the trees
 
 - **cache** — `connect_acl`, `write_acl`, `metrics_acl`,
   `write_registers`, `selection`, `audit_forward`,
-  `audit_forward_format`, `dump_interval`, and the follow-up's
-  `auth_upstream` (`"none"`) + `cache_ttl` (30.0).
+  `audit_forward_format`, `dump_interval`, the follow-up's
+  `auth_upstream` (`"none"`) + `cache_ttl` (30.0), and the nine bools
+  (`allow_write`, `local_time`, `log_access`, `metrics_server`,
+  `audit_daily`, `no_audit_log`, `dump_with_cache`,
+  `restore_on_start`, `control_socket_group`).
 - **scraper** — `modbus_offset`, `metric_prefix`, `audit_forward`,
-  `audit_forward_format`, `dump_interval`.
+  `audit_forward_format`, `dump_interval`, and the seven bools
+  (`grid_positive_import`, `local_time`, `log_access`,
+  `control_socket_group`, `audit_daily`, `no_audit_log`,
+  `restore_on_start`).
 - **dashboard** — `audit_forward`, `audit_forward_format`,
   `dump_interval` (and the `static_defaults` listen shadow deleted from
-  `dashboard/lib/options.py`).
+  `dashboard/lib/options.py`), plus the six bools
+  (`local_time`, `metrics_server`, `audit_daily`, `no_audit_log`,
+  `control_socket_group`, `restore_on_start` — `log_queries` and
+  `log_access` were already tree entries).
 - **inverter** — `timezone`, `connect_acl`, `audit_forward`,
-  `audit_forward_format` (the `STATIC_DEFAULTS` map reads the tree).
+  `audit_forward_format`, and the nine bools (`static`, `strict`,
+  `allow_write`, `control_socket_group`, `control_log_replies`,
+  `metrics_server`, `audit_daily`, `no_audit_log`,
+  `restore_on_start` — the `STATIC_DEFAULTS` map reads the tree).
 
-The dead `metrics_server: false` entries left the cache's and the
-fake's trees — the bool native False is the family default.
+The sweep's dead `metrics_server: false` removal (the cache's and the
+fake's) was undone by the bools' follow-up — the entries are back, now
+read by the resolvers' static rungs like every other tree key.
 
 ## The knobs outside the trees
 
 A flag knob's default is either a `defaults`-tree key or one of the
 no-entry shapes below; `scripts/check_options.py` fails the tool when
-neither holds. Two classes stay out deliberately (the secrets are a
-third — banned outright, after the table):
+neither holds. One class stays out by named reason (the secrets are
+banned outright, after the table) — the bools started there and moved
+in: the follow-up put every bool's native False in the tree too (the
+store_true flag absent resolves False through the tree entry like any
+value knob), and the coverage gate dropped its bool-converter
+exemption, so a bool without its tree entry fails.
 
-| Tool | Named no-entry — the reason each | Bools (native False) |
-|---|---|---|
-| all four | `auth` — empty = no auth · `control-port` — derives from the listen port · `control-ops-verbs` — the registry's `default_ops_verbs` · `control-trust-uids` — empty = nobody trusted · `audit-log` — empty = the XDG state home · `dump-path` — empty = the state dump is off | | |
-| cache | + `profile` — the bundled profile resolves next to the bin | `allow-write`, `local-time`, `control-socket-group`, `metrics-server`, `audit-daily`, `no-audit-log`, `log-access`, `dump-with-cache`, `restore-on-start` |
-| scraper | + `metrics-spec` — empty = the built-in `lib/metrics.json` block · `profile` — the bundled profile resolves next to the bin | `grid-positive-import`, `local-time`, `control-socket-group`, `audit-daily`, `no-audit-log`, `log-access`, `restore-on-start` |
-| inverter | + `profile` — the bin's bundled sun2000 profile · `seed` — a per-run choice · `time` — empty = the clock runs · `grid-voltage` / `grid-frequency` — the tree's `grid` block (`voltage_v` / `frequency_hz`), read via `statics.GRID` | `static`, `strict`, `allow-write`, `control-socket-group`, `control-log-replies`, `metrics-server`, `audit-daily`, `no-audit-log`, `restore-on-start` |
-| dashboard | + `static-dir`, `config-js` — resolve next to the script | `control-socket-group`, `metrics-server`, `audit-daily`, `no-audit-log`, `log-queries`, `log-access`, `local-time`, `restore-on-start` |
+| Tool | Named no-entry — the reason each |
+|---|---|
+| all four | `auth` — empty = no auth · `control-port` — derives from the listen port · `control-ops-verbs` — the registry's `default_ops_verbs` · `control-trust-uids` — empty = nobody trusted · `audit-log` — empty = the XDG state home · `dump-path` — empty = the state dump is off |
+| cache | + `profile` — the bundled profile resolves next to the bin |
+| scraper | + `metrics-spec` — empty = the built-in `lib/metrics.json` block · `profile` — the bundled profile resolves next to the bin |
+| inverter | + `profile` — the bin's bundled sun2000 profile · `seed` — a per-run choice · `time` — empty = the clock runs · `grid-voltage` / `grid-frequency` — the tree's `grid` block (`voltage_v` / `frequency_hz`), read via `statics.GRID` |
+| dashboard | + `static-dir`, `config-js` — resolve next to the script |
 
 The secrets are absent from the table by ruling: **a secret never
 takes a settable default** — its default is the None ladder-end,
@@ -59,11 +80,11 @@ five on the other three). The gate enforces it: a `defaults`-tree key
 naming a secret fails the tool even before a resolver could wire it —
 a shipped secret default would ride every install.
 
-The classes are enforced differently: the named no-entry knobs must
-appear in the gate's `NO_TREE_DEFAULT` map (the common six in
-`_COMMON_NO_TREE_DEFAULT`, the per-tool extras beside them); the bools
-pass the coverage gate by their converter (`o.conv is bool`), the
-secrets by the outright ban.
+The enforcement is one rule plus two outs: every flag knob's default
+names its tree entry; the named no-entry knobs must appear in the
+gate's `NO_TREE_DEFAULT` map (the common six in
+`_COMMON_NO_TREE_DEFAULT`, the per-tool extras beside them); the
+secrets fail the outright ban.
 
 ## The gate
 
@@ -80,7 +101,8 @@ secrets by the outright ban.
   `client-timeout` → `client_timeout_s`,
   `metrics-client-timeout` → `metrics_client_timeout_s`,
   `requests-audit` → `requests_audit_s`), or a `NO_TREE_DEFAULT`
-  reason.
+  reason. The bools take no exemption: a missing bool entry fails
+  (proven on a doctored tree that dropped `allow_write`).
 - **no defaults-tree key names a secret** — the secret's default is
   None, never a settable default (the ruling above; proven to fail on
   a doctored tree).

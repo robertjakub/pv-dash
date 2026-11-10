@@ -26,12 +26,12 @@ def _load_options():
     registry parser (common/settings/options.py parse_registry_sections — the
     show/commands sections, the control-grammar vocabulary) and the
     shared row builder (option_rows). The log-level row takes its choices
-    from lib/static.json (the constants audit's home — the same
+    from lib/defaults.json (the constants audit's home — the same
     LOG_LEVELS the control grammar validates against); the loader reads
     it directly so the module also imports flat (scripts/check_options.py
     walks lib/ on sys.path)."""
     here = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
+    with open(os.path.join(here, 'defaults.json'), encoding='utf-8') as f:
         log_levels = tuple(json.load(f)['log_levels'])
     rows, sections, options = load_registry(here, choices={'log-level': log_levels})
     for key, value in sections.items():

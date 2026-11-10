@@ -24,7 +24,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -Dm755 bin/modbus-cache-ctl.py $out/share/modbus-cache/modbus-cache-ctl.py
     install -Dm755 bin/modbus-cache-cli.py $out/share/modbus-cache/modbus-cache-cli.py
     install -dm755 $out/share/modbus-cache/lib
-    install -m644 lib/*.py lib/static.json lib/options.json $out/share/modbus-cache/lib/
+    install -m644 lib/*.py lib/defaults.json lib/options.json $out/share/modbus-cache/lib/
     install -dm755 $out/share/modbus-cache/common
     install -m644 ${../common}/*.py $out/share/modbus-cache/common/
     install -dm755 $out/share/modbus-cache/common/render

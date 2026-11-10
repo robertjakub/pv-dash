@@ -566,7 +566,7 @@ cache/
 ├── module.nix               # the NixOS service module
 ├── package.nix              # the package (the bins, the libs, the examples, the man pages)
 └── lib/
-    ├── static.json      # the static constants: protocol limits, diagnostics block, defaults
+    ├── defaults.json     # the static constants: protocol limits, diagnostics block, defaults
     ├── statics.py       # its loader (the STATIC dict + the named aliases)
     ├── options.json     # the registry: one row per knob (the flags, the env twins, the help)
     ├── options.py       # its loader + the control-grammar wiring

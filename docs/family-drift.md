@@ -68,7 +68,7 @@ design); the top non-man pairs:
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.92 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:34` `_load_options` |
 | 0.91 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.89 | `scraper/bin/modbus-scraper.py:248` `graceful_stop` <-> `dashboard/bin/dashboard.py:476` `graceful_stop` |
+| 0.89 | `scraper/bin/modbus-scraper.py:251` `graceful_stop` <-> `dashboard/bin/dashboard.py:479` `graceful_stop` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
 | 0.85 | `inverter/lib/options.py:35` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
 | 0.85 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
@@ -78,12 +78,12 @@ design); the top non-man pairs:
 | 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:928` `run_dump_interval` |
 | 0.81 | `inverter/lib/control.py:151` `__init__` <-> `dashboard/lib/control.py:78` `__init__` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:603` `acl_table_report` <-> `dashboard/lib/control.py:440` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:606` `acl_table_report` <-> `dashboard/lib/control.py:443` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
 | 0.75 | `inverter/lib/control.py:67` `handle` <-> `common/wire/control.py:262` `handle` |
 | 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:420` `load_write_gate_file` |
-| 0.73 | `inverter/lib/control.py:614` `command_help` <-> `dashboard/lib/control.py:101` `command_help` |
-| 0.73 | `scraper/lib/control.py:142` `command_help` <-> `inverter/lib/control.py:614` `command_help` |
+| 0.73 | `inverter/lib/control.py:617` `command_help` <-> `dashboard/lib/control.py:101` `command_help` |
+| 0.73 | `scraper/lib/control.py:142` `command_help` <-> `inverter/lib/control.py:617` `command_help` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -464,11 +464,11 @@ published port not backed by a registry default is a lie.
 | `docker/demo/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
 | `docker/entrypoints/entrypoint-prometheus.sh` | `AUDIT`, `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
 | `docker/entrypoints/entrypoint.sh` | `AUDIT`, `JSON`, `README`, `REQUIRED` | — |
-| `docker/env/cache.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL` … | — |
-| `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `INFO`, `LISTEN`, `LOG_LEVEL`, `NO_AUDIT_LOG`, `PLAIN`, `PROM_URL` | — |
-| `docker/env/fake.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CLIENT_TIMEOUT`, `LISTEN`, `MAX_CLIENTS`, `MAX_CONN_PER_IP`, `MAX_KWP`, `NO_AUDIT_LOG`, `PROFILE`, `SIGHUP` … | — |
+| `docker/env/cache.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEBUG`, `ERROR`, `HOST`, `INFO` … | — |
+| `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `INFO`, `LISTEN`, `LOG_LEVEL`, `NO_AUDIT_LOG`, `PLAIN`, `PROM_URL` | — |
+| `docker/env/fake.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CLIENT_TIMEOUT`, `LISTEN`, `MAX_CLIENTS`, `MAX_CONN_PER_IP`, `MAX_KWP`, `NO_AUDIT_LOG`, `PROFILE` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
-| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `METRIC_PREFIX`, `NO_AUDIT_LOG` … | — |
+| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `METRIC_PREFIX` … | — |
 | `docker/prod/README.md` | `AUDIT`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `EDITOR`, `HOST`, `JSON`, `PORT`, `PROM_URL`, `README`, `UPSTREAM`, `YOUR` | 8080, 9350 |
 | `docker/prod/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `ONLY`, `PORT`, `PRODUCTION` … | 8080, 9350 |
 | `docker/prometheus.yml` | `AUDIT` | — |

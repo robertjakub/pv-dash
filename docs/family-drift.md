@@ -61,7 +61,7 @@ design); the top non-man pairs:
 | ratio | pair |
 |---|---|
 | 1.00 | `scraper/lib/options.py:26` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.94 | `scraper/lib/control.py:145` `command_help` <-> `dashboard/lib/control.py:110` `command_help` |
+| 0.94 | `scraper/lib/control.py:144` `command_help` <-> `dashboard/lib/control.py:109` `command_help` |
 | 0.94 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:26` `_load_options` |
 | 0.94 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
@@ -71,15 +71,15 @@ design); the top non-man pairs:
 | 0.88 | `scraper/lib/options.py:26` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
-| 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:1223` `run_dump_interval` |
-| 0.79 | `inverter/lib/control.py:155` `__init__` <-> `dashboard/lib/control.py:82` `__init__` |
+| 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:1227` `run_dump_interval` |
+| 0.79 | `inverter/lib/control.py:155` `__init__` <-> `dashboard/lib/control.py:81` `__init__` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:506` `acl_table_report` <-> `dashboard/lib/control.py:328` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:506` `acl_table_report` <-> `dashboard/lib/control.py:327` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `inverter/lib/control.py:66` `handle` <-> `common/wire/control.py:288` `handle` |
+| 0.75 | `inverter/lib/control.py:66` `handle` <-> `common/wire/control.py:292` `handle` |
 | 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:420` `load_write_gate_file` |
-| 0.73 | `inverter/lib/control.py:517` `command_help` <-> `dashboard/lib/control.py:110` `command_help` |
-| 0.73 | `scraper/lib/control.py:145` `command_help` <-> `inverter/lib/control.py:517` `command_help` |
+| 0.73 | `inverter/lib/control.py:517` `command_help` <-> `dashboard/lib/control.py:109` `command_help` |
+| 0.73 | `scraper/lib/control.py:144` `command_help` <-> `inverter/lib/control.py:517` `command_help` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -534,7 +534,7 @@ paths whose values disagree, the only-there paths (the audit
 defaults, the caps, the grid constants the loaders wire via
 `static_defaults`).
 
-106 leaf paths; 22 in all four; 1 shared with differing values.
+91 leaf paths; 16 in all four; 1 shared with differing values.
 
 | key-path | per-tool values |
 |---|---|

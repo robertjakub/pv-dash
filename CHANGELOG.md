@@ -31,10 +31,23 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   trees too — the store_true flags resolved their False inline before —
   and the coverage gate dropped its bool-converter exemption, so a bool
   without its tree entry fails like any other knob. The ctl/cli
-  connection knobs left the `defaults` tree for defaults.json's own
-  `control-plane` section (the cli console's keepalive/reconnect pair,
-  the ctl+cli per-command timeout — the daemons never read them; the
-  `statics.py` aliases read the section).
+  connection knobs left the `defaults` tree for the **shared, flat**
+  `common/wire/defaults.json` (the cli
+  console's keepalive/reconnect pair, the ctl+cli per-command timeout —
+  the daemons never read them; the `statics.py` aliases read the shared
+  tree, the four per-tool sections are gone). The control session's
+  idle cap joined the shared tree as
+  `cli_idle_timeout_s`: the shared `ControlServer` reads
+  it for `CLI_IDLE_TIMEOUT_S` (was the hardcoded 300 — the
+  cache's/scraper's/dashboard's tree entries were dead), the four
+  tools' `statics.py` aliases unify to the `CLI_*` names, and the
+  per-tool `control_idle_timeout_s` entries are gone. The pre-auth
+  line cap joined too as `cli_max_line_bytes_s` (was the
+  per-tool `control` section's `line_cap_bytes`, dead on three of four
+  daemons) — and the **ctl/cli now enforce the cap at both client
+  ends**: an over-long command fails with clean local text instead of
+  the daemon dropping the connection, and the reply read refuses to
+  accumulate past the cap.
   The cache's
   `cache/ttl` default is
   the flat 30 s (was 3 × the poll interval — the tree's
@@ -136,7 +149,10 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   0 is the broadcast id, 248-255 reserved, neither reaches a server);
   `check_options.py` gates the check. The cache's FC policy and
   exception codes joined the shared tree — its `defaults.json`'s
-  `protocol` section is gone.
+  `protocol` section is gone. So did its `register_types` tree, as
+  `registers_type` (the nine type→words entries — the shared tree is
+  the one home; the cache's `statics.py`/`config.py` speak
+  `REGISTERS_TYPE`).
 - **cache, scraper** — **the bool env twins run when the flag is
   absent**: the unguarded `resolve_bool(args.flag, …)` call passed the
   store_true `False` as a given value, the resolver's first layer saw

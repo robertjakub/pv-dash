@@ -8,32 +8,6 @@
     "cli_reconnect": 3,
     "cli_reconnect_wait_s": 10.0
   },
-  "protocol": {
-    "max_pdu": 253,
-    "max_count": 125,
-    "max_bits": 2000,
-    "max_registers": 65536,
-    "read_funcs": [
-      1,
-      2,
-      3,
-      4
-    ],
-    "write_funcs": [
-      5,
-      6,
-      15,
-      16,
-      22,
-      23
-    ],
-    "exceptions": {
-      "illegal_function": 1,
-      "illegal_address": 2,
-      "illegal_value": 3,
-      "gateway_failed": 11
-    }
-  },
   "register_types": {
     "i16": 1,
     "u16": 1,
@@ -45,10 +19,6 @@
     "f32swap": 2,
     "bit": 1
   },
-  "unit_id_range": [
-    1,
-    247
-  ],
   "diagnostics": {
     "base": 65000,
     "count": 4,

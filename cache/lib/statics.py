@@ -11,7 +11,9 @@ _here = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(_here, 'defaults.json'), encoding='utf-8') as _f:
     STATIC = json.load(_f)
 
-PROTOCOL = STATIC['protocol']
+from common.modbus.protocol import PROTOCOL    # the family's one protocol tree:
+                                               # the limits, the unit range, the FC
+                                               # policy and the exception codes
 MAX_PDU = PROTOCOL['max_pdu']                  # the largest Modbus PDU
 MAX_COUNT = PROTOCOL['max_count']              # max registers per FC3/FC4 read
 MAX_BITS = PROTOCOL['max_bits']                # max bits per FC1/FC2 read (the Modbus spec's 0x7D0)
@@ -27,7 +29,7 @@ GATEWAY_FAILED = PROTOCOL['exceptions']['gateway_failed']
 LOG_LEVELS = tuple(STATIC['log_levels'])
 
 REGISTER_TYPES = STATIC['register_types']      # type name -> words per register
-UNIT_ID_RANGE = tuple(STATIC['unit_id_range'])
+UNIT_ID_RANGE = tuple(PROTOCOL['unit_id_range'])
 
 DIAGNOSTICS = STATIC['diagnostics']
 DIAG_BASE = DIAGNOSTICS['base']                # the synthesized block

@@ -9,7 +9,8 @@ from collections import deque
 
 from common.modbus import (DeviceError, ModbusError, describe_fc, describe_write,
                            exception_frame, frame, pack_bits, serve_modbus,
-                           unpack_bits, write_shape_error, write_target)
+                           unit_in_range, unpack_bits, write_shape_error,
+                           write_target)
 from common.serve.connlimit import ConnGate
 from .config import (IPGate, acl_admits, acl_file_warn, acl_gate_summary, acl_value_text,
                      load_profile_write_gate, load_write_gate_file, compile_write_acl,
@@ -489,6 +490,10 @@ class Proxy:
         if proto != 0 or not pdu:
             return exception_frame(txn, proto, unit, pdu[0] if pdu else 3, ILLEGAL_VALUE)
         func = pdu[0]
+        if not unit_in_range(unit):
+            # the family's unit-id range (protocol.json): 0 is the broadcast
+            # id, 248-255 reserved — the gateway answers in-band, no upstream
+            return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
         if func in WRITE_FUNCS:
             target = write_target(pdu)
             if target is None:

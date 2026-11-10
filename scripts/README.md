@@ -67,7 +67,7 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
 - **`release.py`** — the orchestrator: the suites + the nix build
   gate first, the version bump, the CHANGELOG split maintenance
   (Unreleased + current in the root, the archive in
-  docs/CHANGELOG.md), the tag + the GH release cut. Dry-run leaks
+  docs/history/CHANGELOG.md), the tag + the GH release cut. Dry-run leaks
   the bump; re-run with `--tests none` after a mid-flight fix.
 
 ## Keeping it honest

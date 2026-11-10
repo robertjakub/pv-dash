@@ -35,16 +35,15 @@ only the **Done/history** records for their tool —
 ## The security wave (the audit follow-ups)
 
 - **the remaining audit findings** `[cache]` `[scraper]` `[inverter]`
-  `[docker]` — all documented trust decisions / deployment stories now
-  (F19 closed rev. 5 — the workflow cuts the release after the CI gate,
-  see the release-discipline item): F17 (the volume secrets), F14 (TLS —
-  the item below), F15 (closed — the README privacy note), F1 (accepted)
-  — see [AUDIT.md](AUDIT.md); F2–F10, F11–F13, F16, F18, F19, F21–F23
-  are closed and verified ([AUDIT-history.md](AUDIT-history.md)); re-run
-  the audit after
-  the scraper control surface,
-  the TLS story or the dashboard service (the dashboard is the next audit
-  wave).
+  `[docker]` — the open set (per [AUDIT.md](AUDIT.md) rev. 27): F17
+  (the volume secrets), F14 (TLS — the item below), F15 (INFO — the
+  bearer token + the localhost bind are the controls, the scraper
+  README carries the privacy note), F1 (accepted); re-run the audit
+  after the TLS story (F14) lands, after the multi-target /
+  control-plane evolutions, or any new listener or file format; at
+  least yearly otherwise. The closed findings F2–F13, F16, F18–F23
+  with their fix and verification:
+  [history/AUDIT.md](history/AUDIT.md).
 - **the RBAC rewrite** `[common]` — the role gate decides on the head
   verb (`command_verb` = the first word, `common/wire/wiresec.py`) with the
   flat verb-set policies (`ROLE_POLICIES`); the request-namespace grammar
@@ -173,16 +172,13 @@ only the **Done/history** records for their tool —
   the KPI row, the energy split) — and reconsider the layout while in
   there.
 
-- **the rest of the demo stack** `[docker]` `[dashboard]` — the compose
-  chain runs the three Modbus tools (fake inverter → cache → scraper) with
-  the seeded `/config` volume, and a **Prometheus** service scrapes the
-  exporter over the internal network (the scraper/token story: a random
-  bearer token generated into the volume, 0600); what is missing is the
-  front: a **dashboard** service rendering the Prometheus — plus the demo
-  config seeded into the volume (the cache's `allow-write` demo pokes, the
-  dashboard's `battery: true`), so `docker compose up` and the whole story
-  runs — the write-through pokes land in the charts live, the outages
-  banner themselves, the audit trail narrates.
+- **the demo's write-poke conf** `[docker]` `[cache]` — the demo stack
+  is complete (the four services + Prometheus, the dashboard renders
+  it, the token story seeded); what remains of the old demo-stack item
+  is the demo nicety: a seeded cache conf (or a ctl poke script) that
+  turns `allow-write` on with a small register allow-list, so the
+  write-through pokes land in the charts live — deliberately NOT the
+  default (the demo README documents `allow-write` off).
 - **the multi-target scrape** `[scraper]` — one process polling several
   inverters (per-target metrics with a unit/host label) for the
   two-string-roof households; the metrics endpoint and the audit are
@@ -343,9 +339,10 @@ only the **Done/history** records for their tool —
 - **the rename + env-prefix wave** — the bins and clients carry their
   man-page names (the dash names: `modbus-cache.py`,
   `modbus-cache-ctl.py`, `modbus-scraper*.py`, `modbus-fake-*.py`,
-  `dashboard-*.py`); every env twin wears its tool's prefix — `MCH_*`
-  (cache), `SCR_*` (scraper), `INV_*` (fake), `DSH_*` (dashboard, the
-  generic docker envs retired) — with the one short `*_CTL` form for the
+  `dashboard-*.py`); every env twin then wore its tool's prefix —
+  `MCH_*` (cache), `SCR_*` (scraper), `INV_*` (fake), `DSH_*`
+  (dashboard, the generic docker envs retired) — since retired by the
+  bare-name wave (the record above); with the one short `*_CTL` form for the
   control port; the constants audit put `log_levels` in every tool's
   `lib/static.json` (and the metrics-endpoint defaults on the dashboard),
   and the scraper's register map now lives in the device profile alone —

@@ -2,4 +2,4 @@
 
 {{#include ../../../CHANGELOG.md}}
 
-{{#include ../../../docs/CHANGELOG.md}}
+{{#include ../../../docs/history/CHANGELOG.md}}

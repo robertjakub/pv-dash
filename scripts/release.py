@@ -30,7 +30,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHANGELOG = ROOT / 'CHANGELOG.md'
-ARCHIVE = ROOT / 'docs' / 'CHANGELOG.md'
+ARCHIVE = ROOT / 'docs' / 'history' / 'CHANGELOG.md'
 PKG_NIX = ['cache/package.nix', 'inverter/package.nix',
            'scraper/package.nix', 'dashboard/package.nix']
 SUITES_QUICK = ['tests/cache-regtest.py', 'tests/scrape-regtest.py']
@@ -77,7 +77,7 @@ def version_sites(old):
     excluded (they keep the history; the archive legitimately carries the
     old version strings) — the same sweep a manual bump does."""
     r = run(['git', 'grep', '-l', '-F', old, '--', '.',
-             ':!CHANGELOG.md', ':!docs/CHANGELOG.md'])
+             ':!CHANGELOG.md', ':!docs/history/CHANGELOG.md'])
     return [pathlib.Path(line) for line in r.stdout.splitlines() if line.strip()]
 
 
@@ -93,7 +93,7 @@ def bump(old, new, dry):
     if dry:
         return
     left = subprocess.run(['git', 'grep', '-l', '-F', old, '--', '.',
-                           ':!CHANGELOG.md', ':!docs/CHANGELOG.md'],
+                           ':!CHANGELOG.md', ':!docs/history/CHANGELOG.md'],
                           cwd=ROOT, capture_output=True, text=True)
     if left.returncode not in (0, 1):  # 1 = no matches, the success case
         sys.exit('release: %r failed:\n%s%s' % ('git grep', left.stdout, left.stderr))

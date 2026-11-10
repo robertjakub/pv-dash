@@ -66,8 +66,11 @@ pv-suite/
 │                 #   which registers a write may touch — family-wide), the
 │                 #   [family-wide TODO](docs/TODO.md) (every open item, one file — the
 │                 #   per-tool TODOs keep the Done history), the [SBOM](docs/sbom/SBOM.md),
-│                 #   the [release-history archive](docs/CHANGELOG.md)
-├── CHANGELOG.md  # Unreleased + the current release (the history lives in docs/CHANGELOG.md)
+│                 #   the release-history archive + the history home
+│                 #   ([docs/history/](docs/history) — the audit/changelog/drift
+│                 #   archives behind the current halves) and the
+│                 #   [docs redo workflow](docs/DOC-REDO.md)
+├── CHANGELOG.md  # Unreleased + the current release (the history lives in docs/history/CHANGELOG.md)
 └── LICENSE       # BSD 3-Clause (whole suite)
 ```
 

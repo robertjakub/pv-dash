@@ -10,73 +10,9 @@ verification of the suspicious paths found. This is a design-and-code audit,
 not a penetration test. The `inverter/` fake is a test device simulator —
 its risk class is "developer/demo infrastructure", not production OT;
 findings there are weighted accordingly. Findings keep their numbers across
-revisions; open ones are in §3.1, closed ones in §3.2 with their fix and
-verification in [AUDIT-history.md](AUDIT-history.md) (next number: F24).
-
-**Rev. 27 — the audit-forward targets (the F10 finish line).** The trail
-is tamper-EVIDENT, not tamper-PROOF; the defense is now three tiers: (1)
-the local chain (the file of record, per-writer hashes, `audit_verify.py`),
-(2) the local mirror (rev. 26's journald copy — same box, better not
-strong) and (3) **the off-box copy** — `--audit-forward` spells one
-target: `none`, `syslog` (the local socket auto-scan), `syslog:/path` (an
-explicit socket, must exist at bind), `udp://host[:514]` (RFC5426
-datagrams, best-effort — drops are silent at the source and show as the
-per-prefix chain-hash gaps at the collector) or `tcp://host[:514]`
-(RFC6587 octet-count framing). The remote envelope rides
-`--audit-forward-format` (`rfc5424` — the default — or `cef` as an
-additive wrapping); both carry the native line verbatim (the chain
-verifies identically at the collector) and the prefix + chain hash as
-extracted fields (`[pvDash@1 …]` / `cs1`/`cs2`), so a scheduled search
-can run the chain-verify logic off-box and **alert on a chain break** —
-tamper-evidence stops being a property you check and becomes one that
-pages you. A send failure closes the mirror with one stderr note and the
-next event re-arms lazily (no threads, no buffers; the note carries the
-dropped count and the chain gap is the second tripwire on the same
-hole). Startup gates split: grammar errors and a missing explicit socket
-are hard (ERROR + rc 1), a remote target that does not resolve or
-refuses is soft (a warn, the lazy re-arm carries it — boot ordering
-never blocks the Modbus surface). `--audit-log none` turns the local
-file off: with a forward spelled that is the **remote-only mode** (the
-collector is the sole holder — no file, no XDG directory, the chain
-reseeds at GENESIS per run; the restart discontinuity is the collector
-alert's whitelist entry), without one the audit is disabled (the state
-`--no-audit-log` spells). TLS transport is deliberately out (the
-docs/TODO.md anchor: RFC5425 + certificates need a real collector to
-test against).
-
-**Rev. 26 — the audit trail forwarding (the F10 follow-through).** The
-chain is tamper-EVIDENT, not tamper-PROOF — trailing deletion and a
-rechain by whoever holds the algorithm stay outside its reach, and
-journald forwarding was named the strong answer. It is built in now:
-every audit trail takes `--audit-forward syslog` (`audit/forward` live,
-`$AUDIT_FORWARD`, the ctl/cli clients too), mirroring every finished
-line — the per-writer hash chain included — to the local syslog socket
-(`FailLoudSysLogHandler` on `/dev/log` or its siblings, daemon facility,
-the bin name as the tag; journald picks the lines up sealed). The sink
-stays the authority: a send failure stops the mirroring with one stderr
-note, never the trail; a socket-less spelling refuses to start (the
-clean ERROR + rc 1 shape). The file rotation and the journal retention
-together close the retention/immutability story (NIS2 21.2(b), DORA
-art. 11 — the logs an incident needs survive the box). Rev. 27 extends
-the spelling to the full target grammar above.
-
-**Rev. 25 — the alert rules pack (F16 closed).** The pack ships at
-`alerts/`, one rule file per watched exporter: six alerts in two groups —
-the scraper's poll story (`ScraperPollDown`, the freshness gap
-`ScraperFreshnessGap`, `ScraperExceptionSpike` in `alerts/scraper.yml`)
-and the cache's side
-(`CachePollDown`, `CacheAgeSpike`, `CacheWriteRefusalBurst` on a new
-`modbus_cache_write_refused_total` counter — every gate refusal is a
-WRITE-REFUSED audit event, now counted on the cache's own /metrics — in
-`alerts/cache.yml`). The
-annotations quote the audit vocabulary: a fired page names the audit
-events and the log lines to grep, so detection is wired, not just logged
-(NIS2 21.2(b), DORA art. 11). The demo image bakes the pack
-(`prometheus.yml`'s `rule_files:`), each watched exporter's Nix package
-installs its half (`share/modbus-scraper/alerts.yml`,
-`share/modbus-cache/alerts.yml`), docs/NIXOS.md shows the
-`services.prometheus.ruleFiles` wiring; the cache group stays silent
-until the cache's own /metrics is scraped.
+revisions; the open ones are in §3.1 — every closed finding's fix and
+verification, and the per-revision walk, live in
+[history/AUDIT.md](history/AUDIT.md) (next number: F24).
 
 ## 1. Assets and trust boundaries
 
@@ -100,10 +36,10 @@ trust of their own.
 | Modbus TCP listener | `--listen`, default `127.0.0.1:15502`; `acl/connect` on top | n/a (outbound only) | `--listen`, default `127.0.0.1:5502` (Docker `0.0.0.0:5502`); the connect-acl (inline grammar only) | n/a | none (protocol-inherent, F1) |
 | HTTP surface | `/metrics`: `--metrics-server` (live-settable), off; `--metrics-listen` default `127.0.0.1:9351`; `metrics/acl` at accept | the exporter: `--listen` default `127.0.0.1:9350`, two GET routes (`/`, `/metrics`), `Cache-Control: no-store`, `metrics/acl` at accept | `/metrics`: `--metrics-server`, off, default `127.0.0.1:9352`; `metrics/acl` at accept | page + proxy: `--listen` default `127.0.0.1:8080`, GET-only, the realpath-guarded static tree; own `/metrics` default `127.0.0.1:9353` | bearer token (`hmac.compare_digest`) mandatory beyond loopback on every HTTP surface (F13/F21); the loopback bind serves tokenless; `metrics/acl` sits at accept ahead of the caps — never instead of the token |
 | control server (JSON lines) | unix `/tmp/modbus-cache-<port>.socket`, `0600` after bind (`0660` with `--control-socket-group`); `--control-port` = TCP on 127.0.0.1, **refuses to start without a token** | unix `/tmp/modbus-scraper-<port>.socket`, same | unix socket, same; the TCP control exempt (F11 — a tokenless rebind succeeds live) | unix `/tmp/dashboard-<port>.socket`, same; **refuses tokenless TCP** | ONE listener tier for the family (`common/wire/control.py`): token on TCP (refused without — at start AND on the live rebind), peer-cred on unix (root, the daemon's own user, `--control-trust-uids`), the signed wire wherever a token is held, the live `control/port` rebind (bind-first, the failed bind rolls back, the sessions keep serving) |
-| state dump | `--dump-path`: the setting overrides (plus the cached words on `with-cache`) as one atomic JSON | n/a | n/a | n/a | created `0600` explicitly + a sha256 integrity hash, fail-closed restore (F18); sealed under `dump/key` when set (rev. 11) |
-| token files | every secret knob takes `file:<path>` | same | same | same | owner-only (0600) enforced at the shared loader (F12); the bare `-file` siblings removed rev. 13 |
+| state dump | `--dump-path`: the setting overrides (plus the cached words on `with-cache`) as one atomic JSON | n/a | n/a | n/a | created `0600` explicitly + a sha256 integrity hash, fail-closed restore (F18); sealed under `dump/key` when set |
+| token files | every secret knob takes `file:<path>` | same | same | same | owner-only (0600) enforced at the shared loader (F12); the bare `-file` siblings are gone — `file:` is the one spelling |
 | upstream connection | outbound to the inverter/SDongle | outbound poll (the device or the cache), every 10 s by default | n/a (it *is* the device) | outbound HTTP to Prometheus (`--upstream`, default `http://localhost:9090`) | none (protocol-inherent) |
-| audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `scripts/audit_verify.py` (F10); the opt-in forward mirrors every line to the local syslog or the off-box collector (rev. 27: the udp://tcp:// grammar + the RFC5424/CEF envelopes + the remote-only mode) |
+| audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `scripts/audit_verify.py` (F10); the opt-in forward mirrors every line to the local syslog or the off-box collector (the `udp://`/`tcp://` grammar, the RFC5424/CEF envelopes, the remote-only mode) |
 | compose demo stack | four services on one `internal: true` network, **nothing published on the host**, one shared `config` volume, the generated 0600 `metrics.token` | | | | the internal network is the boundary; the exporter bearer-gated in the demo (F7) |
 
 Deployment (docker/): all three Modbus images run the tool as the
@@ -125,17 +61,19 @@ the intended demo feature, gated by control-server access only.
 ## 2. Implemented controls (all modules)
 
 - **Access control** — the four independent write gates
-  (`proxy.py:287,366-395`); control TCP requires the token and a token-less
+  (`proxy.py` `respond()`); control TCP requires the token and a token-less
   TCP control refuses to start (F5) on every tool that serves one (the fake
   exempt on purpose, F11) — the ONE guard the family's live rebinds call
   (`common/wire/control.py` `refuse_tokenless_rebind`/`refuse_token_drop`); the
   peer-cred path authenticates kernel-vouched peers without the secret
-  (`common/wire/control.py:308`, `common/wire/cred.py`); wherever a token is held the
+  (`common/wire/control.py` `trusted_peer`, `common/wire/cred.py`);
+  wherever a token is held the
   wire is signed both directions (`common/wire/wiresec.py`, constant-time
   `hmac.compare_digest`); the read-only ops role scopes its sessions to the
   show/clear verbs, gated once in `role_allows`, audited
   `role=ops`/`role=admin` (F22); `metrics/acl` at accept ahead of the caps
-  (`common/serve/connlimit.py` hooks, `common/settings/config.py` `acl_admits`); all
+  (`common/serve/connlimit.py` hooks, `common/settings/config.py`
+  `acl_admits`); all
   non-Modbus listeners default 127.0.0.1 and speak the F13 token shape
   beyond it.
 - **Input validation** — MBAP length capped in every reader; read counts
@@ -145,21 +83,46 @@ the intended demo feature, gated by control-server access only.
   one-line messages, never partial state.
 - **Secrets handling** — tokens never logged; every secret value takes
   `file:<path>` (the shared loader enforces owner-only 0600, F12; the bare
-  `-file` siblings removed rev. 13); the token-flag `ps` exposure documented
+  `-file` siblings are gone); the token-flag `ps` exposure documented
   in every README and man page (F9); the Nix modules warn when a token
-  would render into the world-readable store; all secrets are startup-only
-  (rev. 24).
+  would render into the world-readable store; all secrets are
+  startup-only (a secret never takes a live set — the restart is the
+  rotation).
 - **Logging / audit** — append-only, flushed, thread-safe, size/daily
-  rotated (`common/runtime/audit.py` — one writer family-wide); writes, refusals,
+  rotated (`common/runtime/audit.py` — one writer family-wide);
+  writes, refusals,
   auth-fails, control commands and lifecycle events recorded; control
   characters folded at the writer so one event is one physical line (F2);
   falls back to stdout (journald).
+- **Audit forwarding** — the trail's defense is three tiers: the local
+  chain (the file of record, per-writer hashes, `scripts/audit_verify.py`),
+  the local journald mirror and **the off-box copy** — `--audit-forward`
+  spells one target: `none`, `syslog` (the local socket auto-scan),
+  `syslog:/path` (an explicit socket, must exist at bind), `udp://host[:514]`
+  (RFC5426 datagrams, best-effort — drops show as the per-prefix chain-hash
+  gaps at the collector) or `tcp://host[:514]` (RFC6587 octet-count
+  framing). The remote envelope rides `--audit-forward-format` (`rfc5424` —
+  the default — or `cef` as an additive wrapping); both carry the native
+  line verbatim (the chain verifies identically at the collector) and the
+  prefix + chain hash as extracted fields (`[pvDash@1 …]` / `cs1`/`cs2`),
+  so a scheduled search can run the chain-verify logic off-box and **alert
+  on a chain break** — tamper-evidence becomes one that pages you. A send
+  failure closes the mirror with one stderr note and the next event re-arms
+  lazily (no threads, no buffers). Startup gates split: grammar errors and
+  a missing explicit socket are hard (ERROR + rc 1), a remote target that
+  does not resolve or refuses is soft (a warn, the lazy re-arm carries it —
+  boot ordering never blocks the Modbus surface). `--audit-log none` turns
+  the local file off: with a forward spelled that is the **remote-only
+  mode** (the collector is the sole holder — no file, no XDG directory, the
+  chain reseeds at GENESIS per run), without one the audit is disabled (the
+  state `--no-audit-log` spells). TLS transport is deliberately out (the
+  docs/TODO.md anchor).
 - **State dump handling** — written atomically, read defensively (a foreign
   or truncated file restores nothing); settings-only by default (the words
   on `with-cache`); restored overrides re-validate through the live
   dispatch; created `0600` explicitly + the integrity hash, fail-closed
   (F18); the reload state files ride the same writer/reader at 0600
-  explicit (F23); sealed under `dump/key` when set (rev. 11 — a wrong key
+  explicit (F23); sealed under `dump/key` when set (a wrong key
   fails closed as tampered; a keyed restore refuses an unsealed dump and
   vice versa).
 - **Supply chain** — stdlib-only, zero third-party dependencies; Nix-pinned
@@ -197,46 +160,28 @@ the intended demo feature, gated by control-server access only.
 | F15 | scrape | INFO | The metrics expose production values (generation, consumption, battery SoC) — a home-occupancy privacy consideration. | the bearer token (F13) + the localhost bind are the controls; treat the endpoint as internal. |
 | F17 | docker | INFO | The `/config` volume holds live config in plaintext; the entrypoint seeds copies once (existing files are never refreshed); the generated `metrics.token` lives in the same volume. | prefer token files outside the volume / `LoadCredential` / secret-backed mounts; document `docker compose down -v` as the re-sync. |
 
-### 3.2 Closed (fix and verification per finding: [AUDIT-history.md](AUDIT-history.md))
+### 3.2 Closed
 
-| # | Module | Severity | Summary | Closed |
-|---|---|---|---|---|
-| F2 | cache, inverter | MEDIUM | audit-trail injection: a newline in a control command wrote a forged second trail line | rev. 2 |
-| F3 | cache | LOW | the register allow-list failed open on unparseable write frames | rev. 2 |
-| F4 | cache, inverter | LOW | uncapped pre-auth control line buffer — unauthenticated memory amplification | rev. 2 |
-| F5 | cache, inverter | LOW | token-less TCP control was fully unauthenticated | rev. 2 |
-| F6 | cache | LOW | the metrics endpoint without a token exposed register values; no handler timeout | rev. 2 |
-| F7 | docker | LOW | the compose stack published every listener on all host interfaces | rev. 3 |
-| F8 | cache, inverter | LOW | the unix control socket's mode was umask-derived | rev. 2 |
-| F9 | cache, inverter, scrape | INFO | token flags are visible in `ps` / `/proc/*/cmdline` | rev. 3 |
-| F10 | cache, scrape, inverter | INFO | the audit trail was append-only but not integrity-protected | rev. 4 |
-| F11 | inverter | INFO | the fake's Modbus surface: no client limit/timeout/ACL, oversized replies | rev. 4 |
-| F12 | cache, inverter, scrape | INFO | token files were not permission-checked | rev. 3 |
-| F13 | scrape | MEDIUM | `/metrics` unauthenticated by default; the loopback bind the only control | rev. 4 |
-| F16 | scrape | INFO | no automated alerting — the detection half of the audit vocabulary | rev. 25 |
-| F18 | cache | LOW | the state dump was config-equivalent trust at rest with an umask-derived mode | rev. 4 |
-| F19 | scripts | LOW | the release landed before the CI gate reported | rev. 5 |
-| F20 | cache, scrape, inverter, dashboard | LOW | the ctl/cli help promised token-file env vars the clients never read | rev. 6 |
-| F21 | dashboard | MEDIUM | the HTTP surface served without authentication, bound `0.0.0.0` by default | rev. 21 |
-| F22 | cache, scrape, inverter, dashboard + common | LOW | the control plane had no role separation | rev. 7 |
-| F23 | cache | LOW | the reload state file was config-equivalent trust at rest with an umask-derived mode | rev. 9 |
+Every closed finding — F2–F13, F16, F18–F23 — with its fix, its
+verification and the per-revision walk (rev. 1–27):
+[history/AUDIT.md](history/AUDIT.md).
 
 ## 4. Verification
 
 All ten suites print ALL PASS on the revised tree; `nix flake check`,
 `scripts/check_options.py` + `scripts/lint_options.py --check` clean; the
 man pages regenerate (`mandoc -Tlint` clean). The per-finding verification
-and the per-revision walk-throughs: [AUDIT-history.md](AUDIT-history.md).
+and the per-revision walk-throughs: [history/AUDIT.md](history/AUDIT.md).
 
 ## 5. NIS2 / DORA mapping (all modules; cache is the production-relevant one)
 
 | Requirement | Status | Where |
 |---|---|---|
 | NIS2 21.2(a) risk-management policies | yes (scoped) | defaults-as-security documented (the quadruple-gated writes, localhost binds, tokens mandatory on control/metrics, 0600 token files); this audit is the written analysis |
-| NIS2 21.2(b) incident handling | yes (scoped) | the audit trail + journald retention, tamper-evident (F10 closed); the alert rules pack rides the exporter — the detection is wired, not just logged (F16 closed) |
+| NIS2 21.2(b) incident handling | yes (scoped) | the audit trail + journald retention, tamper-evident (F10 closed), the off-box forward + the alert rules pack riding the exporter — the detection is wired, not just logged (F16 closed) |
 | NIS2 21.2(c) business continuity | yes | reconnect/backoff, per-leaf isolation, restart/reload/reset verbs, the gated write-behind dump |
 | NIS2 21.2(d) supply chain | yes | stdlib-only, pinned Nix builds; the shared `common/` core |
-| NIS2 21.2(f) effectiveness | partial | fuzz/stress/regression suites; no CI enforcement yet |
+| NIS2 21.2(f) effectiveness | partial | fuzz/stress/regression suites; the suites run in the tag-triggered release workflow's matrix, no push/PR CI yet |
 | NIS2 21.2(g) cyber hygiene / crypto | partial | constant-time compares, LoadCredential, owner-only token files, no secrets in logs; no TLS (F1 protocol-inherent, F14 proxy) |
 | NIS2 21.2(h) access control / MFA | yes (scoped) | the four write gates (two defaulting to none), the ACLs with restrict-all modes, token-mandatory control (the fake exempt, F11), the metrics token mandatory beyond loopback (F13), the `metrics/acl` accept-time IP gate, per-IP + total caps on every serving surface, peer-cred, the signed wire, the read-only ops role (F22); MFA not applicable to a machine protocol |
 | DORA art. 8 ICT asset identification | yes | every option logged at start; `inspect` dumps the full state; the demo topology documented |
@@ -245,8 +190,9 @@ and the per-revision walk-throughs: [AUDIT-history.md](AUDIT-history.md).
 | DORA art. 12 BCP | partial | restart/reload/clear verbs, the dump/restore write-behind; no automated failover (single-device by design) |
 
 Scraper deltas (rows where scrape matches are omitted): incident handling —
-unauthorized-request logging at WARNING; effectiveness — the fuzz suite, no
-CI enforcement; crypto/hygiene — the constant-time bearer compare, no TLS
+unauthorized-request logging at WARNING; effectiveness — the fuzz suite,
+the release workflow's matrix legs; crypto/hygiene — the constant-time
+bearer compare, no TLS
 (F14); access control — the bearer gate + the non-loopback refusal (F13),
 `metrics/acl`, the caps; DORA 9–10 — the localhost default, the two-route
 whitelist, DoS caps on both the HTTP and poll sides; DORA 11 — yes (the
@@ -255,7 +201,8 @@ stateless, restart-clean; Prometheus holds the history).
 
 Dashboard deltas (rows where the dashboard matches are omitted): incident
 handling — the DSH trail (chained) + the wire macs; effectiveness —
-`tests/dashboard-control-fuzz.py`, no CI enforcement; crypto/hygiene — the
+`tests/dashboard-control-fuzz.py`, the release workflow's matrix legs;
+crypto/hygiene — the
 constant-time compares (control + page/metrics bearers), the signed wire,
 no TLS (F14); access control — the family-hardened control plane + the
 bearer gate on the HTTP surface (F21); DORA 9–10 — partial (the closed
@@ -273,7 +220,8 @@ accept ahead of the caps, token-mandatory TCP control (the fake exempt by
 documented posture), per-IP and total connection caps on every serving
 surface, constant-time token checks, peer-cred on the unix control sockets,
 length-disciplined wire parsing with capped buffers, a tamper-evident audit
-trail, explicit socket modes and owner-only token files instead of umask
+trail with the off-box forward, explicit socket modes and owner-only token
+files instead of umask
 hope, zero dependencies, hardened systemd units and unprivileged containers
 whose entrypoints drop root before exec, and a compose demo stack that
 publishes nothing.

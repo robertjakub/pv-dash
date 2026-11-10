@@ -1,6 +1,6 @@
-# Security-audit history — the pv-suite tree (rev. 1–25)
+# Security-audit history — the pv-suite tree (rev. 1–27)
 
-The per-revision record behind [AUDIT.md](AUDIT.md): the revision history,
+The per-revision record behind [AUDIT.md](../AUDIT.md): the revision history,
 the closed findings with their fix and verification. Findings keep their
 numbers across revisions; the current state lives in AUDIT.md.
 
@@ -32,7 +32,9 @@ numbers across revisions; the current state lives in AUDIT.md.
 | 22 | the control-listener unification | ONE listener tier in `common/control.py`; the private copies shed |
 | 23 | the metrics-stack unification | one metrics stack on all four tools; the default binds renumbered 9350–9353 |
 | 24 | the secrets-startup-only wave | the live secret rotation retired family-wide (see AUDIT.md) |
-| 25 | the alert rules pack | F16 closed — the detection half of the audit vocabulary ships with the exporter (`scraper/alerts.yml`; the cache side on a new `modbus_cache_write_refused_total` counter) |
+| 25 | the alert rules pack | F16 closed — the detection half of the audit vocabulary ships with the exporter (`scraper/alerts.yml`; the cache side on a new `modbus_cache_write_refused_total` counter; the pack since re-homed to `alerts/scraper.yml` + `alerts/cache.yml`) |
+| 26 | the audit trail forwarding | `--audit-forward syslog` mirrors every finished line — the per-writer hash chain included — to the local syslog socket (`FailLoudSysLogHandler`, the bin name the tag; journald picks the lines up sealed); the sink stays the authority (a send failure stops the mirroring with one stderr note, never the trail); a socket-less spelling refuses to start |
+| 27 | the audit-forward targets (the F10 finish line) | the target grammar `none` / `syslog` / `syslog:/path` / `udp://host[:514]` (RFC5426) / `tcp://host[:514]` (RFC6587); the envelope rides `--audit-forward-format` (`rfc5424`/`cef`) carrying the native line verbatim + the prefix and chain hash as extracted fields — the chain verifies off-box and a chain break can page; `--audit-log none` + a forward is the remote-only mode (the collector the sole holder, the chain reseeds per run); grammar errors and a missing explicit socket refuse hard, an unresolvable remote target warns with the lazy re-arm; TLS deliberately out (the docs/TODO.md anchor) |
 
 ## 2. Closed findings (fix and verification)
 

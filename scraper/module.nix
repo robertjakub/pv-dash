@@ -18,68 +18,68 @@ let
     "# --- the device (upstream inverter) and the register map ---"
     # the register map itself (addresses, types, gains, function codes) comes
     # from the device profile alone — `set profile <file-or-name>` swaps it live
-    (setLine "upstream" cfg.upstream)
-    (setLine "modbus-unit" (toString cfg.modbusUnit))
-    (setLine "modbus-offset" (toString cfg.modbusOffset))
-    (lib.optionals (cfg.modbusAuth != null) [ (setLine "modbus-auth" cfg.modbusAuth) ])
-    (lib.optionals (cfg.authKey != null) [ (setLine "auth-key" cfg.authKey) ])
-    (setLine "timeout" (toString cfg.timeout))
-    (setLine "max-kwp" (toString cfg.maxKwp))
-    (setLine "max-grid-kw" (toString cfg.maxGridKw))
-    (setLine "grid-positive-import" (lib.boolToString cfg.gridPositiveImport))
+    (setLine "modbus upstream" cfg.upstream)
+    (setLine "modbus unit" (toString cfg.modbusUnit))
+    (setLine "modbus offset" (toString cfg.modbusOffset))
+    (lib.optionals (cfg.modbusAuth != null) [ (setLine "modbus auth" cfg.modbusAuth) ])
+    (lib.optionals (cfg.authKey != null) [ (setLine "modbus auth key" cfg.authKey) ])
+    (setLine "modbus timeout" (toString cfg.timeout))
+    (setLine "caps max-pv" (toString cfg.maxKwp))
+    (setLine "caps max-grid" (toString cfg.maxGridKw))
+    (setLine "modbus grid-positive-import" (lib.boolToString cfg.gridPositiveImport))
     ""
     "# --- what the tool serves and where ---"
-    (setLine "listen" "${cfg.listenHost}:${toString cfg.listenPort}")
-    (setLine "interval" (toString cfg.interval))
+    (setLine "system listen" "${cfg.listenHost}:${toString cfg.listenPort}")
+    (setLine "metrics interval" (toString cfg.interval))
     (setLine "local-time" (lib.boolToString cfg.localTime))
     ""
     "# --- the connection caps ---"
-    (setLine "max-clients" (toString cfg.maxClients))
-    (setLine "client-timeout" (toString cfg.clientTimeout))
-    (setLine "max-conn-per-ip" (toString cfg.maxConnPerIp))
+    (setLine "metrics limits max-clients" (toString cfg.maxClients))
+    (setLine "metrics limits timeout" (toString cfg.clientTimeout))
+    (setLine "metrics limits max-conn-per-ip" (toString cfg.maxConnPerIp))
     ""
     "# --- the /metrics bearer token ---"
-    (lib.optionals (cfg.authToken != null) [ (setLine "auth-token" cfg.authToken) ])
-    (lib.optionals (cfg.authTokenFile != null) [ (setLine "auth-token" "file:${toString cfg.authTokenFile}") ])
+    (lib.optionals (cfg.authToken != null) [ (setLine "metrics auth token" cfg.authToken) ])
+    (lib.optionals (cfg.authTokenFile != null) [ (setLine "metrics auth token" "file:${toString cfg.authTokenFile}") ])
     ""
     "# --- the /metrics connect ACL ---"
-    (lib.optionals (cfg.metricsAcl != null) [ (setLine "metrics-acl" cfg.metricsAcl) ])
-    (lib.optionals (cfg.metricsAclFile != null) [ (setLine "metrics-acl" "file:${toString cfg.metricsAclFile}") ])
+    (lib.optionals (cfg.metricsAcl != null) [ (setLine "metrics acl" cfg.metricsAcl) ])
+    (lib.optionals (cfg.metricsAclFile != null) [ (setLine "metrics acl" "file:${toString cfg.metricsAclFile}") ])
     ""
     "# --- the control plane ---"
-    (lib.optionals (cfg.controlPort != null) [ (setLine "control-port" (toString cfg.controlPort)) ])
-    (lib.optionals (cfg.controlToken != null) [ (setLine "control-token" cfg.controlToken) ])
+    (lib.optionals (cfg.controlPort != null) [ (setLine "control port" (toString cfg.controlPort)) ])
+    (lib.optionals (cfg.controlToken != null) [ (setLine "control token" cfg.controlToken) ])
     (lib.optionals (cfg.controlTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      (setLine "control-token" "file:/run/credentials/modbus-scraper/control-token")
+      (setLine "control token" "file:/run/credentials/modbus-scraper/control-token")
     ])
-    (lib.optionals (cfg.controlOpsToken != null) [ (setLine "control-ops-token" cfg.controlOpsToken) ])
+    (lib.optionals (cfg.controlOpsToken != null) [ (setLine "control ops token" cfg.controlOpsToken) ])
     (lib.optionals (cfg.controlOpsTokenFile != null) [
       # systemd LoadCredential mounts the file here (see serviceConfig below)
-      (setLine "control-ops-token" "file:/run/credentials/modbus-scraper/control-ops-token")
+      (setLine "control ops token" "file:/run/credentials/modbus-scraper/control-ops-token")
     ])
-    (lib.optionals (cfg.controlOpsVerbs != null) [ (setLine "control-ops-verbs" cfg.controlOpsVerbs) ])
-    (lib.optionals (cfg.controlTrustUids != null) [ (setLine "control-trust-uids" cfg.controlTrustUids) ])
-    (setLine "control-socket-group" (lib.boolToString cfg.controlSocketGroup))
-    (lib.optionals (cfg.profile != null) [ (setLine "profile" (toString cfg.profile)) ])
-    (lib.optionals (cfg.metricsSpec != null) [ (setLine "metrics-spec" cfg.metricsSpec) ])
-    (lib.optionals (cfg.metricPrefix != null) [ (setLine "metric-prefix" cfg.metricPrefix) ])
+    (lib.optionals (cfg.controlOpsVerbs != null) [ (setLine "control ops verbs" cfg.controlOpsVerbs) ])
+    (lib.optionals (cfg.controlTrustUids != null) [ (setLine "control trust-uids" cfg.controlTrustUids) ])
+    (setLine "control socket-group" (lib.boolToString cfg.controlSocketGroup))
+    (lib.optionals (cfg.profile != null) [ (setLine "modbus profile" (toString cfg.profile)) ])
+    (lib.optionals (cfg.metricsSpec != null) [ (setLine "metrics filter" cfg.metricsSpec) ])
+    (lib.optionals (cfg.metricPrefix != null) [ (setLine "metrics prefix" cfg.metricPrefix) ])
     ""
     "# --- the state dump (the live overrides' write-behind) ---"
-    (lib.optionals (cfg.dumpPath != null) [ (setLine "dump-path" cfg.dumpPath) ])
-    (lib.optionals (cfg.dumpPath != null && cfg.dumpKey != null) [ (setLine "dump-key" cfg.dumpKey) ])
+    (lib.optionals (cfg.dumpPath != null) [ (setLine "dump path" cfg.dumpPath) ])
+    (lib.optionals (cfg.dumpPath != null && cfg.dumpKey != null) [ (setLine "dump key" cfg.dumpKey) ])
     (lib.optionals (cfg.dumpPath != null && cfg.dumpInterval != null) [ (setLine "dump-interval" (toString cfg.dumpInterval)) ])
-    (setLine "restore-on-start" (lib.boolToString cfg.restoreOnStart))
+    (setLine "dump restore-on-start" (lib.boolToString cfg.restoreOnStart))
     ""
     "# --- the audit trail ---"
     (lib.optionals (cfg.auditLog != null) [
-      (setLine "audit-log" cfg.auditLog)
-      (setLine "audit-max-mb" (toString cfg.auditMaxMb))
-      (setLine "audit-daily" (lib.boolToString cfg.auditDaily))
-      (setLine "audit-files" (toString cfg.auditFiles))
+      (setLine "audit log-file" cfg.auditLog)
+      (setLine "audit rotate max-size" (toString cfg.auditMaxMb))
+      (setLine "audit rotate daily" (lib.boolToString cfg.auditDaily))
+      (setLine "audit rotate files" (toString cfg.auditFiles))
     ])
-    (lib.optionals (cfg.auditForward != null) [ (setLine "audit-forward" cfg.auditForward) ])
-    (lib.optionals (cfg.auditForwardFormat != null) [ (setLine "audit-forward-format" cfg.auditForwardFormat) ])
+    (lib.optionals (cfg.auditForward != null) [ (setLine "audit forward" cfg.auditForward) ])
+    (lib.optionals (cfg.auditForwardFormat != null) [ (setLine "audit forward format" cfg.auditForwardFormat) ])
     ""
     "# --- the log surface ---"
     (setLine "log-level" cfg.logLevel)

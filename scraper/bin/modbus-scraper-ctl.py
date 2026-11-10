@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 from common.wire.ctl import run_ctl
 from lib.config import DEFAULT_CONTROL_SOCKET
 from lib.man import ctl_page
+from lib.options import SETTING_SPELLINGS
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_MAX_LINE_BYTES_S, CLI_TIMEOUT_S
 
 if __name__ == '__main__':
@@ -32,4 +33,4 @@ if __name__ == '__main__':
             command_help='e.g. inspect, show config, set interval 5, poll now, request reload, request restart, shutdown',
             ctl_socket=DEFAULT_CONTROL_SOCKET, timeout_s=CLI_TIMEOUT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES, ctl_page=ctl_page,
-            max_line_bytes=CLI_MAX_LINE_BYTES_S)
+            max_line_bytes=CLI_MAX_LINE_BYTES_S, spellings=SETTING_SPELLINGS)

@@ -71,13 +71,14 @@ interval`: that logs a warning (polls run back-to-back) instead of failing.
 regenerates the script from the running scraper (secrets hidden):
 
 ```conf
-# modbus-scraper configuration — every line is a set command (the flat registry names)
-set upstream 127.0.0.1:5502
-set modbus-unit 1
-set max-kwp 6
-set max-grid-kw 12
-set listen 127.0.0.1:9350
-set interval 10
+# modbus-scraper configuration — every line is a set command in the CLI spelling
+# (the live path as words; the flat dashed knob name reads too, for older files)
+set modbus upstream 127.0.0.1:5502
+set modbus unit 1
+set caps max-pv 6
+set caps max-grid 12
+set system listen 127.0.0.1:9350
+set metrics interval 10
 set log-level INFO
 ```
 
@@ -86,7 +87,7 @@ set log-level INFO
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--modbus-unit` / `--modbus-offset` | `1` / `0` | Modbus unit id / added to register addresses (`-1` for gateways that need 0-based addressing) |
 | `--modbus-auth` / `--auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/common/MODBUS.md](../docs/common/MODBUS.md) |
-| `--profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set profile` |
+| `--profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set modbus profile` |
 | `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
 | `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
 | `--max-kwp` / `--max-grid-kw` | `6` / `12` | the sanity caps in kW: above the cap → HTTP 503 + error log; `0` = off |
@@ -237,9 +238,9 @@ shared schema the [fake inverter](../inverter/README.md) serves and the
 [cache](../cache/README.md) polls; the shipped profiles live in the suite's
 [`profiles/`](../profiles/) subproject (`sun2000.json` by default); the
 format is documented in [profiles/README.md](../profiles/README.md).
-Resolution: `--profile` flag, env `PROFILE`, config `set profile`,
+Resolution: `--profile` flag, env `PROFILE`, config `set modbus profile`,
 then the bundled copy; re-read on `SIGHUP`. The live control surface swaps
-it at runtime: `set profile <file-or-name>` loads the new map,
+it at runtime: `set modbus profile <file-or-name>` loads the new map,
 rebuilds the metric sources and rolls back cleanly when the profile lacks
 the registers the power math depends on.
 

@@ -5,6 +5,15 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The external surfaces speak the console spellings (the flat wire's
+completion): the one-shot ctl translates the live/alias words like the
+cli's (`set caps max-pv 6`, `set metrics interval 10` — a piped config
+script's live-word lines work), `show config` renders the live paths
+as words, `help config`/`show knobs` and the MANUAL + OPTIONS tables
+spell the console words in their set columns, and the state dumps +
+the reload state file key the live paths (`metrics/auth/token`) — the
+flat names read beside them on restore. The wire itself stays flat.
+
 The wire speaks the flattened registry names: the dispatch, the
 dumps, the defaults and every reply key/render the options.json `name`
 (`interval`, `modbus-unit`, `metrics-spec`) — the live paths and the

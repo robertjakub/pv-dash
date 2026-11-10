@@ -89,7 +89,7 @@ def resolve_config(args, script_dir=None):
     }
     cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'CTL',
                                   'control_port', None, str)
-    cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', None, str)
+    cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', DEFAULTS['audit_log'], str)
     cfg['audit_forward'] = resolve(getattr(args, 'audit_forward', None), 'AUDIT_FORWARD',
                                    'audit_forward', DEFAULTS['audit_forward'], str)
     cfg['audit_forward_format'] = resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
@@ -108,7 +108,7 @@ def resolve_config(args, script_dir=None):
                                                      'control_ops_token', None, str) or '').strip() or None,
                                             'control-ops-token')
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None),
-                                        'CONTROL_TRUST_UIDS', 'control_trust_uids', None, str)
+                                        'CONTROL_TRUST_UIDS', 'control_trust_uids', DEFAULTS['control_trust_uids'], str)
     cfg['control_socket_group'] = resolve(getattr(args, 'control_socket_group', None), 'CONTROL_SOCKET_GROUP',
                                           'control_socket_group', DEFAULTS['control_socket_group'], str_to_bool)
     check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
@@ -151,7 +151,7 @@ def resolve_config(args, script_dir=None):
     cfg['metrics_max_conn_per_ip'] = resolve(getattr(args, 'metrics_max_conn_per_ip', None),
                                              'METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
                                              DEFAULTS['metrics_max_conn_per_ip'], int)
-    cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', None, str)
+    cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', DEFAULTS['dump_path'], str)
     cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
                                             None, str) or '').strip() or None, 'dump/key')
     cfg['dump_interval'] = resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',

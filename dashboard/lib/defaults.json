@@ -23,9 +23,12 @@
     "audit_forward_format": "rfc5424",
     "audit_daily": false,
     "no_audit_log": false,
+    "audit_log": "",
     "dump_interval": 0.0,
     "control_socket_group": false,
-    "restore_on_start": false
+    "control_trust_uids": "",
+    "restore_on_start": false,
+    "dump_path": ""
   },
   "log_levels": [
     "DEBUG",

@@ -577,6 +577,27 @@ def main():
         aud = open('/tmp/inv_regtest_audit.log').read()
         check('signed wire: the audit COMMAND line carries the wire mac', "'show version' wire=h" in aud, aud[-200:])
 
+        # ---- the grid wander knobs: the machines' ranges ride the flags
+        #      and set live (the tree's grid block backs the defaults)
+        tx = ctl(H_CTL, 'show grid-voltage-wander')
+        check('grid wander: the voltage-machine range reads the tree default',
+              tx == 'ok grid-voltage-wander=0.1', tx)
+        tx = ctl(H_CTL, 'set grid-voltage-wander 0.05')
+        check('grid wander: the voltage range sets live',
+              tx.startswith('ok grid-voltage-wander=0.05'), tx)
+        tx = ctl(H_CTL, 'set grid-frequency-wander 0')
+        check('grid wander: the flat frequency clamps',
+              tx.startswith('ok grid-frequency-wander=0'), tx)
+        tx = ctl(H_CTL, 'set grid-frequency-wander 5')
+        check('grid wander: the frequency clamp refuses beyond 0..2',
+              tx.startswith('% error'), tx)
+        tx = ctl(H_CTL, 'set grid-voltage-wander 2')
+        check('grid wander: the fraction refuses beyond 0..1',
+              tx.startswith('% error'), tx)
+        tx = ctl(H_CTL, 'set grid-voltage-wander 0.1')
+        check('grid wander: the default restores',
+              tx.startswith('ok grid-voltage-wander=0.1'), tx)
+
         # ---- the secrets: startup-only (the dump/key treatment) — set/clear
         #      refuse on the wire, the show verb refuses them — a secret never renders
         tx = ctl(H_CTL, 'show control token', token='tok')
@@ -1034,8 +1055,8 @@ def main():
         check("node walk: the bare show mimics the ? output (the walk's first position)",
               words == ['audit', 'batt', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
                         'connect-acl', 'connections', 'control', 'dump', 'dump-interval', 'grid',
-                        'grid-frequency', 'grid-outage',
-                        'grid-voltage', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
+                        'grid-frequency', 'grid-frequency-wander', 'grid-outage',
+                        'grid-voltage', 'grid-voltage-wander', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
                         'metrics', 'modbus', 'mppt', 'pv', 'registers', 'scenario', 'seed',
                         'soc', 'static', 'strict', 'time', 'time-scale', 'timezone', 'version',
                         'write'], tx[:220])

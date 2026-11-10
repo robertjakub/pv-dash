@@ -14,7 +14,7 @@ config file names one and the start refuses."""
 import logging
 
 from .options import OPTIONS
-from .statics import DEFAULTS, GRID
+from .statics import DEFAULTS
 from common.settings.config import Resolver, load_config_script, str_to_bool
 
 logger = logging.getLogger('fake-inverter')
@@ -61,8 +61,10 @@ STATIC_DEFAULTS = {
     'control-log-replies': DEFAULTS['control_log_replies'],
     'control-socket-group': DEFAULTS['control_socket_group'],
     'restore-on-start': DEFAULTS['restore_on_start'],
-    'grid-voltage': GRID['voltage_v'],
-    'grid-frequency': GRID['frequency_hz'],
+    'grid-voltage': DEFAULTS['grid_voltage'],
+    'grid-voltage-wander': DEFAULTS['grid_voltage_wander'],
+    'grid-frequency': DEFAULTS['grid_frequency'],
+    'grid-frequency-wander': DEFAULTS['grid_frequency_wander'],
 }
 
 

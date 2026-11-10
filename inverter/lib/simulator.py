@@ -10,9 +10,9 @@ import time
 from .battery import BATT_DISCHARGE_CAP, BATT_GRID_MARGIN_W, BATT_MAX_TICK_H, BATT_MAX_W, \
     BATT_STANDBY_W, BatteryMachine
 from .profile import load_profile, resolve_profile
-from .statics import (CLOUD_MACHINES, DEFAULT_BATTERY_KWH, DIAG_BASE, DIAG_MAGIC, GRID_FREQUENCY_HZ,
-                      GRID_FREQUENCY_WANDER, GRID_OUTAGE_FAIL_H, GRID_OUTAGE_REPAIR_MIN, GRID_VOLTAGE_V,
-                      GRID_VOLTAGE_WANDER, LOAD_BASE_W, LOAD_BELLS, METER_EXPORT_KWH, METER_IMPORT_KWH,
+from .statics import (CLOUD_MACHINES, DEFAULT_BATTERY_KWH, DIAG_BASE, DIAG_MAGIC,
+                      GRID_OUTAGE_FAIL_H, GRID_OUTAGE_REPAIR_MIN,
+                      LOAD_BASE_W, LOAD_BELLS, METER_EXPORT_KWH, METER_IMPORT_KWH,
                       MPPT_WINDOWS, SUNRISE, SUNSET)
 
 # Runtime-controllable knobs (see the control server): None = follow the
@@ -34,7 +34,8 @@ def format_clock(t):
 
 class Simulator:
     def __init__(self, peak_w, static, frozen_time, battery_kwh=DEFAULT_BATTERY_KWH,
-                 profile=None, seed=None):
+                 profile=None, seed=None, grid_voltage=230.0, grid_voltage_wander=0.1,
+                 grid_frequency=50.0, grid_frequency_wander=0.2):
         self.peak_w = peak_w
         self.static = static
         self.frozen_time = frozen_time
@@ -46,8 +47,10 @@ class Simulator:
         self.cloud_mode = None          # None = clear sky; 'autumn'/'spring'/'winter' = the machine
         self.batt_state = None          # None = the machine decides; 'charging'/'discharging' = forced
         self.mppt = 'both'              # which PV strings feed the MPPTs: both | east | west | none
-        self.grid_voltage = GRID_VOLTAGE_V   # nominal phase voltage (V); the machine wanders +-10 %
-        self.grid_frequency = GRID_FREQUENCY_HZ   # nominal grid frequency (Hz); the machine wanders +-0.2
+        self.grid_voltage = grid_voltage   # nominal phase voltage (V); the machine wanders +-voltage-wander
+        self.grid_voltage_wander = grid_voltage_wander   # the per-phase machine's range (a fraction)
+        self.grid_frequency = grid_frequency   # nominal grid frequency (Hz); the machine wanders +-frequency-wander
+        self.grid_frequency_wander = grid_frequency_wander   # the frequency machine's clamp (Hz)
         self.utc = True                 # the state machines integrate over the UTC clock (configurable)
         self.time_scale = 1.0           # the time-lapse factor: the simulated clock runs N× real time
         self._v_anchor = time.time()    # the virtual epoch at the anchor point
@@ -201,7 +204,7 @@ class Simulator:
             dt = t - self._freq_t
             self._freq_t = t
             if dt > 0:
-                self._freq_dev = min(GRID_FREQUENCY_WANDER, max(-GRID_FREQUENCY_WANDER,
+                self._freq_dev = min(self.grid_frequency_wander, max(-self.grid_frequency_wander,
                     self._freq_dev + 2.0 * (0.0 - self._freq_dev) * dt
                     + 0.08 * math.sqrt(dt) * self._grid_v_rng.gauss(0.0, 1.0)))
             return self.grid_frequency + self._freq_dev
@@ -224,7 +227,7 @@ class Simulator:
             if dt > 0:
                 self._grid_v_t = t
                 self._grid_v = [
-                    min(GRID_VOLTAGE_WANDER, max(-GRID_VOLTAGE_WANDER,
+                    min(self.grid_voltage_wander, max(-self.grid_voltage_wander,
                         w + 1.0 * (0.0 - w) * dt
                         + 0.03 * math.sqrt(dt) * self._grid_v_rng.gauss(0.0, 1.0)))
                     for w in self._grid_v]
@@ -516,7 +519,7 @@ class Simulator:
             'meter-status': 1.0, 'meter-mode': 1.0,
             'meter-voltage-a': v_phases[0], 'meter-voltage-b': v_phases[1], 'meter-voltage-c': v_phases[2],
             'meter-current-a': i_meter[0], 'meter-current-b': i_meter[1], 'meter-current-c': i_meter[2],
-            'meter-reactive-power': 0.0, 'meter-power-factor': 1.0, 'meter-frequency': GRID_FREQUENCY_HZ,
+            'meter-reactive-power': 0.0, 'meter-power-factor': 1.0, 'meter-frequency': self.grid_frequency,
             'meter-export': METER_EXPORT_KWH + export_day,
             'meter-import': METER_IMPORT_KWH + import_day,
             'meter-power-a': grid_w / 3.0, 'meter-power-b': grid_w / 3.0, 'meter-power-c': grid_w / 3.0,

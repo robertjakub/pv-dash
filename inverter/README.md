@@ -60,9 +60,11 @@ hours and moving the clock (`set time 18:00`) acts as time-lapse control.
   0.05–0.95), `spring` (fair-weather cumulus, 0.02–0.80), `winter` (heavy
   overcast spells, 0.10–1.00). `reset` returns to a clear sky.
 - **Grid voltage** — three independent mean-reverting walks around the
-  nominal (±10 %, the phases wander differently); `--grid-voltage`
-  (230 V, 120 supported — the currents double) and `set grid-voltage
-  120|230`.
+  nominal (±10 % by default, the phases wander differently);
+  `--grid-voltage` (230 V, 120 supported — the currents double),
+  `--grid-voltage-wander` (the ±fraction of the nominal, 0 = the flat
+  grid) and the matching `set grid-voltage` / `set
+  grid-voltage-wander`.
 - **Grid outages** — `set grid-outage on` arms a two-state machine: the
   grid randomly drops (phases collapse, the inverter stands by — no
   harvest, no battery flow, the SoC holds) and comes back after a few
@@ -123,7 +125,8 @@ the config names one and the start refuses. The flags:
 | `--profile` | `sun2000` | register-map profile: the built-in name or a JSON path (`PROFILE` when unset) |
 | `--static` / `--battery-kwh` | off / `6.9` | static demo values / the battery's usable capacity in kWh |
 | `--max-kwp` | `6` | PV array size in kWp (peak = 75 % of it) |
-| `--grid-voltage` / `--grid-frequency` | `230` / `50` | nominal grid phase voltage (120 or 230) / frequency (the machine wanders ±0.2 Hz) |
+| `--grid-voltage` / `--grid-frequency` | `230` / `50` | nominal grid phase voltage (120 or 230) / frequency |
+| `--grid-voltage-wander` / `--grid-frequency-wander` | `0.1` / `0.2` | the voltage machine's wander fraction (±10 % by default; 0 = the flat grid) / the frequency machine's clamp in Hz (±0.2 by default) |
 | `--time` / `--time-scale` / `--timezone` | real clock / `1` / `utc` | freeze simulated time `HH:MM` / the N× time-lapse factor / the machines' clock |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the Modbus caps (refuse past the count / kick the silent / per-IP cap; `0` = no limit; `$MAX_CLIENTS` / `$CLIENT_TIMEOUT` / `$MAX_CONN_PER_IP`) |
 | `--connect-acl` | any | the Modbus clients allowed to connect: `any`, `none`, or a comma-separated IP/CIDR list — the family ACL map lives in [docs/ACL.md](../docs/ACL.md) |
@@ -205,6 +208,7 @@ form is legitimate here in a way it never is on the daemons.
 | `mppt` | `both` \| `east` \| `west` \| `none` | the enabled PV strings |
 | `cloud` | `0..1` \| `clear` \| `autumn` \| `spring` \| `winter` | scale the PV: a pinned factor, a clear sky, or a cloud state machine |
 | `grid-voltage` / `grid-frequency` | `120`\|`230` / Hz | the nominals the wander machines walk around |
+| `grid-voltage-wander` / `grid-frequency-wander` | fraction / Hz | the machines' wander range (0 = the flat grid/frequency) |
 | `grid-outage` | `on` \| `off` \| `outage` | the grid-outage machine; `outage` forces one now |
 | `timezone` / `time` / `time-scale` | `utc`\|`local` / `HH:MM`\|`auto` / `N`\|`auto` | the machines' clock / freeze-unfreeze it / the time-lapse factor |
 | `scenario` | `morning` \| `noon` \| `evening` \| `night` \| `custom` | the presets (above) |

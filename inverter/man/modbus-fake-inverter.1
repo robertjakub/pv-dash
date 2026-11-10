@@ -91,12 +91,22 @@ probability 0..1 that a request is answered hostile and dropped; seed
 with \-\-seed for reproducibility
 .TP
 .BI \-\-grid\-voltage " N"
-nominal grid phase voltage in V (120 or 230; the per\-phase machine
-wanders ±10 %% around it, the grid\-voltage setpoint overrides)
+nominal grid phase voltage in V (120 or 230; the machine wanders
+±grid\-voltage\-wander around it, the grid\-voltage setpoint overrides)
+.TP
+.BI \-\-grid\-voltage\-wander " N"
+the per\-phase voltage machine's wander range as a fraction of the
+nominal (0.1 = the phases wander ±10 %%; 0 = the flat grid); the live
+set re\-clamps the walk
 .TP
 .BI \-\-grid\-frequency " N"
-nominal grid frequency in Hz (the machine wanders ±0.2 Hz around it, the
-grid\-frequency setpoint overrides)
+nominal grid frequency in Hz (the machine wanders
+±grid\-frequency\-wander around it, the grid\-frequency setpoint
+overrides)
+.TP
+.BI \-\-grid\-frequency\-wander " N"
+the frequency machine's clamp in Hz around the nominal (0.2 = ±0.2 Hz; 0
+= the flat frequency); the live set re\-clamps the walk
 .TP
 .BI \-\-seed " N"
 chaos RNG seed

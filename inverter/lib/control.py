@@ -267,6 +267,16 @@ class ControlServer(_ControlServer):
             self._gate_range(key, v, 'Hz')
             sim.grid_frequency = v
             return '%g' % v
+        if key == 'grid-voltage-wander':
+            v = float(val)
+            self._gate_range(key, v, 'fraction')
+            sim.grid_voltage_wander = v
+            return '%g' % v
+        if key == 'grid-frequency-wander':
+            v = float(val)
+            self._gate_range(key, v, 'Hz')
+            sim.grid_frequency_wander = v
+            return '%g' % v
         if key == 'grid-outage':
             if val in ('outage', 'down', 'blackout'):
                 sim.grid_outage = 'outage'
@@ -457,6 +467,10 @@ class ControlServer(_ControlServer):
             return '%g' % sim.grid_voltage
         if key == 'grid-frequency':
             return '%g' % sim.grid_frequency
+        if key == 'grid-voltage-wander':
+            return '%g' % sim.grid_voltage_wander
+        if key == 'grid-frequency-wander':
+            return '%g' % sim.grid_frequency_wander
         if key == 'grid-outage':
             return sim.outage_display()
         if key == 'strict':
@@ -733,7 +747,9 @@ class ControlServer(_ControlServer):
             'chaos': '%.2f' % chaos.p,
             'seed': 'random' if chaos.seed is None else str(chaos.seed),
             'grid-voltage': '%g' % sim.grid_voltage,
+            'grid-voltage-wander': '%g' % sim.grid_voltage_wander,
             'grid-frequency': '%g' % sim.grid_frequency,
+            'grid-frequency-wander': '%g' % sim.grid_frequency_wander,
             'grid-outage': sim.grid_outage,
             'max-kwp': '%g' % (sim.peak_w / (1000.0 * PEAK_RATIO)),
             'modbus/profile': sim.profile.path,

@@ -110,7 +110,9 @@ takes. The namespaces group them.
 | `strict` | `set strict` | settable | `on\|off` | `--strict` / `STRICT` | reject undefined registers with exception 02 |
 | `chaos` | `set chaos` | settable | `0..1\|off` | `--chaos` / `CHAOS` | hostile-reply probability; off = disable |
 | `grid-voltage` | `set grid-voltage` | settable | `V` | `--grid-voltage` / — | nominal grid phase voltage; the machine wanders ±10 % per phase |
+| `grid-voltage-wander` | `set grid-voltage-wander` | settable | `fraction` | `--grid-voltage-wander` / — | the per-phase voltage machine's wander range (a fraction of the nominal; 0 = the flat grid) |
 | `grid-frequency` | `set grid-frequency` | settable | `Hz` | `--grid-frequency` / — | nominal grid frequency; the machine wanders around it |
+| `grid-frequency-wander` | `set grid-frequency-wander` | settable | `Hz` | `--grid-frequency-wander` / — | the frequency machine's clamp in Hz around the nominal; 0 = the flat frequency |
 | `seed` | `set seed` | settable | `N` | `--seed` / — | re-seed the chaos RNG |
 | `connect-acl` | `set connect-acl` | settable | `\<acl>` | `--connect-acl` / `CONNECT_ACL` | the Modbus clients allowed to connect (the cache's connect-acl, mirrored: "any", "none", or a comma-separated IP/CIDR list) |
 | `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous Modbus client limit |

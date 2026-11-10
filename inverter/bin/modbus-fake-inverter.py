@@ -236,7 +236,11 @@ def main():
     profile_path = resolve_profile(profile_text)
     simulator = Simulator(PEAK_RATIO * args.max_kwp * 1000.0, args.static, frozen,
                           battery_kwh=args.battery_kwh,
-                          profile=load_profile(profile_path), seed=args.seed)
+                          profile=load_profile(profile_path), seed=args.seed,
+                          grid_voltage=args.grid_voltage,
+                          grid_voltage_wander=args.grid_voltage_wander,
+                          grid_frequency=args.grid_frequency,
+                          grid_frequency_wander=args.grid_frequency_wander)
     simulator.set_time_scale(args.time_scale)   # validated above; before any machine reads the clock
     connect_acl = parse_acl(args.connect_acl, 'connect-acl')
     modbus_auth = parse_auth_type(args.modbus_auth, 'modbus-auth')

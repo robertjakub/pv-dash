@@ -75,12 +75,6 @@ CLOUD_MACHINES = {k: tuple(v) for k, v in STATIC['cloud_machines'].items()}
 LOAD_BASE_W = STATIC['load_curve']['base_w']
 LOAD_BELLS = STATIC['load_curve']['bells']
 
-GRID = STATIC['grid']
-GRID_VOLTAGE_V = GRID['voltage_v']             # nominal phase voltage
-GRID_VOLTAGE_WANDER = GRID['voltage_wander']   # the per-phase machine's range (fraction)
-GRID_FREQUENCY_HZ = GRID['frequency_hz']       # nominal frequency
-GRID_FREQUENCY_WANDER = GRID['frequency_wander']   # the machine's clamp (Hz)
-
 METER_EXPORT_KWH = STATIC['meter_export_kwh']
 METER_IMPORT_KWH = STATIC['meter_import_kwh']
 

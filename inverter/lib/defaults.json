@@ -62,12 +62,6 @@
       ]
     ]
   },
-  "grid": {
-    "voltage_v": 230.0,
-    "voltage_wander": 0.1,
-    "frequency_hz": 50.0,
-    "frequency_wander": 0.2
-  },
   "meter_export_kwh": 12500.0,
   "meter_import_kwh": 9800.0,
   "grid_outage": {
@@ -103,6 +97,10 @@
     "connect_acl": "any",
     "allow_write": false,
     "modbus_auth": "none",
+    "grid_voltage": 230.0,
+    "grid_voltage_wander": 0.1,
+    "grid_frequency": 50.0,
+    "grid_frequency_wander": 0.2,
     "metrics_listen": "127.0.0.1:9352",
     "metrics_acl": "any",
     "metrics_max_clients": 64,

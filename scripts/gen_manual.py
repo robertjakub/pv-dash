@@ -357,7 +357,7 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
              'nothing to set.'))
     w('')
     if any(o.live == 'write/registers' for o in rows) \
-            and any(o.live == 'write/registers/profile' for o in shows):
+            and any(o.live == 'write/registers/table' for o in shows):
         # the set/show spelling collision (the cache's pair): the legend note
         w(wrap('A show report\'s path never shadows a knob value: one '
                'spelling per side of the verb — `set write registers '

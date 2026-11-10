@@ -8,3 +8,6 @@ scraper/metrics.json
 
 # the wave drafts — invented against the tree, deleted at landing
 /docs/draft-*.md
+
+# the battery's per-suite copies (the runner's scratch, never committed)
+/tests/zz_*

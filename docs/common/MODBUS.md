@@ -484,10 +484,10 @@ either way).
 
 | Knob | Flag | Env | Console spelling | Tools |
 |---|---|---|---|---|
-| `modbus-auth` | `--modbus-auth suite\|none` | `MODBUS_AUTH` | `modbus-auth` | all three |
-| `auth-key` *(secret)* | `--auth-key` | `AUTH_KEY` | `auth-key` | all three |
-| `auth-upstream` | `--auth-upstream suite\|waveshare\|none` | `AUTH_UPSTREAM` | `auth-upstream` | cache |
-| `auth-upstream-key` *(secret)* | `--auth-upstream-key` | `AUTH_UPSTREAM_KEY` | `auth-upstream-key` | cache |
+| `modbus-auth` | `--modbus-auth suite\|none` | `MODBUS_AUTH` | `modbus auth` | all three |
+| `auth-key` *(secret)* | `--auth-key` | `AUTH_KEY` | `modbus auth key` | all three |
+| `auth-upstream` | `--auth-upstream suite\|waveshare\|none` | `AUTH_UPSTREAM` | `modbus auth-upstream` | cache |
+| `auth-upstream-key` *(secret)* | `--auth-upstream-key` | `AUTH_UPSTREAM_KEY` | `modbus auth upstream-key` | cache |
 | `upstream` | `--upstream HOST:PORT` | `UPSTREAM` | `upstream` | cache, scraper |
 | `unit` / `modbus-unit` | `--unit` / `--modbus-unit` | `UNIT` / `MODBUS_UNIT` | `modbus/unit` | cache, scraper, fake (flag only) |
 | `timeout` | `--timeout` | `TIMEOUT` | `timeout` | cache, scraper |
@@ -522,8 +522,8 @@ flag/env/config edit plus a restart. The scheme itself still sets live:
 a scheme change re-proves the NEW connections (the cache's inbound
 scheme change does **not** drop standing sessions; they keep theirs).
 
-Useful verbs (`modbus-*-ctl` / `modbus-*-cli`): `set modbus-auth suite`,
-`set auth-key <KEY|file:path>`, `set auth-upstream …`,
+Useful verbs (`modbus-*-ctl` / `modbus-*-cli`): `set modbus auth suite`,
+`set modbus auth key <KEY|file:path>`, `set modbus auth-upstream …`,
 `show modbus-auth`, `show auth-upstream` (the two legs' schemes),
 plus the ordinary `set modbus upstream/unit/timeout/
 interval/...` rows. Startup logs name the schemes

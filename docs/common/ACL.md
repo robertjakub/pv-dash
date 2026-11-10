@@ -43,7 +43,7 @@ token shape beyond the loopback (the page's F21 closed it — rev. 21).
 | tool | listener | the default bind | the stack at it |
 |---|---|---|---|
 | cache | the Modbus mirror | `127.0.0.1:15502` | `connect-acl` (accept, ahead of the caps) → the caps → the suite auth; the write path then adds `--allow-write` + `write-acl` + `write-registers` |
-| all four | control | unix \| TCP `127.0.0.1` | ONE listener for the family (`common/wire/control.py`'s tier, lifted from the cache): the TCP bind refuses without the admin token (F5 — the fake exempt, F11's test-tool posture); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660`; the target rebinds live (`set control-port` — bind-first, the sessions keep serving), the tokens, the ops policy, the trust uids and the socket-group all set live |
+| all four | control | unix \| TCP `127.0.0.1` | ONE listener for the family (`common/wire/control.py`'s tier, lifted from the cache): the TCP bind refuses without the admin token (F5 — the fake exempt, F11's test-tool posture); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660`; the target rebinds live (`set control port` — bind-first, the sessions keep serving), the tokens, the ops policy, the trust uids and the socket-group all set live |
 | all four | /metrics | the scraper always on at `127.0.0.1:9350`; the cache, fake and dashboard off at `9351`/`9352`/`9353` | ONE stack for the family: the token mandatory beyond loopback (F13's refusal) → `metrics-acl` (the inline grammar or `file:<path>`, checked at accept — a client off the ACL is closed without a reply) → the caps |
 | fake | the Modbus listener | `:5502` | `connect-acl` (the system grammar, no `file:`) → the caps → the suite auth; `--allow-write` |
 | dashboard | the page + the config proxy | `127.0.0.1:8080` | the bearer token (`auth-token`, F21 closed — the `?auth=` bootstrap sets the session cookie, the header for scripts; a token-less non-loopback bind refuses to start) — GET-only, the realpath guard, the cap gate |
@@ -174,8 +174,8 @@ The forms: `--connect-acl` / `--write-acl` / `--write-registers` /
 `METRICS_ACL`, the config-file spellings `connect_acl` / `write_acl` /
 `write_registers` / `metrics_acl`, NixOS `connectAcl` / `writeAcl` /
 `writeRegisters` / `metricsAcl` — one str option each, `file:` rides
-inline), live via `set connect-acl`, `set write-acl`, `set metrics-acl`,
-`set write-registers <value>`.
+inline), live via `set acl connect`, `set acl write`, `set metrics acl`,
+`set write registers <value>`.
 
 ## modbus-fake-inverter — the mirror, system grammar only
 
@@ -223,7 +223,7 @@ the old gate standing, and a group/world-readable file warns (the log,
 the audit trail's `ACL-FILE` event, the `set` reply's suffix). The chain
 renders as `show metrics-acl-table` — the three fixed chains for the
 inline forms, the file gate's own rules behind the `% ` desc header — and
-a `set metrics-acl-table` (the show word typed into the set verb) answers
+a `set metrics acl table` (the show word typed into the set verb) answers
 the pointer to the report.
 
 The gate never replaces the bearer: `--auth-token`'s request-time check
@@ -238,7 +238,7 @@ The control socket is NOT this gate — see below.
 
 Every control TCP bind is hardcoded `127.0.0.1`
 (`common/wire/control.py`'s `_open_sock` — the one listener tier all four
-tools ride, live-rebindable via `set control-port`, the target parsers
+tools ride, live-rebindable via `set control port`, the target parsers
 unified in `common/settings/config.py`; the unix sockets are peer-cred), so
 no control surface carries an IP gate — an IP filter on loopback decides
 on the one address that always matches. The plane's admission story is

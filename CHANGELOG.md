@@ -12,31 +12,47 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the external surfaces speak the console spellings**
+  (the flat-wire wave's completion): the one-shot ctl translates the
+  console's live/alias knob spellings to the flat registry names exactly
+  as the interactive cli's — `set acl connect any` through a *-ctl rides
+  the wire as `set connect-acl any`, and a piped config script's
+  live-word lines work (the bundled confs' paste-through-ctl claim is
+  true now). `show config` renders the live paths as words (the config
+  files' own spelling — the output pipes back through the console, a ctl
+  or a config file), `help config` / `show knobs` and the generated
+  MANUAL.md + OPTIONS.md tables spell the console words in their set
+  columns (the knob column keeps the flat registry key — the
+  identifier), and the state dumps + the reload state files key the live
+  paths (`acl/write`, `modbus/interval`) — the flat names read beside
+  them on restore and the restart fold folds both, so every era's state
+  file still restores. The wire itself stays flat: the daemon's match
+  map, the replies, the pointer errors and the bare-show/node listings
+  answer the flattened options.json names only.
+
 - **everywhere** — **the wire speaks the flattened registry names
   (breaking)**: every knob's one internal name is now its options.json
   `name` (the flat dashed key — `interval`, `max-conn-per-ip`,
   `write-acl`), and the same flat name is the wire grammar: set/clear/
   show/help take it, the replies render it (`ok interval=2.00s`), the
-  state dumps, the reload state files and the restart folds key it, the
-  bins' configured-value tables (`clear`'s restore base) key it, and
-  `show config` / `help config` / `show knobs` / the bare-show and node
-  listings render it (the namespace walk survives as the prose
-  hierarchy — `show audit rotate` still answers, listing the flat
-  names). The row's `live` path and `alias` become the CONSOLE
-  spellings: the cli completes and accepts them beside the flat names
-  and translates to the flat name before it sends (`set limits
-  max-conn-per-ip 9` rides the wire as `set max-conn-per-ip 9`; the
-  alias `set write acl any` as `set write-acl any`) — the wire itself
-  refuses the path words (a raw ctl or a piped script spells the flat
-  names; the config files always did). Old state dumps restore: a
-  pre-flat dump's live-path keys fold through the registry on the way
-  back in. The acl-table pointer errors, the audit-forward grammar
-  text, the F5 tokenless line and the dump-family texts spell the flat
-  names; docs/common/MODBUS.md's table column re-heads to the console
-  spelling, docs/common/ACL.md and the four READMEs follow the flat
-  forms, the man pages + MANUAL.md + OPTIONS.md regenerate, the ten
-  suites speak the flat wire. Closes the family-TODO item "internally
-  key on the flattened name, not the live".
+  restart folds and the bins' configured-value tables (`clear`'s restore
+  base) key it, and the bare-show and node listings render it (the
+  namespace walk survives as the prose hierarchy — `show audit rotate`
+  still answers, listing the flat names). The row's `live` path and
+  `alias` become the CONSOLE spellings: the cli completes and accepts
+  them beside the flat names and translates to the flat name before it
+  sends (`set limits max-conn-per-ip 9` rides the wire as
+  `set max-conn-per-ip 9`; the alias `set write acl any` as
+  `set write-acl any`) — the wire itself refuses the path words (the
+  console and the ctls translate; the config files read both spellings).
+  Old state dumps restore: a pre-flat dump's live-path keys fold through
+  the registry on the way back in. The acl-table pointer errors, the
+  audit-forward grammar text, the F5 tokenless line and the dump-family
+  texts spell the flat names; docs/common/MODBUS.md's table column
+  re-heads to the console spelling, docs/common/ACL.md and the four
+  READMEs follow the flat forms, the man pages + MANUAL.md + OPTIONS.md
+  regenerate, the ten suites speak the flat wire. Closes the family-TODO
+  item "internally key on the flattened name, not the live".
 
 - **everywhere** — **the family code sweep: the stale code out, the
   similar code into `common/`**: the dead symbols die (the nine

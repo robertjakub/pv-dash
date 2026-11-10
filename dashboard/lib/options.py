@@ -10,7 +10,7 @@ live-settable (a '/'-path — `inverter/profile` spells as its words on the
 wire: `set inverter profile <value>`), and the secret flag. This module
 loads the JSON into the
 common Option rows and keeps the Python-side wiring: the control-grammar
-vocabulary, the static.json-wired audit defaults and log-level choices, the
+vocabulary, the log-level choices, the
 resolved-config key renames and the set-grammar rendering of the effective
 values. The config script (the ini's replacement), `show config`, the knob
 -> control-command mapper, the argparse parser (--help, built from these
@@ -34,13 +34,12 @@ def _load_options():
     here = os.path.dirname(os.path.realpath(__file__))
     with open(os.path.join(here, 'static.json'), encoding='utf-8') as f:
         static = json.load(f)
-    defaults = static['defaults']
-    # the audit rotation defaults do NOT ride the argparse parser: a
-    # static-wired default would shadow the env layer (the resolver never
-    # falls through a truthy flag value) — they ladder flag > env > config
-    # > static in lib/config.py like every other knob
-    static_defaults = {'listen': defaults['listen']}
-    rows, sections, options = load_registry(here, static_defaults=static_defaults,
+    # no static default rides the argparse parser: a static-wired default
+    # would shadow the env layer (the resolver never falls through a truthy
+    # flag value) — every knob ladders flag > env > config > static in
+    # lib/config.py, the tree read there (a wired listen hid the LISTEN env
+    # once)
+    rows, sections, options = load_registry(here,
                                             choices={'log-level': tuple(static['log_levels'])})
     for key, value in sections.items():
         globals()[key] = value

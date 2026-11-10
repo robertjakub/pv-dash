@@ -91,9 +91,9 @@ def resolve_config(args, script_dir=None):
                                   'control_port', None, str)
     cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', None, str)
     cfg['audit_forward'] = resolve(getattr(args, 'audit_forward', None), 'AUDIT_FORWARD',
-                                   'audit_forward', 'none', str)
+                                   'audit_forward', DEFAULTS['audit_forward'], str)
     cfg['audit_forward_format'] = resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
-                                          'audit_forward_format', 'rfc5424', str)
+                                          'audit_forward_format', DEFAULTS['audit_forward_format'], str)
     cfg['audit_max_mb'] = resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
                                   'audit_max_mb', DEFAULTS['audit_max_mb'], float)
     cfg['audit_files'] = resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
@@ -155,7 +155,7 @@ def resolve_config(args, script_dir=None):
     cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
                                             None, str) or '').strip() or None, 'dump/key')
     cfg['dump_interval'] = resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
-                                   'dump_interval', 0.0, float)
+                                   'dump_interval', DEFAULTS['dump_interval'], float)
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
                                       'restore_on_start', False, str_to_bool)
     if cfg['dump_interval'] < 0:

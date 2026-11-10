@@ -68,15 +68,16 @@ CFG_KEYS = {'log-level': 'level'}
 # the control grammar's live settings — the SAME rows, viewed from the wire
 # (the `set`/`clear` vocabulary, the console completions and word-help).
 # The registry_view builds the tables once for the family: SET_BY_NAME is
-# the KNOB rows only — a show report's live path never joins it, so it
-# cannot shadow a knob VALUE on the wire: `set metrics acl table` takes
-# 'table' as the value (the acl branch points at the report), while
-# `show metrics acl table` answers the metrics/acl/table report — one
-# spelling per side of the verb
+# the KNOB rows only — a show report never joins it, so it cannot shadow a
+# knob VALUE on the wire: `set metrics-spec table` takes 'table' as the
+# value, while `show metrics-acl-table` answers the report — one word per
+# side of the verb
 _VIEW = registry_view(OPTIONS, SHOW_OPTIONS)
 SETTINGS = _VIEW.settings
-SETTING_BY_NAME = _VIEW.setting_by_name
-SETTING_NAMES = _VIEW.setting_names
+SETTING_BY_NAME = _VIEW.setting_by_name   # the FLAT wire names — the daemon's match map
+SETTING_SPELLINGS = _VIEW.spellings   # + the console spellings (the live/alias paths) — the cli's match map
+SETTING_NAMES = _VIEW.setting_names   # the flat names: the dump keys, the clear defaults, the help lists
+POOL_NAMES = _VIEW.pool_names   # the console spellings (the lives + aliases) — the ?/TAB pools' raw list
 ALIAS_NAMES = _VIEW.alias_names
 SET_BY_NAME = _VIEW.set_by_name
 SHOW_LIVES = _VIEW.show_lives

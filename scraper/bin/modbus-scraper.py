@@ -98,7 +98,7 @@ def main():
     setup_logging(cfg)
 
     apply_restart_state(cfg, args.config, cfg['dump_key'], ControlServer,
-                        extra={'system/listen': fold_listen, 'metrics/listen': fold_listen})
+                        extra={'listen': fold_listen, 'metrics-listen': fold_listen})
 
     if cfg['max_kwp'] > 0 and cfg['max_grid_kw'] > 0 and cfg['max_kwp'] > cfg['max_grid_kw']:
         logger.warning('max_kwp (%g) is greater than max_grid_kw (%g): the grid line cannot be '
@@ -146,25 +146,25 @@ def main():
         # knobs stay hand-rendered (their convs do not round-trip a string)
         defaults = {'log-access': 'on' if cfg['log_access'] else 'off',
                     'log-level': cfg['level'],
-                    'control/socket-group': 'on' if cfg['control_socket_group'] else 'off',
-                    'dump/path': cfg['dump_path'] or 'off',
-                    'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
-                    'modbus/auth': cfg['auth'] or 'none',
-                    'audit/log-file': 'off' if cfg['no_audit_log']
+                    'control-socket-group': 'on' if cfg['control_socket_group'] else 'off',
+                    'dump-path': cfg['dump_path'] or 'off',
+                    'restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
+                    'modbus-auth': cfg['auth'] or 'none',
+                    'audit-log': 'off' if cfg['no_audit_log']
                                       else (cfg['audit_log'] or default_path('modbus-scraper'))}
         for o in OPTIONS:
             if o.live and o.conv in (int, float, str) and not o.secret:
                 key = o.name.replace('-', '_')
                 if key in cfg and cfg[key] is not None:
-                    defaults[o.live] = str(cfg[key])
+                    defaults[o.name] = str(cfg[key])   # the defaults speak the FLAT wire name
             elif o.live and o.conv is bool and not o.secret:
                 key = o.name.replace('-', '_')
                 if key in cfg:   # the live bools: `clear` needs a configured value too
-                    defaults[o.live] = 'on' if cfg[key] else 'off'
+                    defaults[o.name] = 'on' if cfg[key] else 'off'
             if o.restart and not o.secret:   # the startup-only knobs: what `show <knob>` answers
                 key = o.name.replace('-', '_')
                 v = cfg.get(key, getattr(args, key, None))
-                wire = o.live or o.name      # the defaults speak the wire name (the live path when the row carries one)
+                wire = o.name                    # the flat registry name — the wire's one spelling
                 if o.name == 'audit-log':
                     defaults[wire] = ('off' if args.no_audit_log
                                       else 'stdout' if args.audit_log == '-'
@@ -179,7 +179,7 @@ def main():
                     defaults[wire] = str(v) if v not in (None, '') else 'off'
         defaults['dump-interval'] = 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval']
         #   ^ the off canonical: str(0.0) is not a live-set spelling (the cache's defaults model)
-        # the secret rows (control/token, control/ops/token, auth/token,
+        # the secret rows (control-token, control-ops-token, auth-token,
         # auth-key, dump-key) carry NO
         # defaults entry: `clear` refuses them (the metrics/token treatment) — a
         # secret never renders, never re-applies

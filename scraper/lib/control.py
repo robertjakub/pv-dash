@@ -28,7 +28,7 @@ from common.settings.config import acl_table, acl_value_text, parse_auth_type, \
 from common.modbus import AUTH_MIN_KEY
 from common.render.texts import T
 from .config import CONTROL_SOCKET_TEMPLATE, resolve_metrics_acl
-from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, \
+from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_OPTIONS, \
     NODE_BY_NAME, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .statics import DEFAULT_LISTEN_PORT, LOG_LEVELS
 
@@ -55,8 +55,9 @@ def _short_help(text):
 # shows and clears itself — the conv parses, the config key takes it, no
 # branch needed. The explicit branches stay first-class for the range
 # gates and the runtime plumbing a bare config write cannot reach (the
-# client, the gate, the logger); bool/choice knobs keep theirs.
-OPTION_BY_LIVE = {o.live: o for o in OPTIONS if o.live}
+# client, the gate, the logger); bool/choice knobs keep theirs. The
+# dispatch keys are the FLAT registry names (the wire's one spelling).
+OPTION_BY_NAME = {o.name: o for o in OPTIONS}
 TYPED_CONVS = (int, float, str)
 
 
@@ -66,7 +67,7 @@ def _check_upstream(text):
     (the endpoint renders as host:port in the status, the client dials
     host and port separately). Returns the config updates."""
     try:
-        host, port = parse_upstream(text, label='modbus/upstream')
+        host, port = parse_upstream(text, label='upstream')
     except SystemExit as e:
         raise ValueError(str(e))
     return {'upstream': '%s:%d' % (host, port), 'host': host, 'modbus_port': port}
@@ -105,12 +106,10 @@ class ControlServer(_ControlServer):
     COMMAND_HIDDEN = COMMAND_HIDDEN
     NODE_BY_NAME = NODE_BY_NAME
     SET_BY_NAME = SET_BY_NAME
-    SHOW_BY_LIVE = SHOW_BY_LIVE
-    OPTION_BY_LIVE = OPTION_BY_LIVE
     SHOW_OPTIONS = SHOW_OPTIONS
-    SHOW_REPORTS = {'show inputs-metrics': 'inputs_metrics_report',   # `show inputs metrics` (the live path's words) forwards here
+    SHOW_REPORTS = {'show inputs-metrics': 'inputs_metrics_report',
                     'show inputs': 'inputs_report',
-                    'show metrics-acl-table': 'acl_table_report'}   # `show metrics acl table` (the live path's words) forwards here
+                    'show metrics-acl-table': 'acl_table_report'}
 
     def __init__(self, scraper, httpd, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None,
@@ -118,7 +117,7 @@ class ControlServer(_ControlServer):
                  audit_params=None, dump_interval=0.0):
         self.scraper = scraper
         self.httpd = httpd
-        self.metrics_acl_warn = None   # the metrics/acl file's permission warning (the stash, None = no warning standing)
+        self.metrics_acl_warn = None   # the metrics-acl file's permission warning (the stash, None = no warning standing)
         super().__init__(target, reloader=reloader, stopper=stopper, audit=audit, token=token,
                          defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
                          ops_token=ops_token, ops_verbs=ops_verbs, audit_params=audit_params,
@@ -173,7 +172,7 @@ class ControlServer(_ControlServer):
             handled, shown = self.apply_restart_key(key, val)
             if handled:
                 return shown
-            if key in ('system/listen', 'metrics/listen'):   # the second spelling: a state file written before the rename
+            if key in ('listen', 'metrics-listen'):   # the second spelling: the scraper's listen is the metrics bind too
                 try:
                     t = parse_listen(val)
                 except SystemExit as e:
@@ -187,7 +186,7 @@ class ControlServer(_ControlServer):
         if handled:                                        # (the ops policy + the trusted peers ARRIVED here),
             return shown                                   # the audit family, the log level, local-time, the dump pair
 
-        if key == 'metrics/interval':
+        if key == 'interval':
             v = num(val, 'interval', 'seconds')
             if not 0 < v <= 86400:
                 raise ValueError(T('wire.interval_range'))
@@ -195,7 +194,7 @@ class ControlServer(_ControlServer):
                 s.cfg['interval'] = v
             s.wake.set()
             return secs(v)
-        if key == 'modbus/timeout':
+        if key == 'timeout':
             v = num(val, 'timeout', 'seconds')
             if not 0 < v <= 60:
                 raise ValueError(T('wire.timeout_range'))
@@ -203,17 +202,17 @@ class ControlServer(_ControlServer):
                 s.cfg['timeout'] = v
             s.client.apply(timeout=v)
             return secs(v)
-        if key == 'modbus/unit':
+        if key == 'modbus-unit':
             v = self._typed(key, val)
             s.client.apply(unit=v)
             return '%d' % v
-        if key == 'modbus/offset':
+        if key == 'modbus-offset':
             v = self._typed(key, val)
             s.client.apply(offset=v)
             return '%d' % v
-        if key == 'modbus/auth':
+        if key == 'modbus-auth':
             try:
-                v = parse_auth_type(val, 'modbus/auth')
+                v = parse_auth_type(val, 'modbus-auth')
             except SystemExit as e:
                 raise ValueError(str(e))
             if v and not s.client.auth_key:
@@ -223,14 +222,14 @@ class ControlServer(_ControlServer):
             s.client.auth = v
             s.client.close()   # the next poll reconnects — and handshakes when suite is on
             return v or 'none'
-        if key == 'metrics/limits/max-clients':
+        if key == 'metrics-max-clients':
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
             if not self.httpd:
                 raise ValueError('no http server attached')
             self.httpd.gate.max_total = v
             return '%d' % v
-        if key == 'metrics/limits/timeout':
+        if key == 'metrics-client-timeout':
             v = num(val, 'client-timeout', 'seconds')
             self._gate_range(key, v, 'seconds')
             if not self.httpd:
@@ -239,16 +238,16 @@ class ControlServer(_ControlServer):
                 s.cfg['client_timeout'] = v
             self.httpd.RequestHandlerClass.timeout = v or None
             return secs(v)
-        if key == 'metrics/limits/max-conn-per-ip':
+        if key == 'metrics-max-conn-per-ip':
             v = numi(val, 'max-conn-per-ip', 'connections')
             self._gate_range(key, v)
             if not self.httpd:
                 raise ValueError('no http server attached')
             self.httpd.gate.max_per_ip = v
             return '%d' % v
-        if key == 'metrics/acl':
+        if key == 'metrics-acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError(T('wire.acl_table_value') % ('a metrics/acl', 'metrics acl'))
+                raise ValueError(T('wire.acl_table_value') % ('a metrics-acl', 'metrics-acl-table'))
             if not self.httpd:
                 raise ValueError('no http server attached')
             try:
@@ -278,7 +277,7 @@ class ControlServer(_ControlServer):
         # — the row's conv parses, the row's min/max gate, the config key
         # takes the value; the value takes effect wherever the config is
         # next consumed (a client rebuild, a reload)
-        opt = OPTION_BY_LIVE.get(key)
+        opt = OPTION_BY_NAME.get(key)
         if opt is not None and opt.conv is bool:
             if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
                 raise ValueError('%s must be on or off' % key)
@@ -297,7 +296,7 @@ class ControlServer(_ControlServer):
         Returns the canonical display value — the caller adds any
         runtime plumbing a bare config write cannot reach."""
         s = self.scraper
-        opt = OPTION_BY_LIVE.get(key)
+        opt = OPTION_BY_NAME.get(key)
         try:
             v = opt.conv(val)
         except ValueError:
@@ -320,30 +319,30 @@ class ControlServer(_ControlServer):
             return value
         with s.lock:
             cfg = dict(s.cfg)
-        if key == 'metrics/interval':
+        if key == 'interval':
             return secs(cfg['interval'])
-        if key == 'modbus/timeout':
+        if key == 'timeout':
             return secs(cfg['timeout'])
-        if key == 'metrics/limits/max-clients':
+        if key == 'metrics-max-clients':
             return '%d' % (self.httpd.gate.max_total if self.httpd else cfg['max_clients'])
-        if key == 'metrics/limits/timeout':
+        if key == 'metrics-client-timeout':
             ct = self.httpd.RequestHandlerClass.timeout if self.httpd else cfg['client_timeout'] or None
             return 'off' if not ct else secs(ct)
-        if key == 'metrics/limits/max-conn-per-ip':
+        if key == 'metrics-max-conn-per-ip':
             return '%d' % (self.httpd.gate.max_per_ip if self.httpd else cfg['max_conn_per_ip'])
-        if key == 'metrics/acl':
+        if key == 'metrics-acl':
             return acl_value_text(self.httpd.metrics_acl) if self.httpd else (cfg['metrics_acl'] or 'any')
         if key == 'log-access':
             return 'on' if (self.httpd.RequestHandlerClass.log_access if self.httpd else cfg['log_access']) else 'off'
-        if key == 'modbus/profile':
+        if key == 'profile':
             return cfg['profile']
-        if key == 'modbus/auth':
+        if key == 'modbus-auth':
             return cfg.get('auth') or 'none'
-        if key == 'metrics/filter':
+        if key == 'metrics-spec':
             return cfg['metrics_spec'] or 'off'
         # the generic path: a registry row with a typed conv reads its
         # config key with no branch at all; a bool row renders on/off
-        opt = OPTION_BY_LIVE.get(key)
+        opt = OPTION_BY_NAME.get(key)
         if opt is not None and opt.conv is bool and opt.name.replace('-', '_') in cfg:
             return 'on' if cfg[opt.name.replace('-', '_')] else 'off'
         if opt is not None and opt.conv in TYPED_CONVS and opt.name.replace('-', '_') in cfg:
@@ -368,30 +367,30 @@ class ControlServer(_ControlServer):
         with s.lock:
             cfg = dict(s.cfg)
         raw = {
-            'modbus/upstream': cfg['upstream'],
-            'modbus/unit': cfg['modbus_unit'],
-            'modbus/offset': cfg['modbus_offset'],
-            'modbus/auth': cfg.get('auth') or 'none',
-            'modbus/timeout': cfg['timeout'],
-            'modbus/profile': cfg['profile'],
-            'modbus/grid-positive-import': 'on' if cfg['grid_positive_import'] else 'off',
-            'metrics/interval': cfg['interval'],
-            'metrics/filter': cfg['metrics_spec'],
-            'metrics/prefix': cfg['metric_prefix'],
-            'caps/max-pv': cfg['max_kwp'],
-            'caps/max-grid': cfg['max_grid_kw'],
-            'metrics/limits/max-clients': cfg['max_clients'],
-            'metrics/limits/timeout': cfg['client_timeout'],
-            'metrics/limits/max-conn-per-ip': cfg['max_conn_per_ip'],
-            'metrics/acl': acl_value_text(self.httpd.metrics_acl) if self.httpd else (cfg['metrics_acl'] or 'any'),
+            'upstream': cfg['upstream'],
+            'modbus-unit': cfg['modbus_unit'],
+            'modbus-offset': cfg['modbus_offset'],
+            'modbus-auth': cfg.get('auth') or 'none',
+            'timeout': cfg['timeout'],
+            'profile': cfg['profile'],
+            'grid-positive-import': 'on' if cfg['grid_positive_import'] else 'off',
+            'interval': cfg['interval'],
+            'metrics-spec': cfg['metrics_spec'],
+            'metric-prefix': cfg['metric_prefix'],
+            'max-kwp': cfg['max_kwp'],
+            'max-grid-kw': cfg['max_grid_kw'],
+            'metrics-max-clients': cfg['max_clients'],
+            'metrics-client-timeout': cfg['client_timeout'],
+            'metrics-max-conn-per-ip': cfg['max_conn_per_ip'],
+            'metrics-acl': acl_value_text(self.httpd.metrics_acl) if self.httpd else (cfg['metrics_acl'] or 'any'),
             'log-access': 'on' if cfg['log_access'] else 'off',
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'local-time': self._get('local-time'),
-            'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
-            'control/socket-group': 'on' if self.socket_group else 'off',
+            'control-port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
+            'control-socket-group': 'on' if self.socket_group else 'off',
             **self.audit_dump_rows(),
-            'dump/path': self.dump_path or 'off',
-            'dump/restore-on-start': 'on' if self.dump_restore else 'off',
+            'dump-path': self.dump_path or 'off',
+            'restore-on-start': 'on' if self.dump_restore else 'off',
             'dump-interval': self.dump_interval,
         }
         return self.dump_settings_tail(raw)
@@ -453,7 +452,7 @@ class ControlServer(_ControlServer):
         return 'ok inputs-metrics\n' + '\n'.join(self._aligned(rows))
 
     def acl_table_report(self):
-        """The metrics/acl/table show report (the show-only view of the
+        """The metrics-acl-table show report (the show-only view of the
         metrics ACL, one entry per line): the system forms spell the chain
         they implement — 'allow 0.0.0.0/0' (any), 'deny 0.0.0.0/0' (none),
         'deny 0.0.0.0/0' + one allow line per network (the whitelist); a

@@ -287,7 +287,7 @@ def resolve_config(args, script_dir=None):
                          '(letters/digits/underscore, not starting with a digit)' % cfg['metric_prefix'])
     cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', DEFAULTS['dump_path'], str)
     cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
-                                            None, str) or '').strip() or None, 'dump/key')
+                                            None, str) or '').strip() or None, 'dump-key')
     cfg['dump_interval'] = resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
                                    'dump_interval', DEFAULTS['dump_interval'], float)
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',

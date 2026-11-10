@@ -71,13 +71,13 @@ interval`: that logs a warning (polls run back-to-back) instead of failing.
 regenerates the script from the running scraper (secrets hidden):
 
 ```conf
-# modbus-scraper configuration — every line is a set command (the CLI spelling)
-set modbus upstream 127.0.0.1:5502
-set modbus unit 1
-set caps max-pv 6
-set caps max-grid 12
-set system listen 127.0.0.1:9350
-set metrics interval 10
+# modbus-scraper configuration — every line is a set command (the flat registry names)
+set upstream 127.0.0.1:5502
+set modbus-unit 1
+set max-kwp 6
+set max-grid-kw 12
+set listen 127.0.0.1:9350
+set interval 10
 set log-level INFO
 ```
 
@@ -86,7 +86,7 @@ set log-level INFO
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--modbus-unit` / `--modbus-offset` | `1` / `0` | Modbus unit id / added to register addresses (`-1` for gateways that need 0-based addressing) |
 | `--modbus-auth` / `--auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/common/MODBUS.md](../docs/common/MODBUS.md) |
-| `--profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set modbus profile` |
+| `--profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set profile` |
 | `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
 | `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
 | `--max-kwp` / `--max-grid-kw` | `6` / `12` | the sanity caps in kW: above the cap → HTTP 503 + error log; `0` = off |
@@ -141,8 +141,8 @@ it off, a TCP port number binds `127.0.0.1:PORT` instead). Talk to it with
 (the console session):
 
 ```bash
-python3 scraper/bin/modbus-scraper-ctl.py show modbus upstream
-printf 'set metrics interval 5\npoll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
+python3 scraper/bin/modbus-scraper-ctl.py show upstream
+printf 'set interval 5\npoll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
 python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
 ```
 
@@ -156,7 +156,7 @@ command, settable (`set`/`clear`) or show-only — is tabled in
 
 | Command | Effect |
 |---|---|
-| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show system listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
+| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
 | `poll now` | the loop wakes immediately |
 | `show connections` | the live HTTP clients of /metrics |
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |
@@ -237,9 +237,9 @@ shared schema the [fake inverter](../inverter/README.md) serves and the
 [cache](../cache/README.md) polls; the shipped profiles live in the suite's
 [`profiles/`](../profiles/) subproject (`sun2000.json` by default); the
 format is documented in [profiles/README.md](../profiles/README.md).
-Resolution: `--profile` flag, env `PROFILE`, config `set modbus profile`,
+Resolution: `--profile` flag, env `PROFILE`, config `set profile`,
 then the bundled copy; re-read on `SIGHUP`. The live control surface swaps
-it at runtime: `set modbus profile <file-or-name>` loads the new map,
+it at runtime: `set profile <file-or-name>` loads the new map,
 rebuilds the metric sources and rolls back cleanly when the profile lacks
 the registers the power math depends on.
 
@@ -268,7 +268,7 @@ packaged `metrics.json` (the lib dir's default; a checkout resolves the
 `--metrics-spec` elsewhere (or `set metrics spec`) to rename metrics or
 reword `# HELP` lines without touching the code; a missing or corrupt
 spec fails cleanly at startup (one-line error, exit 1).
-`show inputs` / `show inputs metrics` (ctl/cli) render the declared inputs
+`show inputs` / `show inputs-metrics` (ctl/cli) render the declared inputs
 and the exported metrics.
 
 ```

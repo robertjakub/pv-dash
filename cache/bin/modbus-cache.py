@@ -123,6 +123,9 @@ def install_signal_handlers(proxy, cache, apply_reload):
 
 
 def main():
+    import faulthandler
+    import signal as _sig
+    faulthandler.register(_sig.SIGUSR2)
     args = parse_args()
     cfg = resolve_config(args, SCRIPT_DIR)
     if cfg['selection'] == 'none':

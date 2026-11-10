@@ -32,8 +32,10 @@ import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from scriptlib import TOOLS
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOOLS = ('cache', 'scraper', 'dashboard', 'inverter')
 SECTIONS = ('options', 'show', 'commands')
 
 

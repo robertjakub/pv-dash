@@ -12,8 +12,8 @@
 #   scripts/battery.sh scraper        # the scraper's commit set (~6 min) — serial
 #   scripts/battery.sh inverter       # the fake's commit set (~1 min) — serial
 #   scripts/battery.sh dashboard      # the dashboard's commit set (~1 min) — serial
-#   scripts/battery.sh quick          # all ten, the fuzzes at 300 (~13 min) — serial
-#   scripts/battery.sh full           # all ten, the suite defaults (~40 min) — the nightly, serial
+#   scripts/battery.sh quick          # all ten, the fuzzes at 300 (~3 min) — serial
+#   scripts/battery.sh full           # all ten, the suite defaults — the nightly, serial
 #   scripts/battery.sh <suite> ...    # explicit names, e.g. cache-regtest inverter-regtest
 #
 # Every run works inside its own dedicated dir: /tmp/pvbattery/<run-id>/

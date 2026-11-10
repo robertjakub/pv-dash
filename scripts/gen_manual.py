@@ -280,6 +280,9 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
     """The page: the speaking-to-the-daemon intro (the clients, the token
     rules, the kinds legend), then the three tables — commands, knobs,
     show reports."""
+    from common.settings.options import default_ops_verbs, known_verbs
+    ops_default = default_ops_verbs(known_verbs(tuple(
+        r['name'] for r in meta.get('commands') or [])))
     out = []
     w = out.append
     w('# The %s manual (MANUAL.md)' % daemon)
@@ -320,11 +323,12 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
     w('')
     w(token)
     w('')
-    w(wrap('The optional ops token (`--control-ops-token`) scopes a session '
-           'to the read-only verbs (the default: show and clear). Every '
+    w(wrap(('The optional ops token (`--control-ops-token`) scopes a session '
+           'to the read-only verbs (the default: %s). Every '
            'command is audited. The clients take `--control-port` (env '
            '`CTL`), `--timeout`, `--control-token`, the audit flags and '
-           '`--man`; the cli adds `--reconnect` / `--reconnect-wait`.'))
+           '`--man`; the cli adds `--reconnect` / `--reconnect-wait`.')
+          % ops_default))
     w('')
     if conf:
         w(wrap('A knob\'s value resolves at start as flag > env > config '

@@ -14,7 +14,6 @@ call the loader, the docs quote it. Stdlib only."""
 import json
 import os
 import re
-import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRY = os.path.join(REPO, 'shared', 'texts.json')

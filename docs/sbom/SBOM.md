@@ -30,8 +30,9 @@ Every name in that list is stdlib (`argparse`, `ast`, `collections`,
 `faulthandler`, `getpass`, `glob`, `hashlib`, `hmac`, `http`, `ipaddress`,
 `json`, `logging`, `math`, `mimetypes`, `operator`, `os`, `random`, `re`,
 `readline`, `secrets`, `signal`, `socket`, `struct`, `subprocess`, `sys`,
-`textwrap`, `threading`, `time`, `unicodedata`, `urllib`) or `common`/`lib`.
-Nothing else. No `requests`, no `pyserial`, no `prometheus_client`.
+`textwrap`, `threading`, `time`, `types`, `unicodedata`, `urllib`) or
+`common`/`lib`. Nothing else. No `requests`, no `pyserial`, no
+`prometheus_client`.
 
 ## Per subproject
 

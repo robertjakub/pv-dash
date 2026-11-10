@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""Helpers shared by the registry-editing scripts (edit_options, set_group,
-set_live): the surgical row-locator and the live-name rule. Stdlib only."""
+"""Helpers shared by the registry scripts (edit_options, set_group,
+set_live, the lints): the surgical row-locator, the live-name rule and
+the family order. Stdlib only."""
 import json
 import re
+
+# the four tools, in the chain order the README tells: fake -> cache ->
+# scraper, then the dashboard that renders the numbers
+TOOLS = ('cache', 'scraper', 'inverter', 'dashboard')
 
 
 def row_span(text, name):

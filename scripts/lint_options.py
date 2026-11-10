@@ -25,8 +25,10 @@ import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from scriptlib import TOOLS
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOOLS = ('cache', 'scraper', 'inverter', 'dashboard')
 WIDTH = 118
 
 KEY_RANK = ('name', 'flag', 'env', 'no-env', 'conv', 'group', 'live', 'alias', 'negates',

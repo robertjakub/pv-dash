@@ -83,8 +83,10 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from scriptlib import TOOLS
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOOLS = ('cache', 'scraper', 'inverter', 'dashboard')
 DOC = os.path.join(REPO, 'docs', 'family-drift.md')
 SEEDS = os.path.join(REPO, 'docs', 'family-drift-seeds.json')
 
@@ -359,12 +361,6 @@ def rendered():
 
 
 # ------------------------------------------------------- the nixos sweep
-
-NIX_TYPE = {'str': ('str', 'lines', 'nullOr', 'enum', 'path', 'either', 'coercedTo'),
-            'int': ('ints', 'types.int', 'signedInterval'),
-            'float': ('float', 'number'),
-            'bool': ('bool',)}
-
 
 def nixos(rows):
     """Each tool's module.nix: the `name = mkOption` blocks (nested

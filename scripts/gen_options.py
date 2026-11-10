@@ -20,7 +20,6 @@ TOOLS = (('cache', 'cache'),
          ('inverter', 'inverter'),
          ('dashboard', 'dashboard'))
 
-CLI_ONLY = ('--config', '--dry-run', '--man', '--version', '--help')
 
 
 def load(tool_dir):
@@ -108,11 +107,14 @@ def main():
            'one-knob-one-source rows) by `scripts/gen_options.py` — edit the',
            'registries and re-run `python3 scripts/gen_options.py`, never this file.',
            'The resolution order on every tool is flag > env > config script >',
-           'default; the bare `$NAME` env forms are the knob\'s upper-snake name.',
-           'Every bin also carries the CLI-only `--config`/`--dry-run`/`--man`',
+           'default; the env twin is the knob\'s bare upper-snake name (the',
+           'exceptions spell their own: `--control-port` -> `CTL`,',
+           '`--cache-ttl` -> `TTL`, the dashboard\'s `--upstream` -> `PROM_URL`;',
+           '`--config` also honors `$CONFIG`). Every bin also carries the',
+           'CLI-only `--config`/`--dry-run`/`--man`',
            '(plus `--version`/`--help`) — flags, not knobs, so they have no rows',
            'here. The ctl/cli clients speak the control plane only',
-           '(`--control-port`, the token file/env pair) and are not compared.',
+           '(`--control-port`, the token env) and are not compared.',
            '']
     all_four = sorted(name for name, by_tool in merged.items()
                       if len(by_tool) == len(TOOLS))

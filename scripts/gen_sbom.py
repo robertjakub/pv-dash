@@ -40,7 +40,7 @@ STDLIB = (
     'argparse', 'ast', 'collections', 'faulthandler', 'getpass', 'glob', 'hashlib',
     'hmac', 'http', 'ipaddress', 'json', 'logging', 'math', 'mimetypes', 'operator',
     'os', 'random', 'readline', 're', 'secrets', 'signal', 'socket', 'struct',
-    'subprocess', 'sys', 'textwrap', 'threading', 'time', 'unicodedata', 'urllib',
+    'subprocess', 'sys', 'textwrap', 'threading', 'time', 'types', 'unicodedata', 'urllib',
 )
 FIRST_PARTY = ('common', 'lib')
 

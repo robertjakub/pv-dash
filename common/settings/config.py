@@ -491,7 +491,7 @@ def parse_acl_value(text, label):
     return parse_acl(text, label)
 
 
-def resolve_metrics_acl(val, label='metrics/acl'):
+def resolve_metrics_acl(val, label='metrics-acl'):
     """The metrics/acl knob value -> (gate, warn): the system words and
     the network lists ride parse_acl; 'file:<path>' loads the standalone
     ip-prefix acl file (the gate object the shared

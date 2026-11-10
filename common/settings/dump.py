@@ -16,7 +16,7 @@ closed — F18 in docs/AUDIT.md), and a group/world-writable dump is refused
 outright: whoever can write the dump holds config trust, so the write bits
 stay owner-only.
 
-With a key (the startup-only dump/key knob — flag/env/config; the reload
+With a key (the startup-only dump-key knob — flag/env/config; the reload
 re-exec re-resolves the same argv, so the key is identical on both sides)
 the dump is **sealed**: the whole state rides as the `box` of a version-2
 envelope, encrypted under a SHA-256-HMAC counter-mode keystream derived from
@@ -127,7 +127,7 @@ def unseal(key, envelope):
         raise ValueError('the sealed envelope is incomplete (%s)' % e)
     _key_enc, key_mac = _seal_keys(key)
     if not hmac.compare_digest(tag, hmac.new(key_mac, nonce + box, hashlib.sha256).hexdigest()):
-        raise ValueError('fails its seal — the wrong dump/key, or edited content (nothing restored)')
+        raise ValueError('fails its seal — the wrong dump-key, or edited content (nothing restored)')
     stream = _keystream(_key_enc, nonce, len(box))
     return bytes(p ^ k for p, k in zip(box, stream))
 
@@ -196,7 +196,7 @@ def open_dump(path, format_name, label, key=None):
         raise ValueError('%s is not a %s (format key missing)' % (path, label))
     if state.get('version') == SEALED_VERSION:
         if not key:
-            raise ValueError('the dump %s is sealed — pass the key (dump/key: --dump-key, $DUMP_KEY '
+            raise ValueError('the dump %s is sealed — pass the key (dump-key: --dump-key, $DUMP_KEY '
                              'or the config file); nothing restored' % path)
         try:
             inner = unseal(key, state)
@@ -209,7 +209,7 @@ def open_dump(path, format_name, label, key=None):
         if not isinstance(state, dict) or state.get('format') != format_name:
             raise ValueError('%s unsealed to a foreign payload (format key missing)' % path)
     elif key:
-        raise ValueError('the dump %s is not sealed but dump/key is configured — dump again '
+        raise ValueError('the dump %s is not sealed but dump-key is configured — dump again '
                          'under the key (nothing restored)' % path)
     return state
 

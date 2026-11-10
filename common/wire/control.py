@@ -96,7 +96,7 @@ class ControlServer:
 
     LOG = logging.getLogger('control')   # the subclass names its daemon's logger
     OPTIONS = ()                          # the registry rows — the subclass sets
-    SETTINGS = {}                         # SETTING_BY_NAME — the subclass sets
+    SETTINGS = {}                         # SETTING_BY_NAME (the flat wire names) — the subclass sets
     WHO = 'the daemon'                    # the show-knobs dictionary's voice
     EXIT_TEXT = 'the daemon is shutting down'
     RELOAD_TEXT = 'the daemon is reloading — the daemon restarts with the saved configuration'
@@ -117,8 +117,6 @@ class ControlServer:
     COMMAND_HIDDEN = frozenset()          # the hidden rows (the dump gate's children)
     NODE_BY_NAME = {}                     # the command namespace's nodes
     SET_BY_NAME = {}                      # the set vocabulary's rows (the knobs — the show reports are not)
-    SHOW_BY_LIVE = {}                     # the live name -> the custom show word (the report routing)
-    OPTION_BY_LIVE = {}                   # the live name -> the Option row (the bounds, the secrets)
     SHOW_OPTIONS = ()                     # the registry's show section (the bare-show pool)
     AUDIT_PREFIX = None                   # the audit trail's chain prefix ('CACHE') — the subclass sets
     AUDIT_APP = None                      # the audit trail's app voice ('modbus-cache')
@@ -160,8 +158,8 @@ class ControlServer:
         self.clients = set()             # the live control sockets (announce_exit)
         self.clients_lock = threading.Lock()
         self.started = time.monotonic()
-        self.option_by_live = {o.live: o for o in self.OPTIONS if o.live}   # the row bounds' one home
-        self.option_by_name = {o.name: o for o in self.OPTIONS}   # the registry rows by knob name (show config)
+        self.option_by_live = {o.live: o for o in self.OPTIONS if o.live}   # the pre-flat dump keys' fold (live -> row)
+        self.option_by_name = {o.name: o for o in self.OPTIONS}   # the registry rows by knob name (the bounds, show config)
         self._describe = make_describe(self.SETTINGS)[0]   # the help-topic knob line (the wire's help <setting>)
 
     # --- the wire tier ---
@@ -600,23 +598,20 @@ class ControlServer:
             return self.show_config()
         if low == 'show knobs':
             return self.knobs_dictionary()
-        for word, report in self.SHOW_REPORTS.items():   # the tool's own show words (the SHOW_BY_LIVE routing)
+        for word, report in self.SHOW_REPORTS.items():   # the tool's own show words (the flat wire words)
             if low == word:
                 if isinstance(report, tuple):
                     return getattr(self, report[0])(report[1])
                 return getattr(self, report)()
         if low.startswith('show'):
             args = cmd.split()[1:]
-            if not args:   # the bare `show`: the walk's first position, the ? output byte for byte
+            if not args:   # the bare `show`: the walk's first position, the flat grammar's listing
                 return 'ok %s' % describe_root(self.OPTIONS, self.SHOW_OPTIONS, hidden_words=self.show_root_hidden())
             key, rest = match_setting_path(args, self.SETTINGS)
             if key is not None and not rest:
-                opt = self.OPTION_BY_LIVE.get(key)
+                opt = self.option_by_name.get(key)
                 if opt is not None and opt.secret:
                     return 'err ' + (T('wire.secret_never_shows') % key)
-                word = self.SHOW_BY_LIVE.get(key)
-                if word:
-                    return self.command('show ' + word)   # a show command's report, by its word
                 if key == 'dump-interval' and not self.dump_path:
                     return 'err ' + T('wire.dump_interval_needs_path')
                 return 'ok %s=%s' % (key, self._get(key))
@@ -719,18 +714,18 @@ class ControlServer:
     def audit_dump_rows(self):
         """The audit family's dump rows, one shape family-wide (the four
         dump_settings fold these): the re-appliable spellings — the raw
-        path/`-`/`none` under audit/log-file, never the display words
+        path/`-`/`none` under audit-log, never the display words
         ('stdout', 'remote') a re-apply would take for a path. The daily
         row rides even where a tool's status line folds it away."""
         prm = self.audit_params
         return {
-            'audit/log-file': ('off' if (self.audit is None or self.audit.disabled) else self.audit.path),
-            'audit/forward': prm.get('forward') or 'none',
-            'audit/forward/format': prm.get('forward_format') or 'rfc5424',
-            'audit/rotate/max-size': '%g' % prm['max_mb'],
-            'audit/rotate/daily': 'on' if prm.get('daily') else 'off',
-            'audit/rotate/files': '%d' % prm['files'],
-            'audit/disable': 'on' if prm['disabled'] else 'off',
+            'audit-log': ('off' if (self.audit is None or self.audit.disabled) else self.audit.path),
+            'audit-forward': prm.get('forward') or 'none',
+            'audit-forward-format': prm.get('forward_format') or 'rfc5424',
+            'audit-max-mb': '%g' % prm['max_mb'],
+            'audit-daily': 'on' if prm.get('daily') else 'off',
+            'audit-files': '%d' % prm['files'],
+            'no-audit-log': 'on' if prm['disabled'] else 'off',
         }
 
     def apply_restart_key(self, key, val):
@@ -738,7 +733,7 @@ class ControlServer:
         tool carries. Returns (True, shown) when key is one of them,
         (False, None) for the tool's own preamble keys (the listen/upstream
         probes differ per tool)."""
-        if key == 'dump/restore-on-start':
+        if key == 'restore-on-start':
             if val not in ON_OFF_WORDS:
                 raise ValueError(T('wire.restore_on_start_invalid'))
             self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
@@ -754,7 +749,7 @@ class ControlServer:
         kept spelling (the fake lowercases `val`; a path never lowers),
         `val` carries the word comparisons."""
         raw = val if raw is None else raw
-        if key == 'audit/log-file':
+        if key == 'audit-log':
             if val == 'none' and self.audit_params.get('forward'):
                 # remote-only: the collector is the sole holder (the chain
                 # reseeds at GENESIS on the next restart)
@@ -775,44 +770,44 @@ class ControlServer:
             self.audit_params['disabled'] = False
             self.record_cfg({'audit_log': raw, 'no_audit_log': False})
             return True, self._rebuild_audit()
-        if key == 'audit/rotate/max-size':
-            v = num(val, 'max-size', 'MB')
+        if key == 'audit-max-mb':
+            v = num(val, 'audit-max-mb', 'MB')
             self._gate_range(key, v, 'MB')
             self.audit_params['max_mb'] = v
             self.record_cfg({'audit_max_mb': v})
             self._rebuild_audit()   # the rotation re-chains live
             return True, '%g' % v
-        if key == 'audit/rotate/daily':
-            on = on_off(val, 'audit/rotate/daily')
+        if key == 'audit-daily':
+            on = on_off(val, 'audit-daily')
             self.audit_params['daily'] = on
             self.record_cfg({'audit_daily': on})
             self._rebuild_audit()
             return True, 'on' if on else 'off'
-        if key == 'audit/rotate/files':
-            v = numi(val, 'files', 'backups')
+        if key == 'audit-files':
+            v = numi(val, 'audit-files', 'backups')
             self._gate_range(key, v, 'backups')
             self.audit_params['files'] = v
             self.record_cfg({'audit_files': v})
             self._rebuild_audit()
             return True, '%d' % v
-        if key == 'audit/forward':
+        if key == 'audit-forward':
             try:
                 parse_forward(raw)
             except ValueError:
-                raise ValueError(T('wire.audit_forward_grammar') % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
+                raise ValueError(T('wire.audit_forward_grammar') % AUDIT_FORWARD_GRAMMAR)
             self.audit_params['forward'] = None if val in ('', 'none') else raw
             self.record_cfg({'audit_forward': raw})
             self._rebuild_audit()   # the fresh forward re-arms the sender, the collector-only fold re-chains
             return True, val
-        if key == 'audit/forward/format':
+        if key == 'audit-forward-format':
             if val not in AUDIT_FORWARD_FORMATS:
                 raise ValueError(T('wire.audit_forward_format_invalid') % ', '.join(AUDIT_FORWARD_FORMATS))
             self.audit_params['forward_format'] = val
             self.record_cfg({'audit_forward_format': val})
             self._rebuild_audit()
             return True, val
-        if key == 'audit/disable':
-            on = on_off(val, 'audit/disable')
+        if key == 'no-audit-log':
+            on = on_off(val, 'no-audit-log')
             self.audit_params['disabled'] = on
             self.record_cfg({'no_audit_log': on})
             self._rebuild_audit()   # the kill-switch swaps the live trail for None (the commands stop landing)
@@ -828,7 +823,7 @@ class ControlServer:
         path or a dump file keeps its case). Returns (True, shown) when
         key is one of them, (False, None) for the tool's own branches."""
         raw = val if raw is None else raw
-        if key == 'control/port':
+        if key == 'control-port':
             try:
                 target = parse_control_target(raw, self.CONTROL_PORT_DEFAULT, self.CONTROL_SOCKET_TEMPLATE)
             except SystemExit as e:
@@ -841,7 +836,7 @@ class ControlServer:
             shown = self._rebind_control(target)
             self.record_cfg({'control_port': '0' if target is None else str(target)})
             return True, shown
-        if key == 'control/ops/verbs':
+        if key == 'control-ops-verbs':
             verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
             known = known_verbs(self.COMMANDS)   # the registry is the one home of the vocabulary
             unknown = sorted(v for v in verbs if v not in known)
@@ -852,16 +847,16 @@ class ControlServer:
             self.ops_verbs = verbs
             self.record_cfg({'control_ops_verbs': ','.join(sorted(verbs))})
             return True, ','.join(sorted(verbs))
-        if key == 'control/trust-uids':
+        if key == 'control-trust-uids':
             try:
-                uids = parse_trust_uids('none' if val == 'off' else val, 'control/trust-uids')
+                uids = parse_trust_uids('none' if val == 'off' else val, 'control-trust-uids')
             except SystemExit as e:
                 raise ValueError(str(e))
             self.trust_uids = uids or frozenset()
             self.record_cfg({'control_trust_uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'})
             return True, ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
-        if key == 'control/socket-group':
-            on = on_off(val, 'control/socket-group')
+        if key == 'control-socket-group':
+            on = on_off(val, 'control-socket-group')
             self.socket_group = on
             self.record_cfg({'control_socket_group': on})
             if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
@@ -889,15 +884,15 @@ class ControlServer:
                 raise ValueError(T('wire.log_handler_missing'))
             self.record_cfg({'local_time': on})
             return True, 'on' if on else 'off'
-        if key == 'dump/path':
+        if key == 'dump-path':
             if val in ('off', 'none', ''):
                 self.dump_path = None
                 self.record_cfg({'dump_path': ''})
                 return True, 'off'
             self.dump_path = raw   # request dump and the graceful shutdown write it from here on
             self.record_cfg({'dump_path': raw})
-            # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
-            return True, raw if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % raw
+            # the seal is opt-in: without dump-key the dump stays plaintext — say so, once, where the choice is made
+            return True, raw if self.dump_key else '%s (not sealed — set dump-key to encrypt at rest)' % raw
         if key == 'dump-interval':
             if not self.dump_path:
                 raise ValueError(T('wire.dump_interval_needs_path'))
@@ -915,15 +910,15 @@ class ControlServer:
         return self.apply_audit_key(key, val, raw=raw)
 
     def get_family_key(self, key):
-        """The `_get` view of the family's shared knobs (get_family_key's
+        """The `_get` view of the family's shared knobs (apply_family_key's
         apply-side sibling). Returns (True, value) / (False, None)."""
-        if key == 'control/port':
+        if key == 'control-port':
             return True, ('off' if self.stopped else self.describe())
-        if key == 'control/ops/verbs':
+        if key == 'control-ops-verbs':
             return True, (','.join(sorted(self.ops_verbs)) or 'off')
-        if key == 'control/trust-uids':
+        if key == 'control-trust-uids':
             return True, (','.join(str(u) for u in sorted(self.trust_uids)) or 'off')
-        if key == 'control/socket-group':
+        if key == 'control-socket-group':
             return True, ('on' if self.socket_group else 'off')
         if key == 'log-level':
             return True, logging.getLevelName(logging.getLogger().getEffectiveLevel())
@@ -933,25 +928,25 @@ class ControlServer:
                 if f is not None and getattr(f, '_fmt', None):
                     return True, ('off' if isinstance(f, UtcFormatter) else 'on')
             return True, 'off'
-        if key == 'dump/path':
+        if key == 'dump-path':
             return True, (self.dump_path or 'off')
         if key == 'dump-interval':
             return True, ('off' if not self.dump_interval else secs(self.dump_interval))
-        if key == 'audit/log-file':
+        if key == 'audit-log':
             if self.audit is None or self.audit.disabled:
                 return True, 'off'
             return True, ('remote' if self.audit.path == 'none' else self.audit.path)
-        if key == 'audit/forward':
+        if key == 'audit-forward':
             return True, (self.audit_params.get('forward') or 'none')
-        if key == 'audit/forward/format':
+        if key == 'audit-forward-format':
             return True, (self.audit_params.get('forward_format') or 'rfc5424')
-        if key == 'audit/rotate/max-size':
+        if key == 'audit-max-mb':
             return True, ('%g' % self.audit_params['max_mb'])
-        if key == 'audit/rotate/daily':
+        if key == 'audit-daily':
             return True, ('on' if self.audit_params['daily'] else 'off')
-        if key == 'audit/rotate/files':
+        if key == 'audit-files':
             return True, ('%d' % self.audit_params['files'])
-        if key == 'audit/disable':
+        if key == 'no-audit-log':
             return True, ('on' if self.audit_params['disabled'] else 'off')
         return False, None
 
@@ -997,7 +992,7 @@ class ControlServer:
     def _gate_range(self, key, v, what=''):
         """The row's min/max (inclusive) — the registry is the one home for
         a knob's bounds; the branch parses and plumbs, the row gates."""
-        opt = self.option_by_live.get(key)
+        opt = self.option_by_name.get(key)
         if opt is None or opt.conv not in self.TYPED_CONVS:
             return
         if (opt.min is not None and not v >= opt.min) or (opt.max is not None and not v <= opt.max):
@@ -1017,8 +1012,8 @@ class ControlServer:
         running one), then the filter keeps the overridden raw and
         re-appliable."""
         for opt in self.OPTIONS:
-            if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:
-                raw[opt.live] = self.defaults[opt.live]
+            if opt.restart and not opt.secret and opt.name in self.defaults:
+                raw[opt.name] = self.defaults[opt.name]
         from common.settings.dump import dump_filter
         return dump_filter(self.overridden, raw, self.SETTINGS)
 
@@ -1073,12 +1068,18 @@ class ControlServer:
         An unknown setting or a value the current config rejects is skipped,
         never fatal; a *** SECRET REMOVED *** placeholder (the dump renders
         an overridden secret's knob) is skipped and named — the secret keeps
-        its current value. APPLY_FIRST names apply before the rest (the
-        fake's scenario: a preset release is the state the pins were pinned
-        after — the pins must land on top of it, never under it)."""
+        its current value. A PRE-FLAT dump's keys (the old live-path
+        spellings — 'audit/rotate/max-size') fold through option_by_live to
+        the flat wire names, so an older state file still restores.
+        APPLY_FIRST names apply before the rest (the fake's scenario: a
+        preset release is the state the pins were pinned after — the pins
+        must land on top of it, never under it)."""
         applied, failed = 0, []
         for name in sorted(settings or {}, key=lambda k: k not in self.APPLY_FIRST):
             value = settings[name]
+            row = self.option_by_live.get(name)
+            if row is not None:
+                name = row.name   # a pre-flat dump's live-path key — the fold, once
             if name not in self.SETTINGS:
                 failed.append(name)
                 continue

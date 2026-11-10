@@ -17,12 +17,12 @@ default. From this one row the surfaces are built or checked:
   registry data only, no values render);
 - the **control grammar's live settings** — the `Setting` rows the `set`/
   `clear` verbs, the console completions and the word-help speak, derived
-  from the same rows (`settings_of`/`make_describe`: a row's `live` name —
-  a `/`-path, `modbus/profile` — its `setting_help`, its completable
-  `values`, the value-shape `hint` and the per-value `value_help`; a
-  flagless row is a control-only setting — the fake's pins and machines;
-  the path spells as its words on the wire: `set modbus profile <value>`,
-  however deep — `a/b/c` → `set a b c <value>`);
+  from the same rows (`settings_of`/`make_describe`: the knob's FLAT
+  registry name is the one wire name — `set max-conn-per-ip <value>` —
+  while the row's `live` path (`modbus/profile`) and `alias` are the
+  CONSOLE spellings: the cli completes and accepts them and translates to
+  the flat name before it sends; a flagless row is a control-only setting
+  — the fake's pins and machines);
 - `scripts/check_options.py` — the CI gate that the four surfaces (the
   flags, the env names, the bundled config, the NixOS module and the README
   tables) agree with the registry.
@@ -46,9 +46,10 @@ class Option:
     text --help and the docs render it), `conv` (the value
     shape: str/int/float/bool — bool flags are store_true, int/float type
     the argparse value), `default` (the argparse default — None = unset, the
-    resolution layers decide), `live` (the control `set` name when the knob
-    is live-settable — a '/'-path whose segments spell as words on the wire:
-    `modbus/profile` is `set modbus profile <value>`), `secret` (a
+    resolution layers decide), `live` (the CONSOLE spelling of the live
+    knob — a '/'-path whose segments the cli spells as words and
+    translates to the flat name before it sends: `modbus/profile` rides
+    the wire as `set profile <value>`), `secret` (a
     token: rendered into a config file only in its -file form), `choices`
     (the values the parser accepts) and `negates` (the name of the boolean
     knob this row switches off — the --no-x form of an --x flag). A
@@ -143,11 +144,11 @@ def parse_config_script(text, label, options=None):
     """Parse one set-grammar config file: every non-comment line is a
     control command — `set <name> <value>` or the bare `<name> <value>`
     shorthand; `#` comments and blank lines stay comments (a config file
-    pipes through a ctl client unchanged). The name speaks the CLI
-    spelling — the live path as words (`set modbus upstream <value>`, what
-    the console, the help and the knob dictionary all say) — and the flat
-    dashed knob name reads too (`set upstream <value>`, the older files'
-    form); the canonical name comes back either way. Pass the registry
+    pipes through a ctl client unchanged). The name speaks the FLAT
+    registry name (`set upstream <value>` — the wire's one spelling, what
+    the console, the help and the knob dictionary all say) — and the
+    console's live-path-as-words form reads too (`set modbus upstream
+    <value>`); the canonical flat name comes back either way. Pass the registry
     (`options`) to get the word matching and the unknown-setting fail
     fast; without it the name is the line's first word, loose as before.
     Returns [(name, value)]. A line the grammar cannot read fails fast
@@ -184,7 +185,7 @@ def parse_config_script(text, label, options=None):
                     break
             if name is None:
                 raise ValueError(("%s:%d: unknown setting in %r — the config is the control grammar: "
-                                  '`set modbus upstream <value>` (or the flat `set upstream <value>`)')
+                                  '`set upstream <value>` (the flat registry name)')
                                  % (label, no, line))
             if not value:
                 raise ValueError('%s:%d: a set line needs a name and a value: %r' % (label, no, line))
@@ -239,46 +240,42 @@ def render_word_sections(sections):
 
 def _listing(name, options, node=None, hidden_words=()):
     """The walk listing describe_node and describe_root share — the
-    console's ? render of one position: the next words under `name`'s
-    prefix (the root when empty) one per row, the node-first
+    wire's flat-grammar listing of one position: the knobs' FLAT names
+    whose live path homes under `name` (the longest node prefix of the
+    row's live/alias spelling — the namespace walk survives as the prose
+    hierarchy over the flat-named knobs), the child nodes' next walk
+    words, the show reports' words; one per row, the node-first
     descriptions, the display groups' sections (the ungrouped on top,
     soft-alphabetical within), the hidden rows never listing (the pools'
     rule; `hidden_words` hides more — the runtime-gated words). A node
     whose every child is hidden falls back to its own `name - help` line;
     the root never falls back."""
     prefix = name + '/' if name else ''
-    nodes = {o.name: o for o in options if o.node}
-    by_live = {}
-    for o in options:
-        if o.live and o.live not in by_live:
-            by_live[o.live] = o
+    node_names = sorted((o.name for o in options if o.node), key=len, reverse=True)
+
+    def home(o):
+        """The row's listing position: the longest node name that prefixes
+        its live/alias spelling, '' = the root."""
+        live = o.live or o.alias
+        for n in node_names:
+            if live and live.startswith(n + '/'):
+                return n
+        return ''
     words = {}
     for o in options:
         if o.hidden:
             continue   # the pools' rule: the hidden rows never list (the typed path still answers)
-        spellings = [(o.live, False)]
-        if o.alias:
-            spellings.append((o.alias, True))
-        for spelling, by_alias in spellings:
-            if spelling and spelling.startswith(prefix):
-                word = spelling[len(prefix):].split('/')[0]
-                if word and word not in hidden_words:
-                    words.setdefault(word, (o, by_alias))
+        if o.node:
+            if o.name != name and o.name.startswith(prefix):
+                words.setdefault(o.name[len(prefix):].split('/')[0], o)
+        elif (o.live or o.alias) and o.name not in hidden_words and home(o) == name:
+            words.setdefault(o.name, o)   # the flat wire name — the word the wire answers
     if not words:
         return ('%s - %s' % (name, node.setting_help or node.help)) if node is not None else None
     buckets = {}
-    for word, (o, by_alias) in words.items():   # registry order = the sections' first-appearance order
-        child = nodes.get(prefix + word)
-        row = by_live.get(prefix + word)
-        if child is not None:   # a namespace child: the word walks on, the node row describes
-            text, via, group = child.setting_help or child.help, None, child.group
-        elif row is not None:   # a setting at the path describes the word (the console's rule)
-            text, via, group = row.setting_help or row.help, None, row.group
-        else:                   # a walk-on: the contributing row describes (the lint keeps nodes on every prefix)
-            text = o.setting_help or o.help
-            via, group = (o.live if by_alias else None), o.group
-        buckets.setdefault(group or '', []).append(
-            (word, '%s%s' % (text, (' (the alias of %s)' % via) if via else '')))
+    for word, o in words.items():   # registry order = the sections' first-appearance order
+        text = o.setting_help or o.help
+        buckets.setdefault(o.group or '', []).append((word, text))
     bare = buckets.pop('', None)
     sections = ([('', sorted(bare, key=lambda p: p[0].lower()))] if bare else []) \
         + [(label, sorted(ws, key=lambda p: p[0].lower())) for label, ws in buckets.items()]
@@ -287,12 +284,10 @@ def _listing(name, options, node=None, hidden_words=()):
 
 def describe_node(options, name):
     """The hierarchy node's wire help (`show audit`, `show audit rotate`;
-    also `help audit`): the node's own children as the console's ?
-    listing renders them — the golden master, byte for byte (the walk
-    carries the depth: `show audit rotate` names the rotation namespace
-    and its own listing answers past it). The alias rows list marked with
-    the canonical name (one knob, two spellings). None when the name is
-    no node."""
+    also `help audit`): the node's own children as the wire's flat-grammar
+    listing renders them — the knobs' flat names homed here, the child
+    nodes' walk words (the golden master, byte for byte). None when the
+    name is no node."""
     node = next((o for o in options if o.node and o.name == name), None)
     if node is None:
         return None
@@ -329,13 +324,12 @@ def describe_command_node(commands, help_map, groups, hidden, name):
 
 
 def describe_root(options, show_options=(), hidden_words=()):
-    """The bare `show` answer — the walk's first position as the console's
-    ? renders it: every visible top-level word (the namespaces, the
-    knobs, the show reports) one per row, the node-first descriptions,
-    the sectioned render. `show_options` rides the same space (the show
-    reports are rows of it); `hidden_words` carries the runtime-gated
-    words — the dump-gated `dump-interval` lists only while the dump node
-    is on, and the caller knows."""
+    """The bare `show` answer — the wire's root listing: every visible
+    flat knob word homed at the root, the namespace nodes' walk words and
+    the show reports' words one per row, the display groups' sections.
+    `hidden_words` carries the runtime-gated words — the dump-gated
+    `dump-interval` lists only while the dump node is on, and the caller
+    knows."""
     return _listing('', tuple(options) + tuple(show_options), None, hidden_words)
 
 
@@ -355,7 +349,7 @@ def render_config_script(options, values, comment=None):
             v = values.get(o.name)
             if v is None or v == '':
                 continue
-            word = ' '.join(o.live.split('/')) if o.live else o.name   # the CLI spelling — the line pastes onto the wire
+            word = o.name   # the flat registry name — the line pastes onto the wire or into a config file
             rows_left.append('set %s %s' % (word, v))
         if rows_left:
             if key:
@@ -392,20 +386,19 @@ def config_value(name, cfg, by_name, cfg_keys=None, formatters=None):
 
 def control_command(opt):
     """The knob -> control-command mapper: the command that changes this knob
-    on a running daemon (`set interval 10`; a live path spells as its words:
-    `set modbus profile <value>`; an aliased row names its second spelling
-    too), or the note that the knob is startup-only (restart to apply). A
-    knob the registry marks restart carries ', restart' on its recipe — the
-    set records the value, the restart applies it. A restart-marked SECRET
+    on a running daemon — `set <flat-name> <value>` (the wire, the config
+    file and the console all take the flat registry name; the console
+    additionally accepts the row's live/alias spellings and translates), or
+    the note that the knob is startup-only (restart to apply). A knob the
+    registry marks restart carries ', restart' on its recipe — the set
+    records the value, the restart applies it. A restart-marked SECRET
     renders no recipe at all: the wire refuses set/clear on it (a secret can
     never ride the reload state, so it has no pending form) — it passes by
     flag/env/config and a restart."""
     if opt.live:
         if opt.restart and opt.secret:
             return 'startup-only — pass it by flag/env/config (set/clear refuse)'
-        cmd = 'set %s <value>' % opt.live.replace('/', ' ')
-        if opt.alias:
-            cmd += ' (alias: %s)' % opt.alias.replace('/', ' ')
+        cmd = 'set %s <value>' % opt.name
         if opt.restart:
             cmd += ', restart'
         return cmd
@@ -510,9 +503,10 @@ def parse_registry_sections(meta):
     vocabulary, one parse for the family's four loaders (the rows live in
     each lib/options.json; the shape is the family's — the loaders assign
     their globals from the returned dict). The show commands expand into
-    the live-path space: the row's own `live` when it spells the hierarchy,
-    else the word itself. The control commands key by the wire word (the
-    row's `live`, else the name — the name is the registry key, never
+    the setting space under the row's FLAT word (the wire answers it; the
+    row's live path — the console spelling — rides the Setting for the
+    cli's walk). The control commands key by the wire word (the row's
+    `live`, else the name — the name is the registry key, never
     typed). A `node` row's descr carries the namespace's word-help (the
     walk-on borrows it; it is no command word itself). An `internal` row
     is the machinery's own word — the wire answers, the cli never offers
@@ -550,7 +544,6 @@ def parse_registry_sections(meta):
         'SHOW_VALUES': tuple((w, d) for w, d, _, _ in show_commands),
         'SHOW_GROUPS': {w: g for w, _, _, g in show_commands},
         'SHOW_OPTIONS': show_options,
-        'SHOW_BY_LIVE': {o.live: o.name for o in show_options},   # the hierarchy live -> the report's word
         'COMMANDS': tuple(commands),
         'COMMAND_HELP': cmd_help,
         'COMMAND_GROUPS': cmd_groups,
@@ -599,26 +592,33 @@ def option_rows(rows, choices=None):
 
 class Setting:
     """One live control setting — the registry's control-grammar view: the
-    `set <name>` name (a '/'-path: the wire spells its segments as words —
-    `modbus/profile` is `set modbus profile <value>`), the short
-    description the wire help answers with, the completable value words, the
-    value-shape hint (shown after the words), the per-value short
-    descriptions and the display group it renders in (the row's `group`,
-    ungrouped — bare, no header — when the row carries none; the console
-    word-help and the completions group by the `group` field alone).
-    Derived from the Option rows (settings_of) — the
-    registry is the one place a knob's vocabulary lives."""
+    knob's FLAT registry name (`set <name>` on the wire — the replies, the
+    dump keys and the defaults speak it; the wire takes no other knob
+    spelling), the short description the wire help answers with, the
+    completable value words, the value-shape hint (shown after the words),
+    the per-value short descriptions and the display group it renders in
+    (the row's `group`, ungrouped — bare, no header — when the row carries
+    none; the console word-help and the completions group by the `group`
+    field alone). `live` and `alias` carry the row's CONSOLE spellings (the
+    '/'-paths the cli completes and translates to `name` before it sends —
+    the wire itself does not see them); `show_report` marks the show-section
+    rows (a report answers `show <word>`, never a set/clear value).
+    Derived from the Option rows (settings_of) — the registry is the one
+    place a knob's vocabulary lives."""
 
-    def __init__(self, name, help, values=(), hint=None, value_help=None, group=None, alias=None, restart=False, secret=False):
+    def __init__(self, name, help, values=(), hint=None, value_help=None, group=None, alias=None,
+                 restart=False, secret=False, live=None, show_report=False):
         self.name = name
         self.help = help
         self.values = values              # completable words
         self.hint = hint                  # the value's shape (N, s, HOST:PORT)
         self.value_help = value_help or {}   # per-value short description
         self.group = group                # the display bucket; None = ungrouped (bare)
-        self.alias = alias                # the row's second wire spelling (the canonical renders)
+        self.alias = alias                # the row's second CONSOLE spelling (the cli translates)
+        self.live = live                  # the row's primary CONSOLE spelling (the cli translates)
         self.restart = restart            # startup-only: set/clear answers the restart note
         self.secret = secret              # a token: the dump/show-config placeholder rule, the paste-back gate
+        self.show_report = show_report    # a show-section row: never a set/clear target
 
     @property
     def display_group(self):
@@ -639,10 +639,12 @@ class Setting:
 def settings_of(options):
     """The Setting rows derived from the registry: every option with a
     `live` name — a live-settable knob or a control-only setting — in
-    registry order; a repeated live name (two knobs steering one setting)
-    keeps the first row's vocabulary. A `restart` knob (the wire answers
-    its set/clear attempt with the restart note) joins under its live
-    name, or under its flat name when the row carries none yet."""
+    registry order, named by the knob's FLAT registry name (the wire
+    name; the row's live/alias ride along as the console spellings). A
+    repeated live name (two knobs steering one setting) keeps the first
+    row's vocabulary. A `restart` knob (the wire answers its set/clear
+    attempt with the restart note) joins under its flat name, live or
+    not."""
     seen = set()
     out = []
     for o in options:
@@ -650,11 +652,11 @@ def settings_of(options):
             if o.live in seen:
                 continue
             seen.add(o.live)
-            out.append(Setting(o.live, o.setting_help or o.help, o.values, o.hint, o.value_help,
-                               o.group, o.alias, restart=o.restart, secret=o.secret))
+            out.append(Setting(o.name, o.setting_help or o.help, o.values, o.hint, o.value_help,
+                               o.group, o.alias, restart=o.restart, secret=o.secret, live=o.live))
         elif o.restart:
             out.append(Setting(o.name, o.setting_help or o.help, o.values, o.hint, o.value_help,
-                               o.group, restart=True, secret=o.secret))
+                               o.group, o.alias, restart=o.restart, secret=o.secret, live=o.live))
     return tuple(out)
 
 
@@ -678,31 +680,45 @@ def static_defaults(options):
 def registry_view(options, show_options):
     """The per-tool registry view, built once (the lib/options.py loaders
     unpack it): the live Setting tables the wire, the consoles and the
-    dumps share — canonical + alias spellings folded into one map (the
-    canonical renders), the knob-only set vocabulary beside the full
-    space, the show lives, the hidden rows, the help-only nodes and the
-    describe pair. One implementation: the alias fold (the row's second
-    spelling answers the same Setting) used to live on two tools only —
-    `set audit forward-format` answered err where the fold was missing."""
+    dumps share — `setting_by_name` keys the FLAT wire names (the daemon's
+    match map: the wire takes no other spelling), `spellings` answers the
+    console spellings beside them (the flat name, the row's `live` path
+    and its `alias` — the cli's match and describe maps; the first row
+    wins a spelling), `pool_names` lists the console spellings (lives +
+    aliases, registry order — the ?/TAB pools' raw material), the
+    knob-only set vocabulary beside the full space, the show lives, the
+    hidden rows, the help-only nodes and the describe pair. One
+    implementation: the alias fold (the row's second spelling answers the
+    same Setting) used to live on two tools only — `set audit forward-format`
+    answered err where the fold was missing."""
     from types import SimpleNamespace
-    settings = settings_of(options) + settings_of(show_options)
+    knob_settings = settings_of(options)
+    report_settings = settings_of(show_options)
+    for s in report_settings:
+        s.show_report = True
+    settings = knob_settings + report_settings
     setting_by_name = {s.name: s for s in settings}
+    spellings = {}
     alias_names = []
-    for s in settings:   # the row's `alias` spelling answers the same Setting — the canonical renders
-        if s.alias and s.alias not in setting_by_name:
-            setting_by_name[s.alias] = s
+    for s in settings:   # the flat name plus the row's console spellings answer the same Setting
+        spellings.setdefault(s.name, s)
+        if s.live:
+            spellings.setdefault(s.live, s)
+        if s.alias:
+            spellings.setdefault(s.alias, s)
             alias_names.append(s.alias)
-    set_by_name = {s.name: s for s in settings_of(options)}
-    for s in settings_of(options):   # the aliases ride the set vocabulary beside the canonicals
-        if s.alias and s.alias not in set_by_name:
-            set_by_name[s.alias] = s
+    set_by_name = {s.name: s for s in knob_settings}   # the knobs: the show reports have nothing to set
     show_lives = frozenset(o.live for o in show_options)   # show answers them, set/clear never offers them
+    pool_names = tuple(n for s in settings
+                       for n in ((s.live,) if s.live else ()) + ((s.alias,) if s.alias else ()))
     describe_setting, describe_value = make_describe(setting_by_name)
     return SimpleNamespace(
         settings=settings,
-        setting_by_name=setting_by_name,
-        setting_names=tuple(s.name for s in settings),   # the dump keys and the clear defaults iterate these
-        alias_names=tuple(alias_names),                  # the ?/TAB pools ride them beside the canonicals
+        setting_by_name=setting_by_name,                 # the FLAT wire names — the daemon's match map
+        spellings=spellings,                             # + the console spellings — the cli's match map
+        setting_names=tuple(s.name for s in settings),   # the flat names: the dump keys, the clear defaults
+        alias_names=tuple(alias_names),                  # the alias spellings (the cli pools beside the lives)
+        pool_names=pool_names,                           # the console spellings — the ?/TAB pools' raw list
         set_by_name=set_by_name,
         show_lives=show_lives,
         live_settings=frozenset(o.live for o in options if o.live) | show_lives,   # the pools list these
@@ -728,14 +744,16 @@ def word_groups(words, groups):
 
 
 def match_setting_path(words, by_name):
-    """The live setting a set/clear/show/help word list names: a `live` path
-    (`modbus/profile`) spells as its segments' words on the wire — the
-    longest '/'-joined prefix of `words` that `by_name` answers wins, the
-    remaining words belong to the value (`set modbus profile <value>`;
-    however deep: `a/b/c` → `set a b c <value>`). The map also answers a
-    row's `alias` spelling — the return is the CANONICAL live name either
-    way (the replies, the dump keys and the defaults render one name).
-    Returns (path, rest words); (None, words) when the words name no
+    """The setting a set/clear/show/help word list names: the longest
+    '/'-joined key of `by_name` that a prefix of `words` answers wins, the
+    remaining words belong to the value. The map's keys decide the accepted
+    spellings: the daemon passes its flat-name map (the wire grammar —
+    `set max-conn-per-ip <value>`), the cli passes the spellings map (the
+    flat names beside the rows' live/alias paths — `set limits
+    max-conn-per-ip <value>` translates) — the return is the Setting's
+    FLAT name either way (the replies, the dump keys and the defaults
+    render one name).
+    Returns (name, rest words); (None, words) when the words name no
     setting."""
     for k in range(len(words), 0, -1):
         cand = '/'.join(words[:k]).lower()

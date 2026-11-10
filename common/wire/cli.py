@@ -23,13 +23,33 @@ except ImportError:
 from common.runtime.audit import AUDIT_FORWARD_FORMATS, AuditLog
 from common.settings.config import parse_secret, resolve_target
 from common.render.human import secs
-from common.settings.options import command_path_pool, render_word_sections, setting_path_pool
+from common.settings.options import command_path_pool, match_setting_path, render_word_sections, setting_path_pool
 from common.render.texts import T
 from common.wire.wiresec import sign_request, verify_reply
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
 
 _SPEC = None   # the tool's specifics — set by run_cli() before anything reads it
+
+
+def translate(cmd):
+    """The typed line's knob words -> the flat registry names. The wire
+    speaks the flattened options.json names (the daemon's match map takes
+    no other spelling); the console accepts the rows' live/alias path
+    spellings beside the flat names and translates here — the longest
+    spelling that prefixes the words wins, the rest of the line (the
+    value words) rides along. Names no setting (the command paths, the
+    node walks, the fake's `set register` words): the line passes
+    through untouched."""
+    parts = cmd.split()
+    if len(parts) < 2:
+        return cmd
+    if parts[0].lower() not in ('set', 'clear', 'show', 'help'):
+        return cmd
+    key, rest = match_setting_path(parts[1:], _SPEC['spellings'])
+    if key is None:
+        return cmd
+    return ' '.join([parts[0], key] + list(rest))
 
 
 class ConnectionLost(Exception):
@@ -42,17 +62,18 @@ class DaemonExit(Exception):
     there is nothing on the other end to reconnect to."""
 
 
-def pools(commands, internal, hidden, settings, nodes, commands_help,
-          setting_names, alias_names, live, banner_name):
+def pools(commands, internal, hidden, spellings, nodes, commands_help,
+          pool_names, banner_name):
     """The standard console's pool/describe/welcome furniture (the three
     simple cli bins' one shape; the cache's dump-gated pools keep their
-    own): the completion/list pools speak the live-named settings + the
-    alias spellings (a not-yet-live knob never lists, the hidden and
-    internal rows never list) and the welcome prints the family banner.
-    Returns (pool_names, describe_word, command_pool, setting_pool, welcome)."""
-    pool_names = tuple(n for n in setting_names + alias_names if n not in hidden
-                       and (n in live or n in alias_names))   # a not-yet-live knob never lists
-    describe_word = make_describe_word(nodes, commands_help, settings)
+    own): the completion/list pools speak the CONSOLE spellings (the rows'
+    live/alias paths — the words TAB offers and `?` lists; the cli
+    translates them to the flat registry names when it sends — a
+    not-yet-live knob never lists, the hidden and internal rows never
+    list) and the welcome prints the family banner. Returns (pool_names,
+    describe_word, command_pool, setting_pool, welcome)."""
+    names = tuple(n for n in pool_names if n not in hidden)
+    describe_word = make_describe_word(nodes, commands_help, spellings)
 
     def command_pool():
         """The first words the daemon offers right now (the hidden and the
@@ -60,9 +81,9 @@ def pools(commands, internal, hidden, settings, nodes, commands_help,
         return tuple(n for n in commands if n not in hidden and n not in internal)
 
     def setting_pool():
-        """The show-branch pool: the live-named settings + the alias
-        spellings (a not-yet-live knob never lists)."""
-        return pool_names
+        """The show-branch pool: the console spellings (the hidden rows
+        never list)."""
+        return names
 
     def welcome(sock):
         """The first-connect greeting: the console's two fixed lines — the
@@ -70,13 +91,14 @@ def pools(commands, internal, hidden, settings, nodes, commands_help,
         print(T('banner.welcome') % banner_name)
         print(T('banner.hint'))
 
-    return pool_names, describe_word, command_pool, setting_pool, welcome
+    return names, describe_word, command_pool, setting_pool, welcome
 
 
-def make_describe_word(nodes, commands_help, settings):
+def make_describe_word(nodes, commands_help, spellings):
     """The describer bound to one tool's registries — the golden order:
     a hierarchy node describes its namespace, a command row its help, a
-    setting its own, then the walk-ons: a word both a settings
+    setting its own (looked up by any spelling — the flat name, the live
+    path or the alias), then the walk-ons: a word both a settings
     namespace and a command one describes by the settings' first child
     (the alias-first-segment rule), a pure command namespace (`request`)
     by its first command child's help."""
@@ -85,11 +107,11 @@ def make_describe_word(nodes, commands_help, settings):
             return nodes[w].setting_help or nodes[w].help
         if w in commands_help:
             return commands_help[w]
-        s = settings.get(w)
+        s = spellings.get(w)
         if s:
             mark = ' (the alias of %s)' % s.name if s.alias and w == s.alias else ''
             return s.help + mark
-        walk = next((s for k, s in settings.items() if k.startswith(w + '/')), None)
+        walk = next((s for k, s in spellings.items() if k.startswith(w + '/')), None)
         if walk is not None:
             return walk.help
         return next((h for k, h in commands_help.items() if k.startswith(w + '/')), None)
@@ -146,7 +168,7 @@ def _grouped(matches, base):
     buckets = {}
     for w in matches:
         full = (base + '/' + w) if base else w
-        s = _SPEC['settings'].get(full) or _SPEC['settings'].get(w)
+        s = _SPEC['spellings'].get(full) or _SPEC['spellings'].get(w)
         if s is not None:
             label = s.display_group
         else:
@@ -154,7 +176,7 @@ def _grouped(matches, base):
             if n is not None:
                 label = n.group or ''
             else:
-                walk = next((s for k, s in _SPEC['settings'].items() if k.startswith(w + '/')), None)
+                walk = next((s for k, s in _SPEC['spellings'].items() if k.startswith(w + '/')), None)
                 label = walk.display_group if walk is not None else ''   # no group, bare
         buckets.setdefault(label, []).append(w)
     bare = buckets.pop('', None)
@@ -244,11 +266,11 @@ def candidates(buf):
         pool, hint, desc = command_path_pool(done, _SPEC['command_pool']()), None, _SPEC['describe']
     elif head in ('set', 'clear'):
         names = tuple(n for n in _SPEC['setting_pool']() if n not in _SPEC['show_lives'])
-        by = {n: _SPEC['settings'][n] for n in names if n in _SPEC['settings']}   # the exact match obeys the pool:
-        s, segs = setting_path_pool(done[1:], names, by)                          # a show report never offers a value
+        by = {n: _SPEC['spellings'][n] for n in names if n in _SPEC['spellings']}   # the exact match obeys the pool:
+        s, segs = setting_path_pool(done[1:], names, by)                            # a show report never offers a value
         if s is None:   # the hidden knobs (the secrets) never walk, but the typed whole path still describes
-            s = _SPEC['settings'].get('/'.join(w.lower() for w in done[1:]))
-            if s is not None and s.name not in _SPEC['live_settings'] - _SPEC['show_lives']:
+            s = _SPEC['spellings'].get('/'.join(w.lower() for w in done[1:]))
+            if s is not None and s.show_report:
                 s = None   # a show report never offers a value
         if s is not None:
             if head == 'clear':
@@ -264,12 +286,12 @@ def candidates(buf):
             pool, hint = segs, None                        # description lives on the full live name
             desc = lambda w, base=base: _SPEC['describe']((base + '/' if base else '') + w)
     elif head == 'show':
-        s, segs = setting_path_pool(done[1:], _SPEC['setting_pool'](), _SPEC['settings'])
+        s, segs = setting_path_pool(done[1:], _SPEC['setting_pool'](), _SPEC['spellings'])
         base = '/'.join(w.lower() for w in done[1:])   # a segment's description lives on the full live name
         if s is None:   # the hidden knobs never walk, but the typed whole path still describes (the wire's help answers it)
-            s = _SPEC['settings'].get('/'.join(w.lower() for w in done[1:]))
+            s = _SPEC['spellings'].get('/'.join(w.lower() for w in done[1:]))
         if s is not None:
-            _, cont = setting_path_pool(done[1:] + [''], _SPEC['setting_pool'](), _SPEC['settings'])
+            _, cont = setting_path_pool(done[1:] + [''], _SPEC['setting_pool'](), _SPEC['spellings'])
             if not cont:
                 return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole and childless; ? describes the report
             pool, hint = cont, None   # a namespace too: the report answers on Enter, TAB walks on
@@ -492,6 +514,8 @@ def typed_loop(sock, prompt, audit=None):
             if audit:
                 audit.command('shutdown', 'ok')
             return
+        cmd = translate(cmd)   # the console's live/alias spellings -> the flat wire names
+        low = cmd.lower()
         try:
             reply = exchange(sock, wire(cmd))
         except ConnectionLost:

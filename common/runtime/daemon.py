@@ -125,12 +125,13 @@ def apply_restart_state(target, config_path, dump_key, server, extra=None):
     note true (the execv'd reload applies what the sets recorded).
     `server` is the tool's ControlServer class: the fold reads the
     registry through it (the subclass-name trap — the common base's
-    SETTINGS is empty, the fold would fold nothing). `dump/restore-on-start`
+    SETTINGS is empty, the fold would fold nothing). `restore-on-start`
     folds everywhere (the dict — or vars(args) — key restore_on_start);
     `extra` maps the tool's own restart-marked branches (the cache's
-    listen/upstream folds) to fn(target, pending)."""
+    listen/upstream folds) to fn(target, pending). The state keys are the
+    FLAT registry names (the wire's one spelling)."""
     for name, pending in server.fold_restart_state(config_path, dump_key).items():
-        if name == 'dump/restore-on-start':
+        if name == 'restore-on-start':
             target['restore_on_start'] = str(pending).strip() in ('on', 'true', '1', 'yes')
         elif extra and name in extra:
             extra[name](target, pending)

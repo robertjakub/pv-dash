@@ -10,7 +10,7 @@ import logging
 from .options import DEFAULT_OPS_VERBS, OPTIONS
 from common.settings.config import (ANY_NET, IPGate, _GATE_TYPES, _acl_desc, _prefix_matcher, _write_gate_object,
                            acl_admits, acl_file_warn, acl_gate_summary, acl_summary, acl_table, acl_text,
-                           acl_value_text, check_auth_key, default_profile_path, load_config_script,
+                           acl_value_text, check_auth_key, load_config_script,
                            load_write_gate_file, parse_acl, parse_acl_value, parse_auth_type, parse_listen,
                            parse_secret, parse_upstream, resolve_profile_file, Resolver)
 from common.wire.cred import parse_trust_uids
@@ -415,7 +415,7 @@ def resolve_config(args, script_dir=None):
             resolve(getattr(args, 'write_registers', None), 'WRITE_REGISTERS',
                     'write_registers', DEFAULTS['write_registers'], str)),
         'profile': resolve_profile_file(resolve(getattr(args, 'profile', None), 'PROFILE',
-                                                'profile', default_profile_path(), str)),
+                                                'profile', DEFAULTS['modbus_profile'], str)),
         'selection': parse_selection(resolve(getattr(args, 'selection', None), 'SELECTION',
                                             'selection', DEFAULTS['selection'], str)),
         'cache_ttl': resolve(args.cache_ttl, 'TTL', 'cache_ttl',
@@ -455,7 +455,7 @@ def resolve_config(args, script_dir=None):
                                                   'control_ops_token', '', str), 'control-ops-token'),
         'control_ops_verbs': resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
                                      'control_ops_verbs', DEFAULT_OPS_VERBS, str),
-        'audit_log': resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', '', str),
+        'audit_log': resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', DEFAULTS['audit_log'], str),
         'audit_forward': resolve(getattr(args, 'audit_forward', None), 'AUDIT_FORWARD',
                                  'audit_forward', DEFAULTS['audit_forward'], str),
         'audit_forward_format': resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
@@ -471,7 +471,7 @@ def resolve_config(args, script_dir=None):
         'requests_audit_s': resolve(getattr(args, 'requests_audit', None), 'REQUESTS_AUDIT',
                                     'requests_audit_s', DEFAULTS['requests_audit_s'], float),
         'dump_path': resolve(getattr(args, 'dump_path', None), 'DUMP_PATH',
-                             'dump_path', '', str),
+                             'dump_path', DEFAULTS['dump_path'], str),
         'dump_key': parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY',
                                           'dump_key', None, str) or '').strip() or None, 'dump/key'),
         'dump_interval': resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
@@ -482,7 +482,7 @@ def resolve_config(args, script_dir=None):
                                          'RESTORE_ON_START', 'restore_on_start', DEFAULTS['restore_on_start']),
         'control_trust_uids': parse_trust_uids(resolve(getattr(args, 'control_trust_uids', None),
                                                        'CONTROL_TRUST_UIDS',
-                                                       'control_trust_uids', '', str)),
+                                                       'control_trust_uids', DEFAULTS['control_trust_uids'], str)),
         'control_socket_group': resolve_bool(getattr(args, 'control_socket_group', False) or None,
                                              'CONTROL_SOCKET_GROUP', 'control_socket_group', DEFAULTS['control_socket_group']),
     }

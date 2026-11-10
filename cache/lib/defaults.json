@@ -38,11 +38,15 @@
     "audit_forward_format": "rfc5424",
     "audit_daily": false,
     "no_audit_log": false,
+    "audit_log": "",
     "requests_audit_s": 300,
     "dump_interval": 0.0,
+    "dump_path": "",
     "dump_with_cache": false,
     "restore_on_start": false,
-    "control_socket_group": false
+    "control_socket_group": false,
+    "control_trust_uids": "",
+    "modbus_profile": "sun2000"
   },
   "log_levels": [
     "DEBUG",

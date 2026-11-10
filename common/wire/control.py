@@ -78,7 +78,7 @@ class ControlServer:
     CFG_FORMATTERS = {}                   # the cfg key -> text map for the structured values
     APP = 'daemon'                        # the show-version voice ('ok <app> <version>')
     SHOW_REPORTS = {}                     # the tool's own show words: low -> method (or (method, arg))
-    RELOAD_CONFIG = True                  # request/reload-config answers (the cache + the fake keep the row decision open)
+    RELOAD_CONFIG = True                  # request/reload-config answers family-wide (the reloader is the bin's apply_reload)
     COMMANDS = ()                         # the registries' command rows — the subclass sets
     COMMAND_HELP = {}                     # the command words' one-line help
     COMMAND_GROUPS = {}                   # the command nodes' group buckets
@@ -457,8 +457,8 @@ class ControlServer:
         set/unset pair, the show reports and the show walk, then the tool's
         own verbs and the family's request namespace. The hooks the
         subclasses use: SHOW_REPORTS (the tool's show words, beside show
-        knobs), RELOAD_CONFIG (the cache and the fake keep the
-        reload-config row decision open), command_set_special (the fake's
+        knobs), RELOAD_CONFIG (request/reload-config answers — the
+        reloader wiring is each bin's apply_reload), command_set_special (the fake's
         Modbus-write set words), _after_set (the fake's pin bookkeeping),
         show_root_hidden (the bare-show pool's extra hidden words),
         show_walk_tail (the walk's no-match tail), command_tool (the tool
@@ -593,7 +593,7 @@ class ControlServer:
                 return 'err no reloader configured'
             try:
                 return 'ok reloaded (%s)' % self.reloader()
-            except Exception as e:
+            except (Exception, SystemExit) as e:   # the resolvers fail SystemExit — keep-last-good, answer the wire
                 return 'err reload failed: %s' % e
         if low == 'request dump':
             return self.dump_state()
@@ -802,6 +802,24 @@ class ControlServer:
                 self.audit.event('RELOAD', 'restored %d override(s) from %s' % (applied, path))
         except (OSError, ValueError) as e:
             self.LOG.error('reload: the state file %s is unreadable (%s) — starting without it', path, e)
+
+    def reloaded(self, summary, dump_interval=None, applied=None):
+        """The reloader's shared tail (every apply_reload body's last
+        lines): the override markers drop — wholesale via the subclass's
+        clear_overrides when the reload re-applies every live knob, or
+        just the `applied` keys where the tool re-applies a subset (the
+        fake's machine pins keep theirs) — and the dump-interval loop
+        re-reads the configured interval (the parked dumper wakes). The
+        RELOAD audit stays caller-side: the audit voices and the extra
+        events differ per tool."""
+        if applied is None:
+            self.clear_overrides()
+        else:
+            self.overridden.difference_update(applied)
+        if dump_interval is not None:
+            self.dump_interval = dump_interval
+            self.dump_wake.set()
+        return summary
 
     def reload_daemon(self):
         """The `reload` verb: save the overrides, then restart the whole

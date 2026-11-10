@@ -59,7 +59,6 @@ DEFAULT_KEYS = {
 # (the secret None is banned outright by its own row): the empty
 # word, the derived path, the registry-computed vocabulary
 _COMMON_NO_TREE_DEFAULT = {
-    'auth': 'empty = no auth',
     'control-port': 'empty — the control socket derives from the listen port',
     'control-ops-verbs': "the registry's default_ops_verbs",
 }
@@ -72,9 +71,7 @@ NO_TREE_DEFAULT = {
                         'time': 'empty = the clock runs',
                         'grid-voltage': "the tree's grid block (voltage_v), read via statics.GRID",
                         'grid-frequency': "the tree's grid block (frequency_hz), read via statics.GRID"}),
-    'dashboard': dict(_COMMON_NO_TREE_DEFAULT,
-                      **{'static-dir': 'the startup-only secret — flag/env/config and restart',
-                         'config-js': 'the startup-only secret — flag/env/config and restart'}),
+    'dashboard': dict(_COMMON_NO_TREE_DEFAULT),
 }
 
 

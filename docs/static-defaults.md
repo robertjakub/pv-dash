@@ -66,16 +66,18 @@ exemption, so a bool without its tree entry fails.
 
 | Tool | Named no-entry — the reason each |
 |---|---|
-| all four | `auth` — empty = no auth · `control-port` — derives from the listen port · `control-ops-verbs` — the registry's `default_ops_verbs` |
+| all four | `control-port` — derives from the listen port · `control-ops-verbs` — the registry's `default_ops_verbs` |
 | scraper | + `metrics-spec` — empty = the built-in `lib/metrics.json` block |
 | inverter | + `seed` — a per-run choice · `time` — empty = the clock runs · `grid-voltage` / `grid-frequency` — the tree's `grid` block (`voltage_v` / `frequency_hz`), read via `statics.GRID` |
-| dashboard | + `static-dir`, `config-js` — the startup-only secrets (flag/env/config and restart; the values never ride the wire, the dump or the tree) |
 
 The secrets are absent from the table by ruling: **a secret never
 takes a settable default** — its default is the None ladder-end,
 categorically (six on the cache — `auth-key`, `auth-upstream-key`,
 `control-token`, `control-ops-token`, `metrics-token`, `dump-key` —
-five on the other three). The gate enforces it: a `defaults`-tree key
+five on the scraper and the inverter, six on the dashboard — its
+`static-dir` and `config-js` are startup-only secrets of the same
+shape: `secret`, `hidden`, `restart`, the values never ride the wire,
+the dump or the tree). The gate enforces it: a `defaults`-tree key
 naming a secret fails the tool even before a resolver could wire it —
 a shipped secret default would ride every install.
 
@@ -105,14 +107,14 @@ as the inline literals did, the rung names the entry.
 
 | Knob | Proposal | Ruling |
 |---|---|---|
-| `auth` (all four) | `"auth": ""` — the empty stays no-auth (the scheme parse treats `none` as off already; `""` keeps every falsy chain behavior-neutral) | TODO — the last common knob that can graduate |
+| `auth` (the three Modbus tools) | DONE — the registry name is `modbus-auth` (`--modbus-auth` / `MODBUS_AUTH`) and the tree carries `"modbus_auth": "none"` (the explicit off — `parse_auth_type` folds it to `None`) | graduated |
 | `control-port` (all four) | `"control_port": ""` — the empty = the derived socket (the template against the listen port; the one derived default the tree cannot hold verbatim, the audit-log shape) | TODO |
 | `control-ops-verbs` (all four) | `"control_ops_verbs": "<the concrete csv>"` — the registry keeps the parse/validate; a gate row would diff the tree's literal against `default_ops_verbs` so the two cannot drift | TODO — needs the drift-diff gate row first |
 | `metrics-spec` (scraper) | `"metrics_spec": ""` — the empty = the built-in `lib/metrics.json` block | TODO |
 | `time` (inverter) | `"time": ""` — the empty = the clock runs | TODO |
 | `seed` (inverter) | — | STAYS OUT — a per-run choice; no default exists to ship |
 | `grid-voltage`, `grid-frequency` (inverter) | — | BACKED — the tree's `grid` block (`voltage_v` / `frequency_hz`) via `statics.GRID`; the row only documents the indirect read |
-| `static-dir`, `config-js` (dashboard) | — | STAYS OUT — the startup-only secrets; the outright ban holds (a shipped path default would ride every install) |
+| `static-dir`, `config-js` (dashboard) | — | STAYS OUT — startup-only secrets of the `dump-key` shape; the outright ban holds (a shipped path default would ride every install) |
 
 ## The gate
 

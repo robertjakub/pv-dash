@@ -215,8 +215,10 @@ def resolve_config(args, script_dir=None):
     profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'PROFILE',
                                                 'profile', default_profile_path(), str))
     profile = load_device_profile(profile_path)
+    prefix_default = DEFAULTS['metric_prefix']
     metric_prefix = (resolve(getattr(args, 'metric_prefix', None), 'METRIC_PREFIX',
-                             'metric_prefix', 'huawei', str) or 'huawei').strip() or 'huawei'
+                             'metric_prefix', prefix_default, str)
+                     or prefix_default).strip() or prefix_default
     metrics_spec = resolve(getattr(args, 'metrics_spec', None), 'METRICS_SPEC',
                            'metrics_spec', None, str)
     spec = Metrics(metrics_spec, prefix=metric_prefix)
@@ -240,7 +242,8 @@ def resolve_config(args, script_dir=None):
         'modbus_port': modbus_port,
         'modbus_unit': resolve(getattr(args, 'modbus_unit', None), 'MODBUS_UNIT',
                                'modbus_unit', DEFAULTS['modbus_unit'], int),
-        'modbus_offset': resolve(args.modbus_offset, 'MODBUS_OFFSET', 'modbus_offset', 0, int),
+        'modbus_offset': resolve(args.modbus_offset, 'MODBUS_OFFSET', 'modbus_offset',
+                                 DEFAULTS['modbus_offset'], int),
         'auth': parse_auth_type(resolve(getattr(args, 'auth', None), 'AUTH', 'auth', '', str), 'auth'),
         'auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
@@ -284,9 +287,9 @@ def resolve_config(args, script_dir=None):
                                           'CONTROL_SOCKET_GROUP', 'control_socket_group', False, str_to_bool)
     cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', None, str)
     cfg['audit_forward'] = resolve(getattr(args, 'audit_forward', None), 'AUDIT_FORWARD',
-                                   'audit_forward', 'none', str)
+                                   'audit_forward', DEFAULTS['audit_forward'], str)
     cfg['audit_forward_format'] = resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
-                                          'audit_forward_format', 'rfc5424', str)
+                                          'audit_forward_format', DEFAULTS['audit_forward_format'], str)
     cfg['audit_max_mb'] = resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
                                   'audit_max_mb', DEFAULTS['audit_max_mb'], float)
     cfg['audit_files'] = resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
@@ -306,7 +309,7 @@ def resolve_config(args, script_dir=None):
     cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
                                             None, str) or '').strip() or None, 'dump/key')
     cfg['dump_interval'] = resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
-                                   'dump_interval', 0.0, float)
+                                   'dump_interval', DEFAULTS['dump_interval'], float)
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
                                       'restore_on_start', False, str_to_bool)
     cfg['listen'] = cfg['listen'].strip()

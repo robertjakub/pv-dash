@@ -21,12 +21,15 @@ import threading
 import time
 
 from common.settings import dump as state
-from common.runtime.audit import AuditLog
-from common.wire.cred import peer_uid
+from common.runtime.audit import AuditLog, AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward
+from common.runtime.logutil import UtcFormatter
+from common.wire.cred import peer_uid, parse_trust_uids
+from common.settings.config import parse_control_target
 from common.settings.dump import SECRET_REMOVED
 from common.settings.options import config_value, control_command, describe_command_node, describe_node, \
-    describe_root, grouped_rows, knob_dictionary, make_describe, match_setting_path, \
+    describe_root, grouped_rows, knob_dictionary, known_verbs, make_describe, match_setting_path, \
     render_config_script
+from common.render.human import secs
 from common.render.texts import T
 from common.runtime.version import version_string
 from common.wire.wiresec import ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, proof_tag, role_allows, \
@@ -48,6 +51,22 @@ def numi(text, label, what):
         return int(text)
     except ValueError:
         raise ValueError('%s must be %s, got %r' % (label, what, text))
+
+
+ON_OFF_WORDS = ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no')
+
+
+def on_off(val, label):
+    """The on/off ladder the family's bool branches share (the eight
+    spellings; the truthy set returns True, the falsy set False, anything
+    else is the label's ValueError — the err reply). The label is the
+    branch's own spelling of the knob (the cache's allow-write, the
+    wire's write/allow) — the refusal keeps the pinned text."""
+    if val in ('on', 'true', '1', 'yes'):
+        return True
+    if val in ('off', 'false', '0', 'no'):
+        return False
+    raise ValueError(T('wire.must_be_on_off') % label)
 
 
 class ControlServer:
@@ -88,6 +107,11 @@ class ControlServer:
     SHOW_BY_LIVE = {}                     # the live name -> the custom show word (the report routing)
     OPTION_BY_LIVE = {}                   # the live name -> the Option row (the bounds, the secrets)
     SHOW_OPTIONS = ()                     # the registry's show section (the bare-show pool)
+    AUDIT_PREFIX = None                   # the audit trail's chain prefix ('CACHE') — the subclass sets
+    AUDIT_APP = None                      # the audit trail's app voice ('modbus-cache')
+    CONTROL_PORT_DEFAULT = None           # the ctl socket's default port (the subclass's statics)
+    CONTROL_SOCKET_TEMPLATE = None        # the ctl unix-socket path template
+    LOG_LEVELS = ()                       # the log-level words (the subclass's static.json list)
 
     def __init__(self, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None,
@@ -98,6 +122,7 @@ class ControlServer:
         self.token = token               # the TCP auth token (the admin role); None = no auth (the unix = the perms)
         self.ops_token = ops_token       # the read-only ops token (the ops role); None = off
         self.ops_verbs = frozenset(v.lower() for v in (ops_verbs or OPS_VERBS))   # the ops role's RBAC policy
+        self.audit_params = {}           # the audit family's live swaps rebuild from these (the subclass re-homes)
         self.config_path = config_path   # the config script the daemon started from — the reload state lives beside it
         self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
         self.dump_path = dump_path or None   # the state dump file (the dump family)
@@ -468,7 +493,7 @@ class ControlServer:
         cmd = cmd.strip()
         low = cmd.lower()
         if not low:
-            return 'err empty command'
+            return 'err ' + T('wire.empty_command')
         if low.split()[0] in ('help', '?') and low != '?':
             args = cmd.split()[1:]
             if args and args[0].lower() == 'config':
@@ -484,12 +509,12 @@ class ControlServer:
             key, rest = match_setting_path(args, self.SETTINGS)
             if key is not None and not rest:
                 if key == 'dump-interval' and not self.dump_path:
-                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
+                    return 'err ' + T('wire.dump_interval_needs_path')
                 return 'ok %s' % self._describe(key)
             if path in self.NODE_BY_NAME:
                 return 'ok %s' % describe_node(self.OPTIONS, path)
             if args:
-                return 'err unknown command or setting %s (try ?)' % ' '.join(args)
+                return 'err ' + (T('wire.unknown_help_topic') % ' '.join(args))
             return 'ok ' + self.command_help()
         if low == '?':
             return 'ok ' + self.command_help()
@@ -500,18 +525,18 @@ class ControlServer:
         if cmd.startswith('unset'):
             args = cmd.split()[1:]
             if not args:
-                return 'err unset needs a setting (try help)'
+                return 'err ' + T('wire.unset_needs_setting')
             key, rest = match_setting_path(args, self.SET_BY_NAME)   # the knobs: the show reports have nothing to unset
             s = self.SET_BY_NAME.get(key) if key is not None else None
             if s is not None and not rest and s.restart:
                 if s.secret:   # a secret never rides the reload state — the wire refuses it
-                    return 'err restart required (startup-only knob)'
+                    return 'err ' + T('wire.restart_required')
                 self.defaults[key] = self.baseline.get(key, self.defaults.get(key))
                 self.overridden.discard(key)
                 self.LOG.info('control: unset %s (the restart re-applies the configured value)', key)
-                return 'note restart required (startup-only knob)'
+                return 'note ' + T('wire.restart_required')
             if key is None or rest or key not in self.defaults:
-                return 'err unknown setting %s (try help)' % ' '.join(args)
+                return 'err ' + (T('wire.unknown_setting') % ' '.join(args))
             try:
                 shown = self._apply(key, self.defaults[key])
             except ValueError as e:
@@ -522,21 +547,21 @@ class ControlServer:
         if cmd.startswith('set'):
             args = cmd.split()[1:]
             if len(args) < 2:
-                return 'err set needs a setting and a value (try help)'
+                return 'err ' + T('wire.set_needs_value')
             special = self.command_set_special(args)   # the tool's own set words (the fake's Modbus writes)
             if special is not None:
                 return special
             key, rest = match_setting_path(args, self.SET_BY_NAME)   # the knobs: the show reports are not settable (and a show path never shadows a knob value)
             if key is None:
-                return 'err unknown setting %s (try help)' % ' '.join(args)
+                return 'err ' + (T('wire.unknown_setting') % ' '.join(args))
             if not rest:
-                return 'err set needs a setting and a value (try help)'
+                return 'err ' + T('wire.set_needs_value')
             s = self.SET_BY_NAME.get(key)
             if s is not None and s.restart and s.secret:
-                return 'err restart required (startup-only knob)'   # a secret cannot ride the reload state
+                return 'err ' + T('wire.restart_required')   # a secret cannot ride the reload state
             value = ' '.join(rest)
             if value == SECRET_REMOVED and getattr(s, 'secret', False):
-                return 'err *** SECRET REMOVED *** is not a value — pass the secret by flag/env, or as file:<path>'
+                return 'err ' + T('wire.secret_not_value')
             try:
                 shown = self._apply(key, value)
             except ValueError as e:
@@ -568,15 +593,15 @@ class ControlServer:
             if key is not None and not rest:
                 opt = self.OPTION_BY_LIVE.get(key)
                 if opt is not None and opt.secret:
-                    return 'err %s is a secret — it never shows (pass it by flag/env, or as file:<path>)' % key
+                    return 'err ' + (T('wire.secret_never_shows') % key)
                 word = self.SHOW_BY_LIVE.get(key)
                 if word:
                     return self.command('show ' + word)   # a show command's report, by its word
                 if key == 'dump-interval' and not self.dump_path:
-                    return 'err dump-interval needs a dump path (set dump/path or --dump-path)'
+                    return 'err ' + T('wire.dump_interval_needs_path')
                 return 'ok %s=%s' % (key, self._get(key))
             if key is not None and rest:
-                return 'err %s: unexpected %s' % (key, ' '.join(rest))
+                return 'err ' + (T('wire.unexpected_tail') % (key, ' '.join(rest)))
             node_path = '/'.join(w.lower() for w in args)   # the walk the ? offers: every word of the path answers
             if node_path in self.NODE_BY_NAME:
                 return 'ok %s' % describe_node(self.OPTIONS, node_path)
@@ -590,7 +615,7 @@ class ControlServer:
             return tool
         if low == 'request reload-config' and self.RELOAD_CONFIG:
             if not self.reloader:
-                return 'err no reloader configured'
+                return 'err ' + T('wire.no_reloader')
             try:
                 return 'ok reloaded (%s)' % self.reloader()
             except (Exception, SystemExit) as e:   # the resolvers fail SystemExit — keep-last-good, answer the wire
@@ -627,7 +652,7 @@ class ControlServer:
         branches (the family's `err unknown command` on a stray extra
         word); a reply ends the walk (the fake reports the whole path)."""
         if len(args) == 1:
-            return 'err unknown setting %s (try help)' % args[0].lower()
+            return 'err ' + (T('wire.unknown_setting') % args[0].lower())
         return None
 
     def command_tool(self, low, cmd):
@@ -639,7 +664,250 @@ class ControlServer:
     def unknown_command(self, cmd):
         """The final err: the family spells the whole command %r-quoted
         (the fake's first-word %s walk keeps its own)."""
-        return 'err unknown command %r (try help)' % cmd
+        return 'err ' + (T('wire.unknown_command') % cmd)
+
+    # --- the family's shared live knobs (one body, four tools) ---
+    #
+    # The control/audit/dump/log-level branches the four tools carried as
+    # near-copies ride here; only the show-config state write differs (the
+    # cache's resolved-config dict, the scraper's locked cfg, the
+    # dashboard's startup values, the fake's argv view — record_cfg). The
+    # tools' _apply route: the restart preamble, then apply_family_key,
+    # then the tool's own branches; _get mirrors through get_family_key.
+
+    def record_cfg(self, updates):
+        """The show-config state write (the live truth show config renders —
+        the show-config-writeback contract): the subclass points this at its
+        resolved-config home. The default drops (the fake's show config is
+        the argv that would restart it — the live values are runtime state,
+        not there)."""
+        return
+
+    def _rebuild_audit(self):
+        """Swap the audit trail for one rebuilt from the params (the live
+        path/rotation/forward changes rebuild from it — rebuild_audit
+        re-chains from the file's own tail, the chain verifiable across the
+        swap). The old trail is NOT closed — a session still holding it
+        writes its last commands there, and an in-flight writer must never
+        hit a closed file. Returns the display line: the trail's path,
+        'remote' for the collector-only mode, 'off'."""
+        self.audit = self.rebuild_audit(self.audit_params, self.AUDIT_PREFIX, self.AUDIT_APP)
+        if self.audit is None or self.audit.disabled:
+            return 'off'
+        return 'remote' if self.audit.path == 'none' else self.audit.path
+
+    def apply_restart_key(self, key, val):
+        """The restart preamble's shared block: the startup-only knobs every
+        tool carries. Returns (True, shown) when key is one of them,
+        (False, None) for the tool's own preamble keys (the listen/upstream
+        probes differ per tool)."""
+        if key == 'dump/restore-on-start':
+            if val not in ON_OFF_WORDS:
+                raise ValueError(T('wire.restore_on_start_invalid'))
+            self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
+            return True, self.defaults[key]
+        return False, None
+
+    def apply_audit_key(self, key, val):
+        """The audit family's live swaps (the log-file, the rotation, the
+        forward pair, the kill switch): the params dict updates, the state
+        records, the trail rebuilds. Returns (True, shown) / (False, None).
+        The log-file spelling is raw — a path, '-' (= stdout) or empty (the
+        XDG state home; AuditLog owns both readings)."""
+        if key == 'audit/log-file':
+            if val == 'none' and self.audit_params.get('forward'):
+                # remote-only: the collector is the sole holder (the chain
+                # reseeds at GENESIS on the next restart)
+                self.audit_params['path'] = 'none'
+                self.audit_params['disabled'] = False
+                self.record_cfg({'audit_log': 'none', 'no_audit_log': False})
+                return True, self._rebuild_audit()
+            if val in ('off', 'none'):
+                # the full off — none without a forward folds to it (the
+                # same state --no-audit-log spells)
+                self.audit_params['disabled'] = True
+                updates = {'no_audit_log': True}
+                if val == 'none':
+                    updates['audit_log'] = 'none'
+                self.record_cfg(updates)
+                return True, self._rebuild_audit()
+            self.audit_params['path'] = val
+            self.audit_params['disabled'] = False
+            self.record_cfg({'audit_log': val, 'no_audit_log': False})
+            return True, self._rebuild_audit()
+        if key == 'audit/rotate/max-size':
+            v = num(val, 'max-size', 'MB')
+            self._gate_range(key, v, 'MB')
+            self.audit_params['max_mb'] = v
+            self.record_cfg({'audit_max_mb': v})
+            return True, '%g' % v
+        if key == 'audit/rotate/daily':
+            on = on_off(val, 'audit/rotate/daily')
+            self.audit_params['daily'] = on
+            self.record_cfg({'audit_daily': on})
+            return True, 'on' if on else 'off'
+        if key == 'audit/rotate/files':
+            v = numi(val, 'files', 'backups')
+            self._gate_range(key, v, 'backups')
+            self.audit_params['files'] = v
+            self.record_cfg({'audit_files': v})
+            return True, '%d' % v
+        if key == 'audit/forward':
+            try:
+                parse_forward(val)
+            except ValueError:
+                raise ValueError(T('wire.audit_forward_grammar') % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
+            self.audit_params['forward'] = None if val in ('', 'none') else val
+            self.record_cfg({'audit_forward': val})
+            return True, val
+        if key == 'audit/forward-format':
+            if val not in AUDIT_FORWARD_FORMATS:
+                raise ValueError(T('wire.audit_forward_format_invalid') % ', '.join(AUDIT_FORWARD_FORMATS))
+            self.audit_params['forward_format'] = val
+            self.record_cfg({'audit_forward_format': val})
+            return True, val
+        if key == 'audit/disable':
+            on = on_off(val, 'audit/disable')
+            self.audit_params['disabled'] = on
+            self.record_cfg({'no_audit_log': on})
+            return True, 'on' if on else 'off'
+        return False, None
+
+    def apply_family_key(self, key, val, raw=None):
+        """The family's shared live knobs: the control plane (the port
+        rebind, the ops policy, the trusted peers, the socket group), the
+        audit family, the log level, the local-time formatter swap and the
+        dump pair. `val` is the tool-normalized value (the off/on words
+        compare against it), `raw` the case-kept stripped spelling (a unix
+        path or a dump file keeps its case). Returns (True, shown) when
+        key is one of them, (False, None) for the tool's own branches."""
+        raw = val if raw is None else raw
+        if key == 'control/port':
+            try:
+                target = parse_control_target(raw, self.CONTROL_PORT_DEFAULT, self.CONTROL_SOCKET_TEMPLATE)
+            except SystemExit as e:
+                raise ValueError(str(e))
+            if val in ('off', 'none', '0'):
+                target = None
+            if target is not None and not self.stopped and self._is_target(target):
+                return True, self.describe()   # the same target: nothing to rebind
+            self.refuse_tokenless_rebind(target)
+            shown = self._rebind_control(target)
+            self.record_cfg({'control_port': '0' if target is None else str(target)})
+            return True, shown
+        if key == 'control/ops/verbs':
+            verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
+            known = known_verbs(self.COMMANDS)   # the registry is the one home of the vocabulary
+            unknown = sorted(v for v in verbs if v not in known)
+            if not verbs or unknown:
+                raise ValueError(T('wire.ops_policy_invalid')
+                                 % ('' if not unknown else ' (unknown: %s)' % ', '.join(unknown),
+                                    ', '.join(sorted(known))))
+            self.ops_verbs = verbs
+            self.record_cfg({'control_ops_verbs': ','.join(sorted(verbs))})
+            return True, ','.join(sorted(verbs))
+        if key == 'control/trust-uids':
+            try:
+                uids = parse_trust_uids('none' if val == 'off' else val, 'control/trust-uids')
+            except SystemExit as e:
+                raise ValueError(str(e))
+            self.trust_uids = uids or frozenset()
+            self.record_cfg({'control_trust_uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'})
+            return True, ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
+        if key == 'control/socket-group':
+            on = on_off(val, 'control/socket-group')
+            self.socket_group = on
+            self.record_cfg({'control_socket_group': on})
+            if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
+                os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
+            return True, 'on' if on else 'off'
+        if key == 'log-level':
+            lvl = val.upper()
+            if lvl not in self.LOG_LEVELS:
+                raise ValueError(T('wire.log_level_invalid') % ', '.join(self.LOG_LEVELS))
+            logging.getLogger().setLevel(getattr(logging, lvl))
+            self.record_cfg({'level': lvl})
+            return True, lvl
+        if key == 'local-time':
+            if val not in ON_OFF_WORDS:
+                raise ValueError(T('wire.local_time_invalid'))
+            on = val in ('on', 'true', '1', 'yes')
+            swapped = 0
+            for h in logging.getLogger().handlers:
+                f = h.formatter
+                if f is None or not getattr(f, '_fmt', None):
+                    continue
+                h.setFormatter(logging.Formatter(f._fmt) if on else UtcFormatter(f._fmt))
+                swapped += 1
+            if not swapped:
+                raise ValueError(T('wire.log_handler_missing'))
+            self.record_cfg({'local_time': on})
+            return True, 'on' if on else 'off'
+        if key == 'dump/path':
+            if val in ('off', 'none', ''):
+                self.dump_path = None
+                self.record_cfg({'dump_path': ''})
+                return True, 'off'
+            self.dump_path = raw   # request dump and the graceful shutdown write it from here on
+            self.record_cfg({'dump_path': raw})
+            # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
+            return True, raw if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % raw
+        if key == 'dump-interval':
+            if not self.dump_path:
+                raise ValueError(T('wire.dump_interval_needs_path'))
+            if val in ('off', 'none', '0'):
+                self.dump_interval = 0
+                self.record_cfg({'dump_interval': 0})
+                self.dump_wake.set()
+                return True, 'off'
+            v = num(val, 'dump-interval', 'seconds or off')
+            self._gate_range(key, v, 'seconds')
+            self.dump_interval = v
+            self.record_cfg({'dump_interval': v})
+            self.dump_wake.set()
+            return True, secs(v)
+        return self.apply_audit_key(key, val)
+
+    def get_family_key(self, key):
+        """The `_get` view of the family's shared knobs (get_family_key's
+        apply-side sibling). Returns (True, value) / (False, None)."""
+        if key == 'control/port':
+            return True, ('off' if self.stopped else self.describe())
+        if key == 'control/ops/verbs':
+            return True, (','.join(sorted(self.ops_verbs)) or 'off')
+        if key == 'control/trust-uids':
+            return True, (','.join(str(u) for u in sorted(self.trust_uids)) or 'off')
+        if key == 'control/socket-group':
+            return True, ('on' if self.socket_group else 'off')
+        if key == 'log-level':
+            return True, logging.getLevelName(logging.getLogger().getEffectiveLevel())
+        if key == 'local-time':
+            for h in logging.getLogger().handlers:
+                f = h.formatter
+                if f is not None and getattr(f, '_fmt', None):
+                    return True, ('off' if isinstance(f, UtcFormatter) else 'on')
+            return True, 'off'
+        if key == 'dump/path':
+            return True, (self.dump_path or 'off')
+        if key == 'dump-interval':
+            return True, ('off' if not self.dump_interval else secs(self.dump_interval))
+        if key == 'audit/log-file':
+            if self.audit is None or self.audit.disabled:
+                return True, 'off'
+            return True, ('remote' if self.audit.path == 'none' else self.audit.path)
+        if key == 'audit/forward':
+            return True, (self.audit_params.get('forward') or 'none')
+        if key == 'audit/forward-format':
+            return True, (self.audit_params.get('forward_format') or 'rfc5424')
+        if key == 'audit/rotate/max-size':
+            return True, ('%g' % self.audit_params['max_mb'])
+        if key == 'audit/rotate/daily':
+            return True, ('on' if self.audit_params['daily'] else 'off')
+        if key == 'audit/rotate/files':
+            return True, ('%d' % self.audit_params['files'])
+        if key == 'audit/disable':
+            return True, ('on' if self.audit_params['disabled'] else 'off')
+        return False, None
 
     def show_config(self):
         """The effective configuration as a set-grammar script (modbus-cache's

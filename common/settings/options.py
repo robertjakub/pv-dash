@@ -468,6 +468,42 @@ def load_registry(here, choices=None, static_defaults=None):
         option_rows(meta['options'], static_defaults=static_defaults, choices=choices or {})
 
 
+CONSOLE_VERBS = frozenset(('exit', 'logout'))
+"""The console's local spellings of quit — common/wire/cli.py closes the
+session before the wire sees them, so the RBAC vocabulary (the verbs the
+SERVER can decide on) excludes them; the registry rows document them for
+the ? listing only."""
+
+
+def known_verbs(commands):
+    """The RBAC vocabulary, derived from the registry's command rows — the
+    one home (the drift doc's "derived, not hand-maintained" item): a row's
+    `live` path names its verb as the first segment past a leading
+    `request` (command_verb's rule: `request/clear/cache` decides on
+    `clear`), a row without one IS the verb (`set`, `poll`, the fake's
+    `reset`). The node rows never join (parse_registry_sections skips
+    them — a namespace is grammar, not authority); the hidden/internal
+    rows count (the display flags do not gate the vocabulary); the
+    console-eaten verbs ride out (CONSOLE_VERBS — the wire never decides
+    on them). Sorted tuple, stable across the surfaces that render it."""
+    verbs = set()
+    for w in commands:
+        segs = w.split('/')
+        if segs[0] == 'request':
+            segs = segs[1:]
+        if segs and segs[0] not in CONSOLE_VERBS:
+            verbs.add(segs[0])
+    return tuple(sorted(verbs))
+
+
+def default_ops_verbs(verbs):
+    """The read-only shift's default policy, derived from the same rows:
+    `show` everywhere, `clear` only where the grammar actually speaks it
+    (the old family-wide `show,clear` accepted a verb three tools' wires
+    refuse — the policy the registry could not back)."""
+    return 'show,clear' if 'clear' in verbs else 'show'
+
+
 def parse_registry_sections(meta):
     """The registry's `show` and `commands` sections -> the control-grammar
     vocabulary, one parse for the family's four loaders (the rows live in

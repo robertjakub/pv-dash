@@ -51,7 +51,7 @@ from common.runtime.version import version_string
 from lib.chaos import Chaos
 from lib.config import resolve_args
 from lib.control import ControlServer
-from lib.options import KNOWN_VERBS, OPTIONS
+from lib.options import DEFAULT_OPS_VERBS, KNOWN_VERBS, OPTIONS
 from lib.inverter import FakeInverter
 from lib.profile import load_profile, profile_label, resolve_profile
 from lib.statics import CONTROL_SOCKET_TEMPLATE, PEAK_RATIO, TIME_SCALE_MAX
@@ -264,7 +264,7 @@ def main():
         logger.error('the ops token must differ from the admin token (the same secret would hand '
                      'every holder the role the server picks first)')
         raise SystemExit(1)
-    ops_verbs = parse_ops_verbs(args.control_ops_verbs, KNOWN_VERBS, rc=1)
+    ops_verbs = parse_ops_verbs(args.control_ops_verbs, KNOWN_VERBS, rc=1, default=DEFAULT_OPS_VERBS)
     trust_uids = parse_trust_uids(args.control_trust_uids,
                                   'control-trust-uids')
     metrics_token = parse_secret(args.metrics_token, 'metrics/token')

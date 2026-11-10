@@ -45,6 +45,7 @@
   "unknown_setting": "unknown setting %s (try help)",
   "unknown_setting_bare": "unknown setting %s",
   "unknown_command": "unknown command %r (try help)",
+  "unknown_command_first": "unknown command %s (try help)",
   "unexpected_tail": "%s: unexpected %s",
   "no_reloader": "no reloader configured",
   "dump_interval_needs_path": "dump-interval needs a dump path (set dump/path or --dump-path)",

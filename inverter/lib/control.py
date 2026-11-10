@@ -21,21 +21,20 @@ import sys
 import threading
 import time
 
-from common.settings.config import acl_table, acl_text, acl_value_text, parse_acl, parse_auth_type, parse_control_target, \
+from common.settings.config import acl_table, acl_text, acl_value_text, parse_acl, parse_auth_type, \
     parse_listen, resolve_metrics_acl
-from common.wire.cred import parse_trust_uids
 from common.render.human import secs
 from common.modbus import AUTH_MIN_KEY
 from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, OPS_VERBS, command_verb, role_allows, role_tag
-from common.wire.control import ControlServer as _ControlServer, num
+from common.wire.control import ControlServer as _ControlServer, num, on_off
 from .metrics import MetricsServer, describe_metrics
 from .profile import load_profile, profile_label, resolve_profile
 from .signals import parse_time
 from common.settings.dump import SECRET_REMOVED, dump_filter
-from common.runtime.audit import AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward
 from common.runtime.version import version_string
+from common.render.texts import T
 from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, \
-    SHOW_OPTIONS, NODE_BY_NAME, KNOWN_VERBS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
+    SHOW_OPTIONS, NODE_BY_NAME, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
 from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, \
     LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
@@ -136,6 +135,11 @@ class ControlServer(_ControlServer):
     APPLY_FIRST = ('scenario',)   # a preset release is the state the pins were pinned after — pins land on top
     TOKENLESS_TCP = 'allow'   # the F11 test-tool posture: a tokenless TCP control bind is fine here (the family refuses — F5)
     APP = 'fake-inverter'
+    AUDIT_PREFIX = 'INV'
+    AUDIT_APP = 'fake-inverter'
+    CONTROL_PORT_DEFAULT = DEFAULT_LISTEN_PORT
+    CONTROL_SOCKET_TEMPLATE = CONTROL_SOCKET_TEMPLATE
+    LOG_LEVELS = LOG_LEVELS
     COMMANDS = COMMANDS
     COMMAND_HELP = COMMAND_HELP
     COMMAND_GROUPS = COMMAND_GROUPS
@@ -184,12 +188,10 @@ class ControlServer(_ControlServer):
         rs = SETTING_BY_NAME.get(key)
         if rs is not None and rs.restart:   # a startup-only knob: validate + record the pending value (the restart applies it)
             if rs.secret:
-                raise ValueError('restart required (startup-only knob)')
-            if key == 'dump/restore-on-start':
-                if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
-                    raise ValueError('dump/restore-on-start must be on or off')
-                self.defaults[key] = 'on' if val in ('on', 'true', '1', 'yes') else 'off'
-                return self.defaults[key]
+                raise ValueError(T('wire.restart_required'))
+            handled, shown = self.apply_restart_key(key, val)
+            if handled:
+                return shown
             if key == 'system/listen':
                 try:
                     t = parse_listen(val)
@@ -197,7 +199,11 @@ class ControlServer(_ControlServer):
                     raise ValueError(str(e))
                 self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
-            raise ValueError('unknown setting %s' % key)
+            raise ValueError(T('wire.unknown_setting_bare') % key)
+
+        handled, shown = self.apply_family_key(key, val, raw=value.strip())   # the family's shared knobs
+        if handled:   # (the record hook drops — the fake's show config is the argv view)
+            return shown
         auto = val in ('auto', 'off', 'none', 'clear', 'live')
         if key in ('pv', 'load', 'batt', 'grid', 'soc', 'cloud'):
             if key == 'cloud' and val in CLOUD_MACHINES:
@@ -324,13 +330,8 @@ class ControlServer(_ControlServer):
         if key == 'write/allow':
             if not fake:
                 raise ValueError('no modbus device attached')
-            if val in ('on', 'true', '1', 'yes'):
-                fake.allow_write = True
-                return 'on'
-            if val in ('off', 'false', '0', 'no'):
-                fake.allow_write = False
-                return 'off'
-            raise ValueError('write/allow must be on or off')
+            fake.allow_write = on_off(val, 'write/allow')
+            return 'on' if fake.allow_write else 'off'
         if key == 'modbus/auth':
             if not fake:
                 raise ValueError('no modbus device attached')
@@ -339,8 +340,7 @@ class ControlServer(_ControlServer):
             except SystemExit as e:
                 raise ValueError(str(e))
             if v and not fake.auth_key:
-                raise ValueError('the suite auth needs a key: pass auth-key by flag/env/config '
-                                 '(min %d characters) and restart' % AUTH_MIN_KEY)
+                raise ValueError(T('wire.suite_auth_needs_key') % AUTH_MIN_KEY)
             fake.auth = v   # the next connection handshakes; the standing ones keep their session
             return v or 'none'
         if key == 'metrics/enable':
@@ -387,30 +387,6 @@ class ControlServer(_ControlServer):
                 raise ValueError('log level must be one of %s' % ', '.join(LOG_LEVELS))
             logging.getLogger('fake-inverter').setLevel(level)
             return level
-        if key == 'audit/rotate/daily':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('audit/rotate/daily must be on or off')
-            self.audit_params['daily'] = on
-            self._rebuild_audit()
-            return 'on' if on else 'off'
-        if key == 'audit/forward':
-            try:
-                parse_forward(val)
-            except ValueError:
-                raise ValueError('audit/forward must be %s' % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
-            self.audit_params['forward'] = None if val in ('', 'none') else val
-            fresh = self._rebuild_audit()
-            return val if val == 'none' else (fresh or 'syslog')
-        if key == 'audit/forward-format':
-            if val not in AUDIT_FORWARD_FORMATS:
-                raise ValueError('audit/forward-format must be one of %s' % ', '.join(AUDIT_FORWARD_FORMATS))
-            self.audit_params['forward_format'] = val
-            self._rebuild_audit()
-            return val
         if key == 'scenario':
             if val == 'custom':
                 sim.freeze(None)
@@ -425,44 +401,6 @@ class ControlServer(_ControlServer):
                 sim.override(k, None)
             self.scenario = val
             return val
-        if key == 'control/port':
-            try:
-                target = parse_control_target(value.strip(), DEFAULT_LISTEN_PORT, CONTROL_SOCKET_TEMPLATE)
-            except SystemExit as e:
-                raise ValueError(str(e))
-            if val in ('off', 'none', '0'):
-                target = None
-            if target is not None and not self.stopped and self._is_target(target):
-                return self.describe()   # the same target: nothing to rebind
-            self.refuse_tokenless_rebind(target)   # no-op here: the fake allows tokenless TCP (F11)
-            return self._rebind_control(target)
-        if key == 'control/ops/verbs':
-            verbs = frozenset(v.strip().lower() for v in val.split(',') if v.strip())
-            unknown = sorted(v for v in verbs if v not in KNOWN_VERBS)
-            if not verbs or unknown:
-                raise ValueError('the ops policy needs at least one verb the grammar speaks%s: %s'
-                                 % ('' if not unknown else ' (unknown: %s)' % ', '.join(unknown),
-                                    ', '.join(sorted(KNOWN_VERBS))))
-            self.ops_verbs = verbs
-            return ','.join(sorted(verbs))
-        if key == 'control/trust-uids':
-            try:
-                uids = parse_trust_uids('none' if val == 'off' else val, 'control/trust-uids')
-            except SystemExit as e:
-                raise ValueError(str(e))
-            self.trust_uids = uids or frozenset()
-            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
-        if key == 'control/socket-group':
-            if val in ('on', 'true', '1', 'yes'):
-                on = True
-            elif val in ('off', 'false', '0', 'no'):
-                on = False
-            else:
-                raise ValueError('control/socket-group must be on or off')
-            self.socket_group = on
-            if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
-                os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
-            return 'on' if on else 'off'
         if key == 'metrics/acl':
             if not fake:
                 raise ValueError('no modbus device attached')
@@ -483,26 +421,7 @@ class ControlServer(_ControlServer):
             if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % warn
             return shown
-        if key == 'dump-interval':
-            if not self.dump_path:
-                raise ValueError('dump-interval needs a dump path (set dump/path or --dump-path)')
-            if val in ('off', 'none', '0'):
-                self.dump_interval = 0
-                self.dump_wake.set()
-                return 'off'
-            v = num(val, 'dump-interval', 'seconds or off')
-            self._gate_range(key, v, 'seconds')
-            self.dump_interval = v
-            self.dump_wake.set()
-            return secs(v)
-        if key == 'dump/path':
-            if val in ('off', 'none', ''):   # the words lower fine; a path keeps its case
-                self.dump_path = None
-                return 'off'
-            self.dump_path = value   # request dump and the graceful shutdown write it from here on
-            # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
-            return value if self.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % value
-        raise ValueError('unknown setting %s' % key)
+        raise ValueError(T('wire.unknown_setting_bare') % key)
 
     def _parse_hour(self, text):
         try:
@@ -512,6 +431,9 @@ class ControlServer(_ControlServer):
 
     def _get(self, key):
         sim, ov, fake, chaos = self.simulator, self.simulator.overrides(), self.fake, self.chaos
+        handled, value = self.get_family_key(key)   # the family's shared knobs (the control plane,
+        if handled:                                 # the audit family, local-time, the dump pair)
+            return value
         if key in ('pv', 'load', 'batt', 'grid', 'soc'):
             if ov[key] is None:
                 return 'auto'
@@ -550,12 +472,6 @@ class ControlServer(_ControlServer):
             return str(fake.max_clients) if fake else '?'
         if key == 'max-conn-per-ip':
             return str(fake.conn_gate.max_per_ip) if fake else '?'
-        if key == 'audit/rotate/daily':
-            return 'on' if self.audit_params['daily'] else 'off'
-        if key == 'audit/forward':
-            return self.audit_params.get('forward') or 'none'
-        if key == 'audit/forward-format':
-            return self.audit_params.get('forward_format') or 'rfc5424'
         if key == 'connect-acl':
             return acl_text(fake.connect_acl) if fake else '?'
         if key == 'write/allow':
@@ -570,20 +486,8 @@ class ControlServer(_ControlServer):
             return '%s (%s)' % (sim.profile.description, profile_label(sim.profile.path))
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel())
-        if key == 'control/port':
-            return 'off' if self.stopped else self.describe()
-        if key == 'control/ops/verbs':
-            return ','.join(sorted(self.ops_verbs)) or 'off'
-        if key == 'control/trust-uids':
-            return ','.join(str(u) for u in sorted(self.trust_uids)) or 'off'
-        if key == 'control/socket-group':
-            return 'on' if self.socket_group else 'off'
         if key == 'metrics/acl':
             return acl_value_text(fake.metrics_acl) if fake else '?'
-        if key == 'dump/path':
-            return self.dump_path or 'off'
-        if key == 'dump-interval':
-            return 'off' if not self.dump_interval else secs(self.dump_interval)
         if key == 'scenario':
             return self.scenario or 'custom'
         s = SETTING_BY_NAME.get(key)
@@ -592,16 +496,13 @@ class ControlServer(_ControlServer):
         return '?'
 
     def _rebuild_audit(self):
-        """Swap the INV audit trail for one rebuilt from the params (the
-        shared rebuild re-chains from the file's own tail): BOTH writers
-        swap — the control's own (the COMMAND events) and the fake's (the
-        WRITE / WRITE-REFUSED events). The old trail is NOT closed — a
-        session still holding it writes its last commands there."""
-        fresh = self.rebuild_audit(self.audit_params, 'INV', 'fake-inverter')
-        self.audit = fresh
+        """The family rebuild, mirrored onto the fake's writer (the WRITE /
+        WRITE-REFUSED events audit there, the control's COMMAND events
+        here)."""
+        shown = super()._rebuild_audit()
         if self.fake is not None:
-            self.fake.audit = fresh
-        return fresh.path if fresh else 'off'
+            self.fake.audit = self.audit
+        return shown
 
     def acl_table_report(self):
         """The metrics/acl/table show report (the show-only view of the
@@ -690,12 +591,12 @@ class ControlServer(_ControlServer):
     def show_walk_tail(self, args):
         """The fake's walk tail reports the whole path (the family's
         one-word tail keeps the stray-word fall-through)."""
-        return 'err unknown setting %s (try help)' % ' '.join(args)
+        return 'err ' + (T('wire.unknown_setting') % ' '.join(args))
 
     def unknown_command(self, cmd):
         """The fake's unknown errs on the first word, unquoted (the
         family's whole-command %r keeps its own)."""
-        return 'err unknown command %s (try help)' % cmd.split()[0].lower()
+        return 'err ' + (T('wire.unknown_command_first') % cmd.split()[0].lower())
 
     def registers_report(self):
         """The registers table (show registers): name | register | type |

@@ -33,7 +33,7 @@ wire is named in the log and the audit trail (all standard FCs, FC1
 through FC43). A synthesized diagnostics block at registers
 65000\\(en65003 lets clients tell cached data from live data.
 .PP
-Modbus auth (\\fB--auth\\fR): with \\fBsuite\\fR the cache's own clients
+Modbus auth (\\fB--modbus-auth\\fR): with \\fBsuite\\fR the cache's own clients
 prove a shared key (\\fB--auth-key\\fR, min 16 characters) with a crypt
 handshake right after every connect \\(em 52 bytes: magic, fresh nonce,
 HMAC\\-SHA256 proof; the cache answers \\fBOK\\fR (plain Modbus follows)

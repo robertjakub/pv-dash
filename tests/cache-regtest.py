@@ -2408,13 +2408,13 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     AUTH_FAKE, AUTH_PORT, AUTH_CTL = 15561, 15562, 15563
     CL_KEY, UP_KEY = 'cl-suite-key-16chars!', 'up-suite-key-16chars!'
     start([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (AUTH_FAKE), '--control-port', '0',
-           '--auth', 'suite', '--auth-key', UP_KEY])
+           '--modbus-auth', 'suite', '--auth-key', UP_KEY])
     time.sleep(0.7)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
            '--listen', '127.0.0.1:%d' % AUTH_PORT, '--profile', R,
            '--timeout', '1', '--interval', '2',
            '--control-port', str(AUTH_CTL), '--control-token', 'ctok-a',
-           '--auth', 'suite', '--auth-key', CL_KEY,
+           '--modbus-auth', 'suite', '--auth-key', CL_KEY,
            '--auth-upstream', 'suite', '--auth-upstream-key', UP_KEY],
           log='/tmp/reg_auth_cache.log')
     time.sleep(1.2)
@@ -2506,17 +2506,17 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('suite auth: the upstream poll recovers under the re-enabled scheme', '(FAILING)' not in r, r[-200:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
                         '--listen', '127.0.0.1:%d' % AUTH_PORT, '--dry-run',
-                        '--auth', 'bogus'], capture_output=True, text=True, timeout=15)
+                        '--modbus-auth', 'bogus'], capture_output=True, text=True, timeout=15)
     check('suite auth: a bogus scheme fails the config fast',
           r.returncode != 0 and "use 'suite'" in r.stderr, r.stderr[-160:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
                         '--listen', '127.0.0.1:%d' % AUTH_PORT, '--dry-run',
-                        '--auth', 'suite'], capture_output=True, text=True, timeout=15)
+                        '--modbus-auth', 'suite'], capture_output=True, text=True, timeout=15)
     check('suite auth: suite without a key fails the config fast',
           r.returncode != 0 and 'needs a key' in r.stderr, r.stderr[-160:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
                         '--listen', '127.0.0.1:%d' % AUTH_PORT, '--dry-run',
-                        '--auth', 'suite', '--auth-key', 'short'], capture_output=True, text=True, timeout=15)
+                        '--modbus-auth', 'suite', '--auth-key', 'short'], capture_output=True, text=True, timeout=15)
     check('suite auth: a short key fails the config fast',
           r.returncode != 0 and 'at least 16 characters' in r.stderr, r.stderr[-160:])
 
@@ -2743,7 +2743,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           r.returncode != 0 and "use 'suite' / 'waveshare'" in r.stderr, r.stderr[-160:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
                         '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
-                        '--auth', 'waveshare', '--auth-key', 'x' * 16],
+                        '--modbus-auth', 'waveshare', '--auth-key', 'x' * 16],
                        capture_output=True, text=True, timeout=15)
     check('waveshare auth: waveshare on the client leg fails the config fast (upstream only)',
           r.returncode != 0 and "use 'suite'" in r.stderr, r.stderr[-160:])

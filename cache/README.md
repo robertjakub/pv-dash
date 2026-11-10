@@ -351,7 +351,7 @@ client that cannot prove the key never sees a frame).
 
 The two legs are configured separately, with separate keys:
 
-- **`--auth` / `--auth-key`** — the auth the cache's *own clients* must
+- **`--modbus-auth` / `--auth-key`** — the auth the cache's *own clients* must
   speak on the listen port. `none` (the default) = no auth at all.
 - **`--auth-upstream` / `--auth-upstream-key`** — the auth the cache
   *presents* to the upstream inverter: `suite` handshakes after every

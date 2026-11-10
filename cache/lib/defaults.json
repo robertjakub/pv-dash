@@ -13,6 +13,7 @@
     "interval_s": 10.0,
     "read_delay_s": 0.05,
     "merge_gap": 8,
+    "modbus_auth": "none",
     "auth_upstream": "none",
     "cache_ttl": 30.0,
     "write_registers": "none",

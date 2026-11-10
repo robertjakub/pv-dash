@@ -29,7 +29,7 @@ let
     (setLine "upstream" cfg.upstream)
     (setLine "unit" (toString cfg.unitId))
     (setLine "timeout" (toString cfg.timeout))
-    (lib.optionals (cfg.auth != null) [ (setLine "auth" cfg.auth) ])
+    (lib.optionals (cfg.modbusAuth != null) [ (setLine "modbus-auth" cfg.modbusAuth) ])
     (lib.optionals (cfg.authKey != null) [ (setLine "auth-key" cfg.authKey) ])
     (lib.optionals (cfg.authUpstream != null) [ (setLine "auth-upstream" cfg.authUpstream) ])
     (lib.optionals (cfg.authUpstreamKey != null) [ (setLine "auth-upstream-key" cfg.authUpstreamKey) ])
@@ -143,7 +143,7 @@ in
       description = "Modbus connect/read timeout in seconds.";
     };
 
-    auth = lib.mkOption {
+    modbusAuth = lib.mkOption {
       type = lib.types.nullOr (lib.types.enum [ "suite" ]);
       default = null;
       description = ''

@@ -12,7 +12,7 @@
     { "name": "timeout", "flag": "--timeout", "env": "TIMEOUT", "conv": "float", "live": "modbus/timeout",
       "setting-help": "upstream Modbus connect/read timeout in seconds", "hint": "s",
       "help": "Modbus connect/read timeout in seconds" },
-    { "name": "auth", "flag": "--auth", "env": "AUTH", "conv": "str", "live": "modbus/auth",
+    { "name": "modbus-auth", "flag": "--modbus-auth", "env": "MODBUS_AUTH", "conv": "str", "live": "modbus/auth",
       "setting-help": "the auth scheme the cache's own Modbus clients must speak: suite (the crypt handshake) or none",
       "values": [ "suite", "none" ], "hint": "suite|none",
       "value-help": { "suite": "every client proves the shared auth-key with the suite handshake right after connect — the cache answers OK, or ERR and the client is dropped",

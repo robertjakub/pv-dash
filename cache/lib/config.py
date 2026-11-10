@@ -397,7 +397,7 @@ def resolve_config(args, script_dir=None):
         'port': port,
         'unit': resolve(args.unit, 'UNIT', 'unit', DEFAULTS['unit'], int),
         'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
-        'auth': parse_auth_type(resolve(args.auth, 'AUTH', 'auth', '', str), 'auth'),
+        'auth': parse_auth_type(resolve(args.modbus_auth, 'MODBUS_AUTH', 'modbus-auth', DEFAULTS['modbus_auth'], str), 'modbus-auth'),
         'auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
                           or '').strip() or None, 'auth-key'), 'auth-key'),

@@ -117,7 +117,7 @@ map, the auth schemes both directions
 | `upstream` | `set modbus upstream` | settable (restart) | `HOST:PORT` | `--upstream` / `UPSTREAM` | the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502) |
 | `unit` | `set modbus unit` | settable | `ID` | `--unit` / `UNIT` | the Modbus unit id the session speaks |
 | `timeout` | `set modbus timeout` | settable | `s` | `--timeout` / `TIMEOUT` | upstream Modbus connect/read timeout in seconds |
-| `auth` | `set modbus auth` | settable | `suite\|none` | `--auth` / `AUTH` | the auth scheme the cache's own Modbus clients must speak: suite (the crypt handshake) or none |
+| `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth scheme the cache's own Modbus clients must speak: suite (the crypt handshake) or none |
 | `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key for the cache's clients, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 | `auth-upstream` | `set modbus auth-upstream` | settable | `suite\|waveshare\|none` | `--auth-upstream` / `AUTH_UPSTREAM` | the auth scheme the cache speaks to the upstream inverter: suite (the crypt handshake), waveshare (the gateway connection password) or none |
 | `auth-upstream-key` | — | startup-only (secret) | `KEY` | `--auth-upstream-key` / `AUTH_UPSTREAM_KEY` | the key the cache presents upstream: the suite handshake's shared key (min 16 characters) or the Waveshare gateway password (`file:<path>` reads an owner-only file) *(hidden)* |

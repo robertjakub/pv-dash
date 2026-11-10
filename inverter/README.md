@@ -362,7 +362,7 @@ file is flushed per event.
 > the control plane is plain-text by design — a demo harness. The blunt
 > mitigations the audit asks for are shipped: the caps (`--max-clients`,
 > `--client-timeout`, both tunable live), the read-count gate against
-> oversized replies, the optional `--auth suite` handshake and
+> oversized replies, the optional `--modbus-auth suite` handshake and
 > `--metrics-acl` IP gate for demos that want them.
 
 - **Minimal supply chain.** Python standard library only — the SBOM is two

@@ -52,6 +52,7 @@ STATIC_DEFAULTS = {
     'audit-forward': DEFAULTS['audit_forward'],
     'audit-forward-format': DEFAULTS['audit_forward_format'],
     'audit-daily': DEFAULTS['audit_daily'],
+    'modbus-auth': DEFAULTS['modbus_auth'],
     'no-audit-log': DEFAULTS['no_audit_log'],
     'audit-log': DEFAULTS['audit_log'],
     'dump-path': DEFAULTS['dump_path'],

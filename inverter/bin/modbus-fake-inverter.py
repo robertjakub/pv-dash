@@ -239,7 +239,7 @@ def main():
                           profile=load_profile(profile_path), seed=args.seed)
     simulator.set_time_scale(args.time_scale)   # validated above; before any machine reads the clock
     connect_acl = parse_acl(args.connect_acl, 'connect-acl')
-    modbus_auth = parse_auth_type(args.auth, 'auth')
+    modbus_auth = parse_auth_type(args.modbus_auth, 'modbus-auth')
     modbus_auth_key = check_auth_key(
         parse_secret((args.auth_key or '').strip() or None, 'auth-key'), 'auth-key')
     if modbus_auth and not modbus_auth_key:

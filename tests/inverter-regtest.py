@@ -980,7 +980,7 @@ def main():
         L_MODBUS, L_CTL = 15991, 15992
         L_KEY = 'inv-suite-key-16chars!'
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (L_MODBUS),
-                                       '--control-port', str(L_CTL), '--auth', 'suite',
+                                       '--control-port', str(L_CTL), '--modbus-auth', 'suite',
                                        '--auth-key', L_KEY],
                                       stdout=open(LOG + '.l', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.1)

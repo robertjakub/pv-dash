@@ -102,6 +102,7 @@
     "max_conn_per_ip": 0,
     "connect_acl": "any",
     "allow_write": false,
+    "modbus_auth": "none",
     "metrics_listen": "127.0.0.1:9352",
     "metrics_acl": "any",
     "metrics_max_clients": 64,

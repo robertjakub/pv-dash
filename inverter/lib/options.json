@@ -102,7 +102,7 @@
       "setting-help": "re-seed the chaos RNG", "hint": "N", "help": "chaos RNG seed" },
     { "name": "modbus", "setting-help": "the Modbus session the fake serves: the auth scheme its clients must speak",
       "node": true },
-    { "name": "auth", "flag": "--auth", "env": "AUTH", "conv": "str", "live": "modbus/auth",
+    { "name": "modbus-auth", "flag": "--modbus-auth", "env": "MODBUS_AUTH", "conv": "str", "live": "modbus/auth",
       "setting-help": "the auth scheme the fake's Modbus clients must speak: suite (the crypt handshake) or none",
       "values": [ "suite", "none" ], "hint": "suite|none",
       "value-help": { "suite": "every client proves the shared auth-key with the suite handshake right after connect — the fake answers OK, or ERR and the client is dropped",

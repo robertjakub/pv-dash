@@ -251,8 +251,8 @@ def resolve_config(args, script_dir=None):
         'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
         'max_kwp': resolve(args.max_kwp, 'MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float),
         'max_grid_kw': resolve(args.max_grid_kw, 'MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float),
-        'grid_positive_import': resolve(args.grid_positive_import, 'GRID_POSITIVE_IMPORT',
-                                        'grid_positive_import', False, str_to_bool),
+        'grid_positive_import': resolve(args.grid_positive_import or None, 'GRID_POSITIVE_IMPORT',
+                                        'grid_positive_import', DEFAULTS['grid_positive_import'], str_to_bool),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
         'interval': resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval_s'], float),
         'max_clients': resolve(args.max_clients, 'MAX_CLIENTS', 'max_clients',
@@ -263,8 +263,8 @@ def resolve_config(args, script_dir=None):
                                    'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
         'metrics_acl': (resolve(getattr(args, 'metrics_acl', None), 'METRICS_ACL',
                                 'metrics_acl', DEFAULTS['metrics_acl'], str) or '').strip() or 'any',
-        'local_time': resolve(args.local_time, 'LOCAL_TIME', 'local_time', False, str_to_bool),
-        'log_access': resolve(args.log_access, 'LOG_ACCESS', 'log_access', False, str_to_bool),
+        'local_time': resolve(args.local_time or None, 'LOCAL_TIME', 'local_time', DEFAULTS['local_time'], str_to_bool),
+        'log_access': resolve(args.log_access or None, 'LOG_ACCESS', 'log_access', DEFAULTS['log_access'], str_to_bool),
         'metric_prefix': metric_prefix,
         'auth_token': parse_secret((resolve(args.auth_token, 'AUTH_TOKEN', 'auth_token', None, str)
                                     or '').strip() or None, 'auth/token'),
@@ -284,7 +284,7 @@ def resolve_config(args, script_dir=None):
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'CONTROL_TRUST_UIDS',
                                         'control_trust_uids', None, str)
     cfg['control_socket_group'] = resolve(getattr(args, 'control_socket_group', False) or None,
-                                          'CONTROL_SOCKET_GROUP', 'control_socket_group', False, str_to_bool)
+                                          'CONTROL_SOCKET_GROUP', 'control_socket_group', DEFAULTS['control_socket_group'], str_to_bool)
     cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', None, str)
     cfg['audit_forward'] = resolve(getattr(args, 'audit_forward', None), 'AUDIT_FORWARD',
                                    'audit_forward', DEFAULTS['audit_forward'], str)
@@ -295,9 +295,9 @@ def resolve_config(args, script_dir=None):
     cfg['audit_files'] = resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
                                  'audit_files', DEFAULTS['audit_files'], int)
     cfg['audit_daily'] = resolve(getattr(args, 'audit_daily', False) or None,
-                                 'AUDIT_DAILY', 'audit_daily', False, str_to_bool)
+                                 'AUDIT_DAILY', 'audit_daily', DEFAULTS['audit_daily'], str_to_bool)
     cfg['no_audit_log'] = resolve(getattr(args, 'no_audit_log', False) or None,
-                                  'NO_AUDIT_LOG', 'no_audit_log', False, str_to_bool)
+                                  'NO_AUDIT_LOG', 'no_audit_log', DEFAULTS['no_audit_log'], str_to_bool)
     check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
     check_token_chars(cfg['control_token'], 'control_token')
     check_token_chars(cfg['auth_token'], 'auth_token')
@@ -311,7 +311,7 @@ def resolve_config(args, script_dir=None):
     cfg['dump_interval'] = resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
                                    'dump_interval', DEFAULTS['dump_interval'], float)
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
-                                      'restore_on_start', False, str_to_bool)
+                                      'restore_on_start', DEFAULTS['restore_on_start'], str_to_bool)
     cfg['listen'] = cfg['listen'].strip()
     cfg['sources'] = sources
     validate_config(cfg)

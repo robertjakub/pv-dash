@@ -16,7 +16,7 @@ from common.settings.config import (ANY_NET, IPGate, _GATE_TYPES, _acl_desc, _pr
 from common.wire.cred import parse_trust_uids
 from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_COUNT, MAX_REGISTERS, \
-    REGISTER_TYPES, UNIT_ID_RANGE
+    REGISTERS_TYPE, UNIT_ID_RANGE
 
 logger = logging.getLogger('modbus-cache')
 
@@ -237,7 +237,7 @@ def load_registers_file(path):
         except (KeyError, TypeError, ValueError):
             raise SystemExit('%s (%s) needs an integer "register"' % (label, entry['name']))
         typ = str(entry.get('type', 'i32'))
-        count = REGISTER_TYPES.get(typ)
+        count = REGISTERS_TYPE.get(typ)
         if count is None:
             raise SystemExit('%s (%s): unknown "type" %r (i16/u16/i32/u32/i32swap/u32swap/f32/f32swap/bit)'
                              % (label, entry['name'], typ))

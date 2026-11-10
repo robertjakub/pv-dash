@@ -26,7 +26,7 @@ from common.wire.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_
 from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
 from common.settings.options import control_command, grouped_rows
 from common.render.texts import T
-from .statics import CONTROL_LINE_CAP, DEFAULT_LISTEN_PORT, LOG_LEVELS
+from .statics import DEFAULT_LISTEN_PORT, LOG_LEVELS
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
     CFG_KEYS, CFG_FORMATTERS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .cache import build_blocks
@@ -42,7 +42,6 @@ logger = logging.getLogger('modbus-cache')
 OPTION_BY_LIVE = {o.live: o for o in OPTIONS if o.live}
 TYPED_CONVS = (int, float, str)
 
-MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
 
 
 class ControlServer(_ControlServer):

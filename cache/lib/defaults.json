@@ -1,24 +1,4 @@
 {
-  "control": {
-    "line_cap_bytes": 1048576
-  },
-  "control-plane": {
-    "cli_keepalive_s": 55.0,
-    "cli_timeout_s": 5.0,
-    "cli_reconnect": 3,
-    "cli_reconnect_wait_s": 10.0
-  },
-  "register_types": {
-    "i16": 1,
-    "u16": 1,
-    "i32": 2,
-    "u32": 2,
-    "i32swap": 2,
-    "u32swap": 2,
-    "f32": 2,
-    "f32swap": 2,
-    "bit": 1
-  },
   "diagnostics": {
     "base": 65000,
     "count": 4,
@@ -62,8 +42,7 @@
     "dump_interval": 0.0,
     "dump_with_cache": false,
     "restore_on_start": false,
-    "control_socket_group": false,
-    "control_idle_timeout_s": 300
+    "control_socket_group": false
   },
   "log_levels": [
     "DEBUG",

@@ -37,6 +37,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../common}/serve/*.py $out/share/modbus-cache/common/serve/
     install -dm755 $out/share/modbus-cache/common/wire
     install -m644 ${../common}/wire/*.py $out/share/modbus-cache/common/wire/
+    install -m644 ${../common}/wire/defaults.json $out/share/modbus-cache/common/wire/
     install -dm755 $out/share/modbus-cache/shared
     install -m644 ${../shared}/texts.json $out/share/modbus-cache/shared/
     install -dm755 $out/share/modbus-cache/common/modbus

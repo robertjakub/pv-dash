@@ -28,7 +28,7 @@ ILLEGAL_VALUE = PROTOCOL['exceptions']['illegal_value']
 GATEWAY_FAILED = PROTOCOL['exceptions']['gateway_failed']
 LOG_LEVELS = tuple(STATIC['log_levels'])
 
-REGISTER_TYPES = STATIC['register_types']      # type name -> words per register
+REGISTERS_TYPE = PROTOCOL['registers_type']   # type name -> words per register (the shared tree)
 UNIT_ID_RANGE = tuple(PROTOCOL['unit_id_range'])
 
 DIAGNOSTICS = STATIC['diagnostics']
@@ -42,10 +42,10 @@ DEFAULT_LISTEN_PORT = int(DEFAULTS['listen'].rsplit(':', 1)[1])
 AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
 AUDIT_FILES = DEFAULTS['audit_files']
 REQUESTS_AUDIT_S = DEFAULTS['requests_audit_s']  # the per-client REQUESTS audit period
-CONTROL_PLANE = STATIC['control-plane']
-CLI_KEEPALIVE_S = CONTROL_PLANE['cli_keepalive_s']
-CLI_TIMEOUT_S = CONTROL_PLANE['cli_timeout_s']
-CLI_RECONNECT = CONTROL_PLANE['cli_reconnect']
-CLI_RECONNECT_WAIT_S = CONTROL_PLANE['cli_reconnect_wait_s']
-CONTROL_IDLE_TIMEOUT_S = DEFAULTS['control_idle_timeout_s']
-CONTROL_LINE_CAP = int(STATIC['control']['line_cap_bytes'])
+from common.wire.control import CONTROL_WIRE_DEFAULTS  # the shared wire tree (flat: the cli_* keys)
+CLI_KEEPALIVE_S = CONTROL_WIRE_DEFAULTS['cli_keepalive_s']
+CLI_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_timeout_s']
+CLI_RECONNECT = CONTROL_WIRE_DEFAULTS['cli_reconnect']
+CLI_RECONNECT_WAIT_S = CONTROL_WIRE_DEFAULTS['cli_reconnect_wait_s']
+CLI_IDLE_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_idle_timeout_s']
+CLI_MAX_LINE_BYTES_S = CONTROL_WIRE_DEFAULTS['cli_max_line_bytes_s']

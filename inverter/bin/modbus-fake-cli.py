@@ -28,14 +28,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 from common.wire import cli
 from common.render.texts import T
 from lib.man import cli_page
-from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, LIVE_SETTINGS, NODE_BY_NAME, SETTING_BY_NAME, SETTING_NAMES, SHOW_LIVES
+from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, NODE_BY_NAME, POOL_NAMES, SETTING_SPELLINGS, SHOW_LIVES
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_MAX_LINE_BYTES_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, \
     CLI_TIMEOUT_S, DEFAULT_CONTROL_SOCKET
 
 
 POOL_NAMES, describe_word, command_pool, setting_pool, welcome = cli.pools(
-    COMMANDS, COMMAND_INTERNAL, COMMAND_HIDDEN, SETTING_BY_NAME, NODE_BY_NAME, COMMAND_HELP,
-    SETTING_NAMES, ALIAS_NAMES, LIVE_SETTINGS, 'fake-inverter')
+    COMMANDS, COMMAND_INTERNAL, COMMAND_HIDDEN, SETTING_SPELLINGS, NODE_BY_NAME, COMMAND_HELP,
+    POOL_NAMES, 'fake-inverter')
 
 
 SPEC = dict(label='the fake inverter', daemon_label='fake inverter control server',
@@ -45,8 +45,8 @@ SPEC = dict(label='the fake inverter', daemon_label='fake inverter control serve
             reconnect=CLI_RECONNECT, reconnect_wait=CLI_RECONNECT_WAIT_S,
             max_line_bytes=CLI_MAX_LINE_BYTES_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES,
-            ctl_socket=DEFAULT_CONTROL_SOCKET, settings=SETTING_BY_NAME, nodes=NODE_BY_NAME,
-            live_settings=LIVE_SETTINGS, show_lives=SHOW_LIVES,
+            ctl_socket=DEFAULT_CONTROL_SOCKET, spellings=SETTING_SPELLINGS, nodes=NODE_BY_NAME,
+            show_lives=SHOW_LIVES,
             command_pool=command_pool, setting_pool=setting_pool,
             describe=describe_word,
             welcome=welcome, loop=cli.typed_loop,

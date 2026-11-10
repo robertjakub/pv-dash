@@ -5,6 +5,15 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The wire speaks the flattened registry names: the dispatch, the
+dumps, the defaults and every reply key/render the options.json `name`
+— for the fake most names were already flat; `system/listen`,
+`modbus/profile`, `write/allow`, `modbus/auth`, `metrics/enable`,
+`metrics/acl` rekey to `listen`, `profile`, `allow-write`,
+`modbus-auth`, `metrics-server`, `metrics-acl`. The live paths are the
+console spellings the cli translates before it sends; the old dumps
+restore (the live-path keys fold on the way back in).
+
 The README moved to the gated skeleton: `scripts/lint_readmes.py --check`
 pins the `##` canon family-wide — the fake's `Simulation` retitled
 `How it works`, its `Signals` H2 folded into Runtime control as the

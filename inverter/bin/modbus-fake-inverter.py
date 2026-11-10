@@ -112,8 +112,8 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
                         control_target, ops_verbs, trust_uids, metrics_acl):
     """Every setting's configured startup value — what `clear <setting>`
     restores (the connect ACL, the auth type and the control family ride
-    in, parsed once in main). The secret rows (control/token,
-    control/ops/token, metrics/token, auth-key) carry NO entry: `clear`
+    in, parsed once in main). The secret rows (control-token,
+    control-ops-token, metrics-token, auth-key) carry NO entry: `clear`
     refuses them (the metrics/token treatment) — a secret never renders,
     never re-applies."""
     return {
@@ -137,33 +137,33 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'client-timeout': '%g' % args.client_timeout,
         'max-conn-per-ip': str(args.max_conn_per_ip),
         'connect-acl': acl_text(connect_acl),
-        'write/allow': 'on' if args.allow_write else 'off',
-        'modbus/auth': modbus_auth or 'none',
-        'metrics/enable': 'on' if args.metrics_server else 'off',
-        'metrics/acl': acl_value_text(metrics_acl),
+        'allow-write': 'on' if args.allow_write else 'off',
+        'modbus-auth': modbus_auth or 'none',
+        'metrics-server': 'on' if args.metrics_server else 'off',
+        'metrics-acl': acl_value_text(metrics_acl),
         'profile': profile_text,
         'log-level': args.log_level,
-        'dump/path': args.dump_path or 'off',
-        'dump/restore-on-start': 'on' if args.restore_on_start else 'off',
+        'dump-path': args.dump_path or 'off',
+        'restore-on-start': 'on' if args.restore_on_start else 'off',
         'dump-interval': 'off' if not args.dump_interval else '%g' % args.dump_interval,
         # the live control family — what `clear` restores (the cache's model)
-        'control/port': control_target,
-        'control/ops/verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
-        'control/trust-uids': ','.join(str(u) for u in sorted(trust_uids or ())) or 'off',
-        'control/socket-group': 'on' if args.control_socket_group else 'off',
+        'control-port': control_target,
+        'control-ops-verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
+        'control-trust-uids': ','.join(str(u) for u in sorted(trust_uids or ())) or 'off',
+        'control-socket-group': 'on' if args.control_socket_group else 'off',
         # the startup-only knobs (restart: true) — what `show <knob>` answers
-        'system/listen': args.listen, 'unit': str(args.unit),
+        'listen': args.listen, 'unit': str(args.unit),
         'control-log-replies': 'on' if args.control_log_replies else 'off',
         'metrics-listen': args.metrics_listen or 'off',
         'metrics-max-clients': str(args.metrics_max_clients),
         'metrics-client-timeout': '%g' % args.metrics_client_timeout,
         'metrics-max-conn-per-ip': str(args.metrics_max_conn_per_ip),
         # the live audit family — what `clear` restores (the cache's model)
-        'audit/log-file': 'off' if args.no_audit_log else (args.audit_log or default_path('fake-inverter')),
-        'audit/rotate/max-size': '%g' % args.audit_max_mb,
-        'audit/rotate/daily': 'on' if args.audit_daily else 'off',
-        'audit/rotate/files': str(args.audit_files),
-        'audit/disable': 'on' if args.no_audit_log else 'off',
+        'audit-log': 'off' if args.no_audit_log else (args.audit_log or default_path('fake-inverter')),
+        'audit-max-mb': '%g' % args.audit_max_mb,
+        'audit-daily': 'on' if args.audit_daily else 'off',
+        'audit-files': str(args.audit_files),
+        'no-audit-log': 'on' if args.no_audit_log else 'off',
     }
 
 
@@ -249,12 +249,12 @@ def main():
         logger.error('the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)')
         raise SystemExit(1)
     chaos = Chaos(args.chaos, seed=args.seed)
-    dump_key = parse_secret((args.dump_key or '').strip() or None, 'dump/key')
+    dump_key = parse_secret((args.dump_key or '').strip() or None, 'dump-key')
     apply_restart_state(vars(args), args.config, dump_key, ControlServer,
-                        extra={'system/listen': fold_listen})
+                        extra={'listen': fold_listen})
     listen_host, listen_port = parse_listen(args.listen)   # the fold may have moved it
     target = resolve_control_target(args.control_port, listen_port, CONTROL_SOCKET_TEMPLATE)
-    control_token = parse_secret(args.control_token, 'control/token')
+    control_token = parse_secret(args.control_token, 'control-token')
     control_ops_token = parse_secret(args.control_ops_token,
                                      'control-ops-token')
     if control_ops_token and not control_token:
@@ -268,7 +268,7 @@ def main():
     ops_verbs = parse_ops_verbs(args.control_ops_verbs, KNOWN_VERBS, rc=1, default=DEFAULT_OPS_VERBS)
     trust_uids = parse_trust_uids(args.control_trust_uids,
                                   'control-trust-uids')
-    metrics_token = parse_secret(args.metrics_token, 'metrics/token')
+    metrics_token = parse_secret(args.metrics_token, 'metrics-token')
     metrics_listen = parse_listen(args.metrics_listen)
     metrics_acl, metrics_acl_warn = resolve_metrics_acl(args.metrics_acl,
                                                         'metrics/acl')   # a bad acl value or gate file refuses the start

@@ -66,12 +66,14 @@ OPTION_BY_NAME = {o.name: o for o in OPTIONS}
 # (the `set`/`clear` vocabulary: the pins, the machines, the live knobs;
 # the console completions and word-help). The registry_view builds the
 # tables once for the family: SET_BY_NAME is the KNOB rows only — a show
-# report's live path never joins it, so it cannot shadow a knob VALUE on
-# the wire (one spelling per side of the verb)
+# report never joins it, so it cannot shadow a knob VALUE on the wire (one
+# word per side of the verb)
 _VIEW = registry_view(OPTIONS, SHOW_OPTIONS)
 SETTINGS = _VIEW.settings
-SETTING_BY_NAME = _VIEW.setting_by_name
-SETTING_NAMES = _VIEW.setting_names
+SETTING_BY_NAME = _VIEW.setting_by_name   # the FLAT wire names — the daemon's match map
+SETTING_SPELLINGS = _VIEW.spellings   # + the console spellings (the live/alias paths) — the cli's match map
+SETTING_NAMES = _VIEW.setting_names   # the flat names: the dump keys, the clear defaults, the help lists
+POOL_NAMES = _VIEW.pool_names   # the console spellings (the lives + aliases) — the ?/TAB pools' raw list
 ALIAS_NAMES = _VIEW.alias_names
 SET_BY_NAME = _VIEW.set_by_name
 SHOW_LIVES = _VIEW.show_lives

@@ -74,7 +74,7 @@ TCP requires the token when configured). Commands: \\fBset\\fR/\\fBclear\\fR/
 grid-frequency, grid-outage, soc, mppt, cloud, timezone, time, time-scale,
 scenario, chaos, seed, battery-state, strict, static, max-kwp,
 battery-kwh, max-clients, client-timeout, max-conn-per-ip,
-metrics enable, metrics acl, register, coil, discrete,
+metrics-server, metrics-acl, register, coil, discrete,
 log-level, modbus auth, modbus profile (the suite
 scheme; the key
 \\(em modbus auth key \\(em is a startup-only secret: \\fBshow\\fR refuses
@@ -100,7 +100,7 @@ loads it at start, \\fB--dump-interval\\fR rewrites it on a timer),
 \\fBquit\\fR. A second, read-only token (\\fB--control-ops-token\\fR)
 authenticates into the show verbs only \\(em the ops shift against the
 admin key, both roles audited. The control listener rides the family's
-live rebind: \\fBset control port\\fR (a unix path, a TCP port on
+live rebind: \\fBset control-port\\fR (a unix path, a TCP port on
 127.0.0.1, or off) swaps the socket without dropping the connected
 sessions \\(em tokenless TCP included, the F11 test-tool posture \\(em and
 the family's control knobs all set live: \\fBcontrol ops verbs\\fR (the
@@ -122,7 +122,7 @@ the metrics endpoint
 speaks the family's F13 shape: it refuses to start beyond loopback
 without a token (the loopback bind serves tokenless), and the
 \\fB--metrics-acl\\fR IP gate narrows who reaches the endpoint at all
-(the cache's metrics/acl: \\fBany\\fR/\\fBnone\\fR/the IP/prefix list or
+(the metrics-acl: \\fBany\\fR/\\fBnone\\fR/the IP/prefix list or
 \\fBfile:<path>\\fR, checked at accept \\(em a client off the ACL is
 closed without a reply). Run it on a trusted,
 LAN-isolated network, next to the tools it is meant to serve.

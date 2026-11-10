@@ -26,7 +26,7 @@ from .profile import load_profile, profile_label, resolve_profile
 from .signals import parse_time
 from common.runtime.version import version_string
 from common.render.texts import T
-from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, \
+from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, \
     SHOW_OPTIONS, NODE_BY_NAME, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
 from .statics import CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, \
@@ -34,10 +34,6 @@ from .statics import CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, \
 
 logger = logging.getLogger('fake-inverter')
 
-# The registry-driven bounds: the row's min/max (inclusive) are the one
-# home for a knob's range — the branches parse and plumb, the row gates.
-OPTION_BY_LIVE = {o.live: o for o in OPTIONS if o.live}
-TYPED_CONVS = (int, float, str)
 
 
 
@@ -52,7 +48,7 @@ class ControlServer(_ControlServer):
     second, read-only token (ops_token) may be configured beside the admin
     token: it authenticates into its policy's verbs —     no set/clear,
     no reset, no reload, no shutdown (common/wire/wiresec.py's roles). The
-    listener rides the base's rebind family: a live `set control/port`
+    listener rides the base's rebind family: a live `set control-port`
     swaps the socket (bind first, the failed bind rolls back, the sessions
     keep serving, off retires) — tokenless TCP included (F11)."""
 
@@ -99,11 +95,9 @@ class ControlServer(_ControlServer):
     COMMAND_HIDDEN = COMMAND_HIDDEN
     NODE_BY_NAME = NODE_BY_NAME
     SET_BY_NAME = SET_BY_NAME
-    SHOW_BY_LIVE = SHOW_BY_LIVE
-    OPTION_BY_LIVE = OPTION_BY_LIVE
     SHOW_OPTIONS = SHOW_OPTIONS
     SHOW_REPORTS = {'show registers': 'registers_report',
-                    'show metrics-acl-table': 'acl_table_report'}   # `show metrics acl table` (the live path's words) forwards here
+                    'show metrics-acl-table': 'acl_table_report'}
 
     def __init__(self, simulator, chaos, target, fake=None, defaults=None, log_replies=False, audit=None, token=None,
                  trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None, startup_values=None,
@@ -121,7 +115,7 @@ class ControlServer(_ControlServer):
         self.fake = fake
         self.signalbox = None       # set by the entry; 'shutdown' hands over to it
         self.scenario = None        # last applied preset, or None = 'custom'
-        self.metrics_acl_warn = None   # the metrics/acl file's permission warning (the stash, None = no warning standing)
+        self.metrics_acl_warn = None   # the metrics-acl file's permission warning (the stash, None = no warning standing)
 
     def show_config(self):
         """The startup options as a set-grammar script — the argv that would
@@ -143,7 +137,7 @@ class ControlServer(_ControlServer):
             handled, shown = self.apply_restart_key(key, val)
             if handled:
                 return shown
-            if key == 'system/listen':
+            if key == 'listen':
                 try:
                     t = parse_listen(val)
                 except SystemExit as e:
@@ -255,7 +249,7 @@ class ControlServer(_ControlServer):
                 raise ValueError('max-kwp must be a positive kW value')
             sim.peak_w = PEAK_RATIO * v * 1000.0
             return '%g' % v
-        if key == 'modbus/profile':
+        if key == 'profile':
             path = resolve_profile('sun2000' if val in ('default', 'auto', 'none') else value.strip())
             try:
                 m = load_profile(path)
@@ -291,23 +285,23 @@ class ControlServer(_ControlServer):
             except SystemExit as e:
                 raise ValueError(str(e))
             return acl_text(fake.connect_acl)
-        if key == 'write/allow':
+        if key == 'allow-write':
             if not fake:
                 raise ValueError('no modbus device attached')
-            fake.allow_write = on_off(val, 'write/allow')
+            fake.allow_write = on_off(val, 'allow-write')
             return 'on' if fake.allow_write else 'off'
-        if key == 'modbus/auth':
+        if key == 'modbus-auth':
             if not fake:
                 raise ValueError('no modbus device attached')
             try:
-                v = parse_auth_type(val, 'modbus/auth')
+                v = parse_auth_type(val, 'modbus-auth')
             except SystemExit as e:
                 raise ValueError(str(e))
             if v and not fake.auth_key:
                 raise ValueError(T('wire.suite_auth_needs_key') % AUTH_MIN_KEY)
             fake.auth = v   # the next connection handshakes; the standing ones keep their session
             return v or 'none'
-        if key == 'metrics/enable':
+        if key == 'metrics-server':
             if not fake:
                 raise ValueError('no modbus device attached')
             if val in ('on', 'true', '1', 'yes'):
@@ -359,12 +353,12 @@ class ControlServer(_ControlServer):
                 sim.override(k, None)
             self.scenario = val
             return val
-        if key == 'metrics/acl':
+        if key == 'metrics-acl':
             if not fake:
                 raise ValueError('no modbus device attached')
             if val == 'table':   # the show word is never a value — point at the report
-                raise ValueError('"table" is not a metrics/acl value — the table is the show: '
-                                 'show metrics acl table')
+                raise ValueError('"table" is not a metrics-acl value — the table is the show: '
+                                 'show metrics-acl-table')
             try:
                 gate, warn = resolve_metrics_acl(value)
             except SystemExit as e:
@@ -436,19 +430,19 @@ class ControlServer(_ControlServer):
             return str(fake.conn_gate.max_per_ip) if fake else '?'
         if key == 'connect-acl':
             return acl_text(fake.connect_acl) if fake else '?'
-        if key == 'write/allow':
+        if key == 'allow-write':
             return ('on' if fake.allow_write else 'off') if fake else '?'
-        if key == 'modbus/auth':
+        if key == 'modbus-auth':
             return (fake.auth or 'none') if fake else '?'
-        if key == 'metrics/enable':
+        if key == 'metrics-server':
             return ('on' if fake.metrics_srv else 'off') if fake else '?'
         if key == 'client-timeout':
             return ('%gs' % fake.client_timeout if fake.client_timeout else 'never') if fake else '?'
-        if key == 'modbus/profile':
+        if key == 'profile':
             return '%s (%s)' % (sim.profile.description, profile_label(sim.profile.path))
         if key == 'log-level':
             return logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel())
-        if key == 'metrics/acl':
+        if key == 'metrics-acl':
             return acl_value_text(fake.metrics_acl) if fake else '?'
         if key == 'scenario':
             return self.scenario or 'custom'
@@ -467,7 +461,7 @@ class ControlServer(_ControlServer):
         return shown
 
     def acl_table_report(self):
-        """The metrics/acl/table show report (the show-only view of the
+        """The metrics-acl-table show report (the show-only view of the
         metrics ACL, one entry per line): the system forms spell the chain
         they implement — 'allow 0.0.0.0/0' (any), 'deny 0.0.0.0/0' (none),
         'deny 0.0.0.0/0' + one allow line per network (the whitelist); a
@@ -693,23 +687,23 @@ class ControlServer(_ControlServer):
             'grid-frequency-wander': '%g' % sim.grid_frequency_wander,
             'grid-outage': sim.grid_outage,
             'max-kwp': '%g' % (sim.peak_w / (1000.0 * PEAK_RATIO)),
-            'modbus/profile': sim.profile.path,
+            'profile': sim.profile.path,
             'max-clients': fake.max_clients,
             'client-timeout': fake.client_timeout,
             'max-conn-per-ip': fake.conn_gate.max_per_ip,
             'connect-acl': acl_text(fake.connect_acl),
-            'modbus/auth': fake.auth or 'none',
-            'metrics/enable': 'on' if fake.metrics_srv else 'off',
-            'metrics/acl': acl_value_text(fake.metrics_acl),
+            'modbus-auth': fake.auth or 'none',
+            'metrics-server': 'on' if fake.metrics_srv else 'off',
+            'metrics-acl': acl_value_text(fake.metrics_acl),
             'log-level': logging.getLevelName(logging.getLogger('fake-inverter').getEffectiveLevel()),
             'scenario': self.scenario or 'custom',
-            'dump/path': self.dump_path or 'off',
-            'dump/restore-on-start': 'on' if self.dump_restore else 'off',
+            'dump-path': self.dump_path or 'off',
+            'restore-on-start': 'on' if self.dump_restore else 'off',
             'dump-interval': self.dump_interval,
-            'control/port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
-            'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
-            'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
-            'control/socket-group': 'on' if self.socket_group else 'off',
+            'control-port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
+            'control-ops-verbs': ','.join(sorted(self.ops_verbs)) or 'off',
+            'control-trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
+            'control-socket-group': 'on' if self.socket_group else 'off',
             **self.audit_dump_rows(),
         }
         return self.dump_settings_tail(raw)

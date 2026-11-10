@@ -132,7 +132,7 @@ the config names one and the start refuses. The flags:
 | `--connect-acl` | any | the Modbus clients allowed to connect: `any`, `none`, or a comma-separated IP/CIDR list — the family ACL map lives in [docs/common/ACL.md](../docs/common/ACL.md) |
 | `--allow-write` | off | accept Modbus writes (FC05/06/15/16): a write lands in the write overlay, logged and audited; off = every write refused with exception 01 |
 | `--modbus-auth` / `--auth-key` | `none` | the auth scheme the fake's Modbus clients must speak: `suite` = the crypt handshake (the scraper takes the matching `--modbus-auth suite --auth-key …`); the key is a secret, `file:<path>` welcome |
-| `--metrics-server` / `--metrics-listen` | off / `127.0.0.1:9352` | the fake's own Prometheus `/metrics` (live-settable `set metrics enable on/off`; refuses to start beyond loopback without `--metrics-token` — the F13 shape) |
+| `--metrics-server` / `--metrics-listen` | off / `127.0.0.1:9352` | the fake's own Prometheus `/metrics` (live-settable `set metrics-server on/off`; refuses to start beyond loopback without `--metrics-token` — the F13 shape) |
 | `--metrics-token` / `--metrics-acl` | off / `any` | the /metrics bearer token (`file:<path>` welcome) / the connect ACL (the ip-prefix grammar) |
 | `--metrics-max-clients` / `--metrics-client-timeout` / `--metrics-max-conn-per-ip` | `64` / `5` / `0` | the metrics caps |
 | `--control-port` | `/tmp/fake-inverter-<port>.socket` | control server target (unix socket or TCP port), `0` = off |
@@ -165,7 +165,7 @@ A JSON-lines control server runs **by default on the unix socket
 `/tmp/fake-inverter-<listen-port>.socket`** — pass a TCP port number to
 bind `127.0.0.1:PORT` instead, or `0` to switch it off. Both tools resolve
 the target the same way: flag > **`CTL`** environment variable > the
-default socket. The target also **rebinds live** — `set control port` —
+default socket. The target also **rebinds live** — `set control-port` —
 and on the fake a **tokenless TCP rebind succeeds** (the F11 test-tool
 posture; every other tool in the family refuses it — F5). Every command
 and knob the wire answers — command, settable (`set`/`clear`) or
@@ -201,7 +201,7 @@ form is legitimate here in a way it never is on the daemons.
 
 | Setting | Values | Meaning |
 |---|---|---|
-| `system listen` | `HOST:PORT` | the address the fake serves Modbus on (`show system listen` answers it; restart to apply — `--listen`/`LISTEN` at start) |
+| `system listen` | `HOST:PORT` | the address the fake serves Modbus on (`show listen` answers it; restart to apply — `--listen`/`LISTEN` at start) |
 | `pv` / `load` / `batt` | `W` \| `auto` | pin the PV power / the home load / the battery power (+charge/−discharge — the state machine integrates it into the SoC) |
 | `grid` | `W` \| `auto` | pin the **grid setpoint** (+export/−import): the battery balances to hold it (`set grid 0` = zero-export) |
 | `soc` | `%` \| `auto` | pin the state of charge (also seeds the machine) |
@@ -217,7 +217,7 @@ form is legitimate here in a way it never is on the daemons.
 | `strict` / `static` | `on` \| `off` | reject undefined registers (exception 02) / switch static values vs the day simulation |
 | `max-kwp` / `battery-kwh` | kW / kWh | the array size / the usable battery capacity |
 | `max-clients` / `client-timeout` / `max-conn-per-ip` / `connect-acl` | — | the Modbus caps + who may connect (the flags above, tunable live) |
-| `write/allow` | `on` \| `off` | the write gate (off refuses every write with exception 01) |
+| `allow-write` | `on` \| `off` | the write gate (off refuses every write with exception 01) |
 | `modbus auth` / `modbus auth key` | `suite` \| `none` / key | the auth scheme + key (secrets: `show` and `clear` refuse them) |
 | `metrics enable` / `metrics token` / `metrics acl` | — | the /metrics endpoint, its bearer, its connect ACL (live) |
 | `control port` / `control token` / `control ops token` / `control ops verbs` / `control trust-uids` / `control socket-group` | — | the control plane's live knobs (the listener rebinds, the tokens rotate, the socket re-modes) |
@@ -323,9 +323,9 @@ default at the **XDG state home**
 it, `--no-audit-log` turns it off, `--audit-log -` sends it to stdout (the
 docker logs / journald way — the shipped Dockerfile runs with it). The
 whole family is live-settable on the control wire (the cache's shape):
-`set audit log-file <path|-|none>` swaps the sink, `set audit rotate
+`set audit-log <path|-|none>` swaps the sink, `set audit rotate
 max-size <MB>` and `set audit rotate files <N>` re-chain the rotation
-live, `set audit rotate daily on/off` rides too and `set audit disable
+live, `set audit-daily on/off` rides too and `set audit disable
 on/off` is the kill switch (`clear <setting>` restores the configured
 value); the env twins spell the same names upper-snake. `--audit-forward` mirrors
 every line — the per-writer hash chain included — onward: `syslog` (the

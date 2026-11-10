@@ -9,65 +9,48 @@ fails the gate.
 
 ## The knobs outside the trees
 
-A flag knob's default is either a `defaults`-tree key or one of the
-no-entry shapes below; `scripts/check_options.py` fails the tool when
-neither holds.
+Every settable default names its tree entry — the plain underscore
+spelling of the flag name or one of the gate's `DEFAULT_KEYS` renames.
+What stays out, by ruling:
 
-| Tool | Named no-entry — the reason each |
-|---|---|
-| all four | `control-port` — derives from the listen port · `control-ops-verbs` — the registry's `default_ops_verbs` |
-| scraper | + `metrics-spec` — empty = the built-in `lib/metrics.json` block |
-| inverter | + `seed` — a per-run choice · `time` — empty = the clock runs |
+- **A secret never takes a settable default** — its default is the
+  None ladder-end, categorically (six on the cache — `auth-key`,
+  `auth-upstream-key`, `control-token`, `control-ops-token`,
+  `metrics-token`, `dump-key` — five on the scraper and the inverter,
+  seven on the dashboard — its `static-dir` and `config-js` are
+  startup-only secrets of the same shape: `secret`, `hidden`,
+  `restart`, the values never ride the wire, the dump or the tree).
+  The gate enforces it: a `defaults`-tree key naming a secret fails
+  the tool even before a resolver could wire it — a shipped secret
+  default would ride every install.
+- **The fake's per-run `seed`** — a per-run choice, no default exists
+  to ship (the gate's `NO_TREE_DEFAULT` map names it; the map sits
+  empty otherwise).
+- **The fake's control-only settings** — the pins and the machines
+  (`pv`, `load`, `batt`, `grid`, `soc`, `mppt`, `cloud`, `scenario`,
+  `battery-state`, `grid-outage`) take no startup layer at all: the
+  config file refuses them, the wire sets them at runtime. Nothing
+  for the tree to hold.
 
-The secrets are absent from the table by ruling: **a secret never
-takes a settable default** — its default is the None ladder-end,
-categorically (six on the cache — `auth-key`, `auth-upstream-key`,
-`control-token`, `control-ops-token`, `metrics-token`, `dump-key` —
-five on the scraper and the inverter, six on the dashboard — its
-`static-dir` and `config-js` are startup-only secrets of the same
-shape: `secret`, `hidden`, `restart`, the values never ride the wire,
-the dump or the tree). The gate enforces it: a `defaults`-tree key
-naming a secret fails the tool even before a resolver could wire it —
-a shipped secret default would ride every install.
-
-The enforcement is one rule plus two outs: every flag knob's default
-names its tree entry; the named no-entry knobs must appear in the
-gate's `NO_TREE_DEFAULT` map (the common two in
-`_COMMON_NO_TREE_DEFAULT`, the per-tool extras beside them); the
-secrets fail the outright ban.
+The empty-string entries are the honest derived/off defaults: the tree
+value spells the knob's own off semantics and the falsy chains resolve
+it — `control_port` `""` (the socket derives from the listen port),
+`metrics_spec` `""` (the built-in `lib/metrics.json` block), the
+fake's `time` `""` (the clock runs), beside the older
+`dump_path`/`control_trust_uids`/`audit_log` empties (the audit-log
+the one dynamic default — the tree cannot hold a per-user path, the
+falsy chain resolves the XDG state home at start). `control_ops_verbs`
+rides the tree as the concrete csv (`show,flush` on the cache, `show`
+elsewhere) — the registry's `default_ops_verbs` derivation stays the
+one truth, the gate pins the literal to it.
 
 The audit rotation bounds (`audit_max_mb`, `audit_files`) ride both
 sides — the daemons' static rungs read their tree entries, the client
 scripts render the same entries.
 
-### The graduation ledger — the proposals for what remains
-
-The empty-string convention is the pattern: the tree value spells the
-knob's own off/derived semantics, the falsy chains resolve it exactly
-as the inline literals did, the rung names the entry. The shipped
-examples: `control_trust_uids` `""` = nobody trusted, `dump_path` `""`
-= the state dump is off, `audit_log` `""` = the XDG state home's
-audit.log (the one dynamic default — the tree cannot hold a per-user
-path, the falsy chain resolves it at start), the three Modbus tools'
-`modbus_profile` `"sun2000"` plus `modbus_auth` `"none"` (the bare
-names, resolved through the shared profiles/ walk and
-`parse_auth_type`'s fold to `None`), and the inverter's grid quartet
-`grid_voltage` / `grid_voltage_wander` / `grid_frequency` /
-`grid_frequency_wander` (the wander machines' nominals and ranges —
-the old `grid` block and its `statics.GRID` read are gone).
-
-| Knob | Proposal | Ruling |
-|---|---|---|
-| `control-port` (all four) | `"control_port": ""` — the empty = the derived socket (the template against the listen port; the one derived default the tree cannot hold verbatim, the audit-log shape) | TODO |
-| `control-ops-verbs` (all four) | `"control_ops_verbs": "<the concrete csv>"` — the registry keeps the parse/validate; a gate row would diff the tree's literal against `default_ops_verbs` so the two cannot drift | TODO — needs the drift-diff gate row first |
-| `metrics-spec` (scraper) | `"metrics_spec": ""` — the empty = the built-in `lib/metrics.json` block | TODO |
-| `time` (inverter) | `"time": ""` — the empty = the clock runs | TODO |
-| `seed` (inverter) | — | STAYS OUT — a per-run choice; no default exists to ship |
-| `static-dir`, `config-js` (dashboard) | — | STAYS OUT — startup-only secrets of the `dump-key` shape; the outright ban holds (a shipped path default would ride every install) |
-
 ## The gate
 
-`scripts/check_options.py` runs three rows per tool:
+`scripts/check_options.py` runs four rows per tool:
 
 - **every defaults.json defaults key is read by lib/** — a dead letter
   fails: a tree entry nothing resolves is a lie waiting to rot. The
@@ -82,5 +65,8 @@ the old `grid` block and its `statics.GRID` read are gone).
   `requests-audit` → `requests_audit_s`,
   `profile` → `modbus_profile`), or a `NO_TREE_DEFAULT` reason. The
   bools take no exemption: a missing bool entry fails.
+- **the tree's `control_ops_verbs` matches the registry's
+  `default_ops_verbs`** — the literal the resolver reads and the
+  derivation the prose renders cannot drift.
 - **no defaults-tree key names a secret** — the secret's default is
   None, never a settable default (the ruling above).

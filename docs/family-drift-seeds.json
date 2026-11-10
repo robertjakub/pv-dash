@@ -1,6 +1,13 @@
 {
  "seeds": [
   {
+   "id": "knob:dashboard:static-dir",
+   "kind": "knob",
+   "tool": "dashboard",
+   "name": "static-dir",
+   "suite": "dashboard-control-fuzz.py"
+  },
+  {
    "id": "phrase:8c882b22",
    "kind": "canon-phrase",
    "tool": "cache, inverter",
@@ -10,7 +17,7 @@
   {
    "id": "phrase:4e544048",
    "kind": "canon-phrase",
-   "tool": "cache, common, dashboard, inverter, scraper",
+   "tool": "common, scraper",
    "name": "connection rejected:",
    "suite": "the emitting tool's regtest"
   },
@@ -33,13 +40,6 @@
    "kind": "canon-phrase",
    "tool": "common, inverter",
    "name": "control handler crashed ",
-   "suite": "the emitting tool's regtest"
-  },
-  {
-   "id": "phrase:3e83cead",
-   "kind": "canon-phrase",
-   "tool": "cache, dashboard, inverter, scraper",
-   "name": "control: shutdown requested",
    "suite": "the emitting tool's regtest"
   },
   {
@@ -80,15 +80,8 @@
   {
    "id": "phrase:bf04e62d",
    "kind": "canon-phrase",
-   "tool": "cache, common, inverter",
+   "tool": "common, inverter",
    "name": "sighup: reload failed ",
-   "suite": "the emitting tool's regtest"
-  },
-  {
-   "id": "phrase:66a0b81f",
-   "kind": "canon-phrase",
-   "tool": "cache, common",
-   "name": "sighup: reload requested",
    "suite": "the emitting tool's regtest"
   },
   {
@@ -135,9 +128,9 @@
   }
  ],
  "counts": {
-  "total": 19,
-  "knob": 0,
+  "total": 18,
+  "knob": 1,
   "command": 0,
-  "canon-phrase": 19
+  "canon-phrase": 17
  }
 }

@@ -528,10 +528,11 @@ paths whose values disagree, the only-there paths (the audit
 defaults, the caps, the grid constants the loaders wire via
 `static_defaults`).
 
-96 leaf paths; 19 in all four; 1 shared with differing values.
+100 leaf paths; 21 in all four; 2 shared with differing values.
 
 | key-path | per-tool values |
 |---|---|
+| `defaults.control_ops_verbs` | c: "show,flush" | s: "show" | i: "show" | d: "show" |
 | `defaults.listen` | c: "127.0.0.1:15502" | s: "127.0.0.1:9350" | i: "127.0.0.1:5502" | d: "127.0.0.1:8080" |
 
 The findings:

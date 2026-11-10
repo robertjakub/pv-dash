@@ -12,6 +12,21 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the defaults sweep closes: every settable default
+  now names its tree entry** — `control_port` `""` (the socket derives
+  from the listen port) family-wide, the scraper's `metrics_spec` `""`
+  (the built-in `lib/metrics.json` block), the fake's `time` `""` (the
+  clock runs) and family-wide `control_ops_verbs` (the concrete csv —
+  `show,flush` on the cache, `show` elsewhere; the registry's
+  `default_ops_verbs` derivation stays the one truth and a new
+  `check_options` row pins the tree literal to it, so the two cannot
+  drift). The fake's per-run `seed` stays the one defaultless knob (a
+  per-run choice — the gate's `NO_TREE_DEFAULT` map names it and sits
+  empty otherwise); the secrets keep the outright ban. The resolvers'
+  last rungs read the entries (`DEFAULTS['control_port']` et al.); the
+  graduated no-entry reasons left the map, `docs/static-defaults.md`
+  is redone to the closed truth and `docs/family-drift.md`'s statics
+  matrices carry the four new leaf paths.
 - **inverter** — **the grid wander values are knobs and the grid
   quartet graduates into the tree**: `--grid-voltage-wander` (the
   per-phase machine's ±fraction, 0.1 by default, 0 = the flat grid)

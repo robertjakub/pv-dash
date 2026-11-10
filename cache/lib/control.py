@@ -330,7 +330,7 @@ class ControlServer(_ControlServer):
             p.config['max_conn_per_ip'] = v
             return '%d' % v
         if key == 'metrics/enable':
-            if val in ON_OFF_WORDS:
+            if val in ('on', 'true', '1', 'yes'):
                 if p.metrics_srv:
                     return 'on'
                 if not p.metrics_token:

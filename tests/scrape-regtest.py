@@ -1874,7 +1874,7 @@ try:
     r = sctl('show knobs', 15597)
     check('scraper control: show knobs, the dictionary of the registry — flag, env twin, how it changes',
           r.startswith('ok knobs') and '--metric-prefix' in r and '$METRIC_PREFIX' in r
-          and 'set interval <value>' in r and ', secret' in r, r[:200])
+          and 'set metrics interval <value>' in r and ', secret' in r, r[:200])
     r = sctl('show inputs', 15597)
     check('scraper control: show inputs shows the declared inputs only, aligned, the help capped',
           r.startswith('ok inputs') and '[battery_net_watts]' in r

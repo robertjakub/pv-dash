@@ -540,7 +540,7 @@ try:
     # public, the value never is
     r = ctl_cmd('show config', 15520 + BASE)
     check('show config: the secret knob renders as *** SECRET REMOVED ***',
-          'set control-token *** SECRET REMOVED ***' in r and 'sekrit' not in r, r[:160])
+          'set control token *** SECRET REMOVED ***' in r and 'sekrit' not in r, r[:160])
 
     # the pre-auth line buffer is capped: a newline-less stream is dropped, not buffered
     s = socket.create_connection(('127.0.0.1', 15520 + BASE), timeout=10)
@@ -723,8 +723,8 @@ try:
     r = ctl_cmd('show knobs', 15514 + BASE)
     check('show knobs: the dictionary of the registry — flag, env twin, how it changes',
           r.startswith('ok knobs') and '--interval' in r and '$INTERVAL' in r
-          and 'set interval <value>' in r and '--control-ops-token' in r and ', secret' in r
-          and 'set upstream <value>, restart' in r, r[:200])   # the restart-marked knob carries the suffix
+          and 'set modbus interval <value>' in r and '--control-ops-token' in r and ', secret' in r
+          and 'set modbus upstream <value>, restart' in r, r[:200])   # the restart-marked knob carries the suffix
     r = ctl_cmd('help knobs', 15514 + BASE)
     check('help knobs: the same dictionary under the help verb', r.startswith('ok knobs'), r[:80])
     r = ctl_cmd('show uplink', 15514 + BASE)
@@ -856,7 +856,7 @@ try:
     ctl_cmd('request dump', 15537 + BASE)
     d = _json.load(open(dumpfile))
     check('request dump: the settings-only dump keeps the words out', d.get('registers') == []
-          and d.get('settings', {}).get('interval') == 2.0, str(d.get('settings')))
+          and d.get('settings', {}).get('modbus/interval') == 2.0, str(d.get('settings')))
     ctl_cmd('request flush cache', 15537 + BASE)
     r = ctl_cmd('show cache', 15537 + BASE)
     check('request restore: the clear emptied the cache first', '0 word(s) cached' in r, r[:80])
@@ -915,7 +915,7 @@ try:
           r.startswith('fail restart required (startup-only knob)'), r[:100])
     r = ctl_cmd('show config', 15539 + BASE)
     check('sealed dump: show config renders the key row as *** SECRET REMOVED ***',
-          'set dump-key *** SECRET REMOVED ***' in r and 'seal-key-1' not in r, r[:200])
+          'set dump key *** SECRET REMOVED ***' in r and 'seal-key-1' not in r, r[:200])
     time.sleep(1.6)   # the poller fills the cache (interval 1 s)
     r = ctl_cmd('request dump with-cache', 15539 + BASE)
     check('sealed dump: the with-cache dump reports sealed',
@@ -1078,7 +1078,7 @@ try:
     p_dump.wait(timeout=10)
     d = _json.load(open(dumpfile))
     check('shutdown dump: settings-only by default (the override is in it, the words stay out)',
-          d.get('registers') == [] and d.get('settings', {}).get('interval') == 3.0, repr(d.get('settings')))
+          d.get('registers') == [] and d.get('settings', {}).get('modbus/interval') == 3.0, repr(d.get('settings')))
     p_dump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                                '--listen', '127.0.0.1:%d' % (15536 + BASE), '--interval', '1', '--cache-ttl', '30',
                                '--profile', R, '--control-port', '%d' % (15537 + BASE), '--dump-with-cache',
@@ -1218,13 +1218,13 @@ try:
     # toggle's row follows the endpoint, not the startup flag
     r = ctl_cmd('show config', 15530 + BASE)
     check('show config: the live metrics enable rides (true after set on)',
-          'set metrics-server true' in r, r[:160])
+          'set metrics enable true' in r, r[:160])
     check('show config: the metrics token renders as *** SECRET REMOVED ***',
-          'set metrics-token *** SECRET REMOVED ***' in r and 'sekrit' not in r, r[:200])
+          'set metrics token *** SECRET REMOVED ***' in r and 'sekrit' not in r, r[:200])
     ctl_cmd('set metrics-server off', 15530 + BASE)
     r = ctl_cmd('show config', 15530 + BASE)
     check('show config: the live metrics enable rides (false after set off)',
-          'set metrics-server false' in r, r[:160])
+          'set metrics enable false' in r, r[:160])
     ctl_cmd('set metrics-server on', 15530 + BASE)
     # the live ttl rides too, and the write-register file marker renders
     # without crashing the handler (the string markers are not range lists)
@@ -1236,11 +1236,11 @@ try:
     check('cache ttl: the live set answers', r.startswith('ok cache-ttl='), r[:90])
     r = ctl_cmd('show config', 15530 + BASE)
     check('show config: the live cache ttl and the file marker ride',
-          'set cache-ttl 55.0' in r and 'set write-registers file:/tmp/reg_acl_write.json' in r, r[:220])
+          'set cache ttl 55.0' in r and 'set write registers file:/tmp/reg_acl_write.json' in r, r[:220])
     ctl_cmd('clear cache-ttl', 15530 + BASE)
     r = ctl_cmd('show config', 15530 + BASE)
     check('show config: the clear ttl returns the configured value',
-          'set cache-ttl 30.0' in r, r[:160])   # the default is the tree's flat 30 s
+          'set cache ttl 30.0' in r, r[:160])   # the default is the tree's flat 30 s
     ctl_cmd('set write-registers any', 15530 + BASE)
     # requests-audit: the live name is the wire spelling (the branch keys it)
     r = ctl_cmd('set requests-audit 120', 15530 + BASE)
@@ -1375,7 +1375,7 @@ try:
     r = ctl_cmd('show metrics-acl', 15530 + BASE)
     check('metrics acl: the none show', r == 'ok metrics-acl=none', r[:60])
     r = ctl_cmd('show config', 15530 + BASE)
-    check('metrics acl: the live set rides show config', 'set metrics-acl none' in r, r[:200])
+    check('metrics acl: the live set rides show config', 'set metrics acl none' in r, r[:200])
     r = ctl_cmd('show metrics-acl-table', 15530 + BASE)
     check('metrics acl: none spells the deny-any chain', r == 'ok acl-metrics-table\ndeny 0.0.0.0/0', r[:80])
     r = ctl_cmd('set metrics-acl table', 15530 + BASE)
@@ -2398,7 +2398,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # line refuses to parse — the placeholder is never a value
     ph = '/tmp/reg_placeholder.conf'
     open(ph, 'w').write('# the rendered script pasted back\n'
-                        'set control-token *** SECRET REMOVED ***\n')
+                        'set control token *** SECRET REMOVED ***\n')
     r = subprocess.run([sys.executable, P, '--config', ph, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                         '--listen', '127.0.0.1:%d' % (15599 + BASE), '--dry-run'],
                        capture_output=True, text=True, timeout=15)

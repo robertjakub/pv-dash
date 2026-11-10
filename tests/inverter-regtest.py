@@ -621,8 +621,8 @@ def main():
               tx.startswith('% error: restart required (startup-only knob)'), tx)
         tx = ctl(H_CTL, 'show config', token='tok')
         check('secrets: show config renders the secret knob as the placeholder',
-              'set control-token *** SECRET REMOVED ***' in tx
-              and 'set control-token tok' not in tx and 'tok2' not in tx, tx[:200])
+              'set control token *** SECRET REMOVED ***' in tx
+              and 'set control token tok' not in tx and 'tok2' not in tx, tx[:200])
 
         # ---- the whole-daemon reload (the fake has no config file — its
         #      reload state lives in the XDG state home) and the settings

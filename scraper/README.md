@@ -28,6 +28,8 @@ port **502**, unit id **1**.
   `--metric-prefix` prefix, default `huawei_`) and the fixed
   `scraper_*` self-observability gauges.
 
+## Usage
+
 ```bash
 python3 scraper/bin/modbus-scraper.py --upstream 192.168.1.100:502
 curl http://localhost:9350/metrics
@@ -42,6 +44,127 @@ traceback); the loopback default needs no token.
 Add **`--dry-run`** to validate the configuration and print the effective
 settings without binding the port or contacting the inverter. Exit codes:
 `0` = valid; `1` = invalid (reason on stderr); `2` = command-line misuse.
+
+## Configuration
+
+Settings are resolved in this order (first hit wins), mirroring
+`modbus-cache`:
+
+1. CLI flags (`--upstream`, `--listen`, …)
+2. Environment variables — the same names, bare (no tool prefix):
+   `CONFIG`, `METRICS_SPEC`, `UPSTREAM`, `MODBUS_UNIT`, `MODBUS_OFFSET`,
+   `TIMEOUT`, `PROFILE`, `METRIC_PREFIX`, `MAX_KWP`, `MAX_GRID_KW`,
+   `GRID_POSITIVE_IMPORT`, `LISTEN`, `INTERVAL`, `LOCAL_TIME`,
+   `LOG_ACCESS`, `LOG_LEVEL`, `AUTH_TOKEN`, `MAX_CLIENTS`,
+   `CLIENT_TIMEOUT`
+3. Config file — the set-grammar script (`set <name> <value>` lines) —
+   `--config` picks the file (default: `$CONFIG`, then `scraper.conf` next
+   to the script, then the subproject root's sample; missing file is fine)
+4. Built-in defaults
+
+Every setting is **sanitized and validated** before use — a malformed
+config file is fatal, nonsense values abort with a clean one-line error
+instead of failing later at runtime. The only soft spot is `timeout >
+interval`: that logs a warning (polls run back-to-back) instead of failing.
+
+`examples/scraper.conf` is a sample in the set grammar; `show config`
+regenerates the script from the running scraper (secrets hidden):
+
+```conf
+# modbus-scraper configuration — every line is a set command (the CLI spelling)
+set modbus upstream 127.0.0.1:5502
+set modbus unit 1
+set caps max-pv 6
+set caps max-grid 12
+set system listen 127.0.0.1:9350
+set metrics interval 10
+set log-level INFO
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
+| `--modbus-unit` / `--modbus-offset` | `1` / `0` | Modbus unit id / added to register addresses (`-1` for gateways that need 0-based addressing) |
+| `--auth` / `--auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/MODBUS.md](../docs/MODBUS.md) |
+| `--profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set modbus profile` |
+| `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
+| `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
+| `--max-kwp` / `--max-grid-kw` | `6` / `12` | the sanity caps in kW: above the cap → HTTP 503 + error log; `0` = off |
+| `--grid-positive-import` | off | grid register positive means import |
+| `--timeout` / `--interval` | `3` / `10` | Modbus timeout, seconds / seconds between Modbus polls |
+| `--listen` | `127.0.0.1:9350` | exporter bind address `HOST:PORT` (loopback by default; beyond loopback `--auth-token` is mandatory, F13) |
+| `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; compared timing-safe); the value may be `file:<path>` — **re-read on every SIGHUP**: rotate by rewriting the file and reloading |
+| `--metrics-acl` | `any` | the clients allowed to **connect** to /metrics: `any`, `none`, comma-separated IPs/prefixes, `file:<path>` (the ip-prefix acl file — the grammar lives in [docs/ACL.md](../docs/ACL.md)); checked at accept; live-settable |
+| `--control-port` | `/tmp/modbus-scraper-<listen-port>.socket` | the JSON-lines control server target (unix socket path or TCP port), `0` = off |
+| `--control-token` / `--control-ops-token` | off | the control tokens (a TCP control port refuses to start without the admin token, F5); `file:<path>` welcome |
+| `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`clear` is not a verb here — there is nothing to flush) |
+| `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
+| `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
+| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | XDG state | the SCR audit trail: a file path, `-` for stdout (the docker/journald way) or `none` (no local file — the forward carries the trail); the forward mirrors every line onward (F10) |
+| `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (overflow gets an immediate `503 # rate limited`) |
+| `--log-level` / `--log-access` / `--local-time` | `INFO` / off / UTC | the log surface |
+| `--config` / `--dry-run` / `--man` | — | the config file path / validate + print and exit / print the generated man page |
+
+Register defaults follow Huawei's official *Solar Inverter Modbus Interface
+Definitions* (Issue 04, 2023-01-10) — they live in the device profile, not
+in flags:
+
+- **32064** — input power, I32, unit kW with gain 1000 (raw values are
+  watts); **37113** — meter power, I32, `> 0` = feed-in (without a meter
+  the inverter alone cannot report grid power).
+- Older **20200520** protocol: input power at **32089**, meter power at
+  **37258** — point `--profile` at a profile carrying those addresses.
+- Unit quirk: the inverter's `[Power meter collection]` copy of 37113 has
+  been observed reporting **watts** (gain 1) while the meter-section table
+  says kW (gain 1000). The bundled profile assumes watts; if grid power
+  looks 1000× off the other way, set the entry's `scale` to 1000 in your
+  profile copy.
+- With a battery the derived home load is wrong while the battery
+  charges/discharges — point the dashboard's `load` metric at a real meter
+  register/exporter instead.
+
+## Runtime control
+
+### Signals
+
+| Signal | Effect |
+|---|---|
+| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, caps, the device profile, auth token (+ file re-read = rotation), client limits, the Modbus auth scheme/key and the upstream take effect immediately. An invalid value keeps the previous settings. The listen address, log level and `metrics.json` need a restart. |
+| `SIGTERM` / `SIGINT` | **Graceful shutdown** with a session summary (duration + poll-error count). |
+
+### The control server
+
+The scraper runs the family's JSON-lines control server — **by default on
+the unix socket `/tmp/modbus-scraper-<listen-port>.socket`** (`0` switches
+it off, a TCP port number binds `127.0.0.1:PORT` instead). Talk to it with
+**`modbus-scraper-ctl`** (one-shot / batch) or **`modbus-scraper-cli`**
+(the console session):
+
+```bash
+python3 scraper/bin/modbus-scraper-ctl.py show modbus upstream
+printf 'set metrics interval 5\npoll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
+python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
+```
+
+The wire (the signed frames, the peer-cred trusted peers, the read-only
+ops role, the F5 token rule) is the family's — one paragraph per piece in
+[docs/ACL.md](../docs/ACL.md) (the control-plane row) and
+[docs/AUDIT.md](../docs/AUDIT.md); a token value never renders back
+(`show <secret>` refuses). Every command and knob the wire answers —
+command, settable (`set`/`clear`) or show-only — is tabled in
+[MANUAL.md](MANUAL.md) (generated from the registry). The commands:
+
+| Command | Effect |
+|---|---|
+| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show system listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
+| `poll now` | the loop wakes immediately |
+| `show connections` | the live HTTP clients of /metrics |
+| `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |
+| `request restart` | the Modbus session drops; the next poll reconnects |
+| `request reload` | the whole-daemon restart that keeps the sets: the live overrides save to `<config>.reload`, the process re-execs and re-applies them once (overridden secrets save as `*** SECRET REMOVED ***`, the reply names them) |
+| `request dump` / `request restore` | the state dump (`--dump-path`): the live overrides as one `0600` JSON with an integrity hash; `--dump-key` seals it; the `--dump-interval` loop rewrites it live |
+| `inspect` / `show version` / `show knobs` | the one-page dump for a bug report / the version / the knob registry |
+| `shutdown` | gracefully stop the exporter |
 
 ## Metrics
 
@@ -173,138 +296,6 @@ device profile without the battery registers keeps the battery metrics
 absent. The fake inverter emulates the battery for testing:
 `python3 inverter/bin/modbus-fake-inverter.py`.
 
-## Configuration
-
-Settings are resolved in this order (first hit wins), mirroring
-`modbus-cache`:
-
-1. CLI flags (`--upstream`, `--listen`, …)
-2. Environment variables — the same names, bare (no tool prefix):
-   `CONFIG`, `METRICS_SPEC`, `UPSTREAM`, `MODBUS_UNIT`, `MODBUS_OFFSET`,
-   `TIMEOUT`, `PROFILE`, `METRIC_PREFIX`, `MAX_KWP`, `MAX_GRID_KW`,
-   `GRID_POSITIVE_IMPORT`, `LISTEN`, `INTERVAL`, `LOCAL_TIME`,
-   `LOG_ACCESS`, `LOG_LEVEL`, `AUTH_TOKEN`, `MAX_CLIENTS`,
-   `CLIENT_TIMEOUT`
-3. Config file — the set-grammar script (`set <name> <value>` lines) —
-   `--config` picks the file (default: `$CONFIG`, then `scraper.conf` next
-   to the script, then the subproject root's sample; missing file is fine)
-4. Built-in defaults
-
-Every setting is **sanitized and validated** before use — a malformed
-config file is fatal, nonsense values abort with a clean one-line error
-instead of failing later at runtime. The only soft spot is `timeout >
-interval`: that logs a warning (polls run back-to-back) instead of failing.
-
-`examples/scraper.conf` is a sample in the set grammar; `show config`
-regenerates the script from the running scraper (secrets hidden):
-
-```conf
-# modbus-scraper configuration — every line is a set command (the CLI spelling)
-set modbus upstream 127.0.0.1:5502
-set modbus unit 1
-set caps max-pv 6
-set caps max-grid 12
-set system listen 127.0.0.1:9350
-set metrics interval 10
-set log-level INFO
-```
-
-| Flag | Default | Meaning |
-|---|---|---|
-| `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
-| `--modbus-unit` / `--modbus-offset` | `1` / `0` | Modbus unit id / added to register addresses (`-1` for gateways that need 0-based addressing) |
-| `--auth` / `--auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/MODBUS.md](../docs/MODBUS.md) |
-| `--profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set modbus profile` |
-| `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
-| `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
-| `--max-kwp` / `--max-grid-kw` | `6` / `12` | the sanity caps in kW: above the cap → HTTP 503 + error log; `0` = off |
-| `--grid-positive-import` | off | grid register positive means import |
-| `--timeout` / `--interval` | `3` / `10` | Modbus timeout, seconds / seconds between Modbus polls |
-| `--listen` | `127.0.0.1:9350` | exporter bind address `HOST:PORT` (loopback by default; beyond loopback `--auth-token` is mandatory, F13) |
-| `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; compared timing-safe); the value may be `file:<path>` — **re-read on every SIGHUP**: rotate by rewriting the file and reloading |
-| `--metrics-acl` | `any` | the clients allowed to **connect** to /metrics: `any`, `none`, comma-separated IPs/prefixes, `file:<path>` (the ip-prefix acl file — the grammar lives in [docs/ACL.md](../docs/ACL.md)); checked at accept; live-settable |
-| `--control-port` | `/tmp/modbus-scraper-<listen-port>.socket` | the JSON-lines control server target (unix socket path or TCP port), `0` = off |
-| `--control-token` / `--control-ops-token` | off | the control tokens (a TCP control port refuses to start without the admin token, F5); `file:<path>` welcome |
-| `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`clear` is not a verb here — there is nothing to flush) |
-| `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
-| `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
-| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | XDG state | the SCR audit trail: a file path, `-` for stdout (the docker/journald way) or `none` (no local file — the forward carries the trail); the forward mirrors every line onward (F10) |
-| `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (overflow gets an immediate `503 # rate limited`) |
-| `--log-level` / `--log-access` / `--local-time` | `INFO` / off / UTC | the log surface |
-| `--config` / `--dry-run` / `--man` | — | the config file path / validate + print and exit / print the generated man page |
-
-Register defaults follow Huawei's official *Solar Inverter Modbus Interface
-Definitions* (Issue 04, 2023-01-10) — they live in the device profile, not
-in flags:
-
-- **32064** — input power, I32, unit kW with gain 1000 (raw values are
-  watts); **37113** — meter power, I32, `> 0` = feed-in (without a meter
-  the inverter alone cannot report grid power).
-- Older **20200520** protocol: input power at **32089**, meter power at
-  **37258** — point `--profile` at a profile carrying those addresses.
-- Unit quirk: the inverter's `[Power meter collection]` copy of 37113 has
-  been observed reporting **watts** (gain 1) while the meter-section table
-  says kW (gain 1000). The bundled profile assumes watts; if grid power
-  looks 1000× off the other way, set the entry's `scale` to 1000 in your
-  profile copy.
-- With a battery the derived home load is wrong while the battery
-  charges/discharges — point the dashboard's `load` metric at a real meter
-  register/exporter instead.
-
-## Runtime control
-
-### Signals
-
-| Signal | Effect |
-|---|---|
-| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, caps, the device profile, auth token (+ file re-read = rotation), client limits, the Modbus auth scheme/key and the upstream take effect immediately. An invalid value keeps the previous settings. The listen address, log level and `metrics.json` need a restart. |
-| `SIGTERM` / `SIGINT` | **Graceful shutdown** with a session summary (duration + poll-error count). |
-
-### The control server
-
-The scraper runs the family's JSON-lines control server — **by default on
-the unix socket `/tmp/modbus-scraper-<listen-port>.socket`** (`0` switches
-it off, a TCP port number binds `127.0.0.1:PORT` instead). Talk to it with
-**`modbus-scraper-ctl`** (one-shot / batch) or **`modbus-scraper-cli`**
-(the console session):
-
-```bash
-python3 scraper/bin/modbus-scraper-ctl.py show modbus upstream
-printf 'set metrics interval 5\npoll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
-python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
-```
-
-The wire (the signed frames, the peer-cred trusted peers, the read-only
-ops role, the F5 token rule) is the family's — one paragraph per piece in
-[docs/ACL.md](../docs/ACL.md) (the control-plane row) and
-[docs/AUDIT.md](../docs/AUDIT.md); a token value never renders back
-(`show <secret>` refuses). Every command and knob the wire answers —
-command, settable (`set`/`clear`) or show-only — is tabled in
-[MANUAL.md](MANUAL.md) (generated from the registry). The commands:
-
-| Command | Effect |
-|---|---|
-| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show system listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
-| `poll now` | the loop wakes immediately |
-| `show connections` | the live HTTP clients of /metrics |
-| `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |
-| `request restart` | the Modbus session drops; the next poll reconnects |
-| `request reload` | the whole-daemon restart that keeps the sets: the live overrides save to `<config>.reload`, the process re-execs and re-applies them once (overridden secrets save as `*** SECRET REMOVED ***`, the reply names them) |
-| `request dump` / `request restore` | the state dump (`--dump-path`): the live overrides as one `0600` JSON with an integrity hash; `--dump-key` seals it; the `--dump-interval` loop rewrites it live |
-| `inspect` / `show version` / `show knobs` | the one-page dump for a bug report / the version / the knob registry |
-| `shutdown` | gracefully stop the exporter |
-
-## What /metrics leaks (the privacy note, F15)
-
-The endpoint exposes **production values, not telemetry**: the current PV
-generation, the home consumption, the battery state of charge and the
-per-phase voltages/currents. A week of that is a **home-occupancy
-profile** — when the house is producing, when it draws, when nobody is
-home. The controls are the **bearer token** (`--auth-token`, mandatory
-beyond loopback — a token-less non-loopback bind refuses to start, F13)
-and the **localhost bind** (the default). Treat the endpoint as internal:
-do not publish it, and scope any reverse proxy that frontends it.
-
 ## Logging and audit trail
 
 Logging is `logging`-based with **UTC timestamps by default**
@@ -340,6 +331,18 @@ The fake inverter lives in its own subproject:
 [inverter/](../inverter/README.md) — a Modbus TCP server with day/static
 demo values, battery + meter simulation, a runtime control server and
 chaos injection. Both regression suites start it automatically.
+
+## Security
+
+The privacy note is the scraper's security story (the audit's F15): the
+endpoint exposes **production values, not telemetry** — the current PV
+generation, the home consumption, the battery state of charge and the
+per-phase voltages/currents. A week of that is a **home-occupancy
+profile** — when the house is producing, when it draws, when nobody is
+home. The controls are the **bearer token** (`--auth-token`, mandatory
+beyond loopback — a token-less non-loopback bind refuses to start, F13)
+and the **localhost bind** (the default). Treat the endpoint as internal:
+do not publish it, and scope any reverse proxy that frontends it.
 
 ## Testing
 

@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The README moved to the gated skeleton: `scripts/lint_readmes.py --check`
+pins the `##` canon family-wide — the scraper gained `Usage` (the
+run/bind/dry-run block split out of `How it works`) and `Security` (the
+F15 privacy note is the security story), and the Metrics, Alerting,
+Device profile, Battery, audit-trail and Test-inverter sections sit in
+the feature slot between Runtime control and Security.
+
 The audit family live family-wide + the scraper's control-handler crash
 fixed: every audit live-set (`set audit forward` included) closed the
 connection with `control handler crashed ('disabled')` — `audit_params`

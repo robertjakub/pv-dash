@@ -12,6 +12,19 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the audit family's sink + rotation knobs are live
+  settable on all four tools** (the cache's shape, the family handler):
+  `set audit log-file` (the sink swap — a path, `-` for stdout, `none`
+  for the remote-only/off fold), `set audit rotate max-size` and
+  `set audit rotate files` (the rotation re-chains live), `set audit
+  disable` (the kill switch) — the fake and the dashboard catch up with
+  the cache and the scraper (`clear <setting>` restores the configured
+  value). The state dumps carry the audit rows from ONE shared
+  `audit_dump_rows()` shape family-wide — a dump written by the scraper,
+  the fake or the dashboard now keeps a live `audit/rotate/daily`
+  override (it was silently dropped before), and the trail swap keeps
+  the path's case on every tool (the fake's lowercased value spelling).
+
 - **everywhere** — **BREAKING: the wire verbs rename** — `unset <setting>`
   becomes **`clear <setting>`** (restore the configured value) and the
   cache's flush becomes **`request flush cache`** (was `request clear
@@ -65,6 +78,14 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Fixed
 
+- **scraper** — **every audit live-set crashed the control handler**
+  (`control handler crashed ('disabled')`, the connection closed): the
+  subclass wired `audit_params` before `super().__init__()` and the
+  base wiped it to `{}` — the family's rebuild read the missing keys.
+  `audit_params` rides the base constructor now (the cache's
+  post-super proxy alias keeps its shape), so `set audit forward`,
+  `set audit rotate …` and `set audit log-file` answer on the scraper
+  like on the other three.
 - **scraper** — **the registry's two live rows answer**: `set control
  ops verbs` and `set control trust uids` hit no `_apply` branch and
  answered `unknown setting` while the registry marked them live

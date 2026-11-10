@@ -25,11 +25,11 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `allow-write` |  | `set write allow` | ✓ live |  | ✓ live |  |
 | c | `audit` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `audit-daily` |  | `set audit rotate daily` | **✓** live | **✓** live | **✓** live | **✓** live |
-| k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** live | **✓** | **✓** |
+| k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `audit-forward` |  | `set audit forward` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `audit-forward-format` |  | `set audit forward format` | **✓** live | **✓** live | **✓** live | **✓** live |
-| k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** live | **✓** | **✓** |
-| k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** live | **✓** | **✓** |
+| k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** live | **✓** live | **✓** live |
 | c | `audit/rotate` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |
 | k | `auth` |  | `set modbus auth` | **✓** live | **✓** live | **✓** live | **✓** |
 | k | `auth-key` |  | `startup-only — pass it by flag/env/config (set/clear refuse)` | ✓ live+secret | ✓ live+secret | ✓ live+secret |  |
@@ -103,7 +103,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `modbus-offset` |  | `set modbus offset` |  | ✓ live |  |  |
 | k | `modbus-unit` |  | `set modbus unit` |  | ✓ live |  |  |
 | c | `mppt` |  | `set mppt` |  |  | ✓ live |  |
-| k | `no-audit-log` |  | `set audit disable` | **✓** live | **✓** live | **✓** | **✓** |
+| k | `no-audit-log` |  | `set audit disable` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `profile` |  | `set modbus profile`, `set profile` | ✓ live | ✓ live | ✓ live |  |
 | k | `prom-prefix` |  | *(startup-only)* |  |  |  | ✓ |
 | c | `pv` |  | `set pv` |  |  | ✓ live |  |

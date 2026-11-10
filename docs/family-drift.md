@@ -59,26 +59,26 @@ design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
-| 0.94 | `scraper/lib/control.py:146` `command_help` <-> `dashboard/lib/control.py:111` `command_help` |
+| 0.94 | `scraper/lib/control.py:145` `command_help` <-> `dashboard/lib/control.py:110` `command_help` |
 | 0.94 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:26` `_load_options` |
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.93 | `scraper/lib/options.py:26` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.89 | `scraper/bin/modbus-scraper.py:251` `graceful_stop` <-> `dashboard/bin/dashboard.py:484` `graceful_stop` |
+| 0.89 | `scraper/bin/modbus-scraper.py:251` `graceful_stop` <-> `dashboard/bin/dashboard.py:483` `graceful_stop` |
 | 0.88 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.88 | `scraper/lib/options.py:26` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.88 | `inverter/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.87 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
-| 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:1203` `run_dump_interval` |
-| 0.80 | `inverter/lib/control.py:155` `__init__` <-> `dashboard/lib/control.py:82` `__init__` |
+| 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:1223` `run_dump_interval` |
+| 0.79 | `inverter/lib/control.py:155` `__init__` <-> `dashboard/lib/control.py:82` `__init__` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:507` `acl_table_report` <-> `dashboard/lib/control.py:330` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:506` `acl_table_report` <-> `dashboard/lib/control.py:328` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
 | 0.75 | `inverter/lib/control.py:66` `handle` <-> `common/wire/control.py:288` `handle` |
 | 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:420` `load_write_gate_file` |
-| 0.73 | `inverter/lib/control.py:518` `command_help` <-> `dashboard/lib/control.py:111` `command_help` |
-| 0.73 | `scraper/lib/control.py:146` `command_help` <-> `inverter/lib/control.py:518` `command_help` |
+| 0.73 | `inverter/lib/control.py:517` `command_help` <-> `dashboard/lib/control.py:110` `command_help` |
+| 0.73 | `scraper/lib/control.py:145` `command_help` <-> `inverter/lib/control.py:517` `command_help` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -164,15 +164,12 @@ four registries; 31 names carry in all four:
 | inverter | `allow-write`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `control-log-replies`, `grid`, `grid-frequency`, `grid-outage`, `grid-voltage`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
 | dashboard | `auth-token`, `config-js`, `local-time`, `log-access`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
-**The shared knobs whose fields disagree** (8 of
-31 knobs, 13 drifted field(s)) — one row per
+**The shared knobs whose fields disagree** (4 of
+31 knobs, 9 drifted field(s)) — one row per
 knob+field, the tools grouped by the value each carries:
 
 | knob | field | the values (the tools carrying each) |
 |---|---|---|
-| `audit-files` | `live` | `audit/rotate/files` (cache, scraper) · `·` (inverter, dashboard) |
-| `audit-log` | `live` | `audit/log-file` (cache, scraper) · `·` (inverter, dashboard) |
-| `audit-max-mb` | `live` | `audit/rotate/max-size` (cache, scraper) · `·` (inverter, dashboard) |
 | `auth` | `flag` | `--auth` (cache, scraper, inverter) · `·` (dashboard) |
 | `auth` | `env` | `AUTH` (cache, scraper, inverter) · `·` (dashboard) |
 | `auth` | `conv` | `str` (cache, scraper, inverter) · `·` (dashboard) |
@@ -182,7 +179,6 @@ knob+field, the tools grouped by the value each carries:
 | `client-timeout` | `live` | `limits/client-timeout` (cache) · `metrics/limits/timeout` (scraper) · `client-timeout` (inverter, dashboard) |
 | `max-clients` | `live` | `limits/max-clients` (cache) · `metrics/limits/max-clients` (scraper) · `max-clients` (inverter, dashboard) |
 | `max-conn-per-ip` | `live` | `limits/max-conn-per-ip` (cache) · `metrics/limits/max-conn-per-ip` (scraper) · `max-conn-per-ip` (inverter, dashboard) |
-| `no-audit-log` | `live` | `audit/disable` (cache, scraper) · `·` (inverter, dashboard) |
 
 **The command vocabularies** (the wire words per tool):
 

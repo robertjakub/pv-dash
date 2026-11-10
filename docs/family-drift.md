@@ -534,7 +534,7 @@ paths whose values disagree, the only-there paths (the audit
 defaults, the caps, the grid constants the loaders wire via
 `static_defaults`).
 
-105 leaf paths; 18 in all four; 1 shared with differing values.
+106 leaf paths; 18 in all four; 1 shared with differing values.
 
 | key-path | per-tool values |
 |---|---|

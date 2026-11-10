@@ -40,7 +40,7 @@ packaging overview live in the [suite root](../README.md).
 - If Prometheus is unreachable, the page switches to **DEMO DATA** so you
   can preview the layout.
 
-## Run
+## Usage
 
 **Recommended (proxy mode, no CORS issues):** `bin/dashboard.py` serves
 the page and proxies `/prom/*` to your Prometheus — the browser never
@@ -157,7 +157,7 @@ control server.
 | `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | the XDG state home | the DSH audit trail: a file path, `-` for stdout (the docker logs / journald way) or `none` (no local file — the forward carries the trail) + the rotation/off + the forward (F10) |
 | `--log-level` / `--log-queries` / `--log-access` / `--local-time` | `INFO` / off / off / UTC | the log surface (`--log-queries` logs the proxied Prometheus queries at INFO) |
 
-## Control
+## Runtime control
 
 The server speaks the family's JSON-lines control protocol: it listens on
 a 0600 unix socket by default (`/tmp/dashboard-<port>.socket`) or a TCP

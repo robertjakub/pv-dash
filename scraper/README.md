@@ -251,7 +251,9 @@ in flags:
   charges/discharges — point the dashboard's `load` metric at a real meter
   register/exporter instead.
 
-## Runtime control (signals)
+## Runtime control
+
+### Signals
 
 | Signal | Effect |
 |---|---|

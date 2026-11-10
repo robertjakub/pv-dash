@@ -347,10 +347,10 @@ READMEs' `##` skeletons.
 
 **The README `##` skeletons:**
 
-- cache: How it works -> Diagnostics registers -> Register map (device profile) -> Usage -> Configuration -> Runtime control (signals) -> Runtime control (`--control-port`) -> Access control -> Modbus auth -> Persistence -> Metrics -> Audit logging -> Security -> Testing -> Nix / NixOS -> Source layout -> License
-- scraper: How it works -> Metrics -> Alerting -> Device profile -> Battery -> Configuration -> Runtime control (signals) -> What /metrics leaks (the privacy note, F15) -> Logging and audit trail -> Test inverter -> Testing -> Nix / NixOS -> Source layout -> License
+- cache: How it works -> Diagnostics registers -> Register map (device profile) -> Usage -> Configuration -> Runtime control -> Access control -> Modbus auth -> Persistence -> Metrics -> Audit logging -> Security -> Testing -> Nix / NixOS -> Source layout -> License
+- scraper: How it works -> Metrics -> Alerting -> Device profile -> Battery -> Configuration -> Runtime control -> What /metrics leaks (the privacy note, F15) -> Logging and audit trail -> Test inverter -> Testing -> Nix / NixOS -> Source layout -> License
 - inverter: Simulation -> Served registers (the default profile) -> Internal registers (not in the profile) -> Usage -> Configuration -> Runtime control -> Chaos injection (`--chaos`) -> Signals -> Docker -> Audit trail -> Security -> Testing -> Nix / NixOS -> Source layout -> License
-- dashboard: Features -> Run -> Configuration -> Control -> Behind a reverse proxy -> Metrics source -> Notes -> Security -> Testing -> Nix / NixOS -> Source layout -> License
+- dashboard: Features -> Usage -> Configuration -> Runtime control -> Behind a reverse proxy -> Metrics source -> Notes -> Security -> Testing -> Nix / NixOS -> Source layout -> License
 
 The findings:
 

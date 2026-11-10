@@ -10,8 +10,48 @@ This file keeps **Unreleased and the current release** only — the release
 history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Unreleased
+### Changed
+
+- **everywhere** — **the family-wide code sweep**: the shared live
+  knobs (the control plane — the port rebind, the ops policy, the
+  trusted peers, the socket group; the audit family's seven swaps;
+  the log level; the local-time formatter swap; the dump pair) ride
+  ONE body in `common/wire/control.py` now (`apply_family_key`/
+  `get_family_key` + the `record_cfg` show-config state write + the
+  one `_rebuild_audit`; the four `lib/control.py` copies died — the
+  scraper shed ~220 lines, the cache ~190, the dashboard ~130, the
+  fake ~110) — the tools' `_apply` route the restart preamble, the
+  family handler, then their own branches. `KNOWN_VERBS` derives
+  from the registry's command rows (`known_verbs` — the RBAC
+  vocabulary is the grammar's rows, one home; the console-eaten
+  `exit`/`logout` ride out) and the default ops policy derives with
+  it (`default_ops_verbs`: `clear` only where the grammar speaks it —
+  the cache keeps `show,clear`, the other three start at `show`).
+  The wire's refusal texts (the unknown/needs-a-value family, the
+  restart-required pair, the secret refusals, the ops-policy
+  one-liner, the audit-grammar pair, the interval/timeout ranges,
+  the suite-auth key demand, cannot-bind) compose
+  `shared/texts.json` — byte-honest transport, the suite pins keep
+  their bytes. The drift doc's knobs-deltas table speaks the drift
+  (the tools grouped by the value each carries), the docker sweep
+  grows the port-map gate (every EXPOSE/CMD/compose port rides a
+  registry listen default) and the secret sweep carries the
+  per-tool markers verdict.
+
 ### Fixed
 
+- **scraper** — **the registry's two live rows answer**: `set control
+ ops verbs` and `set control trust uids` hit no `_apply` branch and
+ answered `unknown setting` while the registry marked them live
+ (the ops policy and the trusted peers are settable family-wide
+ now, through the shared handler).
+- **cache** — **a live `set audit log-file -` spells stdout**: the
+  cache folded `-`/`stdout` to the XDG state home on the live path
+  (the start resolver and the scraper keep `-` raw — AuditLog's
+  reading); the raw spelling is the family's.
+- **dashboard** — **the live audit-forward/dump-path/dump-interval
+  renders ride `show config`** (the show-config-write-back contract
+  the other three tools kept — the startup values record them now).
 - **dashboard** — **a live `metrics/enable on` honors the configured
   caps**: the control's re-enable read the static `DEFAULT_METRICS_CAPS`,
   silently dropping the startup-configured `--metrics-max-clients`/

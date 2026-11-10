@@ -5,6 +5,20 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The family-wide code sweep (the shared-live-knobs wave): the control
+plane (the port rebind, the ops policy, the trusted peers, the socket
+group), the audit family's seven swaps, the log level, the local-time
+formatter swap and the dump pair ride ONE body in
+`common/wire/control.py` (`apply_family_key`/`get_family_key` + the
+`record_cfg` show-config state write + the one `_rebuild_audit`) — the
+tool's `_apply`/`_get` copies died into the routing (the restart
+preamble, the family handler, the tool's own branches). `KNOWN_VERBS`
+derives from the registry's command rows (`known_verbs`; the default
+ops policy derives with it — `clear` only where the grammar speaks
+it), the ladder refusals compose `on_off` and the wire's refusal texts
+compose `shared/texts.json` byte-honest (the suite pins kept their
+bytes). The scraper's registry lie died with it: `control/ops/verbs` and `control/trust-uids` carried live rows the grammar never spoke (a live `set` answered `unknown setting`) — they answer through the shared handler now, and the default ops policy is `show` (there is nothing to flush).
+
 The audit-forward targets wave (the off-box copy, the F10 finish line):
 `--audit-forward` spells one target now — `syslog:/path` (an explicit
 socket), `udp://host[:514]` (RFC5426, best-effort) and

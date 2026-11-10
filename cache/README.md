@@ -203,7 +203,9 @@ lands in `ps` — the file form is the shipped way (the audit's F9/F12).
 regenerates the script from the running daemon (secrets hidden) and `help
 config` maps every knob to its control command.
 
-## Runtime control (signals)
+## Runtime control
+
+### Signals
 
 | Signal | Effect |
 |---|---|
@@ -211,7 +213,7 @@ config` maps every knob to its control command.
 | `SIGUSR1` | **Clean the cache**: all cached values, on-demand entries and poll-status errors are dropped atomically, the poller repopulates immediately. |
 | `SIGTERM` / `SIGINT` | **Graceful shutdown.** |
 
-## Runtime control (`--control-port`)
+### The control port
 
 A JSON-lines control server runs **by default on the unix socket
 `/tmp/modbus-cache-<listen-port>.socket`** — pass a TCP port number to bind

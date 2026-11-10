@@ -388,7 +388,8 @@ def resolve_config(args, script_dir=None):
                        DEFAULTS['upstream'], str)
     host, port = parse_upstream(upstream or DEFAULTS['upstream'])
     upstream_auth = parse_auth_type(
-        resolve(getattr(args, 'auth_upstream', None), 'AUTH_UPSTREAM', 'auth_upstream', '', str),
+        resolve(getattr(args, 'auth_upstream', None), 'AUTH_UPSTREAM', 'auth_upstream',
+                DEFAULTS['auth_upstream'], str),
         'auth-upstream', schemes=('suite', 'waveshare'))
     cfg = {
         'upstream': '%s:%d' % (host, port),
@@ -418,7 +419,7 @@ def resolve_config(args, script_dir=None):
         'selection': parse_selection(resolve(getattr(args, 'selection', None), 'SELECTION',
                                             'selection', DEFAULTS['selection'], str)),
         'cache_ttl': resolve(args.cache_ttl, 'TTL', 'cache_ttl',
-                             DEFAULTS['cache_ttl_factor'] * interval, float),
+                             DEFAULTS['cache_ttl'], float),
         'local_time': resolve_bool(args.local_time, 'LOCAL_TIME', 'local_time', False),
         'log_access': resolve_bool(args.log_access, 'LOG_ACCESS', 'log_access', False),
         'max_clients': resolve(args.max_clients, 'MAX_CLIENTS', 'max_clients', DEFAULTS['max_clients'], int),

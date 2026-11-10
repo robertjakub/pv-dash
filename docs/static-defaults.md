@@ -1,68 +1,17 @@
-# The defaults sweep (2026-11-10)
+# The defaults trees
 
 Every value knob's default lives in its tool's `lib/defaults.json`
 `defaults` tree — the resolver ladder's last rung reads the tree entry
 by name (`DEFAULTS['key']`), and a gate keeps both directions honest.
-Before the sweep the trees carried only part of the defaults: the rest
-sat as inline literals in the resolvers, two of them shadowing live
-layers (the audit-forward-format row default hid the env twin and the
-config line on all four tools; the dashboard's loader-side listen
-default hid the `LISTEN` env), and the cache's and fake's trees held a
-`metrics_server` entry nothing read.
-
-Landed as 60b3770..09ddea0 (six per-tool commits: cache, scraper,
-inverter, dashboard, scripts, docs), with the follow-up that defined
-the cache's two remaining derived defaults later the same day
-(4ff32a1..04dd50f): `modbus/auth-upstream` defaults to the explicit
-`none` (the tree's `auth_upstream` entry — `parse_auth_type` still
-normalizes it to `None`) and `cache/ttl` defaults to the flat 30 s
-(the tree's `cache_ttl` entry — the 3 × interval `cache_ttl_factor`
-derivation and its tree key are gone). A second follow-up put **every
-bool's native False in the trees too** (the store_true flags resolved
-their False inline before) and the coverage gate dropped its
-bool-converter exemption — a bool without its tree entry fails like
-any other knob.
-
-## What entered the trees
-
-- **cache** — `connect_acl`, `write_acl`, `metrics_acl`,
-  `write_registers`, `selection`, `audit_forward`,
-  `audit_forward_format`, `dump_interval`, the follow-up's
-  `auth_upstream` (`"none"`) + `cache_ttl` (30.0), and the nine bools
-  (`allow_write`, `local_time`, `log_access`, `metrics_server`,
-  `audit_daily`, `no_audit_log`, `dump_with_cache`,
-  `restore_on_start`, `control_socket_group`).
-- **scraper** — `modbus_offset`, `metric_prefix`, `audit_forward`,
-  `audit_forward_format`, `dump_interval`, and the seven bools
-  (`grid_positive_import`, `local_time`, `log_access`,
-  `control_socket_group`, `audit_daily`, `no_audit_log`,
-  `restore_on_start`).
-- **dashboard** — `audit_forward`, `audit_forward_format`,
-  `dump_interval` (and the `static_defaults` listen shadow deleted from
-  `dashboard/lib/options.py`), plus the six bools
-  (`local_time`, `metrics_server`, `audit_daily`, `no_audit_log`,
-  `control_socket_group`, `restore_on_start` — `log_queries` and
-  `log_access` were already tree entries).
-- **inverter** — `timezone`, `connect_acl`, `audit_forward`,
-  `audit_forward_format`, and the nine bools (`static`, `strict`,
-  `allow_write`, `control_socket_group`, `control_log_replies`,
-  `metrics_server`, `audit_daily`, `no_audit_log`,
-  `restore_on_start` — the `STATIC_DEFAULTS` map reads the tree).
-
-The sweep's dead `metrics_server: false` removal (the cache's and the
-fake's) was undone by the bools' follow-up — the entries are back, now
-read by the resolvers' static rungs like every other tree key.
+No knob carries an inline literal default: a bool's native False sits
+in the tree like any value knob's default, and a missing bool entry
+fails the gate.
 
 ## The knobs outside the trees
 
 A flag knob's default is either a `defaults`-tree key or one of the
 no-entry shapes below; `scripts/check_options.py` fails the tool when
-neither holds. One class stays out by named reason (the secrets are
-banned outright, after the table) — the bools started there and moved
-in: the follow-up put every bool's native False in the tree too (the
-store_true flag absent resolves False through the tree entry like any
-value knob), and the coverage gate dropped its bool-converter
-exemption, so a bool without its tree entry fails.
+neither holds.
 
 | Tool | Named no-entry — the reason each |
 |---|---|
@@ -83,7 +32,7 @@ a shipped secret default would ride every install.
 
 The enforcement is one rule plus two outs: every flag knob's default
 names its tree entry; the named no-entry knobs must appear in the
-gate's `NO_TREE_DEFAULT` map (the common three in
+gate's `NO_TREE_DEFAULT` map (the common two in
 `_COMMON_NO_TREE_DEFAULT`, the per-tool extras beside them); the
 secrets fail the outright ban.
 
@@ -91,23 +40,21 @@ The audit rotation bounds (`audit_max_mb`, `audit_files`) ride both
 sides — the daemons' static rungs read their tree entries, the client
 scripts render the same entries.
 
-The four graduates carry the empty string as their tree value:
-`control_trust_uids` `""` = nobody trusted, `dump_path` `""` = the
-state dump is off, `audit_log` `""` = **the XDG state home's
-audit.log** (the one dynamic default — the tree cannot hold a
-per-user path, the falsy chain resolves it at start), and the three
-Modbus tools' `modbus_profile` `"sun2000"` (the bare name, resolved
-through the shared profiles/ walk).
-
 ### The graduation ledger — the proposals for what remains
 
 The empty-string convention is the pattern: the tree value spells the
 knob's own off/derived semantics, the falsy chains resolve it exactly
-as the inline literals did, the rung names the entry.
+as the inline literals did, the rung names the entry. The shipped
+examples: `control_trust_uids` `""` = nobody trusted, `dump_path` `""`
+= the state dump is off, `audit_log` `""` = the XDG state home's
+audit.log (the one dynamic default — the tree cannot hold a per-user
+path, the falsy chain resolves it at start), and the three Modbus
+tools' `modbus_profile` `"sun2000"` plus `modbus_auth` `"none"` (the
+bare names, resolved through the shared profiles/ walk and
+`parse_auth_type`'s fold to `None`).
 
 | Knob | Proposal | Ruling |
 |---|---|---|
-| `auth` (the three Modbus tools) | DONE — the registry name is `modbus-auth` (`--modbus-auth` / `MODBUS_AUTH`) and the tree carries `"modbus_auth": "none"` (the explicit off — `parse_auth_type` folds it to `None`) | graduated |
 | `control-port` (all four) | `"control_port": ""` — the empty = the derived socket (the template against the listen port; the one derived default the tree cannot hold verbatim, the audit-log shape) | TODO |
 | `control-ops-verbs` (all four) | `"control_ops_verbs": "<the concrete csv>"` — the registry keeps the parse/validate; a gate row would diff the tree's literal against `default_ops_verbs` so the two cannot drift | TODO — needs the drift-diff gate row first |
 | `metrics-spec` (scraper) | `"metrics_spec": ""` — the empty = the built-in `lib/metrics.json` block | TODO |
@@ -118,7 +65,7 @@ as the inline literals did, the rung names the entry.
 
 ## The gate
 
-`scripts/check_options.py` gained three rows per tool:
+`scripts/check_options.py` runs three rows per tool:
 
 - **every defaults.json defaults key is read by lib/** — a dead letter
   fails: a tree entry nothing resolves is a lie waiting to rot. The
@@ -130,22 +77,8 @@ as the inline literals did, the rung names the entry.
   `interval` → `interval_s`, `read-delay` → `read_delay_s`,
   `client-timeout` → `client_timeout_s`,
   `metrics-client-timeout` → `metrics_client_timeout_s`,
-  `requests-audit` → `requests_audit_s`), or a `NO_TREE_DEFAULT`
-  reason. The bools take no exemption: a missing bool entry fails
-  (proven on a doctored tree that dropped `allow_write`).
+  `requests-audit` → `requests_audit_s`,
+  `profile` → `modbus_profile`), or a `NO_TREE_DEFAULT` reason. The
+  bools take no exemption: a missing bool entry fails.
 - **no defaults-tree key names a secret** — the secret's default is
-  None, never a settable default (the ruling above; proven to fail on
-  a doctored tree).
-
-## Verified
-
-`check_options.py` ALL PASS (87 rows — the secret-ban row included,
-proven to fail on a doctored `auth_key` tree entry), `lint_options.py --check`,
-`lint_texts.py --check`, `gen_man.py --check` (the man pages byte-stable
-— `Option.default` feeds `build_parser` alone, no report surface), the
-`family_drift.py` regeneration, and the battery suites (the one
-cache-regtest `set merge-gap` failure was the first-suite flake — the
-audit trail shows the set replied ok, and the lone clean re-run passed).
-Live probes: `AUDIT_FORWARD_FORMAT=cef` resolves on all four,
-`LISTEN=0.0.0.0:9999` on the dashboard, and the follow-up's
-`AUTH_UPSTREAM=none` / `TTL` ladder verified through `resolve_config`.
+  None, never a settable default (the ruling above).

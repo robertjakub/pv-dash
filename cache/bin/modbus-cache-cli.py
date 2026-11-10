@@ -91,7 +91,7 @@ SPEC = dict(label='the cache proxy', daemon_label='modbus-cache control server',
             command_pool=command_pool, setting_pool=setting_pool,
             describe=describe_word,
             welcome=welcome, loop=cli.typed_loop,
-            silent_ok=lambda low: low.startswith(('request clear', 'request restart')),
+            silent_ok=lambda low: low.startswith(('request flush', 'request restart')),
             render=_render_special, cli_page=cli_page)
 
 if __name__ == '__main__':

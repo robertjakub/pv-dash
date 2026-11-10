@@ -289,8 +289,8 @@ def main():
               st == 'ok' and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show cache')
         check('ops: show cache honored', st == 'ok' and macok, '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('request clear cache')
-        check('ops: request clear cache honored (the read-only shift may flush)',
+        st, tx, macok = ops_roundtrip('request flush cache')
+        check('ops: request flush cache honored (the read-only shift may flush)',
               st == 'ok' and 'cache cleared' in tx and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('set modbus interval 5')
         check('ops: set is forbidden', st == 'fail' and 'forbidden' in tx and 'admin' in tx and macok,
@@ -317,7 +317,7 @@ def main():
         check('ops: a bogus token is refused', st == 'auth-fail', '%s %s' % (st, tx))
         try:
             aud = open(OPS_AUDIT).read()
-            ok = ("role=ops 'request clear cache'" in aud and "role=admin 'set modbus interval 5'" in aud
+            ok = ("role=ops 'request flush cache'" in aud and "role=admin 'set modbus interval 5'" in aud
                   and "role=ops 'shutdown'" in aud and "role=ops 'set modbus interval 5' wire=h" in aud)
         except OSError as e:
             aud, ok = str(e), False

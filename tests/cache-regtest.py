@@ -671,7 +671,7 @@ try:
           r == 'ok restore a setting to its configured value: clear <setting>', r)
     r = ctl_cmd('help request', 15514 + BASE)
     check('help <command node>: the namespace lists its children (the ? shape)',
-          r == 'ok     clear         drop the cached registers and repoll now\n'
+          r == 'ok     flush         drop the cached registers and repoll now\n'
                '    reload        save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)\n'
                '    reload-config re-read the config file (the SIGHUP path)', r)
     r = ctl_cmd('help request reload', 15514 + BASE)

@@ -27,7 +27,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.runtime.audit import AuditLog
+from common.runtime.audit import AuditLog, default_path
 from common.wire.cred import parse_trust_uids
 from common.serve.connlimit import GatedHTTPServer, rate_limit_503
 from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, install_signal_handlers, log_state_dumps, \
@@ -390,12 +390,11 @@ def main():
             'dump/path': cfg['dump_path'] or 'off',
             'dump/restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
             'dump-interval': 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval'],
-            'audit-log': 'off' if cfg['no_audit_log'] else ('stdout' if cfg['audit_log'] == '-'
-                                                            else (cfg['audit_log'] or 'the XDG state home')),
-            'audit-max-mb': '%g' % cfg['audit_max_mb'],
+            'audit/log-file': 'off' if cfg['no_audit_log'] else (cfg['audit_log'] or default_path('dashboard')),
+            'audit/rotate/max-size': '%g' % cfg['audit_max_mb'],
             'audit/rotate/daily': 'on' if cfg['audit_daily'] else 'off',
-            'audit-files': str(cfg['audit_files']),
-            'no-audit-log': 'on' if cfg['no_audit_log'] else 'off',
+            'audit/rotate/files': str(cfg['audit_files']),
+            'audit/disable': 'on' if cfg['no_audit_log'] else 'off',
             'local-time': 'on' if cfg['local_time'] else 'off',
         }
         # the secret rows (control/token, control/ops/token, metrics/token,

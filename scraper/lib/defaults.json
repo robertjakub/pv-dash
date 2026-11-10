@@ -22,6 +22,7 @@
     "max_kwp": 6.0,
     "max_grid_kw": 12.0,
     "grid_positive_import": false,
+    "metrics_spec": "",
     "metric_prefix": "huawei",
     "max_clients": 64,
     "client_timeout_s": 300.0,
@@ -41,6 +42,8 @@
     "restore_on_start": false,
     "control_socket_group": false,
     "control_trust_uids": "",
+    "control_port": "",
+    "control_ops_verbs": "show",
     "dump_path": "",
     "modbus_profile": "sun2000"
   }

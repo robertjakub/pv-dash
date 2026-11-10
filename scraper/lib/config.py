@@ -220,7 +220,7 @@ def resolve_config(args, script_dir=None):
                              'metric_prefix', prefix_default, str)
                      or prefix_default).strip() or prefix_default
     metrics_spec = resolve(getattr(args, 'metrics_spec', None), 'METRICS_SPEC',
-                           'metrics_spec', None, str)
+                           'metrics_spec', DEFAULTS['metrics_spec'], str)
     spec = Metrics(metrics_spec, prefix=metric_prefix)
 
     # the metrics spec's "profile" fields pick the device registers feeding
@@ -272,14 +272,14 @@ def resolve_config(args, script_dir=None):
                          DEFAULTS['log_level'], str).strip().upper(),
     }
     cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'CTL',
-                                  'control_port', None, str)
+                                  'control_port', DEFAULTS['control_port'], str)
     cfg['control_token'] = parse_secret((resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
                                                  'control_token', None, str) or '').strip() or None, 'control/token')
     cfg['control_ops_token'] = parse_secret((resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
                                                      'control_ops_token', None, str) or '').strip() or None,
                                             'control-ops-token')
     cfg['control_ops_verbs'] = (resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
-                                        'control_ops_verbs', DEFAULT_OPS_VERBS,
+                                        'control_ops_verbs', DEFAULTS['control_ops_verbs'],
                                         str) or DEFAULT_OPS_VERBS).strip() or DEFAULT_OPS_VERBS
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None), 'CONTROL_TRUST_UIDS',
                                         'control_trust_uids', DEFAULTS['control_trust_uids'], str)

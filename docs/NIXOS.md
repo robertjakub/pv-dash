@@ -117,17 +117,21 @@ services.modbus-scraper = {
 | `logLevel` / `logAccess` / `localTime` | the log surface |
 | `openFirewall` | open `listenPort` |
 
-The package also ships the **alert rules pack**
-(`share/modbus-scraper/alerts.yml` — the F16 closure, the audit
-vocabulary's detection half): a Prometheus on the same host points its
-`ruleFiles` at it and the poll story alerts itself:
+The packages also ship the **alert rules pack** (`alerts/` in the repo —
+the F16 closure, the audit vocabulary's detection half, one file per
+watched exporter): the scraper's copy sits at
+`share/modbus-scraper/alerts.yml`, the cache's at
+`share/modbus-cache/alerts.yml`. A Prometheus on the same host points its
+`ruleFiles` at the packaged copies and the poll story alerts itself:
 
 ```nix
 services.prometheus.ruleFiles =
-  [ "${inputs.pv-dash.packages.${pkgs.system}.modbus-scraper}/share/modbus-scraper/alerts.yml" ];
+  [ "${inputs.pv-dash.packages.${pkgs.system}.modbus-scraper}/share/modbus-scraper/alerts.yml"
+    "${inputs.pv-dash.packages.${pkgs.system}.modbus-cache}/share/modbus-cache/alerts.yml" ];
 ```
 
-The pack's cache group (`CachePollDown`, `CacheAgeSpike`,
+List only the copies of the tools you run — a cache-only install still
+carries its half. The cache group (`CachePollDown`, `CacheAgeSpike`,
 `CacheWriteRefusalBurst`) stays silent until the cache's own `/metrics`
 endpoint is scraped — enable `services.modbus-cache.metricsServer` and
 add its scrape job to arm it. Thresholds assume the default 10 s poll

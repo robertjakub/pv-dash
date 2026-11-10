@@ -12,6 +12,17 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Added
 
+- **alerts** — **the alert rules pack re-homed to `alerts/`, split per
+  exporter**: the F16 pack leaves the scraper tree — one rule file per
+  watched exporter (`alerts/scraper.yml`, `alerts/cache.yml`,
+  alerts/README.md carries the story + the install map), and each
+  exporter's package installs its own half
+  (`share/modbus-scraper/alerts.yml`, `share/modbus-cache/alerts.yml`),
+  so a cache-only install now carries the cache group. The demo
+  Prometheus image bakes both files (the `alerts` build context rides
+  `../alerts`; `rule_files:` globs `/etc/prometheus/alerts/*.yml`);
+  docs/NIXOS.md lists both packaged copies under `ruleFiles`.
+
 - **common** — **the audit-forward targets (the off-box copy, the F10
   finish line)**: `--audit-forward` spells one target now — `none`,
   `syslog` (the local socket auto-scan), `syslog:/path` (an explicit

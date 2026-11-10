@@ -24,8 +24,10 @@ layout:
 
 Deliberately *not* here: [`profiles/`](../profiles/README.md) (the
 device profiles — one JSON format with a linter and a formatter of
-their own) and [`examples/`](../examples/README.md) (the sample files
-the tools' `file:` gates point at) stay their own root dirs; the
+their own), [`examples/`](../examples/README.md) (the sample files
+the tools' `file:` gates point at) and [`alerts/`](../alerts/README.md)
+(the Prometheus rule pack — shipped by the watched exporters' packages,
+loaded by no tool) stay their own root dirs; the
 tool-local schemas stay in each tool's `schema/` dir.
 
 ## License

@@ -60,18 +60,21 @@ together close the retention/immutability story (NIS2 21.2(b), DORA
 art. 11 — the logs an incident needs survive the box). Rev. 27 extends
 the spelling to the full target grammar above.
 
-**Rev. 25 — the alert rules pack (F16 closed).** The exporter ships
-`scraper/alerts.yml` next to itself: six alerts in two groups — the
-scraper's poll story (`ScraperPollDown`, the freshness gap
-`ScraperFreshnessGap`, `ScraperExceptionSpike`) and the cache's side
+**Rev. 25 — the alert rules pack (F16 closed).** The pack ships at
+`alerts/`, one rule file per watched exporter: six alerts in two groups —
+the scraper's poll story (`ScraperPollDown`, the freshness gap
+`ScraperFreshnessGap`, `ScraperExceptionSpike` in `alerts/scraper.yml`)
+and the cache's side
 (`CachePollDown`, `CacheAgeSpike`, `CacheWriteRefusalBurst` on a new
 `modbus_cache_write_refused_total` counter — every gate refusal is a
-WRITE-REFUSED audit event, now counted on the cache's own /metrics). The
+WRITE-REFUSED audit event, now counted on the cache's own /metrics — in
+`alerts/cache.yml`). The
 annotations quote the audit vocabulary: a fired page names the audit
 events and the log lines to grep, so detection is wired, not just logged
 (NIS2 21.2(b), DORA art. 11). The demo image bakes the pack
-(`prometheus.yml`'s `rule_files:`), the Nix package installs it
-(`share/modbus-scraper/alerts.yml`), docs/NIXOS.md shows the
+(`prometheus.yml`'s `rule_files:`), each watched exporter's Nix package
+installs its half (`share/modbus-scraper/alerts.yml`,
+`share/modbus-cache/alerts.yml`), docs/NIXOS.md shows the
 `services.prometheus.ruleFiles` wiring; the cache group stays silent
 until the cache's own /metrics is scraped.
 

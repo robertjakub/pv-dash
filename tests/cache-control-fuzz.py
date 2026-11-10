@@ -292,10 +292,10 @@ def main():
         st, tx, macok = ops_roundtrip('request flush cache')
         check('ops: request flush cache honored (the read-only shift may flush)',
               st == 'ok' and 'cache cleared' in tx and macok, '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('set modbus interval 5')
+        st, tx, macok = ops_roundtrip('set interval 5')
         check('ops: set is forbidden', st == 'fail' and 'forbidden' in tx and 'admin' in tx and macok,
               '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('clear modbus interval')
+        st, tx, macok = ops_roundtrip('clear interval')
         check('ops: clear is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request restore')
         check('ops: request restore is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
@@ -310,15 +310,15 @@ def main():
         st, tx, macok = ops_roundtrip('show version', unsigned=True)
         check('ops: an unsigned command is still refused first', st == 'fail' and 'unsigned command' in tx,
               '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('set modbus interval 5', token='admintok2')
+        st, tx, macok = ops_roundtrip('set interval 5', token='admintok2')
         check('ops: the admin token still steers the same server, mac\'d with the admin key',
               st == 'ok' and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show version', token='nope')
         check('ops: a bogus token is refused', st == 'auth-fail', '%s %s' % (st, tx))
         try:
             aud = open(OPS_AUDIT).read()
-            ok = ("role=ops 'request flush cache'" in aud and "role=admin 'set modbus interval 5'" in aud
-                  and "role=ops 'shutdown'" in aud and "role=ops 'set modbus interval 5' wire=h" in aud)
+            ok = ("role=ops 'request flush cache'" in aud and "role=admin 'set interval 5'" in aud
+                  and "role=ops 'shutdown'" in aud and "role=ops 'set interval 5' wire=h" in aud)
         except OSError as e:
             aud, ok = str(e), False
         check('ops: both roles audited (role=ops clear, role=admin set, the denials included)',

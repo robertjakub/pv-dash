@@ -365,8 +365,8 @@ def main():
         st, _ = http_get(B_METRICS, token='tok')
         check('metrics recovers after the slot frees', st.split()[1] == '200', st)
         # the live metrics-server switch: off stops the endpoint, on restarts it
-        tx = ctl(B_CTL, 'set metrics enable off')
-        check('metrics enable: set off', tx.startswith('ok metrics/enable=off'), tx)
+        tx = ctl(B_CTL, 'set metrics-server off')
+        check('metrics enable: set off', tx.startswith('ok metrics-server=off'), tx)
         srv_down = False
         try:
             connect(B_METRICS, 1.0).close()
@@ -376,8 +376,8 @@ def main():
         insb = ctl(B_CTL, 'inspect')
         check('metrics enable: inspect says off', '\nmetrics   off' in '\n' + insb,
               [l for l in insb.splitlines() if l.startswith('metrics')])
-        tx = ctl(B_CTL, 'set metrics enable on')
-        check('metrics enable: set on serves again', tx.startswith('ok metrics/enable=on'), tx)
+        tx = ctl(B_CTL, 'set metrics-server on')
+        check('metrics enable: set on serves again', tx.startswith('ok metrics-server=on'), tx)
         st, _ = http_get(B_METRICS, token='tok')
         check('metrics enable: the gauges are back', st.split()[1] == '200', st)
         insb = ctl(B_CTL, 'inspect')
@@ -391,16 +391,16 @@ def main():
               oct(os.stat('/tmp/fake-inverter-%d.socket' % D_MODBUS).st_mode & 0o777))
         check('control: --control-socket-group chmods the socket 0660',
               os.stat(E_SOCK).st_mode & 0o777 == 0o660, oct(os.stat(E_SOCK).st_mode & 0o777))
-        tx = ctl(F_CTL, 'set metrics token off')
-        check('metrics token: startup-only — the set refuses (the dump/key treatment)',
+        tx = ctl(F_CTL, 'set metrics-token off')
+        check('metrics token: startup-only — the set refuses (the dump-key treatment)',
               tx.startswith('% error: restart required (startup-only knob)'), tx)
-        tx = ctl(F_CTL, 'set metrics enable on')
+        tx = ctl(F_CTL, 'set metrics-server on')
         check('metrics enable: the token-less live start on 0.0.0.0 refuses (the F13 shape)',
               '% error:' in tx and 'refusing to expose /metrics beyond loopback' in tx, tx)
         logf = open(LOG + '.f').read()
         check('metrics enable: the refusal is a clean err (no traceback)', 'Traceback' not in logf,
               [l for l in logf.splitlines() if 'Trace' in l])
-        tx = ctl(F_CTL, 'set metrics token t')
+        tx = ctl(F_CTL, 'set metrics-token t')
         check('metrics token: startup-only — the token set refuses too',
               tx.startswith('% error: restart required (startup-only knob)'), tx)
         # the token serves at START instead: a spawned instance answers the
@@ -429,7 +429,7 @@ def main():
         check('F13: the loopback metrics listen needs no token',
               r.returncode == 0, repr((r.stderr + r.stdout)[-140:]))
 
-        # ---- the metrics/acl gate (the cache's logic, the fake's surface):
+        # ---- the metrics-acl gate (the cache's logic, the fake's surface):
         # the accept-time IP gate on the /metrics listener — the ACL first,
         # then the caps, the token's 401 only past both
         ACLGATE = '/tmp/inv_acl_gate.json'
@@ -454,37 +454,37 @@ def main():
             finally:
                 s.close()
 
-        r = ctl(B_CTL, 'set metrics acl none')
-        check('metrics acl: set none answers ok', r.startswith('ok metrics/acl=none'), r[:80])
+        r = ctl(B_CTL, 'set metrics-acl none')
+        check('metrics acl: set none answers ok', r.startswith('ok metrics-acl=none'), r[:80])
         check('metrics acl: none closes the client without a reply', acl_raw() == b'',
               repr(acl_raw()[:40]))
-        r = ctl(B_CTL, 'show metrics acl')
-        check('metrics acl: the none show', r == 'ok metrics/acl=none', r[:60])
-        r = ctl(B_CTL, 'show metrics acl table')
+        r = ctl(B_CTL, 'show metrics-acl')
+        check('metrics acl: the none show', r == 'ok metrics-acl=none', r[:60])
+        r = ctl(B_CTL, 'show metrics-acl-table')
         check('metrics acl: none spells the deny-any chain', r == 'ok metrics-acl-table\ndeny 0.0.0.0/0', r[:80])
-        r = ctl(B_CTL, 'set metrics acl table')
+        r = ctl(B_CTL, 'set metrics-acl table')
         check('metrics acl: the show word is not a value (the pointer to the report)',
-              r.startswith('% error:') and 'show metrics acl table' in r, r[:120])
-        r = ctl(B_CTL, 'set metrics acl 127.0.0.1')
-        check('metrics acl: the whitelist set canonicalizes', r.startswith('ok metrics/acl=127.0.0.1/32'), r[:80])
+              r.startswith('% error:') and 'show metrics-acl-table' in r, r[:120])
+        r = ctl(B_CTL, 'set metrics-acl 127.0.0.1')
+        check('metrics acl: the whitelist set canonicalizes', r.startswith('ok metrics-acl=127.0.0.1/32'), r[:80])
         check('metrics acl: the whitelist serves the lab', acl_raw().startswith(b'HTTP/1.0 200'))
-        r = ctl(B_CTL, 'show metrics acl table')
+        r = ctl(B_CTL, 'show metrics-acl-table')
         check('metrics acl: the whitelist table', r == 'ok metrics-acl-table\ndeny 0.0.0.0/0\nallow 127.0.0.1/32', r[:80])
-        r = ctl(B_CTL, 'set metrics acl file:' + ACLGATE)
-        check('metrics acl: the file gate loads', r.startswith('ok metrics/acl=file:%s' % ACLGATE), r[:100])
-        r = ctl(B_CTL, 'show metrics acl')
-        check('metrics acl: the file spelling shows', r == 'ok metrics/acl=file:%s' % ACLGATE, r[:80])
-        r = ctl(B_CTL, 'show metrics acl table')
+        r = ctl(B_CTL, 'set metrics-acl file:' + ACLGATE)
+        check('metrics acl: the file gate loads', r.startswith('ok metrics-acl=file:%s' % ACLGATE), r[:100])
+        r = ctl(B_CTL, 'show metrics-acl')
+        check('metrics acl: the file spelling shows', r == 'ok metrics-acl=file:%s' % ACLGATE, r[:80])
+        r = ctl(B_CTL, 'show metrics-acl-table')
         check('metrics acl: the file gate renders its own rules',
               r == 'ok metrics-acl-table\n% the lab gate\ndeny 0.0.0.0/0\nallow 127.0.0.1 # the loopback lab', r[:160])
         check('metrics acl: the file gate serves the lab', acl_raw().startswith(b'HTTP/1.0 200'))
         with open(ACLGATE, 'w') as f:
             json.dump({'type': 'ip-prefix', 'rules': [{'type': 'allow', 'prefix': '127.0.0.1/8'}]}, f)
-        r = ctl(B_CTL, 'set metrics acl file:' + ACLGATE)
+        r = ctl(B_CTL, 'set metrics-acl file:' + ACLGATE)
         check('metrics acl: a bad file answers err with the old gate standing',
               r.startswith('% error:') and 'spell the network' in r and acl_raw().startswith(b'HTTP/1.0 200'), r[:140])
-        r = ctl(B_CTL, 'clear metrics acl')
-        check('metrics acl: clear restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
+        r = ctl(B_CTL, 'clear metrics-acl')
+        check('metrics acl: clear restores the configured value', r.startswith('ok metrics-acl=any'), r[:80])
         check('metrics acl: any serves again', acl_raw().startswith(b'HTTP/1.0 200'))
         g = connect(G_MODBUS)
         txn, unit, body = exchange(g, read_req(1, 3, 32064, 2), 1)
@@ -598,31 +598,31 @@ def main():
         check('grid wander: the default restores',
               tx.startswith('ok grid-voltage-wander=0.1'), tx)
 
-        # ---- the secrets: startup-only (the dump/key treatment) — set/clear
+        # ---- the secrets: startup-only (the dump-key treatment) — set/clear
         #      refuse on the wire, the show verb refuses them — a secret never renders
-        tx = ctl(H_CTL, 'show control token', token='tok')
-        check('secrets: the control token never shows', tx.startswith('% error: control/token is a secret'), tx)
-        tx = ctl(H_CTL, 'clear control token', token='tok')
+        tx = ctl(H_CTL, 'show control-token', token='tok')
+        check('secrets: the control token never shows', tx.startswith('% error: control-token is a secret'), tx)
+        tx = ctl(H_CTL, 'clear control-token', token='tok')
         check('secrets: clear refuses a secret (startup-only)',
               tx.startswith('% error: restart required (startup-only knob)'), tx)
-        tx = ctl(H_CTL, 'set control token tok2', token='tok')
+        tx = ctl(H_CTL, 'set control-token tok2', token='tok')
         check('secrets: the control token is startup-only — the set refuses',
               tx.startswith('% error: restart required (startup-only knob)'), tx)
         tx = ctl(H_CTL, 'show version', token='tok')
         check('secrets: the configured control token still speaks (no live rotation)',
               tx.startswith('ok fake-inverter'), tx)
-        tx = ctl(H_CTL, 'set metrics token mtok2', token='tok')
+        tx = ctl(H_CTL, 'set metrics-token mtok2', token='tok')
         check('secrets: the metrics token is startup-only — the set refuses',
               tx.startswith('% error: restart required (startup-only knob)'), tx)
-        tx = ctl(H_CTL, 'show metrics token', token='tok')
-        check('secrets: the metrics token never shows', tx.startswith('% error: metrics/token is a secret'), tx)
-        tx = ctl(H_CTL, 'clear metrics token', token='tok')
+        tx = ctl(H_CTL, 'show metrics-token', token='tok')
+        check('secrets: the metrics token never shows', tx.startswith('% error: metrics-token is a secret'), tx)
+        tx = ctl(H_CTL, 'clear metrics-token', token='tok')
         check('secrets: clear refuses the metrics token too',
               tx.startswith('% error: restart required (startup-only knob)'), tx)
         tx = ctl(H_CTL, 'show config', token='tok')
         check('secrets: show config renders the secret knob as the placeholder',
-              'set control token *** SECRET REMOVED ***' in tx
-              and 'set control token tok' not in tx and 'tok2' not in tx, tx[:200])
+              'set control-token *** SECRET REMOVED ***' in tx
+              and 'set control-token tok' not in tx and 'tok2' not in tx, tx[:200])
 
         # ---- the whole-daemon reload (the fake has no config file — its
         #      reload state lives in the XDG state home) and the settings
@@ -705,7 +705,7 @@ def main():
         check('reload: the re-execed fake shuts down clean', tx.startswith('bye shutdown'), tx)
         time.sleep(0.4)
 
-        # ---- the sealed dumps (dump/key): the state rides encrypted (an
+        # ---- the sealed dumps (dump-key): the state rides encrypted (an
         #      HMAC-SHA256 counter-mode box), the restore fails closed on a
         #      wrong or missing key — and on an unsealed dump under a
         #      configured key — and the keyed reload re-reads the sealed
@@ -727,11 +727,11 @@ def main():
                                       stdout=open(LOG + '.j', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
         time.sleep(1.5)
-        tx = ctl(J_CTL, 'show dump key')
-        check('sealed dump: show dump/key is a secret — it never shows',
-              tx.startswith('% error: dump/key is a secret'), tx[:100])
-        tx = ctl(J_CTL, 'set dump key other')
-        check('sealed dump: set dump/key answers the restart note (the key cannot drift mid-life)',
+        tx = ctl(J_CTL, 'show dump-key')
+        check('sealed dump: show dump-key is a secret — it never shows',
+              tx.startswith('% error: dump-key is a secret'), tx[:100])
+        tx = ctl(J_CTL, 'set dump-key other')
+        check('sealed dump: set dump-key answers the restart note (the key cannot drift mid-life)',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:100])
         tx = ctl(J_CTL, 'set pv 120')
         check('sealed dump: the pin lands', 'ok pv=120' in tx, tx)
@@ -775,7 +775,7 @@ def main():
         check('sealed dump: the daemon is up despite the refused dump', tx == 'ok pv=auto', repr(tx))
         procs[-1].kill()
         time.sleep(0.3)
-        # no key at all: a sealed dump refuses with the pointer to dump/key
+        # no key at all: a sealed dump refuses with the pointer to dump-key
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
                                        '--control-port', str(J_CTL), '--dump-path', kstate,
                                        '--restore-on-start', '--config', jconf],
@@ -788,7 +788,7 @@ def main():
                 break
             time.sleep(0.1)
         check('sealed dump: a sealed dump without any key refuses at start',
-              'is sealed' in line and 'dump/key' in line, line[-220:])
+              'is sealed' in line and 'dump-key' in line, line[-220:])
         procs[-1].kill()
         time.sleep(0.3)
         # a configured key refuses an UNSEALED dump (plaintext stopped being trust at rest)
@@ -800,11 +800,11 @@ def main():
         line = ''
         for _ in range(80):
             line = open(LOG + '.j4').read()
-            if 'dump/key is configured' in line:
+            if 'dump-key is configured' in line:
                 break
             time.sleep(0.1)
         check('sealed dump: a configured key refuses an unsealed dump',
-              'is not sealed' in line and 'dump/key is configured' in line, line[-220:])
+              'is not sealed' in line and 'dump-key is configured' in line, line[-220:])
         procs[-1].kill()
         time.sleep(0.3)
         # the right key: the sealed dump restores at start, and the keyed
@@ -865,10 +865,10 @@ def main():
                 break
             time.sleep(0.1)
         check('file-key: a dump path without a key warns unsealed at start',
-              'is not sealed' in line and 'set dump/key' in line, line[-220:])
-        tx = ctl(K_CTL, 'set dump path %s' % kfile_state)
+              'is not sealed' in line and 'set dump-key' in line, line[-220:])
+        tx = ctl(K_CTL, 'set dump-path %s' % kfile_state)
         check('file-key: the set dump path reply notes the unsealed dump',
-              tx.startswith('ok dump/path=%s (not sealed' % kfile_state), tx[:120])
+              tx.startswith('ok dump-path=%s (not sealed' % kfile_state), tx[:120])
         tx = ctl(K_CTL, 'set pv 77')
         tx = ctl(K_CTL, 'request dump')
         check('file-key: the keyless dump stays plaintext (no sealed mark)',
@@ -888,11 +888,11 @@ def main():
         line = ''
         for _ in range(80):
             line = open(LOG + '.k2').read()
-            if 'dump/key is configured' in line:
+            if 'dump-key is configured' in line:
                 break
             time.sleep(0.1)
         check('file-key: the file-reference key refuses the plaintext dump at start (the symmetric gate)',
-              'is not sealed but dump/key is configured' in line, line[-220:])
+              'is not sealed but dump-key is configured' in line, line[-220:])
         procs[-1].kill()
         time.sleep(0.3)
         kfile_state2 = '/tmp/inv_regtest_state_filekey2.json'
@@ -962,7 +962,7 @@ def main():
             time.sleep(0.1)
         check('file-key: the control token takes the file: reference at start (the file material authenticates)',
               back == 'ok pv=78', repr(back))
-        tx = ctl(K_CTL, 'set control token tok2', token='tok-from-file-77')
+        tx = ctl(K_CTL, 'set control-token tok2', token='tok-from-file-77')
         check('file-key: the tokenized instance still refuses the live set (startup-only)',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:120])
         procs[-1].kill()
@@ -977,12 +977,12 @@ def main():
         line = ''
         for _ in range(80):
             line = open(LOG + '.k5').read()
-            if 'cannot read dump/key' in line:
+            if 'cannot read dump-key' in line:
                 break
             time.sleep(0.1)
         time.sleep(0.3)   # the SystemExit prints, then the process is gone
         check('file-key: an unreadable reference fails the start (fail fast, never plaintext)',
-              'cannot read dump/key' in line and procs[-1].poll() is not None, line[-220:])
+              'cannot read dump-key' in line and procs[-1].poll() is not None, line[-220:])
 
         # ---- --man: every tool prints its generated roff page
         for tool, title in ((F, 'MODBUS-FAKE-INVERTER'), (CTL, 'MODBUS-FAKE-CTL'),
@@ -1040,37 +1040,37 @@ def main():
             pass
         c.close()
         check('suite auth: a bad magic answers ERR verbatim', verdict == b'ERR', verdict.hex())
-        tx = ctl(L_CTL, 'show modbus auth')
-        check('suite auth: show modbus auth reads suite', tx == 'ok modbus/auth=suite', tx)
-        tx = ctl(L_CTL, 'show modbus auth key')
-        check('suite auth: the key never shows', tx.startswith('% error: modbus/auth/key is a secret'), tx[:80])
+        tx = ctl(L_CTL, 'show modbus-auth')
+        check('suite auth: show modbus auth reads suite', tx == 'ok modbus-auth=suite', tx)
+        tx = ctl(L_CTL, 'show auth-key')
+        check('suite auth: the key never shows', tx.startswith('% error: auth-key is a secret'), tx[:80])
         tx = ctl(L_CTL, 'show modbus')
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
-        check('node walk: the modbus listing mimics the ? walk (the key never lists)',
-              words == ['auth', 'profile'] and 'auth/key' not in tx, tx[:160])
+        check('node walk: the modbus listing answers the flat names (the key never lists)',
+              words == ['modbus-auth', 'profile'] and 'auth-key' not in tx, tx[:160])
         tx = ctl(L_CTL, 'show')
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
-        check("node walk: the bare show mimics the ? output (the walk's first position)",
+        check("node walk: the bare show answers the flat grammar's root",
               words == ['audit', 'batt', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
-                        'connect-acl', 'connections', 'control', 'dump', 'dump-interval', 'grid',
+                        'config', 'connect-acl', 'connections', 'control', 'dump', 'dump-interval', 'grid',
                         'grid-frequency', 'grid-frequency-wander', 'grid-outage',
-                        'grid-voltage', 'grid-voltage-wander', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
+                        'grid-voltage', 'grid-voltage-wander', 'knobs', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
                         'metrics', 'modbus', 'mppt', 'pv', 'registers', 'scenario', 'seed',
-                        'soc', 'static', 'strict', 'time', 'time-scale', 'timezone', 'version',
+                        'soc', 'static', 'strict', 'system', 'time', 'time-scale', 'timezone', 'version',
                         'write'], tx[:220])
         tx = ctl(L_CTL, 'show control ops')
         check('node walk: the intermediate node lists its live children',
               tx.startswith('ok') and 'verbs' in tx and 'read-only ops role' in tx, tx[:80])
-        tx = ctl(L_CTL, 'clear modbus auth key')
+        tx = ctl(L_CTL, 'clear auth-key')
         check('suite auth: clear refuses the key (startup-only)',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:80])
-        tx = ctl(L_CTL, 'set modbus auth key short')
+        tx = ctl(L_CTL, 'set auth-key short')
         check('suite auth: startup-only — the short-key set refuses with the rest',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:100])
-        tx = ctl(L_CTL, 'set modbus auth key %s' % ('x' * 16))
-        check('suite auth: startup-only — the key set refuses (the dump/key treatment)',
+        tx = ctl(L_CTL, 'set auth-key %s' % ('x' * 16))
+        check('suite auth: startup-only — the key set refuses (the dump-key treatment)',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:80])
         c = connect(L_MODBUS)
         auth_handshake_client(c, L_KEY)
@@ -1078,15 +1078,15 @@ def main():
         check('suite auth: the configured key still proves (no live rotation)',
               txn == 2 and body[0] == 3, body.hex())
         c.close()
-        tx = ctl(L_CTL, 'set modbus auth none')
-        check('suite auth: the scheme disables live', tx.startswith('ok modbus/auth=none'), tx[:80])
+        tx = ctl(L_CTL, 'set modbus-auth none')
+        check('suite auth: the scheme disables live', tx.startswith('ok modbus-auth=none'), tx[:80])
         c = connect(L_MODBUS)
         txn, unit, body = exchange(c, read_req(3, 3, 32064, 2), 3)
         check('suite auth: none serves a plain client again', txn == 3 and body[0] == 3, body.hex())
         c.close()
-        tx = ctl(L_CTL, 'set modbus auth suite')
+        tx = ctl(L_CTL, 'set modbus-auth suite')
         check('suite auth: re-enabling without a key change works (the key persists)',
-              tx.startswith('ok modbus/auth=suite'), tx[:80])
+              tx.startswith('ok modbus-auth=suite'), tx[:80])
         c = connect(L_MODBUS)
         try:
             auth_handshake_client(c, 'x' * 16)   # a wrong proof: dropped, logged
@@ -1114,29 +1114,29 @@ def main():
                                       stdout=open(LOG + '.m', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.0)
         msock = '/tmp/fake-inverter-%d.socket' % M_MODBUS
-        tx = ctl(msock, 'show control port')
+        tx = ctl(msock, 'show control-port')
         check('fake control: the default socket answers with its target',
-              tx == 'ok control/port=unix:%s' % msock, tx[:90])
-        tx = ctl(msock, 'set control port %d' % M_TCP1)
+              tx == 'ok control-port=unix:%s' % msock, tx[:90])
+        tx = ctl(msock, 'set control-port %d' % M_TCP1)
         check('fake control: a tokenless TCP rebind SUCCEEDS live (the F11 inverse of the family F5)',
-              tx.startswith('ok control/port=127.0.0.1:%d' % M_TCP1), tx[:90])
+              tx.startswith('ok control-port=127.0.0.1:%d' % M_TCP1), tx[:90])
         tx = ctl(msock, 'show version')
         check('fake control: the retired unix socket no longer answers', tx == '', tx[:90])
         tx = ctl(str(M_TCP1), 'show version')
         check('fake control: the new TCP port speaks tokenless', tx.startswith('ok fake-inverter'), tx[:90])
-        tx = ctl(str(M_TCP1), 'set control port %d' % M_TCP1)
+        tx = ctl(str(M_TCP1), 'set control-port %d' % M_TCP1)
         check('fake control: a re-set of the same target no-ops',
-              tx.startswith('ok control/port=127.0.0.1:%d' % M_TCP1), tx[:90])
+              tx.startswith('ok control-port=127.0.0.1:%d' % M_TCP1), tx[:90])
         # off retires the listener; the CONNECTED session keeps serving
         # (the raw wire: one JSON object per line)
         m = socket.create_connection(('127.0.0.1', M_TCP1), timeout=5)
         m.sendall(b'{"cmd": "set control port off"}\n')
         off_reply = m.recv(4096)
-        check('fake control: off retires the listener', b'control/port=off' in off_reply, off_reply[:120])
+        check('fake control: off retires the listener', b'control-port=off' in off_reply, off_reply[:120])
         m.sendall(b'{"cmd": "show control port"}\n')
         off_show = m.recv(4096)
-        check('fake control: the session keeps serving after the retire', b'ok control/port=off' in off_show
-              or b'"control/port=off"' in off_show, off_show[:120])
+        check('fake control: the session keeps serving after the retire', b'ok control-port=off' in off_show
+              or b'"control-port=off"' in off_show, off_show[:120])
         gone = False
         try:
             socket.create_connection(('127.0.0.1', M_TCP1), timeout=1).close()
@@ -1153,24 +1153,24 @@ def main():
         # the group-accessible mode, live
         check('fake control: the default socket is 0600', os.stat(msock).st_mode & 0o777 == 0o600,
               oct(os.stat(msock).st_mode))
-        tx = ctl(msock, 'set control socket-group on')
+        tx = ctl(msock, 'set control-socket-group on')
         check('fake control: set control socket-group on re-modes the live socket 0660',
-              tx.startswith('ok control/socket-group=on') and os.stat(msock).st_mode & 0o777 == 0o660,
+              tx.startswith('ok control-socket-group=on') and os.stat(msock).st_mode & 0o777 == 0o660,
               tx[:90] + ' ' + oct(os.stat(msock).st_mode))
-        tx = ctl(msock, 'set control socket-group off')
+        tx = ctl(msock, 'set control-socket-group off')
         check('fake control: set control socket-group off re-modes it back 0600',
-              tx.startswith('ok control/socket-group=off') and os.stat(msock).st_mode & 0o777 == 0o600,
+              tx.startswith('ok control-socket-group=off') and os.stat(msock).st_mode & 0o777 == 0o600,
               tx[:90] + ' ' + oct(os.stat(msock).st_mode))
         # the ops policy + the trust uids ride the wire
-        tx = ctl(msock, 'set control ops verbs show, ping')
+        tx = ctl(msock, 'set control-ops-verbs show, ping')
         check('fake control: the ops policy sets live (the family spelling)',
-              tx.startswith('ok control/ops/verbs=ping,show'), tx[:90])
-        tx = ctl(msock, 'clear control ops verbs')
-        check('fake control: the ops policy unsets', tx.startswith('ok control/ops/verbs='), tx[:90])
-        tx = ctl(msock, 'set control trust-uids 1000,1001')
-        check('fake control: the trust uids set live', tx.startswith('ok control/trust-uids=1000,1001'), tx[:90])
-        tx = ctl(msock, 'set control trust-uids off')
-        check('fake control: the trust uids drop', tx.startswith('ok control/trust-uids=off'), tx[:90])
+              tx.startswith('ok control-ops-verbs=ping,show'), tx[:90])
+        tx = ctl(msock, 'clear control-ops-verbs')
+        check('fake control: the ops policy unsets', tx.startswith('ok control-ops-verbs='), tx[:90])
+        tx = ctl(msock, 'set control-trust-uids 1000,1001')
+        check('fake control: the trust uids set live', tx.startswith('ok control-trust-uids=1000,1001'), tx[:90])
+        tx = ctl(msock, 'set control-trust-uids off')
+        check('fake control: the trust uids drop', tx.startswith('ok control-trust-uids=off'), tx[:90])
 
         # the logout verb: the cli's local session-close (quit's sibling) —
         # the session ends with stdin still open (the exit is logout's, not EOF's)
@@ -1192,18 +1192,18 @@ def main():
 
         # ---- the audit family's one shape: the daily knob's live name, the
         #      bounds (the one constants home: common/runtime/audit.py), the env twins
-        tx = ctl(msock, 'set audit rotate daily on')
+        tx = ctl(msock, 'set audit-daily on')
         check('fake audit-daily: the daily trigger switches on (the live name)',
-              tx.startswith('ok audit/rotate/daily=on'), tx[:90])
-        tx = ctl(msock, 'show audit rotate daily')
+              tx.startswith('ok audit-daily=on'), tx[:90])
+        tx = ctl(msock, 'show audit-daily')
         check('fake audit-daily: show audit rotate daily answers on',
-              tx == 'ok audit/rotate/daily=on', tx[:90])
-        tx = ctl(msock, 'clear audit rotate daily')
+              tx == 'ok audit-daily=on', tx[:90])
+        tx = ctl(msock, 'clear audit-daily')
         check('fake audit-daily: the daily trigger unsets to the configured off',
-              tx.startswith('ok audit/rotate/daily=off'), tx[:90])
-        tx = ctl(msock, 'set audit rotate daily maybe')
+              tx.startswith('ok audit-daily=off'), tx[:90])
+        tx = ctl(msock, 'set audit-daily maybe')
         check('fake audit-daily: the daily set refuses a bad word',
-              tx.startswith('% error: audit/rotate/daily must be on or off'), tx[:90])
+              tx.startswith('% error: audit-daily must be on or off'), tx[:90])
         r = subprocess.run([sys.executable, F, '--control-port', '0', '--dry-run',
                             '--audit-files', '0'], capture_output=True, text=True)
         check('fake audit: the files bound refuses at start (the clean one-liner)',
@@ -1219,13 +1219,13 @@ def main():
                                        '--control-port', '15988'],
                                       stdout=open(LOG + '.n', 'w'), stderr=subprocess.STDOUT, env=env))
         time.sleep(1.0)
-        tx = ctl(15988, 'show audit rotate daily')
-        check('fake audit-daily: $AUDIT_DAILY drives the start value', tx == 'ok audit/rotate/daily=on', tx[:90])
+        tx = ctl(15988, 'show audit-daily')
+        check('fake audit-daily: $AUDIT_DAILY drives the start value', tx == 'ok audit-daily=on', tx[:90])
         tx = ctl(15988, 'show max-clients')
         check('fake audit: $MAX_CLIENTS drives the cap', tx == 'ok max-clients=7', tx[:90])
         tx = ctl(15988, 'show config')
         check('fake audit: the env-driven rotation renders in show config',
-              'set audit-max-mb 77.0' in tx and 'set audit rotate daily true' in tx
+              'set audit-max-mb 77.0' in tx and 'set audit-daily true' in tx
               and 'set audit-files 9' in tx, tx[:160])
 
         # ---- the config file: the family ladder (flag > env > config >

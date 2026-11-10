@@ -310,8 +310,8 @@ try:
           str({k: m.get(k) for k in ('huawei_pv_generation_watts', 'scraper_up')}))
     r = subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py'),
                         '--control-port', '15610', '--control-token', 'offstok',
-                        'set', 'modbus', 'offset', '20000'], capture_output=True, text=True, timeout=15)
-    check('modbus offset: the live set answers the typed value', r.stdout.startswith('ok modbus/offset=20000'),
+                        'set', 'modbus-offset', '20000'], capture_output=True, text=True, timeout=15)
+    check('modbus offset: the live set answers the typed value', r.stdout.startswith('ok modbus-offset=20000'),
           repr(r.stdout[:90] + r.stderr[:90]))
     for _ in range(30):
         status, m = wait_metrics(9368, want='scraper_up')
@@ -323,8 +323,8 @@ try:
           str({k: m.get(k) for k in ('scraper_up', 'scraper_modbus_errors_total')}))
     r = subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py'),
                         '--control-port', '15610', '--control-token', 'offstok',
-                        'clear', 'modbus', 'offset'], capture_output=True, text=True, timeout=15)
-    check('modbus offset: clear restores the configured zero', r.stdout.startswith('ok modbus/offset=0'),
+                        'clear', 'modbus-offset'], capture_output=True, text=True, timeout=15)
+    check('modbus offset: clear restores the configured zero', r.stdout.startswith('ok modbus-offset=0'),
           repr(r.stdout[:90]))
     for _ in range(30):
         status, m = wait_metrics(9368, want='scraper_up')
@@ -1784,8 +1784,8 @@ try:
     time.sleep(1.5)
     r = sctl('show version', 15597)
     check('scraper control: show version', r.startswith('ok modbus-scraper'), r[:80])
-    r = sctl('set metrics prefix deye', 15597)
-    check('scraper control: the prefix set re-builds the spec', r.startswith('ok metrics/prefix=deye'), r[:80])
+    r = sctl('set metric-prefix deye', 15597)
+    check('scraper control: the prefix set re-builds the spec', r.startswith('ok metric-prefix=deye'), r[:80])
     m = {}
     for _ in range(10):
         m = metrics_dict(get('/metrics', 19457 + BASE)[1])
@@ -1794,10 +1794,10 @@ try:
         time.sleep(0.3)
     check('control: the exported names carry the live prefix', 'deye_pv_generation_watts' in m
           and 'huawei_pv_generation_watts' not in m, str(sorted(m))[:80])
-    r = sctl('set metrics prefix 9bad', 15597)
+    r = sctl('set metric-prefix 9bad', 15597)
     check('control: an invalid prefix refuses', r.startswith('fail invalid metric_prefix'), r[:80])
-    r = sctl('clear metrics prefix', 15597)
-    check('control: the prefix clear re-applies huawei', r.startswith('ok metrics/prefix=huawei'), r[:80])
+    r = sctl('clear metric-prefix', 15597)
+    check('control: the prefix clear re-applies huawei', r.startswith('ok metric-prefix=huawei'), r[:80])
     m = {}
     for _ in range(10):
         m = metrics_dict(get('/metrics', 19457 + BASE)[1])
@@ -1817,11 +1817,11 @@ try:
     r = sctl('show version', 15597, badmac=True)
     check('scraper control: a bad command mac is refused',
           r.startswith('fail the command mac does not verify'), r[:80])
-    r = sctl('set metrics interval 5', 15597)
-    check('scraper control: set interval', r.startswith('ok metrics/interval=5.00s'), r[:80])
-    r = sctl('show metrics interval', 15597)
-    check('scraper control: show interval', r.startswith('ok metrics/interval=5.00s'), r[:80])
-    r = sctl('set metrics interval 0', 15597)
+    r = sctl('set interval 5', 15597)
+    check('scraper control: set interval', r.startswith('ok interval=5.00s'), r[:80])
+    r = sctl('show interval', 15597)
+    check('scraper control: show interval', r.startswith('ok interval=5.00s'), r[:80])
+    r = sctl('set interval 0', 15597)
     check('scraper control: a bad value refused', r.startswith('fail interval must be'), r[:80])
     r = sctl('help clear', 15597)
     check('scraper control: help <command> describes the row',
@@ -1834,15 +1834,15 @@ try:
     r = sctl('help bogus', 15597)
     check('scraper control: help <unknown topic> is the reworded two-space error',
           r == 'fail unknown command or setting bogus (try ?)', r)
-    r = sctl('clear metrics interval', 15597)
-    check('scraper control: clear restores the configured value', r.startswith('ok metrics/interval='), r[:80])
+    r = sctl('clear interval', 15597)
+    check('scraper control: clear restores the configured value', r.startswith('ok interval='), r[:80])
     r = sctl('set log-access on', 15597)
     check('scraper control: set log-access', r.startswith('ok log-access=on'), r[:80])
-    r = sctl('set metrics limits max-conn-per-ip 2', 15597)
-    check('scraper control: the per-IP cap live (the path form)', r.startswith('ok metrics/limits/max-conn-per-ip=2'), r[:80])
-    r = sctl('set metrics limits max-conn-per-ip 9999', 15597)
+    r = sctl('set max-conn-per-ip 2', 15597)
+    check('scraper control: the per-IP cap live (the path form)', r.startswith('ok max-conn-per-ip=2'), r[:80])
+    r = sctl('set max-conn-per-ip 9999', 15597)
     check('scraper control: the row bounds gate (min/max off the registry row)',
-          r.startswith('fail metrics/limits/max-conn-per-ip must be 0..4096'), r[:80])
+          r.startswith('fail max-conn-per-ip must be 0..4096'), r[:80])
     r = sctl('help modbus', 15597)
     words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
@@ -1851,37 +1851,37 @@ try:
                     'timeout', 'unit', 'upstream'], r[:160])
     # 6b-2. the register map lives in the device profile: `set profile` swaps
     #        it live, a profile without the power registers rolls back
-    r = sctl('show modbus profile', 15597)
+    r = sctl('show profile', 15597)
     check('scraper control: show profile names the resolved device profile',
-          r.startswith('ok modbus/profile=') and 'sun2000.json' in r, r[:120])
-    r = sctl('set modbus profile default', 15597)
+          r.startswith('ok profile=') and 'sun2000.json' in r, r[:120])
+    r = sctl('set profile default', 15597)
     check('scraper control: set profile default re-resolves the bundled profile',
-          r.startswith('ok modbus/profile=') and 'sun2000.json' in r, r[:120])
+          r.startswith('ok profile=') and 'sun2000.json' in r, r[:120])
     badprof = '/tmp/scr_no_pv_profile.json'
     _json.dump({'description': 'no power registers',
                 'registers': [{'name': 'device-status', 'register': 32000, 'type': 'u16', 'scrape': True}]},
                open(badprof, 'w'))
-    r = sctl('set modbus profile %s' % badprof, 15597)
+    r = sctl('set profile %s' % badprof, 15597)
     check('scraper control: a profile without the power registers is refused (rollback)',
           r.startswith('fail ') and 'pv_generation_watts' in r, r[:160])
-    r = sctl('set modbus profile /tmp/scr_no_such_profile.json', 15597)
+    r = sctl('set profile /tmp/scr_no_such_profile.json', 15597)
     check('scraper control: a missing profile file is refused', r.startswith('fail cannot read'), r[:120])
-    r = sctl('clear modbus profile', 15597)
+    r = sctl('clear profile', 15597)
     check('scraper control: clear profile restores the configured profile',
-          r.startswith('ok modbus/profile=') and 'sun2000.json' in r, r[:120])
+          r.startswith('ok profile=') and 'sun2000.json' in r, r[:120])
     r = sctl('show settings', 15597)
     check('scraper control: show settings is retired (fail)', r.startswith('fail'), r[:80])
     r = sctl('show knobs', 15597)
     check('scraper control: show knobs, the dictionary of the registry — flag, env twin, how it changes',
           r.startswith('ok knobs') and '--metric-prefix' in r and '$METRIC_PREFIX' in r
-          and 'set metrics interval <value>' in r and ', secret' in r, r[:200])
+          and 'set interval <value>' in r and ', secret' in r, r[:200])
     r = sctl('show inputs', 15597)
     check('scraper control: show inputs shows the declared inputs only, aligned, the help capped',
           r.startswith('ok inputs') and '[battery_net_watts]' in r
           and '[pv_generation_watts]' in r
           and 'battery  ' not in r
           and 'phase_a_voltage_volts' not in r, r[:240])
-    r = sctl('show inputs metrics', 15597)
+    r = sctl('show inputs-metrics', 15597)
     check('scraper control: show inputs metrics (the words forward to the dashed report) lists the exported metrics',
           r.startswith('ok inputs-metrics') and 'huawei_battery_charge_watts' in r and '[compute]' in r
           and '[profile]' in r and 'scraper_up  ' in r and 'gauge' not in r
@@ -1893,41 +1893,41 @@ try:
     check('scraper control: poll now', r.startswith('ok poll now'), r[:80])
     r = sctl('request reload-config', 15597)
     check('scraper control: request reload-config', r.startswith('ok reloaded'), r[:80])
-    # 6b-3. the secrets on the wire: startup-only (the dump/key treatment) —
+    # 6b-3. the secrets on the wire: startup-only (the dump-key treatment) —
     #       set/clear refuse on the wire, the show verb refuses them — a
     #       secret never renders
-    r = sctl('show metrics auth token', 15597)
+    r = sctl('show auth-token', 15597)
     check('scraper control: the auth token is a secret that never shows',
-          r.startswith('fail metrics/auth/token is a secret'), r[:90])
-    r = sctl('clear metrics auth token', 15597)
+          r.startswith('fail auth-token is a secret'), r[:90])
+    r = sctl('clear auth-token', 15597)
     check('scraper control: clear refuses a secret (startup-only)',
           r.startswith('fail restart required (startup-only knob)'), r[:90])
-    r = sctl('show control token', 15597)
-    check('scraper control: the control token never shows', r.startswith('fail control/token is a secret'), r[:90])
-    r = sctl('set metrics auth token bearer9', 15597)
+    r = sctl('show control-token', 15597)
+    check('scraper control: the control token never shows', r.startswith('fail control-token is a secret'), r[:90])
+    r = sctl('set auth-token bearer9', 15597)
     check('scraper control: the auth token is startup-only — the set refuses',
           r.startswith('fail restart required (startup-only knob)'), r[:90])
     st, _ = get('/metrics', 19457 + BASE)
     check('scraper control: the tokenless loopback endpoint keeps serving (the bind is the auth)',
           st == 200, str(st))
-    r = sctl('set control token ctok9', 15597)
+    r = sctl('set control-token ctok9', 15597)
     check('scraper control: the control token is startup-only — the set refuses',
           r.startswith('fail restart required (startup-only knob)'), r[:90])
     r = sctl('show version', 15597)
     check('scraper control: the configured control token still speaks (no live rotation)',
           r.startswith('ok modbus-scraper'), r[:80])
-    r = sctl('show control token', 15597)
+    r = sctl('show control-token', 15597)
     check('scraper control: the control token never renders back',
-          r.startswith('fail control/token is a secret'), r[:90])
+          r.startswith('fail control-token is a secret'), r[:90])
     # 6b-4. the state dump (settings by default — there are no cache words
     #       here): request dump writes 0600 + the integrity hash, the restore
     #       re-applies, the whole-daemon reload keeps the sets across the exec
-    r = sctl('set dump/path /tmp/scr_regtest_state.json', 15597)
-    check('scraper control: the dump path set live', r.startswith('ok dump/path=/tmp/scr_regtest_state.json'), r[:90])
+    r = sctl('set dump-path /tmp/scr_regtest_state.json', 15597)
+    check('scraper control: the dump path set live', r.startswith('ok dump-path=/tmp/scr_regtest_state.json'), r[:90])
     check('scraper control: the set dump path reply notes the unsealed dump (no key configured)',
-          '(not sealed' in r and 'set dump/key' in r, r[:160])
-    r = sctl('set metrics interval 9', 15597)
-    check('scraper control: the override before the dump', r.startswith('ok metrics/interval=9.00s'), r[:80])
+          '(not sealed' in r and 'set dump-key' in r, r[:160])
+    r = sctl('set interval 9', 15597)
+    check('scraper control: the override before the dump', r.startswith('ok interval=9.00s'), r[:80])
     r = sctl('request dump', 15597)
     check('scraper control: request dump writes the live path', r.startswith('ok dumped 2 setting(s)'), r[:80])
     dumpst = os.stat('/tmp/scr_regtest_state.json')
@@ -1935,22 +1935,22 @@ try:
           oct(dumpst.st_mode & 0o777))
     raw = open('/tmp/scr_regtest_state.json').read()
     check('scraper control: the dump carries the settings, never the secrets',
-          '"metrics/interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw
-          and 'metrics/auth/token' not in raw and 'control/token' not in raw, raw[:240])
-    r = sctl('set metrics interval 1', 15597)
+          '"interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw
+          and 'auth-token' not in raw and 'control-token' not in raw, raw[:240])
+    r = sctl('set interval 1', 15597)
     r = sctl('request restore', 15597)
     check('scraper control: the restore re-applies the dump (the secrets never ride it)',
           r.startswith('ok restored 2 setting(s)'), r[:80])
-    r = sctl('show metrics interval', 15597)
-    check('scraper control: the restored override reads back', r == 'ok metrics/interval=9.00s', r[:80])
+    r = sctl('show interval', 15597)
+    check('scraper control: the restored override reads back', r == 'ok interval=9.00s', r[:80])
     r = sctl('request dump', 15597)   # a tamper check: edit the dump, the restore refuses
     tampered = open('/tmp/scr_regtest_state.json').read().replace('9.0', '3.0')
     open('/tmp/scr_regtest_state.json', 'w').write(tampered)
     r = sctl('request restore', 15597)
     check('scraper control: a tampered dump fails closed', r.startswith('fail restore failed')
           and 'integrity' in r, r[:120])
-    r = sctl('clear dump/path', 15597)
-    check('scraper control: the dump path clear back to off', r.startswith('ok dump/path=off'), r[:80])
+    r = sctl('clear dump-path', 15597)
+    check('scraper control: the dump path clear back to off', r.startswith('ok dump-path=off'), r[:80])
     # 6b-4c. the dump-interval (the family knob, the cache's golden shape):
     #        the set/show/describe gate on the dump path, the dumper loop
     #        rewrites the file on the timer (the thread parks while off)
@@ -1963,8 +1963,8 @@ try:
     r = sctl('set dump-interval 5', 15597)
     check('scraper control: set dump-interval without a path is a clean err',
           r.startswith('fail dump-interval needs a dump path'), r[:90])
-    r = sctl('set dump/path /tmp/scr_regtest_state.json', 15597)
-    check('scraper control: the dump path set for the interval loop', r.startswith('ok dump/path='), r[:80])
+    r = sctl('set dump-path /tmp/scr_regtest_state.json', 15597)
+    check('scraper control: the dump path set for the interval loop', r.startswith('ok dump-path='), r[:80])
     r = sctl('set dump-interval 2', 15597)
     check('scraper control: the interval set live', r.startswith('ok dump-interval=2.00s'), r[:80])
     r = sctl('show dump-interval', 15597)
@@ -1975,8 +1975,8 @@ try:
     check('scraper control: the dumper rewrote the file on the timer', m2 > m1, '%.2f -> %.2f' % (m1, m2))
     r = sctl('set dump-interval off', 15597)
     check('scraper control: the interval off again', r.startswith('ok dump-interval=off'), r[:80])
-    r = sctl('clear dump/path', 15597)
-    check('scraper control: the dump path clear back to off again', r.startswith('ok dump/path=off'), r[:80])
+    r = sctl('clear dump-path', 15597)
+    check('scraper control: the dump path clear back to off again', r.startswith('ok dump-path=off'), r[:80])
     # 6b-4b. the sealed dump (the DUMP_KEY env twin): the state rides encrypted,
     #        the restore fails closed without the key (the restart matrix lives
     #        in the inverter and cache regtests — the same open_dump gate)
@@ -1987,13 +1987,13 @@ try:
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                   env={**os.environ, 'DUMP_KEY': 'scr-seal-key'}))
     time.sleep(1.5)
-    r = sctl('show dump key', 15601, token=STOK)
-    check('scraper sealed dump: show dump/key is a secret — it never shows',
-          r.startswith('fail dump/key is a secret'), r[:100])
-    r = sctl('set dump key other', 15601, token=STOK)
-    check('scraper sealed dump: set dump/key answers the restart note',
+    r = sctl('show dump-key', 15601, token=STOK)
+    check('scraper sealed dump: show dump-key is a secret — it never shows',
+          r.startswith('fail dump-key is a secret'), r[:100])
+    r = sctl('set dump-key other', 15601, token=STOK)
+    check('scraper sealed dump: set dump-key answers the restart note',
           r.startswith('fail restart required (startup-only knob)'), r[:100])
-    r = sctl('set metrics interval 7', 15601, token=STOK)
+    r = sctl('set interval 7', 15601, token=STOK)
     r = sctl('request dump', 15601, token=STOK)
     check('scraper sealed dump: request dump reports sealed (the DUMP_KEY env twin)',
           r.startswith('ok dumped 1 setting(s)') and '(sealed)' in r, r[:120])
@@ -2001,8 +2001,8 @@ try:
     d = _json.loads(raw)
     check('scraper sealed dump: the envelope is sealed — the settings encrypted away',
           d.get('version') == 2 and d.get('cipher') == 'sha256-ctr' and 'settings' not in d
-          and '"metrics/interval"' not in raw and d.get('box'), raw[:120])
-    r = sctl('set metrics interval 1', 15601, token=STOK)
+          and '"interval"' not in raw and d.get('box'), raw[:120])
+    r = sctl('set interval 1', 15601, token=STOK)
     r = sctl('request restore', 15601, token=STOK)
     check('scraper sealed dump: the restore re-applies under the configured key',
           r.startswith('ok restored 1 setting(s)'), r[:120])
@@ -2036,12 +2036,12 @@ try:
     line = ''
     for _ in range(80):
         line = open('/tmp/scr_regtest_keyfile_missing.log').read()
-        if 'cannot read dump/key' in line:
+        if 'cannot read dump-key' in line:
             break
         time.sleep(0.1)
     time.sleep(0.3)   # the SystemExit prints, then the process is gone
     check('scraper sealed dump: an unreadable key reference fails the start (fail fast, never plaintext)',
-          'cannot read dump/key' in line and p_nofile.poll() is not None, line[-220:])
+          'cannot read dump-key' in line and p_nofile.poll() is not None, line[-220:])
     p_nofile.poll()
     time.sleep(0.4)
     # a dump path without a key warns at start (the plaintext posture is a
@@ -2060,7 +2060,7 @@ try:
             break
         time.sleep(0.1)
     check('scraper sealed dump: a dump path without a key warns unsealed at start',
-          'is not sealed' in line and 'set dump/key' in line, line[-220:])
+          'is not sealed' in line and 'set dump-key' in line, line[-220:])
     procs[-1].kill()
     time.sleep(0.4)
     r = sctl('request restart', 15597)
@@ -2069,7 +2069,7 @@ try:
     check('scraper control: inspect', r.startswith('ok inspect\n') and 'version   modbus-scraper' in r, r[:120])
     aud = open('/tmp/scr_regtest_audit.log').read()
     check('scraper control: the SCR audit trail with the wire mac',
-          'AUDIT SCR COMMAND ' in aud and "'set metrics interval 5' wire=h" in aud, aud[-200:])
+          'AUDIT SCR COMMAND ' in aud and "'set interval 5' wire=h" in aud, aud[-200:])
 
     # 6c. the read-only ops token: show allowed, everything that steers the
     #     daemon forbidden; both roles audited, both mac keys
@@ -2085,7 +2085,7 @@ try:
     check('scraper control: the ops token reads (show version)', r.startswith('ok modbus-scraper'), r[:80])
     r = sctl('show knobs', 15598, token='opssecret')
     check('scraper control: the ops token reads (show knobs, a show verb)', r.startswith('ok knobs'), r[:80])
-    r = sctl('set metrics interval 5', 15598, token='opssecret')
+    r = sctl('set interval 5', 15598, token='opssecret')
     check('scraper control: the ops token cannot set', r.startswith('fail forbidden:') and 'admin' in r, r[:80])
     r = sctl('poll now', 15598, token='opssecret')
     check('scraper control: the ops token cannot poll now', r.startswith('fail forbidden:'), r[:80])
@@ -2127,22 +2127,22 @@ try:
                                    '--audit-log', '/tmp/scr_regtest_reload_audit.log'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(1.5)
-    r = sctl('set metrics interval 7', 15600)
-    check('scraper reload: the override lands before the reload', r.startswith('ok metrics/interval=7.00s'), r[:90])
+    r = sctl('set interval 7', 15600)
+    check('scraper reload: the override lands before the reload', r.startswith('ok interval=7.00s'), r[:90])
     r = sctl('request reload', 15600)
     check('scraper reload: the reply reports the saved override', r.startswith('ok reload: 1 override(s) saved'),
           r[:100])
     back = None
     for _ in range(100):     # the exec is fast: a connect in the drain window rides the dying daemon's
         try:                 # unsigned bye frame — only the freshly re-resolved status settles it
-            back = sctl('show metrics interval', 15600)
+            back = sctl('show interval', 15600)
         except Exception:
             back = None
-        if back is not None and back.startswith('ok metrics/interval=7.00s'):
+        if back is not None and back.startswith('ok interval=7.00s'):
             break
         time.sleep(0.1)
     check('scraper reload: the daemon came back with the override re-applied (above the config)',
-          back is not None and back.startswith('ok metrics/interval=7.00s'),
+          back is not None and back.startswith('ok interval=7.00s'),
           repr((back or '')[-200:]))
     gone = False
     for _ in range(100):     # the fresh daemon consumes the state at start — poll for the disappearance
@@ -2180,8 +2180,8 @@ try:
     check('scraper_ctl: one-shot show version', r.returncode == 0 and 'ok modbus-scraper' in r.stdout,
           repr(r.stdout[:80]) + repr(r.stderr[-80:]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK],
-                       input='set metrics interval 5\nshow version\n', capture_output=True, text=True, timeout=15)
-    check('scraper_ctl: a piped batch', r.returncode == 0 and 'ok metrics/interval=5.00s' in r.stdout
+                       input='set interval 5\nshow version\n', capture_output=True, text=True, timeout=15)
+    check('scraper_ctl: a piped batch', r.returncode == 0 and 'ok interval=5.00s' in r.stdout
           and 'ok modbus-scraper' in r.stdout, repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, CLIB, '--control-port', '15597', '--control-token', STOK],
                        input='set log-access off\nshow metrics interval\nquit\n', capture_output=True, text=True, timeout=15)
@@ -2199,18 +2199,18 @@ try:
                         'show', 'modbus'], capture_output=True, text=True, timeout=15)
     words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
-    check('scraper_ctl: show modbus mimics the ? walk (the grouped sections, the direct children)',
-          r.returncode == 0 and words == ['auth', 'grid-positive-import', 'offset', 'profile',
-                                          'timeout', 'unit', 'upstream'],
+    check('scraper_ctl: show modbus answers the flat names (the grouped sections, the direct children)',
+          r.returncode == 0 and words == ['grid-positive-import', 'modbus-auth', 'modbus-offset', 'modbus-unit',
+                                          'profile', 'timeout', 'upstream'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'show'], capture_output=True, text=True, timeout=15)
     words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
-    check("scraper_ctl: the bare show mimics the ? output (the walk's first position)",
+    check("scraper_ctl: the bare show answers the flat grammar's root",
           r.returncode == 0 and words == ['audit', 'caps', 'config', 'connections', 'control', 'dump',
-                                          'dump-interval', 'inputs', 'knobs', 'local-time', 'log-access',
-                                          'log-level', 'metrics', 'modbus', 'version'],
+                                          'dump-interval', 'inputs', 'inputs-metrics', 'knobs', 'local-time', 'log-access',
+                                          'log-level', 'metrics', 'modbus', 'system', 'version'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'show', 'control', 'ops'], capture_output=True, text=True, timeout=15)
@@ -2229,8 +2229,8 @@ try:
     # the live rebind (`set control port`): the listener swaps by identity,
     # the old port closes, clear restores the configured target
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
-                        'set', 'control', 'port', '15603'], capture_output=True, text=True, timeout=15)
-    check('scraper control: the control rebinds live', r.stdout.startswith('ok control/port=127.0.0.1:%d' % (15603 + BASE)),
+                        'set', 'control-port', '15603'], capture_output=True, text=True, timeout=15)
+    check('scraper control: the control rebinds live', r.stdout.startswith('ok control-port=127.0.0.1:%d' % (15603 + BASE)),
           repr(r.stdout[:90]))
     old_gone = False
     try:
@@ -2243,9 +2243,9 @@ try:
     check('scraper control: the new port speaks', r.returncode == 0 and r.stdout.startswith('ok modbus-scraper'),
           repr(r.stdout[:60]) + repr(r.stderr[-80:]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15603', '--control-token', STOK,
-                        'clear', 'control', 'port'], capture_output=True, text=True, timeout=15)
+                        'clear', 'control-port'], capture_output=True, text=True, timeout=15)
     check('scraper control: clear restores the configured target',
-          r.stdout.startswith('ok control/port=127.0.0.1:%d' % (15597 + BASE)), repr(r.stdout[:90]))
+          r.stdout.startswith('ok control-port=127.0.0.1:%d' % (15597 + BASE)), repr(r.stdout[:90]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'show', 'version'], capture_output=True, text=True, timeout=15)
     check('scraper control: the restored target speaks', r.returncode == 0 and r.stdout.startswith('ok modbus-scraper'),
@@ -2257,26 +2257,26 @@ try:
         return subprocess.run([sys.executable, CTLB, '--control-port', str(port), '--control-token', STOK]
                               + list(words), capture_output=True, text=True, timeout=15).stdout.strip()
 
-    r = sctl('set', 'audit', 'rotate', 'files', '0')
+    r = sctl('set', 'audit-files', '0')
     check('scraper audit: the files bound refuses low (the family text)',
           'must be 1..100 backups' in r, repr(r[:130]))
-    r = sctl('set', 'audit', 'rotate', 'files', '101')
+    r = sctl('set', 'audit-files', '101')
     check('scraper audit: the files bound refuses high', 'must be 1..100 backups' in r, repr(r[:130]))
-    r = sctl('set', 'audit', 'rotate', 'max-size', '-1')
+    r = sctl('set', 'audit-max-mb', '-1')
     check('scraper audit: the max-size bound refuses', 'must be 0..1048576 MB' in r, repr(r[:130]))
-    r = sctl('set', 'audit', 'rotate', 'daily', 'on')
-    check('scraper audit-daily: the daily trigger switches on', r.startswith('ok audit/rotate/daily=on'), repr(r[:110]))
+    r = sctl('set', 'audit-daily', 'on')
+    check('scraper audit-daily: the daily trigger switches on', r.startswith('ok audit-daily=on'), repr(r[:110]))
     check('scraper audit-daily: show audit rotate daily answers on',
-          sctl('show', 'audit', 'rotate', 'daily') == 'ok audit/rotate/daily=on')
-    r = sctl('clear', 'audit', 'rotate', 'daily')
+          sctl('show', 'audit-daily') == 'ok audit-daily=on')
+    r = sctl('clear', 'audit-daily')
     check('scraper audit-daily: the daily trigger unsets to the configured off',
-          r.startswith('ok audit/rotate/daily=off'), repr(r[:110]))
-    r = sctl('set', 'audit', 'rotate', 'files', '7')
+          r.startswith('ok audit-daily=off'), repr(r[:110]))
+    r = sctl('set', 'audit-files', '7')
     check('scraper audit: the live set writes the config back (the fresh show config)',
-          'set audit rotate files 7' in sctl('show', 'config'), sctl('show', 'config')[:80])
-    r = sctl('clear', 'audit', 'disable')
+          'set audit-files 7' in sctl('show', 'config'), sctl('show', 'config')[:80])
+    r = sctl('clear', 'no-audit-log')
     check('scraper audit: the live bool rows clear (the defaults loop)',
-          r.startswith('ok audit/disable='), repr(r[:110]))
+          r.startswith('ok no-audit-log='), repr(r[:110]))
     env = dict(os.environ, AUDIT_MAX_MB='77', AUDIT_DAILY='1', AUDIT_FILES='9')
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:%d' % (19471 + BASE), '--interval', '1',
@@ -2284,9 +2284,9 @@ try:
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env))
     time.sleep(1.5)
     check('scraper audit: the env twins drive the rotation',
-          sctl('show', 'audit', 'rotate', 'max-size', port=15609) == 'ok audit/rotate/max-size=77'
-          and sctl('show', 'audit', 'rotate', 'daily', port=15609) == 'ok audit/rotate/daily=on'
-          and sctl('show', 'audit', 'rotate', 'files', port=15609) == 'ok audit/rotate/files=9',
+          sctl('show', 'audit-max-mb', port=15609) == 'ok audit-max-mb=77'
+          and sctl('show', 'audit-daily', port=15609) == 'ok audit-daily=on'
+          and sctl('show', 'audit-files', port=15609) == 'ok audit-files=9',
           ' | '.join(sctl('show', 'audit', 'rotate', w, port=15609) for w in ('max-size', 'daily', 'files')))
     env = dict(os.environ, AUDIT_FILES='0')
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT, '--dry-run',
@@ -2309,15 +2309,15 @@ try:
                        timeout=15, env={**os.environ, 'CTL': gsock})
     check('scraper control: the group socket speaks (the owner, us)', r.returncode == 0
           and 'ok modbus-scraper' in r.stdout, repr(r.stdout[-120:]))
-    r = subprocess.run([sys.executable, CTLB, 'set', 'control', 'socket-group', 'off'],
+    r = subprocess.run([sys.executable, CTLB, 'set', 'control-socket-group', 'off'],
                        capture_output=True, text=True, timeout=15, env={**os.environ, 'CTL': gsock})
     check('scraper control: set control socket-group off re-modes the live socket 0600',
-          r.stdout.startswith('ok control/socket-group=off') and os.stat(gsock).st_mode & 0o777 == 0o600,
+          r.stdout.startswith('ok control-socket-group=off') and os.stat(gsock).st_mode & 0o777 == 0o600,
           repr(r.stdout[:120]) + ' ' + oct(os.stat(gsock).st_mode))
-    r = subprocess.run([sys.executable, CTLB, 'set', 'control', 'port', '15603'],
+    r = subprocess.run([sys.executable, CTLB, 'set', 'control-port', '15603'],
                        capture_output=True, text=True, timeout=15, env={**os.environ, 'CTL': gsock})
     check('scraper control: a tokenless TCP rebind refuses on the live wire (F5)',
-          r.stdout.startswith('% error: control/port cannot serve TCP without a token'), repr(r.stdout[:120]))
+          r.stdout.startswith('% error: control-port cannot serve TCP without a token'), repr(r.stdout[:120]))
     # 7b. the suite auth: an authed fake + an authed scraper — the good key
     #     polls, the wrong key fails the connector (ERR), the live `set`
     #     drops the session; then a plain fake under an authed scraper
@@ -2364,7 +2364,7 @@ try:
                                   stdout=open('/tmp/scr_auth_rot.log', 'w'), stderr=subprocess.STDOUT))
     time.sleep(2.0)
     r = subprocess.run([sys.executable, CTLB, '--control-port', '19469', '--control-token', 'ctok-a',
-                        'set', 'modbus', 'auth', 'key', SKEY], capture_output=True, text=True, timeout=15)
+                        'set', 'auth-key', SKEY], capture_output=True, text=True, timeout=15)
     check('suite auth: startup-only — the key set refuses',
           r.stdout.startswith('% error: restart required (startup-only knob)'), r.stdout[:120])
     procs[-1].terminate()
@@ -2480,56 +2480,56 @@ try:
 
     check('metrics acl: any serves (the default)', acl_raw().startswith(b'HTTP/1.1 200'),
           acl_raw().split(b'\r\n')[0].decode()[:60])
-    r = acl_ctl('set metrics acl none')
-    check('metrics acl: set none answers ok', r.startswith('ok metrics/acl=none'), r[:80])
+    r = acl_ctl('set metrics-acl none')
+    check('metrics acl: set none answers ok', r.startswith('ok metrics-acl=none'), r[:80])
     check('metrics acl: none closes the client without a reply', acl_raw() == b'',
           repr(acl_raw()[:40]))
-    r = acl_ctl('show metrics acl')
-    check('metrics acl: the none show', r == 'ok metrics/acl=none', r[:60])
-    r = acl_ctl('show metrics acl table')
+    r = acl_ctl('show metrics-acl')
+    check('metrics acl: the none show', r == 'ok metrics-acl=none', r[:60])
+    r = acl_ctl('show metrics-acl-table')
     check('metrics acl: none spells the deny-any chain', r == 'ok metrics-acl-table\ndeny 0.0.0.0/0', r[:80])
-    r = acl_ctl('set metrics acl table')
+    r = acl_ctl('set metrics-acl table')
     check('metrics acl: the show word is not a value (the pointer to the report)',
-          r.startswith('fail') and 'show metrics acl table' in r, r[:120])
-    r = acl_ctl('set metrics acl 127.0.0.1')
-    check('metrics acl: the whitelist set canonicalizes', r.startswith('ok metrics/acl=127.0.0.1/32'), r[:80])
+          r.startswith('fail') and 'show metrics-acl-table' in r, r[:120])
+    r = acl_ctl('set metrics-acl 127.0.0.1')
+    check('metrics acl: the whitelist set canonicalizes', r.startswith('ok metrics-acl=127.0.0.1/32'), r[:80])
     check('metrics acl: the whitelist serves the lab', acl_raw().startswith(b'HTTP/1.1 200'))
-    r = acl_ctl('show metrics acl table')
+    r = acl_ctl('show metrics-acl-table')
     check('metrics acl: the whitelist table', r == 'ok metrics-acl-table\ndeny 0.0.0.0/0\nallow 127.0.0.1/32', r[:80])
-    r = acl_ctl('set metrics acl file:' + ACLGATE)
-    check('metrics acl: the file gate loads', r.startswith('ok metrics/acl=file:%s' % ACLGATE), r[:100])
-    r = acl_ctl('show metrics acl')
-    check('metrics acl: the file spelling shows', r == 'ok metrics/acl=file:%s' % ACLGATE, r[:80])
-    r = acl_ctl('show metrics acl table')
+    r = acl_ctl('set metrics-acl file:' + ACLGATE)
+    check('metrics acl: the file gate loads', r.startswith('ok metrics-acl=file:%s' % ACLGATE), r[:100])
+    r = acl_ctl('show metrics-acl')
+    check('metrics acl: the file spelling shows', r == 'ok metrics-acl=file:%s' % ACLGATE, r[:80])
+    r = acl_ctl('show metrics-acl-table')
     check('metrics acl: the file gate renders its own rules',
           r == 'ok metrics-acl-table\n% the lab gate\ndeny 0.0.0.0/0\nallow 127.0.0.1 # the loopback lab', r[:160])
     check('metrics acl: the file gate serves the lab', acl_raw().startswith(b'HTTP/1.1 200'))
     with open(ACLGATE, 'w') as f:
         _json.dump({'type': 'ip-prefix', 'rules': [{'type': 'allow', 'prefix': '127.0.0.1/8'}]}, f)
-    r = acl_ctl('set metrics acl file:' + ACLGATE)
+    r = acl_ctl('set metrics-acl file:' + ACLGATE)
     check('metrics acl: a bad file answers err with the old gate standing',
           r.startswith('fail') and 'spell the network' in r and acl_raw().startswith(b'HTTP/1.1 200'), r[:140])
-    r = acl_ctl('clear metrics acl')
-    check('metrics acl: clear restores the configured value', r.startswith('ok metrics/acl=any'), r[:80])
+    r = acl_ctl('clear metrics-acl')
+    check('metrics acl: clear restores the configured value', r.startswith('ok metrics-acl=any'), r[:80])
     check('metrics acl: any serves again', acl_raw().startswith(b'HTTP/1.1 200'))
 
     # the accept ladder's order: the ACL first, then the caps — the cap
     # refusal is only ever answered to a peer the ACL admitted
-    r = acl_ctl('set metrics limits max-clients 1')
+    r = acl_ctl('set max-clients 1')
     check('metrics acl order: the cap sets live', r.startswith('ok'), r[:80])
     hold = socket.create_connection(('127.0.0.1', 19465), timeout=5)
     hold.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\n')   # the partial request parks the handler thread (the exposition handler has no timeout)
     time.sleep(0.5)
     check('metrics acl order: the admitted peer past the cap gets the 503',
           acl_raw().startswith(b'HTTP/1.1 503'), repr(acl_raw()[:24]))
-    r = acl_ctl('set metrics acl none')
-    check('metrics acl order: none sets past the full cap', r.startswith('ok metrics/acl=none'), r[:80])
+    r = acl_ctl('set metrics-acl none')
+    check('metrics acl order: none sets past the full cap', r.startswith('ok metrics-acl=none'), r[:80])
     check('metrics acl order: the off-ACL peer closes silently past the cap (the ACL first, then the caps)',
           acl_raw() == b'', repr(acl_raw()[:40]))
     hold.close()
     time.sleep(0.3)
-    acl_ctl('clear metrics acl')
-    r = acl_ctl('clear metrics limits max-clients')
+    acl_ctl('clear metrics-acl')
+    r = acl_ctl('clear max-clients')
     check('metrics acl order: the cap unsets back', r.startswith('ok'), r[:80])
     check('metrics acl order: any serves after the ladder', acl_raw().startswith(b'HTTP/1.1 200'))
     os.remove(ACLGATE)

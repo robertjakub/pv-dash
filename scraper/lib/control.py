@@ -421,7 +421,7 @@ class ControlServer(_ControlServer):
             'control/socket-group': 'on' if self.socket_group else 'off',
             'audit/log-file': ('off' if (self.audit is None or self.audit.disabled) else self.audit.path),
             'audit/forward': self.audit_params.get('forward') or 'none',
-            'audit/forward-format': self.audit_params.get('forward_format') or 'rfc5424',
+            'audit/forward/format': self.audit_params.get('forward_format') or 'rfc5424',
             'audit/rotate/max-size': '%g' % self.audit_params['max_mb'],
             'audit/rotate/files': '%d' % self.audit_params['files'],
             'audit/disable': 'on' if self.audit_params['disabled'] else 'off',

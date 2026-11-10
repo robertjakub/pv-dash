@@ -765,7 +765,7 @@ class ControlServer:
             self.record_cfg({'audit_forward': val})
             self._rebuild_audit()   # the fresh forward re-arms the sender, the collector-only fold re-chains
             return True, val
-        if key == 'audit/forward-format':
+        if key == 'audit/forward/format':
             if val not in AUDIT_FORWARD_FORMATS:
                 raise ValueError(T('wire.audit_forward_format_invalid') % ', '.join(AUDIT_FORWARD_FORMATS))
             self.audit_params['forward_format'] = val
@@ -904,7 +904,7 @@ class ControlServer:
             return True, ('remote' if self.audit.path == 'none' else self.audit.path)
         if key == 'audit/forward':
             return True, (self.audit_params.get('forward') or 'none')
-        if key == 'audit/forward-format':
+        if key == 'audit/forward/format':
             return True, (self.audit_params.get('forward_format') or 'rfc5424')
         if key == 'audit/rotate/max-size':
             return True, ('%g' % self.audit_params['max_mb'])

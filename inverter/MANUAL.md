@@ -193,7 +193,7 @@ the INV audit trail: the sink, the forwarding, the rotation, the kill switch
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `audit-forward` | `set audit forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
-| `audit-forward-format` | `set audit forward-format` | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
+| `audit-forward-format` | `set audit forward format` (alias: `set audit forward-format`) | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
 
 ### audit/rotate
 

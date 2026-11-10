@@ -295,7 +295,7 @@ class ControlServer(_ControlServer):
             'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control/socket-group': 'on' if self.socket_group else 'off',
             'audit/forward': self.audit_params.get('forward') or 'none',
-            'audit/forward-format': self.audit_params.get('forward_format') or 'rfc5424',
+            'audit/forward/format': self.audit_params.get('forward_format') or 'rfc5424',
         }
         for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
             if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:

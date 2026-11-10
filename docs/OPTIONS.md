@@ -27,7 +27,7 @@ on all four too (the per-tool extras carry their own rows below).
 | k | `audit-daily` |  | `set audit rotate daily` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `audit-files` |  | `set audit rotate files` | **✓** live | **✓** live | **✓** | **✓** |
 | k | `audit-forward` |  | `set audit forward` | **✓** live | **✓** live | **✓** live | **✓** live |
-| k | `audit-forward-format` |  | `set audit forward-format` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `audit-forward-format` |  | `set audit forward format` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `audit-log` |  | `set audit log-file` | **✓** live | **✓** live | **✓** | **✓** |
 | k | `audit-max-mb` |  | `set audit rotate max-size` | **✓** live | **✓** live | **✓** | **✓** |
 | c | `audit/rotate` |  | *(startup-only)* | **✓** | **✓** | **✓** | **✓** |

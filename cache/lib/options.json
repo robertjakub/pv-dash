@@ -199,7 +199,7 @@
       "hint": "none|syslog|syslog:/PATH|udp://HOST|tcp://HOST",
       "help": "also forward the CACHE audit trail: syslog (the local socket auto-scan), syslog:/path (an explicit socket), udp://host[:514] (RFC5426, best-effort) or tcp://host[:514] (RFC6587 framing) — the off-box copy carries the per-writer hash chain, so a scheduled search at the collector can alert on a chain break; docs/AUDIT.md" },
     { "name": "audit-forward-format", "flag": "--audit-forward-format", "env": "AUDIT_FORWARD_FORMAT", "conv": "str",
-      "live": "audit/forward-format",
+      "live": "audit/forward/format", "alias": "audit/forward-format",
       "setting-help": "the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send",
       "values": [ "rfc5424", "cef" ], "hint": "rfc5424|cef",
       "value-help": { "rfc5424": "the syslog envelope, the native line verbatim in the MSG",

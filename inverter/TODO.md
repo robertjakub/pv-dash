@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The external surfaces speak the console spellings (the flat wire's
+completion): the one-shot ctl translates the live/alias words like the
+cli's, `show config` renders the live paths as words (`set modbus
+profile`, `set audit rotate daily`), `help config`/`show knobs` and
+the MANUAL + OPTIONS tables spell the console words in their set
+columns, and the state dumps + the reload state file key the live
+paths — the flat names read beside them on restore. The wire itself
+stays flat; the fake's bare machine lives (`grid-outage`, `soc`) spell
+the same either way.
+
 The wire speaks the flattened registry names: the dispatch, the
 dumps, the defaults and every reply key/render the options.json `name`
 — for the fake most names were already flat; `system/listen`,

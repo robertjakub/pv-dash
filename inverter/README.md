@@ -81,7 +81,7 @@ The fake doesn't hardcode any device layout: the simulator computes
 and the **inverter profile** maps each name onto a register address and
 encoding. The format, the semantics and the shipped devices are documented
 once in [profiles/README.md](../profiles/README.md). `show registers`
-prints the loaded profile as a table, `set profile <name|path>` swaps it
+prints the loaded profile as a table, `set modbus profile <name|path>` swaps it
 live, `--profile` / `PROFILE` pick it at start; `clear profile` returns to
 the configured map.
 
@@ -165,7 +165,7 @@ A JSON-lines control server runs **by default on the unix socket
 `/tmp/fake-inverter-<listen-port>.socket`** — pass a TCP port number to
 bind `127.0.0.1:PORT` instead, or `0` to switch it off. Both tools resolve
 the target the same way: flag > **`CTL`** environment variable > the
-default socket. The target also **rebinds live** — `set control-port` —
+default socket. The target also **rebinds live** — `set control port` —
 and on the fake a **tokenless TCP rebind succeeds** (the F11 test-tool
 posture; every other tool in the family refuses it — F5). Every command
 and knob the wire answers — command, settable (`set`/`clear`) or
@@ -323,9 +323,9 @@ default at the **XDG state home**
 it, `--no-audit-log` turns it off, `--audit-log -` sends it to stdout (the
 docker logs / journald way — the shipped Dockerfile runs with it). The
 whole family is live-settable on the control wire (the cache's shape):
-`set audit-log <path|-|none>` swaps the sink, `set audit rotate
+`set audit log-file <path|-|none>` swaps the sink, `set audit rotate
 max-size <MB>` and `set audit rotate files <N>` re-chain the rotation
-live, `set audit-daily on/off` rides too and `set audit disable
+live, `set audit rotate daily on/off` rides too and `set audit disable
 on/off` is the kill switch (`clear <setting>` restores the configured
 value); the env twins spell the same names upper-snake. `--audit-forward` mirrors
 every line — the per-writer hash chain included — onward: `syslog` (the

@@ -163,7 +163,7 @@ the config names one and the start refuses. The flags:
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the pins, the machines — the tokens apart; every `--dump-interval` seconds) |
 | `--chaos` / `--seed` | `0` / random | the chaos probability / the RNG seed — see [Chaos injection](#chaos-injection---chaos) |
 | `--strict` | off | reject undefined registers with exception 02 |
-| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward syslog`) | XDG state | the audit trail: a file path or `-` for stdout (`$AUDIT_LOG` / `$AUDIT_MAX_MB` / `$AUDIT_DAILY` / `$AUDIT_FILES` / `$NO_AUDIT_LOG` / `$AUDIT_FORWARD`); the syslog forward mirrors every line to journald (F10) |
+| `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | XDG state | the audit trail: a file path, `-` for stdout (the docker logs / journald way) or `none` (no local file — the forward carries the trail) (`$AUDIT_LOG` / `$AUDIT_MAX_MB` / `$AUDIT_DAILY` / `$AUDIT_FILES` / `$NO_AUDIT_LOG` / `$AUDIT_FORWARD` / `$AUDIT_FORWARD_FORMAT`); the forward mirrors every line onward (F10) |
 | `--config` / `--log-level` / `--man` | `inverter.conf` / `INFO` / off | the config script (the set grammar, above) / the log surface / print the generated man page |
 
 `SIGHUP` re-applies the **environment layer** (all-or-nothing — flags are
@@ -323,10 +323,17 @@ docker logs / journald way — the shipped Dockerfile runs with it). The
 rotation rides the family knobs: the size trigger (`--audit-max-mb`, the
 backups kept `--audit-files`) and the UTC-midnight trigger
 (`--audit-daily` — live on this tool too: `set audit rotate daily on/off`);
-the env twins spell the same names upper-snake. `--audit-forward syslog`
-mirrors every line — the per-writer hash chain included — to the local
-syslog socket, journald's sealed external copy beside the file/stdout
-sink (the F10 answer).
+the env twins spell the same names upper-snake. `--audit-forward` mirrors
+every line — the per-writer hash chain included — onward: `syslog` (the
+local socket auto-scan), `syslog:/path` (an explicit socket),
+`udp://host[:514]` (RFC5426, best-effort) or `tcp://host[:514]` (RFC6587
+framing) — the **off-box copy** beside the file/stdout sink (the F10
+answer); the remote envelope rides `--audit-forward-format` (`rfc5424`,
+the default, or `cef`), a send failure notes once and the next event
+re-arms. `--audit-log none` turns the local file off: with a forward
+spelled that is the **remote-only mode** (the collector is the sole
+holder, the chain reseeds at GENESIS per run), without one the audit is
+disabled (the state `--no-audit-log` spells).
 The
 prefix names the writer — `INV` (the fake), `CLI`, `CTL`:
 

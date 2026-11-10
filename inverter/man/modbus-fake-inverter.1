@@ -213,12 +213,20 @@ limit
 .TP
 .B \-\-audit\-log
 INV audit trail: a file path or \- for stdout (the docker/journald way);
-~/.local/state/fake\-inverter/audit.log — the XDG state home when unset
+`none` turns the local file off (with a forward spelled that is the
+remote\-only mode); ~/.local/state/fake\-inverter/audit.log — the XDG
+state home when unset
 .TP
 .B \-\-audit\-forward
-also forward the INV audit trail to the local syslog socket (journald
-picks every line up — the sealed external copy beside the file/stdout
-sink, the per\-writer hash chain included; docs/AUDIT.md F10)
+also forward the INV audit trail: syslog (the local socket auto\-scan),
+syslog:/path (an explicit socket), udp://host[:514] (RFC5426,
+best\-effort) or tcp://host[:514] (RFC6587 framing) — the off\-box copy
+carries the per\-writer hash chain, so a scheduled search at the
+collector can alert on a chain break; docs/AUDIT.md
+.TP
+.B \-\-audit\-forward\-format
+the remote forward's envelope: RFC5424 (the default) or CEF — the local
+syslog forms keep the verbatim send (remote targets only)
 .TP
 .BI \-\-audit\-max\-mb " N"
 rotate the audit log at this size in MB, keeping N backups; 0 = no size
@@ -352,7 +360,16 @@ the read-count gate keeps a malformed frame from assembling an oversized
 reply. The control surface can still carry the family's read-only ops
 token (\fB--control-ops-token\fR) when the ops shift only ever watches;
 the unix control socket is 0600, or 0660 with
-\fB--control-socket-group\fR (a local group shares it).
+\fB--control-socket-group\fR (a local group shares it). The audit
+trail (prefix INV, the XDG state home when \fB--audit-log\fR is
+unset) forwards like the family's: \fB--audit-forward\fR spells the
+target \(em \fBsyslog\fR (the local socket auto\-scan),
+\fBsyslog:/path\fR, \fBudp://host[:514]\fR or
+\fBtcp://host[:514]\fR (the off\-box copy; the remote envelope rides
+\fB--audit-forward-format\fR = \fBrfc5424\fR|\fBcef\fR) \(em a
+send failure notes once and the next event re\-arms;
+\fB--audit-log none\fR turns the local file off (with a forward
+spelled: the remote\-only mode; without one: the audit disabled).
 
 .SH ENVIRONMENT
 .TP

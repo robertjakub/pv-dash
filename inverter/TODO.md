@@ -5,6 +5,21 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The audit-forward targets wave (the off-box copy, the F10 finish line):
+`--audit-forward` spells one target now — `syslog:/path` (an explicit
+socket), `udp://host[:514]` (RFC5426, best-effort) and
+`tcp://host[:514]` (RFC6587 octet-count framing) join the auto-scan;
+the remote envelope rides `--audit-forward-format` (`rfc5424` or `cef`,
+the native line verbatim + the prefix/chain as extracted fields so the
+collector's search can chain-verify and alert on a break); a send
+failure notes once and the next event re-arms lazily (the note carries
+the dropped count); `--audit-log none` is the remote-only mode with a
+forward spelled (the chain reseeds at GENESIS per run) and folds to the
+audit disabled without one; the grammar validator is one function in
+`common/runtime/audit.py` and the audit-chain suite gained the
+collector harnesses (the framing, CEF, UDP, the re-arm, the
+remote-only e2e).
+
 The config re-read joins the wire family-wide (`request/reload-config`,
 the grammar follow-through): the reloader re-resolves the ladder
 (`resolve_args` — flag > env > the config script) and re-applies the

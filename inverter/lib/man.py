@@ -131,7 +131,16 @@ the read-count gate keeps a malformed frame from assembling an oversized
 reply. The control surface can still carry the family's read-only ops
 token (\\fB--control-ops-token\\fR) when the ops shift only ever watches;
 the unix control socket is 0600, or 0660 with
-\\fB--control-socket-group\\fR (a local group shares it)."""
+\\fB--control-socket-group\\fR (a local group shares it). The audit
+trail (prefix INV, the XDG state home when \\fB--audit-log\\fR is
+unset) forwards like the family's: \\fB--audit-forward\\fR spells the
+target \\(em \\fBsyslog\\fR (the local socket auto\\-scan),
+\\fBsyslog:/path\\fR, \\fBudp://host[:514]\\fR or
+\\fBtcp://host[:514]\\fR (the off\\-box copy; the remote envelope rides
+\\fB--audit-forward-format\\fR = \\fBrfc5424\\fR|\\fBcef\\fR) \\(em a
+send failure notes once and the next event re\\-arms;
+\\fB--audit-log none\\fR turns the local file off (with a forward
+spelled: the remote\\-only mode; without one: the audit disabled)."""
     environment = """.SH ENVIRONMENT
 .TP
 .B CHAOS ", " MAX_KWP ", " PROFILE ,

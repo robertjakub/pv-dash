@@ -158,7 +158,10 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'metrics-client-timeout': '%g' % args.metrics_client_timeout,
         'metrics-max-conn-per-ip': str(args.metrics_max_conn_per_ip),
         'audit-log': 'off' if args.no_audit_log else ('stdout' if args.audit_log == '-'
-                                                      else (args.audit_log or 'the XDG state home')),
+                                                      else ('remote' if args.audit_log == 'none'
+                                                            and args.audit_forward not in (None, '', 'none')
+                                                            else ('off' if args.audit_log == 'none'
+                                                                  else (args.audit_log or 'the XDG state home')))),
         'audit-max-mb': '%g' % args.audit_max_mb,
         'audit/rotate/daily': 'on' if args.audit_daily else 'off',
         'audit-files': str(args.audit_files),
@@ -279,13 +282,15 @@ def main():
         audit = None if args.no_audit_log else AuditLog(args.audit_log, 'INV', app='fake-inverter',
                                                         max_mb=args.audit_max_mb,
                                                         daily=args.audit_daily, files=args.audit_files,
-                                                        forward=args.audit_forward)
+                                                        forward=args.audit_forward,
+                                                        forward_format=args.audit_forward_format)
     except ValueError as e:
         logger.error(str(e))
         raise SystemExit(1)
     audit_params = {'path': args.audit_log, 'max_mb': args.audit_max_mb,
                     'files': args.audit_files, 'daily': args.audit_daily,
                     'forward': None if args.audit_forward in (None, '', 'none') else args.audit_forward,
+                    'forward_format': args.audit_forward_format,
                     'disabled': bool(args.no_audit_log)}
     if args.dry_run:
         mode = 'static values' if args.static else (

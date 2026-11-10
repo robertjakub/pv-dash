@@ -64,26 +64,26 @@ design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
-| 0.94 | `scraper/lib/control.py:141` `command_help` <-> `dashboard/lib/control.py:100` `command_help` |
+| 0.94 | `scraper/lib/control.py:142` `command_help` <-> `dashboard/lib/control.py:101` `command_help` |
 | 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.92 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:34` `_load_options` |
 | 0.91 | `scraper/lib/options.py:34` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.89 | `scraper/bin/modbus-scraper.py:244` `graceful_stop` <-> `dashboard/bin/dashboard.py:471` `graceful_stop` |
+| 0.89 | `scraper/bin/modbus-scraper.py:246` `graceful_stop` <-> `dashboard/bin/dashboard.py:474` `graceful_stop` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
 | 0.85 | `inverter/lib/options.py:35` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
 | 0.85 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
 | 0.85 | `scraper/lib/options.py:34` `_load_options` <-> `inverter/lib/options.py:35` `_load_options` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
 | 0.83 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:34` `_load_options` |
-| 0.82 | `cache/bin/modbus-cache.py:368` `watch_dump` <-> `common/wire/control.py:905` `run_dump_interval` |
-| 0.81 | `inverter/lib/control.py:151` `__init__` <-> `dashboard/lib/control.py:77` `__init__` |
-| 0.78 | `inverter/lib/signals.py:30` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:587` `acl_table_report` <-> `dashboard/lib/control.py:421` `acl_table_report` |
+| 0.82 | `cache/bin/modbus-cache.py:350` `watch_dump` <-> `common/wire/control.py:925` `run_dump_interval` |
+| 0.81 | `inverter/lib/control.py:151` `__init__` <-> `dashboard/lib/control.py:78` `__init__` |
+| 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
+| 0.78 | `inverter/lib/control.py:596` `acl_table_report` <-> `dashboard/lib/control.py:432` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `inverter/lib/control.py:66` `handle` <-> `common/wire/control.py:262` `handle` |
+| 0.75 | `inverter/lib/control.py:67` `handle` <-> `common/wire/control.py:262` `handle` |
 | 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:420` `load_write_gate_file` |
-| 0.73 | `inverter/lib/control.py:598` `command_help` <-> `dashboard/lib/control.py:100` `command_help` |
-| 0.73 | `scraper/lib/control.py:141` `command_help` <-> `inverter/lib/control.py:598` `command_help` |
+| 0.73 | `inverter/lib/control.py:607` `command_help` <-> `dashboard/lib/control.py:101` `command_help` |
+| 0.73 | `scraper/lib/control.py:142` `command_help` <-> `inverter/lib/control.py:607` `command_help` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -170,10 +170,10 @@ by semantic family — the knob layer is the one source --help, the man
 pages, the set grammar, the NixOS modules and the README checks read,
 so a drifted row travels wide.
 
-**The shape**: 215 knob rows across the
-four registries; 29 names carry in all four:
+**The shape**: 219 knob rows across the
+four registries; 30 names carry in all four:
 
-`audit`, `audit-daily`, `audit-files`, `audit-log`, `audit-max-mb`, `audit/rotate`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
+`audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-log`, `audit-max-mb`, `audit/rotate`, `auth`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
 
 **The tool-specific remainder** (by nature):
 
@@ -185,7 +185,7 @@ four registries; 29 names carry in all four:
 | dashboard | `auth-token`, `config-js`, `local-time`, `log-access`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
 **The shared knobs whose fields disagree** (8 of
-29):
+30):
 
 | knob | the drifted fields (cache / scraper / inverter / dashboard) |
 |---|---|
@@ -200,18 +200,15 @@ four registries; 29 names carry in all four:
 
 **The command vocabularies** (the wire words per tool):
 
-- cache: `help`, `inspect`, `ping`, `quit`, `request`, `request/clear`, `request/clear/cache`, `request/dump`, `request/dump`, `request/dump/with-cache`, `request/reload`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `unset`
+- cache: `help`, `inspect`, `ping`, `quit`, `request`, `request/clear`, `request/clear/cache`, `request/dump`, `request/dump`, `request/dump/with-cache`, `request/reload`, `request/reload-config`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `unset`
 - scraper: `help`, `inspect`, `ping`, `poll`, `poll/now`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `unset`
-- inverter: `exit`, `help`, `inspect`, `logout`, `ping`, `quit`, `request`, `request/dump`, `request/reload`, `request/restore`, `reset`, `set`, `show`, `shutdown`, `unset`
+- inverter: `exit`, `help`, `inspect`, `logout`, `ping`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restore`, `reset`, `set`, `show`, `shutdown`, `unset`
 - dashboard: `help`, `inspect`, `ping`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restore`, `set`, `show`, `shutdown`, `unset`
 
 **The command deltas worth a ruling:**
 
 - `request/clear/cache` + `request/dump/with-cache` — the cache only
   (the write-behind cadence and the flush verb are its nature).
-- `request/reload-config` — the scraper and the dashboard (the
-  cache's and the fake's reload exec and re-read in one — the fake's
-  conf rides the exec since the config-file wave).
 - `request/restart` — absent on the fake (its reload execs and
   re-reads the conf already, so the verb would double it; the
   restart-marked overrides fold in the exec).
@@ -271,8 +268,8 @@ canon the operators grep for.
 | dashboard | `ACL-FILE`, `RELOAD`, `SHUTDOWN`, `START` |
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
-**The phrase canon**: 31 log phrase(s) shared by >= 2 tools;
-83 tool-local. The canon (the lead clause, the tools that speak it):
+**The phrase canon**: 30 log phrase(s) shared by >= 2 tools;
+84 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
@@ -285,7 +282,6 @@ canon the operators grep for.
 | `shutdown:` | cache, dashboard, inverter, scraper |
 | `the state dump` | cache, common, inverter |
 | `state dumped to` | cache, common |
-| `sighup: reload failed ` | cache, common, inverter |
 | `connection rejected:` | common, scraper |
 | `unhandled error serving` | dashboard, scraper |
 | `dry-run: configuration is valid nothing was boun` | dashboard, inverter, scraper |
@@ -301,6 +297,7 @@ canon the operators grep for.
 | `the read-only ops token supplements the admin to` | cache, inverter |
 | `the ops token must differ from the admin token t` | cache, inverter |
 | `cannot serve on` | cache, inverter |
+| `the shutdown dump to` | cache, common |
 
 The findings:
 
@@ -316,7 +313,7 @@ the family canon: same cause, same code, same text shape.
 **The rc summary** + **the distinct refusal texts** (the literal
 message args — the family's refusal canon):
 
-- rc 0 (the clean exits): 9; rc 1 (the binds): 17; rc 2 (the CLI mistakes): 6; 0 site(s) raising a variable (the message/`rc` computed —
+- rc 0 (the clean exits): 9; rc 1 (the binds): 20; rc 2 (the CLI mistakes): 6; 0 site(s) raising a variable (the message/`rc` computed —
   the common SystemExit(str) prints the message and exits 1).
 
 The refusal texts (the literal SystemExit args, sorted):
@@ -397,7 +394,7 @@ READMEs' `##` skeletons.
 **The README `##` skeletons:**
 
 - cache: How it works -> Diagnostics registers -> Register map (device profile) -> Usage -> Configuration -> Runtime control (signals) -> Runtime control (`--control-port`) -> Access control -> Modbus auth -> Persistence -> Metrics -> Audit logging -> Security -> Testing -> Nix / NixOS -> Source layout -> License
-- scraper: How it works -> Metrics -> Device profile -> Battery -> Configuration -> Runtime control (signals) -> What /metrics leaks (the privacy note, F15) -> Logging and audit trail -> Test inverter -> Testing -> Nix / NixOS -> Source layout -> License
+- scraper: How it works -> Metrics -> Alerting -> Device profile -> Battery -> Configuration -> Runtime control (signals) -> What /metrics leaks (the privacy note, F15) -> Logging and audit trail -> Test inverter -> Testing -> Nix / NixOS -> Source layout -> License
 - inverter: Simulation -> Served registers (the default profile) -> Internal registers (not in the profile) -> Usage -> Configuration -> Runtime control -> Chaos injection (`--chaos`) -> Signals -> Docker -> Audit trail -> Security -> Testing -> Nix / NixOS -> Source layout -> License
 - dashboard: Features -> Run -> Configuration -> Control -> Behind a reverse proxy -> Metrics source -> Notes -> Security -> Testing -> Nix / NixOS -> Source layout -> License
 
@@ -423,9 +420,9 @@ LINES are quoted, the verdicts curated.
 | tool | mkOption blocks |
 |---|---|
 | cache | 12 |
-| scraper | 44 |
+| scraper | 45 |
 | inverter | no module.nix |
-| dashboard | 43 |
+| dashboard | 44 |
 
 **The module options NOT matching a registry knob name** (after
 the kebab/camel normalization; the `*File` suffix is the NixOS
@@ -467,12 +464,12 @@ published port not backed by a registry default is a lie.
 | `docker/demo/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
 | `docker/entrypoints/entrypoint-prometheus.sh` | `AUDIT`, `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
 | `docker/entrypoints/entrypoint.sh` | `AUDIT`, `JSON`, `README`, `REQUIRED` | — |
-| `docker/env/cache.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL` … | — |
-| `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `INFO`, `LISTEN`, `LOG_LEVEL`, `NO_AUDIT_LOG`, `PLAIN`, `PROM_URL` | — |
-| `docker/env/fake.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CLIENT_TIMEOUT`, `LISTEN`, `MAX_CLIENTS`, `MAX_CONN_PER_IP`, `MAX_KWP`, `NO_AUDIT_LOG`, `PROFILE`, `SIGHUP`, `STRICT` … | — |
+| `docker/env/cache.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL` … | — |
+| `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `INFO`, `LISTEN`, `LOG_LEVEL`, `NO_AUDIT_LOG`, `PLAIN`, `PROM_URL` | — |
+| `docker/env/fake.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CLIENT_TIMEOUT`, `LISTEN`, `MAX_CLIENTS`, `MAX_CONN_PER_IP`, `MAX_KWP`, `NO_AUDIT_LOG`, `PROFILE`, `SIGHUP` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
-| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `METRIC_PREFIX`, `NO_AUDIT_LOG`, `PORT` … | — |
-| `docker/prod/README.md` | `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `EDITOR`, `HOST`, `JSON`, `PORT`, `PROM_URL`, `README`, `UPSTREAM`, `YOUR` | 8080, 9350 |
+| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `METRIC_PREFIX`, `NO_AUDIT_LOG` … | — |
+| `docker/prod/README.md` | `AUDIT`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `EDITOR`, `HOST`, `JSON`, `PORT`, `PROM_URL`, `README`, `UPSTREAM`, `YOUR` | 8080, 9350 |
 | `docker/prod/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `ONLY`, `PORT`, `PRODUCTION` … | 8080, 9350 |
 | `docker/prometheus.yml` | `AUDIT` | — |
 
@@ -509,10 +506,10 @@ list is the TODO seed, not a verdict.
 - inverter: every command exercised
 - dashboard: every command exercised
 
-**The canon phrases no suite pins**: 18
+**The canon phrases no suite pins**: 17
 
 **The graduation path**: the seeds carry stable IDs in
-[docs/family-drift-seeds.json](family-drift-seeds.json) (18
+[docs/family-drift-seeds.json](family-drift-seeds.json) (17
 open promise(s), the suggested suite per seed); a test wave
 consumes entries, the regeneration drops them, the shrinkage is
 the wave's proof; `--check` fails when a NEW promise ships
@@ -542,7 +539,6 @@ files cite it — the promise ledger against the code.
 | F1 | Modbus TCP carries no authentication and no encryption | — |
 | F14 | No TLS on the HTTP endpoint (plain HTTP): the bearer token and the metrics trave | dashboard |
 | F15 | The metrics expose production values (generation, consumption, battery SoC) | — |
-| F16 | No automated alerting yet (freshness gap, poll down, exception spikes) | — |
 | F17 | The `/config` volume holds live config in plaintext; the entrypoint seeds copies | — |
 | F2 | audit-trail injection: a newline in a control command wrote a forged second trai | — |
 | F3 | the register allow-list failed open on unparseable write frames | — |
@@ -552,10 +548,11 @@ files cite it — the promise ledger against the code.
 | F7 | the compose stack published every listener on all host interfaces | — |
 | F8 | the unix control socket's mode was umask-derived | cache, common |
 | F9 | token flags are visible in `ps` / `/proc/*/cmdline` | — |
-| F10 | the audit trail was append-only but not integrity-protected | cache, common |
+| F10 | the audit trail was append-only but not integrity-protected | cache, common, dashboard, scraper |
 | F11 | the fake's Modbus surface: no client limit/timeout/ACL, oversized replies | common, inverter |
 | F12 | token files were not permission-checked | cache, common |
 | F13 | `/metrics` unauthenticated by default; the loopback bind the only control | cache, common, dashboard, inverter, scraper |
+| F16 | no automated alerting | cache |
 | F18 | the state dump was config-equivalent trust at rest with an umask-derived mode | cache, common |
 | F19 | the release landed before the CI gate reported | — |
 | F20 | the ctl/cli help promised token-file env vars the clients never read | — |
@@ -692,27 +689,19 @@ malformed-frame policy hook with it).
    proposal + the migration note (the alias map carries the old
    spellings one release).
 
-2. **`request/reload-config` family-wide** — the re-read-without-exec
-   surface exists on the scraper and the dashboard; the remaining two
-   are the cache and the fake. The fake grew its config story (its
-   reload execs and the conf re-reads in the new process) but has no
-   reload-config row — the row decision open (a reloader of its own,
-   or the family row answering `err no reloader configured`); the
-   cache has the config script but no reloader wiring at all.
-
-3. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
+2. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
    the RBAC vocabulary from the registry's command rows (the
    hidden/internal flags included). One home; the silent drift
    (a policy accepting a verb the grammar refuses) dies.
 
-4. **The coverage TODOs graduate** — the seeds carry stable IDs in
+3. **The coverage TODOs graduate** — the seeds carry stable IDs in
     docs/family-drift-seeds.json (`family_drift.py --seeds`, the
     suggested suite per seed); a test wave consumes entries, the
     regeneration drops them, the shrinkage is the wave's proof, and
     `--check` fails when a NEW promise ships uncovered (the list may
     only shrink).
 
-5. **The parity gates wired** — the NixOS-parity and docker/env
+4. **The parity gates wired** — the NixOS-parity and docker/env
     sweeps join `check_options`/the release gates as machine checks
     (the module.nix type/default vs the registry, the env-file
     coverage vs the env twins). The drift doc's `--check` already

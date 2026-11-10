@@ -26,6 +26,46 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   take the flag too), the NixOS modules grew `auditForward`, and the
   audit-chain suite pins the mirror, the fail-stop and the refusals.
 
+- **scraper** — **the alert rules pack ships next to the exporter** (the
+  F16 closure): `scraper/alerts.yml`, six alerts in two groups, the
+  audit vocabulary's detection half — every annotation names the audit
+  events and the log lines the fired page correlates with (the
+  `WRITE-REFUSED` events, the SCR/CACHE trails), so detection is wired,
+  not just logged. The scraper's group is its poll story
+  (`ScraperPollDown`, `ScraperFreshnessGap`, `ScraperExceptionSpike`);
+  the cache contributes its side (`CachePollDown`, `CacheAgeSpike`,
+  `CacheWriteRefusalBurst`) on a new `modbus_cache_write_refused_total`
+  counter on the cache's own /metrics (every gate refusal counts —
+  allow-write off, the write ACL, the register allow-list, a malformed
+  frame; each is a `WRITE-REFUSED` audit event) and stays silent until
+  that endpoint is scraped. The demo image bakes the pack
+  (`rule_files:` in `prometheus.yml`, the `alerts` build context), the
+  scraper package installs it (`share/modbus-scraper/alerts.yml`),
+  docs/NIXOS.md shows the `services.prometheus.ruleFiles` wiring; the
+  thresholds assume the default 10 s poll interval.
+
+- **everywhere** — **`request/reload-config` answers family-wide**: the
+  config re-read without the exec (the surface the request-namespace
+  wave named) now speaks on all four. The cache and the fake gain their
+  reloaders (the scraper and the dashboard had it): the cache's
+  `apply_reload` is the SIGHUP body extracted — the map swaps atomically,
+  the override markers clear, and the dump loop now re-reads the
+  configured interval on that path (the wake it was missing) — and the
+  fake's re-applies the demo knobs (chaos, peak, strict, time, time-scale,
+  profile, log level) over the running machines from the re-resolved
+  ladder, the machine pins keeping their markers. The shared tail lives
+  once in the control base (`reloaded()`: the markers drop — wholesale,
+  or the `applied` keys — and the dump-interval loop re-reads with the
+  parked dumper waking), the shared SIGHUP watcher in
+  `common/runtime/daemon.py` gained the SIGUSR1 hook and the
+  reload-failure audit hook so the cache adopts it wholesale, and the
+  spine's reload-config reply catches the resolvers' `SystemExit` now (a
+  broken config file answers `err reload failed` instead of killing the
+  session). The verb joins `KNOWN_VERBS` on the two tools that lacked it
+  (the ops default stays `show,clear`), the rows land beside
+  `request/reload` in both registries, and the ctls' helps, the READMEs,
+  the man pages and the MANUALs follow.
+
 - **common** — **the flat package organizes into functional subdirs**: the
   17 flat modules split into five subpackages beside the existing
   `modbus/` — `render/` (the static texts + JSON, the man-page builder,
@@ -283,16 +323,6 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   shipped).
 
 ### Fixed
-
-- **common** — **the device profiles resolve again from the settings
-  subdir**: the common/ subdir split left `_profile_candidates` climbing
-  one dirname short (`here` stayed `common/` where the module had moved
-  to `common/settings/`) — the bundled profiles fell through to the bare
-  name and every bare-name `--config` profile refused ("cannot read
-  device profile sun2000.json": the scrape-regtest "never came up", the
-  fuzz pairs' connection-refused aborts). The walk climbs to the tree
-  root; the packaged share-tree and the one-up suite-tree candidates
-  keep their order.
 
 - **scraper** — **a live `modbus/offset` set reaches the client**: the
   registry row said live, but the poller's `apply()` had no `offset=`

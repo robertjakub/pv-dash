@@ -738,9 +738,6 @@ drift is at parity or declined with the reasons above."""
 KNOBS_VERBS = """\
 - `request/clear/cache` + `request/dump/with-cache` — the cache only
   (the write-behind cadence and the flush verb are its nature).
-- `request/reload-config` — the scraper and the dashboard (the
-  cache's and the fake's reload exec and re-read in one — the fake's
-  conf rides the exec since the config-file wave).
 - `request/restart` — absent on the fake (its reload execs and
   re-reads the conf already, so the verb would double it; the
   restart-marked overrides fold in the exec).
@@ -933,27 +930,19 @@ malformed-frame policy hook with it).
    proposal + the migration note (the alias map carries the old
    spellings one release).
 
-2. **`request/reload-config` family-wide** — the re-read-without-exec
-   surface exists on the scraper and the dashboard; the remaining two
-   are the cache and the fake. The fake grew its config story (its
-   reload execs and the conf re-reads in the new process) but has no
-   reload-config row — the row decision open (a reloader of its own,
-   or the family row answering `err no reloader configured`); the
-   cache has the config script but no reloader wiring at all.
-
-3. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
+2. **`KNOWN_VERBS` derived, not hand-maintained** — the loaders build
    the RBAC vocabulary from the registry's command rows (the
    hidden/internal flags included). One home; the silent drift
    (a policy accepting a verb the grammar refuses) dies.
 
-4. **The coverage TODOs graduate** — the seeds carry stable IDs in
+3. **The coverage TODOs graduate** — the seeds carry stable IDs in
     docs/family-drift-seeds.json (`family_drift.py --seeds`, the
     suggested suite per seed); a test wave consumes entries, the
     regeneration drops them, the shrinkage is the wave's proof, and
     `--check` fails when a NEW promise ships uncovered (the list may
     only shrink).
 
-5. **The parity gates wired** — the NixOS-parity and docker/env
+4. **The parity gates wired** — the NixOS-parity and docker/env
     sweeps join `check_options`/the release gates as machine checks
     (the module.nix type/default vs the registry, the env-file
     coverage vs the env twins). The drift doc's `--check` already

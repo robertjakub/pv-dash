@@ -180,8 +180,9 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--client-timeout` | `300` | disconnect clients silent for this many seconds (`0` = never) |
 | `--max-conn-per-ip` | `0` | per-peer-IP connection cap (`0` = no limit) |
 | **Audit trail** | | |
-| `--audit-log` | XDG state | the CACHE audit trail: a file path or `-` for stdout (docker logs / journald) — see [Audit logging](#audit-logging) |
-| `--audit-forward syslog` | off | also mirror every audit line to the local syslog socket (journald picks it up — the sealed external copy, F10) |
+| `--audit-log` | XDG state | the CACHE audit trail: a file path, `-` for stdout (docker logs / journald), or `none` for no local file — the forward carries the trail — see [Audit logging](#audit-logging) |
+| `--audit-forward` | off | also forward every audit line: `syslog` (the local socket auto-scan), `syslog:/path`, `udp://host[:514]` (RFC5426) or `tcp://host[:514]` (RFC6587) — the off-box copy, F10 |
+| `--audit-forward-format` | `rfc5424` | the remote forward's envelope: `rfc5424` or `cef` — the local syslog forms keep the verbatim send |
 | `--audit-max-mb` / `--audit-daily` / `--audit-files` / `--no-audit-log` | `10` / off / `3` / off | rotation at size / at UTC midnight / backups kept / the off switch |
 | `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds, `0` = off |
 | **Logging** | | |
@@ -458,9 +459,21 @@ by default at the **XDG state home** (`~/.local/state/modbus-cache/audit.log`).
 `--audit-log -` sends it to stdout (the docker logs / journald way — the
 NixOS module ships with it). Rotation: `--audit-max-mb 10` (the default),
 `--audit-daily` (UTC midnight), `--audit-files 3`. And the F10 answer is
-opt-in: `--audit-forward syslog` mirrors every line — the hash chain
-included — to the local syslog socket, journald's sealed external copy: an
-edited local trail breaks its chain, the journal still shows the truth.
+opt-in: `--audit-forward` mirrors every line — the hash chain included —
+onward: `syslog` (the local socket auto-scan), `syslog:/path` (an
+explicit socket), `udp://host[:514]` (RFC5426, best-effort) or
+`tcp://host[:514]` (RFC6587 octet-count framing) — the **off-box copy**:
+an edited local trail breaks its chain, and a scheduled search at the
+collector can chain-verify the extracted prefix/chain fields and alert on
+a break; a line that left the box before an attacker arrived cannot be
+touched from it. The remote envelope rides `--audit-forward-format`
+(`rfc5424`, the default, or `cef` — the local syslog forms keep the
+verbatim send). A send failure notes once on stderr and the next event
+re-arms (the note carries the dropped count). `--audit-log none` turns
+the local file off: with a forward spelled that is the **remote-only
+mode** (the collector is the sole holder — no file, no XDG directory,
+the chain reseeds at GENESIS per run), without one the audit is disabled
+(the state `--no-audit-log` spells).
 The prefix names the
 writer — `CACHE` (the proxy), `CLI` (modbus-cache-cli), `CTL`
 (modbus-cache-ctl):

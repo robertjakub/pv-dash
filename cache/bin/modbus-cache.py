@@ -169,6 +169,8 @@ def main():
                                         cfg['metrics_max_clients'], cfg['metrics_max_conn_per_ip'])
     if cfg['no_audit_log']:
         audit_display = 'off'
+    elif cfg['audit_log'] == 'none':
+        audit_display = 'remote' if cfg['audit_forward'] not in (None, '', 'none') else 'off'
     elif cfg['audit_log'] == '-':
         audit_display = 'stdout'
     else:
@@ -197,6 +199,7 @@ def main():
     proxy.audit_params = {'path': cfg['audit_log'] or None, 'max_mb': cfg['audit_max_mb'],
                           'daily': cfg['audit_daily'], 'files': cfg['audit_files'],
                           'forward': None if cfg['audit_forward'] in (None, '', 'none') else cfg['audit_forward'],
+                          'forward_format': cfg['audit_forward_format'],
                           'disabled': bool(cfg['no_audit_log'])}   # the audit lives rebuild from here
     logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, client auth: %s, upstream auth: %s, control token: %s, ops token: %s, audit trail: %s, requests audit: %s, metrics: %s, metrics acl: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
@@ -236,7 +239,8 @@ def main():
         audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'] or None, 'CACHE',
                                                           app='modbus-cache', max_mb=cfg['audit_max_mb'],
                                                           daily=cfg['audit_daily'], files=cfg['audit_files'],
-                                                          forward=cfg['audit_forward'])
+                                                          forward=cfg['audit_forward'],
+                                                          forward_format=cfg['audit_forward_format'])
     except ValueError as e:
         logger.error(str(e))
         raise SystemExit(1)

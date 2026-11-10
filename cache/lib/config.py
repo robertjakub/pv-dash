@@ -455,6 +455,8 @@ def resolve_config(args, script_dir=None):
         'audit_log': resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', '', str),
         'audit_forward': resolve(getattr(args, 'audit_forward', None), 'AUDIT_FORWARD',
                                  'audit_forward', 'none', str),
+        'audit_forward_format': resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
+                                        'audit_forward_format', 'rfc5424', str),
         'audit_max_mb': resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
                                 'audit_max_mb', DEFAULTS['audit_max_mb'], float),
         'audit_daily': resolve_bool(getattr(args, 'audit_daily', False), 'AUDIT_DAILY',

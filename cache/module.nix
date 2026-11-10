@@ -80,6 +80,7 @@ let
     (setLine "no-audit-log" (lib.boolToString cfg.noAuditLog))
     (setLine "audit-log" (if cfg.auditLog == null then "-" else cfg.auditLog))
     (setLine "audit-forward" (if cfg.auditForward == null then "none" else cfg.auditForward))
+    (lib.optionals (cfg.auditForwardFormat != null) [ (setLine "audit-forward-format" cfg.auditForwardFormat) ])
     (setLine "audit-max-mb" (toString cfg.auditMaxMb))
     (setLine "audit-daily" (lib.boolToString cfg.auditDaily))
     (setLine "audit-files" (toString cfg.auditFiles))
@@ -617,13 +618,25 @@ in
     };
 
     auditForward = lib.mkOption {
-      type = lib.types.nullOr (lib.types.enum [ "syslog" ]);
+      type = lib.types.nullOr (lib.types.addCheck lib.types.str
+        (v: v == "none" || v == "syslog" || lib.hasPrefix "syslog:/" v
+            || lib.hasPrefix "udp://" v || lib.hasPrefix "tcp://" v));
       default = null;
       description = ''
-        Also forward the CACHE audit trail to the local syslog socket
-        ("syslog"): journald picks every audit line up — the sealed external
-        copy beside the file/stdout sink, the per-writer hash chain included.
-        null = off.
+        Also forward the CACHE audit trail: "syslog" (the local socket
+        auto-scan), "syslog:/path" (an explicit socket), "udp://host[:514]"
+        (RFC5426, best-effort) or "tcp://host[:514]" (RFC6587 framing) — the
+        off-box copy carries the per-writer hash chain, so a scheduled search
+        at the collector can alert on a chain break. null = off.
+      '';
+    };
+
+    auditForwardFormat = lib.mkOption {
+      type = lib.types.nullOr (lib.types.enum [ "rfc5424" "cef" ]);
+      default = null;
+      description = ''
+        The remote forward's envelope: RFC5424 (the tool's default) or CEF —
+        the local syslog forms keep the verbatim send (remote targets only).
       '';
     };
 

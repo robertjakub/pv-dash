@@ -16,7 +16,7 @@ import os
 import socket
 import time
 
-from common.runtime.audit import AUDIT_FORWARD_CHOICES
+from common.runtime.audit import AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward
 from common.runtime.version import version_string
 from common.settings.config import auth_key_floor_error, default_profile_path, is_loopback_host, parse_auth_type, parse_control_target, \
     parse_upstream, resolve_profile_file
@@ -408,9 +408,20 @@ class ControlServer(_ControlServer):
                 p.metrics_srv._http.gate.max_per_ip = v
             return '%d' % v
         if key == 'audit/log-file':
+            if val == 'none' and p.audit_params.get('forward'):
+                # remote-only: the collector is the sole holder (the chain
+                # reseeds at GENESIS on the next restart)
+                p.audit_params['path'] = 'none'
+                p.audit_params['disabled'] = False
+                p.config['audit_log'] = 'none'
+                p.config['no_audit_log'] = False
+                self._rebuild_audit()
+                return 'remote'
             if val in ('off', 'none'):
+                # the full off — none without a forward folds to it (the
+                # same state --no-audit-log spells)
                 p.audit_params['disabled'] = True
-                p.config['audit_log'] = ''
+                p.config['audit_log'] = 'none' if val == 'none' else ''
                 p.config['no_audit_log'] = True
                 self._rebuild_audit()
                 return 'off'
@@ -446,10 +457,19 @@ class ControlServer(_ControlServer):
             self._rebuild_audit()
             return '%d' % v
         if key == 'audit/forward':
-            if val not in ('none', 'syslog'):
-                raise ValueError('audit/forward must be one of %s' % ', '.join(AUDIT_FORWARD_CHOICES))
-            p.audit_params['forward'] = None if val == 'none' else val
+            try:
+                parse_forward(val)
+            except ValueError:
+                raise ValueError('audit/forward must be %s' % AUDIT_FORWARD_GRAMMAR)   # the wire speaks the live name
+            p.audit_params['forward'] = None if val in ('', 'none') else val
             p.config['audit_forward'] = val
+            self._rebuild_audit()
+            return val
+        if key == 'audit/forward-format':
+            if val not in AUDIT_FORWARD_FORMATS:
+                raise ValueError('audit/forward-format must be one of %s' % ', '.join(AUDIT_FORWARD_FORMATS))
+            p.audit_params['forward_format'] = val
+            p.config['audit_forward_format'] = val
             self._rebuild_audit()
             return val
         if key == 'audit/disable':
@@ -667,9 +687,13 @@ class ControlServer(_ControlServer):
         if key == 'metrics/limits/max-conn-per-ip':
             return '%d' % p.metrics_caps[2]
         if key == 'audit/log-file':
-            return p.audit.path if p.audit else 'off'
+            if p.audit is None or p.audit.disabled:
+                return 'off'
+            return 'remote' if p.audit.path == 'none' else p.audit.path
         if key == 'audit/forward':
             return p.audit_params.get('forward') or 'none'
+        if key == 'audit/forward-format':
+            return p.audit_params.get('forward_format') or 'rfc5424'
         if key == 'audit/rotate/max-size':
             return '%g' % p.audit_params['max_mb']
         if key == 'audit/rotate/daily':
@@ -913,8 +937,9 @@ class ControlServer(_ControlServer):
             'control/ops/verbs': ','.join(sorted(self.ops_verbs)) or 'off',
             'control/trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control/socket-group': 'on' if self.socket_group else 'off',
-            'audit/log-file': (p.audit.path if p.audit else 'off'),
+            'audit/log-file': ('off' if (p.audit is None or p.audit.disabled) else p.audit.path),
             'audit/forward': p.audit_params.get('forward') or 'none',
+            'audit/forward-format': p.audit_params.get('forward_format') or 'rfc5424',
             'audit/rotate/max-size': '%g' % prm['max_mb'],
             'audit/rotate/daily': 'on' if prm['daily'] else 'off',
             'audit/rotate/files': '%d' % prm['files'],

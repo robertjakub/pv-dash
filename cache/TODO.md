@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The README moved to the gated skeleton: `scripts/lint_readmes.py --check`
+pins the `##` canon family-wide, and the cache came to it — the
+`Diagnostics registers` and `Register map (device profile)` sections
+relocated into the feature slot (right after Runtime control), and the
+flags table's `--profile` row links the map instead of pointing "see
+above".
+
 The audit family live family-wide (the template's role): the dump's
 seven audit rows fold the shared `audit_dump_rows()` — one shape on all
 four tools (the scraper/fake/dashboard gained the daily row) — and

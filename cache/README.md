@@ -53,59 +53,6 @@ Resilience:
   survived; a client cannot crash the proxy, only burn its own connection
   (fuzz- and soak-tested).
 
-## Diagnostics registers
-
-The cache synthesizes a 4-register block at **65000** from live poller
-state — answered instantly, never forwarded, never cached, never part of a
-profile (FC3 only):
-
-| Register | Meaning |
-|---|---|
-| 65000 | magic `0xCAFE` (validity check for clients) |
-| 65001 | `1` if the last completed poll cycle had at least one successful read |
-| 65002 | seconds since the last successful device read (`65535` = none yet) |
-| 65003 | cache process uptime in seconds |
-
-Reads that straddle the block are rejected with exception `02`. Reply unit
-ids are validated on every forwarded request before anything is cached.
-
-## Register map (device profile)
-
-The proxy caches the registers listed in the **device profile** — the same
-shared schema the [fake inverter](../inverter/README.md) serves and the
-[scraper](../scraper/README.md) scrapes; the shipped profiles live in the
-suite's [`profiles/`](../profiles/) subproject (`sun2000.json` by default).
-The format is documented in [profiles/README.md](../profiles/README.md).
-Resolution: `--profile` flag, env `PROFILE`, config `set modbus profile`,
-then the bundled copy; the file is re-read on `SIGHUP`.
-
-- Entry `type` gives the width and the space: `i16`/`u16` (one word),
-  `i32`/`u32` and the lo-word-first `i32swap`/`u32swap`, the IEEE 754
-  `f32`/`f32swap` (two words each), `bit` (one address = one binary value).
-- The optional **`fc`** field picks the address space: `3` (holding
-  registers) or `4` (input registers) for the word types (`3` the default),
-  `1` (coils, the bit default) or `2` (discrete inputs) for `bit` — the
-  four spaces are cached and polled independently.
-- The optional **`ttl`** field overrides the cache TTL per entry (seconds;
-  `0` = never expire): a fast power word at 5s next to a nameplate word at
-  1h, one poll cadence for both (`show cache all` marks the entries carrying
-  one). The entry TTL **replaces** the global one in both directions — the
-  global TTL is only the fallback, never a floor.
-
-Which registers are actually **fetched** comes from a selection file —
-`{"registers": ["pv-power", ...]}`, profile names only — resolved as
-`--selection` flag, env `SELECTION`, config `set modbus selection`; the
-default fetches **every** profile entry (`all`), and **`none`** empties the
-map: every read forwards and nothing is stored. The shipped
-`examples/selection.json` is the essential SUN2000 monitoring set. The
-65000-65003 diagnostics block is never fetched — the cache synthesizes it.
-
-For slow dongles the poller reads the map in as **few transactions as
-possible**: ranges closer together than `--merge-gap` registers are merged
-into one block read (never across a function-code boundary); a block that
-fails is split in halves and the pieces are retried — the plan converges to
-the largest blocks the device actually answers.
-
 ## Usage
 
 By default the proxy **binds to 127.0.0.1:15502** (loopback only) — pass
@@ -143,7 +90,7 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--unit` | `1` | Modbus unit id (1–247) |
 | `--timeout` | `3` | Modbus connect/read timeout, seconds |
-| `--profile` | the bundled `sun2000` profile | device profile JSON to cache (see above) |
+| `--profile` | the bundled `sun2000` profile | device profile JSON to cache (see [Register map](#register-map-device-profile)) |
 | `--interval` | `10` | seconds between cache polls |
 | `--cache-ttl` | 3× `--interval` | per-register cache TTL in seconds (`0` = never expire) |
 | `--read-delay` | `0.05` | seconds between consecutive inverter reads within a poll cycle |
@@ -304,6 +251,59 @@ when the connection dies it retries `--reconnect` times (default 3) with
 `--reconnect-wait` seconds (default 10) and resumes on the first success.
 The session is audited (prefix `CLI`), the commands are audited by the
 server (prefix `CACHE`).
+
+## Diagnostics registers
+
+The cache synthesizes a 4-register block at **65000** from live poller
+state — answered instantly, never forwarded, never cached, never part of a
+profile (FC3 only):
+
+| Register | Meaning |
+|---|---|
+| 65000 | magic `0xCAFE` (validity check for clients) |
+| 65001 | `1` if the last completed poll cycle had at least one successful read |
+| 65002 | seconds since the last successful device read (`65535` = none yet) |
+| 65003 | cache process uptime in seconds |
+
+Reads that straddle the block are rejected with exception `02`. Reply unit
+ids are validated on every forwarded request before anything is cached.
+
+## Register map (device profile)
+
+The proxy caches the registers listed in the **device profile** — the same
+shared schema the [fake inverter](../inverter/README.md) serves and the
+[scraper](../scraper/README.md) scrapes; the shipped profiles live in the
+suite's [`profiles/`](../profiles/) subproject (`sun2000.json` by default).
+The format is documented in [profiles/README.md](../profiles/README.md).
+Resolution: `--profile` flag, env `PROFILE`, config `set modbus profile`,
+then the bundled copy; the file is re-read on `SIGHUP`.
+
+- Entry `type` gives the width and the space: `i16`/`u16` (one word),
+  `i32`/`u32` and the lo-word-first `i32swap`/`u32swap`, the IEEE 754
+  `f32`/`f32swap` (two words each), `bit` (one address = one binary value).
+- The optional **`fc`** field picks the address space: `3` (holding
+  registers) or `4` (input registers) for the word types (`3` the default),
+  `1` (coils, the bit default) or `2` (discrete inputs) for `bit` — the
+  four spaces are cached and polled independently.
+- The optional **`ttl`** field overrides the cache TTL per entry (seconds;
+  `0` = never expire): a fast power word at 5s next to a nameplate word at
+  1h, one poll cadence for both (`show cache all` marks the entries carrying
+  one). The entry TTL **replaces** the global one in both directions — the
+  global TTL is only the fallback, never a floor.
+
+Which registers are actually **fetched** comes from a selection file —
+`{"registers": ["pv-power", ...]}`, profile names only — resolved as
+`--selection` flag, env `SELECTION`, config `set modbus selection`; the
+default fetches **every** profile entry (`all`), and **`none`** empties the
+map: every read forwards and nothing is stored. The shipped
+`examples/selection.json` is the essential SUN2000 monitoring set. The
+65000-65003 diagnostics block is never fetched — the cache synthesizes it.
+
+For slow dongles the poller reads the map in as **few transactions as
+possible**: ranges closer together than `--merge-gap` registers are merged
+into one block read (never across a function-code boundary); a block that
+fails is split in halves and the pieces are retried — the plan converges to
+the largest blocks the device actually answers.
 
 ## Access control
 

@@ -32,10 +32,12 @@ STATIC_DEFAULTS = {
     'battery-kwh': DEFAULTS['battery_kwh'],
     'time-scale': DEFAULTS['time_scale'],
     'chaos': DEFAULTS['chaos'],
+    'timezone': DEFAULTS['timezone'],
     'dump-interval': DEFAULTS['dump_interval'],
     'max-clients': DEFAULTS['max_clients'],
     'client-timeout': DEFAULTS['client_timeout_s'],
     'max-conn-per-ip': DEFAULTS['max_conn_per_ip'],
+    'connect-acl': DEFAULTS['connect_acl'],
     'metrics-listen': DEFAULTS['metrics_listen'],
     'metrics-acl': DEFAULTS['metrics_acl'],
     'metrics-max-clients': DEFAULTS['metrics_max_clients'],
@@ -44,9 +46,10 @@ STATIC_DEFAULTS = {
     'log-level': DEFAULTS['log_level'],
     'audit-max-mb': DEFAULTS['audit_max_mb'],
     'audit-files': DEFAULTS['audit_files'],
+    'audit-forward': DEFAULTS['audit_forward'],
+    'audit-forward-format': DEFAULTS['audit_forward_format'],
     'grid-voltage': GRID['voltage_v'],
     'grid-frequency': GRID['frequency_hz'],
-    'timezone': 'utc',          # the settings registry's default
 }
 
 

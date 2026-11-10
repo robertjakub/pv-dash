@@ -14,7 +14,7 @@ The control server is a JSON-lines listener: a unix socket (the default
 `/tmp/modbus-cache-15502.socket`) or a TCP port on 127.0.0.1 — the
 `--control-port` flag, env `CTL`, `0` = off. Two clients speak it:
 
-    python3 bin/modbus-cache-ctl.py --control-port 15509 request clear cache
+    python3 bin/modbus-cache-ctl.py --control-port 15509 request flush cache
     python3 bin/modbus-cache-cli.py
 
 - the **ctl** runs one command per invocation (or a batch on stdin);

@@ -30,7 +30,7 @@ TOOLS = (
      'single-client devices: it polls the inverter once and serves every '
      'client from the cache.',
      'modbus-cache-ctl', 'modbus-cache-cli', '/tmp/modbus-cache-15502.socket',
-     '15509', 'request clear cache', True, 'cache/examples/modbus_cache.conf'),
+     '15509', 'request flush cache', True, 'cache/examples/modbus_cache.conf'),
     ('scraper', 'modbus-scraper', 'modbus-scraper',
      'A dependency-free (Python stdlib only) Prometheus exporter that polls '
      'a Modbus device and exposes the metrics at /metrics.',

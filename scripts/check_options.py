@@ -180,7 +180,7 @@ def check_tool(tool):
     rows.append((not alias_bad, '%s: every alias is a clean word-path unique in the setting space%s'
                  % (tool, ' — bad: %s' % ', '.join(alias_bad) if alias_bad else '')))
     # the control commands: '/'-paths spelled as words on the wire
-    # (`request/clear/cache` is `request clear cache`) — one clean word-path
+    # (`request/flush/cache` is `request flush cache`) — one clean word-path
     # each, unique in the command space, a description each
     cmd_words = list(mod.COMMANDS)
     cmd_dupes = sorted({w for w in cmd_words if cmd_words.count(w) > 1})

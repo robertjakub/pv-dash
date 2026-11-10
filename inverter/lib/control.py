@@ -36,7 +36,7 @@ from common.render.texts import T
 from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, describe_setting, SHOW_BY_LIVE, \
     SHOW_OPTIONS, NODE_BY_NAME, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
-from .statics import CONTROL_IDLE_TIMEOUT_S, CONTROL_LINE_CAP, CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, \
+from .statics import CLI_IDLE_TIMEOUT_S, CLI_MAX_LINE_BYTES_S, CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, \
     LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX, MAX_REGISTERS, PEAK_RATIO, TIME_SCALE_MAX
 
 logger = logging.getLogger('fake-inverter')
@@ -46,7 +46,7 @@ logger = logging.getLogger('fake-inverter')
 OPTION_BY_LIVE = {o.live: o for o in OPTIONS if o.live}
 TYPED_CONVS = (int, float, str)
 
-MAX_LINE = CONTROL_LINE_CAP   # the pre-auth line-buffer cap (drop past it)
+
 
 
 class ControlServer(_ControlServer):
@@ -70,7 +70,7 @@ class ControlServer(_ControlServer):
         with self.clients_lock:
             self.clients.add(client)
         try:
-            client.settimeout(CONTROL_IDLE_TIMEOUT_S)
+            client.settimeout(CLI_IDLE_TIMEOUT_S)
             buf = b''
             while True:
                 if b'\n' not in buf:      # buffered reads: a 1 MB frame must not
@@ -80,8 +80,8 @@ class ControlServer(_ControlServer):
                 else:
                     chunk = b''
                 buf += chunk
-                if len(buf) > MAX_LINE:   # no newline = no frame: drop the amplifier
-                    logger.warning('control client from %s: the line exceeded %d bytes, dropping it', who, MAX_LINE)
+                if len(buf) > CLI_MAX_LINE_BYTES_S:   # no newline = no frame: drop the amplifier
+                    logger.warning('control client from %s: the line exceeded %d bytes, dropping it', who, CLI_MAX_LINE_BYTES_S)
                     break
                 if b'\n' not in buf:
                     continue

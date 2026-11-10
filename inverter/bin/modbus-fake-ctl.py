@@ -23,11 +23,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 
 from common.wire.ctl import run_ctl
 from lib.man import ctl_page
-from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_TIMEOUT_S, DEFAULT_CONTROL_SOCKET
+from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_MAX_LINE_BYTES_S, CLI_TIMEOUT_S, DEFAULT_CONTROL_SOCKET
 
 if __name__ == '__main__':
     run_ctl(daemon='fake inverter', bin_name='modbus-fake-ctl', app='fake-inverter',
             self_note='the fake itself',
             command_help='e.g. set pv 2500, set scenario noon, show registers, reset, shutdown',
             ctl_socket=DEFAULT_CONTROL_SOCKET, timeout_s=CLI_TIMEOUT_S,
-            audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES, ctl_page=ctl_page)
+            audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES, ctl_page=ctl_page,
+            max_line_bytes=CLI_MAX_LINE_BYTES_S)

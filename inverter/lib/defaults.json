@@ -1,13 +1,4 @@
 {
-  "control": {
-    "line_cap_bytes": 1048576
-  },
-  "control-plane": {
-    "cli_keepalive_s": 55.0,
-    "cli_timeout_s": 5.0,
-    "cli_reconnect": 3,
-    "cli_reconnect_wait_s": 10.0
-  },
   "diagnostics": {
     "base": 65000,
     "count": 4,
@@ -125,8 +116,7 @@
     "no_audit_log": false,
     "control_log_replies": false,
     "control_socket_group": false,
-    "restore_on_start": false,
-    "control_idle_timeout_s": 300
+    "restore_on_start": false
   },
   "log_levels": [
     "DEBUG",

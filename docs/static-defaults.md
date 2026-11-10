@@ -17,7 +17,7 @@ neither holds.
 |---|---|
 | all four | `control-port` — derives from the listen port · `control-ops-verbs` — the registry's `default_ops_verbs` |
 | scraper | + `metrics-spec` — empty = the built-in `lib/metrics.json` block |
-| inverter | + `seed` — a per-run choice · `time` — empty = the clock runs · `grid-voltage` / `grid-frequency` — the tree's `grid` block (`voltage_v` / `frequency_hz`), read via `statics.GRID` |
+| inverter | + `seed` — a per-run choice · `time` — empty = the clock runs |
 
 The secrets are absent from the table by ruling: **a secret never
 takes a settable default** — its default is the None ladder-end,
@@ -48,10 +48,13 @@ as the inline literals did, the rung names the entry. The shipped
 examples: `control_trust_uids` `""` = nobody trusted, `dump_path` `""`
 = the state dump is off, `audit_log` `""` = the XDG state home's
 audit.log (the one dynamic default — the tree cannot hold a per-user
-path, the falsy chain resolves it at start), and the three Modbus
-tools' `modbus_profile` `"sun2000"` plus `modbus_auth` `"none"` (the
-bare names, resolved through the shared profiles/ walk and
-`parse_auth_type`'s fold to `None`).
+path, the falsy chain resolves it at start), the three Modbus tools'
+`modbus_profile` `"sun2000"` plus `modbus_auth` `"none"` (the bare
+names, resolved through the shared profiles/ walk and
+`parse_auth_type`'s fold to `None`), and the inverter's grid quartet
+`grid_voltage` / `grid_voltage_wander` / `grid_frequency` /
+`grid_frequency_wander` (the wander machines' nominals and ranges —
+the old `grid` block and its `statics.GRID` read are gone).
 
 | Knob | Proposal | Ruling |
 |---|---|---|
@@ -60,7 +63,6 @@ bare names, resolved through the shared profiles/ walk and
 | `metrics-spec` (scraper) | `"metrics_spec": ""` — the empty = the built-in `lib/metrics.json` block | TODO |
 | `time` (inverter) | `"time": ""` — the empty = the clock runs | TODO |
 | `seed` (inverter) | — | STAYS OUT — a per-run choice; no default exists to ship |
-| `grid-voltage`, `grid-frequency` (inverter) | — | BACKED — the tree's `grid` block (`voltage_v` / `frequency_hz`) via `statics.GRID`; the row only documents the indirect read |
 | `static-dir`, `config-js` (dashboard) | — | STAYS OUT — startup-only secrets of the `dump-key` shape; the outright ban holds (a shipped path default would ride every install) |
 
 ## The gate

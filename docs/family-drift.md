@@ -74,12 +74,12 @@ design); the top non-man pairs:
 | 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:1227` `run_dump_interval` |
 | 0.79 | `inverter/lib/control.py:155` `__init__` <-> `dashboard/lib/control.py:81` `__init__` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:506` `acl_table_report` <-> `dashboard/lib/control.py:327` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:520` `acl_table_report` <-> `dashboard/lib/control.py:327` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
 | 0.75 | `inverter/lib/control.py:66` `handle` <-> `common/wire/control.py:292` `handle` |
 | 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:420` `load_write_gate_file` |
-| 0.73 | `inverter/lib/control.py:517` `command_help` <-> `dashboard/lib/control.py:109` `command_help` |
-| 0.73 | `scraper/lib/control.py:144` `command_help` <-> `inverter/lib/control.py:517` `command_help` |
+| 0.73 | `inverter/lib/control.py:531` `command_help` <-> `dashboard/lib/control.py:109` `command_help` |
+| 0.73 | `scraper/lib/control.py:144` `command_help` <-> `inverter/lib/control.py:531` `command_help` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -151,7 +151,7 @@ by semantic family — the knob layer is the one source --help, the man
 pages, the set grammar, the NixOS modules and the README checks read,
 so a drifted row travels wide.
 
-**The shape**: 223 knob rows across the
+**The shape**: 225 knob rows across the
 four registries; 30 names carry in all four:
 
 `audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-log`, `audit-max-mb`, `audit/rotate`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
@@ -162,7 +162,7 @@ four registries; 30 names carry in all four:
 |---|---|
 | cache | `acl`, `allow-write`, `auth-key`, `auth-upstream`, `auth-upstream-key`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `local-time`, `log-access`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `profile`, `read-delay`, `requests-audit`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
 | scraper | `auth-key`, `auth-token`, `caps`, `grid-positive-import`, `interval`, `local-time`, `log-access`, `max-grid-kw`, `max-kwp`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-offset`, `modbus-unit`, `profile`, `timeout`, `upstream` |
-| inverter | `allow-write`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `control-log-replies`, `grid`, `grid-frequency`, `grid-outage`, `grid-voltage`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
+| inverter | `allow-write`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `control-log-replies`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
 | dashboard | `auth`, `auth-token`, `config-js`, `local-time`, `log-access`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
 **The shared knobs whose fields disagree** (3 of

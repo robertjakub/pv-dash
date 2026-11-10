@@ -12,6 +12,16 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **inverter** — **the grid wander values are knobs and the grid
+  quartet graduates into the tree**: `--grid-voltage-wander` (the
+  per-phase machine's ±fraction, 0.1 by default, 0 = the flat grid)
+  and `--grid-frequency-wander` (the frequency machine's ±Hz clamp,
+  0.2 by default) — no env twins (F11, the grid simulator rides the
+  flags), live-settable. The defaults.json's `grid` block dies: the
+  four flat entries (`grid_voltage`, `grid_voltage_wander`,
+  `grid_frequency`, `grid_frequency_wander`) are the rungs' reads,
+  `statics.GRID` is gone, and the meter snapshot reports the live
+  nominal frequency.
 - **cache, scraper, inverter** — **the auth knob is `modbus-auth`**
   (`--modbus-auth` / `MODBUS_AUTH`; the wire spelling stays
   `modbus/auth`) and its default graduates into the trees as

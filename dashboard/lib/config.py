@@ -3,7 +3,7 @@
 layer and the CLI flags (stdlib only).
 
 The precedence is the family's: CLI flags > the env > the config
-script > the shipped defaults (lib/static.json). The env twins are the
+script > the shipped defaults (lib/defaults.json). The env twins are the
 bare upper-snake names (PORT, BIND, PROM_URL, CONFIG_JS, BATTERY) the
 docker image documents. The config file speaks the control grammar
 (common/settings/options.py):

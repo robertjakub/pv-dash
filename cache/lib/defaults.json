@@ -47,6 +47,8 @@
     "restore_on_start": false,
     "control_socket_group": false,
     "control_trust_uids": "",
+    "control_port": "",
+    "control_ops_verbs": "show,flush",
     "modbus_profile": "sun2000"
   },
   "log_levels": [

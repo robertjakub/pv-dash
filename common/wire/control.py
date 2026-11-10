@@ -898,17 +898,20 @@ class ControlServer:
         """Build the audit trail from its params dict (the live
         path/rotation/forward changes rebuild from it): the fresh writer
         re-chains from the file's own tail (common/runtime/audit.py tail_hash), so the chain
-        stays verifiable across the swap. The old trail is NOT closed — a
-        session still holding it writes its last commands there, and an
-        in-flight writer must never hit a closed file. Returns the writer
-        (None = off); the caller assigns where its live state reads. The
-        daily-rotation flag and the syslog forward ride the params when
-        the tool carries them."""
+        stays verifiable across the swap — except the remote-only mode
+        (path 'none' + a forward), which reseeds at GENESIS by design (the
+        collector whitelists the restart discontinuity). The old trail is
+        NOT closed — a session still holding it writes its last commands
+        there, and an in-flight writer must never hit a closed file.
+        Returns the writer (None = off); the caller assigns where its live
+        state reads. The daily-rotation flag, the forward target/format
+        ride the params when the tool carries them."""
         if prm['disabled']:
             return None
         return AuditLog(prm['path'], prefix, app=app, max_mb=prm['max_mb'],
                         daily=prm.get('daily', False), files=prm['files'],
-                        forward=prm.get('forward'))
+                        forward=prm.get('forward'),
+                        forward_format=prm.get('forward_format') or 'rfc5424')
 
     def shutdown_dump(self):
         """The graceful stop's write-behind: the overrides to the dump path

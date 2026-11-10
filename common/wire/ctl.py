@@ -11,7 +11,7 @@ import os
 import socket
 import sys
 
-from common.runtime.audit import AUDIT_FORWARD_CHOICES, AuditLog
+from common.runtime.audit import AUDIT_FORWARD_FORMATS, AuditLog
 from common.settings.config import parse_secret, resolve_target
 from common.render.texts import T
 from common.wire.wiresec import sign_request, verify_reply
@@ -30,9 +30,11 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
     p.add_argument('command', nargs='*', help='control command, %s' % command_help)
     p.add_argument('--timeout', type=float, default=timeout_s, help='socket timeout in seconds')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN); a file:<path> value reads the first line of an owner-only 0600 file')
-    p.add_argument('--audit-log', default=None, help="audit trail: a file path or - for stdout; the XDG state home when unset")
-    p.add_argument('--audit-forward', default='none', choices=AUDIT_FORWARD_CHOICES,
-                   help='also mirror every audit line to the local syslog socket (journald picks it up)')
+    p.add_argument('--audit-log', default=None, help="audit trail: a file path, - for stdout, or none for no local file (the forward carries the trail); the XDG state home when unset")
+    p.add_argument('--audit-forward', default='none', metavar='TARGET',
+                   help='also forward every audit line: none, syslog, syslog:/path, udp://host[:port] or tcp://host[:port] (the off-box copy, docs/AUDIT.md)')
+    p.add_argument('--audit-forward-format', default='rfc5424', choices=AUDIT_FORWARD_FORMATS,
+                   help="the remote forward's envelope: rfc5424 (the default) or cef — the local syslog forms keep the verbatim send")
     p.add_argument('--audit-max-mb', type=float, default=audit_max_mb, help='rotate the audit log at this size, 0 = off')
     p.add_argument('--audit-files', type=int, default=audit_files, help='rotated audit backups to keep')
     p.add_argument('--no-audit-log', action='store_true', help='disable the audit trail')
@@ -45,7 +47,8 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
     try:
         audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CTL', app=app,
                                                         max_mb=args.audit_max_mb, files=args.audit_files,
-                                                        forward=args.audit_forward)
+                                                        forward=args.audit_forward,
+                                                        forward_format=args.audit_forward_format)
     except ValueError as e:
         p.error(str(e))
 

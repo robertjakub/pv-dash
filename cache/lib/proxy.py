@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """The proxy itself: poller thread, client handling, forwarding and reload (stdlib only)."""
 import logging
-import os
 import struct
 import threading
 import time
@@ -46,6 +45,15 @@ def _read_shape(fc, count):
     if fc in BIT_READ_FUNCS:
         return (count + 7) // 8
     return count * 2
+
+
+
+def _write_desc(func, pdu, unit):
+    """The write frame's one-line description: the shared describer's
+    words, else the fc + payload size."""
+    return describe_write(pdu, unit) or \
+        ('%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
+         if pdu else '%s (unit %d)' % (describe_fc(func), unit))
 
 
 class Proxy:
@@ -320,7 +328,7 @@ class Proxy:
         connect/write: last matching rule decides, no match denies).
         ValueError on a bad value or file — the caller keeps the old gate.
         A group/world-readable acl file warns (the log, the audit trail's
-        ACL-FILE event, the set/unset reply's suffix — the <knob>_acl_warn
+        ACL-FILE event, the set/clear reply's suffix — the <knob>_acl_warn
         stash; chmod 0600 silences all three). The resolved shapes pass
         through: None / () / the networks tuple from the config resolution,
         an IPGate from a live set."""
@@ -388,7 +396,7 @@ class Proxy:
         stash swapping only on a successful resolve so a bad gate leaves
         the old one AND its report standing; everything else passes
         through unchanged. A group/world-readable acl file warns — the
-        log, the audit trail's ACL-FILE event, and the set/unset reply's
+        log, the audit trail's ACL-FILE event, and the set/clear reply's
         suffix all carry it (the file is config trust: chmod 0600)."""
         try:
             if val == 'profile':
@@ -497,28 +505,28 @@ class Proxy:
         if func in WRITE_FUNCS:
             target = write_target(pdu)
             if target is None:
-                desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
+                desc = _write_desc(func, pdu, unit)
                 logger.info('write: refused %s (the frame is too short to carry a register address)', desc)
                 self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (the frame is too short to carry a register address)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
             if not self.allow_write:
-                desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
+                desc = _write_desc(func, pdu, unit)
                 logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)
                 self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (write support disabled)' % desc)
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
             if not self._allowed(self.write_acl, addr[0]):
-                desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
+                desc = _write_desc(func, pdu, unit)
                 logger.info('write: refused %s (client %s not on the write ACL)', desc, addr[0])
                 self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s (client %s not on the write ACL)' % (desc, addr[0]))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
             if not self._write_allowed(target):
-                desc = describe_write(pdu, unit) or '%s (unit %d)' % (describe_fc(func), unit)
+                desc = _write_desc(func, pdu, unit)
                 logger.info('write: refused %s (registers outside the write allow-list %s)',
                             desc, self.describe_write_gate())
                 self.write_refused += 1
@@ -527,7 +535,7 @@ class Proxy:
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
             shape_err = write_shape_error(pdu)
             if shape_err:
-                desc = describe_write(pdu, unit) or '%s, %d byte(s) (unit %d)' % (describe_fc(func), len(pdu) - 1, unit)
+                desc = _write_desc(func, pdu, unit)
                 logger.info('write: refused %s (malformed frame: %s)', desc, shape_err)
                 self.write_refused += 1
                 if self.audit:

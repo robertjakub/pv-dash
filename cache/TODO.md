@@ -131,7 +131,7 @@ and shortened (965 → ~430 lines) — the Nix/NixOS section moved to
 `module.nix`: the README's had gone stale — it predated the metrics ACL,
 the dump knobs and the control-plane options), and the family-wide
 stories (the ACL grammar, the Modbus handshake, the audit chain
-mechanics) now point at docs/ACL.md / docs/MODBUS.md / docs/AUDIT.md
+mechanics) now point at docs/common/ACL.md / docs/common/MODBUS.md / docs/AUDIT.md
 instead of re-running them.
 
 The metrics/acl family wave: the cache rides along — the default
@@ -516,6 +516,9 @@ the clients' help always promised — the env form of
 `--control-token-file` on `cache_ctl`/`cache_cli` (the daemon's config
 resolved it from the start; flag over env, the file over the plain
 token, both together the mutual-exclusion error).
+(Since retired: the env prefixes and the `*_FILE` twins died — the bare
+env twin with `file:<path>` inside the plain value is the spelling.)
+
 
 The **signed wire**: with a control token configured every command and
 reply on the control socket carries the full sha256 HMAC of its payload

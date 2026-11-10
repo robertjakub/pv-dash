@@ -4,9 +4,8 @@ cached registers (+ their stamps), as one JSON file — the write-behind that
 lets a daemon restart serve last-known values instead of cold misses
 (stdlib only). A dump is settings-only or full (with-cache); a restore
 loads whatever the file carries (the words restore only if it has them).
-The reload state file (`<config>.reload`) rides the settings-only shape —
-the shared common/settings/dump.py writer and reader (write_state_dump/
-read_state_dump).
+The reload state file (`<config>.reload`) rides the settings-only shape of
+the shared common/settings/dump.py writer and reader directly.
 
 The file is written atomically (tmp + rename) and **explicitly 0600** (the
 F8/F12 pattern — the dump is config-equivalent trust at rest: the words are
@@ -42,27 +41,11 @@ import os
 import time
 
 from common.settings.dump import SEALED_VERSION, open_dump, payload_hash, seal
-from common.settings.dump import write_dump as _state_write_dump
-from common.settings.dump import read_dump_state as _state_read_dump_state
 
 logger = logging.getLogger('modbus-cache')
 
 FORMAT = 'modbus-cache-dump'
 VERSION = 1
-
-
-def write_state_dump(path, settings, key=None):
-    """The reload state file: the settings-only dump shape — the shared
-    common/settings/dump.py writer (the cache's richer shape with the words is
-    write_dump's). Sealed when key is given."""
-    return _state_write_dump(path, settings, key=key)
-
-
-def read_state_dump(path, key=None):
-    """The reload state file's read: the shared common/settings/dump.py reader —
-    the full validated state ({settings, saved, ...}; the staleness reads
-    `saved`). Sealed dumps refuse to open without the key."""
-    return _state_read_dump_state(path, key=key)
 
 
 def write_dump(path, cache, settings=None, with_cache=True, key=None):

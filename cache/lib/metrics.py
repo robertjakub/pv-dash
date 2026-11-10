@@ -14,7 +14,7 @@ import time
 
 from common.settings.config import acl_admits
 from common.serve.metrics_server import MetricsServer as _MetricsServer
-from common.serve.metrics_server import describe_metrics
+from common.serve.metrics_server import describe_metrics, metric
 
 
 class MetricsServer(_MetricsServer):
@@ -27,7 +27,7 @@ class MetricsServer(_MetricsServer):
     IP at accept (the acl/connect reading, the scraper's metrics/acl
     shape): a client off the ACL is closed without a reply — nothing was
     parsed to answer, the caps never see the peer. The gate reads through
-    the proxy per connection: one live state, the set/unset swap needs no
+    the proxy per connection: one live state, the set/clear swap needs no
     push here."""
 
     REALM = 'modbus-cache'
@@ -78,70 +78,46 @@ class MetricsServer(_MetricsServer):
     def render(self):
         st = self.snapshot()
         rows = [
-            '# HELP modbus_cache_uptime_seconds The modbus-cache process uptime.',
-            '# TYPE modbus_cache_uptime_seconds gauge',
-            'modbus_cache_uptime_seconds %d' % st['uptime'],
-            '# HELP modbus_cache_poll_up 1 = the last poll cycle talked to the device.',
-            '# TYPE modbus_cache_poll_up gauge',
-            'modbus_cache_poll_up %d' % st['poll_up'],
-            '# HELP modbus_cache_hits_total Cache hits (reads served without the device).',
-            '# TYPE modbus_cache_hits_total counter',
-            'modbus_cache_hits_total %d' % st['hits'],
-            '# HELP modbus_cache_misses_total Cache misses (reads forwarded to the device).',
-            '# TYPE modbus_cache_misses_total counter',
-            'modbus_cache_misses_total %d' % st['misses'],
-            '# HELP modbus_cache_write_refused_total Writes the gate refused (allow-write off, the write ACL, the register allow-list, a malformed frame) — each refusal is a WRITE-REFUSED audit event.',
-            '# TYPE modbus_cache_write_refused_total counter',
-            'modbus_cache_write_refused_total %d' % st['write_refused'],
-            '# HELP modbus_cache_ranges The register ranges in the map (fc3/fc4 labels).',
-            '# TYPE modbus_cache_ranges gauge',
-            'modbus_cache_ranges{fc="3"} %d' % (st['ranges'] - st['fc4']),
-            'modbus_cache_ranges{fc="4"} %d' % st['fc4'],
-            '# HELP modbus_cache_words Cached register words.',
-            '# TYPE modbus_cache_words gauge',
-            'modbus_cache_words %d' % st['words'],
-            '# HELP modbus_cache_clients Connected Modbus clients.',
-            '# TYPE modbus_cache_clients gauge',
-            'modbus_cache_clients %d' % st['clients'],
-            '# HELP modbus_cache_poll_duration_seconds The last poll cycle duration.',
-            '# TYPE modbus_cache_poll_duration_seconds gauge',
-            'modbus_cache_poll_duration_seconds %g' % st['poll_last'],
-            '# HELP modbus_cache_poll_duration_mean_seconds The mean poll cycle duration.',
-            '# TYPE modbus_cache_poll_duration_mean_seconds gauge',
-            'modbus_cache_poll_duration_mean_seconds %g' % st['poll_mean'],
-            '# HELP modbus_cache_poll_duration_max_seconds The longest poll cycle duration so far.',
-            '# TYPE modbus_cache_poll_duration_max_seconds gauge',
-            'modbus_cache_poll_duration_max_seconds %g' % st['poll_max'],
+            *metric('modbus_cache_uptime_seconds', 'The modbus-cache process uptime.', 'gauge',
+                    '%d' % st['uptime']),
+            *metric('modbus_cache_poll_up', '1 = the last poll cycle talked to the device.', 'gauge',
+                    '%d' % st['poll_up']),
+            *metric('modbus_cache_hits_total', 'Cache hits (reads served without the device).', 'counter',
+                    '%d' % st['hits']),
+            *metric('modbus_cache_misses_total', 'Cache misses (reads forwarded to the device).', 'counter',
+                    '%d' % st['misses']),
+            *metric('modbus_cache_write_refused_total',
+                    'Writes the gate refused (allow-write off, the write ACL, the register allow-list, a malformed frame) — each refusal is a WRITE-REFUSED audit event.',
+                    'counter', '%d' % st['write_refused']),
+            *metric('modbus_cache_ranges', 'The register ranges in the map (fc3/fc4 labels).', 'gauge',
+                    ('fc="3"', '%d' % (st['ranges'] - st['fc4'])), ('fc="4"', '%d' % st['fc4'])),
+            *metric('modbus_cache_words', 'Cached register words.', 'gauge', '%d' % st['words']),
+            *metric('modbus_cache_clients', 'Connected Modbus clients.', 'gauge', '%d' % st['clients']),
+            *metric('modbus_cache_poll_duration_seconds', 'The last poll cycle duration.', 'gauge',
+                    '%g' % st['poll_last']),
+            *metric('modbus_cache_poll_duration_mean_seconds', 'The mean poll cycle duration.', 'gauge',
+                    '%g' % st['poll_mean']),
+            *metric('modbus_cache_poll_duration_max_seconds', 'The longest poll cycle duration so far.', 'gauge',
+                    '%g' % st['poll_max']),
         ]
         if st['last_poll_age'] is not None:
-            rows += [
-                '# HELP modbus_cache_last_poll_age_seconds Seconds since the last successful poll cycle.',
-                '# TYPE modbus_cache_last_poll_age_seconds gauge',
-                'modbus_cache_last_poll_age_seconds %d' % st['last_poll_age'],
-            ]
+            rows += metric('modbus_cache_last_poll_age_seconds',
+                           'Seconds since the last successful poll cycle.', 'gauge',
+                           '%d' % st['last_poll_age'])
         if st['oldest'] is not None:
-            rows += [
-                '# HELP modbus_cache_age_seconds The age of the oldest cached word.',
-                '# TYPE modbus_cache_age_seconds gauge',
-                'modbus_cache_age_seconds %g' % st['oldest'],
-            ]
+            rows += metric('modbus_cache_age_seconds', 'The age of the oldest cached word.', 'gauge',
+                           '%g' % st['oldest'])
         rows += [
-            '# HELP modbus_cache_uplink_up 1 = the upstream socket to the inverter is connected.',
-            '# TYPE modbus_cache_uplink_up gauge',
-            'modbus_cache_uplink_up %d' % st['uplink_up'],
-            '# HELP modbus_cache_uplink_connects_total Successful upstream connects (2 = one reconnect).',
-            '# TYPE modbus_cache_uplink_connects_total counter',
-            'modbus_cache_uplink_connects_total %d' % st['uplink_connects'],
-            '# HELP modbus_cache_uplink_exchanges_total Completed upstream request/reply exchanges.',
-            '# TYPE modbus_cache_uplink_exchanges_total counter',
-            'modbus_cache_uplink_exchanges_total %d' % st['uplink_exchanges'],
-            '# HELP modbus_cache_uplink_errors_total Failed upstream exchanges (timeout, reset, refused, bad frame).',
-            '# TYPE modbus_cache_uplink_errors_total counter',
-            'modbus_cache_uplink_errors_total %d' % st['uplink_errors'],
-            '# HELP modbus_cache_uplink_bytes_total Upstream bytes by direction.',
-            '# TYPE modbus_cache_uplink_bytes_total counter',
-            'modbus_cache_uplink_bytes_total{dir="in"} %d' % st['uplink_bytes_in'],
-            'modbus_cache_uplink_bytes_total{dir="out"} %d' % st['uplink_bytes_out'],
+            *metric('modbus_cache_uplink_up', '1 = the upstream socket to the inverter is connected.', 'gauge',
+                    '%d' % st['uplink_up']),
+            *metric('modbus_cache_uplink_connects_total', 'Successful upstream connects (2 = one reconnect).',
+                    'counter', '%d' % st['uplink_connects']),
+            *metric('modbus_cache_uplink_exchanges_total', 'Completed upstream request/reply exchanges.',
+                    'counter', '%d' % st['uplink_exchanges']),
+            *metric('modbus_cache_uplink_errors_total', 'Failed upstream exchanges (timeout, reset, refused, bad frame).',
+                    'counter', '%d' % st['uplink_errors']),
+            *metric('modbus_cache_uplink_bytes_total', 'Upstream bytes by direction.', 'counter',
+                    ('dir="in"', '%d' % st['uplink_bytes_in']), ('dir="out"', '%d' % st['uplink_bytes_out'])),
         ]
         if st['uplink_err_age'] is not None:
             rows += [

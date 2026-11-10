@@ -324,9 +324,9 @@ graceful shutdown.
 .SH CONTROL
 The control server speaks JSON lines: one request
 \fB{"cmd": "..."}\fR per line, one reply
-\fB{"status": "ok|fail|bye", "text": "..."}\fR per line. Commands
+\fB{"status": "ok|fail|note|bye", "text": "..."}\fR per line. Commands
 (the settings registry drives the grammar):
-.BR set ", " unset ", " show ", " help ,
+.BR set ", " clear ", " show ", " help ,
 the reports
 .BR inspect ", " "show connections" ,
 .BR "show cache" " [all]" ", " "show write registers table" ,
@@ -427,7 +427,7 @@ restart, no shutdown \(em
 the ops shift against the admin key, both roles audited. A secret knob
 (control token, the ops token, the metrics token, modbus auth key, dump
 key) never shows its value: \fBshow\fR answers \fBerr <name> is a
-secret \(em it never shows\fR, \fBunset\fR refuses \(em pass the
+secret \(em it never shows\fR, \fBclear\fR refuses \(em pass the
 secret by flag/env, or as \fBfile:<path>\fR; \fBshow config\fR and the
 dumps render the knob as \fB*** SECRET REMOVED ***\fR (the config
 parser refuses the placeholder \(em it is never a value).
@@ -466,9 +466,11 @@ per run), without one the audit is disabled (the state
 control target for the daemon's clients when the flag is unset (flag
 \fB--control-port\fR wins).
 .TP
-.B HOST ", " LISTEN ", " ALLOW_WRITE ", " ...
+.B LISTEN ", " INTERVAL ", " ALLOW_WRITE ", " ...
 every flag has an environment twin of the same bare name (no tool
-prefix); the flag wins over the env, the env over the config script.
+prefix — the exceptions spell their own: `--control-port`'s is `CTL`,
+`--cache-ttl`'s `TTL`); the flag wins over the env, the env over the
+config script.
 
 .SH FILES
 .TP

@@ -92,11 +92,11 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--timeout` | `3` | Modbus connect/read timeout, seconds |
 | `--profile` | the bundled `sun2000` profile | device profile JSON to cache (see [Register map](#register-map-device-profile)) |
 | `--interval` | `10` | seconds between cache polls |
-| `--cache-ttl` | 3× `--interval` | per-register cache TTL in seconds (`0` = never expire) |
+| `--cache-ttl` | `30` | per-register cache TTL in seconds (`0` = never expire) |
 | `--read-delay` | `0.05` | seconds between consecutive inverter reads within a poll cycle |
 | `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Auth** | | |
-| `--auth` / `--auth-key` | `none` | the auth scheme the cache's **own Modbus clients** must speak + the shared key (**min 16 characters**) — see [Modbus auth](#modbus-auth); the value may be `file:<path>` |
+| `--modbus-auth` / `--auth-key` | `none` | the auth scheme the cache's **own Modbus clients** must speak + the shared key (**min 16 characters**) — see [Modbus auth](#modbus-auth); the value may be `file:<path>` |
 | `--auth-upstream` / `--auth-upstream-key` | `none` | the auth scheme **toward the upstream inverter** (`suite` or `waveshare`) + the key — see [Modbus auth](#modbus-auth) |
 | **Write path** | | |
 | `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter |
@@ -106,8 +106,8 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | **Control plane** | | |
 | `--control-port` | unix socket | control server target: a TCP port on 127.0.0.1, a unix socket path, `0` = off |
 | `--control-token` | none | require a token on control connections; a **TCP** control port refuses to start without one (F5); the value may be `file:<path>` |
-| `--control-ops-token` | none | a **second, read-only control token**: its sessions run the `show`/`clear` verbs only; needs `--control-token`, must differ from it |
-| `--control-ops-verbs` | `show,clear` | the read-only ops role's RBAC policy |
+| `--control-ops-token` | none | a **second, read-only control token**: its sessions run the `show`/`flush` verbs only; needs `--control-token`, must differ from it |
+| `--control-ops-verbs` | `show,flush` | the read-only ops role's RBAC policy |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`) |
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`0660` instead of `0600`) |
 | **Persistence** | | |
@@ -118,7 +118,7 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--restore-on-start` | off | load the state dump when the daemon starts |
 | **Metrics** | | |
 | `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint — live-settable (`set metrics enable on/off`); **refuses to start beyond loopback without `--metrics-token`** (F13) |
-| `--metrics-listen` | `127.0.0.1:9351` | the metrics bind address (`0.0.0.0:PORT` = every interface, token mandatory) |
+| `--metrics-listen` | `127.0.0.1:9351` | the metrics bind address (`0.0.0.0:PORT` = every interface, token mandatory beyond loopback) |
 | `--metrics-token` | off | `Authorization: Bearer <token>` on `/metrics`; mandatory beyond loopback (F13); `file:<path>` welcome |
 | `--metrics-acl` | `any` | clients allowed to connect to `/metrics` (the connect-acl grammar); checked at accept |
 | `--metrics-max-clients` / `--metrics-client-timeout` / `--metrics-max-conn-per-ip` | `64` / `5` / `0` | the metrics caps (extras get `503 # rate limited`) |
@@ -134,7 +134,7 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds, `0` = off |
 | **Logging** | | |
 | `--log-level` | `INFO` | `DEBUG` adds per-client traffic and per-poll detail |
-| `--log-access` | `DEBUG` | log client connects/disconnects at `INFO` |
+| `--log-access` | off | log client connects/disconnects at `INFO` |
 | `--local-time` | UTC | log timestamps in the system time zone |
 | `--man` | off | print the generated man page (roff) to stdout and exit |
 
@@ -171,19 +171,19 @@ command, settable (`set`/`clear`) or show-only — is tabled in
 [MANUAL.md](MANUAL.md) (generated from the registry).
 
 One command per line, one reply per line: `{"cmd": …}` →
-`{"status": "ok|fail|bye", "text": …}`. With `--control-token` set,
+`{"status": "ok|fail|note|bye", "text": …}`. With `--control-token` set,
 connections authenticate first (`{"cmd": "auth", "token": …}`) and the wire
 is **signed**: every frame carries the full sha256 HMAC of its payload
 keyed by the token — mandatory over TCP, verify-if-present over the unix
 socket, where root, the daemon's own user and the `--control-trust-uids`
 peers skip the handshake (`SO_PEERCRED`). The wire, the roles and the
 secrets discipline are the family's — see
-[docs/ACL.md](../docs/ACL.md) (the control-plane row) and the audit's F5/F9/F12
+[docs/common/ACL.md](../docs/common/ACL.md) (the control-plane row) and the audit's F5/F9/F12
 in [docs/AUDIT.md](../docs/AUDIT.md).
 
 The **read-only ops role**: a daemon may carry a second token
 (`--control-ops-token`) beside the admin one; its sessions may run the
-`show`/`clear` verbs only — the ops shift can look, flush the cache, and
+`show`/`flush` verbs only — the ops shift can look, flush the cache, and
 leave; steering needs the admin key. Both tokens are audited
 (`role=ops`/`role=admin`), each session's frames are mac'd with the key it
 authenticated with.
@@ -309,7 +309,7 @@ the largest blocks the device actually answers.
 
 The family-wide ACL map — the rule-chain semantics, the standalone acl
 file, the tools and where every tool's support stops — lives in
-[docs/ACL.md](../docs/ACL.md). The short form:
+[docs/common/ACL.md](../docs/common/ACL.md). The short form:
 
 - **`--connect-acl`** defaults to `any` (who may connect is the listen
   bind's job — the default bind is loopback): `any` / `none` / a
@@ -344,7 +344,7 @@ those two deliberately.
 
 Beyond the address-based ACLs the cache speaks the family's **`suite`**
 Modbus auth — a proof-of-key handshake on the Modbus TCP wire itself (the
-wire shape is specified in [docs/MODBUS.md](../docs/MODBUS.md)): the client
+wire shape is specified in [docs/common/MODBUS.md](../docs/common/MODBUS.md)): the client
 proves the shared key with one round trip after the TCP connect; the server
 answers `OK` (plain Modbus follows) or `ERR` (the connection is dead — a
 client that cannot prove the key never sees a frame).
@@ -528,10 +528,10 @@ stdlib only, each starts its own fake inverter + proxy on scratch ports and
 cleans up after itself:
 
 ```bash
-python3 tests/cache-regtest.py        # the functional battery
-python3 tests/cache-stress.py         # 100 clients / 15 s load + latency report
-python3 tests/cache-fuzz.py [n]       # n client-garbage frames (default 3000)
-python3 tests/cache-control-fuzz.py   # hostile JSON against the control server
+scripts/battery.sh cache              # the cache profile: the regtest, the two fuzzes,
+                                      # the audit chain (the stress suite rides quick/full)
+scripts/battery.sh cache-regtest      # one suite — every run needs the runner (the suites
+                                      # refuse without the runner's PV_RUN_DIR)
 ```
 
 Every scenario must end with the proxy alive and **zero tracebacks** in the
@@ -566,8 +566,8 @@ cache/
 ├── module.nix               # the NixOS service module
 ├── package.nix              # the package (the bins, the libs, the examples, the man pages)
 └── lib/
-    ├── defaults.json     # the static constants: protocol limits, diagnostics block, log levels
-    ├── statics.py       # its loader (the STATIC dict + the named aliases)
+    ├── defaults.json     # the static constants: diagnostics block, log levels (the protocol
+    ├── statics.py       #   limits live in common/modbus/protocol.json)
     ├── options.json     # the registry: one row per knob (the flags, the env twins, the help)
     ├── options.py       # its loader + the control-grammar wiring
     ├── config.py        # settings resolution + device-profile/acl-gate loading

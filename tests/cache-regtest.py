@@ -545,7 +545,7 @@ try:
     # the pre-auth line buffer is capped: a newline-less stream is dropped, not buffered
     s = socket.create_connection(('127.0.0.1', 15520 + BASE), timeout=10)
     try:
-        s.sendall(b'x' * (1024 * 1024 + 65536))   # > MAX_LINE, no newline: the server drops us
+        s.sendall(b'x' * (1024 * 1024 + 65536))   # > CLI_MAX_LINE_BYTES_S, no newline: the server drops us
         try:
             s.shutdown(socket.SHUT_WR)
         except OSError:
@@ -2523,8 +2523,6 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # 6b-10. the waveshare upstream auth: the cache presents the shared key
     #        as a Waveshare gateway's connection password — raw ASCII after
     #        every connect, OK opens the session, anything else kills it
-    from common.modbus import waveshare_handshake_client
-
     class WavesharePeer:
         """A stand-in gateway: the first bytes on a connection must be the
         password (raw), the verdict is OK or NO+drop, then canned MBAP

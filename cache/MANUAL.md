@@ -28,7 +28,7 @@ unix socket a trusted peer (root, the daemon's own user or
 `--control-trust-uids` — SO_PEERCRED) speaks without it.
 
 The optional ops token (`--control-ops-token`) scopes a session to the
-read-only verbs (the default: show and clear). Every command is audited. The
+read-only verbs (the default: show,flush). Every command is audited. The
 clients take `--control-port` (env `CTL`), `--timeout`, `--control-token`,
 the audit flags and `--man`; the cli adds `--reconnect` /
 `--reconnect-wait`.
@@ -152,7 +152,7 @@ trusted peers
 ### control/ops
 
 the read-only ops role: the second token that scopes its sessions to the
-configured verbs (the default: show and clear)
+configured verbs (the default: show,flush)
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|

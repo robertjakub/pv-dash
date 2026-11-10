@@ -4,7 +4,7 @@ sections render from the tools' argparse parsers, the prose sections live
 here as roff (ported from the original hand-written pages). scripts/gen_man.py
 writes the shipped man/*.1 from these; `modbus-cache --man` (and the
 ctl/cli's --man) prints the same page."""
-from common.render.manpage import options_section, page
+from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_CTL, EXIT_STATUS_DAEMON, options_section, page
 
 DATE = '2026-11-05'
 VERSION = 'pv-suite 0.4.2'
@@ -69,9 +69,9 @@ graceful shutdown."""
     control = """.SH CONTROL
 The control server speaks JSON lines: one request
 \\fB{"cmd": "..."}\\fR per line, one reply
-\\fB{"status": "ok|fail|bye", "text": "..."}\\fR per line. Commands
+\\fB{"status": "ok|fail|note|bye", "text": "..."}\\fR per line. Commands
 (the settings registry drives the grammar):
-.BR set ", " unset ", " show ", " help ,
+.BR set ", " clear ", " show ", " help ,
 the reports
 .BR inspect ", " "show connections" ,
 .BR "show cache" " [all]" ", " "show write registers table" ,
@@ -171,7 +171,7 @@ restart, no shutdown \\(em
 the ops shift against the admin key, both roles audited. A secret knob
 (control token, the ops token, the metrics token, modbus auth key, dump
 key) never shows its value: \\fBshow\\fR answers \\fBerr <name> is a
-secret \\(em it never shows\\fR, \\fBunset\\fR refuses \\(em pass the
+secret \\(em it never shows\\fR, \\fBclear\\fR refuses \\(em pass the
 secret by flag/env, or as \\fBfile:<path>\\fR; \\fBshow config\\fR and the
 dumps render the knob as \\fB*** SECRET REMOVED ***\\fR (the config
 parser refuses the placeholder \\(em it is never a value).
@@ -209,9 +209,11 @@ per run), without one the audit is disabled (the state
 control target for the daemon's clients when the flag is unset (flag
 \\fB--control-port\\fR wins).
 .TP
-.B HOST ", " LISTEN ", " ALLOW_WRITE ", " ...
+.B LISTEN ", " INTERVAL ", " ALLOW_WRITE ", " ...
 every flag has an environment twin of the same bare name (no tool
-prefix); the flag wins over the env, the env over the config script."""
+prefix — the exceptions spell their own: `--control-port`'s is `CTL`,
+`--cache-ttl`'s `TTL`); the flag wins over the env, the env over the
+config script."""
     files = """.SH FILES
 .TP
 .I /tmp/modbus-cache-<port>.socket
@@ -228,16 +230,7 @@ file at the repo root (the deye write policy for \\fB--write-registers
 file:<path>\\fR \\(em
 a group/world-readable acl file warns in the log, the audit trail
 (ACL-FILE) and on the set/clear reply; chmod 0600 silences it)."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-success (\\fB--dry-run\\fR: valid configuration).
-.TP
-.B 1
-invalid configuration or a failed bind (reason on stderr).
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_DAEMON
     return page(
         'Modbus TCP caching proxy for single-client devices',
         'modbus-cache', 1, DATE, VERSION, MANUAL,
@@ -256,7 +249,7 @@ Sends one control command (or a batch piped on stdin, one per line) to the
 stdout, one per line. Every invocation lands in the audit trail (prefix
 \\fBCTL\\fR).
 .PP
-The command grammar is the daemon's: \\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/
+The command grammar is the daemon's: \\fBset\\fR/\\fBclear\\fR/\\fBshow\\fR/
 \\fBhelp\\fR (the settings registry), \\fBinspect\\fR,
 \\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR],
 \\fBshow write registers table\\fR, \\fBshow uplink\\fR,
@@ -275,16 +268,7 @@ CONTROL."""
 .IP \\(bu 2
 .B printf 'show cache\\enrequest flush cache\\en' | modbus-cache-ctl
 .RE"""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-every command answered \\fBok\\fR.
-.TP
-.B 1
-connection or control error.
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_CTL
     environment = """.SH ENVIRONMENT
 .TP
 .B CTL ", " CONTROL_TOKEN
@@ -309,7 +293,7 @@ the poll health and the uptime; the prompt shows the connected port
 their descriptions (the listings group the settings under the registry's
 own groups \\(em ungrouped rows render bare, no header \\(em, with
 [values] beside);
-\\fB?\\fR prints the same in any position; \\fBset\\fR/\\fBunset\\fR confirm
+\\fB?\\fR prints the same in any position; \\fBset\\fR/\\fBclear\\fR confirm
 \\fB% changed\\fR (the errors print \\fB% error: <message>\\fR, the ok
 replies' messages print bare);
 \\fBrequest flush cache\\fR/\\fBrequest restart\\fR
@@ -330,16 +314,7 @@ idle ping interval, seconds; \\fB0\\fR = off.
 .TP
 .B CTL ", " CONTROL_TOKEN
 the control target and TCP token when the flags are unset."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-the session ended cleanly.
-.TP
-.B 1
-connection or control error.
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_CLI
     return page(
         'console-style control session for the modbus-cache daemon',
         'modbus-cache-cli', 1, DATE, VERSION, MANUAL,

@@ -25,7 +25,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.runtime.audit import AuditLog, default_path as default_audit_path
+from common.runtime.audit import audit_params_of, build_audit, default_path as default_audit_path
 from common.settings.config import is_loopback_host, parse_control_target, parse_listen, parse_secret, parse_upstream
 from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, parse_ops_verbs, setup_logging, \
     install_signal_handlers as install_family_signals
@@ -145,14 +145,6 @@ def main():
     control_target = parse_control_target(cfg['control_port'], listen_port, CONTROL_SOCKET_TEMPLATE)
     control_token = cfg['control_token'] or None
     control_ops_token = cfg['control_ops_token'] or None
-    if control_ops_token and not control_token:
-        logger.error('the read-only ops token supplements the admin token: set --control-token too '
-                     '(an ops token alone would leave the control plane unusable)')
-        raise SystemExit(2)
-    if control_ops_token and control_ops_token == control_token:
-        logger.error('the ops token must differ from the admin token (the same secret would hand '
-                     'every holder the role the server picks first)')
-        raise SystemExit(2)
     ops_verbs = parse_ops_verbs(cfg['control_ops_verbs'], KNOWN_VERBS, default=DEFAULT_OPS_VERBS)
     if isinstance(control_target, int) and not control_token:
         logger.error('the TCP control port %d without a token is open to every local process; '
@@ -160,7 +152,7 @@ def main():
                      'or disable it with --control-port 0', control_target)
         raise SystemExit(2)
     metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics/token')
-    metrics_listen = parse_listen(cfg['metrics_listen'])
+    metrics_listen = parse_listen(cfg['metrics_listen'], '--metrics-listen')
     if cfg['metrics_server'] and not metrics_token and not is_loopback_host(metrics_listen[0]):
         logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
                      'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
@@ -199,11 +191,7 @@ def main():
     proxy.dump_interval = cfg['dump_interval']
     proxy.dump_with_cache = cfg['dump_with_cache']
     proxy.restore_on_start = cfg['restore_on_start']
-    proxy.audit_params = {'path': cfg['audit_log'] or None, 'max_mb': cfg['audit_max_mb'],
-                          'daily': cfg['audit_daily'], 'files': cfg['audit_files'],
-                          'forward': None if cfg['audit_forward'] in (None, '', 'none') else cfg['audit_forward'],
-                          'forward_format': cfg['audit_forward_format'],
-                          'disabled': bool(cfg['no_audit_log'])}   # the audit lives rebuild from here
+    proxy.audit_params = audit_params_of(cfg)   # the audit lives rebuild from here
     logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, client auth: %s, upstream auth: %s, control token: %s, ops token: %s, audit trail: %s, requests audit: %s, metrics: %s, metrics acl: %s)',
                 len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
                 cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
@@ -238,15 +226,7 @@ def main():
                     'off' if control_target is None else
                     ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target))
         return
-    try:
-        audit = None if cfg['no_audit_log'] else AuditLog(cfg['audit_log'] or None, 'CACHE',
-                                                          app='modbus-cache', max_mb=cfg['audit_max_mb'],
-                                                          daily=cfg['audit_daily'], files=cfg['audit_files'],
-                                                          forward=cfg['audit_forward'],
-                                                          forward_format=cfg['audit_forward_format'])
-    except ValueError as e:
-        logger.error(str(e))
-        raise SystemExit(1)
+    audit = build_audit(cfg, 'CACHE', 'modbus-cache', logger)
     proxy.audit = audit
     if audit:
         audit.event('START', 'version=%s upstream=%s:%d unit=%d listen=%s:%d control=%s profile=%s'
@@ -320,7 +300,7 @@ def main():
                     'system/listen': cfg['listen'],
                     'system/log-access': 'on' if cfg['log_access'] else 'off'}
         # the secret rows (control/token, control/ops/token, metrics/token)
-        # carry NO defaults entry: `unset` refuses them
+        # carry NO defaults entry: `clear` refuses them
         # (the metrics/token treatment) — a secret never renders, never re-applies
         proxy.control = ControlServer(proxy, control_target, stop, audit=audit,
                                       token=control_token, defaults=defaults,
@@ -386,7 +366,7 @@ def main():
         if proxy.stopping:
             logger.info('stopped')
             return
-        logger.error('cannot serve on %s:%d: %s', listen_host, listen_port, e)
+        logger.error('cannot bind %s:%d: %s', listen_host, listen_port, e)
         raise SystemExit(1)
     finally:
         upstream.close()

@@ -13,18 +13,14 @@ read-only token (--control-ops-token) authenticates into the show/clear
 verbs only — the ops shift against the admin key, both audited."""
 import logging
 import os
-import socket
 import time
 
 from common.runtime.version import version_string
 from common.settings.config import auth_key_floor_error, default_profile_path, is_loopback_host, parse_auth_type, \
     parse_upstream, resolve_profile_file
-from common.settings.dump import SECRET_REMOVED, dump_filter
 from common.modbus import AUTH_MIN_KEY
 from common.render.human import secs
-from common.wire.wiresec import sign_reply, verify_request_mac, proof_tag, ROLE_ADMIN, ROLE_OPS, command_verb, role_allows, role_tag
 from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
-from common.settings.options import control_command, grouped_rows
 from common.render.texts import T
 from .statics import DEFAULT_LISTEN_PORT, LOG_LEVELS
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, \
@@ -118,10 +114,8 @@ class ControlServer(_ControlServer):
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, clear <setting>, inspect, show <setting|connections|cache|'
                 'uplink|version|config|knobs|write-registers-table|acl-connect-table|acl-write-table>')
-        if self.proxy.dump_path:
-            cmds += ', request dump [with-cache], request restore'
-        cmds += ', request flush cache, request reload, request reload-config, request restart, shutdown, quit; help <setting> describes it, help config maps every knob to its control command, show knobs prints the full dictionary'
-        return cmds
+        cmds += ', request flush cache, request reload, request reload-config, request restart, shutdown, quit'
+        return self.command_help_tail(cmds, dump_words=', request dump [with-cache], request restore')
 
     def command_tool(self, low, cmd):
         """The cache's own verbs beside the family's request namespace:
@@ -184,15 +178,8 @@ class ControlServer(_ControlServer):
                     t = parse_listen(val)
                 except SystemExit as e:
                     raise ValueError(str(e))
-                if key == 'metrics/listen':   # fail fast: the bind at restart is too late to complain
-                    probe = socket.socket()
-                    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    try:
-                        probe.bind(t)
-                    except OSError as e:
-                        raise ValueError(T('wire.cannot_bind') % (t[0], t[1], e))
-                    finally:
-                        probe.close()
+                if key == 'metrics/listen':
+                    self.probe_bind(t, key)
                     if p.metrics_srv is not None and not p.metrics_token and not is_loopback_host(t[0]):
                         raise ValueError('metrics/listen cannot move beyond loopback while the endpoint '
                                          'serves without a token (F13 in docs/AUDIT.md) — '
@@ -532,8 +519,6 @@ class ControlServer(_ControlServer):
             return 'on' if p.dump_with_cache else 'off'
         if key == 'audit/requests':
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
-        if key == 'dump-interval':
-            return 'off' if not p.dump_interval else secs(p.dump_interval)
         if key == 'system/log-access':
             return 'on' if p.log_access else 'off'
         if key == 'modbus/timeout':
@@ -553,10 +538,6 @@ class ControlServer(_ControlServer):
             return self.defaults.get(key, '?')   # renders (the secrets answer '<set>'/'off')
         return '?'
 
-    def clear_overrides(self):
-        """The config was re-applied (SIGHUP): nothing is live-overridden anymore."""
-        self.overridden.clear()
-
     def summary(self):
         """The compact state summary appended to the set/clear replies."""
         p = self.proxy
@@ -567,12 +548,7 @@ class ControlServer(_ControlServer):
                    'ok' if p.poll_ok else 'down', age, p.cache_hits, p.cache_misses, p.client_count))
 
     def connections_line(self):
-        with self.proxy.client_lock:
-            if not self.proxy.clients:
-                return 'none'
-            now = time.monotonic()
-            return '; '.join('%s connected %s requests %d' % (k, secs(now - v['since']), v['requests'])
-                             for k, v in sorted(self.proxy.clients.items()))
+        return self.modbus_connections_line(self.proxy.clients, self.proxy.client_lock)
 
     def inspect(self):
         """One pretty dump of everything — the state, the map, the counters,
@@ -723,7 +699,7 @@ class ControlServer(_ControlServer):
         """The live-overridden settings as raw, re-appliable values (a
         SIGHUP clears the override set — the dump follows). No secret can
         be overridden (the wire refuses them — startup-only), so no
-        SECRET_REMOVED placeholder occurs; the dump filter's secret branch
+        secret placeholder occurs; the dump filter's secret branch
         stays as the class invariant's guard."""
         p = self.proxy
         raw = {
@@ -757,10 +733,7 @@ class ControlServer(_ControlServer):
             'dump/with-cache': 'on' if p.dump_with_cache else 'off',
             'dump/restore-on-start': 'on' if getattr(p, 'restore_on_start', False) else 'off',
         }
-        for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
-            if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:
-                raw[opt.live] = self.defaults[opt.live]
-        return dump_filter(self.overridden, raw, SETTING_BY_NAME)
+        return self.dump_settings_tail(raw)
 
     # --- the dump/reload family: the reload state file and the whole-daemon
     # reload (`reload`) ride the base (_save/_restore/_reload_state_path/

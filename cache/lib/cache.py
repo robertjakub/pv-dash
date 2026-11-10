@@ -9,7 +9,6 @@ never merge across function codes (a read can only serve one)."""
 import threading
 import time
 
-from common.render.human import secs
 
 from .statics import BIT_READ_FUNCS, MAX_BITS, MAX_COUNT, READ_FUNCS
 
@@ -102,11 +101,6 @@ class Cache:
                 if ttl and now - self.ts[(fc, a)] > ttl:
                     return False
             return True
-
-    def describe_ttl(self):
-        if not self.cache_ttl:
-            return 'never expires'
-        return 'for %s' % secs(self.cache_ttl)
 
     def words(self, fc, addr, count):
         with self.lock:

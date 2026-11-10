@@ -125,7 +125,7 @@
       "help": "require a token on control connections: the client authenticates with {\"cmd\": \"auth\", \"token\":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
       "secret": true, "hidden": true, "restart": true },
     { "name": "control/ops",
-      "setting-help": "the read-only ops role: the second token that scopes its sessions to the configured verbs (the default: show and clear)",
+      "setting-help": "the read-only ops role: the second token that scopes its sessions to the configured verbs (the default: show,flush)",
       "node": true },
     { "name": "control-ops-token", "flag": "--control-ops-token", "env": "CONTROL_OPS_TOKEN", "conv": "str",
       "live": "control/ops/token",

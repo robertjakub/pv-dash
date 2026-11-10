@@ -5,7 +5,7 @@ import threading
 import time
 
 from common.modbus import (ClientBase, ModbusError, check_data_bytes,
-                           check_head, check_reply, frame, recv_exact,
+                           check_head, check_reply, frame,
                            unpack_bits)
 from .statics import BIT_READ_FUNCS, MAX_PDU
 

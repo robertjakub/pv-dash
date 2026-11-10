@@ -8,8 +8,8 @@ import json
 import logging
 
 from .options import OPTIONS
-from common.settings.config import (ANY_NET, IPGate, _GATE_TYPES, _acl_desc, _prefix_matcher, _write_gate_object,
-                           acl_admits, acl_file_warn, acl_gate_summary, acl_summary, acl_table, acl_text,
+from common.settings.config import (IPGate, _GATE_TYPES, _write_gate_object,
+                           acl_admits, acl_file_warn, acl_gate_summary, acl_table,
                            acl_value_text, check_auth_key, load_config_script,
                            load_write_gate_file, parse_acl, parse_acl_value, parse_auth_type, parse_listen,
                            parse_secret, parse_upstream, resolve_profile_file, Resolver)
@@ -160,14 +160,6 @@ def compile_write_acl(rules):
     return tuple(_ranges_from_bits(bits))
 
 
-def load_profile_write_acl(path, label=None):
-    """The device profile's write acl, loaded and compiled (see
-    load_profile_write_gate for the schema) -> the write-registers
-    shapes."""
-    _desc, rules = load_profile_write_gate(path, label)
-    return compile_write_acl(rules)
-
-
 def render_write_acl(desc, rules):
     """The parsed gate as the write/registers/table show report's lines:
     the gate-level desc first as the '% ' line, then one
@@ -191,21 +183,6 @@ def render_write_acl(desc, rules):
     for prefix, d in rows:
         lines.append(('%s # %s' % (prefix.ljust(width), d)) if d else prefix.rstrip())
     return lines
-
-
-def check_range(start, count, label):
-    if start < 0 or start + count > MAX_REGISTERS or not 0 < count <= MAX_COUNT:
-        raise SystemExit('%s out of bounds' % label)
-    return (start, count)
-
-
-def parse_range(text, label):
-    try:
-        start, count = str(text).split(':')
-        start, count = int(start), int(count)
-    except ValueError:
-        raise SystemExit('%s must be START:COUNT, got %r' % (label, text))
-    return check_range(start, count, label)
 
 
 def load_registers_file(path):

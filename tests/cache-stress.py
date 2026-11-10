@@ -9,7 +9,6 @@ import os
 import random
 import resource
 import socket
-import statistics
 import struct
 import subprocess
 import sys

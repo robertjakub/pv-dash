@@ -78,7 +78,7 @@ def resolve_config(args, script_dir=None):
         'log_access': resolve(args.log_access, 'LOG_ACCESS', 'log_access',
                               DEFAULTS['log_access'], str_to_bool),
         'local_time': resolve(getattr(args, 'local_time', None), 'LOCAL_TIME',
-                              'local_time', False, str_to_bool),
+                              'local_time', DEFAULTS['local_time'], str_to_bool),
         'max_clients': resolve(getattr(args, 'max_clients', None), 'MAX_CLIENTS',
                                'max_clients', DEFAULTS['max_clients'], int),
         'client_timeout': resolve(getattr(args, 'client_timeout', None), 'CLIENT_TIMEOUT',
@@ -99,9 +99,9 @@ def resolve_config(args, script_dir=None):
     cfg['audit_files'] = resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
                                  'audit_files', DEFAULTS['audit_files'], int)
     cfg['audit_daily'] = resolve(getattr(args, 'audit_daily', False) or None,
-                                 'AUDIT_DAILY', 'audit_daily', False, str_to_bool)
+                                 'AUDIT_DAILY', 'audit_daily', DEFAULTS['audit_daily'], str_to_bool)
     cfg['no_audit_log'] = resolve(getattr(args, 'no_audit_log', False) or None,
-                                  'NO_AUDIT_LOG', 'no_audit_log', False, str_to_bool)
+                                  'NO_AUDIT_LOG', 'no_audit_log', DEFAULTS['no_audit_log'], str_to_bool)
     cfg['control_token'] = parse_secret((resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
                                                  'control_token', None, str) or '').strip() or None, 'control/token')
     cfg['control_ops_token'] = parse_secret((resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
@@ -110,7 +110,7 @@ def resolve_config(args, script_dir=None):
     cfg['control_trust_uids'] = resolve(getattr(args, 'control_trust_uids', None),
                                         'CONTROL_TRUST_UIDS', 'control_trust_uids', None, str)
     cfg['control_socket_group'] = resolve(getattr(args, 'control_socket_group', None), 'CONTROL_SOCKET_GROUP',
-                                          'control_socket_group', False, str_to_bool)
+                                          'control_socket_group', DEFAULTS['control_socket_group'], str_to_bool)
     check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
     check_token_chars(cfg['control_token'], 'control_token')
     parse_listen(cfg['listen'])   # the serve address validates: HOST:PORT, the port in range
@@ -132,7 +132,7 @@ def resolve_config(args, script_dir=None):
                                         'control_ops_verbs', DEFAULT_OPS_VERBS,
                                         str) or DEFAULT_OPS_VERBS).strip() or DEFAULT_OPS_VERBS
     cfg['metrics_server'] = resolve(getattr(args, 'metrics_server', False) or None, 'METRICS_SERVER',
-                                    'metrics_server', False, str_to_bool)
+                                    'metrics_server', DEFAULTS['metrics_server'], str_to_bool)
     cfg['metrics_listen'] = resolve(getattr(args, 'metrics_listen', None), 'METRICS_LISTEN',
                                     'metrics_listen', DEFAULTS['metrics_listen'], str)
     cfg['metrics_token'] = parse_secret((resolve(getattr(args, 'metrics_token', None), 'METRICS_TOKEN',
@@ -157,7 +157,7 @@ def resolve_config(args, script_dir=None):
     cfg['dump_interval'] = resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
                                    'dump_interval', DEFAULTS['dump_interval'], float)
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
-                                      'restore_on_start', False, str_to_bool)
+                                      'restore_on_start', DEFAULTS['restore_on_start'], str_to_bool)
     if cfg['dump_interval'] < 0:
         raise SystemExit('invalid dump_interval = %r: must be >= 0 (0 = off)' % cfg['dump_interval'])
     if cfg['dump_interval'] and not cfg['dump_path']:

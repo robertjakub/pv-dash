@@ -51,13 +51,18 @@ def default_config_path(script_dir, conf):
     return next_to_script(script_dir, conf)
 
 
-def install_signal_handlers(apply_reload=None, graceful_stop=None):
-    """The two watcher threads: SIGHUP re-resolves and re-applies (the
-    shared apply_reload — the bin's reload body), SIGTERM/SIGINT run the
-    graceful stop once (the signal name as the reason). The handlers ride
-    the main-thread signal discipline; the watchers keep the handlers'
-    work off the signal frame."""
-    if hasattr(signal, 'SIGHUP'):
+def install_signal_handlers(apply_reload=None, graceful_stop=None, usr1=None,
+                            on_reload_failed=None):
+    """The watcher threads: SIGHUP re-resolves and re-applies (the shared
+    apply_reload — the bin's reload body), SIGUSR1 runs the optional extra
+    (the cache's cache-clear), SIGTERM/SIGINT run the graceful stop once
+    (the signal name as the reason). The handlers ride the main-thread
+    signal discipline; the watchers keep the handlers' work off the signal
+    frame. on_reload_failed(e) runs beside the failure log (the cache's
+    RELOAD audit event). The cache's os._exit-restart shape rides this now
+    (its graceful_stop carries it); the fake's signal machine (the
+    SignalBox env layer) stays its own. A None callback skips its watcher."""
+    if apply_reload is not None and hasattr(signal, 'SIGHUP'):
         reload_requested = threading.Event()
 
         def on_hup(signum, frame):
@@ -73,10 +78,26 @@ def install_signal_handlers(apply_reload=None, graceful_stop=None):
                     logger.info('SIGHUP: applied (%s)', summary)
                 except (Exception, SystemExit) as e:
                     logger.error('SIGHUP: reload failed (%s), keeping the previous settings', e)
+                    if on_reload_failed:
+                        on_reload_failed(e)
 
         signal.signal(signal.SIGHUP, on_hup)
         threading.Thread(target=watch_reload, daemon=True).start()
-    if hasattr(signal, 'SIGTERM'):
+    if usr1 is not None and hasattr(signal, 'SIGUSR1'):
+        clean_requested = threading.Event()
+
+        def on_usr1(signum, frame):
+            clean_requested.set()
+
+        def watch_usr1():
+            while True:
+                clean_requested.wait()
+                clean_requested.clear()
+                usr1()
+
+        signal.signal(signal.SIGUSR1, on_usr1)
+        threading.Thread(target=watch_usr1, daemon=True).start()
+    if graceful_stop is not None and hasattr(signal, 'SIGTERM'):
         stop_signal = []
 
         def on_stop(signum, frame):

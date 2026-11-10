@@ -17,7 +17,6 @@ append-only audit trail), common/version, this file (CLI, logging, signals).
 """
 import logging
 import os
-import signal
 import sys
 import threading
 import time
@@ -28,7 +27,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root —
 
 from common.runtime.audit import AuditLog, default_path as default_audit_path
 from common.settings.config import is_loopback_host, parse_control_target, parse_listen, parse_secret, parse_upstream
-from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, parse_ops_verbs, setup_logging
+from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, parse_ops_verbs, setup_logging, \
+    install_signal_handlers as install_family_signals
 from common.settings.options import build_parser
 from common.runtime.version import version_string
 from lib.config import CONTROL_SOCKET_TEMPLATE, load_registers_file, load_selection, resolve_config, acl_value_text, acl_gate_summary
@@ -70,7 +70,12 @@ def fold_upstream(cfg, pending):
     cfg['upstream'], cfg['host'], cfg['port'] = '%s:%d' % (fold_host, fold_port), fold_host, fold_port
 
 
-def install_signal_handlers(proxy, cache, args):
+def install_signal_handlers(proxy, cache, apply_reload):
+    """The signal set rides the family's shared watcher
+    (common.runtime.daemon): SIGHUP re-resolves and re-applies (the
+    apply_reload body is this bin's, the failure hook audits), SIGUSR1
+    clears the cache, SIGTERM/SIGINT run the graceful stop once. Returns
+    the graceful stop (the control server's stopper)."""
     def graceful_stop(reason):
         logger.info('shutdown: %s, closing the listener', reason)
         if proxy.dump_path:
@@ -101,65 +106,19 @@ def install_signal_handlers(proxy, cache, args):
         time.sleep(0.2)   # let the serve loop log 'stopped' ...
         os._exit(0)       # ... as a backstop if it somehow didn't
 
-    if hasattr(signal, 'SIGHUP'):
-        reload_requested = threading.Event()
+    def clean_cache():
+        dropped = cache.clear()
+        proxy.poll_wake.set()
+        logger.info('SIGUSR1: cache cleared (%d register(s) dropped), repolling now', dropped)
+        if proxy.audit:
+            proxy.audit.event('RESET', 'SIGUSR1: %d register(s) dropped' % dropped)
 
-        def on_hup(signum, frame):
-            reload_requested.set()
+    def on_reload_failed(e):
+        if proxy.audit:
+            proxy.audit.event('RELOAD', 'failed: %s' % e)
 
-        def watch_reload():
-            while True:
-                reload_requested.wait()
-                reload_requested.clear()
-                logger.info('SIGHUP: reload requested')
-                try:
-                    proxy.config = resolve_config(args, SCRIPT_DIR)
-                    proxy.reload()
-                    ctl = getattr(proxy, 'control', None)
-                    if ctl:
-                        ctl.clear_overrides()   # the config won: nothing is live-overridden
-                    if proxy.audit:
-                        proxy.audit.event('RELOAD', '%d range(s) from %s' % (len(proxy.cache.ranges),
-                                                                             proxy.config['profile']))
-                except (Exception, SystemExit) as e:
-                    logger.error('SIGHUP: reload failed (%s), keeping the previous settings', e)
-                    if proxy.audit:
-                        proxy.audit.event('RELOAD', 'failed: %s' % e)
-
-        signal.signal(signal.SIGHUP, on_hup)
-        threading.Thread(target=watch_reload, daemon=True).start()
-    if hasattr(signal, 'SIGUSR1'):
-        clean_requested = threading.Event()
-
-        def on_usr1(signum, frame):
-            clean_requested.set()
-
-        def watch_clean():
-            while True:
-                clean_requested.wait()
-                clean_requested.clear()
-                dropped = cache.clear()
-                proxy.poll_wake.set()
-                logger.info('SIGUSR1: cache cleared (%d register(s) dropped), repolling now', dropped)
-                if proxy.audit:
-                    proxy.audit.event('RESET', 'SIGUSR1: %d register(s) dropped' % dropped)
-
-        signal.signal(signal.SIGUSR1, on_usr1)
-        threading.Thread(target=watch_clean, daemon=True).start()
-    if hasattr(signal, 'SIGTERM'):
-        stop_signal = []
-
-        def on_stop(signum, frame):
-            stop_signal.append(signum)
-
-        def watch_stop():
-            while not stop_signal:
-                time.sleep(0.2)
-            graceful_stop('%s received' % signal.Signals(stop_signal[0]).name)
-
-        signal.signal(signal.SIGTERM, on_stop)
-        signal.signal(signal.SIGINT, on_stop)
-        threading.Thread(target=watch_stop, daemon=True).start()
+    install_family_signals(apply_reload=apply_reload, graceful_stop=graceful_stop,
+                           usr1=clean_cache, on_reload_failed=on_reload_failed)
     return graceful_stop
 
 
@@ -293,7 +252,23 @@ def main():
         for warn in (proxy.connect_acl_warn, proxy.write_acl_warn, proxy.metrics_acl_warn):
             if warn:
                 audit.event('ACL-FILE', warn)
-    stop = install_signal_handlers(proxy, cache, args)
+    def apply_reload():
+        """The SIGHUP and the `request reload-config` command share this: re-resolve
+        the config, swap the register map and the poll posture, clear the
+        override markers, audit."""
+        proxy.config = resolve_config(args, SCRIPT_DIR)
+        proxy.reload()
+        summary = '%d range(s) from %s' % (len(proxy.cache.ranges), proxy.config['profile'])
+        if proxy.control:
+            proxy.control.reloaded(summary)
+        # the dump loop re-reads the configured interval (the parked dumper wakes to see it)
+        proxy.dump_interval = proxy.config['dump_interval']
+        proxy.dump_wake.set()
+        if proxy.audit:
+            proxy.audit.event('RELOAD', summary)
+        return summary
+
+    stop = install_signal_handlers(proxy, cache, apply_reload)
     if control_target is not None:
         defaults = {'modbus/interval': '%g' % cfg['interval'],
                     'cache/ttl': 'off' if not cfg['cache_ttl'] else '%g' % cfg['cache_ttl'],
@@ -348,6 +323,7 @@ def main():
                                       ops_verbs=ops_verbs,
                                       config_path=args.config)
         proxy.control.start()
+        proxy.control.reloader = apply_reload   # the control server's `request reload-config` runs the same path
     if proxy.dump_path:
         if not cfg['restore_on_start']:
             if os.path.exists(proxy.dump_path):

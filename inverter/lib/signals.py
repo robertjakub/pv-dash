@@ -23,6 +23,54 @@ def parse_time(text):
     return t
 
 
+def apply_demo(simulator, chaos, fake, values):
+    """The demo knobs onto the machines from typed values — the SIGHUP
+    env layer and the config reloader's re-read (the bin's apply_reload)
+    share it. The keys: chaos (float), max_kwp (float), strict (bool),
+    time ('auto'/'live'/HH:MM), time_scale (float), profile (a profile
+    path), log_level (a level name); absent or None keeps the knob's
+    current value. All-or-nothing: every value parses (the profile loads)
+    before anything applies — a bad one raises and the caller keeps the
+    previous settings. Returns the applied labels."""
+    plan = []
+    v = values.get('chaos')
+    if v is not None:
+        plan.append(('chaos=%g' % v, lambda v=v: chaos.set_probability(v)))
+    v = values.get('max_kwp')
+    if v is not None:
+        plan.append(('peak=%gW' % (0.75 * v * 1000.0),
+                     lambda v=v: setattr(simulator, 'peak_w', 0.75 * v * 1000.0)))
+    v = values.get('strict')
+    if v is not None:
+        plan.append(('strict=%s' % v, lambda v=v: setattr(fake, 'strict', v)))
+    v = values.get('time')
+    if v is not None:
+        if v.strip().lower() in ('auto', 'live'):
+            plan.append(('time=live', lambda: simulator.freeze(None)))
+        else:
+            frozen = parse_time(v)   # eager: a bad HH:MM keeps everything
+            plan.append(('time=%s' % v.strip(), lambda f=frozen: simulator.freeze(f)))
+    v = values.get('time_scale')
+    if v is not None:
+        if not 0 < v <= 1440:
+            raise ValueError('TIME_SCALE must be 0 < N <= 1440, got %r' % v)
+        plan.append(('time-scale=x%g' % v, lambda v=v: simulator.set_time_scale(v)))
+    v = values.get('profile')
+    if v is not None:
+        new_map = load_profile(v)   # eager: a bad profile keeps everything
+        plan.append(('profile=%s: %s' % (profile_label(new_map.path), new_map.description),
+                     lambda m=new_map: simulator.set_profile(m)))
+    v = values.get('log_level')
+    if v is not None:
+        level = getattr(logging, str(v).strip().upper())
+        plan.append(('log_level=%s' % str(v).strip().upper(),
+                     lambda: (logging.getLogger('fake-inverter').setLevel(level),
+                              logging.getLogger('fake-inverter-control').setLevel(level))))
+    for _, fn in plan:
+        fn()
+    return [label for label, _ in plan]
+
+
 class SignalBox:
     """Installs the family signal set; a watcher thread does the work so the
     Modbus accept loop (main thread) is never interrupted mid-request."""
@@ -64,59 +112,47 @@ class SignalBox:
     # ---- SIGHUP: re-read the environment layer, all-or-nothing
 
     def reload(self):
-        plan = []
         env = os.environ
+        values = {}
         try:
             v = env.get('CHAOS')
             if v:
-                plan.append(('chaos=%g' % float(v), lambda v=float(v): self.chaos.set_probability(v)))
+                values['chaos'] = float(v)
             v = env.get('MAX_KWP')
             if v:
-                plan.append(('peak=%gW' % (0.75 * float(v) * 1000.0),
-                             lambda v=float(v): setattr(self.simulator, 'peak_w', 0.75 * v * 1000.0)))
+                values['max_kwp'] = float(v)
             v = env.get('STRICT')
             if v:
-                flag = v.strip().lower() in ('1', 'true', 'yes', 'on')
-                plan.append(('strict=%s' % flag, lambda: setattr(self.fake, 'strict', flag)))
+                values['strict'] = v.strip().lower() in ('1', 'true', 'yes', 'on')
             v = env.get('TIME')
             if v:
-                if v.strip().lower() in ('auto', 'live'):
-                    plan.append(('time=live', lambda: self.simulator.freeze(None)))
-                else:
-                    plan.append(('time=%s' % v.strip(), lambda v=v: self.simulator.freeze(parse_time(v))))
+                values['time'] = v
             v = env.get('TIME_SCALE')
             if v:
                 x = float(v)
                 if not 0 < x <= 1440:
                     raise ValueError('TIME_SCALE must be 0 < N <= 1440, got %r' % v)
-                plan.append(('time-scale=x%g' % x, lambda x=x: self.simulator.set_time_scale(x)))
+                values['time_scale'] = x
             v = env.get('PROFILE')
             if v:
-                path = v.strip()
-                new_map = load_profile(path)   # eager: a bad profile keeps everything
-                plan.append(('profile=%s: %s' % (profile_label(new_map.path), new_map.description),
-                             lambda m=new_map: self.simulator.set_profile(m)))
+                values['profile'] = v.strip()
             v = env.get('LOG_LEVEL')
             if v:
-                level = getattr(logging, v.strip().upper())
-                plan.append(('log_level=%s' % v.strip().upper(),
-                             lambda: (logging.getLogger('fake-inverter').setLevel(level),
-                                      logging.getLogger('fake-inverter-control').setLevel(level))))
+                values['log_level'] = v
         except (ValueError, AttributeError, SystemExit) as e:
             logger.warning('SIGHUP: reload failed (%s), keeping previous settings', e)
             if self.audit:
                 self.audit.event('RELOAD', 'failed: %s' % e)
             return
-        if not plan:
+        labels = apply_demo(self.simulator, self.chaos, self.fake, values)
+        if not labels:
             logger.info('SIGHUP: reloaded, no environment settings to apply')
             if self.audit:
                 self.audit.event('RELOAD', 'no environment settings to apply')
             return
-        for _, fn in plan:
-            fn()
-        logger.info('SIGHUP: reloaded %d setting(s): %s', len(plan), ', '.join(label for label, _ in plan))
+        logger.info('SIGHUP: reloaded %d setting(s): %s', len(labels), ', '.join(labels))
         if self.audit:
-            self.audit.event('RELOAD', '%d setting(s): %s' % (len(plan), ', '.join(label for label, _ in plan)))
+            self.audit.event('RELOAD', '%d setting(s): %s' % (len(labels), ', '.join(labels)))
 
     # ---- SIGUSR1: reset the scenario (release pins + drop the write overlay)
 

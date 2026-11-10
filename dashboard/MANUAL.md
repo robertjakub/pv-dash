@@ -27,10 +27,9 @@ unix socket a trusted peer (root, the daemon's own user or
 `--control-trust-uids` — SO_PEERCRED) speaks without it.
 
 The optional ops token (`--control-ops-token`) scopes a session to the
-read-only verbs (the default: show and clear). Every command is audited. The
-clients take `--control-port` (env `CTL`), `--timeout`, `--control-token`,
-the audit flags and `--man`; the cli adds `--reconnect` /
-`--reconnect-wait`.
+read-only verbs (the default: show). Every command is audited. The clients
+take `--control-port` (env `CTL`), `--timeout`, `--control-token`, the audit
+flags and `--man`; the cli adds `--reconnect` / `--reconnect-wait`.
 
 A knob's value resolves at start as flag > env > config script > default;
 the config file (the bundled `dashboard/examples/server.conf`) speaks the
@@ -69,10 +68,10 @@ The kinds — every row of the tables below carries one:
 | `request reload` | command | save the live overrides and restart the whole daemon (the config file and the flags are re-resolved) |
 | `request reload-config` | command | re-read the config file (the SIGHUP path) |
 | `request restore` | command | re-apply a state dump's overrides (when the daemon has a dump path) |
-| `set` | command | configure a setting (set battery on, set log-queries on) |
+| `set` | command | configure a setting (set log-queries on, set metrics enable on) |
 | `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the dashboard server (asks to confirm) |
-| `clear` | command | restore a setting to its configured value (clear battery, clear log-level) |
+| `clear` | command | restore a setting to its configured value (clear log-queries, clear log-level) |
 
 ## Knobs
 
@@ -132,7 +131,7 @@ the control plane: the tokens, the ops role's RBAC policy, the trusted peers
 ### control/ops
 
 the read-only ops role: the second token that scopes its sessions to the
-configured verbs (the default: show and clear)
+configured verbs (the default: show)
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|

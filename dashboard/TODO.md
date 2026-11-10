@@ -276,9 +276,11 @@ and the word help unchanged).
 
 The env-prefix retirement wave: the env twins are the bare upper-snake
 names — the docker-documented generic set (`PORT`, `BIND`, `PROM_URL`,
-`CONFIG_JS`, ...) IS the set now, no `DSH_` duplicates beside it; the
+`CONFIG_JS`, ...) IS the set then, no `DSH_` duplicates beside it; the
 registry, the resolver, the ctl/cli clients, the docs and the man pages
-follow. The shipped `config.js` `batteryFlag` selector asks for
+follow. (Since retired further: `PORT`/`BIND` died with the
+`--listen` unification — the twin is `LISTEN`, the live path
+`system/listen`.) The shipped `config.js` `batteryFlag` selector asks for
 `scraper_battery` (the metrics wave's rename, propagated — the retired
 `huawei_battery` gauge no longer answers).
 
@@ -340,6 +342,9 @@ clients' help always promised — the env form of `--control-token-file`
 on `dashboard_ctl`/`dashboard_cli` (the daemon's config resolved it from
 the start; flag over env, the file over the plain token, both together
 the mutual-exclusion error).
+(Since retired: the env prefixes and the `*_FILE` twins died — the bare
+env twin with `file:<path>` inside the plain value is the spelling.)
+
 
 The control plane (the family set is complete): the JSON-lines control
 server on the scraper's pattern (the unix socket by default, the token'd

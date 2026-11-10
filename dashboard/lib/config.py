@@ -4,8 +4,8 @@ layer and the CLI flags (stdlib only).
 
 The precedence is the family's: CLI flags > the env > the config
 script > the shipped defaults (lib/defaults.json). The env twins are the
-bare upper-snake names (PORT, BIND, PROM_URL, CONFIG_JS, BATTERY) the
-docker image documents. The config file speaks the control grammar
+bare upper-snake names (LISTEN, PROM_URL, CONFIG_JS) the docker image
+documents. The config file speaks the control grammar
 (common/settings/options.py):
 every line a `set <name> <value>`, every comment a `#` comment — the ini
 format is gone (the breaking wave in docs/TODO.md).
@@ -15,17 +15,12 @@ import os
 
 from .options import DEFAULT_OPS_VERBS, OPTIONS
 from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
+from common.runtime.daemon import next_to_script
 from common.settings.config import check_control_tokens, check_token_chars, load_config_script, parse_listen, parse_secret, \
     resolve_metrics_acl, Resolver, str_to_bool
-from .statics import DEFAULTS, DEFAULT_LISTEN, DEFAULT_LISTEN_PORT, LOG_LEVELS
+from .statics import CONTROL_SOCKET_TEMPLATE, DEFAULTS, DEFAULT_LISTEN, DEFAULT_CONTROL_SOCKET, DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
-
-# the control socket's name: the daemon's template (common.config's parsers
-# take it as the argument), the clients' default (the template spelled with
-# the default page port)
-CONTROL_SOCKET_TEMPLATE = '/tmp/dashboard-%d.socket'
-DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_LISTEN_PORT
 
 
 def load_config(path):
@@ -33,16 +28,6 @@ def load_config(path):
     malformed file — or the legacy ini format — is fatal. Returns {key:
     raw-string value} with the dash names underscore-normalized."""
     return load_config_script(path, OPTIONS)
-
-
-def next_to_script(name, script_dir=None):
-    """The flattened package layout first (the file next to the script),
-    then the dev checkout's subproject root (the parent of bin/)."""
-    for base in (script_dir or '.', os.path.dirname(script_dir or '.')):
-        cand = os.path.join(base, name)
-        if os.path.exists(cand):
-            return cand
-    return os.path.join(script_dir or '.', name)
 
 
 def resolve_config(args, script_dir=None):
@@ -57,12 +42,12 @@ def resolve_config(args, script_dir=None):
     resolve = r.resolve
 
     static_dir = resolve(args.static_dir, 'STATIC_DIR', 'static_dir',
-                         next_to_script('static', script_dir), str)
+                         next_to_script(script_dir, 'static'), str)
     if not os.path.isabs(static_dir):
         static_dir = os.path.join(script_dir or '.', static_dir)
     static_dir = os.path.realpath(static_dir)
     config_js = resolve(args.config_js, 'CONFIG_JS', 'config_js',
-                        next_to_script('config.js', script_dir), str)
+                        next_to_script(script_dir, 'config.js'), str)
     config_js = os.path.realpath(config_js if os.path.isabs(config_js)
                                  else os.path.join(script_dir or '.', config_js))
     prom_prefix = resolve(args.prom_prefix, 'PROM_PREFIX', 'prom_prefix',
@@ -164,7 +149,7 @@ def resolve_config(args, script_dir=None):
         raise SystemExit('invalid dump_interval = %r: needs dump_path set (there is nothing to dump into)'
                          % cfg['dump_interval'])
     control_port = str(cfg['control_port'] or '').strip()
-    if control_port.isdigit() and control_port != '0' and not cfg['control_token']:
+    if control_port.isdigit() and control_port != '0' and int(control_port) <= 65535 and not cfg['control_token']:
         raise SystemExit('the TCP control port %s without a token is open to every local process; '
                          'set --control-token (the default unix socket needs none), '
                          'or disable it with --control-port 0' % control_port)

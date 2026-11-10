@@ -17,16 +17,13 @@ TCP the signed commands are mandatory. A second, read-only token
 (--control-ops-token) authenticates into its policy's verbs only (the
 ops shift against the admin key, both audited."""
 import logging
-import os
 import time
 
 from common.render.human import secs
 from common.runtime.version import version_string
-from common.wire.wiresec import verify_request_mac, sign_reply, proof_tag, ROLE_ADMIN, ROLE_OPS, command_verb, role_allows, role_tag
 from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
 from common.settings.config import acl_table, acl_value_text, is_loopback_host, parse_listen, \
     resolve_metrics_acl
-from common.settings.dump import SECRET_REMOVED, dump_filter
 from common.render.texts import T
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_BY_LIVE, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
     COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
@@ -89,10 +86,6 @@ class ControlServer(_ControlServer):
                          config_path=config_path, dump_path=dump_path, restore_on_start=restore_on_start,
                          dump_key=dump_key, dump_interval=dump_interval)
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
-        self.config_path = config_path   # the config script the daemon started from — the reload state lives beside it
-        self.reload_pending = False      # a reload saved the state; the exec runs after the reply leaves the wire
-        self.dump_path = dump_path or None   # the state dump file (the dump family)
-        self.dump_restore = bool(restore_on_start)   # prospective-only: the START already chose
         self.metrics_srv = None          # set by the entry (the live metrics enable toggle)
         self.metrics_token = None        # the /metrics bearer token (the entry passes it)
         self.metrics_listen = None       # the /metrics bind address (the entry passes it)
@@ -112,19 +105,14 @@ class ControlServer(_ControlServer):
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, clear <setting>, inspect, '
                 'show <setting|connections|version|config|knobs>, request reload-config')
-        if self.dump_path:
-            cmds += ', request dump, request restore'
-        cmds += ', request reload, shutdown, quit; '
-        cmds += 'help <setting> describes it, help config maps every knob to its control command, '
-        cmds += 'show knobs prints the full dictionary'
-        return cmds
+        cmds += ', request reload, shutdown, quit'
+        return self.command_help_tail(cmds)
 
     def show_config_cfg(self):
         """The resolved startup values with the metrics knobs' LIVE state
         folded in (the dashboard's own endpoint runs on and off and its
         acl sets live — the rows render what runs, not what the startup
         flag said)."""
-        from common.settings.config import acl_value_text
         return dict(self.startup_values or {}, metrics_server=bool(self.metrics_srv),
                     metrics_acl=acl_value_text(self.metrics_acl))
 
@@ -232,14 +220,6 @@ class ControlServer(_ControlServer):
             if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % warn
             return shown
-    def _metrics_caps(self):
-        """The caps the describe line renders: the running server's when it
-        is up, the configured ones otherwise (the defaults only when the
-        entry passed nothing)."""
-        from .statics import DEFAULT_METRICS_CAPS
-        return ((self.metrics_srv.max_clients, self.metrics_srv.client_timeout, self.metrics_srv.max_per_ip)
-                if self.metrics_srv else (self.metrics_caps or DEFAULT_METRICS_CAPS))
-
     def _get(self, key):
         h = self.httpd.RequestHandlerClass
         handled, value = self.get_family_key(key)   # the family's shared knobs (the control plane,
@@ -265,15 +245,10 @@ class ControlServer(_ControlServer):
             return self.defaults.get(key, '?')   # the secrets never reach here — the show gate refuses them
         return '?'
 
-    def clear_overrides(self):
-        """The config was re-applied (SIGHUP/request reload-config): nothing is
-        live-overridden anymore."""
-        self.overridden.clear()
-
     def dump_settings(self):
         """The live-overridden settings as raw, re-appliable values. No
         secret can be overridden (the wire refuses them — startup-only),
-        so no SECRET_REMOVED placeholder occurs; the dump filter's secret
+        so no secret placeholder occurs; the dump filter's secret
         branch stays as the class invariant's guard."""
         h = self.httpd.RequestHandlerClass
         raw = {
@@ -294,10 +269,7 @@ class ControlServer(_ControlServer):
             'control/socket-group': 'on' if self.socket_group else 'off',
             **self.audit_dump_rows(),
         }
-        for opt in OPTIONS:   # a restart-marked knob speaks its CONFIGURED value (the pending override), not the running one
-            if opt.restart and not opt.secret and opt.live and opt.live in self.defaults:
-                raw[opt.live] = self.defaults[opt.live]
-        return dump_filter(self.overridden, raw, SETTING_BY_NAME)
+        return self.dump_settings_tail(raw)
 
     # --- the whole-daemon reload (`reload`) and the dump family ride the
     # base (_save/_restore/_reload_state_path/apply_dump_settings/reload_daemon):
@@ -315,14 +287,9 @@ class ControlServer(_ControlServer):
                    'ok' if self.httpd.RequestHandlerClass.upstream_ok else 'down', total))
 
     def connections_line(self):
-        """The live HTTP clients (the static pages + the proxy): the gate's
-        counters, one row per peer IP."""
-        total, per_ip = self.httpd.gate.snapshot()
-        if not total:
-            return 'none'
-        rows = ['%d active' % total]
-        rows += ['%s: %d' % (ip, n) for ip, n in sorted(per_ip.items())]
-        return '; '.join(rows)
+        """The live HTTP clients (the static pages + the proxy) — the
+        base's gate reading."""
+        return self.gate_connections_line(self.httpd)
 
     def acl_table_report(self):
         """The metrics/acl/table show report (the show-only view of the

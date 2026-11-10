@@ -3,7 +3,7 @@
 sections render from the tools' argparse parsers, the prose sections live
 here as roff. scripts/gen_man.py writes the shipped man/*.1 from these;
 `dashboard --man` (and the ctl/cli's --man) prints the same page."""
-from common.render.manpage import page, options_section
+from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_CTL, EXIT_STATUS_DAEMON, options_section, page
 
 DATE = '2026-11-05'
 VERSION = 'pv-suite 0.4.2'
@@ -54,9 +54,9 @@ and stay.
 graceful shutdown (the connected consoles get the daemon-exit frame)."""
     control = """.SH CONTROL
 The control server speaks JSON lines ({"cmd": "..."} ->
-{"status": "ok|fail|bye", "text": "..."}; TCP requires the token when
+{"status": "ok|fail|note|bye", "text": "..."}; TCP requires the token when
 configured and refuses to start without one). Commands:
-\\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: max-clients,
+\\fBset\\fR/\\fBclear\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: max-clients,
 client-timeout, max-conn-per-ip, log-access, log-queries,
 log-level, metrics acl \\(em the /metrics IP gate at accept, the table
 show \\fBshow metrics acl table\\fR \\(em and the startup-only secrets:
@@ -137,16 +137,7 @@ control target for the daemon's clients when the flag is unset (flag
 the flags' environment twins (bare names; the Prometheus upstream's
 twin is \\fBPROM_URL\\fR); the flag wins over the env, the env over the
 config script."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-success (\\fB--dry-run\\fR: valid configuration).
-.TP
-.B 1
-invalid configuration or a failed bind (reason on stderr).
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_DAEMON
     return page(
         'Static single-page home PV monitoring dashboard with a Prometheus proxy',
         'dashboard', 1, DATE, VERSION, MANUAL,
@@ -180,16 +171,7 @@ the token)."""
 .TP
 .B CTL ", " CONTROL_TOKEN
 the control target and the TCP token when the flags are unset."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-every command answered \\fBok\\fR.
-.TP
-.B 1
-connection or control error.
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_CTL
     return page(
         "send commands to the dashboard control server (one-shot / batch)",
         'dashboard-ctl', 1, DATE, VERSION, MANUAL,
@@ -220,16 +202,7 @@ the control target when \\fB--control-port\\fR is unset.
 .TP
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
 the TCP token and the idle-ping interval in seconds (0 = off)."""
-    exit_status = """.SH EXIT STATUS
-.TP
-.B 0
-the session ended cleanly.
-.TP
-.B 1
-connection or control error.
-.TP
-.B 2
-command-line misuse."""
+    exit_status = EXIT_STATUS_CLI
     return page(
         "console-style session on the dashboard control server",
         'dashboard-cli', 1, DATE, VERSION, MANUAL,

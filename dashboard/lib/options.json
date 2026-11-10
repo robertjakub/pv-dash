@@ -52,7 +52,7 @@
       "help": "require a token on control connections: the client authenticates with {\"cmd\": \"auth\", \"token\":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
       "secret": true, "hidden": true, "restart": true },
     { "name": "control/ops",
-      "setting-help": "the read-only ops role: the second token that scopes its sessions to the configured verbs (the default: show and clear)",
+      "setting-help": "the read-only ops role: the second token that scopes its sessions to the configured verbs (the default: show)",
       "node": true },
     { "name": "control-ops-token", "flag": "--control-ops-token", "env": "CONTROL_OPS_TOKEN", "conv": "str",
       "live": "control/ops/token",
@@ -211,9 +211,9 @@
       "help": "re-read the config file (the SIGHUP path)" },
     { "name": "request-restore", "live": "request/restore",
       "help": "re-apply a state dump's overrides (when the daemon has a dump path)" },
-    { "name": "set", "help": "configure a setting (set battery on, set log-queries on)" },
+    { "name": "set", "help": "configure a setting (set log-queries on, set metrics enable on)" },
     { "name": "show", "help": "print a setting's live value, or a report" },
     { "name": "shutdown", "help": "stop the dashboard server (asks to confirm)" },
-    { "name": "clear", "help": "restore a setting to its configured value (clear battery, clear log-level)" }
+    { "name": "clear", "help": "restore a setting to its configured value (clear log-queries, clear log-level)" }
   ]
 }

@@ -122,7 +122,7 @@ load falls back to the files next to the page, then to the built-in
 defaults.
 
 The server's settings resolve CLI > env > `server.conf` > defaults — the
-env twins are the knobs' bare upper-snake names (`PORT`, `BIND`,
+env twins are the knobs' bare upper-snake names (`LISTEN`,
 `PROM_URL`, `PROM_PREFIX`, `STATIC_DIR`, `CONFIG_JS`,
 `AUTH_TOKEN`, the caps, `LOG_ACCESS`, `CTL`, `CONTROL_TOKEN`, …). The
 `server.conf` sample speaks the set grammar (every line a `set <name>
@@ -130,8 +130,7 @@ env twins are the knobs' bare upper-snake names (`PORT`, `BIND`,
 
 ```conf
 # the dashboard's server.conf — every line is a set command
-set port 8080
-set bind 127.0.0.1
+set system listen 127.0.0.1:8080
 # set auth-token file:/path/to/page.token   (mandatory beyond loopback, F21)
 set upstream http://localhost:9090
 set prom-prefix /prom
@@ -153,11 +152,11 @@ control server.
 | `--auth-token` | off | the page's bearer token (the `?auth=` bootstrap sets the cookie); `file:<path>` welcome |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (a total cap / the idle kick / the per-IP cap) |
 | `--metrics-server` / `--metrics-listen` | off / `127.0.0.1:9353` | the dashboard's own `/metrics` endpoint (a token is mandatory when it is on — F13) |
-| `--metrics-token` / `--metrics-acl` | off / `any` | the /metrics bearer (`file:<path>` welcome) / the connect ACL (the ip-prefix grammar — [docs/ACL.md](../docs/ACL.md)) |
+| `--metrics-token` / `--metrics-acl` | off / `any` | the /metrics bearer (`file:<path>` welcome) / the connect ACL (the ip-prefix grammar — [docs/common/ACL.md](../docs/common/ACL.md)) |
 | `--metrics-max-clients` / `--metrics-client-timeout` / `--metrics-max-conn-per-ip` | `16` / `5` / `0` | the metrics caps |
 | `--control-port` | `/tmp/dashboard-<port>.socket` | the control server target (unix path or TCP port), `0` = off |
 | `--control-token` / `--control-ops-token` | off | the control tokens (a TCP control port refuses to start without the admin token, F5); `file:<path>` welcome |
-| `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`clear` is not a verb here) |
+| `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`flush` is not a verb here) |
 | `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
 | `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | the XDG state home | the DSH audit trail: a file path, `-` for stdout (the docker logs / journald way) or `none` (no local file — the forward carries the trail) + the rotation/off + the forward (F10) |
@@ -276,9 +275,9 @@ front.
 ## Testing
 
 ```bash
-python3 tests/dashboard-control-fuzz.py  # hostile JSON against the control server
-                                         #   (the main instance serves /metrics; the
-                                         #   acl round rides the control)
+scripts/battery.sh dashboard             # the dashboard profile: the control fuzz +
+                                         #   the audit chain (the suites refuse without
+                                         #   the runner's PV_RUN_DIR)
 ```
 
 Plus the `/config.js` fuzz pin in the same suite (a bogus override file

@@ -15,7 +15,7 @@ import time
 
 from common.settings.config import acl_admits
 from common.serve.metrics_server import MetricsServer as _MetricsServer
-from common.serve.metrics_server import describe_metrics
+from common.serve.metrics_server import describe_metrics, metric
 from common.runtime.version import version_string
 
 
@@ -39,7 +39,7 @@ class MetricsServer(_MetricsServer):
 
     def acl_allows(self, ip):
         """The accept-time metrics/acl gate: the gate reads through the
-        control per connection — one live state, the set/unset swap needs
+        control per connection — one live state, the set/clear swap needs
         no push here (the cache's metrics.py reading); control-less (the
         control-port 0 edge) the ctor's copy stands, and no set surface
         exists to move it."""
@@ -64,34 +64,24 @@ class MetricsServer(_MetricsServer):
     def render(self):
         st = self.snapshot()
         rows = [
-            '# HELP dashboard_uptime_seconds The dashboard process uptime.',
-            '# TYPE dashboard_uptime_seconds gauge',
-            'dashboard_uptime_seconds %d' % st['uptime'],
-            '# HELP dashboard_version_info The dashboard version (value is always 1).',
-            '# TYPE dashboard_version_info gauge',
-            'dashboard_version_info{version="%s"} 1' % st['version'],
-            '# HELP dashboard_requests_total HTTP requests served, by status class.',
-            '# TYPE dashboard_requests_total counter',
-            'dashboard_requests_total{status="2xx"} %d' % st['counts'].get('2xx', 0),
-            'dashboard_requests_total{status="4xx"} %d' % st['counts'].get('4xx', 0),
-            'dashboard_requests_total{status="5xx"} %d' % st['counts'].get('5xx', 0),
-            '# HELP dashboard_prom_queries_total Proxied Prometheus queries.',
-            '# TYPE dashboard_prom_queries_total counter',
-            'dashboard_prom_queries_total %d' % st['counts'].get('prom', 0),
-            '# HELP dashboard_upstream_ok 1 = the last proxied query reached the Prometheus upstream.',
-            '# TYPE dashboard_upstream_ok gauge',
-            'dashboard_upstream_ok %d' % st['upstream_ok'],
-            '# HELP dashboard_clients Active HTTP clients (the family gate).',
-            '# TYPE dashboard_clients gauge',
-            'dashboard_clients %d' % st['clients'],
-            '# HELP dashboard_max_clients The configured total client cap (0 = unlimited).',
-            '# TYPE dashboard_max_clients gauge',
-            'dashboard_max_clients %d' % st['max_clients'],
+            *metric('dashboard_uptime_seconds', 'The dashboard process uptime.', 'gauge',
+                    '%d' % st['uptime']),
+            *metric('dashboard_version_info', 'The dashboard version (value is always 1).', 'gauge',
+                    ('version="%s"' % st['version'], '1')),
+            *metric('dashboard_requests_total', 'HTTP requests served, by status class.', 'counter',
+                    ('status="2xx"', '%d' % st['counts'].get('2xx', 0)),
+                    ('status="4xx"', '%d' % st['counts'].get('4xx', 0)),
+                    ('status="5xx"', '%d' % st['counts'].get('5xx', 0))),
+            *metric('dashboard_prom_queries_total', 'Proxied Prometheus queries.', 'counter',
+                    '%d' % st['counts'].get('prom', 0)),
+            *metric('dashboard_upstream_ok', '1 = the last proxied query reached the Prometheus upstream.',
+                    'gauge', '%d' % st['upstream_ok']),
+            *metric('dashboard_clients', 'Active HTTP clients (the family gate).', 'gauge',
+                    '%d' % st['clients']),
+            *metric('dashboard_max_clients', 'The configured total client cap (0 = unlimited).', 'gauge',
+                    '%d' % st['max_clients']),
         ]
         if st['max_per_ip']:
-            rows += [
-                '# HELP dashboard_max_conn_per_ip The configured per-IP client cap.',
-                '# TYPE dashboard_max_conn_per_ip gauge',
-                'dashboard_max_conn_per_ip %d' % st['max_per_ip'],
-            ]
+            rows += metric('dashboard_max_conn_per_ip', 'The configured per-IP client cap.', 'gauge',
+                           '%d' % st['max_per_ip'])
         return '\n'.join(rows) + '\n'

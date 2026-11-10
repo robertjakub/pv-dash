@@ -10,7 +10,7 @@ require the token first ({"cmd": "auth", "token": ...}) — pass it with
   printf 'set log-queries on\\nshow config\\n' | python3 dashboard-ctl.py --control-port 15598
 
 Commands (see the server's help): show <connections|version>,
-set/unset, inspect, request reload-config, request reload, shutdown, quit.
+set/clear, inspect, request reload-config, request reload, shutdown, quit.
 
 Exit codes: 0 = ok, 1 = connection/control error, 2 = CLI misuse.
 """

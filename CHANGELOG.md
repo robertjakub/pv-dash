@@ -12,6 +12,36 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the family code sweep: the stale code out, the
+  similar code into `common/`**: the dead symbols die (the nine
+  functions, the unreachable ops-token/rc-2 branches, the orphaned
+  `DEFAULT_*` aliases, the unused imports, the `show and clear` prose
+  rows and the `unset`-era comments) and the shared shapes land once —
+  `registry_view()` (the per-tool lookup tables; the alias fold the
+  dashboard and the fake missed — `set audit forward-format` answers
+  there now), the statics fold (`load_static_json`/`static_defaults` +
+  the clients' wire constants off `common/wire/control.py`), the man
+  pages' EXIT STATUS blocks, the fake's `handle()` fork (the base's
+  `log_exchange` + `stopper` hooks), the `metric()` exposition helper
+  (the 47 hand-paired HELP/TYPE sets render structurally; the fake's
+  grid-frequency HELP name mismatch fixed onto the sampled
+  `fake_inverter_grid_hz`), the audit start (`audit_params_of` +
+  `build_audit`), the base-able control helpers (`clear_overrides` on
+  the base — the reload called a method only the subclasses defined —
+  the dump tails, the command_help tails, the two connections
+  readers, the bind probe), `scripts/tui.py` (the editors' shared
+  curses primitives; `edit_options` gains the ^C treatment) and the
+  cli pools factory. The wire stops lying: the fake's bad numbers
+  answer the family's `must be <what>, got %r` (the Python exception
+  text no longer leaks) and bad bools refuse (`on_off`), the scraper's
+  `invalid modbus-unit = None` renders the value. Docs follow: the
+  shared-layer specs group under `docs/common/` (the ACL map, the
+  Modbus reference, the defaults ladder — moved, the links
+  re-pointed), the READMEs' flag/default/verb tables match the
+  registries, the demo/prod stacks' `AUTH` → `MODBUS_AUTH` (the env
+  nothing read — the Modbus hops ship authenticated as documented),
+  the man pages + MANUALs + OPTIONS.md regenerate.
+
 - **everywhere** — **the knob defaults move into the registry rows**
   (the one-knob-one-source closure): every non-secret flag knob's
   `lib/options.json` row carries its `default` now — conv-typed JSON,
@@ -195,8 +225,8 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   from the registry's command rows (`known_verbs` — the RBAC
   vocabulary is the grammar's rows, one home; the console-eaten
   `exit`/`logout` ride out) and the default ops policy derives with
-  it (`default_ops_verbs`: `clear` only where the grammar speaks it —
-  the cache keeps `show,clear`, the other three start at `show`).
+  it (`default_ops_verbs`: `flush` only where the grammar speaks it —
+  the cache starts at `show,flush`, the other three at `show`).
   The wire's refusal texts (the unknown/needs-a-value family, the
   restart-required pair, the secret refusals, the ops-policy
   one-liner, the audit-grammar pair, the interval/timeout ranges,
@@ -414,7 +444,9 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   spine's reload-config reply catches the resolvers' `SystemExit` now (a
   broken config file answers `err reload failed` instead of killing the
   session). The verb joins `KNOWN_VERBS` on the two tools that lacked it
-  (the ops default stays `show,clear`), the rows land beside
+  (the ops default is then `show,clear` — the verb-rename wave below
+  re-derives both: the cache `show,flush`, the fake `show`), the rows
+  land beside
   `request/reload` in both registries, and the ctls' helps, the READMEs,
   the man pages and the MANUALs follow.
 
@@ -592,11 +624,11 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 - **everywhere** — **the control wire's verb walk is one implementation**:
   the family's `command()` grammar (the help/topic ladder, the
-  quit/ping keepalives, the set/unset pair, the show reports and the
+  quit/ping keepalives, the set/clear pair, the show reports and the
   show walk, the request namespace, shutdown) rides the base in
   `common/control.py` — the four per-tool `command()` copies die. The
   tool differences are hooks now: the `SHOW_REPORTS` dict (the tool's
-  own show words), `command_tool` (poll now, reset, `request clear
+  own show words), `command_tool` (poll now, reset, `request flush
   cache`/`restart`, the cache's `request dump with-cache`), the fake's
   Modbus-write set words (`command_set_special`) and its pin
   bookkeeping (`_after_set`), the show-walk tail and the unknown-word
@@ -606,7 +638,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   proxy's value is the one home), `fold_listen` lives in
   `common/daemon.py`, the cache answers an empty `{"cmd": ""}` with
   `err empty command` (its own copy crashed the session) and the fake's
-  `unset` of a value that fails to re-apply now answers `err` instead of
+  `clear` of a value that fails to re-apply now answers `err` instead of
   dropping the session.
 - **common** — the one registry load the four `lib/options.py` share
   (`load_registry`: the rows, the `show`/`commands` sections, the
@@ -639,7 +671,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   every secret row (the control tokens, the ops tokens, the metrics
   tokens, the Modbus auth keys, the dashboard's page token, `dump/key`)
   takes the dump-key shape — `live` + `restart` + `hidden` + `secret` —
-  and the wire **refuses `set`/`unset`** on it
+  and the wire **refuses `set`/`clear`** on it
   (`restart required (startup-only knob)`) before any dispatch: a secret
   never rides the reload state, so it has no pending form — it passes by
   flag/env/config (`file:<path>` included) and a restart, where the
@@ -647,7 +679,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   ops ≠ admin, the F13 token-mandatory binds) already check it. The live
   rotation branches and their `<set>`/`<set>`-render backs are deleted;
   `help config`/`show knobs`/OPTIONS.md render the secrets
-  `startup-only — pass it by flag/env/config (set/unset refuse)` instead
+  `startup-only — pass it by flag/env/config (set/clear refuse)` instead
   of a set recipe; the scraper's SIGHUP/`request reload-config` path
   still re-reads the `file:` references, and the dump/reload state files
   are unchanged (the SECRET_REMOVED placeholder can no longer occur —
@@ -657,7 +689,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - **everywhere** — **the /metrics listener is ONE stack, family wide**:
   the fake's and dashboard's own `/metrics` take the cache's
   **`metrics/acl`** (`--metrics-acl`, env `METRICS_ACL`, live `set
-  metrics acl` / `unset metrics acl`, the table show `show metrics acl
+  metrics acl` / `clear metrics acl`, the table show `show metrics acl
   table`, the `set metrics acl table` pointer) — the same value grammar
   (`any` the default, `none`, the comma-separated whitelist,
   `file:<path>` the standalone ip-prefix acl file), checked at **accept,
@@ -753,7 +785,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   `control/port` rebinds the listener live on all four tools (bind-first,
   the failed bind rolls back, the old loop retires by identity, the
   connected sessions keep serving, `off` retires while the sessions keep
-  serving, `unset` restores the configured target); the F5 refusal (a
+  serving, `clear` restores the configured target); the F5 refusal (a
   tokenless TCP control bind) now also guards the **live** rebind, not
   just the start — the fake opts out by posture (`TOKENLESS_TCP =
   'allow'`, F11: a tokenless TCP rebind succeeds there, the regtest pins
@@ -776,13 +808,13 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 - **cache** — **`metrics/acl`** (`--metrics-acl`, env `METRICS_ACL`,
   config `metrics_acl`, NixOS `metricsAcl`, live `set metrics acl` /
-  `unset metrics acl`): the scraper's metrics/acl wave migrates to the
+  `clear metrics acl`): the scraper's metrics/acl wave migrates to the
   cache's own /metrics endpoint — the same value grammar (`any` the
   default, `none`, the comma-separated whitelist, `file:<path>` the
   standalone ip-prefix acl file), checked at **accept** beside the
   connection caps: a client off the ACL is closed without a reply and
   logged `connection rejected: … not on the metrics ACL`. The gate
-  re-resolves on every `set`/`unset` and on SIGHUP (a bad file keeps the
+  re-resolves on every `set`/`clear` and on SIGHUP (a bad file keeps the
   old gate standing; an inline set clears a standing file warning), the
   group/world-readable file warns (the log, the audit trail's `ACL-FILE`
   event, the `set` reply's suffix), **`show metrics acl table`** renders
@@ -794,7 +826,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 - **scraper** — **`metrics/acl`** (`--metrics-acl`, env `METRICS_ACL`,
   config `metrics_acl`, NixOS `metricsAcl`/`metricsAclFile`, live `set
-  metrics acl` / `unset metrics acl`): one IP-kind gate on the /metrics
+  metrics acl` / `clear metrics acl`): one IP-kind gate on the /metrics
   listener doing what the cache's `acl/connect` does on the Modbus
   listener — the value grammar (`any` the default, `none`,
   a comma-separated `IP,IP/prefix, ...` whitelist, `file:<path>` the
@@ -803,7 +835,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ahead of the connection caps (the ACL first, then the caps): a client
 off the ACL is closed without a reply — nothing was parsed to answer — and
   logged `connection rejected: … not on the metrics ACL`. The acl file
-  re-resolves on every `set`/`unset` and on SIGHUP (a bad file keeps the
+  re-resolves on every `set`/`clear` and on SIGHUP (a bad file keeps the
   old gate standing), a group/world-readable file warns (the log, the
   audit trail's `ACL-FILE` event, the `set` reply's suffix), and the
   **`show metrics acl table`** report (show-only) renders the gate as its
@@ -853,9 +885,9 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   default deny any; the matcher word `any` is the whole space,
   `0.0.0.0/0`). A missing or bad file refuses the start and answers
   `err` on the wire with the old gate standing, the spelling
-  round-trips through the dumps and `unset`, and a group/world-readable
+  round-trips through the dumps and `clear`, and a group/world-readable
   acl file warns (the log, the audit trail's `ACL-FILE` event, the
-  set/unset reply's suffix). The **`show acl connect table` /
+  set/clear reply's suffix). The **`show acl connect table` /
   `show acl write table`** reports (show-only) render either ACL as its
   chain, one entry per line: the system forms spell the chain they
   implement — `allow 0.0.0.0/0` (any), `deny 0.0.0.0/0` (none), `deny
@@ -911,7 +943,7 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   policy worked out: the clean-slate deny, the allows (the plain range,
   the list), the deny carves and the re-opens —
   and **a group/world-readable acl file warns**: in the log, the audit
-  trail's `ACL-FILE` event, and as the suffix of the `set`/`unset` reply
+  trail's `ACL-FILE` event, and as the suffix of the `set`/`clear` reply
   (the write gate is config trust any local user could have loosened —
   chmod 0600 silences it).
 
@@ -920,7 +952,7 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   / `deny any`, a range list as its whitelist (`deny any`, then one
   `allow START:COUNT` line per range), and in profile mode the device
   profile's own rules (the gate's `desc` as the `% ` line, then one
-  `allow|deny <range> # desc` line per range, the comments aligned). The set/unset verbs match
+  `allow|deny <range> # desc` line per range, the comments aligned). The set/clear verbs match
   the knob rows only, so the report's live path never shadows the knob
   value `profile` — `set write registers profile` keeps setting the knob.
 
@@ -931,7 +963,7 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   user; `set control socket-group` re-modes the live socket.
 
 - **scraper** — **`control/port` rebinds the listener live** (`set control
-  port` / `unset control port`): the cache's control listener logic ports
+  port` / `clear control port`): the cache's control listener logic ports
   over. The live set swaps the unix/TCP listener by identity — bind-first
   (a failed bind leaves the old listener untouched, the attrs roll back),
   the old accept loop retires, the connected sessions keep serving their
@@ -1006,7 +1038,7 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
 
 - **everywhere** — **the control wire's reply status gains `note`** (besides
   `ok` | `fail` | `bye`): the verdict of a command that ran and whose effect
-  waits. A `set`/`unset` of a restart-marked knob no longer refuses — the
+  waits. A `set`/`clear` of a restart-marked knob no longer refuses — the
   value is validated and **recorded as the configured value** (`show` renders
   it, the state dump and the reload state carry it) and the daemon answers
   **`note restart required (startup-only knob)`**; the consoles and the ctl
@@ -1057,7 +1089,7 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   Nothing replaces it: the per-setting `show <setting>` reads each value
   back, `show config` renders the effective script, `inspect` is the
   one-page dump (the machines' readings, the pins, the counters included),
-  and the set/unset replies carry the compact state summary. The cli
+  and the set/clear replies carry the compact state summary. The cli
   consoles greet with the two fixed lines now (the banner's status line
   rode the report; the cache's dump-gated completion pools probe
   `show dump path` instead).
@@ -1173,7 +1205,7 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   serve-address wave and read by nothing (the bin ladders
   flag > env > static now); the dashboard's audit knobs were flag-only
   (a config-script `set audit log-file …` was silently ignored). With
-  them, the scraper's `unset audit disable`/`local-time`/
+  them, the scraper's `clear audit disable`/`local-time`/
   `grid-positive-import` stop answering `unknown setting` (the defaults
   loop covers the live bool rows) and the scraper's audit knobs render
   their live values in `show config` (the `_apply` branches write the
@@ -1210,7 +1242,7 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   interval/read-delay/merge-gap, the limits caps, write allow/registers,
   control port/token/ops/verbs/trust-uids/socket-group, the audit
   path/rotation/disable pair, requests audit, the dump trio, local-time,
-  log-access, log-level) and `unset` restores the configured startup
+  log-access, log-level) and `clear` restores the configured startup
   value through the same branches. The metrics token resolves into the
   config dict at start now too — its `*** SECRET REMOVED ***` row renders
   (the control token's did, the metrics token's never did).
@@ -1237,7 +1269,7 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   registry and the NIS2/DORA mapping — the docs/TODO pointer re-pointed.
 - **everywhere** — **the four `<tool>/MANUAL.md` pages land**: every
   command, knob and show report each tool's control wire answers, the
-  kind of each — command, settable (`set`/`unset`, the restart-marked
+  kind of each — command, settable (`set`/`clear`, the restart-marked
   knobs noted, the secrets flagged) or show-only (the startup-only
   knobs included) — with the flag/env twin, the value shape and the
   description, one page per tool. GENERATED from the registries by the

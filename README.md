@@ -14,8 +14,8 @@ the Deye hybrids — packaged together as one Nix flake:
 | [`scraper/`](scraper/README.md) | `modbus-scraper` | Prometheus exporter for a Modbus TCP inverter (stdlib only) with a NixOS module |
 | [`cache/`](cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
 | [`inverter/`](inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
-| [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; a linter and a formatter keep them in shape |
-| [`examples/`](examples/README.md) | — | The shared sample file the tools' `file:` acl gates point at — `acl-ip-prefix.json`, the ip-prefix connect policy every tool reads ([docs/ACL.md](docs/ACL.md)) |
+| [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `sun2000_full`, `demo-fc4`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; a linter and a formatter keep them in shape |
+| [`examples/`](examples/README.md) | — | The shared sample file the tools' `file:` acl gates point at — `acl-ip-prefix.json`, the ip-prefix connect policy every tool reads ([docs/common/ACL.md](docs/common/ACL.md)) |
 | [`shared/`](shared/README.md) | — | The family's shared data, outside every package — `texts.json` (the static texts `common/render/texts.py`'s `T()` reads) and [`shared/schema/`](shared/schema/README.md) (the shared JSON Schemas, draft 2020-12 — `acl-ip-prefix.schema.json`, the standalone acl file's schema (the loader stays the strict word)) |
 | [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`), six functional subpackages: `render/` (texts, man pages), `runtime/` (daemon ladder, audit, version), `settings/` (the option registry — one knob, one source — config plumbing, dumps), `wire/` (the signed wire + RBAC, both ctl/cli ends), `serve/` (the gates + metrics skeleton), `modbus/` (the wire core) |
 
@@ -55,14 +55,17 @@ pv-suite/
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))
 ├── common/       # the shared Python package — render/ runtime/ settings/ wire/ serve/ modbus/ ([docs](common/README.md))
 ├── tests/        # the test suites, one or more per Modbus tool
-├── scripts/      # the registry gates + editors (check/lint/gen/edit_options, set_group/set_live), gen_man.py, gen_sbom.py, release.py, audit_verify.py
+├── scripts/      # the gates + editors: check/lint/gen_options, edit_options, edit_acl,
+│                 #   lint_readmes/lint_texts/lint_acl, family_drift, gen_man/gen_manual,
+│                 #   gen_sbom, validate_json, set_group/set_live, battery.sh, release.py,
+│                 #   audit_verify.py
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
 ├── docs/         # the family-level docs: the [Nix reference](docs/NIXOS.md), the
 │                 #   [security audit](docs/AUDIT.md), the
-│                 #   [Modbus protocol reference](docs/MODBUS.md), the
-│                 #   [ACL map](docs/ACL.md) (who may connect, whose writes forward,
+│                 #   [Modbus protocol reference](docs/common/MODBUS.md), the
+│                 #   [ACL map](docs/common/ACL.md) (who may connect, whose writes forward,
 │                 #   which registers a write may touch — family-wide), the
 │                 #   [family-wide TODO](docs/TODO.md) (every open item, one file — the
 │                 #   per-tool TODOs keep the Done history), the [SBOM](docs/sbom/SBOM.md),
@@ -86,8 +89,8 @@ marker for their legs.
 
 ```bash
 scripts/battery.sh                    # the commit loop: the fast set, the fuzz budgets at 100 (~3 min)
-scripts/battery.sh quick              # all ten, the fuzz budgets at 300 (~13 min) — the pre-push loop
-scripts/battery.sh full               # all ten, the suite defaults (~40 min) — the nightly
+scripts/battery.sh quick              # all ten, the fuzz budgets at 300 (~3 min) — the pre-push loop
+scripts/battery.sh full               # all ten, the suite defaults — the nightly
 scripts/battery.sh cache              # the cache's commit set (~5 min); scraper, inverter, dashboard, common likewise
 scripts/battery.sh control-fuzz       # named suite(s) — e.g. the one you are iterating on
 ```

@@ -276,8 +276,7 @@ outstanding one; `proto == 0`; `unit` matches the configured unit;
 `func == fc + 0x80` → Modbus exception (the cache raises `DeviceError`
 carrying `.code` so it can replay the device's code to its clients);
 function byte matches; body ≥ 2 bytes; `byte_count == count × 2`; then
-`count` big-endian words. The scraper's `read_i32` reads two registers
-hi,lo and unpacks `>i`.
+`count` big-endian words.
 
 Worked example — read PV power (i32 at 32064 = `0x7D40`, 2 registers,
 unit 1, txn 9):
@@ -461,7 +460,7 @@ replayed to clients).
 | listen backlog | 128 | — | 128 |
 | poll interval | 10 s | 10 s | — |
 | read delay between device reads | 0.05 s | — | — |
-| cache TTL | 3 × poll interval | — | — |
+| cache TTL | 30 s | — | — |
 
 Pacing and caps, not rate limiting: one serialized upstream connection;
 `read-delay` sleeps between consecutive device reads in a healthy cycle
@@ -493,8 +492,8 @@ path as words normalize to the canonical key.
 | `timeout` | `--timeout` | `TIMEOUT` | `modbus/timeout` | cache, scraper |
 | `offset` | `--modbus-offset` | `MODBUS_OFFSET` | `modbus/offset` | scraper |
 | `allow-write` | `--allow-write` | `ALLOW_WRITE` | `write/allow` | cache, fake |
-| `write-registers` | `--write-registers` | `WRITE_REGISTERS` | `write/registers` (`…/profile` answers the acl-chain report) | cache |
-| `connect-acl` | `--connect-acl` | `CONNECT_ACL` | `acl/connect` | cache, fake |
+| `write-registers` | `--write-registers` | `WRITE_REGISTERS` | `write/registers` (`show write registers table` answers the acl-chain report) | cache |
+| `connect-acl` | `--connect-acl` | `CONNECT_ACL` | `acl/connect` (the fake's is the bare `connect-acl`) | cache, fake |
 | `write-acl` | `--write-acl` | `WRITE_ACL` | `acl/write` | cache |
 
 Validation: `parse_auth_type` accepts the leg's schemes — `suite`
@@ -573,6 +572,6 @@ random PDUs, pipelined bursts, trickled frames), `tests/cache-stress.py`
 
 *Credits: the suite auth handshake is MK's design — see
 [CONTRIBUTORS.md](CONTRIBUTORS.md). The per-tool behavior prose lives in
-the [cache](../cache/README.md), [scraper](../scraper/README.md) and
-[inverter](../inverter/README.md) READMEs; the knob table is
+the [cache](../../cache/README.md), [scraper](../../scraper/README.md) and
+[inverter](../../inverter/README.md) READMEs; the knob table is
 [OPTIONS.md](OPTIONS.md).*

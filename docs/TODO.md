@@ -101,7 +101,7 @@ only the **Done/history** records for their tool —
   stay `10.0.0.5` to the ACL, not `::ffff:10.0.0.5`), `parse_listen`'s
   bracketed grammar verified end to end, the regtest coverage on the
   `::1` pair (the v6 loopback works on Linux and macOS alike; the
-  v4-mapped carve proof), and the doc pass (docs/ACL.md's family notes,
+  v4-mapped carve proof), and the doc pass (docs/common/ACL.md's family notes,
   the AUDIT posture rows, the NixOS `listenHost`'s v6 spelling + the
   dual-stack note — `openFirewall`'s v6 half is the deployment's
   ip6tables business). The docker compose network stays v4 (the demo's
@@ -117,12 +117,6 @@ only the **Done/history** records for their tool —
   collector to test against (the suite cannot generate the certificates),
   so the anchor lives here until one exists; `tls://…` today gets the
   generic unknown-scheme refusal.
-- **the systemd unit hardening review** `[common]` — the NixOS modules
-  ship `PrivateTmp`; a full sandbox pass (`ProtectSystem=strict`,
-  `PrivateDevices`, `ProtectHome`, `RestrictAddressFamilies`,
-  `CapabilityBoundingSet=`) per service, verified with
-  `systemd-analyze security` (a score per unit in the NixOS test).
-
 ## The pipeline (CI, releases, supply chain)
 
 - **schema every family JSON** `[common]` — `scripts/validate_json.py`
@@ -368,10 +362,11 @@ only the **Done/history** records for their tool —
   F15 privacy note.
 - **the read-only control role** — the former open item ("a second token
   granting only the show/clear verbs") shipped family-wide: every control
-  server takes `--control-ops-token`/`--control-ops-token-file` and scopes
-  its ops sessions to the show/clear verbs — the ops shift versus the
-  admin key, both audited (`role=ops`/`role=admin` in the COMMAND
-  entries). The per-tool records name the flag/env forms; the audit wave
+  server takes `--control-ops-token` and scopes its ops sessions to the
+  show/clear verbs — the ops shift versus the admin key, both audited
+  (`role=ops`/`role=admin` in the COMMAND entries). (The record's
+  `--control-ops-token-file` spelling died with the `-file` removal —
+  `file:` inside the plain token is the spelling.) The per-tool records name the flag/env forms; the audit wave
   is docs/AUDIT.md rev. 7 (F22 raised and closed with it).
 - **the metrics endpoint wave** — the caps (max-clients/client-timeout/
   max-conn-per-ip) on every HTTP + Modbus surface, the fake's and the
@@ -383,16 +378,24 @@ only the **Done/history** records for their tool —
   splits by content (settings by default, with-cache on request).
 - **the release tooling** — `scripts/release.py` + the tag-triggered
   release workflow (the pipeline item above is the operational follow-up).
+- **the systemd unit hardening** — the three NixOS modules sandbox every
+  service (`ProtectSystem=strict`, `PrivateDevices`, `ProtectHome`,
+  `MemoryDenyWriteExecute`, `CapabilityBoundingSet=`,
+  `RestrictAddressFamilies`, `SystemCallFilter`), verified with
+  `systemd-analyze security` (a score per unit asserted by
+  tests/hardening.nix); docs/NIXOS.md documents the posture.
 - **the token-file env honored** `[inverter]` — the help promised
   `CONTROL_TOKEN_FILE` / `METRICS_TOKEN_FILE`, the code never
   read them: both are honored now (the fake and the two clients — flag
   over env, the file over the plain token, both together the
-  mutual-exclusion error).
+  mutual-exclusion error). (Since retired by the `-file` sibling
+  removal: there are no `*_FILE` twins — `file:<path>` inside the plain
+  token value is the one spelling.)
 - **the man pages** — one roff page per tool in each subproject's `man/`
-  (`man/` per subproject; 11 pages total: the three cache binaries,
-  the three inverter binaries, the scraper, the dashboard server, the two
-  profile tools), installed by the Nix packages (`share/man/man1/`) and
-  linted with `mandoc -Tlint`.
+  (`man/` per subproject; 14 pages: the three cache binaries,
+  the three inverter binaries, the three scraper binaries, the dashboard
+  server + its two clients, the two profile tools), installed by the Nix
+  packages (`share/man/man1/`) and linted with `mandoc -Tlint`.
 - **the demo stack, the Modbus chain** — `docker/compose.yaml`: the three
   alpine images (one Dockerfile per tool, unprivileged `pvsuite`, tools on
   `PATH`), the shared external `config` volume seeded by `entrypoint.sh`

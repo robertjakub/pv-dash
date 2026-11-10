@@ -60,7 +60,7 @@ One JSON object per device:
   list of them, or `any`). The chain is a **whitelist**: it reads top to
   bottom and **the last matching rule decides**; a register no rule
   decides refuses (the default deny any). The cache's `write-registers
-  profile` value compiles the chain, its `show write registers profile`
+  profile` value compiles the chain, its `show write registers table`
   answers it back (see the cache README); a profile without the `acl`
   section simply offers no profile gate.
 - **`mappings`** — the coded registers: one `{"register": <name>,
@@ -118,11 +118,12 @@ One JSON object per device:
 | `deye-sg03lp1` | Deye SUN single-phase hybrid (SG01/03LP1) | 14 |
 | `deye-sg04lp3` | Deye SUN three-phase hybrid (SG04LP3) | 19 |
 | `deye-sg05lp3` | Deye SUN three-phase hybrid (SUN-12K-SG05LP3-EU) | 88 |
+| `demo-fc4` | the demo's FC4 input-register strip (7 input entries) | 7 |
 
-All shipped entries read on FC3 (holding registers) — the `fc: 4` input
-space is supported end to end (the schema, the linter, the cache and the
-scraper; the regtest exercises it), but no shipped profile carries real
-input-register data yet — that waits for a hardware capture.
+All `sun2000`/`deye-*` entries read on FC3 (holding registers) — the
+`fc: 4` input space is supported end to end (the schema, the linter, the
+cache and the scraper) and `demo-fc4` carries real input-register
+entries for it; a hardware-captured input map is still wanted.
 
 ## The sun2000 drift (the small profile vs the full map)
 

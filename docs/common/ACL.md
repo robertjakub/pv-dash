@@ -16,7 +16,7 @@ with `file:<path>` or a profile carries it embedded.
 The control-plane auth is NOT an ACL: the tokens, the RBAC ops role and
 the `trust-uids` list decide who may drive the control socket, and the
 suite auth (`modbus/auth`) is a wire-level proof between Modbus peers.
-Those stories live in docs/AUDIT.md and docs/MODBUS.md; the Related
+Those stories live in docs/AUDIT.md and docs/common/MODBUS.md; the Related
 section below maps the boundary.
 
 ## The surfaces (the family at a glance)
@@ -48,7 +48,8 @@ token shape beyond the loopback (the page's F21 closed it — rev. 21).
 | fake | the Modbus listener | `:5502` | `connect-acl` (the system grammar, no `file:`) → the caps → the suite auth; `--allow-write` |
 | dashboard | the page + the config proxy | `127.0.0.1:8080` | the bearer token (`auth/token`, F21 closed — the `?auth=` bootstrap sets the session cookie, the header for scripts; a token-less non-loopback bind refuses to start) — GET-only, the realpath guard, the cap gate |
 
-The defaults come from each tool's `statics.py`; the authoritative
+The defaults come from each tool's registry rows (the `default` field —
+the static rung, docs/common/static-defaults.md); the authoritative
 per-surface detail is docs/AUDIT.md's surfaces table.
 
 ## The rule chain (the one semantics)
@@ -173,8 +174,8 @@ The forms: `--connect-acl` / `--write-acl` / `--write-registers` /
 `METRICS_ACL`, the config-file spellings `connect_acl` / `write_acl` /
 `write_registers` / `metrics_acl`, NixOS `connectAcl` / `writeAcl` /
 `writeRegisters` / `metricsAcl` — one str option each, `file:` rides
-inline), live via `set acl connect|acl/write|metrics acl|write registers
-<value>`.
+inline), live via `set acl connect`, `set acl write`, `set metrics acl`,
+`set write registers <value>`.
 
 ## modbus-fake-inverter — the mirror, system grammar only
 
@@ -208,7 +209,7 @@ it dials the inverter or the cache's mirror (`--upstream`, live
 leg the scraper is the peer the server's connect gate decides about (the
 cache's `acl/connect`, the fake's mirror of it), and what it presents is
 the suite-auth key (`modbus/auth` + `modbus/auth/key`, the PVA1
-handshake — docs/MODBUS.md). The poll's reads need no register gate:
+handshake — docs/common/MODBUS.md). The poll's reads need no register gate:
 the register plane is write-only, and the poller sends no write (it
 speaks `read_registers`/`read_bits`), so there is nothing read-side for
 an acl to decide.
@@ -252,7 +253,7 @@ beyond loopback — until then the fake's tokenless-loopback TCP exemption
 - **the suite auth** (`modbus/auth`, `modbus/auth-upstream`) — the
   PVA1/HMAC-SHA256 handshake on the Modbus wire itself: a proof of key
   between peers, orthogonal to the address gates (both stack).
-  docs/MODBUS.md.
+  docs/common/MODBUS.md.
 - **the control-plane auth** — the admin token, the read-only ops token
   and its verb set (the RBAC roles), the `trust-uids` peer-cred path, the
   signed wire. docs/AUDIT.md.

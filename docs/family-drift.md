@@ -54,32 +54,31 @@ copy-paste twins), the similarity pass pairs cross-file bodies over the
 
 - 25L `_load_options`: `dashboard/lib/options.py:25`, `scraper/lib/options.py:27`
 
-**The similarity pass**: 51 cross-file pair(s) over the ratio
+**The similarity pass**: 49 cross-file pair(s) over the ratio
 floor (30 of them the man-page prose, per-tool by
 design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
 | 1.00 | `scraper/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.94 | `scraper/lib/control.py:144` `command_help` <-> `dashboard/lib/control.py:109` `command_help` |
 | 0.94 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:27` `_load_options` |
 | 0.94 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.93 | `scraper/bin/modbus-scraper.py:45` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
-| 0.89 | `scraper/bin/modbus-scraper.py:251` `graceful_stop` <-> `dashboard/bin/dashboard.py:483` `graceful_stop` |
+| 0.93 | `scraper/bin/modbus-scraper.py:46` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
+| 0.89 | `scraper/bin/modbus-scraper.py:238` `graceful_stop` <-> `dashboard/bin/dashboard.py:470` `graceful_stop` |
 | 0.88 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.88 | `inverter/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.88 | `scraper/lib/options.py:27` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
-| 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:45` `parse_args` |
-| 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:279` `parse_args` |
-| 0.82 | `cache/bin/modbus-cache.py:357` `watch_dump` <-> `common/wire/control.py:1227` `run_dump_interval` |
-| 0.79 | `inverter/lib/control.py:155` `__init__` <-> `dashboard/lib/control.py:81` `__init__` |
-| 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:520` `acl_table_report` <-> `dashboard/lib/control.py:327` `acl_table_report` |
-| 0.76 | `scraper/lib/server.py:97` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `inverter/lib/control.py:66` `handle` <-> `common/wire/control.py:292` `handle` |
-| 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:420` `load_write_gate_file` |
-| 0.73 | `inverter/lib/control.py:531` `command_help` <-> `dashboard/lib/control.py:109` `command_help` |
-| 0.73 | `scraper/lib/control.py:144` `command_help` <-> `inverter/lib/control.py:531` `command_help` |
+| 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
+| 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
+| 0.82 | `cache/bin/modbus-cache.py:337` `watch_dump` <-> `common/wire/control.py:1305` `run_dump_interval` |
+| 0.82 | `inverter/lib/control.py:108` `__init__` <-> `dashboard/lib/control.py:78` `__init__` |
+| 0.78 | `inverter/lib/signals.py:77` `__init__` <-> `common/modbus/client.py:20` `__init__` |
+| 0.78 | `inverter/lib/control.py:468` `acl_table_report` <-> `dashboard/lib/control.py:294` `acl_table_report` |
+| 0.76 | `scraper/lib/server.py:89` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
+| 0.74 | `scraper/lib/control.py:115` `__init__` <-> `dashboard/lib/control.py:78` `__init__` |
+| 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:421` `load_write_gate_file` |
+| 0.73 | `scraper/lib/control.py:115` `__init__` <-> `inverter/lib/control.py:108` `__init__` |
+| 0.72 | `common/settings/config.py:14` `resolve_target` <-> `common/runtime/daemon.py:44` `default_config_path` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -230,12 +229,12 @@ canon the operators grep for.
 |---|---|
 | cache | `ACL-FILE`, `RELOAD`, `REQUESTS`, `RESET`, `RESTORE`, `SHUTDOWN`, `START`, `WRITE`, `WRITE-FAILED`, `WRITE-REFUSED`, `WRITE-REJECTED` |
 | scraper | `ACL-FILE`, `START` |
-| inverter | `ACL-FILE`, `AUTH-FAIL`, `COMMAND`, `RELOAD`, `RESET`, `SHUTDOWN`, `START`, `WRITE`, `WRITE-REFUSED` |
+| inverter | `ACL-FILE`, `RELOAD`, `RESET`, `SHUTDOWN`, `START`, `WRITE`, `WRITE-REFUSED` |
 | dashboard | `ACL-FILE`, `RELOAD`, `SHUTDOWN`, `START` |
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
-**The phrase canon**: 30 log phrase(s) shared by >= 2 tools;
-83 tool-local. The canon (the lead clause, the tools that speak it):
+**The phrase canon**: 24 log phrase(s) shared by >= 2 tools;
+88 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
@@ -243,7 +242,7 @@ canon the operators grep for.
 | `stopped` | cache, dashboard, inverter, scraper |
 | `write:` | cache, inverter |
 | `write: refused` | cache, inverter |
-| `control client from` | common, inverter |
+| `cannot bind` | cache, dashboard, inverter, scraper |
 | `client` | dashboard, scraper |
 | `shutdown:` | cache, dashboard, inverter, scraper |
 | `the state dump` | cache, common, inverter |
@@ -251,7 +250,6 @@ canon the operators grep for.
 | `connection rejected:` | common, scraper |
 | `unhandled error serving` | dashboard, scraper |
 | `dry-run: configuration is valid nothing was boun` | dashboard, inverter, scraper |
-| `cannot bind` | dashboard, scraper |
 | `restore-on-start:` | dashboard, inverter, scraper |
 | `control from` | common, inverter |
 | `control: state dumped to` | cache, common |
@@ -260,10 +258,10 @@ canon the operators grep for.
 | `sighup: reloaded` | cache, inverter |
 | `poll cycle crashed ` | cache, scraper |
 | `state dumps:` | cache, common |
-| `the read-only ops token supplements the admin to` | cache, inverter |
-| `the ops token must differ from the admin token t` | cache, inverter |
-| `cannot serve on` | cache, inverter |
 | `the shutdown dump to` | cache, common |
+| `the periodic dump to` | cache, common |
+| `rejected` | common, inverter |
+| `sighup: reload failed ` | common, inverter |
 
 The findings:
 
@@ -279,7 +277,7 @@ the family canon: same cause, same code, same text shape.
 **The rc summary** + **the distinct refusal texts** (the literal
 message args — the family's refusal canon):
 
-- rc 0 (the clean exits): 9; rc 1 (the binds): 20; rc 2 (the CLI mistakes): 6; 0 site(s) raising a variable (the message/`rc` computed —
+- rc 0 (the clean exits): 9; rc 1 (the binds): 16; rc 2 (the CLI mistakes): 4; 0 site(s) raising a variable (the message/`rc` computed —
   the common SystemExit(str) prints the message and exits 1).
 
 The refusal texts (the literal SystemExit args, sorted):
@@ -415,18 +413,18 @@ published port not backed by a registry default is a lie.
 | `docker/Dockerfile.modbus-cache` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `README`, `REQUIRED`, `SELECTION`, `SO_PEERCRED`, `UPSTREAM`, `VOLUME`, `WORKDIR` | 15502 |
 | `docker/Dockerfile.modbus-scraper` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `METRICS_SPEC`, `README`, `REQUIRED`, `SO_PEERCRED`, `UPSTREAM`, `VOLUME` … | 9350 |
 | `docker/Dockerfile.prometheus` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `VOLUME` | — |
-| `docker/README.md` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CHAOS`, `CONFIG`, `CONFIG_JS`, `COPY`, `EDITOR`, `ENTRYPOINT`, `HEALTHCHECK`, `HMAC`, `HOST` … | 15502, 5502, 8080, 9350 |
+| `docker/README.md` | `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CHAOS`, `CONFIG`, `CONFIG_JS`, `COPY`, `EDITOR`, `ENTRYPOINT`, `HEALTHCHECK`, `HMAC`, `HOST`, `INTERVAL` … | 15502, 5502, 8080, 9350 |
 | `docker/demo/README.md` | `DEMO`, `HOST`, `JSON`, `PROM_URL`, `README`, `TSDB`, `UPSTREAM` | 8080, 9090 |
-| `docker/demo/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
+| `docker/demo/compose.yaml` | `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `MODBUS_AUTH`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
 | `docker/entrypoints/entrypoint-prometheus.sh` | `AUDIT`, `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
 | `docker/entrypoints/entrypoint.sh` | `AUDIT`, `JSON`, `README`, `REQUIRED` | — |
-| `docker/env/cache.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEBUG`, `ERROR`, `HOST`, `INFO` … | — |
+| `docker/env/cache.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL` … | — |
 | `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `INFO`, `LISTEN`, `LOG_LEVEL`, `NO_AUDIT_LOG`, `PLAIN`, `PROM_URL` | — |
-| `docker/env/fake.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CLIENT_TIMEOUT`, `LISTEN`, `MAX_CLIENTS`, `MAX_CONN_PER_IP`, `MAX_KWP`, `NO_AUDIT_LOG`, `PROFILE` … | — |
+| `docker/env/fake.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CLIENT_TIMEOUT`, `INFO`, `LISTEN`, `LOG_LEVEL`, `MAX_CLIENTS`, `MAX_CONN_PER_IP`, `MAX_KWP` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
 | `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `METRIC_PREFIX` … | — |
 | `docker/prod/README.md` | `AUDIT`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `EDITOR`, `HOST`, `JSON`, `PORT`, `PROM_URL`, `README`, `UPSTREAM`, `YOUR` | 8080, 9350 |
-| `docker/prod/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `ONLY`, `PORT`, `PRODUCTION` … | 8080, 9350 |
+| `docker/prod/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `MODBUS_AUTH`, `ONLY`, `PORT` … | 8080, 9350 |
 | `docker/prometheus.yml` | `AUDIT` | — |
 
 **The port map 1:1** — the registries back every port the docker
@@ -479,10 +477,10 @@ list is the TODO seed, not a verdict.
 - inverter: every command exercised
 - dashboard: every command exercised
 
-**The canon phrases no suite pins**: 17
+**The canon phrases no suite pins**: 11
 
 **The graduation path**: the seeds carry stable IDs in
-[docs/family-drift-seeds.json](family-drift-seeds.json) (18
+[docs/family-drift-seeds.json](family-drift-seeds.json) (12
 open promise(s), the suggested suite per seed); a test wave
 consumes entries, the regeneration drops them, the shrinkage is
 the wave's proof; `--check` fails when a NEW promise ships
@@ -608,10 +606,10 @@ the dumps placeholder, the examples and configs reference):
 
 | tool | parse_secret | SECRET_REMOVED | file: |
 |---|---|---|---|
-| cache | yes | yes | yes |
-| scraper | yes | yes | yes |
+| cache | yes | **MISSING** | yes |
+| scraper | yes | **MISSING** | yes |
 | inverter | yes | yes | yes |
-| dashboard | yes | yes | yes |
+| dashboard | yes | **MISSING** | yes |
 
 The findings:
 

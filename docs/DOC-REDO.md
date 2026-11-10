@@ -61,7 +61,7 @@ run, and `--check` fails a stale page.
    the generator's constants if the verdict prose moved), not the doc.
 
 2. **The retired-vocabulary hunt** in the HAND-written docs (the
-   READMEs, docs/ACL.md, docs/MODBUS.md, docs/NIXOS.md, docs/TODO.md,
+   READMEs, docs/common/ACL.md, docs/common/MODBUS.md, docs/NIXOS.md, docs/TODO.md,
    docs/AUDIT.md) — targeted greps for the vocabularies that died:
    retired commands (`show settings`), retired flags (`--host`,
    `--port`, the `-file` siblings), retired env prefixes

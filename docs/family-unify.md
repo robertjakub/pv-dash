@@ -136,18 +136,19 @@ defaults, the live-run refusal texts).
   also omits the `file:<path>` form its sibling supports); the
   cache's `dump-interval` is the only dump child outside the `dump/`
   node. Outcome: the node-ful spelling wins each time.
-- **the stale prose rows** `[all]` — every `control` node says
+- **the stale prose rows** `[all]` — every `control` node said
   `(the default: show and clear)` while the derived default is
-  `show,flush` on the cache and `show` elsewhere
-  (`common/settings/options.py:499-505`): four false sentences, plus
-  `cache/README.md:107,110` and `scripts/gen_manual.py:324`. The
-  scraper's `auth` node still advertises the bearer token the
-  `auth-token` row now owns. The inverter's `log-level` row has **no
-  help** (an empty `.TP` renders in its man page,
-  `inverter/man/modbus-fake-inverter.1:244`), and its `battery-kwh`
-  `no-env` note still blames a `BATTERY` SIGHUP env no code reads
-  (`inverter/lib/options.json:77`). Outcome: the node prose renders
-  from `default_ops_verbs`; the stale notes die.
+  `show,flush` on the cache and `show` elsewhere (the
+  `default_ops_verbs` derivation): four false sentences in the
+  registries, `cache/README.md` and `scripts/gen_manual.py`'s literal.
+  The inverter's `log-level` row had **no help** (an empty `.TP`
+  rendered in its man page), and its `battery-kwh` `no-env` note
+  blamed a `BATTERY` SIGHUP env no code reads. Outcome: LANDED
+  2026-11-10, the family-sweep wave — the rows/gen_manual speak the
+  derived default (the generator now derives it from the registry),
+  the log-level help is in, the BATTERY note is F11-honest; the
+  scraper's `auth` node bearer prose stays (the auth-token rename is
+  short-list item 5).
 - **the NixOS render bugs** `[cache]` `[dashboard]` — the dashboard
   emits `--metrics-server` for `metricsServer = false` (the flag
   turns the endpoint ON, `dashboard/module.nix:73`); the cache
@@ -225,28 +226,23 @@ defaults, the live-run refusal texts).
   secret" (man pages), and "restart to apply" (inverter README).
   Outcome: a two-phrase lexicon in `shared/texts.json`, every surface
   renders it, the marker rule ("the % changed exception") stays.
-- **the man pages lag the wire** `[all]` — all four still describe
-  the wire as `{"status": "ok|fail|bye"}` (note is missing: cache
-  `lib/man.py:72`, scraper `:68`, inverter `:71`, dashboard `:57`);
-  `unset` survives at nine sites (`cache/lib/man.py:74,174,259,312`,
-  `scraper:70,74`, `inverter:72,203`, and the dashboard page
-  contradicts itself, `set/unset` at `:59` vs `set/clear` at `:64`);
-  the scraper/dashboard cli pages never mention `% changed` /
-  `% error:` / `[confirm]`; the cache page still claims the console
-  greets with upstream/poll health (the banner wave removed it); two
-  ctl docstrings still say `set/unset`
-  (`scraper/bin/modbus-scraper-ctl.py:13`,
-  `dashboard/bin/dashboard-ctl.py:13`). Outcome: the vocabulary sweep
-  + regeneration (the `--check` gates only catch stale *output*, not
-  stale *prose sources*).
+- **the man pages lag the wire** `[all]` — all four described the
+  wire as `{"status": "ok|fail|bye"}` (the `note` status missing),
+  `unset` survived in the four `lib/man.py` prose sources and the
+  ctl docstrings, and the READMEs repeated the retired spellings.
+  Outcome: LANDED 2026-11-10, the family-sweep wave — the sources
+  speak `ok|fail|note|bye` + `set/clear`, the pages regenerate (the
+  `--check` gates only catch stale *output*, not stale *prose
+  sources* — the redo hunts the sources). The cli pages' `% changed` /
+  `[confirm]` mentions stay open (a docs nicety, not a lie).
 - **the dashboard's dead live branch** `[dashboard]` `[common]` —
-  the registry has no live for `local-time`, but the shared
-  `apply_family_key`/`get_family_key` carry a live branch for it
-  (`common/wire/control.py:858,911`): either the dashboard's row
-  gains `live: local-time` or the branch documents its reach.
-
-## The refusal plane — the same refusals everywhere
-
+  the registry has no live for the dashboard's `local-time`, but the
+  shared `apply_family_key`/`get_family_key` carry a live branch for
+  it: RESOLVED by verification (the family-sweep wave) — the branch
+  is LIVE for the cache and the scraper (their rows carry
+  `live: local-time`); only the dashboard's row has no live. Not
+  dead — the item becomes the knob-plane question of the dashboard's
+  row joining (the local-time/log-access knob item above).
 - **the rc discipline splits on the unsafe-config refusals** —
   the F13 start refusal exits 2 on cache/dashboard
   (`cache/bin/modbus-cache.py:168`, `dashboard/bin/dashboard.py:318`)
@@ -257,12 +253,10 @@ defaults, the live-run refusal texts).
   posture; also pick one *presentation* (the cache/dashboard log an
   ERROR line, the scraper/dashboard config path prints a bare
   `SystemExit(str)`).
-- **`cannot serve on` vs `cannot bind`** `[cache]` `[inverter]` —
-  the Modbus listeners answer
-  `cannot serve on 127.0.0.1:PORT: ...` (`cache/bin:389`,
-  `inverter/bin:403`) where every other listener says
-  `cannot bind ...`; the drift doc's own exit findings claim the
-  family speaks `cannot bind`. Outcome: `cannot bind` family-wide.
+- **`cannot serve on` vs `cannot bind`** `[cache]` `[inverter]` — the Modbus listeners answered `cannot serve on ...` where
+  every other listener says `cannot bind`. Outcome: LANDED
+  2026-11-10, the family-sweep wave — `cannot bind` family-wide
+  (nothing pinned the old text).
 - **the live F13 floor, three spellings** `[cache]` `[dashboard]`
   `[inverter]` — the cache prefixes "the metrics endpoint serves
   register values: ", the dashboard "serves the request counters: ",
@@ -271,31 +265,31 @@ defaults, the live-run refusal texts).
   Outcome: the bare sentence, one `T()` leaf.
 - **the ops-token sentence, three spellings + dead code** — the
   common loader says `the read-only ops token supplements the admin
-  token: set --control-token too` (`common/settings/config.py:143`),
-  the cache's validate_config wraps it as
-  `invalid control-ops-token = 'X': ...` (`cache/lib/config.py:361`)
-  and its bin carries two unreachable rc-2 branches
-  (`cache/bin:149,155` — validate_config fires first). Outcome: the
-  common sentence; the dead branches die.
+  token: set --control-token too`; the cache's validate_config wraps
+  it and its bin carried two unreachable rc-2 branches
+  (validate_config fires first). Outcome: LANDED 2026-11-10, the
+  family-sweep wave — the dead branches die (the common sentence
+  stands; the wrap-vs-plain spelling stays the cache's).
 - **the value-parse refusals, four voices** — the spine's canon is
-  `<live-name> must be <what>, got %r` (`common/wire/control.py:39`);
-  the cache/dashboard speak it, the scraper's `_typed` drops
-  `, got %r` and the unit (`scraper/lib/control.py:326-329`), and the
-  fake leaks Python's own exception text to the wire and console
-  (`could not convert string to float: 'abc'`,
-  `inverter/lib/control.py:213-377`) and **silently coerces bad
-  bools** (`set strict maybe` → `ok strict=off`). The metrics toggle
-  label is spelled `metrics enable` / `metrics-server` /
-  `metrics/enable` across tools. Outcome: `num`/`numi`/`on_off`
-  everywhere; the toggle label is `metrics/enable`.
-- **the mislabeled refusals** — the scraper renders
-  `invalid modbus-unit = None` (it looks up a key that does not
-  exist, `scraper/lib/config.py:65`); the shared listen validator
-  hardcodes the `--listen` label so `--metrics-listen nope` answers
-  `--listen must be HOST:PORT` (`common/settings/config.py:172`); a
-  `--control-port 99999` on scraper/dashboard answers the *token*
-  sentence because the isdigit check precedes the range check.
-  Outcome: three one-line fixes.
+  `<live-name> must be <what>, got %r` (the `_apply` parsers): the
+  fake leaked Python's own exception text to the wire and console
+  (`could not convert string to float: 'abc'`) and **silently coerced
+  bad bools** (`set strict maybe` → `ok strict=off`); the scraper's
+  `_typed` dropped `, got %r`. Outcome: LANDED 2026-11-10, the
+  family-sweep wave — the fake parses through `num`/`numi` and refuses
+  bools through `on_off` (its `strict`/`static` included), the
+  scraper's `_typed` carries the canon. The metrics toggle label
+  spelling (`metrics enable` / `metrics-server` / `metrics/enable`) —
+  one label — stays open.
+- **the mislabeled refusals** — the scraper rendered
+  `invalid modbus-unit = None` (the fail closure looked up a key that
+  does not exist); the shared listen validator hardcoded the
+  `--listen` label so `--metrics-listen nope` answered
+  `--listen must be HOST:PORT`; a `--control-port 99999` on
+  scraper/dashboard answered the *token* sentence (the isdigit
+  tokenless check preceded the range check). Outcome: LANDED
+  2026-11-10, the family-sweep wave — the label param, the key fix
+  and the valid-port scope; 99999 answers the range validator.
 - **the startup validation, two shapes** — cache/scraper/dashboard
   say `invalid <key> = <val>: <rule>`; the fake says
   `--flag <rule>, got %r` and collects every problem before exiting.
@@ -346,12 +340,11 @@ defaults, the live-run refusal texts).
   `UPSTREAM` (`docker/Dockerfile.modbus-cache:59-62`). Outcome: the
   container defaults move to `ENV` like `UPSTREAM`, or the example
   lines carry a "pinned by the image CMD" note.
-- **the fake's env example lags** `[inverter]` — `LOG_LEVEL` is
-  missing entirely (its row carries the twin *and* the SIGHUP layer
-  reads it), and the SIGHUP block lists five of the seven re-read
-  envs (`PROFILE` and `LOG_LEVEL` are in both layers;
-  `docker/env/fake.env.example:30-33`). Outcome: the example gains
-  `#LOG_LEVEL=INFO` and the true SIGHUP list.
+- **the fake's env example lags** `[inverter]` — `LOG_LEVEL` was
+  missing entirely and the SIGHUP block listed five of the re-read
+  envs. Outcome: LANDED 2026-11-10, the family-sweep wave — the
+  example gains `#LOG_LEVEL=INFO` and the both-layers notes
+  (`PROFILE`/`LOG_LEVEL`), the SIGHUP block honest.
 - **the stale env claims in docs** — the cache man advertises a
   `HOST` twin no resolver reads (`cache/lib/man.py:212`); the
   dashboard man/README/docstring still sell `PORT`/`BIND`
@@ -362,13 +355,12 @@ defaults, the live-run refusal texts).
   `upstream`→`PROM_URL`) and calls `--config` CLI-only while every
   tool honors `$CONFIG` (`common/runtime/daemon.py:47-51`).
   Outcome: the claims match the resolvers; regenerate the pages.
-- **the stale `*_FILE` honored records** — five TODO records still
-  celebrate `CONTROL_TOKEN_FILE`/`METRICS_TOKEN_FILE` twins the
-  `-file`-removal wave deleted (`docs/TODO.md:386-390`,
-  `cache/TODO.md:514`, `scraper/TODO.md:402`,
-  `dashboard/TODO.md:338`, `inverter/TODO.md:386`). History keeps the
-  old names; present-tense "honored now" is false. Outcome: the
-  records gain the reversing pointer (`file:` inside the plain env).
+- **the stale `*_FILE` honored records** — five TODO records
+  celebrated `CONTROL_TOKEN_FILE`/`METRICS_TOKEN_FILE` twins the
+  `-file`-removal wave deleted, and a sixth claimed the removed
+  `--control-ops-token-file` flag. Outcome: LANDED 2026-11-10, the
+  family-sweep wave — the records carry the reversing pointer (the
+  bare env twin with `file:<path>` inside the plain value).
 - **the env examples are samples that read as the contract** —
   coverage is 13/50 (cache), 12/39 (scraper), 17/34 (fake), 11/36
   (dashboard) twins; whole blocks (control, dump, ACLs, secrets) are
@@ -378,11 +370,11 @@ defaults, the live-run refusal texts).
   Outcome: generate the common block from the registries, or one
   honest header line ("sample, not exhaustive — `show knobs` lists
   all N"), and a coverage gate.
-- **the dev wrappers wear prefixes again** — `cache/dev-cli` invents
-  `CACHE_CTL`, `cache/dev` `CACHE_UPSTREAM` (and siblings per tool),
-  violating the bare-name rule and shadowing `CTL` via the flag.
-  Dev-only. Outcome: pass the bare envs through, or document the
-  wrapper prefix as an exception.
+- **the dev wrappers wore prefixes again** — the `dev`/`dev-cli`
+  wrappers invented `CACHE_CTL`/`CACHE_UPSTREAM` and siblings,
+  violating the bare-name rule. Outcome: LANDED 2026-11-10, the
+  family-sweep wave — the wrappers pass the bare twins (`CTL`,
+  `UPSTREAM`) through; the dev shell is a surface like any other.
 - **`CLI_KEEPALIVE` is unvalidated** — a non-float raises an
   uncaught ValueError traceback (`common/wire/cli.py:356`), unlike
   the family's one-line refusals; documented in two READMEs only.
@@ -392,6 +384,14 @@ defaults, the live-run refusal texts).
   while `resolve_target`/`CONFIG` strip: `LISTEN=' '` is *set* and
   fails validation. Uniform family-wide. Outcome: a docstring
   precision fix (or strip everywhere — pick one).
+
+- **a path marked secret** `[dashboard]` — the registry marks
+  `static-dir` and `config-js` `secret: true`
+  (`dashboard/lib/options.json`): a directory/file PATH is not a
+  secret, but the marking renders them `*** SECRET REMOVED ***` in
+  `show config` and refuses their `clear`. Deliberate path privacy or
+  a copy-paste — needs a product ruling before touching (the sweep
+  left it standing).
 
 ## The gates that keep it
 

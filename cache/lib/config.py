@@ -383,7 +383,7 @@ def resolve_config(args, script_dir=None):
     resolve = r.resolve
     resolve_bool = r.resolve_bool
 
-    interval = resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval_s'], float)
+    interval = resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval'], float)
     upstream = resolve(getattr(args, 'upstream', None), 'UPSTREAM', 'upstream',
                        DEFAULTS['upstream'], str)
     host, port = parse_upstream(upstream or DEFAULTS['upstream'])
@@ -396,7 +396,7 @@ def resolve_config(args, script_dir=None):
         'host': host,
         'port': port,
         'unit': resolve(args.unit, 'UNIT', 'unit', DEFAULTS['unit'], int),
-        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout_s'], float),
+        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout'], float),
         'auth': parse_auth_type(resolve(args.modbus_auth, 'MODBUS_AUTH', 'modbus-auth', DEFAULTS['modbus_auth'], str), 'modbus-auth'),
         'auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
@@ -408,14 +408,14 @@ def resolve_config(args, script_dir=None):
             'auth-upstream-key', kind=upstream_auth),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
         'interval': interval,
-        'read_delay': resolve(args.read_delay, 'READ_DELAY', 'read_delay', DEFAULTS['read_delay_s'], float),
+        'read_delay': resolve(args.read_delay, 'READ_DELAY', 'read_delay', DEFAULTS['read_delay'], float),
         'merge_gap': resolve(args.merge_gap, 'MERGE_GAP', 'merge_gap', DEFAULTS['merge_gap'], int),
         'allow_write': resolve_bool(args.allow_write or None, 'ALLOW_WRITE', 'allow_write', DEFAULTS['allow_write']),
         'write_registers': parse_write_registers(
             resolve(getattr(args, 'write_registers', None), 'WRITE_REGISTERS',
                     'write_registers', DEFAULTS['write_registers'], str)),
         'profile': resolve_profile_file(resolve(getattr(args, 'profile', None), 'PROFILE',
-                                                'profile', DEFAULTS['modbus_profile'], str)),
+                                                'profile', DEFAULTS['profile'], str)),
         'selection': parse_selection(resolve(getattr(args, 'selection', None), 'SELECTION',
                                             'selection', DEFAULTS['selection'], str)),
         'cache_ttl': resolve(args.cache_ttl, 'TTL', 'cache_ttl',
@@ -424,14 +424,14 @@ def resolve_config(args, script_dir=None):
         'log_access': resolve_bool(args.log_access or None, 'LOG_ACCESS', 'log_access', DEFAULTS['log_access']),
         'max_clients': resolve(args.max_clients, 'MAX_CLIENTS', 'max_clients', DEFAULTS['max_clients'], int),
         'client_timeout': resolve(args.client_timeout, 'CLIENT_TIMEOUT', 'client_timeout',
-                                  DEFAULTS['client_timeout_s'], float),
+                                  DEFAULTS['client_timeout'], float),
         'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MAX_CONN_PER_IP',
                                    'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
         'metrics_max_clients': resolve(getattr(args, 'metrics_max_clients', None), 'METRICS_MAX_CLIENTS',
                                        'metrics_max_clients', DEFAULTS['metrics_max_clients'], int),
         'metrics_client_timeout': resolve(getattr(args, 'metrics_client_timeout', None),
                                           'METRICS_CLIENT_TIMEOUT', 'metrics_client_timeout',
-                                          DEFAULTS['metrics_client_timeout_s'], float),
+                                          DEFAULTS['metrics_client_timeout'], float),
         'metrics_max_conn_per_ip': resolve(getattr(args, 'metrics_max_conn_per_ip', None),
                                            'METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
                                            DEFAULTS['metrics_max_conn_per_ip'], int),
@@ -470,7 +470,7 @@ def resolve_config(args, script_dir=None):
         'no_audit_log': resolve_bool(getattr(args, 'no_audit_log', False) or None, 'NO_AUDIT_LOG',
                                      'no_audit_log', DEFAULTS['no_audit_log']),
         'requests_audit_s': resolve(getattr(args, 'requests_audit', None), 'REQUESTS_AUDIT',
-                                    'requests_audit_s', DEFAULTS['requests_audit_s'], float),
+                                    'requests_audit_s', DEFAULTS['requests_audit'], float),
         'dump_path': resolve(getattr(args, 'dump_path', None), 'DUMP_PATH',
                              'dump_path', DEFAULTS['dump_path'], str),
         'dump_key': parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY',

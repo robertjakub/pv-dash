@@ -37,11 +37,13 @@ DIAG_COUNT = DIAGNOSTICS['count']
 DIAG_MAGIC = DIAGNOSTICS['magic']
 DIAG_MAX = DIAGNOSTICS['max_age']              # the age/uptime clamp (0xFFFF)
 
-DEFAULTS = STATIC['defaults']
+from .options import OPTIONS   # the registry rows — the defaults' one home (the rows' `default`)
+DEFAULTS = {o.name.replace('-', '_'): o.static_default
+            for o in OPTIONS if o.static_default is not None}
 DEFAULT_LISTEN_PORT = int(DEFAULTS['listen'].rsplit(':', 1)[1])
 AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
 AUDIT_FILES = DEFAULTS['audit_files']
-REQUESTS_AUDIT_S = DEFAULTS['requests_audit_s']  # the per-client REQUESTS audit period
+REQUESTS_AUDIT_S = DEFAULTS['requests_audit']  # the per-client REQUESTS audit period
 from common.wire.control import CONTROL_WIRE_DEFAULTS  # the shared wire tree (flat: the cli_* keys)
 CLI_KEEPALIVE_S = CONTROL_WIRE_DEFAULTS['cli_keepalive_s']
 CLI_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_timeout_s']

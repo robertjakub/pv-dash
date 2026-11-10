@@ -22,8 +22,8 @@ logger = logging.getLogger('fake-inverter')
 # the static defaults the parser no longer carries (a static-wired default
 # would shadow the env/config layers — the flag never looks unset): the
 # same dict lib/options.py used to bake into build_parser, applied last in
-# the ladder instead. The bool rows need none (the store_true native False
-# is absent); the untwinned knobs left out stay None (profile falls to the
+# the ladder instead. The bool rows read the tree's false entries like the
+# rest; the untwinned knobs left out stay None (profile falls to the
 # bin's 'sun2000', audit-log to the XDG state home, the secrets to off).
 STATIC_DEFAULTS = {
     'listen': DEFAULTS['listen'],
@@ -32,22 +32,31 @@ STATIC_DEFAULTS = {
     'battery-kwh': DEFAULTS['battery_kwh'],
     'time-scale': DEFAULTS['time_scale'],
     'chaos': DEFAULTS['chaos'],
+    'static': DEFAULTS['static'],
+    'strict': DEFAULTS['strict'],
     'timezone': DEFAULTS['timezone'],
     'dump-interval': DEFAULTS['dump_interval'],
     'max-clients': DEFAULTS['max_clients'],
     'client-timeout': DEFAULTS['client_timeout_s'],
     'max-conn-per-ip': DEFAULTS['max_conn_per_ip'],
     'connect-acl': DEFAULTS['connect_acl'],
+    'allow-write': DEFAULTS['allow_write'],
     'metrics-listen': DEFAULTS['metrics_listen'],
     'metrics-acl': DEFAULTS['metrics_acl'],
     'metrics-max-clients': DEFAULTS['metrics_max_clients'],
     'metrics-client-timeout': DEFAULTS['metrics_client_timeout_s'],
     'metrics-max-conn-per-ip': DEFAULTS['metrics_max_conn_per_ip'],
+    'metrics-server': DEFAULTS['metrics_server'],
     'log-level': DEFAULTS['log_level'],
     'audit-max-mb': DEFAULTS['audit_max_mb'],
     'audit-files': DEFAULTS['audit_files'],
     'audit-forward': DEFAULTS['audit_forward'],
     'audit-forward-format': DEFAULTS['audit_forward_format'],
+    'audit-daily': DEFAULTS['audit_daily'],
+    'no-audit-log': DEFAULTS['no_audit_log'],
+    'control-log-replies': DEFAULTS['control_log_replies'],
+    'control-socket-group': DEFAULTS['control_socket_group'],
+    'restore-on-start': DEFAULTS['restore_on_start'],
     'grid-voltage': GRID['voltage_v'],
     'grid-frequency': GRID['frequency_hz'],
 }

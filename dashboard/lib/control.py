@@ -96,6 +96,7 @@ class ControlServer(_ControlServer):
         self.metrics_listen = None       # the /metrics bind address (the entry passes it)
         self.metrics_acl = None          # the /metrics accept gate (the entry passes it; the hooks read it per connection)
         self.metrics_acl_warn = None     # the metrics/acl file's permission warning (the stash, None = no warning standing)
+        self.metrics_caps = None         # the /metrics caps the entry configured (the re-enable reads them — the cache's p.metrics_caps reading)
         self.metrics_desc = 'off'        # the status/inspect one-liner
 
     def command_help(self):
@@ -193,7 +194,7 @@ class ControlServer(_ControlServer):
                                          'metrics/listen on 127.0.0.1')
                 from .metrics import MetricsServer, describe_metrics
                 listen = self.metrics_listen
-                caps = DEFAULT_METRICS_CAPS
+                caps = self.metrics_caps or DEFAULT_METRICS_CAPS   # the CONFIGURED caps (the cache's rebind reading) — not the defaults
                 srv = MetricsServer(self.httpd, self, listen, token=self.metrics_token,
                                     max_clients=caps[0], client_timeout=caps[1], max_per_ip=caps[2],
                                     acl=self.metrics_acl)
@@ -325,10 +326,11 @@ class ControlServer(_ControlServer):
 
     def _metrics_caps(self):
         """The caps the describe line renders: the running server's when it
-        is up, the defaults otherwise."""
+        is up, the configured ones otherwise (the defaults only when the
+        entry passed nothing)."""
         from .statics import DEFAULT_METRICS_CAPS
         return ((self.metrics_srv.max_clients, self.metrics_srv.client_timeout, self.metrics_srv.max_per_ip)
-                if self.metrics_srv else DEFAULT_METRICS_CAPS)
+                if self.metrics_srv else (self.metrics_caps or DEFAULT_METRICS_CAPS))
 
     def _rebuild_audit(self):
         """Swap the DSH audit trail for one rebuilt from the params (the

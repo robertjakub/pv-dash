@@ -432,12 +432,15 @@ def main():
         # a live `set dump-interval` wakes it without a restart — and a live
         # `set dump/path` (no path at start) finds the thread waiting too
         threading.Thread(target=control.run_dump_interval, daemon=True, name='dump').start()
+    metrics_caps = (cfg.get('metrics_max_clients', 16),
+                    cfg.get('metrics_client_timeout', 5),
+                    cfg.get('metrics_max_conn_per_ip', 0))
     metrics_srv = None
     if cfg['metrics_server']:
         metrics_srv = MetricsServer(httpd, control, metrics_listen, token=metrics_token, started=started,
-                                    max_clients=cfg.get('metrics_max_clients', 16),
-                                    client_timeout=cfg.get('metrics_client_timeout', 5),
-                                    max_per_ip=cfg.get('metrics_max_conn_per_ip', 0), acl=metrics_acl)
+                                    max_clients=metrics_caps[0],
+                                    client_timeout=metrics_caps[1],
+                                    max_per_ip=metrics_caps[2], acl=metrics_acl)
         metrics_srv.start()
         httpd.metrics_srv = metrics_srv
     if control:
@@ -448,6 +451,7 @@ def main():
         control.metrics_listen = metrics_listen
         control.metrics_acl = metrics_acl
         control.metrics_acl_warn = metrics_acl_warn
+        control.metrics_caps = metrics_caps
         control.metrics_desc = metrics_desc
 
     def apply_reload():

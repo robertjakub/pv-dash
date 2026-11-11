@@ -50,6 +50,20 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   `../pkgs/<tool>/package.nix`, and the check_options/family_drift gates
   read the modules from the new home.
 
+- **everywhere** — **`log-level` joins the system/ namespace and the wire's
+  node listings speak the console's own words**: the last flat logging knob
+  moves to `system/log-level` (the live word is `set system log-level`; the
+  flat `set log-level` spelling still reads on the wire and in config
+  files — the regtests' stale root/listing pins repaired to the daemon
+  truth). `show <node>` and `help <node>` (describe_node) now key the
+  knobs' live/alias walk words — the `?` face's golden master, byte for
+  byte: `show system` spells `log-replies` like `show system ?`, the
+  cache's bare `show` folds `cache-ttl` into the `show cache` report's own
+  word, the scraper's folds `inputs-metrics` into `inputs` — the flat
+  names stay the wire's answers (the ctls translate the console words when
+  they send), and an exact word (a show report's own `cache`) outranks a
+  walk-on in the listing exactly as the cli's describe resolves it.
+
 - **everywhere** — **the control exchange's DEBUG line slims, and the
   logging knobs gather family-wide under the system/ namespace**: the
   daemons' debug exchange line carries the command and the outcome status

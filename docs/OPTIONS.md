@@ -84,7 +84,7 @@ on all four too (the per-tool extras carry their own rows below).
 | c | `load` |  | `set load` |  |  | ✓ live |  |
 | k | `local-time` |  | `set system local-time` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `log-access` |  | `set system log-access` | **✓** live | **✓** live | **✓** live | **✓** live |
-| k | `log-level` |  | `set log-level` | **✓** live | **✓** live | **✓** live | **✓** live |
+| k | `log-level` |  | `set system log-level` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `log-queries` |  | `set log-queries` |  |  |  | ✓ live |
 | k | `max-clients` |  | `set limits max-clients`, `set max-clients`, `set metrics limits max-clients` | **✓** live | **✓** live | **✓** live | **✓** live |
 | k | `max-conn-per-ip` |  | `set limits max-conn-per-ip`, `set max-conn-per-ip`, `set metrics limits max-conn-per-ip` | **✓** live | **✓** live | **✓** live | **✓** live |

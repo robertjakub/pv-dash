@@ -33,7 +33,7 @@ The sweep types:
    ports against the registries.
 9. **The suite-coverage sweep** — the promises (knobs, commands,
    canon phrases) grepped against the tests.
-10. **The F-ledger sweep** — docs/AUDIT.md's F-numbers vs the
+10. **The F-ledger sweep** — docs/SECURITY.md's F-numbers vs the
     tree's enforcement markers.
 11. **The statics sweep** — the four defaults.json blocks by
     key-path.
@@ -294,9 +294,9 @@ The refusal texts (the literal SystemExit args, sorted):
 - `connection closed by peer`
 - `fails its seal — the wrong dump-key, or edited content (nothing restored)`
 - `grid-outage must be on|off|outage`
-- `listen cannot move beyond loopback while the page serves without a token (F21 in docs/AUDIT.md) — pass auth-token by flag/env/config and restart`
+- `listen cannot move beyond loopback while the page serves without a token (F21 in docs/SECURITY.md) — pass auth-token by flag/env/config and restart`
 - `max-kwp must be a positive kW value`
-- `metrics-listen cannot move beyond loopback while the endpoint serves without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart`
+- `metrics-listen cannot move beyond loopback while the endpoint serves without a token (F13 in docs/SECURITY.md) — pass metrics-token by flag/env/config and restart`
 - `metrics-server must be on or off`
 - `mppt must be both|east|west|none`
 - `must be an http:// or https:// URL with a host`
@@ -304,11 +304,11 @@ The refusal texts (the literal SystemExit args, sorted):
 - `no modbus device attached`
 - `non-finite result`
 - `not a boolean`
-- `refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind 127.0.0.1:PORT`
+- `refusing to expose /metrics beyond loopback without a token (F13 in docs/SECURITY.md) — pass metrics-token by flag/env/config and restart, or bind 127.0.0.1:PORT`
 - `short response: function byte only`
 - `the Waveshare password must be ASCII`
-- `the metrics endpoint serves register values: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind metrics-listen on 127.0.0.1`
-- `the metrics endpoint serves the request counters: refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart, or bind metrics-listen on 127.0.0.1`
+- `the metrics endpoint serves register values: refusing to expose /metrics beyond loopback without a token (F13 in docs/SECURITY.md) — pass metrics-token by flag/env/config and restart, or bind metrics-listen on 127.0.0.1`
+- `the metrics endpoint serves the request counters: refusing to expose /metrics beyond loopback without a token (F13 in docs/SECURITY.md) — pass metrics-token by flag/env/config and restart, or bind metrics-listen on 127.0.0.1`
 - `the ops token must differ from the admin token (the same secret would hand every holder the role the server picks first)`
 - `time out of range (00:00-23:59)`
 - `timezone must be utc|local`
@@ -342,10 +342,10 @@ READMEs' `##` skeletons.
 
 **The README `##` skeletons:**
 
-- cache: How it works -> Usage -> Configuration -> Runtime control -> Diagnostics registers -> Register map (device profile) -> Access control -> Modbus auth -> Persistence -> Metrics -> Audit logging -> Security -> Testing -> Nix / NixOS -> Source layout -> License
-- scraper: How it works -> Usage -> Configuration -> Runtime control -> Metrics -> Alerting -> Device profile -> Battery -> Logging and audit trail -> Test inverter -> Security -> Testing -> Nix / NixOS -> Source layout -> License
-- inverter: How it works -> Usage -> Configuration -> Runtime control -> Served registers (the default profile) -> Internal registers (not in the profile) -> Chaos injection (`--chaos`) -> Audit trail -> Security -> Testing -> Nix / NixOS -> Source layout -> License
-- dashboard: How it works -> Usage -> Configuration -> Runtime control -> Behind a reverse proxy -> Metrics source -> Security -> Testing -> Nix / NixOS -> Source layout -> License
+- cache: How it works -> Usage -> Configuration -> Runtime control -> Diagnostics registers -> Register map (device profile) -> Access control -> Modbus auth -> Persistence -> Metrics -> Audit logging -> Security -> Testing -> Source layout -> License
+- scraper: How it works -> Usage -> Configuration -> Runtime control -> Metrics -> Alerting -> Device profile -> Battery -> Logging and audit trail -> Test inverter -> Security -> Testing -> Source layout -> License
+- inverter: How it works -> Usage -> Configuration -> Runtime control -> Served registers (the default profile) -> Internal registers (not in the profile) -> Chaos injection (`--chaos`) -> Audit trail -> Security -> Testing -> Source layout -> License
+- dashboard: How it works -> Usage -> Configuration -> Runtime control -> Behind a reverse proxy -> Metrics source -> Security -> Testing -> Source layout -> License
 
 The skeleton verdict (`scripts/lint_readmes.py --check` gates it):
 
@@ -420,16 +420,16 @@ published port not backed by a registry default is a lie.
 | `docker/README.md` | `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CHAOS`, `CONFIG`, `CONFIG_JS`, `COPY`, `EDITOR`, `ENTRYPOINT`, `GENERATED`, `HEALTHCHECK`, `HMAC`, `HOST` … | 15502, 5502, 8080, 9350 |
 | `docker/demo/README.md` | `DEMO`, `HOST`, `JSON`, `PROM_URL`, `README`, `TSDB`, `UPSTREAM` | 8080, 9090 |
 | `docker/demo/compose.yaml` | `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `MODBUS_AUTH`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
-| `docker/entrypoints/entrypoint-prometheus.sh` | `AUDIT`, `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
-| `docker/entrypoints/entrypoint.sh` | `AUDIT`, `JSON`, `README`, `REQUIRED` | — |
+| `docker/entrypoints/entrypoint-prometheus.sh` | `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `SECURITY`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
+| `docker/entrypoints/entrypoint.sh` | `JSON`, `README`, `REQUIRED`, `SECURITY` | — |
 | `docker/env/cache.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
 | `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONFIG_JS`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS` … | — |
 | `docker/env/fake.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `CHAOS`, `CIDR`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
 | `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS` … | — |
-| `docker/prod/README.md` | `AUDIT`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `EDITOR`, `HOST`, `JSON`, `PORT`, `PROM_URL`, `README`, `UPSTREAM`, `YOUR` | 8080, 9350 |
+| `docker/prod/README.md` | `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `EDITOR`, `HOST`, `JSON`, `PORT`, `PROM_URL`, `README`, `SECURITY`, `UPSTREAM`, `YOUR` | 8080, 9350 |
 | `docker/prod/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `MODBUS_AUTH`, `ONLY`, `PORT` … | 8080, 9350 |
-| `docker/prometheus.yml` | `AUDIT` | — |
+| `docker/prometheus.yml` | `SECURITY` | — |
 
 **The port map 1:1** — the registries back every port the docker
 surface names (a port here that no knob backs is the lie this
@@ -504,7 +504,7 @@ The findings:
   keeps the list honest — new promises ship covered or the gate
   fails.
 
-## The F-ledger sweep — docs/AUDIT.md vs the tree
+## The F-ledger sweep — docs/SECURITY.md vs the tree
 
 Each F-number's title from the audit doc, and which of the family's
 files cite it — the promise ledger against the code.
@@ -522,7 +522,7 @@ The findings:
   citations are the audit doc itself has no enforcement markers in
   the tree (either the F is enforced in code without a marker — add
   the marker — or it is not enforced — the ledger lies). The F-suffix
-  convention (the code comments cite `F13 in docs/AUDIT.md`) is the
+  convention (the code comments cite `F13 in docs/SECURITY.md`) is the
   family's traceability habit; the sweep keeps it honest.
 
 ## The statics sweep — the four defaults.json blocks

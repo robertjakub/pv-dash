@@ -138,7 +138,12 @@ target \\(em \\fBsyslog\\fR (the local socket auto\\-scan),
 \\fBsyslog:/path\\fR, \\fBudp://host[:514]\\fR or
 \\fBtcp://host[:514]\\fR (the off\\-box copy; the remote envelope rides
 \\fB--audit-forward-format\\fR = \\fBrfc5424\\fR|\\fBcef\\fR) \\(em a
-send failure notes once and the next event re\\-arms;
+send failure notes once and the next event re\\-arms. Every line names
+its writer daemon in \\fBinstance=<id>\\fR \\(em the control port when
+\\fB--audit-instance\\fR is unset (unique per host by construction), the
+override when spelled (1\\-64 characters, letters, digits, . _ : @ \\-);
+make an override unique among everything that shares one collector: the
+chain groups by it;
 \\fB--audit-log none\\fR turns the local file off (with a forward
 spelled: the remote\\-only mode; without one: the audit disabled)."""
     environment = """.SH ENVIRONMENT

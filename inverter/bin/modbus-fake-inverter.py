@@ -288,8 +288,9 @@ def main():
                        'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '
                        'to encrypt it', args.dump_path)
     tag = load_audit_tags('inverter')
-    audit = build_audit(vars(args), tag, 'fake-inverter', logger)
-    audit_params = audit_params_of(vars(args))
+    audit_derive = target if target.isdigit() and target != '0' else str(listen_port)
+    audit = build_audit(vars(args), tag, 'fake-inverter', logger, derive=audit_derive)
+    audit_params = audit_params_of(vars(args), derive=audit_derive)
     if args.dry_run:
         mode = 'static values' if args.static else (
             'day simulation at x%g' % args.time_scale if args.time_scale != 1.0 else 'day simulation')

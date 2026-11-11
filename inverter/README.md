@@ -324,7 +324,9 @@ default at the **XDG state home**
 it, `--no-audit-log` turns it off, `--audit-log -` sends it to stdout (the
 docker logs / journald way — the shipped Dockerfile runs with it). The
 whole family is live-settable on the control wire (the cache's shape):
-`set audit log-file <path|-|none>` swaps the sink, `set audit rotate
+`set audit log-file <path|-|none>` swaps the sink, `set audit instance
+<id>` renames the writer daemon (`none` returns to the derived control
+port), `set audit rotate
 max-size <MB>` and `set audit rotate files <N>` re-chain the rotation
 live, `set audit rotate daily on/off` rides too and `set audit disable
 on/off` is the kill switch (`clear <setting>` restores the configured
@@ -339,15 +341,20 @@ re-arms. `--audit-log none` turns the local file off: with a forward
 spelled that is the **remote-only mode** (the collector is the sole
 holder, the chain reseeds at GENESIS per run), without one the audit is
 disabled (the state `--no-audit-log` spells).
-The line names its writer — the fake `tools=INV tag=daemon`, the ctl and
-cli clients the shared `tools=INV tag=cli` role:
+The line names its writer — the fake `application=INV tag=daemon`, the ctl and
+cli clients the shared `application=INV tag=cli` role — and carries an
+`instance=<id>` word naming the writer daemon: the **control port** when
+`--audit-instance` is unset (unique per host by construction), the override
+when spelled. Keep an override unique among everything that shares one
+collector — the native line and CEF carry no hostname, so pooled trails
+name their instances apart; the chain groups by the triple:
 
 ```
-2026-11-03T20:10:06Z AUDIT tools=INV tag=daemon type=start hash=3f9a21c04de7 message=version=0.4.2 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
-2026-11-03T20:10:07Z AUDIT tools=INV tag=daemon type=command hash=9c41e2b7a058 message=peer=127.0.0.1:54425 cmd='set soc 40' result=ok
-2026-11-03T20:10:07Z AUDIT tools=INV tag=daemon type=command hash=3d82f6c05e19 message=peer=127.0.0.1:54426 role=ops cmd='show connections' wire=h4b91de207a86 result=ok
-2026-11-03T20:10:08Z AUDIT tools=INV tag=daemon type=reset hash=77b0c4e19d23 message=SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
-2026-11-03T20:10:08Z AUDIT tools=INV tag=daemon type=shutdown hash=5e2af8c30b61 message=reason=SIGTERM-received uptime=2s conns=0 requests=0 chaos_hits=0
+2026-11-03T20:10:06Z AUDIT application=INV tag=daemon instance=15991 type=start hash=3f9a21c04de7 message=version=0.4.2 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
+2026-11-03T20:10:07Z AUDIT application=INV tag=daemon instance=15991 type=command hash=9c41e2b7a058 message=peer=127.0.0.1:54425 cmd='set soc 40' result=ok
+2026-11-03T20:10:07Z AUDIT application=INV tag=daemon instance=15991 type=command hash=3d82f6c05e19 message=peer=127.0.0.1:54426 role=ops cmd='show connections' wire=h4b91de207a86 result=ok
+2026-11-03T20:10:08Z AUDIT application=INV tag=daemon instance=15991 type=reset hash=77b0c4e19d23 message=SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
+2026-11-03T20:10:08Z AUDIT application=INV tag=daemon instance=15991 type=shutdown hash=5e2af8c30b61 message=reason=SIGTERM-received uptime=2s conns=0 requests=0 chaos_hits=0
 ```
 
 The 12-hex token after the event name is the entry's **chained hash** (the
@@ -397,7 +404,7 @@ inverter/
     ├── inverter.py     # Modbus TCP server: FC1-FC4 reads, writes behind the write gate, chaos
     ├── control.py      # JSON-lines control server (set/clear/show, scenarios)
     ├── metrics.py      # the fake's own Prometheus /metrics endpoint
-    ├── audit.py        # the append-only audit trail (the KV lines, tools=INV)
+    ├── audit.py        # the append-only audit trail (the KV lines, application=INV)
     ├── chaos.py        # seeded hostile-reply dice layer
     ├── signals.py      # SIGHUP/SIGUSR1/SIGTERM handling
     ├── statics.py      # static configuration loader (lib/defaults.json)

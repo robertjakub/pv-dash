@@ -15,6 +15,7 @@ import datetime
 import os
 import pathlib
 import re
+import signal
 import sys
 import time
 
@@ -174,6 +175,7 @@ def render():
 
 
 def main():
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)   # a piped view (| head, | grep) exits silently, no traceback
     ap = argparse.ArgumentParser(description="the battery's live view (read-only)")
     ap.add_argument('-w', '--watch', action='store_true',
                     help='loop with the screen cleared per tick (default: one show)')

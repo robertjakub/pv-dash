@@ -83,8 +83,8 @@ let
     (lib.optionals (cfg.auditForwardFormat != null) [ (setLine "audit forward format" cfg.auditForwardFormat) ])
     ""
     "# --- the log surface ---"
-    (setLine "log-level" cfg.logLevel)
-    (setLine "log-access" (lib.boolToString cfg.logAccess))
+    (setLine "system log-level" cfg.logLevel)
+    (setLine "system log-access" (lib.boolToString cfg.logAccess))
   ]));
 in
 {

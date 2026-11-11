@@ -75,7 +75,7 @@ The kinds — every row of the tables below carries one:
 | `set` | command | configure a setting (set metrics interval 5, set log-access on) |
 | `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the scraper (asks to confirm) |
-| `clear` | command | restore a setting to its configured value (clear metrics interval, clear log-level) |
+| `clear` | command | restore a setting to its configured value (clear metrics interval, clear system log-level) |
 
 ## Knobs
 
@@ -89,7 +89,6 @@ translate). The namespaces group them.
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `log-level` | `set log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
 | `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 
 ### modbus
@@ -140,6 +139,7 @@ the daemon's own serving socket: the listen address
 | `local-time` | `set system local-time` | settable | `on\|off` | `--local-time` / `LOCAL_TIME` | log timestamps in the system time zone instead of UTC |
 | `control-log-replies` | `set system log-replies` | settable | `on\|off` | `--control-log-replies` / — | DEBUG-log the full output of every control command (plainly: the command and its status log) |
 | `log-access` | `set system log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log every HTTP request at INFO |
+| `log-level` | `set system log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
 
 ### metrics/limits
 

@@ -1836,7 +1836,7 @@ try:
     check('scraper control: a bad value refused', r.startswith('fail interval must be'), r[:80])
     r = sctl('help clear', 15597)
     check('scraper control: help <command> describes the row',
-          r == 'ok restore a setting to its configured value (clear metrics interval, clear log-level)', r)
+          r == 'ok restore a setting to its configured value (clear metrics interval, clear system log-level)', r)
     r = sctl('help request', 15597)
     check('scraper control: help <command node> lists the namespace (the ? shape)',
           r.startswith('ok ') and all(w in r for w in ('dump', 'reload', 'reload-config', 'restart', 'restore')), r[:200])
@@ -2211,18 +2211,18 @@ try:
                         'show', 'modbus'], capture_output=True, text=True, timeout=15)
     words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
-    check('scraper_ctl: show modbus answers the flat names (the grouped sections, the direct children)',
-          r.returncode == 0 and words == ['grid-positive-import', 'modbus-auth', 'modbus-offset', 'modbus-unit',
-                                          'profile', 'timeout', 'upstream'],
+    check('scraper_ctl: show modbus answers the live words (the grouped sections, the direct children)',
+          r.returncode == 0 and words == ['auth', 'grid-positive-import', 'offset', 'profile', 'timeout', 'unit',
+                                          'upstream'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'show'], capture_output=True, text=True, timeout=15)
     words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
-    check("scraper_ctl: the bare show answers the flat grammar's root",
+    check("scraper_ctl: the bare show answers the root in the console's own words",
           r.returncode == 0 and words == ['audit', 'caps', 'config', 'connections', 'control', 'dump',
-                                          'dump-interval', 'inputs', 'inputs-metrics', 'knobs', 'local-time', 'log-access',
-                                          'log-level', 'metrics', 'modbus', 'system', 'version'],
+                                          'dump-interval', 'inputs', 'knobs', 'metrics', 'modbus', 'system',
+                                          'version'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'show', 'control', 'ops'], capture_output=True, text=True, timeout=15)
@@ -2431,7 +2431,7 @@ try:
     # 9. the metrics ACL: the cache's acl/connect reading on the /metrics
     # listener — the accept-time IP gate (the inline grammar + the file: chain)
     r = subprocess.run([sys.executable, P, '--dry-run',
-                        '--metrics-acl', 'file:' + os.path.join(REPO, 'examples', 'acl-ip-prefix.json')],
+                        '--metrics-acl', 'file:' + os.path.join(REPO, 'extras', 'examples', 'acl-ip-prefix.json')],
                        capture_output=True, text=True, timeout=15)
     check('metrics acl: the shipped ip-prefix example loads (dry-run rc 0)',
           r.returncode == 0 and 'dry-run: configuration is valid' in r.stderr, r.stderr[-100:])

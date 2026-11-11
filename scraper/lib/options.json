@@ -169,7 +169,7 @@
       "setting-help": "log every HTTP request at INFO", "values": [ "on", "off" ],
       "value-help": { "on": "audit trail for who polled /metrics and when", "off": "quiet (the default)" },
       "default": false, "help": "log every HTTP request at INFO" },
-    { "name": "log-level", "flag": "--log-level", "env": "LOG_LEVEL", "conv": "str", "live": "log-level",
+    { "name": "log-level", "flag": "--log-level", "env": "LOG_LEVEL", "conv": "str", "live": "system/log-level",
       "setting-help": "log verbosity", "value-help": { "DEBUG": "per-poll detail + the HTTP access log at DEBUG",
                       "INFO": "lifecycle, control commands, poll up/down",
                       "WARNING": "problems only",
@@ -234,6 +234,7 @@
     { "name": "set", "help": "configure a setting (set metrics interval 5, set log-access on)" },
     { "name": "show", "help": "print a setting's live value, or a report" },
     { "name": "shutdown", "help": "stop the scraper (asks to confirm)" },
-    { "name": "clear", "help": "restore a setting to its configured value (clear metrics interval, clear log-level)" }
+    { "name": "clear",
+      "help": "restore a setting to its configured value (clear metrics interval, clear system log-level)" }
   ]
 }

@@ -20,6 +20,7 @@ table."""
 import json
 import os
 
+from common.modbus.protocol import apply_socket_timeout
 from common.settings.options import default_ops_verbs, known_verbs, load_registry, make_describe, registry_view, settings_of
 
 
@@ -42,6 +43,7 @@ def _load_options():
     # falls through a truthy flag value) — they ladder flag > env > config
     # > static in lib/config.py like every other knob
     rows, sections, options = load_registry(here, choices={'log-level': tuple(static['log_levels'])})
+    apply_socket_timeout(options)   # the modbus timeout's default is the protocol tree's socket_timeout
     for key, value in sections.items():
         globals()[key] = value
     globals()['KNOWN_VERBS'] = known_verbs(sections['COMMANDS'])   # the RBAC vocabulary — the registry's rows are its one home

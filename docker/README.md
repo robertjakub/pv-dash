@@ -110,6 +110,15 @@ so no namespacing is needed (the Prometheus file is the exception: its
 `PROM_*` knobs belong to `entrypoint-prometheus.sh`, not a pv-suite
 tool). Every line starts commented; the defaults live in the image.
 
+The four tool files are **GENERATED** (`scripts/gen_env.py --check`
+gates the drift) from the per-tool registries (`lib/options.json`): the
+registry's full env-twin set, grouped by the knob's namespace node, the
+sample value the image itself runs (the CMD flag or an ENV where one
+pins it — those lines carry the pin note), the compose's environment
+pins marked per knob and the secrets' lines empty (`file:<path>` is the
+discipline). Edit the registry and re-run the generator — never the
+file.
+
 The same file is consumed two ways:
 
 ```bash

@@ -34,9 +34,11 @@ Rules across all four families:
 
 `docs/family-drift.md` (`scripts/family_drift.py`), `docs/OPTIONS.md`
 (`scripts/gen_options.py`), the four `<tool>/MANUAL.md` pages
-(`scripts/gen_manual.py --check`), the man pages
-(`scripts/gen_man.py`), the SBOM pair (`scripts/gen_sbom.py --check`),
-the seed ledger (`family_drift.py --seeds`). An editorial change to a
+(`scripts/gen_manual.py --check`), the four tool env examples
+(`docker/env/<tool>.env.example`, `scripts/gen_env.py --check`), the man
+pages (`scripts/gen_man.py`), the SBOM pair (`scripts/gen_sbom.py
+--check`), the seed ledger (`family_drift.py --seeds`). An editorial
+change to a
 generated doc lands in the GENERATOR's constants (the drift verdicts
 live in `family_drift.py`'s `*_FINDINGS`/`*_VERBS`/`*_CENSUS` blocks),
 then regenerates — a hand edit to the rendered page dies at the next
@@ -53,6 +55,7 @@ run, and `--check` fails a stale page.
    python3 scripts/lint_options.py --check
    python3 scripts/lint_texts.py
    python3 scripts/gen_manual.py --check
+   python3 scripts/gen_env.py --check
    python3 scripts/gen_sbom.py --check
    python3 scripts/gen_man.py && mandoc -Tlint <tool>/man/*.1
    ```

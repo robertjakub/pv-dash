@@ -56,7 +56,7 @@ pv-suite/
 ├── common/       # the shared Python package — render/ runtime/ settings/ wire/ serve/ modbus/ ([docs](common/README.md))
 ├── tests/        # the test suites, one or more per Modbus tool
 ├── scripts/      # the gates + editors: check/lint/gen_options, editor.py,
-│                 #   lint_readmes/lint_texts/lint_acl, family_drift, gen_man/gen_manual,
+│                 #   lint_readmes/lint_texts/lint_acl, family_drift, gen_man/gen_manual/gen_env,
 │                 #   gen_sbom, validate_json, set_group/set_live, battery.sh, release.py,
 │                 #   audit_verify.py
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:

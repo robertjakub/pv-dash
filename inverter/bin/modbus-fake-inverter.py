@@ -105,6 +105,8 @@ def validate(args):
         problems.append('--dump-interval must be >= 0 seconds (0 = off), got %r' % args.dump_interval)
     if (args.dump_interval or 0.0) and not args.dump_path:
         problems.append('--dump-interval needs --dump-path set (there is nothing to dump into)')
+    if args.timezone not in ('utc', 'local'):
+        problems.append('--timezone must be utc|local, got %r' % args.timezone)
     return problems
 
 
@@ -217,14 +219,14 @@ def main():
     # the ladder (lib/config.py): flag > env > the config script > the
     # static defaults — written back onto args, every knob the same way
     resolve_args(args)
-    logging.basicConfig(level=getattr(logging, args.log_level),
+    logging.basicConfig(level=getattr(logging, args.log_level, logging.INFO),
                         format='%(levelname)-7s %(message)s' if os.environ.get('JOURNAL_STREAM')
                         else '%(asctime)s %(levelname)-7s %(message)s')
     problems = validate(args)
     try:
-        frozen = parse_time(args.time) if args.time else None
+        frozen = None if (not args.time or args.time.strip().lower() in ('auto', 'live')) else parse_time(args.time)
     except ValueError:
-        logger.error('--time must be HH:MM (00:00-23:59), got %r', args.time)
+        logger.error('--time must be HH:MM (00:00-23:59), or auto, got %r', args.time)
         frozen = None
         problems.append('--time invalid')
     if problems:
@@ -241,6 +243,7 @@ def main():
                           grid_frequency=args.grid_frequency,
                           grid_frequency_wander=args.grid_frequency_wander)
     simulator.set_time_scale(args.time_scale)   # validated above; before any machine reads the clock
+    simulator.utc = args.timezone == 'utc'   # the documented timezone knob applies at start too (the wire set's own mapping)
     connect_acl = parse_acl(args.connect_acl, 'connect-acl')
     modbus_auth = parse_auth_type(args.modbus_auth, 'modbus-auth')
     modbus_auth_key = check_auth_key(

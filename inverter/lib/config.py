@@ -62,7 +62,8 @@ def resolve_args(args):
         else:
             cli = given if (given is not None and given != '') else None
         conv = str_to_bool if o.conv is bool else o.conv
-        value = r.resolve(cli, o.env, dest, STATIC_DEFAULTS.get(o.name), conv)
+        value = r.resolve(cli, o.env, dest, STATIC_DEFAULTS.get(o.name), conv,
+                          row=None if o.conv is bool else o)
         if value is None and o.conv is bool:
             value = False
         setattr(args, dest, value)

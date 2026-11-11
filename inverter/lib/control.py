@@ -187,7 +187,9 @@ class ControlServer(_ControlServer):
             if val in ('off', 'none'):
                 chaos.set_probability(0.0)
             else:
-                chaos.set_probability(num(val, 'chaos', 'a probability 0..1'))
+                v = num(val, 'chaos', 'a probability 0..1')
+                self._gate_range(key, v)
+                chaos.set_probability(v)
             return '%.2f' % chaos.p
         if key == 'seed':
             if val in ('random', 'none', 'auto'):
@@ -373,6 +375,9 @@ class ControlServer(_ControlServer):
             if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % warn
             return shown
+        shown = self.apply_typed_key(key, val)   # the typed-row fallback: the row's words, conv, choices, bounds, check
+        if shown is not None:
+            return str(shown)
         raise ValueError(T('wire.unknown_setting_bare') % key)
 
     def _parse_hour(self, text):

@@ -191,7 +191,7 @@ authenticated with.
 
 | Command | Effect |
 |---|---|
-| `set <setting> <value>` | configure a setting **live** — the poll plan, the write gates, the ACLs, the limits, the auth schemes, `control port` (rebinds the listener live), `audit log-file`/`audit rotate …`, `dump path`/`dump with-cache`/`dump restore-on-start` |
+| `set <setting> <value>` | configure a setting **live** — the poll plan, the write gates, the ACLs, the limits, the auth schemes, `control port` (rebinds the listener live), `audit log-file`/`audit rotate …`/`audit instance`, `dump path`/`dump with-cache`/`dump restore-on-start` |
 | `clear <setting>` | restore a setting to its **configured** startup value |
 | `show <setting>` | the bare live value of one tunable (a **secret knob refuses to show**) |
 | `help <setting>` | the registry description of one setting |
@@ -251,8 +251,8 @@ While idle the CLI sends wire pings (every 55 s, `CLI_KEEPALIVE` to tune);
 when the connection dies it retries `--reconnect` times (default 3) with
 `--reconnect-wait` seconds (default 10) and resumes on the first success.
 The session is audited (the clients' shared `cli` writer role,
-`tools=CACHE tag=cli`), the commands are audited by the
-server (`tools=CACHE tag=daemon`).
+`application=CACHE tag=cli`), the commands are audited by the
+server (`application=CACHE tag=daemon`).
 
 ## Diagnostics registers
 
@@ -459,15 +459,22 @@ the local file off: with a forward spelled that is the **remote-only
 mode** (the collector is the sole holder — no file, no XDG directory,
 the chain reseeds at GENESIS per run), without one the audit is disabled
 (the state `--no-audit-log` spells).
-The line names its writer — the proxy `tools=CACHE tag=daemon`, the
-ctl and cli clients the shared `tools=CACHE tag=cli` role:
+The line names its writer — the proxy `application=CACHE tag=daemon`, the
+ctl and cli clients the shared `application=CACHE tag=cli` role — and
+carries an `instance=<id>` word naming the writer daemon: the **control
+port** when `--audit-instance` is unset (unique per host by construction),
+the override when spelled. Keep an override unique among everything that
+shares one collector: two caches on different hosts may share a name (the
+RFC5424 envelope adds the hostname beside it), but the native line and CEF
+carry no host — pooled there, name them apart. The chain groups by the
+(application, writer, instance) triple:
 
 ```
-2026-11-04T07:16:40Z AUDIT tools=CACHE tag=daemon type=start hash=4e1b92f0c7a3 message=version=0.4.2 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
-2026-11-04T07:16:43Z AUDIT tools=CACHE tag=daemon type=write hash=b2c4e17f90d8 message=register 47415 = 5 (single register, unit 1)
-2026-11-04T07:17:12Z AUDIT tools=CACHE tag=daemon type=command hash=09ab57d3f4e1 message=peer=127.0.0.1:54426 cmd='clear cache' result=ok
-2026-11-04T07:17:20Z AUDIT tools=CACHE tag=daemon type=command hash=5c92f1b8d3a7 message=peer=127.0.0.1:54427 role=ops cmd='clear cache' wire=h1e6070592485 result=ok
-2026-11-04T07:17:45Z AUDIT tools=CACHE tag=daemon type=shutdown hash=d94a1f07c3e2 message=reason=SIGTERM-received uptime=65s clients=1 hits=412 misses=9
+2026-11-04T07:16:40Z AUDIT application=CACHE tag=daemon instance=15502 type=start hash=4e1b92f0c7a3 message=version=0.4.2 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
+2026-11-04T07:16:43Z AUDIT application=CACHE tag=daemon instance=15502 type=write hash=b2c4e17f90d8 message=register 47415 = 5 (single register, unit 1)
+2026-11-04T07:17:12Z AUDIT application=CACHE tag=daemon instance=15502 type=command hash=09ab57d3f4e1 message=peer=127.0.0.1:54426 cmd='clear cache' result=ok
+2026-11-04T07:17:20Z AUDIT application=CACHE tag=daemon instance=15502 type=command hash=5c92f1b8d3a7 message=peer=127.0.0.1:54427 role=ops cmd='clear cache' wire=h1e6070592485 result=ok
+2026-11-04T07:17:45Z AUDIT application=CACHE tag=daemon instance=15502 type=shutdown hash=d94a1f07c3e2 message=reason=SIGTERM-received uptime=65s clients=1 hits=412 misses=9
 ```
 
 The 12-hex token after the event name is the entry's **chained hash** (the

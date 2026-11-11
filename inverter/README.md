@@ -353,7 +353,7 @@ name their instances apart; the chain groups by the triple:
 2026-11-03T20:10:06Z AUDIT application=INV tag=daemon instance=15991 type=start hash=3f9a21c04de7 message=version=0.4.2 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
 2026-11-03T20:10:07Z AUDIT application=INV tag=daemon instance=15991 type=command hash=9c41e2b7a058 message=peer=127.0.0.1:54425 cmd='set soc 40' result=ok
 2026-11-03T20:10:07Z AUDIT application=INV tag=daemon instance=15991 type=command hash=3d82f6c05e19 message=peer=127.0.0.1:54426 role=ops cmd='show connections' wire=h4b91de207a86 result=ok
-2026-11-03T20:10:08Z AUDIT application=INV tag=daemon instance=15991 type=reset hash=77b0c4e19d23 message=SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
+2026-11-03T20:10:08Z AUDIT application=INV tag=daemon instance=15991 type=reset hash=77b0c4e19d23 message=signal=SIGUSR1 pins=1 coils=0 overlay=0
 2026-11-03T20:10:08Z AUDIT application=INV tag=daemon instance=15991 type=shutdown hash=5e2af8c30b61 message=reason=SIGTERM-received uptime=2s conns=0 requests=0 chaos_hits=0
 ```
 

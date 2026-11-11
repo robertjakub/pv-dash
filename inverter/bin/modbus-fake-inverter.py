@@ -376,7 +376,8 @@ def main():
                          applied=('chaos', 'max-kwp', 'strict', 'time', 'time-scale',
                                   'profile', 'log-level'))
         if control.audit:
-            control.audit.event('RELOAD', '%d setting(s): %s' % (len(labels), summary))
+            control.audit.event('RELOAD', 'result=ok settings=%d changed=%s'
+                                % (len(labels), audit_quote(','.join(labels))))
         return summary
 
     if control:
@@ -386,12 +387,13 @@ def main():
         control.signalbox = box
     box.install()
     if audit:
-        audit.event('START', 'version=%s modbus=%s:%d control=%s profile=%s: %s'
+        audit.event('START', 'version=%s modbus=%s:%d control=%s profile=%s description=%s'
                     % (version_string(), listen_host, listen_port,
                        audit_quote(('127.0.0.1:' + target) if target != '0' else 'off'),
-                       audit_quote(profile_label(profile_path)), simulator.profile.description))
+                       audit_quote(profile_label(profile_path)),
+                       audit_quote(simulator.profile.description)))
         if metrics_acl_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
-            audit.event('ACL-FILE', metrics_acl_warn)
+            audit.event('ACL-FILE', 'warn=%s' % audit_quote(metrics_acl_warn))
     try:
         fake.serve(listen_host, listen_port)
     except KeyboardInterrupt:

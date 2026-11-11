@@ -27,7 +27,7 @@ from .profile import load_profile, profile_label, resolve_profile
 from .signals import parse_time
 from common.runtime.version import version_string
 from common.render.texts import T
-from common.runtime.audit import load_audit_tags
+from common.runtime.audit import audit_quote, load_audit_tags
 from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, \
     SHOW_OPTIONS, NODE_BY_NAME, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
@@ -365,7 +365,7 @@ class ControlServer(_ControlServer):
             if warn is not None:   # the acl file's permission warning: the log, the audit trail, the reply's suffix
                 logger.warning('acl file: %s', warn)
                 if self.audit:
-                    self.audit.event('ACL-FILE', warn)
+                    self.audit.event('ACL-FILE', 'warn=%s' % audit_quote(warn))
             fake.metrics_acl = gate   # the swap is live: the accept check reads it per connection
             shown = acl_value_text(gate)
             if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)

@@ -11,7 +11,7 @@ import threading
 import time
 
 from common.settings.config import acl_admits
-from common.modbus import (describe_fc, describe_write, exception_frame,
+from common.modbus import (describe_fc, describe_write, exception_frame, write_kv,
                            frame, pack_bits, serve_modbus, unit_in_range,
                            unpack_bits)
 from common.serve.connlimit import ConnGate
@@ -152,7 +152,7 @@ class FakeInverter:
                 client.sendall(exception_frame(txn, 0, unit, func, 1))
                 logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)
                 if self.audit:
-                    self.audit.event('WRITE-REFUSED', '%s (write support disabled)' % desc)
+                    self.audit.event('WRITE-REFUSED', '%s reason=write-disabled' % write_kv(pdu, unit))
                 return
             if func in (3, 4) and addr_ is not None:   # holding (FC3) / input (FC4) registers
                 if not 1 <= count <= MAX_COUNT or addr_ + count > 65536:
@@ -201,13 +201,13 @@ class FakeInverter:
                 client.sendall(frame(txn, unit, pdu))
                 logger.info('write: %s', describe_write(pdu, unit))
                 if self.audit:
-                    self.audit.event('WRITE', describe_write(pdu, unit))
+                    self.audit.event('WRITE', write_kv(pdu, unit))
             elif func == 6 and len(pdu) == 5:
                 self.overlay[addr_] = struct.unpack('>H', pdu[3:5])[0]
                 client.sendall(frame(txn, unit, pdu))
                 logger.info('write: %s', describe_write(pdu, unit))
                 if self.audit:
-                    self.audit.event('WRITE', describe_write(pdu, unit))
+                    self.audit.event('WRITE', write_kv(pdu, unit))
             elif func == 15 and addr_ is not None and len(pdu) >= 6 and count \
                     and pdu[5] == (count + 7) // 8 and len(pdu) == 6 + pdu[5]:
                 if not 1 <= count <= MAX_BITS or addr_ + count > 65536:
@@ -220,7 +220,7 @@ class FakeInverter:
                 client.sendall(frame(txn, unit, struct.pack('>BHH', func, addr_, count)))
                 logger.info('write: %s', describe_write(pdu, unit))
                 if self.audit:
-                    self.audit.event('WRITE', describe_write(pdu, unit))
+                    self.audit.event('WRITE', write_kv(pdu, unit))
             elif func == 16 and len(pdu) >= 6 and pdu[5] == count * 2 and len(pdu) == 6 + count * 2:
                 values = struct.unpack('>%dH' % count, pdu[6:6 + count * 2])
                 for i, w in enumerate(values):
@@ -228,7 +228,7 @@ class FakeInverter:
                 client.sendall(frame(txn, unit, struct.pack('>BHH', func, addr_, count)))
                 logger.info('write: %s', describe_write(pdu, unit))
                 if self.audit:
-                    self.audit.event('WRITE', describe_write(pdu, unit))
+                    self.audit.event('WRITE', write_kv(pdu, unit))
             else:
                 # everything the fake does not serve is named and refused:
                 # a bad shape on an implemented FC (including a frame too

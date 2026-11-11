@@ -8,6 +8,7 @@ import signal
 import threading
 import time
 
+from common.runtime.audit import audit_quote
 from .profile import load_profile, profile_label
 
 logger = logging.getLogger('fake-inverter')
@@ -141,17 +142,18 @@ class SignalBox:
         except (ValueError, AttributeError, SystemExit) as e:
             logger.warning('SIGHUP: reload failed (%s), keeping previous settings', e)
             if self.audit:
-                self.audit.event('RELOAD', 'failed: %s' % e)
+                self.audit.event('RELOAD', 'result=err error=%s' % audit_quote(e))
             return
         labels = apply_demo(self.simulator, self.chaos, self.fake, values)
         if not labels:
             logger.info('SIGHUP: reloaded, no environment settings to apply')
             if self.audit:
-                self.audit.event('RELOAD', 'no environment settings to apply')
+                self.audit.event('RELOAD', 'result=ok settings=0')
             return
         logger.info('SIGHUP: reloaded %d setting(s): %s', len(labels), ', '.join(labels))
         if self.audit:
-            self.audit.event('RELOAD', '%d setting(s): %s' % (len(labels), ', '.join(labels)))
+            self.audit.event('RELOAD', 'result=ok settings=%d changed=%s'
+                             % (len(labels), audit_quote(','.join(labels))))
 
     # ---- SIGUSR1: reset the scenario (release pins + drop the write overlay)
 
@@ -165,7 +167,7 @@ class SignalBox:
         logger.info('SIGUSR1: scenario reset (%d pin(s), %d coil/discrete pin(s), %d overlay register(s) cleared), simulation continues',
                     pins, bits, overlay)
         if self.audit:
-            self.audit.event('RESET', 'SIGUSR1: %d pin(s), %d coil/discrete pin(s), %d overlay register(s) cleared'
+            self.audit.event('RESET', 'signal=SIGUSR1 pins=%d coils=%d overlay=%d'
                              % (pins, bits, overlay))
 
     # ---- SIGTERM / SIGINT

@@ -310,36 +310,16 @@ the largest blocks the device actually answers.
 
 The family-wide ACL map — the rule-chain semantics, the standalone acl
 file, the tools and where every tool's support stops — lives in
-[docs/common/ACL.md](../docs/common/ACL.md). The short form:
-
-- **`--connect-acl`** defaults to `any` (who may connect is the listen
-  bind's job — the default bind is loopback): `any` / `none` / a
-  comma-separated list of IPs and CIDR prefixes / `file:<path>` (the
-  standalone ip-prefix acl file).
-- **`--write-acl`** defaults to `none` — clients allowed to write, still
-  requires `--allow-write`; refused writes get a Modbus illegal-function
-  exception, logged with the client IP, the connection stays up.
-- **`--write-registers`** defaults to `none` — the ranges a forwarded write
-  may touch; `profile` takes the gate from the device profile's `acl`/
-  `write` chain, `file:<path>` from a standalone acl file. An example ships
-  as `examples/acl-write-registers.json` at the repo root (the deye
-  policy, worked out).
-- **`--metrics-acl`** defaults to `any` — who may connect to `/metrics`,
-  the same grammar, checked at accept.
-- Every acl file (the ip-prefix gate and the write gate) must be
-  **owner-only `0600`**: a group/world-readable file warns in the log, the
-  audit trail and the `set` reply suffix (the gate is config trust any
-  local user could have loosened).
-- The `show … table` reports render each gate as its chain, one
-  `allow`/`deny` line per range, the descs included.
-- ACLs re-resolve on `SIGHUP` like every other setting; a malformed list
-  keeps the previous one.
-
-Writing is therefore gated four times: the frame parse gate, `--allow-write`,
-the client on the write ACL, every touched register inside the allow-list —
+[docs/common/ACL.md](../docs/common/ACL.md); the four gates' knobs
+(`--connect-acl`, `--write-acl`, `--write-registers`, `--metrics-acl`)
+sit in the flag table above with their defaults and the inline grammar.
+Writing is gated four times: the frame parse gate, `--allow-write`, the
+client on the write ACL, every touched register inside the allow-list —
 with `write-acl` and `write-registers` defaulting to `none`, enabling
 `--allow-write` alone still refuses every write until the operator opens
-those two deliberately.
+those two deliberately. A worked write-gate example ships as
+`examples/acl-write-registers.json` at the repo root (the deye policy,
+worked out).
 
 ## Modbus auth
 

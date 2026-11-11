@@ -18,16 +18,18 @@ TCP the signed commands are mandatory. A second, read-only token
 (--control-ops-token) authenticates into its policy's verbs only (the
 ops shift against the admin key, both audited."""
 import logging
+import re
 import time
 
 from common.render.human import secs
 from common.runtime.version import version_string
 from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
 from common.settings.config import acl_table, acl_value_text, parse_auth_type, \
-    parse_listen, parse_upstream
+    parse_listen, parse_upstream, resolve_profile_file
 from common.modbus import AUTH_MIN_KEY
 from common.render.texts import T
-from .config import CONTROL_SOCKET_TEMPLATE, resolve_metrics_acl
+from .config import CONTROL_SOCKET_TEMPLATE, build_sources, load_device_profile, resolve_metrics_acl
+from .metrics import Metrics
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_OPTIONS, \
     NODE_BY_NAME, CFG_KEYS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .statics import DEFAULT_LISTEN_PORT, LOG_LEVELS
@@ -247,7 +249,7 @@ class ControlServer(_ControlServer):
             return '%d' % v
         if key == 'metrics-acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError(T('wire.acl_table_value') % ('a metrics-acl', 'metrics-acl-table'))
+                raise ValueError(T('wire.acl_table_value') % ('metrics-acl', 'metrics-acl-table'))
             if not self.httpd:
                 raise ValueError('no http server attached')
             try:
@@ -273,10 +275,47 @@ class ControlServer(_ControlServer):
             with s.lock:
                 s.cfg['log_access'] = on
             return 'on' if on else 'off'
+        if key == 'profile':
+            try:
+                path = resolve_profile_file(val)
+                profile = load_device_profile(path)   # SystemExit on an unreadable file
+            except SystemExit as e:
+                raise ValueError(str(e))
+            with s.lock:
+                spec = s.spec
+            sources = build_sources(profile, spec, path)   # ValueError when the power math cannot bind
+            with s.lock:   # build-first: a bad profile never lands, nothing to roll back
+                s.cfg['profile'] = path
+                s.cfg['sources'] = sources
+            return path
+        if key == 'metrics-spec':
+            try:
+                spec = Metrics(val, prefix=s.cfg['metric_prefix'])
+                profile = load_device_profile(s.cfg['profile'])
+            except SystemExit as e:
+                raise ValueError(str(e))
+            sources = build_sources(profile, spec, val)
+            with s.lock:
+                s.cfg['metrics_spec'] = val
+                s.cfg['sources'] = sources
+                s.spec = spec   # the poller reads the new spec on the next poll
+            return val
+        if key == 'metric-prefix':
+            if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', val):
+                raise ValueError('invalid metric_prefix = %r: must be a valid metric-name start '
+                                 '(letters/digits/underscore, not starting with a digit)' % val)
+            spec = Metrics(s.cfg['metrics_spec'], prefix=val)
+            with s.lock:
+                profile = load_device_profile(s.cfg['profile'])
+            sources = build_sources(profile, spec, s.cfg['metrics_spec'])
+            with s.lock:
+                s.cfg['metric_prefix'] = val
+                s.cfg['sources'] = sources
+                s.spec = spec
+            return val
         # the generic path: a typed row (int/float/str conv) needs no branch
-        # — the row's conv parses, the row's min/max gate, the config key
-        # takes the value; the value takes effect wherever the config is
-        # next consumed (a client rebuild, a reload)
+        # — the row's value words, conv, choices and min/max gate through
+        # the family's row_value, the config key takes the value
         opt = OPTION_BY_NAME.get(key)
         if opt is not None and opt.conv is bool:
             if val not in ('on', 'true', '1', 'yes', 'off', 'false', '0', 'no'):
@@ -284,33 +323,16 @@ class ControlServer(_ControlServer):
             with s.lock:
                 s.cfg[opt.name.replace('-', '_')] = val in ('on', 'true', '1', 'yes')
             return 'on' if val in ('on', 'true', '1', 'yes') else 'off'
-        if opt is not None and opt.conv in TYPED_CONVS:
-            return str(self._typed(key, val))
+        shown = self.apply_typed_key(key, val)
+        if shown is not None:
+            return str(shown)
         raise ValueError('unknown setting %s' % key)
 
     def _typed(self, key, val):
-        """The registry-driven typed write: the row's conv parses, the
-        row's check validates the shape (and hands back the config
-        updates — a check normalizes and fills the keys derived from the
-        knob), the row's min/max gate, the config keys take the values.
-        Returns the canonical display value — the caller adds any
-        runtime plumbing a bare config write cannot reach."""
-        s = self.scraper
-        opt = OPTION_BY_NAME.get(key)
-        try:
-            v = opt.conv(val)
-        except ValueError:
-            raise ValueError('%s must be %s, got %r'
-                             % (key, {int: 'an integer', float: 'a number'}.get(opt.conv, 'text'), val))
-        if opt.check:
-            updates = CHECKS[opt.check](v)
-        else:
-            if (opt.min is not None and not v >= opt.min) or (opt.max is not None and not v <= opt.max):
-                raise ValueError('%s must be %s..%s' % (key, opt.min, opt.max))
-            updates = {opt.name.replace('-', '_'): v}
-        with s.lock:
-            s.cfg.update(updates)
-        return updates[opt.name.replace('-', '_')]
+        """The registry-driven typed write, now the family's apply_typed_key
+        (the row's words, conv, choices, min/max, check) — the branches'
+        name for it."""
+        return self.apply_typed_key(key, val)
 
     def _get(self, key):
         s = self.scraper

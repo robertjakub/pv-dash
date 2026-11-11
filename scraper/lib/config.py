@@ -20,6 +20,10 @@ from .statics import DEFAULTS, DEFAULT_LISTEN_PORT, LOG_LEVELS, MAX_REGISTERS, U
 
 logger = logging.getLogger('scraper')
 
+# the registry rows by knob name — the resolver's row-driven validation
+# (row_value: the words, the conv, the choices, the min/max bounds)
+OPT = {o.name: o for o in OPTIONS}
+
 HOST_RE = re.compile(r'[A-Za-z0-9._:\[\]-]+')
 
 # the control socket's name: the daemon's template (common.config's parsers
@@ -221,26 +225,29 @@ def resolve_config(args, script_dir=None):
         'host': host,
         'modbus_port': modbus_port,
         'modbus_unit': resolve(getattr(args, 'modbus_unit', None), 'MODBUS_UNIT',
-                               'modbus_unit', DEFAULTS['modbus_unit'], int),
+                               'modbus_unit', DEFAULTS['modbus_unit'], int, row=OPT['modbus-unit']),
         'modbus_offset': resolve(args.modbus_offset, 'MODBUS_OFFSET', 'modbus_offset',
-                                 DEFAULTS['modbus_offset'], int),
+                                 DEFAULTS['modbus_offset'], int, row=OPT['modbus-offset']),
         'auth': parse_auth_type(resolve(getattr(args, 'modbus_auth', None), 'MODBUS_AUTH', 'modbus-auth', DEFAULTS['modbus_auth'], str), 'modbus-auth'),
         'auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
                           or '').strip() or None, 'auth-key'), 'auth-key'),
-        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout'], float),
-        'max_kwp': resolve(args.max_kwp, 'MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float),
-        'max_grid_kw': resolve(args.max_grid_kw, 'MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float),
+        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout'], float, row=OPT['timeout']),
+        'max_kwp': resolve(args.max_kwp, 'MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float, row=OPT['max-kwp']),
+        'max_grid_kw': resolve(args.max_grid_kw, 'MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float,
+                               row=OPT['max-grid-kw']),
         'grid_positive_import': resolve(args.grid_positive_import or None, 'GRID_POSITIVE_IMPORT',
                                         'grid_positive_import', DEFAULTS['grid_positive_import'], str_to_bool),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
-        'interval': resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval'], float),
+        'interval': resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval'], float,
+                            row=OPT['interval']),
         'max_clients': resolve(args.max_clients, 'MAX_CLIENTS', 'max_clients',
-                               DEFAULTS['max_clients'], int),
+                               DEFAULTS['max_clients'], int, row=OPT['max-clients']),
         'client_timeout': resolve(args.client_timeout, 'CLIENT_TIMEOUT', 'client_timeout',
-                                  DEFAULTS['client_timeout'], float),
+                                  DEFAULTS['client_timeout'], float, row=OPT['client-timeout']),
         'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MAX_CONN_PER_IP',
-                                   'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
+                                   'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int,
+                                   row=OPT['max-conn-per-ip']),
         'metrics_acl': (resolve(getattr(args, 'metrics_acl', None), 'METRICS_ACL',
                                 'metrics_acl', DEFAULTS['metrics_acl'], str) or '').strip() or 'any',
         'local_time': resolve(args.local_time or None, 'LOCAL_TIME', 'local_time', DEFAULTS['local_time'], str_to_bool),
@@ -271,9 +278,9 @@ def resolve_config(args, script_dir=None):
     cfg['audit_forward_format'] = resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
                                           'audit_forward_format', DEFAULTS['audit_forward_format'], str)
     cfg['audit_max_mb'] = resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
-                                  'audit_max_mb', DEFAULTS['audit_max_mb'], float)
+                                  'audit_max_mb', DEFAULTS['audit_max_mb'], float, row=OPT['audit-max-mb'])
     cfg['audit_files'] = resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
-                                 'audit_files', DEFAULTS['audit_files'], int)
+                                 'audit_files', DEFAULTS['audit_files'], int, row=OPT['audit-files'])
     cfg['audit_daily'] = resolve(getattr(args, 'audit_daily', False) or None,
                                  'AUDIT_DAILY', 'audit_daily', DEFAULTS['audit_daily'], str_to_bool)
     cfg['no_audit_log'] = resolve(getattr(args, 'no_audit_log', False) or None,
@@ -289,7 +296,7 @@ def resolve_config(args, script_dir=None):
     cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
                                             None, str) or '').strip() or None, 'dump-key')
     cfg['dump_interval'] = resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
-                                   'dump_interval', DEFAULTS['dump_interval'], float)
+                                   'dump_interval', DEFAULTS['dump_interval'], float, row=OPT['dump-interval'])
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
                                       'restore_on_start', DEFAULTS['restore_on_start'], str_to_bool)
     cfg['listen'] = cfg['listen'].strip()

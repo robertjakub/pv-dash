@@ -147,32 +147,6 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   intro name both copy targets (`gen_examples.py` renders them); the prod
   compose's `env_file:` paths and the docker READMEs follow.
 
-### Added
-
-- **extras** — **the audit trail's Graylog content pack lands under
-  `extras/graylog/`** (the new extras/ home for the operator-side packs
-  nothing in the build or runtime path consumes):
-  `pv-suite-content-pack.json` imports as one unit — the syslog UDP
-  input on 1514, three pipeline rules + one pipeline (the `audit_*` KV
-  parse, the quoted `cmd=` pick, the **GIM normalization** — the
-  Graylog Information Model field names from the Illuminate schema:
-  `event_action`/`event_uid`/`event_outcome`/`event_severity(+level)`/
-  `event_error_code`/`event_duration`, `source_ip`+`source_port`,
-  `destination_ip`+`destination_port`, `user_name`, `user_command`,
-  `application_name`, with the source-specific `audit_*` forms staying
-  beside), the five dedicated Audit streams routing on the raw message
-  (remove_matches pulls the trail out of the Default stream) and the
-  four event definitions (no notifications attached); the README
-  carries the import steps and the GIM mapping table, the chain verify
-  stays off-box in audit_verify, and the pack is verified by inspection
-  only (no Graylog on the dev machine). **`extras/` also takes in
-  `alerts/` and the root `examples/`** (the other operator-side packs —
-  the packages' `../extras/...` installs, the docker build contexts,
-  the docker/NIXOS/shared/scripts README pointers and lint_acl's glob
-  follow; the tool-local `examples/` dirs stay with their tools).
-
-### Changed
-
 - **docs** — **docs/TODO.md's open items bucket per tool**: the product
   and the security wave group their items under `### SCRAPER` /
   `INVERTER` / `DASHBOARD` / `COMMON` headings (the tag drops where the
@@ -297,8 +271,6 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   cache-regtest rounds the
   metrics per-IP cap live (`metrics/limits/max-conn-per-ip`) — the drift
   ledger's straggler promise.
-
-### Changed
 
 - **everywhere** — **every knob's value is judged by its registry row at
   every layer** (the row-driven validation): a row's `conv`, `choices`,
@@ -608,434 +580,6 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   registry listen default) and the secret sweep carries the
   per-tool markers verdict.
 
-### Fixed
-
-- **scripts** — **release.py's version read path follows the runtime/
-  split**: `old_version()` still read the flat `common/version.py` home
-  the common/ subdir wave (b10995d) had moved into
-  `common/runtime/version.py`, so the next release run would have died
-  on a FileNotFoundError before its first bump (verified: the read
-  resolves 0.4.2 through the new path).
-
-- **everywhere** — **`CLI_KEEPALIVE` is validated**: a non-float value
-  raised an uncaught ValueError traceback inside the cli session (the
-  enclosing try caught only DaemonExit/ConnectionLost). The env is
-  parsed once at startup, before the connect — a bad value is the
-  family's one-line refusal (`invalid CLI_KEEPALIVE '…': must be a
-  number of seconds (0 = off)`, exit 1) on every console that
-  documents the knob, and a blank value now counts as unset (the
-  resolver's rule) instead of crashing the float().
-
-- **cache** — **the metrics-token knob resolves through the full ladder**:
-  the config layer was missing — a config line `set metrics-token …`
-  parsed and was silently dropped (the bin read the flag/env pair only),
-  so a token standing in the config file never reached the F13 gate (a
-  tokenless non-loopback /metrics refused to start despite the knob's own
-  flag/env/config claim). `resolve_config` carries `metrics_token` now
-  (flag > env > config, the `file:` form works from every layer), the
-  bin's local flag/env read and the post-hoc show-config injection are
-  gone — the key rides the resolved dict and the secret placeholder rule
-  renders as before.
-
-- **cache, scraper, inverter** — **the Modbus protocol limits are one
-  tree**: `common/modbus/protocol.json` (max_pdu **253**, max_registers
-  **65536**, max_count 125, max_bits 2000, unit_id_range 1..247) —
-  the scraper's 65535 and the fake's 260 PDU were per-tool drift, and
-  the cache's top-level `unit_id_range` met the scraper's
-  `protocol`-nested one. The cache's `defaults.json` keeps only its own
-  `protocol` block (the FC policy + the exception codes), and **every
-  tool with a unit knob checks the configured unit against the shared
-  range** (the fake's hardcoded 1..247 check reads the tree now — its
-  message the family's wording); the cache's and the fake's Modbus
-  server faces refuse **out-of-range unit ids in-band** (exception 03 —
-  0 is the broadcast id, 248-255 reserved, neither reaches a server);
-  `check_options.py` gates the check. The cache's FC policy and
-  exception codes joined the shared tree — its `defaults.json`'s
-  `protocol` section is gone. So did its `register_types` tree, as
-  `registers_type` (the nine type→words entries — the shared tree is
-  the one home; the cache's `statics.py`/`config.py` speak
-  `REGISTERS_TYPE`).
-- **cache, scraper** — **the bool env twins run when the flag is
-  absent**: the unguarded `resolve_bool(args.flag, …)` call passed the
-  store_true `False` as a given value, the resolver's first layer saw
-  the flag set and the env never fell through (`LOCAL_TIME=1`,
-  `AUDIT_DAILY=1` and their siblings were dead unless the flag itself
-  was given). The call sites pass `or None` now — the flag-absent
-  `False` means unset, the env and config layers run, the tree's
-  `false` backs the ladder end.
-- **everywhere** — **the `audit-forward-format` env and config layers
-  come alive on all four tools**: the registry row baked
-  `"default": "rfc5424"` onto the flag, so `AUDIT_FORWARD_FORMAT` and
-  the config line never fell through (the resolver's first layer saw
-  the flag set). The default is the resolver's static rung now — the
-  flag layer starts empty, the tree entry backs it
-  (`AUDIT_FORWARD_FORMAT=cef` resolves on all four).
-- **dashboard** — **the `LISTEN` env is honored again**: the loader
-  wired the static listen default onto the flag, the flag was never
-  empty and the env layer never ran (the compose `LISTEN:` lines only
-  worked because the image CMD pins the flag); the static-defaults
-  wiring is gone, the resolver's static rung owns the default.
-
-- **scraper** — **every audit live-set crashed the control handler**
-  (`control handler crashed ('disabled')`, the connection closed): the
-  subclass wired `audit_params` before `super().__init__()` and the
-  base wiped it to `{}` — the family's rebuild read the missing keys.
-  `audit_params` rides the base constructor now (the cache's
-  post-super proxy alias keeps its shape), so `set audit forward`,
-  `set audit rotate …` and `set audit log-file` answer on the scraper
-  like on the other three.
-- **scraper** — **the registry's two live rows answer**: `set control
- ops verbs` and `set control trust uids` hit no `_apply` branch and
- answered `unknown setting` while the registry marked them live
- (the ops policy and the trusted peers are settable family-wide
- now, through the shared handler).
-- **cache** — **a live `set audit log-file -` spells stdout**: the
-  cache folded `-`/`stdout` to the XDG state home on the live path
-  (the start resolver and the scraper keep `-` raw — AuditLog's
-  reading); the raw spelling is the family's.
-- **dashboard** — **the live audit-forward/dump-path/dump-interval
-  renders ride `show config`** (the show-config-write-back contract
-  the other three tools kept — the startup values record them now).
-- **dashboard** — **a live `metrics/enable on` honors the configured
-  caps**: the control's re-enable read the static `DEFAULT_METRICS_CAPS`,
-  silently dropping the startup-configured `--metrics-max-clients`/
-  `--metrics-client-timeout`/`--metrics-max-conn-per-ip` (the cache's
-  `p.metrics_caps` reading is the family's golden shape — the entry now
-  carries the tuple, the rebind and the describe line consume it). The
-  dashboard's and the fake's own `/metrics` endpoints take the cache's
-  two-hook shape (the `snapshot()` state dict + the `render()` consumer;
-  the fake's private `_uptime()` retires into its snapshot), and the
-  drift census's three `/metrics` rows read as the one shape they are.
-- **tests** — **control-fuzz waits the ports it drives**: the
-  SUITE_PORT_BASE rewrite pointed the token/reference/ops sections'
-  startup waits at the plain server's already-bound port, so every
-  check raced its fresh daemon's python startup and answered
-  connection-refused (latent since the battery runner landed; the
-  family's startup-weight growth widened the window past losing).
-  Each section waits its own daemon's control port now, the cache and
-  dashboard fuzzers' shape.
-
-- **tests** — **the suites always run through the battery**: every suite
-  refuses a standalone invocation (`PV_RUN_DIR` — the marker
-  `scripts/battery.sh` exports; the release verification and the CI
-  matrix set it for their legs) — the standalone runs shared /tmp
-  scratch across sessions and collided. The battery gained the perf
-  stats (per-suite wall time + the battery total in the tally), the
-  keep-4 run-dir housekeeping (a busy day piled ~2G), the dead-slot
-  scrub with a working `rm -rf` reclaim (the `rmdir` never removed a
-  non-empty slot dir — the slots only ever accumulated), and the
-  socket-exception rewrite now covers the %-formatted socket names
-  (inverter-regtest's mode checks and the dashboard's rebind wait
-  crashed on the run-dir rewrite). control-fuzz and
-  cache-control-fuzz dial the ports they spawn (the SUITE_PORT_BASE
-  sweep had left the token/reference/ops sections raw — the checks
-  raced fresh daemons and answered connection-refused), and the three
-  regtests took their `SUITE_PORT_BASE` blocks (cache-regtest's
-  describe/audit pins included).
-
-### Added
-
-- **everywhere** — **the example configuration scripts are GENERATED
-  from the registries** (`scripts/gen_examples.py`; `--check` gates the
-  drift — the env generator absorbed the surface, `gen_env.py` is
-  gone): every knob the registry declares is in the file now
-  (52/41/52/39 — the hand files carried ~30 each), every line
-  commented at its default, the console's live-path spelling on each
-  `set` line (the file pastes into a ctl unchanged), the buckets under
-  the namespace nodes' help, the restart-marked and secret rows marked,
-  the credentials in their `file:/run/credentials/<daemon>/<knob>` form
-  (a secret never renders inline) and the fake's control-only demo
-  machines documented out. The hand files' active lines all spelled
-  registry defaults (two pinned a stale ops-verbs policy) — the docker
-  images' effective config is unchanged.
-
-- **docker** — **the env examples are GENERATED from the registries**
-  (`scripts/gen_examples.py`; `--check` gates the drift): every env twin the
-  four registries declare is in the file now (50/39/34/36 — the hand
-  files carried 13/12/18/11), grouped by the knob's namespace node the
-  MANUAL.md knobs tables speak, the sample value the image itself runs
-  (the CMD flag or an ENV where one pins the knob — `LISTEN`/
-  `AUDIT_LOG` carry the pinned-by-the-CMD note, `UPSTREAM`/`SELECTION`/
-  `METRICS_SPEC`/`CONFIG_JS` the image-ENV one), the compose stacks'
-  environment pins marked per knob (the suite keys, the generated
-  tokens), the secrets' lines empty with the `file:<path>` discipline,
-  and the dashboard's example gains the twins header it never had. The
-  prometheus example stays hand-written (its `PROM_*` knobs belong to
-  `entrypoint-prometheus.sh`) — the check cross-checks its names
-  against the entrypoint.
-
-- **tests** — **the battery learns quick/full and tells time**: every
-  suite takes a `quick|full` profile (`PV_SUITE_PROFILE` — the runner
-  exports it per its own profile, the release verification pins `full`)
-  — quick runs each suite's core sections and the whole ten finish in
-  ~3 minutes, full keeps the nightly depth (the seal, the auth
-  handshake, the metrics parity, the rotation and syslog rounds, the
-  wide fuzz pools). The suite logs open with `NOTE started at`, close
-  with a blank line, `NOTE finished at` and the one verdict, and the
-  runner predicts the batch: the per-suite wall times live in
-  `eta-<profile>.txt` (rewritten at every tally), the header prints
-  the estimate, and every START line carries
-  `eta <seconds> (HH:MM)` refined by each actual. The backup archives
-  drop the macOS `._` members and a `previous` link names the run
-  before `latest`.
-
-- **everywhere** — **a wedged daemon dumps its threads on `SIGUSR2`**:
-  every daemon's `main()` registers `faulthandler` for `SIGUSR2` — one
-  signal later stderr carries every thread's stack, and the daemon keeps
-  running. The dump writes straight to fd 2 (no logging machinery), so it
-  answers even when the logging lock is held by a stuck thread. The
-  ctl/cli tools are one-shot and skip it.
-
-- **alerts** — **the alert rules pack re-homed to `alerts/`, split per
-  exporter**: the F16 pack leaves the scraper tree — one rule file per
-  watched exporter (`alerts/scraper.yml`, `alerts/cache.yml`,
-  alerts/README.md carries the story + the install map), and each
-  exporter's package installs its own half
-  (`share/modbus-scraper/alerts.yml`, `share/modbus-cache/alerts.yml`),
-  so a cache-only install now carries the cache group. The demo
-  Prometheus image bakes both files (the `alerts` build context rides
-  `../alerts`; `rule_files:` globs `/etc/prometheus/alerts/*.yml`);
-  docs/NIXOS.md lists both packaged copies under `ruleFiles`.
-
-- **common** — **the audit-forward targets (the off-box copy, the F10
-  finish line)**: `--audit-forward` spells one target now — `none`,
-  `syslog` (the local socket auto-scan), `syslog:/path` (an explicit
-  socket, must exist at bind), `udp://host[:514]` (RFC5426 datagrams,
-  best-effort) or `tcp://host[:514]` (RFC6587 octet-count framing). The
-  remote envelope rides the new `--audit-forward-format` (`rfc5424`, the
-  default, or `cef` as an additive wrapping) — both carry the native
-  line verbatim plus the prefix + chain hash as extracted fields
-  (`[pvDash@1 …]` / `cs1`/`cs2`), so a scheduled search at the collector
-  can chain-verify the off-box copy and alert on a break. A send failure
-  notes once and the next event re-arms lazily (no threads, no buffers;
-  the re-armed note carries the dropped count). `--audit-log none` turns
-  the local file off: with a forward spelled that is the remote-only
-  mode (the collector is the sole holder, the chain reseeds at GENESIS
-  per run), without one the audit is disabled (the state
-  `--no-audit-log` spells). The knob stays live family-wide
-  (`audit/forward`, `audit/forward-format`); the NixOS modules grew
-  `auditForward` (grammar-checked) + `auditForwardFormat`; the
-  audit-chain suite grew the collector harnesses (the TCP framing, CEF,
-  UDP, the re-arm cycle, the remote-only e2e).
-
-- **common** — **the audit trail forwarding** (`--audit-forward syslog`):
-  every trail can mirror its lines to the local syslog socket as they
-  land — stdlib `SysLogHandler` on `/dev/log` (or its macOS/journal
-  siblings), daemon facility, the bin name as the tag, journald picking
-  every line up sealed. The F10 answer, built in: the file sink stays the
-  authority (the chain lives there — `scripts/audit_verify.py` walks it
-  unchanged), the mirror carries the finished line with its hash, a send
-  failure stops the mirroring with one stderr note, and a socket-less
-  spelling refuses to start with the family's one-clean-ERROR shape. The
-  knob is family-wide (`audit/forward`, live: `set audit forward syslog`,
-  `$AUDIT_FORWARD`, the dump/reload story carries it, the ctl/cli clients
-  take the flag too), the NixOS modules grew `auditForward`, and the
-  audit-chain suite pins the mirror, the fail-stop and the refusals.
-  Superseded in shape by the targets entry above (the same knob, the
-  full grammar).
-
-- **scraper** — **the alert rules pack ships next to the exporter** (the
-  F16 closure): `scraper/alerts.yml`, six alerts in two groups, the
-  audit vocabulary's detection half — every annotation names the audit
-  events and the log lines the fired page correlates with (the
-  `WRITE-REFUSED` events, the SCR/CACHE trails), so detection is wired,
-  not just logged. The scraper's group is its poll story
-  (`ScraperPollDown`, `ScraperFreshnessGap`, `ScraperExceptionSpike`);
-  the cache contributes its side (`CachePollDown`, `CacheAgeSpike`,
-  `CacheWriteRefusalBurst`) on a new `modbus_cache_write_refused_total`
-  counter on the cache's own /metrics (every gate refusal counts —
-  allow-write off, the write ACL, the register allow-list, a malformed
-  frame; each is a `WRITE-REFUSED` audit event) and stays silent until
-  that endpoint is scraped. The demo image bakes the pack
-  (`rule_files:` in `prometheus.yml`, the `alerts` build context), the
-  scraper package installs it (`share/modbus-scraper/alerts.yml`),
-  docs/NIXOS.md shows the `services.prometheus.ruleFiles` wiring; the
-  thresholds assume the default 10 s poll interval.
-
-- **everywhere** — **`request/reload-config` answers family-wide**: the
-  config re-read without the exec (the surface the request-namespace
-  wave named) now speaks on all four. The cache and the fake gain their
-  reloaders (the scraper and the dashboard had it): the cache's
-  `apply_reload` is the SIGHUP body extracted — the map swaps atomically,
-  the override markers clear, and the dump loop now re-reads the
-  configured interval on that path (the wake it was missing) — and the
-  fake's re-applies the demo knobs (chaos, peak, strict, time, time-scale,
-  profile, log level) over the running machines from the re-resolved
-  ladder, the machine pins keeping their markers. The shared tail lives
-  once in the control base (`reloaded()`: the markers drop — wholesale,
-  or the `applied` keys — and the dump-interval loop re-reads with the
-  parked dumper waking), the shared SIGHUP watcher in
-  `common/runtime/daemon.py` gained the SIGUSR1 hook and the
-  reload-failure audit hook so the cache adopts it wholesale, and the
-  spine's reload-config reply catches the resolvers' `SystemExit` now (a
-  broken config file answers `err reload failed` instead of killing the
-  session). The verb joins `KNOWN_VERBS` on the two tools that lacked it
-  (the ops default is then `show,clear` — the verb-rename wave below
-  re-derives both: the cache `show,flush`, the fake `show`), the rows
-  land beside
-  `request/reload` in both registries, and the ctls' helps, the READMEs,
-  the man pages and the MANUALs follow.
-
-- **common** — **the flat package organizes into functional subdirs**: the
-  17 flat modules split into five subpackages beside the existing
-  `modbus/` — `render/` (the static texts + JSON, the man-page builder,
-  the time formats), `runtime/` (the daemon-bin ladder, the audit trail,
-  the UTC log stamps, the version — whose repo-root walk gained one
-  dirname), `settings/` (the option registry, the config plumbing, the
-  state dumps + the seal), `wire/` (the ControlServer base + the family
-  `command()` walk, the HMAC frames, the peer-cred, both ctl/cli clients)
-  and `serve/` (the connection caps, the gated Prometheus skeleton). No
-  shim modules — the ~175 import lines spell the full submodule path
-  (`from common.wire.control import ControlServer`), the doc prose paths
-  swept, the four `package.nix` install every subdir (the modbus
-  pattern), `gen_sbom`'s module count walks the package recursively (21
-  modules now — `modbus/` was never counted before) and `lint_texts`
-  reads the JSON in `render/`. One commit, the common-split precedent
-  (ab387d4): a coupled move cannot bisect. Byte-identical `--help`/`--man`
-  for all twelve bins, the family chain smoke green (ctl ×4, the metrics
-  401→200 gate, the sealed dump round-trip, the cli pty connect), all
-  gates + ten suites green.
-
-- **inverter** — **the fake takes the family's config file**: `--config`
-  (`$CONFIG`, then `inverter.conf` next to the script) reads the set
-  grammar — every line a `set <name> <value>` in the CLI spelling — and
-  the bundled sample is `inverter/examples/inverter.conf`; the ladder is
-  the family's flag > env > config > the static defaults
-  (`inverter/lib/config.py` `resolve_args` writes the effective values
-  back onto the args namespace, and the CLI defaults left the parser —
-  a static-wired default would shadow the lower layers). The demo twins
-  (`CHAOS`, `MAX_KWP`, `STRICT`, `TIME`, `TIME_SCALE`) are ordinary env
-  twins now: they apply at start and SIGHUP re-applies them (the
-  SIGHUP-only posture is retired, the scrape-regtest check reworked);
-  the declared-but-dead twins (`LOG_LEVEL`, `ALLOW_WRITE`,
-  `CONTROL_SOCKET_GROUP`, `DUMP_PATH`, `DUMP_INTERVAL`,
-  `RESTORE_ON_START`, `METRICS_ACL`) resolve at start too. The pins and
-  the machines stay control-wire settings — a config line naming one
-  refuses the start. `request reload` saves the reload state beside the
-  config script (`RELOAD_NEEDS_CONFIG` true family-wide; the state home
-  stays the `--config ''` fallback) and the dry-run line names the
-  config path. The image ships the conf (`Dockerfile.fake-inverter`
-  COPYs `examples/inverter.conf` onto the built-in target),
-  `package.nix` installs it, the man page regenerates (the CONFIG env,
-  the conf in FILES) and the MANUAL prose carries the conf story (the
-  other three MANUALs' stale bundled-conf paths fixed in the regen).
-
-- **common** — **the static texts are one JSON home** (`common/texts.json`,
-  loaded by the new `common/texts.py`): the console's faces and reconnect
-  ladder, the ctl's, the four welcome banners, the wire's fixed replies
-  (the auth/mac/forbidden family, the reload/dump/restore heads, the
-  restart note, the show-config comment) and the daemon bind/startup lines
-  resolve through the dotted `T(key)` — byte-identical renders, no text
-  changed. The gate `scripts/lint_texts.py --check` fails an unresolved
-  reference, an orphan key and a duplicated value (one text, one home);
-  the four `package.nix` and the four Dockerfiles ship the JSON beside the
-  common modules. The wire's status tokens (`ok`/`err`/`note`/`bye`,
-  `daemon-exit`, the `*** SECRET REMOVED ***` placeholder) keep their
-  grammar homes — the prose moved, the protocol did not.
-
-- **everywhere** — **the `audit-daily` knob is one shape, family-wide**:
-  the UTC-midnight audit-rotation trigger is a live knob on all four —
-  the scraper and the dashboard gain the row
-  (`--audit-daily`/`$AUDIT_DAILY`, live `audit/rotate/daily`), the fake
-  inverter's startup-only row gains its live name (the control learns the
-  audit_params + the rebuild, swapping both writers — the control's
-  COMMAND trail and the fake's WRITE trail), and the cache's (the only
-  live one) stays the template. `set audit rotate daily on/off` switches
-  the trigger identically everywhere; the common `rebuild_audit` already
-  rode the params.
-
-- **everywhere** — **the env twins are complete**: every knob the docker
-  env files need is reachable from an env file. The fake inverter gains
-  `$AUDIT_LOG`/`$AUDIT_MAX_MB`/`$AUDIT_FILES`/`$AUDIT_DAILY`/
-  `$NO_AUDIT_LOG` and the F13 caps' twins `$MAX_CLIENTS`/
-  `$CLIENT_TIMEOUT`/`$MAX_CONN_PER_IP` — and `$LISTEN` finally works (the
-  row has declared the env since the serve-address wave; no code read
-  it); the dashboard's audit knobs reach the env layer and the config
-  script at all (they were flag-only — a config-script
-  `set audit log-file …` parsed and was silently ignored) and `log-level`
-  gains `$LOG_LEVEL`; `$NO_AUDIT_LOG` is family-wide (the everywhere
-  ruling — a journald-only deployment disables the file trail from the
-  env file). A knob ruled env-free carries the registry's `no-env` note
-  instead of a silent gap (the fake's F11 flags-first demo knobs, the
-  dashboard's `log-queries`), rendered in the env-free footnote
-  and gated: `check_options` fails a flag row with neither an env twin
-  nor a note.
-
-- **everywhere** — **the serve-address word is family-wide**: `show system
-  listen` prints the address the daemon serves on, on all four. The cache's
-  `system/listen` is the canon; the scraper's listen knob re-spells to it
-  (`metrics/listen` stays as the alias — the wire, the config grammar and
-  the state files accept both spellings, the canonical one renders), with
-  the restart fold that was missing (a `set` + `request reload` now really
-  rebinds). The fake inverter and the dashboard trade their custom serve
-  knobs for the same knob — the fake's `--host`/`--port` and the
-  dashboard's `--bind`/`--port` retire for `--listen HOST:PORT`
-  (`$LISTEN`, live `system/listen`, hidden, restart-marked — the argv
-  defaults keep their addresses: `127.0.0.1:5502` and `127.0.0.1:8080`);
-  the dashboard's `set system listen` refuses a pending move beyond
-  loopback while the page serves tokenless (the F21 shape at set time).
-  The NixOS module options are `listenHost`/`listenPort` rendering one
-  `--listen` (the cache's shape), the docker CMDs and the compose
-  `LISTEN` env follow, and the MANUALs, the man pages and the
-  drift census ride along.
-
-- **everywhere** — **the `dump-interval` knob is family-wide** (the cache
-  was the only holder): the scraper, the fake inverter and the dashboard
-  gain the cache's `dump-interval` — `--dump-interval`/`$DUMP_INTERVAL`,
-  live as `set dump-interval <s|off>` — and the state dump rewrites
-  itself on a timer: the dumper loop parks on the control base while the
-  interval is off and a live set wakes it without a restart (the cache's
-  golden shape, shared now as `run_dump_interval`); a
-  set/show/describe without a dump path answers the family's
-  `dump-interval needs a dump path (set dump/path or --dump-path)`, the
-  start resolution refuses an interval without a dump path, and the
-  SIGHUP/`request reload-config` path re-reads the configured interval
-  (the scraper and the dashboard; the fake's SIGHUP layer does not touch
-  the dump family — the dump-path parity). The dump-path rows' help
-  spells the timer; the MANUALs, the man pages and the
-  modules' `dumpInterval` option follow.
-
-- **docker** — **the stacks split by wiring, and both ship
-  authenticated**: the new `docker/prod/compose.yaml` is the production
-  shape — the same three service images the demo runs (cache + scraper +
-  dashboard), no fake, **no in-stack collector** (your Prometheus is
-  external and pulls the exporter's `/metrics` — the loopback `9350`
-  publish for a host-level collector, or attach it to the network; the
-  dashboard's `PROM_URL` points its `/prom` proxy at it), a
-  **non-internal** network (`pv-suite`,
-  the cache dials the device on the LAN), the cache's `env/cache.env`
-  **required** (UPSTREAM is the operator's decision — the image default
-  only ever resolves in the demo), the device's own auth
-  (`AUTH_UPSTREAM`/`AUTH_UPSTREAM_KEY`, suite or the cache-only
-  waveshare) the env file's, and two published ports (the dashboard's
-  loopback 8080 + the exporter's loopback 9350). The Modbus hops ship
-  authenticated in BOTH stacks now:
-  one shared suite key (`/config/modbus-auth.token`, generated into the
-  volume on the first seed by whichever Modbus image seeds first — the
-  same mechanism as the tokens, a `*.token` placeholder in the fake's,
-  cache's and scraper's `config-defaults/`) proven by the PVA1/HMAC
-  handshake on every connect — the fake demands it (server), the cache
-  proves it upstream and demands it from its own clients, the scraper
-  proves it; the `environment:` blocks pin scheme + `file:` reference
-  (environment beats env_file — opening a hop is a compose edit, the F7
-   shape). The collector (`Dockerfile.prometheus`,
-   `entrypoint-prometheus.sh`, `prometheus.yml`) serves the demo stack
-   from `docker/` — the reference wiring a prod collector mirrors; the
-   demo wiring lives in `docker/demo/` (`compose.yaml` —
-  the build contexts re-point one level out — plus its README with the
-  demo blockquote + topology); the four tool Dockerfiles and the env
-  examples stay at `docker/`, the two entrypoints move to
-  `docker/entrypoints/` (the five Dockerfiles' COPY paths + build
-  comments carry the prefix) — demo and
-  production run identical images, the split is the wiring. The
-  READMEs follow: `docker/README.md` turns production-facing (the
-  secrets-story section joins), `docker/demo/README.md` carries the demo
-  blockquote + the topology, `docker/prod/README.md` the production
-  shape (its own topology: the device outside the network, the cache's
-  client the one route out).
-
-### Changed
-
 - **shared** — **the write-acl pair joins the shared homes**:
   `examples/acl-write-registers.json` + `shared/schema/acl-write-registers.schema.json`
   leave the cache tree — the standalone acl file format is family-wide
@@ -1131,27 +675,6 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   examples; the cache's `package.nix` now installs its three
   `schema/*.schema.json` files too (the scraper's were the only ones
   shipped).
-
-### Fixed
-
-- **common** — **the device profiles resolve again from the settings
-  subdir**: the common/ subdir split left `_profile_candidates` climbing
-  one dirname short (`here` stayed `common/` where the module had moved
-  to `common/settings/`) — the bundled profiles fell through to the bare
-  name and every bare-name `--config` profile refused ("cannot read
-  device profile sun2000.json": the scrape-regtest "never came up", the
-  fuzz pairs' connection-refused aborts). The walk climbs to the tree
-  root; the packaged share-tree and the one-up suite-tree candidates
-  keep their order.
-
-- **scraper** — **a live `modbus/offset` set reaches the client**: the
-  registry row said live, but the poller's `apply()` had no `offset=`
-  plumbing — a live set wrote the config and changed nothing (the poll
-  kept the start offset until a reload). `apply()` takes the offset and
-  the `_apply` branch mirrors `modbus/unit`; the row carries the
-  ±100000 bounds (the parity with the start-path check).
-
-### Changed
 
 - **scraper** — **the legacy flat-spec wire-name fallback retires from
   the exposition**: the poll gauges always render their fixed
@@ -1478,8 +1001,6 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   CONFIGURED value now (was: the live rebind on `metrics/listen` — the row
   marked restart again in `dda97b9`); the audit rev. 17 entry follows.
 
-### Changed
-
 - **everywhere** — **the /metrics token posture is the F13 shape
   family-wide** (the scraper's refusal is the golden master): the cache's,
   the dashboard's and the fake's own endpoints serve tokenless on the
@@ -1621,7 +1142,470 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   `--help`/`--man` byte-identical, the option gates clean, the
   ten-suite battery green.
 
+### Added
+
+- **extras** — **the audit trail's Graylog content pack lands under
+  `extras/graylog/`** (the new extras/ home for the operator-side packs
+  nothing in the build or runtime path consumes):
+  `pv-suite-content-pack.json` imports as one unit — the syslog UDP
+  input on 1514, three pipeline rules + one pipeline (the `audit_*` KV
+  parse, the quoted `cmd=` pick, the **GIM normalization** — the
+  Graylog Information Model field names from the Illuminate schema:
+  `event_action`/`event_uid`/`event_outcome`/`event_severity(+level)`/
+  `event_error_code`/`event_duration`, `source_ip`+`source_port`,
+  `destination_ip`+`destination_port`, `user_name`, `user_command`,
+  `application_name`, with the source-specific `audit_*` forms staying
+  beside), the five dedicated Audit streams routing on the raw message
+  (remove_matches pulls the trail out of the Default stream) and the
+  four event definitions (no notifications attached); the README
+  carries the import steps and the GIM mapping table, the chain verify
+  stays off-box in audit_verify, and the pack is verified by inspection
+  only (no Graylog on the dev machine). **`extras/` also takes in
+  `alerts/` and the root `examples/`** (the other operator-side packs —
+  the packages' `../extras/...` installs, the docker build contexts,
+  the docker/NIXOS/shared/scripts README pointers and lint_acl's glob
+  follow; the tool-local `examples/` dirs stay with their tools).
+
+- **everywhere** — **the example configuration scripts are GENERATED
+  from the registries** (`scripts/gen_examples.py`; `--check` gates the
+  drift — the env generator absorbed the surface, `gen_env.py` is
+  gone): every knob the registry declares is in the file now
+  (52/41/52/39 — the hand files carried ~30 each), every line
+  commented at its default, the console's live-path spelling on each
+  `set` line (the file pastes into a ctl unchanged), the buckets under
+  the namespace nodes' help, the restart-marked and secret rows marked,
+  the credentials in their `file:/run/credentials/<daemon>/<knob>` form
+  (a secret never renders inline) and the fake's control-only demo
+  machines documented out. The hand files' active lines all spelled
+  registry defaults (two pinned a stale ops-verbs policy) — the docker
+  images' effective config is unchanged.
+
+- **docker** — **the env examples are GENERATED from the registries**
+  (`scripts/gen_examples.py`; `--check` gates the drift): every env twin the
+  four registries declare is in the file now (50/39/34/36 — the hand
+  files carried 13/12/18/11), grouped by the knob's namespace node the
+  MANUAL.md knobs tables speak, the sample value the image itself runs
+  (the CMD flag or an ENV where one pins the knob — `LISTEN`/
+  `AUDIT_LOG` carry the pinned-by-the-CMD note, `UPSTREAM`/`SELECTION`/
+  `METRICS_SPEC`/`CONFIG_JS` the image-ENV one), the compose stacks'
+  environment pins marked per knob (the suite keys, the generated
+  tokens), the secrets' lines empty with the `file:<path>` discipline,
+  and the dashboard's example gains the twins header it never had. The
+  prometheus example stays hand-written (its `PROM_*` knobs belong to
+  `entrypoint-prometheus.sh`) — the check cross-checks its names
+  against the entrypoint.
+
+- **tests** — **the battery learns quick/full and tells time**: every
+  suite takes a `quick|full` profile (`PV_SUITE_PROFILE` — the runner
+  exports it per its own profile, the release verification pins `full`)
+  — quick runs each suite's core sections and the whole ten finish in
+  ~3 minutes, full keeps the nightly depth (the seal, the auth
+  handshake, the metrics parity, the rotation and syslog rounds, the
+  wide fuzz pools). The suite logs open with `NOTE started at`, close
+  with a blank line, `NOTE finished at` and the one verdict, and the
+  runner predicts the batch: the per-suite wall times live in
+  `eta-<profile>.txt` (rewritten at every tally), the header prints
+  the estimate, and every START line carries
+  `eta <seconds> (HH:MM)` refined by each actual. The backup archives
+  drop the macOS `._` members and a `previous` link names the run
+  before `latest`.
+
+- **everywhere** — **a wedged daemon dumps its threads on `SIGUSR2`**:
+  every daemon's `main()` registers `faulthandler` for `SIGUSR2` — one
+  signal later stderr carries every thread's stack, and the daemon keeps
+  running. The dump writes straight to fd 2 (no logging machinery), so it
+  answers even when the logging lock is held by a stuck thread. The
+  ctl/cli tools are one-shot and skip it.
+
+- **alerts** — **the alert rules pack re-homed to `alerts/`, split per
+  exporter**: the F16 pack leaves the scraper tree — one rule file per
+  watched exporter (`alerts/scraper.yml`, `alerts/cache.yml`,
+  alerts/README.md carries the story + the install map), and each
+  exporter's package installs its own half
+  (`share/modbus-scraper/alerts.yml`, `share/modbus-cache/alerts.yml`),
+  so a cache-only install now carries the cache group. The demo
+  Prometheus image bakes both files (the `alerts` build context rides
+  `../alerts`; `rule_files:` globs `/etc/prometheus/alerts/*.yml`);
+  docs/NIXOS.md lists both packaged copies under `ruleFiles`.
+
+- **common** — **the audit-forward targets (the off-box copy, the F10
+  finish line)**: `--audit-forward` spells one target now — `none`,
+  `syslog` (the local socket auto-scan), `syslog:/path` (an explicit
+  socket, must exist at bind), `udp://host[:514]` (RFC5426 datagrams,
+  best-effort) or `tcp://host[:514]` (RFC6587 octet-count framing). The
+  remote envelope rides the new `--audit-forward-format` (`rfc5424`, the
+  default, or `cef` as an additive wrapping) — both carry the native
+  line verbatim plus the prefix + chain hash as extracted fields
+  (`[pvDash@1 …]` / `cs1`/`cs2`), so a scheduled search at the collector
+  can chain-verify the off-box copy and alert on a break. A send failure
+  notes once and the next event re-arms lazily (no threads, no buffers;
+  the re-armed note carries the dropped count). `--audit-log none` turns
+  the local file off: with a forward spelled that is the remote-only
+  mode (the collector is the sole holder, the chain reseeds at GENESIS
+  per run), without one the audit is disabled (the state
+  `--no-audit-log` spells). The knob stays live family-wide
+  (`audit/forward`, `audit/forward-format`); the NixOS modules grew
+  `auditForward` (grammar-checked) + `auditForwardFormat`; the
+  audit-chain suite grew the collector harnesses (the TCP framing, CEF,
+  UDP, the re-arm cycle, the remote-only e2e).
+
+- **common** — **the audit trail forwarding** (`--audit-forward syslog`):
+  every trail can mirror its lines to the local syslog socket as they
+  land — stdlib `SysLogHandler` on `/dev/log` (or its macOS/journal
+  siblings), daemon facility, the bin name as the tag, journald picking
+  every line up sealed. The F10 answer, built in: the file sink stays the
+  authority (the chain lives there — `scripts/audit_verify.py` walks it
+  unchanged), the mirror carries the finished line with its hash, a send
+  failure stops the mirroring with one stderr note, and a socket-less
+  spelling refuses to start with the family's one-clean-ERROR shape. The
+  knob is family-wide (`audit/forward`, live: `set audit forward syslog`,
+  `$AUDIT_FORWARD`, the dump/reload story carries it, the ctl/cli clients
+  take the flag too), the NixOS modules grew `auditForward`, and the
+  audit-chain suite pins the mirror, the fail-stop and the refusals.
+  Superseded in shape by the targets entry above (the same knob, the
+  full grammar).
+
+- **scraper** — **the alert rules pack ships next to the exporter** (the
+  F16 closure): `scraper/alerts.yml`, six alerts in two groups, the
+  audit vocabulary's detection half — every annotation names the audit
+  events and the log lines the fired page correlates with (the
+  `WRITE-REFUSED` events, the SCR/CACHE trails), so detection is wired,
+  not just logged. The scraper's group is its poll story
+  (`ScraperPollDown`, `ScraperFreshnessGap`, `ScraperExceptionSpike`);
+  the cache contributes its side (`CachePollDown`, `CacheAgeSpike`,
+  `CacheWriteRefusalBurst`) on a new `modbus_cache_write_refused_total`
+  counter on the cache's own /metrics (every gate refusal counts —
+  allow-write off, the write ACL, the register allow-list, a malformed
+  frame; each is a `WRITE-REFUSED` audit event) and stays silent until
+  that endpoint is scraped. The demo image bakes the pack
+  (`rule_files:` in `prometheus.yml`, the `alerts` build context), the
+  scraper package installs it (`share/modbus-scraper/alerts.yml`),
+  docs/NIXOS.md shows the `services.prometheus.ruleFiles` wiring; the
+  thresholds assume the default 10 s poll interval.
+
+- **everywhere** — **`request/reload-config` answers family-wide**: the
+  config re-read without the exec (the surface the request-namespace
+  wave named) now speaks on all four. The cache and the fake gain their
+  reloaders (the scraper and the dashboard had it): the cache's
+  `apply_reload` is the SIGHUP body extracted — the map swaps atomically,
+  the override markers clear, and the dump loop now re-reads the
+  configured interval on that path (the wake it was missing) — and the
+  fake's re-applies the demo knobs (chaos, peak, strict, time, time-scale,
+  profile, log level) over the running machines from the re-resolved
+  ladder, the machine pins keeping their markers. The shared tail lives
+  once in the control base (`reloaded()`: the markers drop — wholesale,
+  or the `applied` keys — and the dump-interval loop re-reads with the
+  parked dumper waking), the shared SIGHUP watcher in
+  `common/runtime/daemon.py` gained the SIGUSR1 hook and the
+  reload-failure audit hook so the cache adopts it wholesale, and the
+  spine's reload-config reply catches the resolvers' `SystemExit` now (a
+  broken config file answers `err reload failed` instead of killing the
+  session). The verb joins `KNOWN_VERBS` on the two tools that lacked it
+  (the ops default is then `show,clear` — the verb-rename wave below
+  re-derives both: the cache `show,flush`, the fake `show`), the rows
+  land beside
+  `request/reload` in both registries, and the ctls' helps, the READMEs,
+  the man pages and the MANUALs follow.
+
+- **common** — **the flat package organizes into functional subdirs**: the
+  17 flat modules split into five subpackages beside the existing
+  `modbus/` — `render/` (the static texts + JSON, the man-page builder,
+  the time formats), `runtime/` (the daemon-bin ladder, the audit trail,
+  the UTC log stamps, the version — whose repo-root walk gained one
+  dirname), `settings/` (the option registry, the config plumbing, the
+  state dumps + the seal), `wire/` (the ControlServer base + the family
+  `command()` walk, the HMAC frames, the peer-cred, both ctl/cli clients)
+  and `serve/` (the connection caps, the gated Prometheus skeleton). No
+  shim modules — the ~175 import lines spell the full submodule path
+  (`from common.wire.control import ControlServer`), the doc prose paths
+  swept, the four `package.nix` install every subdir (the modbus
+  pattern), `gen_sbom`'s module count walks the package recursively (21
+  modules now — `modbus/` was never counted before) and `lint_texts`
+  reads the JSON in `render/`. One commit, the common-split precedent
+  (ab387d4): a coupled move cannot bisect. Byte-identical `--help`/`--man`
+  for all twelve bins, the family chain smoke green (ctl ×4, the metrics
+  401→200 gate, the sealed dump round-trip, the cli pty connect), all
+  gates + ten suites green.
+
+- **inverter** — **the fake takes the family's config file**: `--config`
+  (`$CONFIG`, then `inverter.conf` next to the script) reads the set
+  grammar — every line a `set <name> <value>` in the CLI spelling — and
+  the bundled sample is `inverter/examples/inverter.conf`; the ladder is
+  the family's flag > env > config > the static defaults
+  (`inverter/lib/config.py` `resolve_args` writes the effective values
+  back onto the args namespace, and the CLI defaults left the parser —
+  a static-wired default would shadow the lower layers). The demo twins
+  (`CHAOS`, `MAX_KWP`, `STRICT`, `TIME`, `TIME_SCALE`) are ordinary env
+  twins now: they apply at start and SIGHUP re-applies them (the
+  SIGHUP-only posture is retired, the scrape-regtest check reworked);
+  the declared-but-dead twins (`LOG_LEVEL`, `ALLOW_WRITE`,
+  `CONTROL_SOCKET_GROUP`, `DUMP_PATH`, `DUMP_INTERVAL`,
+  `RESTORE_ON_START`, `METRICS_ACL`) resolve at start too. The pins and
+  the machines stay control-wire settings — a config line naming one
+  refuses the start. `request reload` saves the reload state beside the
+  config script (`RELOAD_NEEDS_CONFIG` true family-wide; the state home
+  stays the `--config ''` fallback) and the dry-run line names the
+  config path. The image ships the conf (`Dockerfile.fake-inverter`
+  COPYs `examples/inverter.conf` onto the built-in target),
+  `package.nix` installs it, the man page regenerates (the CONFIG env,
+  the conf in FILES) and the MANUAL prose carries the conf story (the
+  other three MANUALs' stale bundled-conf paths fixed in the regen).
+
+- **common** — **the static texts are one JSON home** (`common/texts.json`,
+  loaded by the new `common/texts.py`): the console's faces and reconnect
+  ladder, the ctl's, the four welcome banners, the wire's fixed replies
+  (the auth/mac/forbidden family, the reload/dump/restore heads, the
+  restart note, the show-config comment) and the daemon bind/startup lines
+  resolve through the dotted `T(key)` — byte-identical renders, no text
+  changed. The gate `scripts/lint_texts.py --check` fails an unresolved
+  reference, an orphan key and a duplicated value (one text, one home);
+  the four `package.nix` and the four Dockerfiles ship the JSON beside the
+  common modules. The wire's status tokens (`ok`/`err`/`note`/`bye`,
+  `daemon-exit`, the `*** SECRET REMOVED ***` placeholder) keep their
+  grammar homes — the prose moved, the protocol did not.
+
+- **everywhere** — **the `audit-daily` knob is one shape, family-wide**:
+  the UTC-midnight audit-rotation trigger is a live knob on all four —
+  the scraper and the dashboard gain the row
+  (`--audit-daily`/`$AUDIT_DAILY`, live `audit/rotate/daily`), the fake
+  inverter's startup-only row gains its live name (the control learns the
+  audit_params + the rebuild, swapping both writers — the control's
+  COMMAND trail and the fake's WRITE trail), and the cache's (the only
+  live one) stays the template. `set audit rotate daily on/off` switches
+  the trigger identically everywhere; the common `rebuild_audit` already
+  rode the params.
+
+- **everywhere** — **the env twins are complete**: every knob the docker
+  env files need is reachable from an env file. The fake inverter gains
+  `$AUDIT_LOG`/`$AUDIT_MAX_MB`/`$AUDIT_FILES`/`$AUDIT_DAILY`/
+  `$NO_AUDIT_LOG` and the F13 caps' twins `$MAX_CLIENTS`/
+  `$CLIENT_TIMEOUT`/`$MAX_CONN_PER_IP` — and `$LISTEN` finally works (the
+  row has declared the env since the serve-address wave; no code read
+  it); the dashboard's audit knobs reach the env layer and the config
+  script at all (they were flag-only — a config-script
+  `set audit log-file …` parsed and was silently ignored) and `log-level`
+  gains `$LOG_LEVEL`; `$NO_AUDIT_LOG` is family-wide (the everywhere
+  ruling — a journald-only deployment disables the file trail from the
+  env file). A knob ruled env-free carries the registry's `no-env` note
+  instead of a silent gap (the fake's F11 flags-first demo knobs, the
+  dashboard's `log-queries`), rendered in the env-free footnote
+  and gated: `check_options` fails a flag row with neither an env twin
+  nor a note.
+
+- **everywhere** — **the serve-address word is family-wide**: `show system
+  listen` prints the address the daemon serves on, on all four. The cache's
+  `system/listen` is the canon; the scraper's listen knob re-spells to it
+  (`metrics/listen` stays as the alias — the wire, the config grammar and
+  the state files accept both spellings, the canonical one renders), with
+  the restart fold that was missing (a `set` + `request reload` now really
+  rebinds). The fake inverter and the dashboard trade their custom serve
+  knobs for the same knob — the fake's `--host`/`--port` and the
+  dashboard's `--bind`/`--port` retire for `--listen HOST:PORT`
+  (`$LISTEN`, live `system/listen`, hidden, restart-marked — the argv
+  defaults keep their addresses: `127.0.0.1:5502` and `127.0.0.1:8080`);
+  the dashboard's `set system listen` refuses a pending move beyond
+  loopback while the page serves tokenless (the F21 shape at set time).
+  The NixOS module options are `listenHost`/`listenPort` rendering one
+  `--listen` (the cache's shape), the docker CMDs and the compose
+  `LISTEN` env follow, and the MANUALs, the man pages and the
+  drift census ride along.
+
+- **everywhere** — **the `dump-interval` knob is family-wide** (the cache
+  was the only holder): the scraper, the fake inverter and the dashboard
+  gain the cache's `dump-interval` — `--dump-interval`/`$DUMP_INTERVAL`,
+  live as `set dump-interval <s|off>` — and the state dump rewrites
+  itself on a timer: the dumper loop parks on the control base while the
+  interval is off and a live set wakes it without a restart (the cache's
+  golden shape, shared now as `run_dump_interval`); a
+  set/show/describe without a dump path answers the family's
+  `dump-interval needs a dump path (set dump/path or --dump-path)`, the
+  start resolution refuses an interval without a dump path, and the
+  SIGHUP/`request reload-config` path re-reads the configured interval
+  (the scraper and the dashboard; the fake's SIGHUP layer does not touch
+  the dump family — the dump-path parity). The dump-path rows' help
+  spells the timer; the MANUALs, the man pages and the
+  modules' `dumpInterval` option follow.
+
+- **docker** — **the stacks split by wiring, and both ship
+  authenticated**: the new `docker/prod/compose.yaml` is the production
+  shape — the same three service images the demo runs (cache + scraper +
+  dashboard), no fake, **no in-stack collector** (your Prometheus is
+  external and pulls the exporter's `/metrics` — the loopback `9350`
+  publish for a host-level collector, or attach it to the network; the
+  dashboard's `PROM_URL` points its `/prom` proxy at it), a
+  **non-internal** network (`pv-suite`,
+  the cache dials the device on the LAN), the cache's `env/cache.env`
+  **required** (UPSTREAM is the operator's decision — the image default
+  only ever resolves in the demo), the device's own auth
+  (`AUTH_UPSTREAM`/`AUTH_UPSTREAM_KEY`, suite or the cache-only
+  waveshare) the env file's, and two published ports (the dashboard's
+  loopback 8080 + the exporter's loopback 9350). The Modbus hops ship
+  authenticated in BOTH stacks now:
+  one shared suite key (`/config/modbus-auth.token`, generated into the
+  volume on the first seed by whichever Modbus image seeds first — the
+  same mechanism as the tokens, a `*.token` placeholder in the fake's,
+  cache's and scraper's `config-defaults/`) proven by the PVA1/HMAC
+  handshake on every connect — the fake demands it (server), the cache
+  proves it upstream and demands it from its own clients, the scraper
+  proves it; the `environment:` blocks pin scheme + `file:` reference
+  (environment beats env_file — opening a hop is a compose edit, the F7
+   shape). The collector (`Dockerfile.prometheus`,
+   `entrypoint-prometheus.sh`, `prometheus.yml`) serves the demo stack
+   from `docker/` — the reference wiring a prod collector mirrors; the
+   demo wiring lives in `docker/demo/` (`compose.yaml` —
+  the build contexts re-point one level out — plus its README with the
+  demo blockquote + topology); the four tool Dockerfiles and the env
+  examples stay at `docker/`, the two entrypoints move to
+  `docker/entrypoints/` (the five Dockerfiles' COPY paths + build
+  comments carry the prefix) — demo and
+  production run identical images, the split is the wiring. The
+  READMEs follow: `docker/README.md` turns production-facing (the
+  secrets-story section joins), `docker/demo/README.md` carries the demo
+  blockquote + the topology, `docker/prod/README.md` the production
+  shape (its own topology: the device outside the network, the cache's
+  client the one route out).
+
 ### Fixed
+
+- **scripts** — **release.py's version read path follows the runtime/
+  split**: `old_version()` still read the flat `common/version.py` home
+  the common/ subdir wave (b10995d) had moved into
+  `common/runtime/version.py`, so the next release run would have died
+  on a FileNotFoundError before its first bump (verified: the read
+  resolves 0.4.2 through the new path).
+
+- **everywhere** — **`CLI_KEEPALIVE` is validated**: a non-float value
+  raised an uncaught ValueError traceback inside the cli session (the
+  enclosing try caught only DaemonExit/ConnectionLost). The env is
+  parsed once at startup, before the connect — a bad value is the
+  family's one-line refusal (`invalid CLI_KEEPALIVE '…': must be a
+  number of seconds (0 = off)`, exit 1) on every console that
+  documents the knob, and a blank value now counts as unset (the
+  resolver's rule) instead of crashing the float().
+
+- **cache** — **the metrics-token knob resolves through the full ladder**:
+  the config layer was missing — a config line `set metrics-token …`
+  parsed and was silently dropped (the bin read the flag/env pair only),
+  so a token standing in the config file never reached the F13 gate (a
+  tokenless non-loopback /metrics refused to start despite the knob's own
+  flag/env/config claim). `resolve_config` carries `metrics_token` now
+  (flag > env > config, the `file:` form works from every layer), the
+  bin's local flag/env read and the post-hoc show-config injection are
+  gone — the key rides the resolved dict and the secret placeholder rule
+  renders as before.
+
+- **cache, scraper, inverter** — **the Modbus protocol limits are one
+  tree**: `common/modbus/protocol.json` (max_pdu **253**, max_registers
+  **65536**, max_count 125, max_bits 2000, unit_id_range 1..247) —
+  the scraper's 65535 and the fake's 260 PDU were per-tool drift, and
+  the cache's top-level `unit_id_range` met the scraper's
+  `protocol`-nested one. The cache's `defaults.json` keeps only its own
+  `protocol` block (the FC policy + the exception codes), and **every
+  tool with a unit knob checks the configured unit against the shared
+  range** (the fake's hardcoded 1..247 check reads the tree now — its
+  message the family's wording); the cache's and the fake's Modbus
+  server faces refuse **out-of-range unit ids in-band** (exception 03 —
+  0 is the broadcast id, 248-255 reserved, neither reaches a server);
+  `check_options.py` gates the check. The cache's FC policy and
+  exception codes joined the shared tree — its `defaults.json`'s
+  `protocol` section is gone. So did its `register_types` tree, as
+  `registers_type` (the nine type→words entries — the shared tree is
+  the one home; the cache's `statics.py`/`config.py` speak
+  `REGISTERS_TYPE`).
+- **cache, scraper** — **the bool env twins run when the flag is
+  absent**: the unguarded `resolve_bool(args.flag, …)` call passed the
+  store_true `False` as a given value, the resolver's first layer saw
+  the flag set and the env never fell through (`LOCAL_TIME=1`,
+  `AUDIT_DAILY=1` and their siblings were dead unless the flag itself
+  was given). The call sites pass `or None` now — the flag-absent
+  `False` means unset, the env and config layers run, the tree's
+  `false` backs the ladder end.
+- **everywhere** — **the `audit-forward-format` env and config layers
+  come alive on all four tools**: the registry row baked
+  `"default": "rfc5424"` onto the flag, so `AUDIT_FORWARD_FORMAT` and
+  the config line never fell through (the resolver's first layer saw
+  the flag set). The default is the resolver's static rung now — the
+  flag layer starts empty, the tree entry backs it
+  (`AUDIT_FORWARD_FORMAT=cef` resolves on all four).
+- **dashboard** — **the `LISTEN` env is honored again**: the loader
+  wired the static listen default onto the flag, the flag was never
+  empty and the env layer never ran (the compose `LISTEN:` lines only
+  worked because the image CMD pins the flag); the static-defaults
+  wiring is gone, the resolver's static rung owns the default.
+
+- **scraper** — **every audit live-set crashed the control handler**
+  (`control handler crashed ('disabled')`, the connection closed): the
+  subclass wired `audit_params` before `super().__init__()` and the
+  base wiped it to `{}` — the family's rebuild read the missing keys.
+  `audit_params` rides the base constructor now (the cache's
+  post-super proxy alias keeps its shape), so `set audit forward`,
+  `set audit rotate …` and `set audit log-file` answer on the scraper
+  like on the other three.
+- **scraper** — **the registry's two live rows answer**: `set control
+ ops verbs` and `set control trust uids` hit no `_apply` branch and
+ answered `unknown setting` while the registry marked them live
+ (the ops policy and the trusted peers are settable family-wide
+ now, through the shared handler).
+- **cache** — **a live `set audit log-file -` spells stdout**: the
+  cache folded `-`/`stdout` to the XDG state home on the live path
+  (the start resolver and the scraper keep `-` raw — AuditLog's
+  reading); the raw spelling is the family's.
+- **dashboard** — **the live audit-forward/dump-path/dump-interval
+  renders ride `show config`** (the show-config-write-back contract
+  the other three tools kept — the startup values record them now).
+- **dashboard** — **a live `metrics/enable on` honors the configured
+  caps**: the control's re-enable read the static `DEFAULT_METRICS_CAPS`,
+  silently dropping the startup-configured `--metrics-max-clients`/
+  `--metrics-client-timeout`/`--metrics-max-conn-per-ip` (the cache's
+  `p.metrics_caps` reading is the family's golden shape — the entry now
+  carries the tuple, the rebind and the describe line consume it). The
+  dashboard's and the fake's own `/metrics` endpoints take the cache's
+  two-hook shape (the `snapshot()` state dict + the `render()` consumer;
+  the fake's private `_uptime()` retires into its snapshot), and the
+  drift census's three `/metrics` rows read as the one shape they are.
+- **tests** — **control-fuzz waits the ports it drives**: the
+  SUITE_PORT_BASE rewrite pointed the token/reference/ops sections'
+  startup waits at the plain server's already-bound port, so every
+  check raced its fresh daemon's python startup and answered
+  connection-refused (latent since the battery runner landed; the
+  family's startup-weight growth widened the window past losing).
+  Each section waits its own daemon's control port now, the cache and
+  dashboard fuzzers' shape.
+
+- **tests** — **the suites always run through the battery**: every suite
+  refuses a standalone invocation (`PV_RUN_DIR` — the marker
+  `scripts/battery.sh` exports; the release verification and the CI
+  matrix set it for their legs) — the standalone runs shared /tmp
+  scratch across sessions and collided. The battery gained the perf
+  stats (per-suite wall time + the battery total in the tally), the
+  keep-4 run-dir housekeeping (a busy day piled ~2G), the dead-slot
+  scrub with a working `rm -rf` reclaim (the `rmdir` never removed a
+  non-empty slot dir — the slots only ever accumulated), and the
+  socket-exception rewrite now covers the %-formatted socket names
+  (inverter-regtest's mode checks and the dashboard's rebind wait
+  crashed on the run-dir rewrite). control-fuzz and
+  cache-control-fuzz dial the ports they spawn (the SUITE_PORT_BASE
+  sweep had left the token/reference/ops sections raw — the checks
+  raced fresh daemons and answered connection-refused), and the three
+  regtests took their `SUITE_PORT_BASE` blocks (cache-regtest's
+  describe/audit pins included).
+
+- **common** — **the device profiles resolve again from the settings
+  subdir**: the common/ subdir split left `_profile_candidates` climbing
+  one dirname short (`here` stayed `common/` where the module had moved
+  to `common/settings/`) — the bundled profiles fell through to the bare
+  name and every bare-name `--config` profile refused ("cannot read
+  device profile sun2000.json": the scrape-regtest "never came up", the
+  fuzz pairs' connection-refused aborts). The walk climbs to the tree
+  root; the packaged share-tree and the one-up suite-tree candidates
+  keep their order.
+
+- **scraper** — **a live `modbus/offset` set reaches the client**: the
+  registry row said live, but the poller's `apply()` had no `offset=`
+  plumbing — a live set wrote the config and changed nothing (the poll
+  kept the start offset until a reload). `apply()` takes the offset and
+  the `_apply` branch mirrors `modbus/unit`; the row carries the
+  ±100000 bounds (the parity with the start-path check).
 
 - **scraper, inverter, dashboard** — **the declared env twins that never
   worked**: the scraper's `$AUDIT_MAX_MB`/`$AUDIT_FILES` were shadowed by
@@ -1687,6 +1671,15 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
 
 ### Docs
 
+- **docs** — **the Unreleased section consolidates to one block per
+  type**: the waves had each appended their own heading (six Changed,
+  three Fixed, two Added, two Docs rode the one release section); the
+  entries gather under the first heading of their type in
+  first-appearance order (Changed, Added, Fixed, Docs), every bullet
+  byte-identical and each type's newest-on-top order preserved, and the
+  released sections stay untouched (0.4.2 was already one block per
+  type, the archive is history).
+
 - **docs** — **AUDIT.md is SECURITY.md (rev. 28) — the one security
   document**: the audit (the F-ledger unchanged since rev. 27) absorbs the
   four tool READMEs' Security sections (which shrink to pointers under the
@@ -1746,8 +1739,6 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   moves the superseded release section(s) to the archive and the
   version-sweep's pathspec excludes it.
 
-### Docs
-
 - **everywhere** — **the man pages carry one section ladder per page
   class**: the daemon pages all run NAME, SYNOPSIS, DESCRIPTION,
   OPTIONS, SIGNALS, CONTROL, SECURITY, ENVIRONMENT, FILES, EXIT STATUS,
@@ -1763,7 +1754,6 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   `printf` pipelines render their `\n` for the first time (`\\n` ate a
   character and printed a `0` — latent since the pages were ported),
   and the cache page's three over-long `.BR`/`.I` rows rewrap.
-
 ## 0.4.2 — 2026-11-08
 ### Changed
 

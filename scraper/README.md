@@ -157,7 +157,7 @@ command, settable (`set`/`clear`) or show-only — is tabled in
 
 | Command | Effect |
 |---|---|
-| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `system log-access`, `system log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
+| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `system log-access`, `system log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit instance`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
 | `poll now` | the loop wakes immediately |
 | `show connections` | the live HTTP clients of /metrics |
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |
@@ -326,7 +326,12 @@ failure notes once and the next event re-arms. `--audit-log none` turns
 the local file off: with a forward spelled that is the **remote-only
 mode** (the collector is the sole holder, the chain reseeds at GENESIS
 per run), without one the audit is disabled (the state
-`--no-audit-log` spells).
+`--no-audit-log` spells). Every line names its writer daemon in
+`instance=<id>` — the control port when `--audit-instance` is unset
+(unique per host by construction), the override when spelled; keep an
+override unique among everything that shares one collector (the native
+line and CEF carry no hostname) — the chain groups by the
+(application, writer, instance) triple.
 
 ## Test inverter
 

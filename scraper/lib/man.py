@@ -110,7 +110,12 @@ auto\\-scan), \\fBsyslog:/path\\fR (an explicit socket),
 (F10): a scheduled search at the collector can chain\\-verify the
 extracted prefix/chain fields and alert on a break. The remote envelope
 rides \\fB--audit-forward-format\\fR (\\fBrfc5424\\fR, the default, or
-\\fBcef\\fR); the local forms keep the verbatim send. A send failure
+\\fBcef\\fR); the local forms keep the verbatim send. Every line names
+its writer daemon in \\fBinstance=<id>\\fR \\(em the control port when
+\\fB--audit-instance\\fR is unset (unique per host by construction), the
+override when spelled (1\\-64 characters, letters, digits, . _ : @ \\-);
+make an override unique among everything that shares one collector: the
+chain groups by it. A send failure
 notes once and the next event re\\-arms. \\fB--audit-log none\\fR turns
 the local file off: with a forward spelled that is the remote\\-only
 mode (the collector is the sole holder, the chain reseeds at GENESIS

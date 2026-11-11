@@ -110,9 +110,10 @@ def main():
     control_ops_token = cfg['control_ops_token'] or None
     ops_verbs = parse_ops_verbs(cfg.get('control_ops_verbs'), KNOWN_VERBS, default=DEFAULT_OPS_VERBS)
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
-    audit_params = audit_params_of(cfg)
+    audit_derive = control_target if control_target.isdigit() and control_target != '0' else str(listen_port)
+    audit_params = audit_params_of(cfg, derive=audit_derive)
     tag = load_audit_tags('scraper')
-    audit = build_audit(cfg, tag, 'modbus-scraper', logger)
+    audit = build_audit(cfg, tag, 'modbus-scraper', logger, derive=audit_derive)
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target) \
         + (', read-only ops token accepted' if control_ops_token else '')

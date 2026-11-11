@@ -1,7 +1,7 @@
 # The defaults
 
 Every value knob's default lives in its registry row — the `default`
-field of `lib/options.json`, editable with `scripts/edit_options.py`
+field of `lib/options.json`, editable with `scripts/editor.py options`
 (conv-typed: int/float/bool/str, the empty input clears to the None
 ladder-end). The resolver ladder's last rung reads it: each tool's
 `lib/statics.py` builds `DEFAULTS` off the loaded `OPTIONS` rows (the

@@ -22,8 +22,11 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   `lib/options.json` registries: the canonical row order, the
   hand-formatted layout (edits must be surgical — the lint enforces
   it). `--check` for the gates.
-- **`edit_options.py`** — the registry's terminal editor (two faces,
-  one core): the row surgery the hand-formatting demands.
+- **`editor.py`** — the combined terminal editor, word subcommands:
+  `options [<project>]` (the registry's dialog + line mode, the
+  row surgery the hand-formatting demands) and `acl [--type <t>]
+  <file>` (the standalone gate's editor — the loader-gated save,
+  the SIGINT-blocked writes, the ^C-safe dialogs).
 - **`set_group.py` / `set_live.py`** — the one-field surgical
   setters (an option row's `group` / `live`), riding `scriptlib.py`'s
   row-locator and the live-name rule.
@@ -97,10 +100,11 @@ python3 scripts/family_drift.py --check    # stale doc fails
 ## TODO (the scripts' own — separate from docs/TODO.md)
 
 - **cleanup**
-  - the prose-mangling class guard: the edit_options.py replace paths
-    that produced the scraper's audit rows' "keeps)"/"rotations)"
-    (docs/family-drift.md's knobs findings) get a render-and-diff
-    guard — a row edit that changes sibling rows' text fails loud.
+  - the prose-mangling class guard: the editor.py replace paths
+    (edit_options.py's, that produced the scraper's audit rows'
+    "keeps)"/"rotations)" (docs/family-drift.md's knobs findings) get a
+    render-and-diff guard — a row edit that changes sibling rows' text
+    fails loud.
   - the exit-sweep's precision: `family_drift.py`'s refusal-text
     canon buckets the `SystemExit(variable)` sites properly (the
     nearest-text walk is linear over the enclosing block; make it the

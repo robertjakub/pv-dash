@@ -114,7 +114,7 @@ file is read at start and on every `set`/`clear`:
 Two tools keep the files honest — `scripts/lint_acl.py` (the loader's
 schema plus what the loader cannot say: a no-op rule, a dead rule —
 everything it decides a later rule re-decides — and the canonical layout)
-and `scripts/edit_acl.py` (the dialog and the line mode, `--type` seeds a
+and `scripts/editor.py acl` (the dialog and the line mode, `--type` seeds a
 fresh gate and migrates a typeless one). Both speak both kinds; the
 embedded profile gates belong to `profiles/bin/profile-lint.py`. The
 shipped examples — one shared copy each at the repo root:

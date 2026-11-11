@@ -12,6 +12,18 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **scripts** — **`editor.py` replaces `edit_options.py` and
+  `edit_acl.py`** (the one combined terminal editor, the word
+  subcommands): the two old editors are gone, every reference
+  (the READMEs, the ACL + defaults docs, the lints' and helpers'
+  docstrings) points at `editor.py options` / `editor.py acl` now.
+  With the merge, the options dialog's `default` field edits for
+  real (a conv-typed int/float default no longer crashes the input
+  line), `l` lints the file from the list or the form (a `lint` word
+  at the line-mode prompt), and the two faces share the shapes —
+  the prompts, the completers, the bindings, the pick menus and the
+  list walk (Home/End/PgUp/PgDn everywhere).
+
 - **everywhere** — **the external surfaces speak the console spellings**
   (the flat-wire wave's completion): the one-shot ctl translates the
   console's live/alias knob spellings to the flat registry names exactly

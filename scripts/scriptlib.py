@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Helpers shared by the registry scripts (edit_options, set_group,
+"""Helpers shared by the registry scripts (editor.py, set_group,
 set_live, the lints): the surgical row-locator, the live-name rule and
 the family order. Stdlib only."""
 import json

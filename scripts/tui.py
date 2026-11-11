@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""The registry editors' shared curses primitives (edit_options,
-edit_acl): the ESC/^C key decoding, the drawing helpers and the input
-line — the dialogs stay per-script, these never care what is on the
-screen. Stdlib only."""
+"""The registry editors' shared curses primitives (editor.py): the
+ESC/^C key decoding, the drawing helpers and the input line — the
+dialogs stay per-script, these never care what is on the screen. Stdlib only."""
 import curses
 
 INTR = -2   # the ^C speak: getch raises KeyboardInterrupt — the surfaces answer INTR, no traceback

@@ -883,7 +883,7 @@ The findings:
 - **The defaults.json blocks are the non-knob statics' home** (the
   simulators' grid constants, the diagnostics block, the log levels)
   — the knobs' defaults live in the registry rows' `default` fields
-  now (edit_options edits them; check_options validates them). The
+  now (editor.py edits them; check_options validates them). The
   shared-path matrix is the ruling surface for what remains."""
 
 SCHEMA_FINDINGS = """\

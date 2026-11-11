@@ -18,6 +18,7 @@ import time
 if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
     sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
              'a standalone run shares /tmp scratch and collides across sessions)')
+SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
 print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 
 PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
@@ -37,7 +38,7 @@ def raise_fds():
     resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
 
 starts = [32000 + i * 18 for i in range(50)]              # 50 x 2 = 100 registers, gaps 16 > merge-gap 8
-map_file = '/tmp/stress_profile.json'
+map_file = os.path.join(SCRATCH, 'stress_profile.json')
 json.dump({'registers': [{'name': 'r%d' % s, 'register': s, 'type': 'u32', 'cache': True}
                          for s in starts]}, open(map_file, 'w'))
 

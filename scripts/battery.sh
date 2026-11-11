@@ -18,17 +18,17 @@
 #   scripts/battery.sh <suite> ...    # explicit names, e.g. cache-regtest inverter-regtest
 #   scripts/battery.sh --depth full <suite> ...  # explicit names at the nightly depth (the regtests' full profile + the fuzzes' full spread) — the release's recovery pair rides this
 #   scripts/battery.sh --stop ...     # the flag may sit anywhere: the first FAILED suite ends the run — the tally marks the rest SKIPPED
-#   scripts/battery.sh --name <label> ...  # label the run with the wave/chat that asked for it — the flag may sit anywhere: the status carries a `wave:` line (the battery_status view shows it)
+#   scripts/battery.sh --name <label> ...  # label the run with the wave/chat that asked for it — the flag may sit anywhere: the status carries a `wave:` line (the battery_status.py view shows it)
 #
 # Every run works inside its own dedicated dir: <root>/<run-id>/ where the
 # root is ~/.local/state/pvbattery (XDG_STATE_HOME respected — the state
 # home the family's audit trails already use; /tmp would lose the eta
 # history and the failed-run backups to the reboot/periodic cleaners, and
 # the one-time migration moves them over)
-# (the suites' /tmp scratch is rewritten into it, and TMPDIR points there
-# too, so the tempfile users land inside the run dir as well — only the
-# daemon-derived unix sockets stay at /tmp/modbus-*.socket, their paths
-# are the daemons' own constants). The live handles: a run holding a
+# (the suites resolve their /tmp scratch literals from PV_RUN_DIR — the
+# run dir's tmp — and TMPDIR points there too, so the tempfile users land
+# inside the run dir as well — only the daemon-derived unix sockets stay
+# at /tmp/modbus-*.socket, their paths are the daemons' own constants). The live handles: a run holding a
 # port slot gets slots/slot<N> -> its run dir, so a concurrent battery
 # reads `tail -f ~/.local/state/pvbattery/slots/slot2/status.txt`. The link dies
 # with the run — the exit trap frees it; a battery killed outright
@@ -284,7 +284,7 @@ name_busy() {
   pgrep -f '[m]odbus-cache.py|[m]odbus-scraper.py|[m]odbus-fake-inverter.py|bin/[d]ashboard.py' >/dev/null
 }
 # the one-time WAIT row: on the first busy poll the queued suite says it
-# sits on the quiet window — battery_status.sh reads the row while it is
+# sits on the quiet window — battery_status.py reads the row while it is
 # the status's last word, and the START row retires it when the wait ends
 w_note() {
   [ -n "$waited" ] && return
@@ -332,16 +332,16 @@ for s in $SUITES; do
   [ -f "tests/$s.py" ] || { say "$(date '+%H:%M:%S') SKIP $N/$TOTAL $s (no such suite)"; continue; }
   quiet
   [ "$PARALLEL" = 1 ] || { kill_daemons; sleep 2; }
-  [ -n "$REMAIN" ] && say "$(date '+%H:%M:%S') START $N/$TOTAL $s eta ${REMAIN}s ($(etatime "$REMAIN"))" \
+  [ -n "$REMAIN" ] && say "$(date '+%H:%M:%S') START $N/$TOTAL $s eta $(fmt "$REMAIN") ($(etatime "$REMAIN"))" \
                    || say "$(date '+%H:%M:%S') START $N/$TOTAL $s"
   cp "tests/$s.py" tests/zz_bx.py
-  # the /tmp scratch moves into the run dir — EXCEPT the unix-socket paths:
-  # the daemons derive /tmp/<family>-*.socket from their own constants in
-  # common/ (modbus-cache, fake-inverter, dashboard...), so every .socket
-  # path stays put and the default-socket checks stat the real thing (the
-  # basename rides %-formatting — '%d' % (port + BASE) — so the exception
-  # matches any non-slash basename, not just the literal ones)
-  sed -i '' "s#/tmp/#$RUNDIR/tmp/#g; s#$RUNDIR/tmp/\([^/]*\.socket\)#/tmp/\1#g" tests/zz_bx.py
+  # the suites resolve their scratch from PV_RUN_DIR (the battery's per-run
+  # tmp — SCRATCH at each suite's gate) and TMPDIR points there too, so the
+  # tempfile users land inside the run dir as well; the copy itself exists
+  # so a suite's processes carry the zz_ name the quiet window and the
+  # housekeeping greps. Only the daemon-derived unix sockets stay at
+  # /tmp/modbus-*.socket — their paths are the daemons' own constants and
+  # the suites check those real paths.
   t0=$(date +%s)
   if [ "$s" = "cache-fuzz" -o "$s" = "scrape-fuzz" ]; then
     # the fuzz budget + the mode: quick pools the basic shapes, full the

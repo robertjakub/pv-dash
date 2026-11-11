@@ -17,6 +17,7 @@ import time
 if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
     sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
              'a standalone run shares /tmp scratch and collides across sessions)')
+SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
 print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -51,7 +52,7 @@ try:
                                    '--listen', '127.0.0.1:%d' % CACHE_PORT, '--interval', '1',
                                    '--allow-write', '--profile',
                                    os.path.join(REPO, 'profiles', 'profiles', 'sun2000.json')],
-                                  stdout=open('/tmp/fuzz_cache.log', 'w'), stderr=subprocess.STDOUT))
+                                  stdout=open(os.path.join(SCRATCH, 'fuzz_cache.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)
 
     rnd = random.Random(1337)
@@ -126,7 +127,7 @@ try:
     s.close()
 
     check('every iteration handled (%d of %d)' % (done, ITERATIONS), done == ITERATIONS)
-    check('no tracebacks in the proxy log', 'Traceback' not in open('/tmp/fuzz_cache.log').read())
+    check('no tracebacks in the proxy log', 'Traceback' not in open(os.path.join(SCRATCH, 'fuzz_cache.log')).read())
     check('proxy still alive after the fuzz', procs[1].poll() is None)
 except KeyboardInterrupt:
     print()

@@ -21,6 +21,7 @@ import time
 if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
     sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
              'a standalone run shares /tmp scratch and collides across sessions)')
+SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
 print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 
 PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
@@ -29,7 +30,7 @@ PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 CTL = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py')
-LOG = '/tmp/inv_regtest.log'
+LOG = os.path.join(SCRATCH, 'inv_regtest.log')
 FAILURES = []
 
 BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
@@ -134,7 +135,7 @@ def main():
                                       stdout=open(LOG + '.g', 'w'), stderr=subprocess.STDOUT))
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (H_MODBUS),
                                        '--control-port', str(H_CTL), '--control-token', 'tok',
-                                       '--audit-log', '/tmp/inv_regtest_audit.log'],
+                                       '--audit-log', os.path.join(SCRATCH, 'inv_regtest_audit.log')],
                                       stdout=open(LOG + '.h', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.1)
 
@@ -260,7 +261,7 @@ def main():
         cb.close()
 
         # ---- instance I: the profile's per-entry fc picks the address space
-        split_prof = '/tmp/inv_fc_split.json'
+        split_prof = os.path.join(SCRATCH, 'inv_fc_split.json')
         json.dump({'description': 'fc split demo', 'registers': [
             {'name': 'pv-power', 'register': 300, 'type': 'i32', 'scale': 1},
             {'name': 'grid-power', 'register': 400, 'type': 'i32', 'scale': 1, 'fc': 4},
@@ -432,7 +433,7 @@ def main():
         # ---- the metrics-acl gate (the cache's logic, the fake's surface):
         # the accept-time IP gate on the /metrics listener — the ACL first,
         # then the caps, the token's 401 only past both
-        ACLGATE = '/tmp/inv_acl_gate.json'
+        ACLGATE = os.path.join(SCRATCH, 'inv_acl_gate.json')
         with open(ACLGATE, 'w') as f:
             json.dump({'desc': 'the lab gate', 'type': 'ip-prefix', 'rules': [
                 {'type': 'deny', 'prefix': 'any'},
@@ -574,7 +575,7 @@ def main():
         s.close()
         check('signed wire: a bad command mac is refused',
               obj.get('status') == 'fail' and 'mac does not verify' in obj.get('text', ''), str(obj))
-        aud = open('/tmp/inv_regtest_audit.log').read()
+        aud = open(os.path.join(SCRATCH, 'inv_regtest_audit.log')).read()
         check('signed wire: the audit COMMAND line carries the wire mac', "'show version' wire=h" in aud, aud[-200:])
 
         # ---- the grid wander knobs: the machines' ranges ride the flags
@@ -628,9 +629,9 @@ def main():
         #      reload state lives in the XDG state home) and the settings
         #      dump/restore (instance I)
         I_MODBUS, I_CTL = 15985, 15986
-        reload_state = '/tmp/inv_regtest_reload_state'
-        state_file = '/tmp/inv_regtest_state.json'
-        with open('/tmp/inv_regtest_reload.conf', 'w') as fh:
+        reload_state = os.path.join(SCRATCH, 'inv_regtest_reload_state')
+        state_file = os.path.join(SCRATCH, 'inv_regtest_state.json')
+        with open(os.path.join(SCRATCH, 'inv_regtest_reload.conf'), 'w') as fh:
             fh.write('# the reload config: the state file rides beside it\nset max-clients 64\n')
         if os.path.exists(state_file):
             os.unlink(state_file)   # the block is idempotent: a previous run's dump (its
@@ -638,7 +639,7 @@ def main():
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (I_MODBUS),
                                        '--control-port', str(I_CTL),
                                        '--dump-path', state_file, '--restore-on-start',
-                                       '--config', '/tmp/inv_regtest_reload.conf'],
+                                       '--config', os.path.join(SCRATCH, 'inv_regtest_reload.conf')],
                                       stdout=open(LOG + '.i', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
         time.sleep(1.5)
@@ -650,10 +651,10 @@ def main():
         check('dump: the freeze pins', 'ok time=09:30' in tx, tx)
         tx = ctl(I_CTL, 'request dump')
         check('dump: request dump writes the state', tx.startswith('ok dumped 3 setting(s)'), tx)
-        dumpst = os.stat('/tmp/inv_regtest_state.json')
+        dumpst = os.stat(os.path.join(SCRATCH, 'inv_regtest_state.json'))
         check('dump: the state dump is 0600 (the F18 posture)', dumpst.st_mode & 0o777 == 0o600,
               oct(dumpst.st_mode & 0o777))
-        raw = open('/tmp/inv_regtest_state.json').read()
+        raw = open(os.path.join(SCRATCH, 'inv_regtest_state.json')).read()
         check('dump: the dump carries the settings, never the secrets',
               '"pv"' in raw and 'mtok2' not in raw and 'tok2' not in raw, raw[:160])
         tx = ctl(I_CTL, 'reset')
@@ -682,12 +683,12 @@ def main():
         check('reload: the machine rode the exec too', back is not None and tx.startswith('ok cloud=autumn'), tx)
         gone = False
         for _ in range(100):     # the fresh daemon consumes the state at start — poll for the disappearance
-            if not os.path.exists('/tmp/inv_regtest_reload.conf.reload'):
+            if not os.path.exists(os.path.join(SCRATCH, 'inv_regtest_reload.conf.reload')):
                 gone = True
                 break
             time.sleep(0.1)
         check('reload: the state file is consumed', gone,
-              '/tmp/inv_regtest_reload.conf.reload')
+              os.path.join(SCRATCH, 'inv_regtest_reload.conf.reload'))
         # the dump-interval (the family knob, the cache's golden shape): the
         # dumper loop on the control base rewrites the file on the timer
         # (the thread parks while the interval is off, a live set wakes it)
@@ -695,9 +696,9 @@ def main():
         check('dump: show dump-interval answers off', tx == 'ok dump-interval=off', tx)
         tx = ctl(I_CTL, 'set dump-interval 2')
         check('dump: the interval set live', tx.startswith('ok dump-interval=2.00s'), tx)
-        m1 = os.path.getmtime('/tmp/inv_regtest_state.json')
+        m1 = os.path.getmtime(os.path.join(SCRATCH, 'inv_regtest_state.json'))
         time.sleep(2.6)
-        m2 = os.path.getmtime('/tmp/inv_regtest_state.json')
+        m2 = os.path.getmtime(os.path.join(SCRATCH, 'inv_regtest_state.json'))
         check('dump: the dumper rewrote the file on the timer', m2 > m1, '%.2f -> %.2f' % (m1, m2))
         tx = ctl(I_CTL, 'set dump-interval off')
         check('dump: the interval off again', tx.startswith('ok dump-interval=off'), tx)
@@ -711,8 +712,8 @@ def main():
         #      configured key — and the keyed reload re-reads the sealed
         #      state file on the other side of the exec (instance J)
         J_MODBUS, J_CTL = 15987, 15988
-        kstate = '/tmp/inv_regtest_state_sealed.json'
-        jconf = '/tmp/inv_regtest_sealed_reload.conf'
+        kstate = os.path.join(SCRATCH, 'inv_regtest_state_sealed.json')
+        jconf = os.path.join(SCRATCH, 'inv_regtest_sealed_reload.conf')
         with open(jconf, 'w') as fh:
             fh.write('# the sealed-reload config: the state file rides beside it\n')
         if os.path.exists(jconf + '.reload'):
@@ -793,7 +794,7 @@ def main():
         time.sleep(0.3)
         # a configured key refuses an UNSEALED dump (plaintext stopped being trust at rest)
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (J_MODBUS),
-                                       '--control-port', str(J_CTL), '--dump-path', '/tmp/inv_regtest_state.json',
+                                       '--control-port', str(J_CTL), '--dump-path', os.path.join(SCRATCH, 'inv_regtest_state.json'),
                                        '--dump-key', 'inv-seal-key', '--restore-on-start', '--config', jconf],
                                       stdout=open(LOG + '.j4', 'w'), stderr=subprocess.STDOUT,
                                       env={**os.environ, 'XDG_STATE_HOME': reload_state}))
@@ -851,7 +852,7 @@ def main():
         #      key warns at start and on set, and the control token takes
         #      the same reference form at start
         K_MODBUS, K_CTL = 15989, 15990
-        kfile_state = '/tmp/inv_regtest_state_filekey.json'
+        kfile_state = os.path.join(SCRATCH, 'inv_regtest_state_filekey.json')
         if os.path.exists(kfile_state):
             os.unlink(kfile_state)
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (K_MODBUS),
@@ -876,7 +877,7 @@ def main():
         procs[-1].kill()
         time.sleep(0.3)
         # the file reference: the key material comes from an owner-only file
-        kkey = '/tmp/inv_regtest_dump_key_file'
+        kkey = os.path.join(SCRATCH, 'inv_regtest_dump_key_file')
         with open(kkey, 'w') as fh:
             fh.write('file-key-material-9\n')
         os.chmod(kkey, 0o600)
@@ -895,7 +896,7 @@ def main():
               'is not sealed but dump-key is configured' in line, line[-220:])
         procs[-1].kill()
         time.sleep(0.3)
-        kfile_state2 = '/tmp/inv_regtest_state_filekey2.json'
+        kfile_state2 = os.path.join(SCRATCH, 'inv_regtest_state_filekey2.json')
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (K_MODBUS),
                                        '--control-port', str(K_CTL), '--dump-path', kfile_state2,
                                        '--dump-key', 'file:' + kkey],
@@ -941,7 +942,7 @@ def main():
         time.sleep(0.3)
         # the control token takes the file: reference form too — at start
         # (the wire's set refuses every secret now)
-        ktok = '/tmp/inv_regtest_ctl_token_file'
+        ktok = os.path.join(SCRATCH, 'inv_regtest_ctl_token_file')
         with open(ktok, 'w') as fh:
             fh.write('tok-from-file-77\n')
         os.chmod(ktok, 0o600)
@@ -1236,7 +1237,7 @@ def main():
 
         # ---- the config file: the family ladder (flag > env > config >
         #      static), the sample's grammar, the fail-fast shapes
-        conf = '/tmp/inv_regtest.conf'
+        conf = os.path.join(SCRATCH, 'inv_regtest.conf')
         with open(conf, 'w') as fh:
             fh.write('# the set grammar\nset max-kwp 20\nset chaos 0.25\nset unit 2\n')
         r = subprocess.run([sys.executable, F, '--config', conf, '--control-port', '0', '--dry-run'],

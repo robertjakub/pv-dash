@@ -23,6 +23,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
     sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
              'a standalone run shares /tmp scratch and collides across sessions)')
+SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
 print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 
 PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
@@ -190,10 +191,10 @@ def main():
                                        '--metrics-server', '--metrics-listen', '127.0.0.1:%d' % METRICS_PORT,
                                        '--control-port', str(CTRL_PORT), '--control-token', TOKEN,
                                        '--audit-log', '-'],
-                                      stdout=open('/tmp/dash_ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'dash_ctl_fuzz.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(HTTP_PORT):
             check('fuzz: the dashboard came up (page port %d)' % HTTP_PORT, False,
-                  'the port never opened — see /tmp/dash_ctl_fuzz.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'dash_ctl_fuzz.log'))
 
         # 1. malformed and hostile frames (pre-auth): always a well-formed err reply
         garbage = [
@@ -324,26 +325,26 @@ def main():
             check('fuzz: the right token authenticates', False, str(e))
 
         # 6b. the token as a file: reference on the env: honored like the flag
-        open('/tmp/dash_ctl_fuzz_token', 'w').write(TOKEN + '\n')
-        os.chmod('/tmp/dash_ctl_fuzz_token', 0o600)
+        open(os.path.join(SCRATCH, 'dash_ctl_fuzz_token'), 'w').write(TOKEN + '\n')
+        os.chmod(os.path.join(SCRATCH, 'dash_ctl_fuzz_token'), 0o600)
         r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
                             '--control-port', str(CTRL_PORT), 'show', 'version'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'CONTROL_TOKEN': 'file:/tmp/dash_ctl_fuzz_token'})
+                           env={**os.environ, 'CONTROL_TOKEN': 'file:' + os.path.join(SCRATCH, 'dash_ctl_fuzz_token')})
         check('fuzz: dashboard_ctl honors CONTROL_TOKEN=file:...', r.returncode == 0
               and 'dashboard' in r.stdout, repr(r.stdout[:80]))
 
         # 6c. the read-only ops token: show allowed, steering forbidden; both audited
-        OPS_AUDIT = '/tmp/dash_ctl_fuzz_ops_audit.log'
+        OPS_AUDIT = os.path.join(SCRATCH, 'dash_ctl_fuzz_ops_audit.log')
         open(OPS_AUDIT, 'w').write('')
         procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (OPS_HTTP_PORT),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--control-port', str(OPS_CTRL_PORT), '--control-token', 'admintok2',
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
-                                      stdout=open('/tmp/dash_ctl_fuzz_ops.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'dash_ctl_fuzz_ops.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(OPS_HTTP_PORT):
             check('ops: the ops dashboard came up (page port %d)' % OPS_HTTP_PORT, False,
-                  'the port never opened — see /tmp/dash_ctl_fuzz_ops.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'dash_ctl_fuzz_ops.log'))
         st, tx, macok = ops_roundtrip('show version')
         check('ops: the ops token authenticates, show version honored, mac\'d with the ops key',
               st == 'ok' and macok, '%s %s' % (st, tx))
@@ -384,7 +385,7 @@ def main():
         import urllib.request, urllib.error
         def query_lines():
             try:
-                body = open('/tmp/dash_ctl_fuzz_ops.log').read()
+                body = open(os.path.join(SCRATCH, 'dash_ctl_fuzz_ops.log')).read()
             except OSError as e:
                 return ['the daemon log is unreadable: %s' % e]
             return [l for l in body.splitlines() if 'GET /prom/metrics ->' in l]
@@ -510,10 +511,10 @@ def main():
                                        '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js'),
                                        '--control-port', str(PAGES_CTL), '--control-token', TOKEN,
                                        '--audit-log', '-'],
-                                      stdout=open('/tmp/dash_ctl_fuzz_pages.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'dash_ctl_fuzz_pages.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(PAGES_PORT):
             check('page auth: the token\'d page came up (page port %d)' % PAGES_PORT, False,
-                  'the port never opened — see /tmp/dash_ctl_fuzz_pages.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'dash_ctl_fuzz_pages.log'))
         r = page_get(PAGES_PORT, b'/config.js')
         check('page auth: the token-less read is a 401', r.startswith(b'HTTP/1.1 401')
               and b'WWW-Authenticate: Bearer' in r, r[:60])
@@ -538,10 +539,10 @@ def main():
         procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (15980 + BASE),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js')],
-                                      stdout=open('/tmp/dash_ctl_fuzz_tokless.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'dash_ctl_fuzz_tokless.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(15980 + BASE):
             check('page auth: the tokenless page came up (page port %d)' % (15980 + BASE), False,
-                  'the port never opened — see /tmp/dash_ctl_fuzz_tokless.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'dash_ctl_fuzz_tokless.log'))
         r = page_get(15980 + BASE, b'/config.js')
         check('page auth: the tokenless loopback page serves', r.startswith(b'HTTP/1.1 200'), r[:40])
 
@@ -573,10 +574,10 @@ def main():
         procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (REB_HTTP),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--audit-log', '-'],
-                                      stdout=open('/tmp/dash_ctl_fuzz_rebind.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'dash_ctl_fuzz_rebind.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(REB_HTTP):
             check('family listener: the rebind dashboard came up (page port %d)' % REB_HTTP, False,
-                  'the port never opened — see /tmp/dash_ctl_fuzz_rebind.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'dash_ctl_fuzz_rebind.log'))
 
         def rctl(*cmds, port=None, token=None):
             r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-ctl.py'),
@@ -615,10 +616,10 @@ def main():
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
                                        '--audit-log', '-', '--control-port', '%d' % (15982 + BASE),
                                        '--control-token', 'rtok2'],
-                                      stdout=open('/tmp/dash_ctl_fuzz_rebind2.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'dash_ctl_fuzz_rebind2.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(15981 + BASE):
             check('family listener: the tokenized rebind dashboard came up (page port %d)' % (15981 + BASE), False,
-                  'the port never opened — see /tmp/dash_ctl_fuzz_rebind2.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'dash_ctl_fuzz_rebind2.log'))
         tx = rctl('set control-port %d' % REB_TCP, port=str(15982 + BASE), token='rtok2')
         check('family listener: the tokenized TCP rebind succeeds', tx.startswith('ok control-port=127.0.0.1:%d' % REB_TCP),
               tx[:120])
@@ -686,7 +687,7 @@ def main():
             if p.poll() is None:
                 p.kill()
     log = ''
-    for f in ('/tmp/dash_ctl_fuzz.log', '/tmp/dash_ctl_fuzz_ops.log', '/tmp/dash_ctl_fuzz_pages.log'):
+    for f in (os.path.join(SCRATCH, 'dash_ctl_fuzz.log'), os.path.join(SCRATCH, 'dash_ctl_fuzz_ops.log'), os.path.join(SCRATCH, 'dash_ctl_fuzz_pages.log')):
         if os.path.exists(f):          # quick skips the sections that own some of these
             log += open(f).read()
     ok = 'Traceback' not in log

@@ -23,6 +23,7 @@ import time
 if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
     sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
              'a standalone run shares /tmp scratch and collides across sessions)')
+SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
 print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 
 PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
@@ -128,10 +129,10 @@ def main():
     try:
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15960 + BASE),
                                        '--control-port', '%d' % (15961 + BASE)],
-                                      stdout=open('/tmp/ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'ctl_fuzz.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(15961 + BASE):
             check('fuzz: the fake came up (control port %d)' % (15961 + BASE), False,
-                  'the port never opened — see /tmp/ctl_fuzz.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'ctl_fuzz.log'))
 
         # 1. malformed and hostile frames: always a well-formed err reply
         garbage = [
@@ -203,10 +204,10 @@ def main():
         # 6. the token server: the auth abuse is rejected, the real token works
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15962 + BASE),
                                        '--control-port', '%d' % (15963 + BASE), '--control-token', 'sekrit'],
-                                      stdout=open('/tmp/ctl_fuzz2.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'ctl_fuzz2.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(15963 + BASE):
             check('fuzz: the token server came up (control port %d)' % (15963 + BASE), False,
-                  'the port never opened — see /tmp/ctl_fuzz2.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'ctl_fuzz2.log'))
         st, tx = roundtrip(15963 + BASE, b'{"cmd": "show version"}\n')
         check('fuzz: token server rejects the unauthenticated', st == 'fail' and 'authenticate' in tx,
               '%s %s' % (st, tx))
@@ -246,15 +247,15 @@ def main():
 
         # 6b. the token as a file: reference: the fake reads it, the ctl authenticates
         #     with it (the file must be owner-only 0600 — F12 in docs/SECURITY.md)
-        open('/tmp/ctl_fuzz_token', 'w').write('filesecret\n')
-        os.chmod('/tmp/ctl_fuzz_token', 0o600)
+        open(os.path.join(SCRATCH, 'ctl_fuzz_token'), 'w').write('filesecret\n')
+        os.chmod(os.path.join(SCRATCH, 'ctl_fuzz_token'), 0o600)
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15965 + BASE),
                                        '--control-port', '%d' % (15964 + BASE), '--control-token',
-                                       'file:/tmp/ctl_fuzz_token'],
-                                      stdout=open('/tmp/ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
+                                       'file:' + os.path.join(SCRATCH, 'ctl_fuzz_token')],
+                                      stdout=open(os.path.join(SCRATCH, 'ctl_fuzz3.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(15964 + BASE):
             check('fuzz: the token-reference server came up (control port %d)' % (15964 + BASE), False,
-                  'the port never opened — see /tmp/ctl_fuzz3.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'ctl_fuzz3.log'))
         st, tx = roundtrip(15964 + BASE, b'{"cmd": "show version"}\n')
         check('fuzz: token reference server rejects the unauthenticated', st == 'fail' and 'authenticate' in tx,
               '%s %s' % (st, tx))
@@ -270,20 +271,20 @@ def main():
         except (OSError, ValueError) as e:
             check('fuzz: the file: token authenticates', False, str(e))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
-                            '--control-port', '%d' % (15964 + BASE), '--control-token', 'file:/tmp/ctl_fuzz_token',
+                            '--control-port', '%d' % (15964 + BASE), '--control-token', 'file:' + os.path.join(SCRATCH, 'ctl_fuzz_token'),
                             'show', 'version'], capture_output=True, text=True, timeout=15)
         check('fuzz: fake_ctl authenticates with the file: token', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
-                            '--control-port', '%d' % (15963 + BASE), '--control-token', 'file:/tmp/ctl_fuzz_no_file',
+                            '--control-port', '%d' % (15963 + BASE), '--control-token', 'file:' + os.path.join(SCRATCH, 'ctl_fuzz_no_file'),
                             'show', 'version'], capture_output=True, text=True, timeout=15)
         check('fuzz: a missing token reference fails fast, one line', r.returncode != 0
               and 'cannot read control-token' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
-        open('/tmp/ctl_fuzz_token_lax', 'w').write('laxsecret\n')          # the umask default (0644)
+        open(os.path.join(SCRATCH, 'ctl_fuzz_token_lax'), 'w').write('laxsecret\n')          # the umask default (0644)
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--listen', '127.0.0.1:%d' % (15962 + BASE), '--dry-run',
-                            '--control-token', 'file:/tmp/ctl_fuzz_token_lax'],
+                            '--control-token', 'file:' + os.path.join(SCRATCH, 'ctl_fuzz_token_lax')],
                            capture_output=True, text=True, timeout=15)
         check('fuzz: a group/world-readable token file refuses to start (F12)',
               r.returncode != 0 and '0600' in (r.stderr + r.stdout)
@@ -293,28 +294,28 @@ def main():
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py'),
                             '--control-port', '%d' % (15964 + BASE), 'show', 'version'],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'CONTROL_TOKEN': 'file:/tmp/ctl_fuzz_token'})
+                           env={**os.environ, 'CONTROL_TOKEN': 'file:' + os.path.join(SCRATCH, 'ctl_fuzz_token')})
         check('fuzz: fake_ctl honors CONTROL_TOKEN=file:...', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
         r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--listen', '127.0.0.1:%d' % (15962 + BASE), '--dry-run', '--metrics-server',
                             '--metrics-listen', '127.0.0.1:%d' % (15967 + BASE)],
                            capture_output=True, text=True, timeout=15,
-                           env={**os.environ, 'METRICS_TOKEN': 'file:/tmp/ctl_fuzz_token'})
+                           env={**os.environ, 'METRICS_TOKEN': 'file:' + os.path.join(SCRATCH, 'ctl_fuzz_token')})
         check('fuzz: the fake honors METRICS_TOKEN=file:...', r.returncode == 0
               and 'bearer token' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
 
         # 6d. the read-only ops token: the show/clear verbs only, both audited
-        OPS_AUDIT = '/tmp/ctl_fuzz_ops_audit.log'
+        OPS_AUDIT = os.path.join(SCRATCH, 'ctl_fuzz_ops_audit.log')
         open(OPS_AUDIT, 'w').write('')
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15983 + BASE),
                                        '--control-port', '%d' % (15982 + BASE), '--control-token', 'admintok',
                                        '--control-ops-token', 'opstok', '--audit-log', OPS_AUDIT],
-                                      stdout=open('/tmp/ctl_fuzz4.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'ctl_fuzz4.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(15982 + BASE):
             check('ops: the ops server came up (control port %d)' % (15982 + BASE), False,
-                  'the port never opened — see /tmp/ctl_fuzz4.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'ctl_fuzz4.log'))
         r = authed_roundtrip(15982 + BASE, 'opstok', 'show version')
         check('ops: the ops token authenticates and the reply is mac\'d with the ops key',
               r.get('status') == 'ok' and 'fake-inverter' in r.get('text', '') and r.get('_mac_ok'), str(r))
@@ -438,7 +439,7 @@ def main():
                 p.kill()
     ok = False
     try:
-        log = open('/tmp/ctl_fuzz.log').read() + open('/tmp/ctl_fuzz2.log').read()
+        log = open(os.path.join(SCRATCH, 'ctl_fuzz.log')).read() + open(os.path.join(SCRATCH, 'ctl_fuzz2.log')).read()
         ok = 'Traceback' not in log
     except OSError as e:
         log = 'the daemon logs are unreadable: %s' % e

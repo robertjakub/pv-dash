@@ -23,6 +23,7 @@ import time
 if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
     sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
              'a standalone run shares /tmp scratch and collides across sessions)')
+SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
 print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 
 PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
@@ -161,10 +162,10 @@ def main():
         procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
                                        '--listen', '127.0.0.1:%d' % (15964 + BASE), '--interval', '1',
                                        '--control-port', '%d' % AUTH_PORT, '--control-token', TOKEN],
-                                      stdout=open('/tmp/cache_ctl_fuzz.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'cache_ctl_fuzz.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(AUTH_PORT):
             check('fuzz: the fuzz cache came up (control port %d)' % AUTH_PORT, False,
-                  'the port never opened — see /tmp/cache_ctl_fuzz.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'cache_ctl_fuzz.log'))
 
         # 1. malformed and hostile frames: always a well-formed err reply
         garbage = [
@@ -241,10 +242,10 @@ def main():
         procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
                                        '--listen', '127.0.0.1:%d' % (15966 + BASE), '--interval', '1',
                                        '--control-port', '%d' % (15967 + BASE), '--control-token', 'sekrit'],
-                                      stdout=open('/tmp/cache_ctl_fuzz2.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'cache_ctl_fuzz2.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(15967 + BASE):
             check('fuzz: the token cache came up (control port %d)' % (15967 + BASE), False,
-                  'the port never opened — see /tmp/cache_ctl_fuzz2.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'cache_ctl_fuzz2.log'))
         st, tx = roundtrip(15967 + BASE, b'{"cmd": "show version"}\n')
         check('fuzz: token server rejects the unauthenticated', st == 'fail' and 'authenticate' in tx,
               '%s %s' % (st, tx))
@@ -274,16 +275,16 @@ def main():
 
         # 6d. the read-only ops token: show/clear allowed, everything that
         #     steers the daemon forbidden; both roles audited, both mac keys
-        OPS_AUDIT = '/tmp/cache_ctl_fuzz_ops_audit.log'
+        OPS_AUDIT = os.path.join(SCRATCH, 'cache_ctl_fuzz_ops_audit.log')
         open(OPS_AUDIT, 'w').write('')
         procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
                                        '--listen', '127.0.0.1:%d' % (15968 + BASE), '--interval', '1',
                                        '--control-port', str(OPS_PORT), '--control-token', 'admintok2',
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
-                                      stdout=open('/tmp/cache_ctl_fuzz3.log', 'w'), stderr=subprocess.STDOUT))
+                                      stdout=open(os.path.join(SCRATCH, 'cache_ctl_fuzz3.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(OPS_PORT):
             check('ops: the ops cache came up (control port %d)' % OPS_PORT, False,
-                  'the port never opened — see /tmp/cache_ctl_fuzz3.log')
+                  'the port never opened — see ' + os.path.join(SCRATCH, 'cache_ctl_fuzz3.log'))
         st, tx, macok = ops_roundtrip('show version')
         check('ops: the ops token authenticates, show version honored, mac\'d with the ops key',
               st == 'ok' and macok, '%s %s' % (st, tx))
@@ -387,8 +388,8 @@ def main():
                 p.kill()
     ok = False
     try:
-        log = open('/tmp/cache_ctl_fuzz.log').read() + open('/tmp/cache_ctl_fuzz2.log').read() \
-            + open('/tmp/cache_ctl_fuzz3.log').read()
+        log = open(os.path.join(SCRATCH, 'cache_ctl_fuzz.log')).read() + open(os.path.join(SCRATCH, 'cache_ctl_fuzz2.log')).read() \
+            + open(os.path.join(SCRATCH, 'cache_ctl_fuzz3.log')).read()
         ok = 'Traceback' not in log
     except OSError as e:
         log = 'the daemon logs are unreadable: %s' % e

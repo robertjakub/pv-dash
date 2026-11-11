@@ -12,6 +12,29 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **scripts** — **battery_status is python**: the read-only view moves
+  from the sh twin to a stdlib script (the BSD-only `date -j`/`stat -f`
+  spellings and the awk/grep field parsing die — the ages read off the
+  status file's mtime, the run stamp off the run id, one rendering pass)
+  with the shape kept: the aligned label column, the aged `last:` rows,
+  the RUNNING block's run/wave/estimate/stats rows, the newest run's
+  canceled/finished/no-tally classification. One deliberate behavior
+  fix: the newest block FALLS THROUGH to the newest non-slotted run —
+  the sh's single candidate made the block vanish entirely whenever a
+  live battery owned the newest dir. The runner's START rows join the
+  shape too: `eta 207s` renders `eta 3m27s` (the eta history files keep
+  their raw-seconds rows for the predictions).
+
+- **tests** — **the suites resolve their scratch from the battery's run
+  dir**: every `/tmp/reg_*`-style literal (328 across the nine suites)
+  becomes `os.path.join(SCRATCH, …)` off
+  `SCRATCH = os.environ['PV_RUN_DIR']` at each suite's gate — the
+  per-battery tmp the runner already owns, so the failed-run backups and
+  the keep-8 housekeeping sweep the scratch with the run and `/tmp`
+  keeps only the daemon-derived unix sockets (the daemons' own
+  constants, the suites check those real paths); the runner's copy-time
+  `/tmp/` sed retires — the zz_ copy stays for the pgrep tell alone.
+
 - **scripts** — **battery_status ages and aligns its rows**: the
   `last:` row (the slot block's and the newest run's) carries an
   `(Xm Ys ago)` age read off the status file's mtime — say() appends on

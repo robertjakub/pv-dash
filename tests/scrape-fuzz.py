@@ -16,6 +16,7 @@ import urllib.request
 if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
     sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
              'a standalone run shares /tmp scratch and collides across sessions)')
+SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
 print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -67,13 +68,13 @@ try:
     procs.append(subprocess.Popen([sys.executable, F, '--control-port', '0', '--static', '--listen', '127.0.0.1:%d' % (INV_PORT)],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
-    with open('/tmp/scr_fuzz.ini', 'w') as fh:
+    with open(os.path.join(SCRATCH, 'scr_fuzz.ini'), 'w') as fh:
         fh.write('# the set grammar (the ini format is gone)\nset interval 1\nset timeout 1\n'
                  'set client-timeout 2\nset max-clients 16\nset log-level DEBUG\n')
-    procs.append(subprocess.Popen([sys.executable, P, '--config', '/tmp/scr_fuzz.ini',
+    procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_fuzz.ini'),
                                    '--upstream', '127.0.0.1:%d' % INV_PORT,
                                    '--listen', '127.0.0.1:%d' % PORT],
-                                  stdout=open('/tmp/scr_fuzz.log', 'w'), stderr=subprocess.STDOUT))
+                                  stdout=open(os.path.join(SCRATCH, 'scr_fuzz.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)
 
     random.seed(1234)
@@ -114,7 +115,7 @@ try:
     status, body = get('/metrics')
     check('scraper alive after fuzz -> 200', status == 200, str(status))
     check('metrics still correct', 'huawei_pv_generation_watts 4000' in body)
-    log = open('/tmp/scr_fuzz.log').read()
+    log = open(os.path.join(SCRATCH, 'scr_fuzz.log')).read()
     check('no tracebacks in fuzz log', 'Traceback' not in log)
     check('client errors logged as one-liners', 'ConnectionResetError: ' in log or 'Request timed out' in log
           or 'Bad request' in log or '400' in log, 'some client-error lines expected at DEBUG')

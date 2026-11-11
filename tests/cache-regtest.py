@@ -19,6 +19,7 @@ import time
 if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
     sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
              'a standalone run shares /tmp scratch and collides across sessions)')
+SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
 print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 
 PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
@@ -182,7 +183,7 @@ try:
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT, '--listen', '127.0.0.1:%d' % CACHE_PORT,
            '--interval', '1', '--cache-ttl', '3', '--allow-write', '--profile', R,
            '--write-acl', 'any', '--write-registers', 'any',
-           '--audit-log', '/tmp/reg_audit.log'], log='/tmp/reg_cache.log')
+           '--audit-log', os.path.join(SCRATCH, 'reg_audit.log')], log=os.path.join(SCRATCH, 'reg_cache.log'))
     time.sleep(2.5)
 
     # cached reads served with correct values
@@ -200,7 +201,7 @@ try:
 
     # forwarded (uncached) read: a mini profile (only pv+grid marked) proves
     # the marks: 32089 is not in it -> forwarded once, cached, then served
-    mini = '/tmp/reg_mini_profile.json'
+    mini = os.path.join(SCRATCH, 'reg_mini_profile.json')
     _json.dump({'description': 'mini device (marks test)',
                 'registers': [
                     {'name': 'pv-power', 'register': 32064, 'type': 'i32', 'scale': 1, 'cache': True},
@@ -208,14 +209,14 @@ try:
                 ]}, open(mini, 'w'))
     c3 = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                            '--listen', '127.0.0.1:%d' % (15517 + BASE), '--interval', '1', '--cache-ttl', '3',
-                           '--profile', mini], stdout=open('/tmp/reg_mini.log', 'w'), stderr=subprocess.STDOUT)
+                           '--profile', mini], stdout=open(os.path.join(SCRATCH, 'reg_mini.log'), 'w'), stderr=subprocess.STDOUT)
     procs.append(c3)
     time.sleep(1.5)
     b = rd(32089, 1, port=15517 + BASE)
     check('profile marks: unmarked register forwarded (32089 = on-grid)',
           b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 512, b.hex())
     b2 = rd(32089, 1, port=15517 + BASE)
-    forwards = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_mini.log'],
+    forwards = subprocess.run(['grep', '-c', 'not cached, polling', os.path.join(SCRATCH, 'reg_mini.log')],
                               capture_output=True, text=True).stdout.strip()
     check('profile marks: repeat read served from cache', b2[0] == 3
           and struct.unpack('>H', b2[2:4])[0] == 512 and forwards == '1',
@@ -225,10 +226,10 @@ try:
     b = rd(32100, 1)
     check('undefined register -> client gets exception 02', b[0] == 0x83 and b[1] == 2, b.hex())
     # ... and NOT cached as data (next read forwards again — grep grows)
-    n1 = subprocess.run(['grep', '-c', 'polling the device', '/tmp/reg_cache.log'],
+    n1 = subprocess.run(['grep', '-c', 'polling the device', os.path.join(SCRATCH, 'reg_cache.log')],
                         capture_output=True, text=True).stdout.strip()
     rd(32100, 1)
-    n2 = subprocess.run(['grep', '-c', 'polling the device', '/tmp/reg_cache.log'],
+    n2 = subprocess.run(['grep', '-c', 'polling the device', os.path.join(SCRATCH, 'reg_cache.log')],
                         capture_output=True, text=True).stdout.strip()
     check('failed read not cached as data', int(n2) == int(n1) + 1)
 
@@ -241,7 +242,7 @@ try:
     check('fc16 echo', b[0] == 16 and struct.unpack('>HH', b[1:5]) == (47416, 2), b.hex())
     b = rd(47416, 2)
     check('fc16 readback', struct.unpack('>2H', b[2:6]) == (2, 6000))
-    audit_txt = open('/tmp/reg_audit.log').read()
+    audit_txt = open(os.path.join(SCRATCH, 'reg_audit.log')).read()
     check('audit: START + forwarded writes land in the trail',
           'application=CACHE tag=daemon instance=' in audit_txt and 'type=start' in audit_txt
           and 'type=write' in audit_txt and 'register=47415 value=5' in audit_txt, audit_txt[-200:])
@@ -262,7 +263,7 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:%d' % (15507 + BASE), '--interval', '1',
                                    '--profile', R],
-                                  stdout=open('/tmp/reg_cache_nowrite.log', 'w'), stderr=subprocess.STDOUT))
+                                  stdout=open(os.path.join(SCRATCH, 'reg_cache_nowrite.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(1.5)
     s = socket.create_connection(('127.0.0.1', 15507 + BASE), timeout=5)
     s.sendall(struct.pack('>HHHB', 78, 0, 6, 1) + struct.pack('>BHH', 6, 47415, 99))
@@ -271,7 +272,7 @@ try:
     check('write refused when disabled (exception 0x86/01)', b[7] == 0x86 and b[8] == 1, b.hex())
     b = rd(47415, 1)
     check('refused write did not reach the inverter', struct.unpack('>H', b[2:4])[0] == 5)
-    check('refusal logged with detail', 'write: refused register 47415 = 99' in open('/tmp/reg_cache_nowrite.log').read())
+    check('refusal logged with detail', 'write: refused register 47415 = 99' in open(os.path.join(SCRATCH, 'reg_cache_nowrite.log')).read())
 
     # 1c. diagnostics registers: synthesized by the cache from poller state (never forwarded)
     b = rd(65000, 4)
@@ -332,21 +333,21 @@ try:
     import json as _json
     map_ = _json.load(open(R))
     map_["registers"].append({'name': 'undefined test register', 'register': 32100, 'type': 'u16', 'cache': True})
-    badmap = '/tmp/reg_badmap.json'
+    badmap = os.path.join(SCRATCH, 'reg_badmap.json')
     _json.dump(map_, open(badmap, 'w'))
     c2 = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                            '--listen', '127.0.0.1:%d' % (15506 + BASE), '--interval', '1', '--cache-ttl', '3',
-                           '--profile', badmap], stdout=open('/tmp/reg_cache2.log', 'w'),
+                           '--profile', badmap], stdout=open(os.path.join(SCRATCH, 'reg_cache2.log'), 'w'),
                           stderr=subprocess.STDOUT)
     procs.append(c2)
     time.sleep(2.5)
     b = rd(32100, 1, port=15506 + BASE)
     check('failed poll leaf -> client served the failure (02)', b[0] == 0x83 and b[1] == 2, b.hex())
-    n1 = subprocess.run(['grep', '-c', 'polling the device', '/tmp/reg_cache2.log'],
+    n1 = subprocess.run(['grep', '-c', 'polling the device', os.path.join(SCRATCH, 'reg_cache2.log')],
                         capture_output=True, text=True).stdout.strip()
     rd(32100, 1, port=15506 + BASE)
     rd(32100, 1, port=15506 + BASE)
-    n2 = subprocess.run(['grep', '-c', 'polling the device', '/tmp/reg_cache2.log'],
+    n2 = subprocess.run(['grep', '-c', 'polling the device', os.path.join(SCRATCH, 'reg_cache2.log')],
                         capture_output=True, text=True).stdout.strip()
     check('failed leaf answered from poll status, no device hammering', n1 == n2)
     b = rd(32064, 2, port=15506 + BASE)
@@ -357,7 +358,7 @@ try:
     evil.mode = 'garbage'  # cold from the start: no fine-mode poll can fill the cache
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15509 + BASE),
            '--listen', '127.0.0.1:%d' % (15508 + BASE), '--interval', '1', '--cache-ttl', '3',
-           '--profile', R], log='/tmp/reg_evil.log')
+           '--profile', R], log=os.path.join(SCRATCH, 'reg_evil.log'))
     time.sleep(2)
     for mode in ('garbage', 'short', 'lying', 'txn', 'unit', 'stall'):
         evil.mode = mode
@@ -377,7 +378,7 @@ try:
     b = rd(32064, 2, port=15508 + BASE)
     check('evil upstream: recovers when replies turn sane',
           b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
-    evil_log = open('/tmp/reg_evil.log').read()
+    evil_log = open(os.path.join(SCRATCH, 'reg_evil.log')).read()
     check('evil upstream: zero tracebacks, failures are one-liners',
           'Traceback' not in evil_log and 'poll of' in evil_log)
     evil.stop()
@@ -420,9 +421,9 @@ try:
     SEL = os.path.join(CACHE_DIR, 'examples', 'selection.json')
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
            '--listen', '127.0.0.1:%d' % (15518 + BASE), '--interval', '1', '--profile', R,
-           '--selection', SEL], log='/tmp/reg_sel.log')
+           '--selection', SEL], log=os.path.join(SCRATCH, 'reg_sel.log'))
     time.sleep(1.5)
-    plan = open('/tmp/reg_sel.log').read()
+    plan = open(os.path.join(SCRATCH, 'reg_sel.log')).read()
     b = rd(32064, 2, port=15518 + BASE)
     check('selection: the essential set polls pv-power', b[0] == 3
           and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
@@ -435,7 +436,7 @@ try:
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
            '--listen', '127.0.0.1:%d' % (15513 + BASE), '--interval', '1', '--profile', R,
            '--write-acl', 'any', '--write-registers', 'any',
-           '--control-port', '%d' % (15514 + BASE)], log='/tmp/reg_ctl.log',
+           '--control-port', '%d' % (15514 + BASE)], log=os.path.join(SCRATCH, 'reg_ctl.log'),
           env_extra={'CONTROL_TOKEN': 'sekrit'})
     time.sleep(2)
     r = ctl_cmd('show upstream', 15514 + BASE)
@@ -500,7 +501,7 @@ try:
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
            '--listen', '127.0.0.1:%d' % (15519 + BASE), '--interval', '1', '--profile', R,
            '--control-port', '%d' % (15520 + BASE), '--control-token', 'sekrit',
-           '--audit-log', '/tmp/reg_audit_ctl.log'], log='/tmp/reg_ctl_tok.log')
+           '--audit-log', os.path.join(SCRATCH, 'reg_audit_ctl.log')], log=os.path.join(SCRATCH, 'reg_ctl_tok.log'))
     time.sleep(1.5)
     r = ctl_raw(b'{"cmd": "show version"}\n', 15520)
     check('control: token server rejects the unauthenticated', r.get('status') == 'fail'
@@ -533,7 +534,7 @@ try:
     r = ctl_raw(_json.dumps({'cmd': 'show version', 'mac': 'ab' * 32}).encode() + b'\n', 15520, token='sekrit')
     check('control: a bad command mac is refused',
           r.get('status') == 'fail' and 'mac does not verify' in r.get('text', ''), str(r))
-    tok_audit = open('/tmp/reg_audit_ctl.log').read()
+    tok_audit = open(os.path.join(SCRATCH, 'reg_audit_ctl.log')).read()
     check('audit: AUTH-FAIL + COMMAND events with the peer and the wire mac',
           'type=auth-fail' in tok_audit and 'application=CACHE tag=daemon instance=' in tok_audit
           and 'type=command' in tok_audit
@@ -747,11 +748,11 @@ try:
     r = ctl_cmd('show cache', 15514 + BASE)
     check('set selection none: the map empties', '0 range(s)' in r
           and ctl_cmd('show selection', 15514 + BASE) == 'ok selection=none', r[:160])
-    m1 = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache.log'],
+    m1 = subprocess.run(['grep', '-c', 'not cached, polling', os.path.join(SCRATCH, 'reg_cache.log')],
                         capture_output=True, text=True).stdout.strip()
     rd(47415, 1)
     rd(47415, 1)
-    m2 = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache.log'],
+    m2 = subprocess.run(['grep', '-c', 'not cached, polling', os.path.join(SCRATCH, 'reg_cache.log')],
                         capture_output=True, text=True).stdout.strip()
     check('selection none: repeat reads forward, nothing is stored', int(m2) == int(m1) + 2,
           '%s -> %s' % (m1, m2))
@@ -764,7 +765,7 @@ try:
     p_none = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                                '--listen', '127.0.0.1:%d' % (15526 + BASE), '--interval', '1', '--profile', R,
                                '--selection', 'none', '--control-port', '%d' % (15527 + BASE)],
-                              stdout=open('/tmp/reg_cache_none.log', 'w'), stderr=subprocess.STDOUT,
+                              stdout=open(os.path.join(SCRATCH, 'reg_cache_none.log'), 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_none)
     time.sleep(1.5)
@@ -780,7 +781,7 @@ try:
     check('inspect: the poll-cycle durations', 'poll cyc  last ' in r and 'mean ' in r, r[:300])
 
     # per-entry ttl: the profile entry expires early, the global-ttl one stays
-    ttlmap = '/tmp/reg_ttl_profile.json'
+    ttlmap = os.path.join(SCRATCH, 'reg_ttl_profile.json')
     _json.dump({'description': 'per-entry ttl',
                 'registers': [
                     {'name': 'pv-power', 'register': 32064, 'type': 'i32', 'ttl': 2},
@@ -789,18 +790,18 @@ try:
     p_ttl = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                               '--listen', '127.0.0.1:%d' % (15533 + BASE), '--interval', '5', '--cache-ttl', '30',
                               '--profile', ttlmap, '--control-port', '%d' % (15534 + BASE)],
-                             stdout=open('/tmp/reg_cache_ttl.log', 'w'), stderr=subprocess.STDOUT,
+                             stdout=open(os.path.join(SCRATCH, 'reg_cache_ttl.log'), 'w'), stderr=subprocess.STDOUT,
                              env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_ttl)
     time.sleep(1.5)
     rd(32064, 2, port=15533 + BASE)
     rd(32089, 1, port=15533 + BASE)
-    f1 = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache_ttl.log'],
+    f1 = subprocess.run(['grep', '-c', 'not cached, polling', os.path.join(SCRATCH, 'reg_cache_ttl.log')],
                         capture_output=True, text=True).stdout.strip()
     time.sleep(2.0)          # pv-power (ttl 2s) expires mid-cycle; device-status (global 30s) stays
     rd(32064, 2, port=15533 + BASE)
     rd(32089, 1, port=15533 + BASE)
-    f2 = subprocess.run(['grep', '-c', 'not cached, polling', '/tmp/reg_cache_ttl.log'],
+    f2 = subprocess.run(['grep', '-c', 'not cached, polling', os.path.join(SCRATCH, 'reg_cache_ttl.log')],
                         capture_output=True, text=True).stdout.strip()
     check('per-entry ttl: the fast entry re-forwards, the global one stays cached',
           int(f2) == int(f1) + 1, '%s -> %s' % (f1, f2))
@@ -815,7 +816,7 @@ try:
     p_cred = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                                '--listen', '127.0.0.1:%d' % (15538 + BASE), '--interval', '1', '--profile', R,
                                '--control-port', cred_sock, '--control-token', 'sekrit'],
-                              stdout=open('/tmp/reg_cache_cred.log', 'w'), stderr=subprocess.STDOUT)
+                              stdout=open(os.path.join(SCRATCH, 'reg_cache_cred.log'), 'w'), stderr=subprocess.STDOUT)
     procs.append(p_cred)
     time.sleep(1.5)
     r = subprocess.run([sys.executable, ctl, '--control-port', cred_sock, 'show', 'version'],
@@ -829,12 +830,12 @@ try:
     p_cred.wait(timeout=10)
 
     # the state dump (write-behind): the cached words + the live setting overrides
-    dumpfile = '/tmp/reg_dump.json'
+    dumpfile = os.path.join(SCRATCH, 'reg_dump.json')
     p_dump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                                '--listen', '127.0.0.1:%d' % (15536 + BASE), '--interval', '1', '--cache-ttl', '30',
                                '--profile', R, '--control-port', '%d' % (15537 + BASE),
                                '--dump-path', dumpfile],
-                              stdout=open('/tmp/reg_cache_dump.log', 'w'), stderr=subprocess.STDOUT,
+                              stdout=open(os.path.join(SCRATCH, 'reg_cache_dump.log'), 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_dump)
     time.sleep(1.5)
@@ -907,12 +908,12 @@ try:
 
     # ---- the sealed dumps (dump-key): the words and the settings ride
     #      encrypted; a restore fails closed on a wrong or missing key
-    kdumpfile = '/tmp/reg_dump_sealed.json'
+    kdumpfile = os.path.join(SCRATCH, 'reg_dump_sealed.json')
     p_kdump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                                 '--listen', '127.0.0.1:%d' % (15538 + BASE), '--interval', '1', '--cache-ttl', '30',
                                 '--profile', R, '--control-port', '%d' % (15539 + BASE),
                                 '--dump-path', kdumpfile, '--dump-key', 'seal-key-1'],
-                               stdout=open('/tmp/reg_cache_kdump.log', 'w'), stderr=subprocess.STDOUT,
+                               stdout=open(os.path.join(SCRATCH, 'reg_cache_kdump.log'), 'w'), stderr=subprocess.STDOUT,
                                env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_kdump)
     time.sleep(1.5)
@@ -955,12 +956,12 @@ try:
                                 '--profile', R, '--control-port', '%d' % (15539 + BASE),
                                 '--dump-path', kdumpfile, '--dump-key', 'seal-key-WRONG',
                                 '--restore-on-start'],
-                               stdout=open('/tmp/reg_cache_kwrong.log', 'w'), stderr=subprocess.STDOUT,
+                               stdout=open(os.path.join(SCRATCH, 'reg_cache_kwrong.log'), 'w'), stderr=subprocess.STDOUT,
                                env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_wrong)
     line = ''
     for _ in range(80):
-        line = open('/tmp/reg_cache_kwrong.log').read()
+        line = open(os.path.join(SCRATCH, 'reg_cache_kwrong.log')).read()
         if 'fails its seal' in line:
             break
         time.sleep(0.1)
@@ -975,12 +976,12 @@ try:
                                 '--listen', '127.0.0.1:%d' % (15538 + BASE), '--interval', '1', '--cache-ttl', '30',
                                 '--profile', R, '--control-port', '%d' % (15539 + BASE),
                                 '--dump-path', kdumpfile, '--restore-on-start'],
-                               stdout=open('/tmp/reg_cache_knokey.log', 'w'), stderr=subprocess.STDOUT,
+                               stdout=open(os.path.join(SCRATCH, 'reg_cache_knokey.log'), 'w'), stderr=subprocess.STDOUT,
                                env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_nokey)
     line = ''
     for _ in range(80):
-        line = open('/tmp/reg_cache_knokey.log').read()
+        line = open(os.path.join(SCRATCH, 'reg_cache_knokey.log')).read()
         if 'pass the key' in line:
             break
         time.sleep(0.1)
@@ -996,12 +997,12 @@ try:
                                 '--profile', R, '--control-port', '%d' % (15539 + BASE),
                                 '--dump-path', kdumpfile, '--dump-key', 'seal-key-1',
                                 '--restore-on-start'],
-                               stdout=open('/tmp/reg_cache_kright.log', 'w'), stderr=subprocess.STDOUT,
+                               stdout=open(os.path.join(SCRATCH, 'reg_cache_kright.log'), 'w'), stderr=subprocess.STDOUT,
                                env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_right)
     line = ''
     for _ in range(80):
-        line = open('/tmp/reg_cache_kright.log').read()
+        line = open(os.path.join(SCRATCH, 'reg_cache_kright.log')).read()
         if 'restored the state dump' in line:
             break
         time.sleep(0.1)
@@ -1014,11 +1015,11 @@ try:
     # the file: reference form (one secret knob, two forms): the key
     # material comes from an owner-only file — and an unreadable reference
     # fails the start; the keyless dump posture warns at start
-    kkeyfile = '/tmp/reg_cache_dump_key_file'
+    kkeyfile = os.path.join(SCRATCH, 'reg_cache_dump_key_file')
     with open(kkeyfile, 'w') as fh:
         fh.write('seal-key-1\n')
     os.chmod(kkeyfile, 0o600)
-    log = open('/tmp/reg_cache_dump.log').read()   # the keyless dump instance's start
+    log = open(os.path.join(SCRATCH, 'reg_cache_dump.log')).read()   # the keyless dump instance's start
     check('file-key: a dump path without a key warns unsealed at start',
           'is not sealed' in log and 'set dump-key' in log, log[-220:])
     p_file = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
@@ -1026,12 +1027,12 @@ try:
                                '--profile', R, '--control-port', '%d' % (15539 + BASE),
                                '--dump-path', kdumpfile, '--dump-key', 'file:' + kkeyfile,
                                '--restore-on-start'],
-                              stdout=open('/tmp/reg_cache_kfile.log', 'w'), stderr=subprocess.STDOUT,
+                              stdout=open(os.path.join(SCRATCH, 'reg_cache_kfile.log'), 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_file)
     line = ''
     for _ in range(80):
-        line = open('/tmp/reg_cache_kfile.log').read()
+        line = open(os.path.join(SCRATCH, 'reg_cache_kfile.log')).read()
         if 'restored the state dump' in line:
             break
         time.sleep(0.1)
@@ -1046,11 +1047,11 @@ try:
                                   '--profile', R, '--control-port', '%d' % (15539 + BASE),
                                   '--dump-path', kdumpfile, '--dump-key', 'file:/nonexistent/dump_key',
                                   '--restore-on-start'],
-                                 stdout=open('/tmp/reg_cache_kmissing.log', 'w'), stderr=subprocess.STDOUT,
+                                 stdout=open(os.path.join(SCRATCH, 'reg_cache_kmissing.log'), 'w'), stderr=subprocess.STDOUT,
                                  env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     line = ''
     for _ in range(80):
-        line = open('/tmp/reg_cache_kmissing.log').read()
+        line = open(os.path.join(SCRATCH, 'reg_cache_kmissing.log')).read()
         if 'cannot read dump-key' in line:
             break
         time.sleep(0.1)
@@ -1076,7 +1077,7 @@ try:
     ctl_cmd('set dump-interval 1', 15537 + BASE)
     time.sleep(2.2)
     ctl_cmd('set dump-interval off', 15537 + BASE)
-    dlog = open('/tmp/reg_cache_dump.log', errors='replace').read()
+    dlog = open(os.path.join(SCRATCH, 'reg_cache_dump.log'), errors='replace').read()
     check('dump-interval: a failing periodic dump logs its one line',
           'the periodic dump to /nonexistent-dir-zz/dump.json failed' in dlog, dlog[-200:])
     ctl_cmd('set dump-path ' + dumpfile, 15537 + BASE)
@@ -1092,11 +1093,11 @@ try:
                                '--listen', '127.0.0.1:%d' % (15536 + BASE), '--interval', '1', '--cache-ttl', '30',
                                '--profile', R, '--control-port', '%d' % (15537 + BASE), '--dump-with-cache',
                                '--dump-path', dumpfile],
-                              stdout=open('/tmp/reg_cache_dump2.log', 'w'), stderr=subprocess.STDOUT,
+                              stdout=open(os.path.join(SCRATCH, 'reg_cache_dump2.log'), 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_dump)
     time.sleep(1.5)
-    log = open('/tmp/reg_cache_dump2.log').read()
+    log = open(os.path.join(SCRATCH, 'reg_cache_dump2.log')).read()
     check('restore-on-start: the gate defaults to off — the dump is not loaded', 'not loaded on start' in log
           and 'restored the state dump' not in log.split('state dumps:')[1], log[-200:])
     r = ctl_cmd('show interval', 15537 + BASE)
@@ -1117,7 +1118,7 @@ try:
                                '--listen', '127.0.0.1:%d' % (15536 + BASE), '--interval', '1', '--cache-ttl', '30',
                                '--profile', R, '--control-port', '%d' % (15537 + BASE), '--dump-with-cache',
                                '--dump-path', dumpfile, '--restore-on-start'],
-                              stdout=open('/tmp/reg_cache_dump2.log', 'w'), stderr=subprocess.STDOUT,
+                              stdout=open(os.path.join(SCRATCH, 'reg_cache_dump2.log'), 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_dump)
     time.sleep(1.5)
@@ -1135,7 +1136,7 @@ try:
                                   '--control-port', '%d' % (15530 + BASE),
                                   '--metrics-listen', '127.0.0.1:%d' % (15529 + BASE), '--metrics-server', '--metrics-token', 'sekrit',
                                   '--metrics-max-clients', '1'],
-                                 stdout=open('/tmp/reg_cache_metrics.log', 'w'), stderr=subprocess.STDOUT,
+                                 stdout=open(os.path.join(SCRATCH, 'reg_cache_metrics.log'), 'w'), stderr=subprocess.STDOUT,
                                  env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_metrics)
     time.sleep(1.5)
@@ -1237,15 +1238,15 @@ try:
     ctl_cmd('set metrics-server on', 15530 + BASE)
     # the live ttl rides too, and the write-register file marker renders
     # without crashing the handler (the string markers are not range lists)
-    with open('/tmp/reg_acl_write.json', 'w') as f:
+    with open(os.path.join(SCRATCH, 'reg_acl_write.json'), 'w') as f:
         _json.dump({'type': 'write-registers', 'rules': [{'type': 'allow', 'range': '127:2'}]}, f)
-    r = ctl_cmd('set write-registers file:/tmp/reg_acl_write.json', 15530 + BASE)
+    r = ctl_cmd('set write-registers file:' + os.path.join(SCRATCH, 'reg_acl_write.json'), 15530 + BASE)
     check('write registers: the file marker sets', r.startswith('ok write-registers=file:'), r[:90])
     r = ctl_cmd('set cache-ttl 55', 15530 + BASE)
     check('cache ttl: the live set answers', r.startswith('ok cache-ttl='), r[:90])
     r = ctl_cmd('show config', 15530 + BASE)
     check('show config: the live cache ttl and the file marker ride',
-          'set cache ttl 55.0' in r and 'set write registers file:/tmp/reg_acl_write.json' in r, r[:220])
+          'set cache ttl 55.0' in r and 'set write registers file:' + os.path.join(SCRATCH, 'reg_acl_write.json') in r, r[:220])
     ctl_cmd('clear cache-ttl', 15530 + BASE)
     r = ctl_cmd('show config', 15530 + BASE)
     check('show config: the clear ttl returns the configured value',
@@ -1314,7 +1315,7 @@ try:
                                   '--listen', '127.0.0.1:%d' % (15540 + BASE), '--interval', '1', '--profile', R,
                                   '--control-port', '%d' % (15542 + BASE),
                                   '--metrics-listen', '127.0.0.1:%d' % (15541 + BASE), '--metrics-server'],
-                                 stdout=open('/tmp/reg_cache_tokless.log', 'w'), stderr=subprocess.STDOUT,
+                                 stdout=open(os.path.join(SCRATCH, 'reg_cache_tokless.log'), 'w'), stderr=subprocess.STDOUT,
                                  env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_tokless)
     time.sleep(1.5)
@@ -1396,7 +1397,7 @@ try:
     r = ctl_cmd('show metrics-acl-table', 15530 + BASE)
     check('metrics acl: the whitelist table',
           r == 'ok acl-metrics-table\ndeny 0.0.0.0/0\nallow 127.0.0.1/32', r[:80])
-    mgate = '/tmp/reg_acl_metrics-%d.json' % PORT
+    mgate = os.path.join(SCRATCH, 'reg_acl_metrics-%d.json') % PORT
     with open(mgate, 'w') as fh:
         _json.dump({'desc': 'the lab gate', 'type': 'ip-prefix', 'rules': [
             {'type': 'deny', 'prefix': 'any'},
@@ -1500,7 +1501,7 @@ try:
     r = ctl_cmd('show audit-log', 15530 + BASE)
     check('audit log-file: the XDG default renders', r.startswith('ok audit-log=')
           and r.endswith('modbus-cache/audit.log'), r)
-    live_audit = '/tmp/reg_live_audit.log'
+    live_audit = os.path.join(SCRATCH, 'reg_live_audit.log')
     if os.path.exists(live_audit):
         os.remove(live_audit)
     r = ctl_cmd('set audit-log %s' % live_audit, 15530)
@@ -1562,7 +1563,7 @@ try:
     r = ctl_cmd('clear audit-log', 15530 + BASE)
     check('audit log-file: clear restores the configured sink', r.startswith('ok audit-log=')
           and 'modbus-cache/audit.log' in r, r[:120])
-    live_dump = '/tmp/reg_live_dump.json'
+    live_dump = os.path.join(SCRATCH, 'reg_live_dump.json')
     r = ctl_cmd('set dump-path %s' % live_dump, 15530)
     check('dump path: set live', r.startswith('ok dump-path=%s' % live_dump), r[:120])
     r = ctl_cmd('show dump', 15530 + BASE)
@@ -1628,7 +1629,7 @@ try:
                               '--listen', '127.0.0.1:%d' % (15533 + BASE), '--interval', '1', '--profile', R,
                               '--max-clients', '0', '--max-conn-per-ip', '1', '--control-port', '%d' % (15534 + BASE),
                               '--control-token', 'sekrit'],
-                             stdout=open('/tmp/reg_cache_pip.log', 'w'), stderr=subprocess.STDOUT)
+                             stdout=open(os.path.join(SCRATCH, 'reg_cache_pip.log'), 'w'), stderr=subprocess.STDOUT)
     procs.append(p_pip)
     time.sleep(1.5)
     g1 = socket.create_connection(('127.0.0.1', 15533 + BASE), timeout=5)
@@ -1695,7 +1696,7 @@ try:
         raise QuickDone()   # quick: the core sections only
     # 6. FC4 input-register caching, the write allow-list, inspect,
     #    per-client REQUESTS accounting, the control token file
-    fc4map = '/tmp/reg_fc4_profile.json'
+    fc4map = os.path.join(SCRATCH, 'reg_fc4_profile.json')
     _json.dump({'description': 'fc4 device (mixed spaces)',
                 'registers': [
                     {'name': 'pv-power', 'register': 32064, 'type': 'i32', 'fc': 3, 'cache': True},
@@ -1703,7 +1704,7 @@ try:
                     {'name': 'coil-flag', 'register': 47400, 'type': 'bit', 'fc': 1, 'cache': True},
                 ]}, open(fc4map, 'w'))
     # the allow-list rides the config script (the reloadable source: the env is frozen at start)
-    ini4 = '/tmp/reg_fc4.conf'
+    ini4 = os.path.join(SCRATCH, 'reg_fc4.conf')
     open(ini4, 'w').write('# the fc4 regtest config: the set grammar\n'
                           'set write-registers 47400:100,40001:2\n'
                           'set write-acl any\n')
@@ -1718,8 +1719,8 @@ try:
                     '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                    '--listen', '127.0.0.1:%d' % (15521 + BASE), '--interval', '1', '--cache-ttl', '3',
                    '--allow-write', '--control-port', '%d' % (15522 + BASE),
-                   '--profile', fc4map, '--audit-log', '/tmp/reg_audit_fc4.log'],
-                  log='/tmp/reg_fc4.log', env_extra={'REQUESTS_AUDIT': '1',
+                   '--profile', fc4map, '--audit-log', os.path.join(SCRATCH, 'reg_audit_fc4.log')],
+                  log=os.path.join(SCRATCH, 'reg_fc4.log'), env_extra={'REQUESTS_AUDIT': '1',
                                                      'CONTROL_TOKEN': 'sekrit'})
     time.sleep(2.5)
     b = rd(32064, 2, port=15521 + BASE)
@@ -1728,14 +1729,14 @@ try:
     check('fc4 range polled and served from cache', b[0] == 4 and struct.unpack('>i', b[2:6])[0] == 0, b.hex())
     b = rd4(31000, 1, port=15521 + BASE)
     check('fc4 uncached register forwarded (device answers 0)', b[0] == 4 and struct.unpack('>H', b[2:4])[0] == 0, b.hex())
-    forwards = subprocess.run(['grep', '-c', 'fc4 registers 31000:1 not cached', '/tmp/reg_fc4.log'],
+    forwards = subprocess.run(['grep', '-c', 'fc4 registers 31000:1 not cached', os.path.join(SCRATCH, 'reg_fc4.log')],
                               capture_output=True, text=True).stdout.strip()
     b = rd4(31000, 1, port=15521 + BASE)
-    forwards2 = subprocess.run(['grep', '-c', 'fc4 registers 31000:1 not cached', '/tmp/reg_fc4.log'],
+    forwards2 = subprocess.run(['grep', '-c', 'fc4 registers 31000:1 not cached', os.path.join(SCRATCH, 'reg_fc4.log')],
                                capture_output=True, text=True).stdout.strip()
     check('fc4 forward cached on first pass', forwards == '1' and forwards2 == '1', '%s/%s' % (forwards, forwards2))
     b = rd4(65000, 1, port=15521 + BASE)
-    forwards = subprocess.run(['grep', '-c', 'fc4 registers 65000:1 not cached', '/tmp/reg_fc4.log'],
+    forwards = subprocess.run(['grep', '-c', 'fc4 registers 65000:1 not cached', os.path.join(SCRATCH, 'reg_fc4.log')],
                               capture_output=True, text=True).stdout.strip()
     check('fc4 65000 not synthetic -> forwarded to the device', b[0] == 4 and forwards == '1',
           '%s forwards=%s' % (b.hex(), forwards))
@@ -1771,9 +1772,9 @@ try:
           b[0] == 0x97 and b[1] == 1, b.hex())
     check('write allow-list: the refused fc23 write is a WRITE-REFUSED naming the span',
           'fc=23 registers=47999:1 read=47415:2 values=5 unit=1 reason=outside-allow-list'
-          in open('/tmp/reg_audit_fc4.log').read())
+          in open(os.path.join(SCRATCH, 'reg_audit_fc4.log')).read())
     b = txn(struct.pack('>BHHHH', 23, 47415, 2, 47498, 1) + struct.pack('>BH', 2, 5), port=15521 + BASE)
-    fc4_log = open('/tmp/reg_fc4.log').read()
+    fc4_log = open(os.path.join(SCRATCH, 'reg_fc4.log')).read()
     check('write allow-list: fc23 spans inside pass the gate (the device answers)',
           b[0] == 0x97 and b[1] == 1
           and 'write: registers 47498:1 = [5], read back 47415:2 (read/write multiple registers, unit 1)' in fc4_log
@@ -1783,7 +1784,7 @@ try:
     # its function code named in the log
     b = txn(struct.pack('>B', 17), port=15521 + BASE)   # FC17 report slave id
     check('unknown-FC forward: the frame is named in the log',
-          'forwarded FC17 (report slave id)' in open('/tmp/reg_fc4.log').read(), b.hex())
+          'forwarded FC17 (report slave id)' in open(os.path.join(SCRATCH, 'reg_fc4.log')).read(), b.hex())
 
     # the bulk-write shape gate: an FC16 whose byte count lies about its
     # data is refused at the cache (exception 03), never forwarded
@@ -1791,8 +1792,8 @@ try:
     check('malformed fc16 (the byte count lies) -> exception 03 at the cache',
           b == bytes.fromhex('9003'), b.hex())
     check('malformed fc16: the WRITE-REFUSED names the inconsistency',
-          'the byte count is 3, the register count needs 4' in open('/tmp/reg_audit_fc4.log').read(),
-          open('/tmp/reg_audit_fc4.log').read()[-200:])
+          'the byte count is 3, the register count needs 4' in open(os.path.join(SCRATCH, 'reg_audit_fc4.log')).read(),
+          open(os.path.join(SCRATCH, 'reg_audit_fc4.log')).read()[-200:])
     # write-through invalidation now sweeps both register spaces: the fc4
     # copy of meter-live is dropped by an fc06 write to the same address
     b = rd4(40001, 2, port=15521 + BASE)
@@ -1801,17 +1802,17 @@ try:
           b == bytes.fromhex('069c410007'), b.hex())
     check('write-through: the fc4 copy invalidated, the repoll refills',
           'write: invalidated 1 cached word(s) at registers 40001:1, repolling'
-          in open('/tmp/reg_fc4.log').read(), open('/tmp/reg_fc4.log').read()[-200:])
+          in open(os.path.join(SCRATCH, 'reg_fc4.log')).read(), open(os.path.join(SCRATCH, 'reg_fc4.log')).read()[-200:])
 
     # inspect: the pretty multi-line dump
     r = ctl_cmd('inspect', 15522 + BASE)
     check('control: inspect dumps state, map, write gate',
           r.startswith('ok inspect') and 'modbus-cache' in r and 'upstream  127.0.0.1:%d' % (15512 + BASE)
           and 'write-registers 47400:100' in r and 'fc4' in r, repr(r[:160]))
-    fc4_audit = open('/tmp/reg_audit_fc4.log').read()
+    fc4_audit = open(os.path.join(SCRATCH, 'reg_audit_fc4.log')).read()
     check('audit: WRITE + WRITE-REFUSED (allow-list) events',
           'application=CACHE tag=daemon' in fc4_audit and 'type=write' in fc4_audit and 'type=write-refused' in fc4_audit
-          and 'outside the write allow-list' in fc4_audit, fc4_audit[-160:])
+          and 'reason=outside-allow-list' in fc4_audit, fc4_audit[-160:])
 
     # SIGHUP reloads the allow-list from the config script
     conf_txt = open(ini4).read().replace('set write-registers 47400:100', 'set write-registers 47600:100')
@@ -1827,12 +1828,12 @@ try:
     # the overrides save to the state file beside the config, the process
     # re-execs, the fresh daemon re-resolves the config (the file edit takes
     # effect — the restart-marked style) and re-applies the saved overrides once
-    ini_r = '/tmp/reg_reload.conf'
+    ini_r = os.path.join(SCRATCH, 'reg_reload.conf')
     open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset unit 4\n')
     p_r = start([sys.executable, P, '--config', ini_r, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                  '--listen', '127.0.0.1:%d' % (15581 + BASE), '--interval', '1', '--cache-ttl', '3',
                  '--control-port', '%d' % (15582 + BASE), '--profile', fc4map],
-                log='/tmp/reg_reload.log', env_extra={'CONTROL_TOKEN': 'sekrit'})
+                log=os.path.join(SCRATCH, 'reg_reload.log'), env_extra={'CONTROL_TOKEN': 'sekrit'})
     time.sleep(2)
     r = ctl_cmd('set interval 7', 15582 + BASE)
     check('reload: the override lands before the reload', r.startswith('ok interval=7'), r[:120])
@@ -1874,12 +1875,13 @@ try:
     # consumes the file before a stat could land)
     r = subprocess.run([sys.executable, '-c', '''
 import os, sys
+SCRATCH = os.environ['PV_RUN_DIR']   # the white-box snippet is its own process — the scratch rides the inherited env
 sys.path.insert(0, %r)
 sys.path.insert(0, %r)
 import lib.control as C
 class Stub(C.ControlServer):
     def __init__(self, key):
-        self.config_path = '/tmp/reg_reload_mode.conf'
+        self.config_path = os.path.join(SCRATCH, 'reg_reload_mode.conf')
         self.overridden = {'interval'}
         class _Proxy:
             dump_key = key   # the reload state file seals only under dump-key
@@ -1887,13 +1889,13 @@ class Stub(C.ControlServer):
     def dump_settings(self):
         return {'interval': '7'}
 Stub(None)._save_reload_state()
-st = os.stat('/tmp/reg_reload_mode.conf.reload')
+st = os.stat(os.path.join(SCRATCH, 'reg_reload_mode.conf.reload'))
 assert st.st_mode & 0o777 == 0o600, oct(st.st_mode)
-plain = open('/tmp/reg_reload_mode.conf.reload').read()
-os.unlink('/tmp/reg_reload_mode.conf.reload')
+plain = open(os.path.join(SCRATCH, 'reg_reload_mode.conf.reload')).read()
+os.unlink(os.path.join(SCRATCH, 'reg_reload_mode.conf.reload'))
 Stub('seal-key-9')._save_reload_state()
-sealed = open('/tmp/reg_reload_mode.conf.reload').read()
-os.unlink('/tmp/reg_reload_mode.conf.reload')
+sealed = open(os.path.join(SCRATCH, 'reg_reload_mode.conf.reload')).read()
+os.unlink(os.path.join(SCRATCH, 'reg_reload_mode.conf.reload'))
 import json as _js
 d = _js.loads(sealed)
 assert d.get('version') == 2 and d.get('cipher') == 'sha256-ctr' and d.get('box') and d.get('mac'), d.keys()
@@ -1944,15 +1946,15 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
            '--listen', '127.0.0.1:%d' % (15531 + BASE), '--interval', '1', '--profile', R,
            '--allow-write', '--control-port', '%d' % (15532 + BASE), '--control-token', 'sekrit'],
-          log='/tmp/reg_none.log')
+          log=os.path.join(SCRATCH, 'reg_none.log'))
     time.sleep(2)
-    none_log = open('/tmp/reg_none.log').read()
+    none_log = open(os.path.join(SCRATCH, 'reg_none.log')).read()
     check('defaults logged: write acl none, allow-list none',
           'connect acl: any' in none_log and 'write acl: none' in none_log
           and 'write allow-list: none' in none_log, none_log[:240])
     b = wr6(47415, 5, port=15531 + BASE)
     check('write-acl none (the default): the write is refused', b[0] == 0x86 and b[1] == 1, b.hex())
-    none_log = open('/tmp/reg_none.log').read()
+    none_log = open(os.path.join(SCRATCH, 'reg_none.log')).read()
     check('write-acl none: the refusal names the ACL',
           'not on the write ACL' in none_log)
     r = ctl_cmd('set write-acl any', 15532 + BASE)
@@ -1998,12 +2000,12 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # the TOU schedule slots (148-177) and the grid-start registers (127-128)
     deye = os.path.join(REPO, 'profiles', 'profiles', 'deye-sg05lp3.json')
     start([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15584 + BASE), '--profile', deye,
-           '--control-port', '0', '--allow-write'], log='/tmp/reg_deye_fake.log')
+           '--control-port', '0', '--allow-write'], log=os.path.join(SCRATCH, 'reg_deye_fake.log'))
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
            '--listen', '127.0.0.1:%d' % (15585 + BASE), '--interval', '1', '--profile', 'deye-sg05lp3',
            '--allow-write', '--write-acl', 'any', '--write-registers', 'profile',
            '--control-port', '%d' % (15586 + BASE), '--control-token', 'sekrit'],
-          log='/tmp/reg_profile_acl.log')
+          log=os.path.join(SCRATCH, 'reg_profile_acl.log'))
     time.sleep(2)
     b = wr6(127, 55, port=15585 + BASE)
     check('profile acl: grid-start register 127 passes', b == bytes.fromhex('06007f0037'), b.hex())
@@ -2013,7 +2015,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('profile acl: the TOU span 148:30 passes', b[:3] == bytes.fromhex('100094'), b.hex())
     b = wr16(148, [0] * 31, port=15585 + BASE)
     check('profile acl: a write spanning past 177 refused', b[0] == 0x90 and b[1] == 1, b.hex())
-    pal_log = open('/tmp/reg_profile_acl.log').read()
+    pal_log = open(os.path.join(SCRATCH, 'reg_profile_acl.log')).read()
     check('profile acl: the refusal names the profile gate',
           'outside the write allow-list profile (127:2,148:30)' in pal_log, pal_log[-200:])
     r = ctl_cmd('show write-registers', 15586 + BASE)
@@ -2054,7 +2056,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
 
     # the deny side: a profile copy with allow any + the deye spans denied —
     # everything EXCEPT 127-128/148-177 becomes writable
-    deny_prof = '/tmp/reg_deye_deny.json'
+    deny_prof = os.path.join(SCRATCH, 'reg_deye_deny.json')
     with open(deye) as fh:
         dj = _json.load(fh)
     dj['acl'] = {'write': {'rules': [
@@ -2067,7 +2069,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
            '--listen', '127.0.0.1:%d' % (15587 + BASE), '--interval', '1', '--profile', deny_prof,
            '--allow-write', '--write-acl', 'any', '--write-registers', 'profile',
            '--control-port', '%d' % (15588 + BASE), '--control-token', 'sekrit'],
-          log='/tmp/reg_profile_deny.log')
+          log=os.path.join(SCRATCH, 'reg_profile_deny.log'))
     time.sleep(2)
     b = wr6(200, 1, port=15587 + BASE)
     check('profile acl deny: register 200 passes (allow any)',
@@ -2076,7 +2078,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('profile acl deny: the denied 127:2 refused', b[0] == 0x86 and b[1] == 1, b.hex())
     b = wr6(148, 1, port=15587 + BASE)
     check('profile acl deny: the denied 148:30 refused', b[0] == 0x86 and b[1] == 1, b.hex())
-    pdl_log = open('/tmp/reg_profile_deny.log').read()
+    pdl_log = open(os.path.join(SCRATCH, 'reg_profile_deny.log')).read()
     check('profile acl deny: the refusal names the carved gate',
           'outside the write allow-list profile (0:127,129:19,178:65358)' in pdl_log, pdl_log[-200:])
     r = ctl_cmd('show write-registers-table', 15588 + BASE)
@@ -2092,7 +2094,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     for name, gate in [('clean', [{'type': 'deny', 'range': 'any'}, {'type': 'allow', 'range': '148:30'}]),
                        ('reopen', [{'type': 'allow', 'range': 'any'}, {'type': 'deny', 'range': '148:30'},
                                    {'type': 'allow', 'range': '148:1'}])]:
-        cp = '/tmp/reg_deye_%s.json' % name
+        cp = os.path.join(SCRATCH, 'reg_deye_%s.json') % name
         with open(deye) as fh:
             dj = _json.load(fh)
         dj['acl'] = {'write': {'rules': gate}}
@@ -2102,7 +2104,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
                '--listen', '127.0.0.1:%d' % (15590 if name == 'clean' else 15591),
                '--interval', '1', '--profile', cp,
                '--allow-write', '--write-acl', 'any', '--write-registers', 'profile'],
-              log='/tmp/reg_profile_%s.log' % name)
+              log=os.path.join(SCRATCH, 'reg_profile_%s.log') % name)
     time.sleep(2)
     b = wr6(148, 1, port=15590 + BASE)
     check('profile acl chain (clean slate): the allowed span passes', b[0] == 6, b.hex())
@@ -2126,7 +2128,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # the standalone acl file: --write-registers file:<path> — the file IS
     # the gate object (what a profile carries under write-acl), read and
     # compiled at start and on every set, the whitelist semantics the same
-    aclf = '/tmp/reg_acl_file.json'
+    aclf = os.path.join(SCRATCH, 'reg_acl_file.json')
     with open(aclf, 'w') as fh:
         _json.dump({'desc': 'the regtest gate',
                     'rules': [{'type': 'allow', 'range': '148:30', 'desc': 'the TOU slots'},
@@ -2136,14 +2138,14 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
            '--listen', '127.0.0.1:%d' % (15600 + BASE), '--interval', '1',
            '--allow-write', '--write-acl', 'any', '--write-registers', 'file:' + aclf,
            '--control-port', '15601', '--control-token', 'sekrit',
-           '--audit-log', '/tmp/reg_acl_audit.log'],
-          log='/tmp/reg_acl_file.log')
+           '--audit-log', os.path.join(SCRATCH, 'reg_acl_audit.log')],
+          log=os.path.join(SCRATCH, 'reg_acl_file.log'))
     time.sleep(2)
-    acl_start_log = open('/tmp/reg_acl_file.log').read()
+    acl_start_log = open(os.path.join(SCRATCH, 'reg_acl_file.log')).read()
     check('acl file: a group/world-readable file warns at start',
           'the acl file %s is group/world-readable, mode 644 — chmod 0600' % aclf in acl_start_log,
           acl_start_log[-200:])
-    acl_audit = open('/tmp/reg_acl_audit.log').read()
+    acl_audit = open(os.path.join(SCRATCH, 'reg_acl_audit.log')).read()
     check('acl file: the warning lands in the audit trail (ACL-FILE)',
           'type=acl-file' in acl_audit and 'group/world-readable' in acl_audit, acl_audit[-200:])
     b = wr6(149, 1, port=15600)
@@ -2199,7 +2201,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # the range-map form and the none word refuse
     for what, matcher in [('the range-map matcher', {'148:18': 'the TOU slots'}),
                           ('the none word', 'none')]:
-        badf = '/tmp/reg_acl_bad_matcher.json'
+        badf = os.path.join(SCRATCH, 'reg_acl_bad_matcher.json')
         with open(badf, 'w') as fh:
             _json.dump({'rules': [{'type': 'allow', 'range': matcher}]}, fh)
         p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
@@ -2214,7 +2216,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
            '--listen', '127.0.0.1:%d' % (15539 + BASE), '--interval', '1', '--profile', R,
            '--connect-acl', 'none', '--control-port', '%d' % (15540 + BASE), '--control-token', 'sekrit'],
-          log='/tmp/reg_noconn.log')
+          log=os.path.join(SCRATCH, 'reg_noconn.log'))
     time.sleep(2)
     try:
         b = rd(32064, 2, port=15539 + BASE)
@@ -2232,7 +2234,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # acl file (the chain: the last matching rule decides, no match denies,
     # the matcher word any = 0.0.0.0/0); the table shows spell either ACL
     # one entry per line
-    aclc = '/tmp/reg_acl_connect.json'
+    aclc = os.path.join(SCRATCH, 'reg_acl_connect.json')
     with open(aclc, 'w') as fh:
         _json.dump({'desc': 'the lab connect policy', 'type': 'ip-prefix', 'rules': [
             {'type': 'allow', 'prefix': '127.0.0.0/8', 'desc': 'the loopback lab'}]}, fh)
@@ -2262,7 +2264,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     r = ctl_cmd('show connect-acl-table', 15540 + BASE)
     check('acl connect table: the any matcher spells 0.0.0.0/0',
           'deny 0.0.0.0/0' in r and 'the clean slate wins: the last match decides' in r, r[:200])
-    r = ctl_cmd('set connect-acl file:/tmp/reg_acl_missing-%d.json' % PORT, 15540)
+    r = ctl_cmd('set connect-acl file:' + os.path.join(SCRATCH, 'reg_acl_missing-%d.json') % PORT, 15540)
     check('acl connect: a missing acl file answers err, the old gate stands',
           r.startswith('fail cannot read acl file')
           and ctl_cmd('show connect-acl', 15540 + BASE).startswith('ok connect-acl=file:%s' % aclc), r[:120])
@@ -2310,7 +2312,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
 
     # the write-registers file: reader checks the gate schema: an
     # ip-prefix gate refuses (this reader takes the write-registers gate)
-    badk = '/tmp/reg_acl_wrong_kind.json'
+    badk = os.path.join(SCRATCH, 'reg_acl_wrong_kind.json')
     with open(badk, 'w') as fh:
         _json.dump({'type': 'ip-prefix', 'rules': [{'type': 'allow', 'prefix': '10.0.0.0/8'}]}, fh)
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
@@ -2335,7 +2337,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     b = txn(b'\x06', port=15521 + BASE)          # FC6 with no address: forwarded before the fix
     check('write allow-list: an unparseable write frame is refused (fail closed)',
           b == bytes.fromhex('8603'), b.hex())
-    fc4_audit = open('/tmp/reg_audit_fc4.log').read()
+    fc4_audit = open(os.path.join(SCRATCH, 'reg_audit_fc4.log')).read()
     check('audit: the unparseable write is a WRITE-REFUSED event',
           'type=write-refused' in fc4_audit and 'reason=too-short' in fc4_audit,
           fc4_audit[-160:])
@@ -2344,7 +2346,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # forge a second, attacker-crafted trail line
     r = ctl_cmd('show version\n2026-01-01T00:00:00Z AUDIT CACHE WRITE forged line', 15522 + BASE)
     check('control: the injection attempt is a clean err', r.startswith('fail unknown command'), r[:100])
-    fc4_audit = open('/tmp/reg_audit_fc4.log').read()
+    fc4_audit = open(os.path.join(SCRATCH, 'reg_audit_fc4.log')).read()
     forged = [line for line in fc4_audit.splitlines() if 'AUDIT CACHE WRITE forged' in line]
     check('audit: the trail injection folds to one physical line',
           forged and all('type=command' in line and line.startswith('2026-11-') for line in forged),
@@ -2358,20 +2360,20 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     time.sleep(1.2)          # > the 1s REQUESTS audit period: the periodic tally fires
     s.close()
     time.sleep(0.5)
-    fc4_audit = open('/tmp/reg_audit_fc4.log').read()
+    fc4_audit = open(os.path.join(SCRATCH, 'reg_audit_fc4.log')).read()
     check('audit: per-client REQUESTS tallies (periodic + disconnect)',
           'application=CACHE tag=daemon' in fc4_audit and 'type=requests' in fc4_audit and 'peer=127.0.0.1:' in fc4_audit
           and 'window=1s' in fc4_audit and 'recent=' in fc4_audit and 'connected=' in fc4_audit, fc4_audit[-160:])
 
     # the control token as a file: reference (the LoadCredential pattern);
     # the file must be owner-only 0600 (F12 in docs/AUDIT.md)
-    tokfile = '/tmp/reg_token_file'
+    tokfile = os.path.join(SCRATCH, 'reg_token_file')
     open(tokfile, 'w').write('tokensecret\n')
     os.chmod(tokfile, 0o600)
     p_tok = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                               '--listen', '127.0.0.1:%d' % (15523 + BASE), '--interval', '1', '--profile', fc4map,
                               '--control-port', '%d' % (15524 + BASE), '--control-token', 'file:' + tokfile],
-                             stdout=open('/tmp/reg_tok.log', 'w'), stderr=subprocess.STDOUT)
+                             stdout=open(os.path.join(SCRATCH, 'reg_tok.log'), 'w'), stderr=subprocess.STDOUT)
     procs.append(p_tok)
     time.sleep(1.5)
     r = subprocess.run([sys.executable, ctl, '--control-port', '%d' % (15524 + BASE),
@@ -2389,12 +2391,12 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('token file: token-less ctl refused', r.returncode == 0
           and '% error: authenticate first' in r.stdout, repr(r.stdout[:80]))
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE), '--listen', '127.0.0.1:%d' % (15525 + BASE),
-                        '--control-token', 'file:/tmp/reg_no_such_token_file', '--dry-run'],
+                        '--control-token', 'file:' + os.path.join(SCRATCH, 'reg_no_such_token_file'), '--dry-run'],
                        capture_output=True, text=True, timeout=15)
     check('token file: a missing reference fails fast, one line', r.returncode != 0
           and 'cannot read control-token' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-140:]))
-    lax = '/tmp/reg_token_file_lax'
+    lax = os.path.join(SCRATCH, 'reg_token_file_lax')
     open(lax, 'w').write('laxsecret\n')                                 # the umask default (0644)
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE), '--listen', '127.0.0.1:%d' % (15525 + BASE),
                         '--control-token', 'file:' + lax, '--dry-run'],
@@ -2430,7 +2432,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
                        capture_output=True, text=True, timeout=15)
     check('metrics: a non-loopback endpoint with a token starts',
           r.returncode == 0 and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
-    mtc = '/tmp/reg_metrics_token.conf'
+    mtc = os.path.join(SCRATCH, 'reg_metrics_token.conf')
     open(mtc, 'w').write('# the token rides the config layer\n'
                          'set metrics-token sekrit\n')
     r = subprocess.run([sys.executable, P, '--config', mtc, '--upstream', '127.0.0.1:%d' % (15512 + BASE), '--dry-run',
@@ -2442,7 +2444,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
 
     # the paste-back gate: a rendered `set <secret> *** SECRET REMOVED ***`
     # line refuses to parse — the placeholder is never a value
-    ph = '/tmp/reg_placeholder.conf'
+    ph = os.path.join(SCRATCH, 'reg_placeholder.conf')
     open(ph, 'w').write('# the rendered script pasted back\n'
                         'set control token *** SECRET REMOVED ***\n')
     r = subprocess.run([sys.executable, P, '--config', ph, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
@@ -2470,7 +2472,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
            '--control-port', str(AUTH_CTL), '--control-token', 'ctok-a',
            '--modbus-auth', 'suite', '--auth-key', CL_KEY,
            '--auth-upstream', 'suite', '--auth-upstream-key', UP_KEY],
-          log='/tmp/reg_auth_cache.log')
+          log=os.path.join(SCRATCH, 'reg_auth_cache.log'))
     time.sleep(1.2)
 
     def ctl_auth(*cmds):
@@ -2510,7 +2512,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     except Exception:
         check('suite auth: the wrong key is rejected (ERR)', True)
     c.close()
-    loga = open('/tmp/reg_auth_cache.log').read()
+    loga = open(os.path.join(SCRATCH, 'reg_auth_cache.log')).read()
     check('suite auth: the failed proofs are logged',
           'suite auth failed for' in loga)
     check('suite auth: the start log names both schemes',
@@ -2654,7 +2656,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
            '--timeout', '2', '--interval', '2',
            '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
            '--auth-upstream', 'waveshare', '--auth-upstream-key', GW_KEY],
-          log='/tmp/reg_ws_cache.log')
+          log=os.path.join(SCRATCH, 'reg_ws_cache.log'))
     time.sleep(1.2)
 
     def ctl_ws(*cmds):
@@ -2663,7 +2665,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
                            capture_output=True, text=True, timeout=15)
         return r.stdout.strip()
 
-    logw = open('/tmp/reg_ws_cache.log').read()
+    logw = open(os.path.join(SCRATCH, 'reg_ws_cache.log')).read()
     check('waveshare auth: the start log names the scheme',
           'client auth: none, upstream auth: waveshare' in logw, logw[-200:])
     for _ in range(40):
@@ -2706,7 +2708,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
            '--timeout', '2', '--interval', '2',
            '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
            '--auth-upstream', 'waveshare', '--auth-upstream-key', 'gw-pass2'],
-          log='/tmp/reg_ws_cache_bad.log')
+          log=os.path.join(SCRATCH, 'reg_ws_cache_bad.log'))
     time.sleep(1.2)
     for _ in range(200):
         r = ctl_ws('inspect')
@@ -2717,7 +2719,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           '(FAILING)' in r, r[-200:])
     check('waveshare auth: the gateway counted the bad attempts',
           ws.bad_attempts >= 1, 'bad=%d' % ws.bad_attempts)
-    logw = open('/tmp/reg_ws_cache_bad.log').read()
+    logw = open(os.path.join(SCRATCH, 'reg_ws_cache_bad.log')).read()
     check('waveshare auth: the failed proofs land in the log as exchange errors',
           'Waveshare TCP auth failed' in logw, logw[-200:])
     procs[-1].terminate()
@@ -2728,7 +2730,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
            '--timeout', '2', '--interval', '2',
            '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
            '--auth-upstream', 'waveshare', '--auth-upstream-key', GW_KEY],
-          log='/tmp/reg_ws_cache.log')
+          log=os.path.join(SCRATCH, 'reg_ws_cache.log'))
     time.sleep(1.2)
     for _ in range(40):
         r = ctl_ws('inspect')

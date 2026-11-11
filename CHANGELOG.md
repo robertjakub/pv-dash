@@ -12,6 +12,50 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the control exchange's DEBUG line slims, and the
+  logging knobs gather family-wide under the system/ namespace**: the
+  daemons' debug exchange line carries the command and the outcome status
+  only (`show config -> ok`) — the reply text stays on the client's
+  console and joins the line only with the reply-log toggle on. The
+  toggle is registry-driven on all four tools (the flag
+  `--control-log-replies`, the live word `set system log-replies` the
+  ctls and config files translate, the dumps and the reload state carry
+  it, `show config` renders it); the fake's `log_exchange` override died
+  into the base. `local-time` and `log-access` move to
+  `system/local-time` / `system/log-access` and go live everywhere (the
+  dashboard's local-time was startup-only, the cache's log-access
+  unhides), and the fake gains both rows — its Modbus connects now log
+  at DEBUG by default, `set system log-access on` raises them to INFO.
+  **The audit trail's writer tags ride one `shared/tags.json`** (the
+  texts loader's tree walk; one tag per tool —
+  `{"cache": "CACHE", "scraper": "SCR", "inverter": "INV",
+  "dashboard": "DSH"}`) — the daemon's line speaks it as `tools=<TAG>`,
+  the clients answer with the cli writer role; a deployment renames its
+  line tag in one place; a
+  malformed file refuses to start. **check_options guards the env
+  surface**: no
+  tool-tagged env twin (`MCH_*`/`CACHE_*`/…, the retired era — the one
+  control env stays the common `CTL`) may return in a registry row or a
+  tool's own code. The NixOS modules, READMEs, OPTIONS.md, the MANUALs
+  and the man pages follow.   **The audit line itself is KV now**:
+  `<stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<12-hex>
+  [message=<kv pairs>]` —
+  `tools=<TAG>` the always-uppercase tool tag (one per tool in
+  shared/tags.json), `tag=daemon|cli` the writer role (the CTL/CLI tag
+  split is gone — one client role beside the daemon's, the per-writer
+  chain keys on the pair), the `message=` tail rule (its value runs to
+  end-of-line), the command's `cmd='…'`/`result=ok|err|…` words replacing
+  the `'…' -> ok` arrow form, `reason=unsigned|bad-mac` naming the
+  wire-policy refusals, the SHUTDOWN prose heads folded into `reason=`;
+  the verifier reads the pre-KV lines beside the new ones (the rotated
+  trails verify across the upgrade) and the RFC5424/CEF envelopes'
+  extracted fields follow the line's own words. The coverage rider:
+  cache-regtest rounds the
+  metrics per-IP cap live (`metrics/limits/max-conn-per-ip`) — the drift
+  ledger's straggler promise.
+
+### Changed
+
 - **everywhere** — **every knob's value is judged by its registry row at
   every layer** (the row-driven validation): a row's `conv`, `choices`,
   `min`/`max` and the named `check` validators now gate the flag parser

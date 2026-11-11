@@ -95,7 +95,41 @@ the intended demo feature, gated by control-server access only.
   writes, refusals,
   auth-fails, control commands and lifecycle events recorded; control
   characters folded at the writer so one event is one physical line (F2);
-  falls back to stdout (journald).
+  falls back to stdout (journald). The line grammar is KV:
+  `<stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<12-hex>
+  [message=<kv pairs>]` —
+  `tools=<TAG>` is always uppercase and names the tool (the daemon's own tag
+  from `shared/tags.json`), `tag=` names the writer — the daemon's own
+  `daemon` or the ctl and cli clients' shared `cli` —, the message is
+  the last key and runs to end-of-line, its values carry `key=value` pairs
+  (values with spaces wear single quotes — `cmd='set pv 3000'`), the
+  command's `result=ok|err|bye|local|aborted` and — when the exchange was
+  signed — its `wire=h<12-hex>` mac proof ride beside it, and the wire-policy
+  refusals name themselves (`reason=unsigned` / `reason=bad-mac`). The keys
+  are unique: the five outer words (`tools`/`tag`/`type`/`hash`/`message`)
+  are reserved — no message emits them — and a message never repeats a key.
+  The outer keys:
+
+  | key | value |
+  |---|---|
+  | `tools=` | the tool's tag, always uppercase — the `shared/tags.json` spelling (`CACHE` / `SCR` / `INV` / `DSH`) |
+  | `tag=` | the writer role: `daemon` (the service's own trail) or `cli` (the ctl and cli clients, one role) |
+  | `type=` | the event type, lowercase — see the table below |
+  | `hash=` | the entry's chained hash (12 hex) |
+  | `message=` | the detail — the last key, its value runs to end-of-line |
+
+  The message keys per type (a message never repeats a key; the types not
+  listed still speak prose — the pending KV pass):
+
+  | type | message keys |
+  |---|---|
+  | `start` | `version`, `upstream` (the fake: `modbus`), `unit` (not the dashboard), `listen`, `control`, `profile` (the cache and the fake) |
+  | `shutdown` | `reason` (`control-command`, `sigterm`, …), `uptime` — plus the tool's counters: `clients`/`hits`/`misses` (the cache), `errors` (the scraper), `conns`/`requests`/`chaos_hits` (the fake) |
+  | `command` | `peer`, `role` (the session's RBAC role, when authenticated), `cmd` (single-quoted), `wire` (the frame mac's 12-hex head, when signed), `result` (`ok`/`err`/`bye`), `reason` (the wire-policy refusals only: `unsigned` / `bad-mac`) |
+  | `connect` / `disconnect` | `target`, `user` (the clients' session trail) |
+  | `auth-fail` | `peer` |
+  | `requests` | `peer`, `requests` |
+  | `write` / `write-refused` / `write-rejected` / `write-failed` | the write describer's words (the pending KV pass) |
 - **Audit forwarding** — the trail's defense is three tiers: the local
   chain (the file of record, per-writer hashes, `scripts/audit_verify.py`),
   the local journald mirror and **the off-box copy** — `--audit-forward`

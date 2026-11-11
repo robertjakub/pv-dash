@@ -1,0 +1,634 @@
+{
+  "v": 1,
+  "id": "293b2334-b70e-5e1d-b5fe-c55c38acb34b",
+  "rev": 1,
+  "name": "pv-suite audit trail",
+  "summary": "The pv-suite family audit trail: the syslog input, the audit_* parse, the streams and the event definitions.",
+  "description": "Operator content for pointing Graylog at the pv-suite audit trail (--audit-forward udp://<graylog>:1514 with the default rfc5424 format). Creates one syslog UDP input on 1514, two pipeline rules that parse the KV line into audit_* fields, one pipeline wired to the Audit - all stream, five streams and four event definitions (no notifications attached - attach your own). The chain verification stays off-box: scripts/audit_verify.py over the collected file.",
+  "vendor": "pv-suite",
+  "url": "https://github.com/wework5119/opencode",
+  "parameters": [],
+  "entities": [
+    {
+      "id": "3bc640fc-3fbc-5b00-93d9-14624f1e8bc4",
+      "type": {
+        "name": "input",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "title": "pv-suite audit (syslog UDP)",
+        "configuration": {
+          "bind_address": "0.0.0.0",
+          "port": 1514,
+          "recv_buffer_size": 1048576,
+          "number_worker_threads": 2,
+          "force_rdns": false,
+          "allow_override_date": true,
+          "expand_structured_data": false,
+          "store_full_message": true
+        },
+        "static_fields": {
+          "source": "pv-suite"
+        },
+        "type": "org.graylog2.inputs.syslog.udp.SyslogUDPInput",
+        "global": true
+      }
+    },
+    {
+      "id": "3245b1ba-b17b-5721-af96-672ac472a20a",
+      "type": {
+        "name": "pipeline_rule",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "title": "pv-suite audit kv",
+        "source": "rule \"pv-suite audit kv\"\nwhen\n    has_field(\"message\") AND contains(to_string($message.message), \" AUDIT \")\nthen\n    let msg = to_string($message.message);\n    let kv = key_value(msg, quote: \"'\", ignore_empty_values: true);\n    set_fields(kv, prefix: \"audit_\");\nend"
+      }
+    },
+    {
+      "id": "31bc27da-2e5d-568c-a22f-bcb8bfc47738",
+      "type": {
+        "name": "pipeline_rule",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "title": "pv-suite audit cmd",
+        "source": "rule \"pv-suite audit cmd\"\nwhen\n    has_field(\"message\") AND contains(to_string($message.message), \" cmd=\")\nthen\n    let msg = to_string($message.message);\n    let m = regex(\" cmd='(?<cmd>[^']*)'\", msg);\n    set_field(\"audit_cmd\", m[\"cmd\"]);\nend"
+      }
+    },
+    {
+      "id": "900c3b19-7aef-55a6-955b-1735d2046496",
+      "type": {
+        "name": "pipeline",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "title": "pv-suite audit",
+        "description": "Parses the family audit line (docs/AUDIT.md) into audit_* fields.",
+        "source": "pipeline \"pv-suite audit\"\nrule \"pv-suite audit kv\"\nrule \"pv-suite audit cmd\"\nend\n",
+        "connected_streams": [
+          {
+            "$ref": "705ca793-7249-5b6a-b1ba-13160de2f31b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "705ca793-7249-5b6a-b1ba-13160de2f31b",
+      "type": {
+        "name": "stream",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "title": "pv-suite audit - all",
+        "description": "Every pv-suite audit line the family forwards (the whole trail).",
+        "stream_rules": [
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " AUDIT tools=",
+            "inverted": false,
+            "description": ""
+          }
+        ],
+        "matching_type": "AND",
+        "remove_matches": true,
+        "disabled": false,
+        "default_stream": false,
+        "alarm_callbacks": [],
+        "outputs": [],
+        "alert_conditions": []
+      }
+    },
+    {
+      "id": "e0be0990-9642-538f-9ce3-1978a344adcf",
+      "type": {
+        "name": "stream",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "title": "pv-suite audit - commands",
+        "description": "The control-plane commands and their results (audit_* carries peer, role, cmd, wire, result).",
+        "stream_rules": [
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=command ",
+            "inverted": false,
+            "description": ""
+          }
+        ],
+        "matching_type": "AND",
+        "remove_matches": true,
+        "disabled": false,
+        "default_stream": false,
+        "alarm_callbacks": [],
+        "outputs": [],
+        "alert_conditions": []
+      }
+    },
+    {
+      "id": "d3d80b8b-38e8-5d26-806f-6f49cb36a27e",
+      "type": {
+        "name": "stream",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "title": "pv-suite audit - security",
+        "description": "The tamper surface: the auth failures, the refused and rejected writes, the unsigned and badly-signed frames.",
+        "stream_rules": [
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=auth-fail ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=write-refused ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=write-rejected ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=write-failed ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " reason=unsigned ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " reason=bad-mac ",
+            "inverted": false,
+            "description": ""
+          }
+        ],
+        "matching_type": "OR",
+        "remove_matches": true,
+        "disabled": false,
+        "default_stream": false,
+        "alarm_callbacks": [],
+        "outputs": [],
+        "alert_conditions": []
+      }
+    },
+    {
+      "id": "d55a57cc-02a5-5383-b511-f912ec91e8c9",
+      "type": {
+        "name": "stream",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "title": "pv-suite audit - lifecycle",
+        "description": "The daemon lifecycle: start, restore, shutdown, reload, reset, reconnect, the acl-file loads.",
+        "stream_rules": [
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=start ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=shutdown ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=reload ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=reset ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=reconnect ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=restore ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=acl-file ",
+            "inverted": false,
+            "description": ""
+          }
+        ],
+        "matching_type": "OR",
+        "remove_matches": true,
+        "disabled": false,
+        "default_stream": false,
+        "alarm_callbacks": [],
+        "outputs": [],
+        "alert_conditions": []
+      }
+    },
+    {
+      "id": "5970ea06-a118-536c-a55d-d216978135dc",
+      "type": {
+        "name": "stream",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "title": "pv-suite audit - writes",
+        "description": "The Modbus write edge and what the gates did to it (the write, the refusals, the rejections, the failures).",
+        "stream_rules": [
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=write ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=write-refused ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=write-rejected ",
+            "inverted": false,
+            "description": ""
+          },
+          {
+            "type": "REGEX",
+            "field": "message",
+            "value": " type=write-failed ",
+            "inverted": false,
+            "description": ""
+          }
+        ],
+        "matching_type": "OR",
+        "remove_matches": true,
+        "disabled": false,
+        "default_stream": false,
+        "alarm_callbacks": [],
+        "outputs": [],
+        "alert_conditions": []
+      }
+    },
+    {
+      "id": "e8a18c0f-ecc8-5573-8aa0-06acf4b1f87b",
+      "type": {
+        "name": "event_definition",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "id": "e8a18c0f-ecc8-5573-8aa0-06acf4b1f87b",
+        "title": "pv-suite auth-fail surge",
+        "description": "More than 5 auth-fail audit events from one peer within 5 minutes - the brute-force signal.",
+        "priority": 3,
+        "alert": true,
+        "config": {
+          "type": "aggregation-v1",
+          "query": "audit_type:auth-fail",
+          "query_parameters": [],
+          "streams": [
+            {
+              "$ref": "d3d80b8b-38e8-5d26-806f-6f49cb36a27e"
+            }
+          ],
+          "group_by": [
+            "audit_peer"
+          ],
+          "series": [
+            {
+              "id": "count()",
+              "type": "count-v1",
+              "field": null
+            }
+          ],
+          "conditions": {
+            "expression": {
+              "type": "number-greater-v1",
+              "left": {
+                "type": "number-reference-v1",
+                "expr": "count()"
+              },
+              "right": {
+                "type": "number-literal-v1",
+                "value": 5
+              }
+            }
+          },
+          "search_within_ms": 300000,
+          "execute_every_ms": 120000
+        },
+        "field_spec": [
+          {
+            "field": "audit_peer",
+            "alias": "peer"
+          }
+        ],
+        "key_spec": [
+          "audit_peer"
+        ],
+        "notification_settings": {
+          "grace_period_ms": 300000,
+          "backlog_size": 0
+        },
+        "notifications": [],
+        "storage": {
+          "type": "persist-v1"
+        }
+      }
+    },
+    {
+      "id": "cea953da-4b4b-5a21-8e8f-bccb2acefa67",
+      "type": {
+        "name": "event_definition",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "id": "cea953da-4b4b-5a21-8e8f-bccb2acefa67",
+        "title": "pv-suite wire-policy refusal",
+        "description": "An unsigned or badly-signed frame reached a signed surface - an attack in progress, not noise.",
+        "priority": 3,
+        "alert": true,
+        "config": {
+          "type": "aggregation-v1",
+          "query": "audit_reason:(unsigned OR bad-mac)",
+          "query_parameters": [],
+          "streams": [
+            {
+              "$ref": "d3d80b8b-38e8-5d26-806f-6f49cb36a27e"
+            }
+          ],
+          "group_by": [],
+          "series": [
+            {
+              "id": "count()",
+              "type": "count-v1",
+              "field": null
+            }
+          ],
+          "conditions": {
+            "expression": {
+              "type": "number-greater-v1",
+              "left": {
+                "type": "number-reference-v1",
+                "expr": "count()"
+              },
+              "right": {
+                "type": "number-literal-v1",
+                "value": 0
+              }
+            }
+          },
+          "search_within_ms": 300000,
+          "execute_every_ms": 120000
+        },
+        "field_spec": [],
+        "key_spec": [],
+        "notification_settings": {
+          "grace_period_ms": 300000,
+          "backlog_size": 0
+        },
+        "notifications": [],
+        "storage": {
+          "type": "persist-v1"
+        }
+      }
+    },
+    {
+      "id": "e636da71-e710-5a47-b2fd-936d49845e0c",
+      "type": {
+        "name": "event_definition",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "id": "e636da71-e710-5a47-b2fd-936d49845e0c",
+        "title": "pv-suite write refusal",
+        "description": "The write gates refused a Modbus write (the ACL or allow-list doing its job) - worth a look, not necessarily a page.",
+        "priority": 2,
+        "alert": true,
+        "config": {
+          "type": "aggregation-v1",
+          "query": "audit_type:(write-refused OR write-rejected OR write-failed)",
+          "query_parameters": [],
+          "streams": [
+            {
+              "$ref": "5970ea06-a118-536c-a55d-d216978135dc"
+            }
+          ],
+          "group_by": [],
+          "series": [
+            {
+              "id": "count()",
+              "type": "count-v1",
+              "field": null
+            }
+          ],
+          "conditions": {
+            "expression": {
+              "type": "number-greater-v1",
+              "left": {
+                "type": "number-reference-v1",
+                "expr": "count()"
+              },
+              "right": {
+                "type": "number-literal-v1",
+                "value": 0
+              }
+            }
+          },
+          "search_within_ms": 300000,
+          "execute_every_ms": 300000
+        },
+        "field_spec": [],
+        "key_spec": [],
+        "notification_settings": {
+          "grace_period_ms": 300000,
+          "backlog_size": 0
+        },
+        "notifications": [],
+        "storage": {
+          "type": "persist-v1"
+        }
+      }
+    },
+    {
+      "id": "ac884baf-424e-5baf-8783-6b0cea798f86",
+      "type": {
+        "name": "event_definition",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "id": "ac884baf-424e-5baf-8783-6b0cea798f86",
+        "title": "pv-suite restart churn",
+        "description": "More than 3 start audit events from one tool within 15 minutes - the crash loop.",
+        "priority": 2,
+        "alert": true,
+        "config": {
+          "type": "aggregation-v1",
+          "query": "audit_type:start",
+          "query_parameters": [],
+          "streams": [
+            {
+              "$ref": "d55a57cc-02a5-5383-b511-f912ec91e8c9"
+            }
+          ],
+          "group_by": [
+            "audit_tools"
+          ],
+          "series": [
+            {
+              "id": "count()",
+              "type": "count-v1",
+              "field": null
+            }
+          ],
+          "conditions": {
+            "expression": {
+              "type": "number-greater-v1",
+              "left": {
+                "type": "number-reference-v1",
+                "expr": "count()"
+              },
+              "right": {
+                "type": "number-literal-v1",
+                "value": 3
+              }
+            }
+          },
+          "search_within_ms": 900000,
+          "execute_every_ms": 300000
+        },
+        "field_spec": [
+          {
+            "field": "audit_tools",
+            "alias": "tools"
+          }
+        ],
+        "key_spec": [
+          "audit_tools"
+        ],
+        "notification_settings": {
+          "grace_period_ms": 300000,
+          "backlog_size": 0
+        },
+        "notifications": [],
+        "storage": {
+          "type": "persist-v1"
+        }
+      }
+    }
+  ]
+}

@@ -64,20 +64,20 @@ design); the top non-man pairs:
 | 0.94 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:27` `_load_options` |
 | 0.94 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.93 | `scraper/bin/modbus-scraper.py:46` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
-| 0.89 | `scraper/bin/modbus-scraper.py:238` `graceful_stop` <-> `dashboard/bin/dashboard.py:470` `graceful_stop` |
+| 0.90 | `scraper/bin/modbus-scraper.py:240` `graceful_stop` <-> `dashboard/bin/dashboard.py:473` `graceful_stop` |
 | 0.88 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.88 | `inverter/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.88 | `scraper/lib/options.py:27` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
-| 0.82 | `cache/bin/modbus-cache.py:336` `watch_dump` <-> `common/wire/control.py:1339` `run_dump_interval` |
-| 0.82 | `inverter/lib/control.py:102` `__init__` <-> `dashboard/lib/control.py:72` `__init__` |
+| 0.83 | `inverter/lib/control.py:96` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
+| 0.82 | `cache/bin/modbus-cache.py:339` `watch_dump` <-> `common/wire/control.py:1356` `run_dump_interval` |
 | 0.78 | `inverter/lib/signals.py:77` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:468` `acl_table_report` <-> `dashboard/lib/control.py:293` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:466` `acl_table_report` <-> `dashboard/lib/control.py:296` `acl_table_report` |
+| 0.76 | `scraper/lib/control.py:117` `__init__` <-> `inverter/lib/control.py:96` `__init__` |
 | 0.76 | `scraper/lib/server.py:89` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.74 | `scraper/lib/control.py:116` `__init__` <-> `dashboard/lib/control.py:72` `__init__` |
+| 0.75 | `scraper/lib/control.py:117` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
 | 0.74 | `cache/lib/config.py:127` `load_profile_write_gate` <-> `common/settings/config.py:438` `load_write_gate_file` |
-| 0.73 | `scraper/lib/control.py:116` `__init__` <-> `inverter/lib/control.py:102` `__init__` |
 | 0.72 | `common/settings/config.py:14` `resolve_target` <-> `common/runtime/daemon.py:44` `default_config_path` |
 
 ## The surface sweep — the listeners, the wire and the loops
@@ -150,29 +150,33 @@ by semantic family — the knob layer is the one source --help, the man
 pages, the set grammar, the NixOS modules and the README checks read,
 so a drifted row travels wide.
 
-**The shape**: 225 knob rows across the
-four registries; 30 names carry in all four:
+**The shape**: 230 knob rows across the
+four registries; 33 names carry in all four:
 
-`audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-log`, `audit-max-mb`, `audit/rotate`, `client-timeout`, `control`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
+`audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-log`, `audit-max-mb`, `audit/rotate`, `client-timeout`, `control`, `control-log-replies`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `local-time`, `log-access`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
 
 **The tool-specific remainder** (by nature):
 
 | tool | only-there knobs |
 |---|---|
-| cache | `acl`, `allow-write`, `auth-key`, `auth-upstream`, `auth-upstream-key`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `local-time`, `log-access`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `profile`, `read-delay`, `requests-audit`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
-| scraper | `auth-key`, `auth-token`, `caps`, `grid-positive-import`, `interval`, `local-time`, `log-access`, `max-grid-kw`, `max-kwp`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-offset`, `modbus-unit`, `profile`, `timeout`, `upstream` |
-| inverter | `allow-write`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `control-log-replies`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
-| dashboard | `auth`, `auth-token`, `config-js`, `local-time`, `log-access`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
+| cache | `acl`, `allow-write`, `auth-key`, `auth-upstream`, `auth-upstream-key`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `profile`, `read-delay`, `requests-audit`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
+| scraper | `auth-key`, `auth-token`, `caps`, `grid-positive-import`, `interval`, `max-grid-kw`, `max-kwp`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-offset`, `modbus-unit`, `profile`, `timeout`, `upstream` |
+| inverter | `allow-write`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
+| dashboard | `auth`, `auth-token`, `config-js`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
-**The shared knobs whose fields disagree** (5 of
-30 knobs, 5 drifted field(s)) — one row per
+**The shared knobs whose fields disagree** (8 of
+33 knobs, 9 drifted field(s)) — one row per
 knob+field, the tools grouped by the value each carries:
 
 | knob | field | the values (the tools carrying each) |
 |---|---|---|
 | `client-timeout` | `live` | `limits/client-timeout` (cache) · `metrics/limits/timeout` (scraper) · `client-timeout` (inverter, dashboard) |
 | `control-ops-verbs` | `default` | `show,flush` (cache) · `show` (scraper, inverter, dashboard) |
+| `dump-interval` | `live` | `dump/interval` (cache) · `dump-interval` (scraper, inverter, dashboard) |
 | `listen` | `default` | `127.0.0.1:15502` (cache) · `127.0.0.1:9350` (scraper) · `127.0.0.1:5502` (inverter) · `127.0.0.1:8080` (dashboard) |
+| `local-time` | `env` | `LOCAL_TIME` (cache, scraper, dashboard) · *absent* (inverter) |
+| `log-access` | `env` | `LOG_ACCESS` (cache, scraper, dashboard) · *absent* (inverter) |
+| `log-access` | `hidden` | `True` (cache) · `·` (scraper, inverter, dashboard) |
 | `max-clients` | `live` | `limits/max-clients` (cache) · `metrics/limits/max-clients` (scraper) · `max-clients` (inverter, dashboard) |
 | `max-conn-per-ip` | `live` | `limits/max-conn-per-ip` (cache) · `metrics/limits/max-conn-per-ip` (scraper) · `max-conn-per-ip` (inverter, dashboard) |
 
@@ -233,8 +237,8 @@ canon the operators grep for.
 | dashboard | `ACL-FILE`, `RELOAD`, `SHUTDOWN`, `START` |
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
-**The phrase canon**: 24 log phrase(s) shared by >= 2 tools;
-89 tool-local. The canon (the lead clause, the tools that speak it):
+**The phrase canon**: 23 log phrase(s) shared by >= 2 tools;
+90 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
@@ -251,7 +255,6 @@ canon the operators grep for.
 | `unhandled error serving` | dashboard, scraper |
 | `dry-run: configuration is valid nothing was boun` | dashboard, inverter, scraper |
 | `restore-on-start:` | dashboard, inverter, scraper |
-| `control from` | common, inverter |
 | `control: state dumped to` | cache, common |
 | `control: state restored from` | cache, common |
 | `control: the dump to` | cache, common |
@@ -375,9 +378,9 @@ LINES are quoted, the verdicts curated.
 | tool | mkOption blocks |
 |---|---|
 | cache | 12 |
-| scraper | 46 |
+| scraper | 47 |
 | inverter | no module.nix |
-| dashboard | 45 |
+| dashboard | 46 |
 
 **The module options NOT matching a registry knob name** (after
 the kebab/camel normalization; the `*File` suffix is the NixOS
@@ -466,7 +469,7 @@ list is the TODO seed, not a verdict.
 
 **The live knobs no suite mentions** (word-bounded grep):
 
-- cache: `metrics-max-conn-per-ip`
+- cache: every live knob named somewhere in the suites
 - scraper: every live knob named somewhere in the suites
 - inverter: every live knob named somewhere in the suites
 - dashboard: `static-dir`
@@ -481,7 +484,7 @@ list is the TODO seed, not a verdict.
 **The canon phrases no suite pins**: 11
 
 **The graduation path**: the seeds carry stable IDs in
-[docs/family-drift-seeds.json](family-drift-seeds.json) (13
+[docs/family-drift-seeds.json](family-drift-seeds.json) (12
 open promise(s), the suggested suite per seed); a test wave
 consumes entries, the regeneration drops them, the shrinkage is
 the wave's proof; `--check` fails when a NEW promise ships

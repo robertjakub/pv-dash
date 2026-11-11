@@ -65,7 +65,7 @@ def parse_version(text):
 
 
 def old_version():
-    src = (ROOT / 'common' / 'version.py').read_text()
+    src = (ROOT / 'common' / 'runtime' / 'version.py').read_text()
     m = re.search(r"VERSION = '([^']+)'", src)
     if not m:
         sys.exit('release: cannot parse VERSION out of common/runtime/version.py')

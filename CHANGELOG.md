@@ -1,6 +1,6 @@
 # Changelog
 
-The suite versions as one: the number lives in `common/version.py`
+The suite versions as one: the number lives in `common/runtime/version.py`
 (`version_string()` appends `-<short git>` in a checkout). Dates are the
 tagged commits'. The early tags (before 0.1.0) carried per-tool versions —
 the dashboard, the scraper and the cache each numbered their own releases
@@ -609,6 +609,13 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   per-tool markers verdict.
 
 ### Fixed
+
+- **scripts** — **release.py's version read path follows the runtime/
+  split**: `old_version()` still read the flat `common/version.py` home
+  the common/ subdir wave (b10995d) had moved into
+  `common/runtime/version.py`, so the next release run would have died
+  on a FileNotFoundError before its first bump (verified: the read
+  resolves 0.4.2 through the new path).
 
 - **everywhere** — **`CLI_KEEPALIVE` is validated**: a non-float value
   raised an uncaught ValueError traceback inside the cli session (the

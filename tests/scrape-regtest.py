@@ -601,9 +601,9 @@ try:
     subprocess.run([sys.executable, C, '--control-port', '15589', 'shutdown'], capture_output=True, text=True)
     time.sleep(1)
     ctl_debug = open('/tmp/scr_ctl_dbg.log').read()
-    check('fake audit: control commands logged with the peer, the output withheld by default',
-          'control from 127.0.0.1' in ctl_debug and ': set soc 30' in ctl_debug
-          and '-> ok' not in ctl_debug, ctl_debug[-200:])
+    check('fake audit: control commands logged with the peer, the status only — the output withheld by default',
+          'control from 127.0.0.1' in ctl_debug and ': set soc 30 -> ok' in ctl_debug
+          and '-> ok fake-inverter' not in ctl_debug, ctl_debug[-200:])
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15584 + BASE), '--control-port', '15585',
                                    '--log-level', 'DEBUG', '--control-log-replies'],
                                   stdout=open('/tmp/scr_ctl_full.log', 'w'), stderr=subprocess.STDOUT))
@@ -614,7 +614,18 @@ try:
     time.sleep(1)
     ctl_full = open('/tmp/scr_ctl_full.log').read()
     check('fake audit: --control-log-replies logs the full command output',
-          ': set soc 30 -> ok' in ctl_full and ': show version -> ok fake-inverter' in ctl_full, ctl_full[-200:])
+          ': set soc 30 -> ok soc=30' in ctl_full and ': show version -> ok fake-inverter' in ctl_full, ctl_full[-200:])
+    r = subprocess.run([sys.executable, C, '--control-port', '15585', 'set', 'system', 'log-replies', 'off'],
+                       capture_output=True, text=True)
+    check('fake audit: set system log-replies off (the live toggle, the ctl translates)',
+          r.returncode == 0 and r.stdout.startswith('ok control-log-replies=off'), r.stdout.strip() or r.stderr.strip())
+    ctl('show version', 15585)
+    subprocess.run([sys.executable, C, '--control-port', '15585', 'shutdown'], capture_output=True, text=True)
+    time.sleep(1)
+    ctl_full = open('/tmp/scr_ctl_full.log').read()
+    check('fake audit: the live off withholds the output again',
+          ': set control-log-replies off -> ok control-log-replies=off' in ctl_full and ': show version -> ok\n' in ctl_full,
+          ctl_full[-200:])
 
     # 2f. CTL environment (short name) drives both tools when the flag is clear
     r = subprocess.run([sys.executable, C, 'set', 'pv', '2200'], capture_output=True, text=True,
@@ -947,9 +958,9 @@ try:
     r = cli('show version\nping\nquit\n', audit=AUD2)
     cli_rows = open(AUD2).read()
     check('audit: cli logs the session + the local commands; the wire commands = the server trail',
-          'CLI CONNECT ' in cli_rows and 'target=' in cli_rows
-          and 'CLI COMMAND ' in cli_rows and "'quit' -> local" in cli_rows
-          and 'CLI DISCONNECT' in cli_rows and "CLI COMMAND 'show" not in cli_rows
+          'tools=INV tag=cli type=connect' in cli_rows and 'target=' in cli_rows
+          and 'tools=INV tag=cli type=command' in cli_rows and "cmd='quit' result=local" in cli_rows
+          and 'tools=INV tag=cli type=disconnect' in cli_rows and "message='show" not in cli_rows
           and 'ping' not in cli_rows and 'pong' not in cli_rows, cli_rows)
     r = cli('inspect\nquit\n')
     rows = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
@@ -1039,7 +1050,7 @@ try:
     time.sleep(1)
     inv_rows = open(AUDD).read()
     check('audit: INV logs START, COMMAND (peer), RELOAD, RESET, SHUTDOWN; ping skipped',
-          'INV START ' in inv_rows and 'version=' in inv_rows and "INV COMMAND " in inv_rows
+          'tools=INV tag=daemon type=start' in inv_rows and 'version=' in inv_rows and "tools=INV tag=daemon type=command" in inv_rows
           and 'peer=127.0.0.1' in inv_rows
           and "'set soc 55' -> ok" in inv_rows and 'INV RELOAD' in inv_rows
           and 'INV RESET ' in inv_rows and 'SIGUSR1' in inv_rows and 'INV SHUTDOWN ' in inv_rows
@@ -2069,7 +2080,8 @@ try:
     check('scraper control: inspect', r.startswith('ok inspect\n') and 'version   modbus-scraper' in r, r[:120])
     aud = open('/tmp/scr_regtest_audit.log').read()
     check('scraper control: the SCR audit trail with the wire mac',
-          'AUDIT SCR COMMAND ' in aud and "'set interval 5' wire=h" in aud, aud[-200:])
+          'tools=SCR tag=daemon type=command' in aud and "cmd='set interval 5' wire=h" in aud
+          and 'result=ok' in aud, aud[-200:])
 
     # 6c. the read-only ops token: show allowed, everything that steers the
     #     daemon forbidden; both roles audited, both mac keys

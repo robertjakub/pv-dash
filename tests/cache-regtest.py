@@ -243,7 +243,7 @@ try:
     check('fc16 readback', struct.unpack('>2H', b[2:6]) == (2, 6000))
     audit_txt = open('/tmp/reg_audit.log').read()
     check('audit: START + forwarded writes land in the trail',
-          'AUDIT CACHE START' in audit_txt and 'AUDIT CACHE WRITE' in audit_txt
+          'tools=CACHE tag=daemon type=start' in audit_txt and 'tools=CACHE tag=daemon type=write' in audit_txt
           and 'register 47415 = 5' in audit_txt, audit_txt[-200:])
 
     # write-through invalidation: the written range serves the NEW value immediately
@@ -532,9 +532,9 @@ try:
           r.get('status') == 'fail' and 'mac does not verify' in r.get('text', ''), str(r))
     tok_audit = open('/tmp/reg_audit_ctl.log').read()
     check('audit: AUTH-FAIL + COMMAND events with the peer and the wire mac',
-          'AUTH-FAIL' in tok_audit and 'AUDIT CACHE COMMAND ' in tok_audit
+          'type=auth-fail' in tok_audit and 'tools=CACHE tag=daemon type=command' in tok_audit
           and 'peer=127.0.0.1:' in tok_audit and "'show version' wire=h" in tok_audit
-          and ' -> ok' in tok_audit, tok_audit[-240:])
+          and 'result=ok' in tok_audit, tok_audit[-240:])
 
     # show config: the secret knobs render as the placeholder — the knob is
     # public, the value never is
@@ -1487,7 +1487,7 @@ try:
              if line.strip() and not line.strip().startswith('[')]
     check("bare show: the flat grammar's root (the gated word hidden while the dump is off)",
           words == ['acl', 'audit', 'cache', 'cache-ttl', 'config', 'connections', 'control', 'dump',
-                    'knobs', 'limits', 'local-time', 'log-level', 'metrics', 'modbus', 'system',
+                    'knobs', 'limits', 'log-level', 'metrics', 'modbus', 'system',
                     'uplink', 'version', 'write'],
           r[:220])
     r = ctl_cmd('set audit-max-mb 5', 15530 + BASE)
@@ -1501,7 +1501,7 @@ try:
     r = ctl_cmd('set audit-log %s' % live_audit, 15530)
     check('audit log-file: the trail moves live', r.startswith('ok audit-log=%s' % live_audit), r[:120])
     ctl_cmd('show version', 15530 + BASE)
-    check('audit log-file: the new sink takes the commands', ' CACHE COMMAND' in open(live_audit).read(),
+    check('audit log-file: the new sink takes the commands', 'tools=CACHE tag=daemon type=command' in open(live_audit).read(),
           open(live_audit).read()[-120:])
     r = ctl_cmd('set audit-daily on', 15530 + BASE)
     check('audit rotate: daily set', r.startswith('ok audit-daily=on'), r[:90])
@@ -1546,10 +1546,9 @@ try:
     live_dump = '/tmp/reg_live_dump.json'
     r = ctl_cmd('set dump-path %s' % live_dump, 15530)
     check('dump path: set live', r.startswith('ok dump-path=%s' % live_dump), r[:120])
-    r = ctl_cmd('show', 15530 + BASE)
-    words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
-             if line.strip() and not line.strip().startswith('[')]
-    check('bare show: the dump on, the gated word lists', 'dump-interval' in words, r[:160])
+    r = ctl_cmd('show dump', 15530 + BASE)
+    check('bare show: the dump on, the interval word lists under the dump node (the dump/ grammar)',
+          'dump-interval' in r, r[:160])
     r = ctl_cmd('request dump', 15530 + BASE)
     check('dump path: request dump writes the live path', r.startswith('ok dumped') and live_dump in r, r[:90])
     r = ctl_cmd('set dump-with-cache on', 15530 + BASE)
@@ -1637,6 +1636,20 @@ try:
     g1.close(); g2.close()
     p_pip.send_signal(signal.SIGTERM)
     p_pip.wait(timeout=10)
+
+    # the metrics per-IP cap (the ledger's knob promise) and the log-cmd-replies
+    # toggle: the live set/show/clear roundtrips on the main daemon
+    r = ctl_cmd('set metrics-max-conn-per-ip 3', 15514 + BASE)
+    check('metrics per-IP: raised live', r.startswith('ok metrics-max-conn-per-ip=3'), r[:100])
+    r = ctl_cmd('show metrics-max-conn-per-ip', 15514 + BASE)
+    check('metrics per-IP: the cap shows (the per-setting row)', r == 'ok metrics-max-conn-per-ip=3', r[:100])
+    r = ctl_cmd('clear metrics-max-conn-per-ip', 15514 + BASE)
+    check('metrics per-IP: clear restores the configured cap', r.startswith('ok metrics-max-conn-per-ip='), r[:100])
+    r = ctl_cmd('set control-log-replies on', 15514 + BASE)
+    check('log-cmd-replies: the live toggle takes (the flat wire spelling)', r.startswith('ok control-log-replies=on'), r[:100])
+    r = ctl_cmd('show control-log-replies', 15514 + BASE)
+    check('log-cmd-replies: the toggle shows (the per-setting row)', r == 'ok control-log-replies=on', r[:100])
+    ctl_cmd('clear control-log-replies', 15514 + BASE)
 
     r_before = ctl_cmd('inspect', 15514 + BASE)
     ctl_cmd('set merge-gap 0', 15514 + BASE)
@@ -1778,7 +1791,7 @@ try:
           and 'write-registers 47400:100' in r and 'fc4' in r, repr(r[:160]))
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     check('audit: WRITE + WRITE-REFUSED (allow-list) events',
-          'AUDIT CACHE WRITE ' in fc4_audit and 'WRITE-REFUSED' in fc4_audit
+          'tools=CACHE tag=daemon type=write' in fc4_audit and 'type=write-refused' in fc4_audit
           and 'outside the write allow-list' in fc4_audit, fc4_audit[-160:])
 
     # SIGHUP reloads the allow-list from the config script
@@ -2328,7 +2341,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     time.sleep(0.5)
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     check('audit: per-client REQUESTS tallies (periodic + disconnect)',
-          'AUDIT CACHE REQUESTS' in fc4_audit and 'peer=127.0.0.1:' in fc4_audit
+          'tools=CACHE tag=daemon type=requests' in fc4_audit and 'peer=127.0.0.1:' in fc4_audit
           and '(last 1s:' in fc4_audit and 'connected=' in fc4_audit, fc4_audit[-160:])
 
     # the control token as a file: reference (the LoadCredential pattern);

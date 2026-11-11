@@ -360,8 +360,8 @@ def main():
         check('ops: a bogus token is refused', r.get('status') in ('auth-fail', 'fail'), str(r))
         try:
             aud = open(OPS_AUDIT).read()
-            ok = ("role=ops 'show version'" in aud and "role=admin 'set pv 100'" in aud
-                  and "role=ops 'shutdown'" in aud and '-> err' in aud)
+            ok = ("role=ops cmd='show version'" in aud and "role=admin cmd='set pv 100'" in aud
+                  and "role=ops cmd='shutdown'" in aud and 'result=err' in aud)
         except OSError as e:
             aud, ok = str(e), False
         check('ops: both roles audited (role=ops show, role=admin set, the denials included)',

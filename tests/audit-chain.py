@@ -66,22 +66,24 @@ def main():
         c = AuditLog(log, 'CLI')
         a.event('START', 'version=test')
         c.event('CONNECT', 'target=127.0.0.1:1')
-        a.event('COMMAND', "'show version' -> ok")
-        c.event('COMMAND', "'quit' -> local")
+        a.event('COMMAND', "cmd='show version' result=ok")
+        c.event('COMMAND', "cmd='quit' result=local")
         a.event('REQUESTS', 'clients=1 reads=3 writes=0')
         ok, out = verify(log, contain=['OK'])
         check('interleaved writers verify', ok, out)
         # the layout: the hash sits right after the event name, no decoration
         first = open(log).read().splitlines()[0].split(' ')
-        check('layout: hash inline after the event (no h=)', len(first) >= 5 and first[1] == 'AUDIT'
-              and len(first[4]) == 12 and all(ch in '0123456789abcdef' for ch in first[4])
-              and first[5] == 'version=test', ' '.join(first[:6]))
+        check('layout: the hash rides its hash= token, the detail its message=', len(first) >= 7 and first[1] == 'AUDIT'
+              and first[2] == 'tools=CACHE' and first[3] == 'tag=daemon'
+              and first[5].startswith('hash=') and len(first[5]) == 17
+              and all(ch in '0123456789abcdef' for ch in first[5][5:])
+              and first[6] == 'message=version=test', ' '.join(first[:7]))
 
         # 2. an edited line breaks the chain at that line
         lines = open(log).read().splitlines()
         lines[2] = lines[2].replace("'show version'", "'show secrets'")
         open(log, 'w').write('\n'.join(lines) + '\n')
-        ok, out = verify(log, rc=1, contain=['line 3 [CACHE]: hash mismatch'])
+        ok, out = verify(log, rc=1, contain=['line 3 [CACHE:daemon]: hash mismatch'])
         check('edited line detected (right line, right prefix)', ok, out)
 
         # 3. a deleted line breaks the chain
@@ -98,12 +100,12 @@ def main():
         ok, out = verify(log, rc=1)
         check('reordered lines detected', ok, out)
 
-        # 5. legacy unsigned lines: reported, not failed
+        # 5. the pre-KV lines: the validator speaks the current grammar only
         open(log, 'w').write(
             '2026-01-01T00:00:00Z AUDIT CACHE START version=old\n'
             '2026-01-01T00:00:01Z AUDIT CACHE COMMAND \'x\' -> ok\n')
-        ok, out = verify(log, contain=['2 entr', '2 unsigned'])
-        check('legacy unsigned lines reported, not failed', ok, out)
+        ok, out = verify(log, rc=1, contain=['2 broken', 'malformed'])
+        check('pre-KV lines read malformed (the current grammar only)', ok, out)
 
         # 6. a restarted writer chains from its own trail (no false break)
         open(log, 'w').write('')
@@ -296,6 +298,8 @@ def main():
             chain = sd.split('chain="')[1].split('"')[0]
             native = text.split('] ', 1)[1]
             parts = native.split(' ')
+            if parts[2].startswith('tools='):   # the KV line: the body carries tag= type= message=
+                return parts[0], prefix, chain, ' '.join(parts[3:5] + parts[6:])
             return parts[0], prefix, chain, ' '.join(parts[3:4] + parts[5:])
 
         col = TcpCollector()
@@ -437,13 +441,13 @@ def main():
                     proc.kill()
             deadline = time.time() + 10
             while time.time() < deadline and not any(
-                    (b'INV START' in fr and b'version=' in fr) and b'INV COMMAND' in b''.join(col3.frames)
+                    (b'tools=INV tag=daemon type=start' in fr and b'version=' in fr) and b'tools=INV tag=daemon type=command' in b''.join(col3.frames)
                     for fr in col3.frames):
                 time.sleep(0.1)
-            events = [tuple(chain_of(fr)[1:3]) + (chain_of(fr)[3].split(' ')[0],) for fr in col3.frames]
+            events = [tuple(chain_of(fr)[1:3]) + (chain_of(fr)[3].split(' ')[1],) for fr in col3.frames]
             check('the fake, remote-only: the INV trail arrives at the collector, no local state',
-                  any(e[0] == 'INV' and e[2] == 'START' for e in events)
-                  and any(e[0] == 'INV' and e[2] == 'COMMAND' for e in events)
+                  any(e[0] == 'INV' and e[2] == 'type=start' for e in events)
+                  and any(e[0] == 'INV' and e[2] == 'type=command' for e in events)
                   and not os.path.exists(os.path.join(xdg, 'fake-inverter')))
         finally:
             col3.down()

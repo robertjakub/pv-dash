@@ -121,7 +121,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   `UPSTREAM` (the image default `fake-inverter:5502` is the demo's peer;
   the prod copy points at the device). Still ONE generated example per
   tool — the knobs are identical, the header's cp line and the cache
-  intro name both copy targets (`gen_env.py` renders them); the prod
+  intro name both copy targets (`gen_examples.py` renders them); the prod
   compose's `env_file:` paths and the docker READMEs follow.
 
 ### Added
@@ -706,8 +706,22 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Added
 
+- **everywhere** — **the example configuration scripts are GENERATED
+  from the registries** (`scripts/gen_examples.py`; `--check` gates the
+  drift — the env generator absorbed the surface, `gen_env.py` is
+  gone): every knob the registry declares is in the file now
+  (52/41/52/39 — the hand files carried ~30 each), every line
+  commented at its default, the console's live-path spelling on each
+  `set` line (the file pastes into a ctl unchanged), the buckets under
+  the namespace nodes' help, the restart-marked and secret rows marked,
+  the credentials in their `file:/run/credentials/<daemon>/<knob>` form
+  (a secret never renders inline) and the fake's control-only demo
+  machines documented out. The hand files' active lines all spelled
+  registry defaults (two pinned a stale ops-verbs policy) — the docker
+  images' effective config is unchanged.
+
 - **docker** — **the env examples are GENERATED from the registries**
-  (`scripts/gen_env.py`; `--check` gates the drift): every env twin the
+  (`scripts/gen_examples.py`; `--check` gates the drift): every env twin the
   four registries declare is in the file now (50/39/34/36 — the hand
   files carried 13/12/18/11), grouped by the knob's namespace node the
   MANUAL.md knobs tables speak, the sample value the image itself runs

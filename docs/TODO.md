@@ -398,7 +398,7 @@ they name the wire.
   flanked by the unit-range and audit-bounds rows, and the sweep's
   field table reads the rows (`default`/`min`/`max`/`live`).
 - the env examples are **GENERATED from the registries**
-  (`scripts/gen_env.py --check`): the full registry env-twin set per
+  (`scripts/gen_examples.py --check`): the full registry env-twin set per
   tool (50/39/34/38), grouped by the knob's namespace node, the image's
   own CMD/ENV values as the sample lines with the pin notes (the
   compose's environment pins marked per knob), the secrets' lines

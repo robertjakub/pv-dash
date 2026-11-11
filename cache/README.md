@@ -147,7 +147,9 @@ sit. Pass each one on every start — by flag, by env, or as `file:<path>`
 (the first line of an owner-only `0600` file). A token passed as a flag
 lands in `ps` — the file form is the shipped way (the audit's F9/F12).
 
-`examples/modbus_cache.conf` is a sample in the set grammar; `show config`
+`examples/modbus_cache.conf` is a sample in the set grammar — GENERATED
+(`scripts/gen_examples.py`) from `lib/options.json`, every knob the
+registry declares, every line commented at its default; `show config`
 regenerates the script from the running daemon (secrets hidden) and `help
 config` maps every knob to its control command.
 

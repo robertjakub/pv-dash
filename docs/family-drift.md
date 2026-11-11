@@ -71,8 +71,8 @@ design); the top non-man pairs:
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.83 | `inverter/lib/control.py:96` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
-| 0.82 | `cache/bin/modbus-cache.py:342` `watch_dump` <-> `common/wire/control.py:1375` `run_dump_interval` |
-| 0.78 | `inverter/lib/signals.py:77` `__init__` <-> `common/modbus/client.py:20` `__init__` |
+| 0.82 | `cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1376` `run_dump_interval` |
+| 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
 | 0.78 | `inverter/lib/control.py:466` `acl_table_report` <-> `dashboard/lib/control.py:296` `acl_table_report` |
 | 0.76 | `scraper/lib/control.py:117` `__init__` <-> `inverter/lib/control.py:96` `__init__` |
 | 0.76 | `scraper/lib/server.py:89` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
@@ -402,8 +402,9 @@ The findings:
   *File option present — nothing else may be declared. The inline secret
   options are removed-option tombstones the module system refuses at
   eval; the env-file keys are freeform and carry no parity claim.
-- The registry keeps its docs-side role: gen_env.py renders the
-  docker/env examples the settings key list is lifted from, and the
+- The registry keeps its docs-side role: gen_examples.py renders the
+  docker/env examples and the tools' example confs the settings key
+  list is lifted from, and the
   nixos/README.md tables document the contract per tool.
 
 ## The docker/env sweep — the env twins and the ports
@@ -563,12 +564,12 @@ shipped example re-parsed through the tool's own set-grammar reader
 
 | example | the read |
 |---|---|
-| `cache/examples/modbus_cache.conf` | ok (31 setting line(s)) |
+| `cache/examples/modbus_cache.conf` | ok (0 setting line(s)) |
 | `cache/examples/selection.json` | json ok |
 | `scraper/examples/metrics.json` | json ok |
-| `scraper/examples/scraper.conf` | ok (18 setting line(s)) |
-| `inverter/examples/inverter.conf` | ok (3 setting line(s)) |
-| `dashboard/examples/server.conf` | ok (19 setting line(s)) |
+| `scraper/examples/scraper.conf` | ok (0 setting line(s)) |
+| `inverter/examples/inverter.conf` | ok (0 setting line(s)) |
+| `dashboard/examples/server.conf` | ok (0 setting line(s)) |
 | `extras/examples/acl-ip-prefix.json` | json ok |
 | `extras/examples/acl-write-registers.json` | json ok |
 

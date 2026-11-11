@@ -77,7 +77,7 @@ release.
    python3 scripts/lint_options.py --check
    python3 scripts/lint_texts.py
    python3 scripts/gen_manual.py --check
-   python3 scripts/gen_env.py --check
+   python3 scripts/gen_examples.py --check
    python3 scripts/gen_sbom.py --check
    python3 scripts/gen_man.py && mandoc -Tlint <tool>/man/*.1
    ```

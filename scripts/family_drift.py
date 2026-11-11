@@ -849,8 +849,9 @@ The findings:
   *File option present — nothing else may be declared. The inline secret
   options are removed-option tombstones the module system refuses at
   eval; the env-file keys are freeform and carry no parity claim.
-- The registry keeps its docs-side role: gen_env.py renders the
-  docker/env examples the settings key list is lifted from, and the
+- The registry keeps its docs-side role: gen_examples.py renders the
+  docker/env examples and the tools' example confs the settings key
+  list is lifted from, and the
   nixos/README.md tables document the contract per tool."""
 
 DOCKER_FINDINGS = """\

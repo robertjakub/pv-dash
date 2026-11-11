@@ -228,11 +228,11 @@ def main():
             control.reloaded(summary, dump_interval=new_cfg['dump_interval'])
         a = the_audit()
         if a:
-            a.event('RELOAD', 'upstream %s:%d unit %d, interval %gs, auth %s'
+            a.event('RELOAD', 'result=ok upstream=%s:%d unit=%d interval=%gs auth=%s'
                     % (new_cfg['host'], new_cfg['modbus_port'], new_cfg['modbus_unit'], new_cfg['interval'],
                        'bearer' if new_cfg['auth_token'] else 'none'))
             if metrics_acl_warn:
-                a.event('ACL-FILE', metrics_acl_warn)
+                a.event('ACL-FILE', 'warn=%s' % audit_quote(metrics_acl_warn))
         return summary
 
     if control:
@@ -255,11 +255,11 @@ def main():
         control.stopper = graceful_stop
     install_signal_handlers(apply_reload=apply_reload, graceful_stop=graceful_stop)
     if audit:
-        audit.event('START', 'version=%s upstream=%s:%d unit %d listen=%s control=%s'
+        audit.event('START', 'version=%s upstream=%s:%d unit=%d listen=%s control=%s'
                     % (version_string(), cfg['host'], cfg['modbus_port'], cfg['modbus_unit'],
                        audit_quote(cfg['listen']), audit_quote(control_desc)))
         if metrics_acl_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
-            audit.event('ACL-FILE', metrics_acl_warn)
+            audit.event('ACL-FILE', 'warn=%s' % audit_quote(metrics_acl_warn))
     try:
         threading.Thread(target=scraper.poll_loop, daemon=True).start()
         httpd.serve_forever()

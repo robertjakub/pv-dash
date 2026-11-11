@@ -28,7 +28,7 @@ from common.settings.config import acl_table, acl_value_text, parse_auth_type, \
     parse_listen, parse_upstream, resolve_profile_file
 from common.modbus import AUTH_MIN_KEY
 from common.render.texts import T
-from common.runtime.audit import load_audit_tags
+from common.runtime.audit import audit_quote, load_audit_tags
 from .config import CONTROL_SOCKET_TEMPLATE, build_sources, load_device_profile, resolve_metrics_acl
 from .metrics import Metrics
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_OPTIONS, \
@@ -270,7 +270,7 @@ class ControlServer(_ControlServer):
             if warn is not None:   # the acl file's permission warning: the log, the audit trail, the reply's suffix
                 logger.warning('acl file: %s', warn)
                 if self.audit:
-                    self.audit.event('ACL-FILE', warn)
+                    self.audit.event('ACL-FILE', 'warn=%s' % audit_quote(warn))
             self.httpd.metrics_acl = gate   # the swap is live: the accept check reads it per connection
             with s.lock:
                 s.cfg['metrics_acl'] = acl_value_text(gate)

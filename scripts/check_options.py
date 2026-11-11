@@ -39,15 +39,6 @@ TOOLS = {
 # can spell, checked against the registry rows and the tools' own sources
 TAG_ENV_PREFIXES = ('MCH_', 'SCR_', 'INV_', 'DSH_', 'CACHE_', 'SCRAPER_', 'DASHBOARD_', 'FAKE_')
 
-# the nix option names that deliberately diverge from lowerCamel(flag), and
-# the flags a module deliberately covers another way (documented in the
-# module's comments)
-NIX_NAMES = {
-    'cache': {'unit': 'unitId', 'listen': 'listenHost'},
-    'scraper': {'modbus-unit': 'modbusUnit', 'listen': 'listenHost'},
-    'dashboard': {'listen': 'listenHost', 'upstream': 'prometheusUrl', 'config-js': 'configFile'},
-}
-
 # the knobs whose row carries deliberately no `default` — a reason each
 # (the secrets are banned outright by their own check). The fake's
 # per-run seed is the one entry — a future no-default names its reason
@@ -88,9 +79,11 @@ def parser_flags(bin_script):
 
 
 def nix_options(module_nix):
-    """The option names the NixOS module defines (mkOption names, camelCase)."""
+    """The option names the NixOS module declares: lib.mkOption blocks,
+    the mkEnableOption enable row, and the modules' mkFileOption credential
+    helper (the settings wave's <secret>File shape)."""
     text = open(os.path.join(REPO, module_nix)).read()
-    return set(re.findall(r'([A-Za-z][A-Za-z0-9]*)\s*=\s*lib\.mkOption', text))
+    return set(re.findall(r'([A-Za-z][A-Za-z0-9]*)\s*=\s*(?:lib\.)?(?:mkOption|mkEnableOption|mkFileOption)\b', text))
 
 
 def readme_flags(readme):
@@ -347,12 +340,30 @@ def check_tool(tool):
             parts = name.split('-')
             return parts[0] + ''.join(p.capitalize() for p in parts[1:])
 
-        renames = NIX_NAMES.get(tool, {})
-        missing_nix = sorted('--' + o.name for o in options
-                             if o.flag and o.flag not in ('--config', '--dry-run', '--man')
-                             and renames.get(o.name, camel(o.name)) not in nix)
-        rows.append((not missing_nix, '%s: the NixOS module defines every option%s'
-                     % (tool, ' — missing: %s' % ', '.join(missing_nix) if missing_nix else '')))
+        # the settings wave inverted the module: no knob options at all —
+        # `settings` is the freeform env-file attrset (its keys are the bare
+        # env names, unvalidated); the secrets keep the *File credential
+        # options only (the inline forms are tombstones the module system
+        # refuses); the survivors are the structural options. The
+        # NIX_NAMES renames died with the knob options.
+        want = {'enable', 'package', 'openFirewall', 'settings'}
+        # the secret rows ride *File credentials — except the two marks that
+        # are not secrets in the credential sense (the dashboard's static
+        # dir and the public front-end config)
+        want |= {camel(o.name) + 'File' for o in options
+                 if o.secret and o.name not in ('static-dir', 'config-js')}
+        if tool == 'dashboard':
+            want |= {'solarConfig', 'staticDir'}
+        missing_nix = sorted(want - nix)
+        extra_nix = sorted(nix - want)
+        problem = ''
+        if missing_nix:
+            problem += ' — missing: %s' % ', '.join(missing_nix)
+        if extra_nix:
+            problem += '%sunexpected module options: %s' % (
+                ' —' if problem else '', ', '.join(extra_nix))
+        rows.append((not missing_nix and not extra_nix,
+                     '%s: the NixOS module declares exactly the structural options%s' % (tool, problem)))
 
     if config:
         try:

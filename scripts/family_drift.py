@@ -44,9 +44,11 @@ The sweep types — what we are sweeping:
    by structure: the man pages' section ladders, --help's option
    groups, the README skeletons. Catches a section that grew on one
    tool and not the others.
-7. THE NIXOS-PARITY SWEEP. Each module.nix option (type, default)
-   against the same knob's registry row — the units drift (MB vs
-   bytes) and the missing options are what this finds.
+7. THE NIXOS-PARITY SWEEP. The structural check: the modules declare
+   exactly enable/package/openFirewall/settings (+ the dashboard's
+   solarConfig/staticDir) and every registry secret row's *File
+   credential option — the knob options are gone (the settings wave:
+   the freeform env-file attrset, the LoadCredential secrets).
 8. THE DOCKER/ENV SWEEP. The compose files, the env files and the
    entrypoints text-scanned for the env-var names and the published
    ports, matched against the registries' env twins and the default
@@ -372,9 +374,9 @@ NIX_MODULES = {
 
 def nixos(rows):
     """Each tool's service module (nixos/modules/<tool>.nix): the
-    `name = mkOption` blocks (nested
-    under options.services.<tool>) with their type/default lines, then
-    compared with the registry rows by name."""
+    `name = mkOption` blocks (plus the mkEnableOption enable row and the
+    settings wave's mkFileOption credential helper) — the names are what
+    the structural check diffs against the expected contract."""
     out = {}
     for t in TOOLS:
         rel = NIX_MODULES.get(t)
@@ -387,11 +389,15 @@ def nixos(rows):
         depth = 0
         for line in open(p, encoding='utf-8'):
             if cur is None:
-                m = re.match(r'\s*(\w+)\s*=\s*(lib\.)?mkOption\b', line)
+                m = re.match(r'\s*(\w+)\s*=\s*(lib\.)?(?:mkOption|mkEnableOption|mkFileOption)\b', line)
                 if m:
                     cur = m.group(1)
                     blocks[cur] = {'type': None, 'default': None}
                     depth = line.count('{') - line.count('}')
+                    if depth <= 0:
+                        # the one-line shape (the mkFileOption helper call):
+                        # reset now or the next option is swallowed
+                        cur = None
                 continue
             depth += line.count('{') - line.count('}')
             if blocks[cur]['type'] is None and re.search(r'\btype\s*=', line):
@@ -652,10 +658,12 @@ READMEs' `##` skeletons."""
 NIXOS_HEAD = """\
 ## The NixOS-parity sweep — the modules vs the registries
 
-Each `module.nix` option's type and default against the same knob's
-registry row — the units drift (MB vs bytes, seconds vs ms) and the
-missing options are what this finds. Heuristic parse: the type/default
-LINES are quoted, the verdicts curated."""
+The settings wave inverted the modules: no knob options at all — one
+freeform `settings` attrset rendered verbatim into the unit's
+EnvironmentFile (the keys are the bare env twins, unvalidated), the
+secrets ride the `<secret>File` LoadCredential options only, and the
+survivors are the structural options. There is no per-knob Nix-side
+type/default left to drift; the check is structural."""
 
 DOCKER_HEAD = """\
 ## The docker/env sweep — the env twins and the ports
@@ -835,16 +843,15 @@ The findings:
 NIXOS_FINDINGS = """\
 The findings:
 
-- **check_options gates the presence** ("the NixOS module defines
-  every option"); the TYPE and DEFAULT parity is not gated — the
-  units drift (the audit's MB, the intervals' seconds) is where a
-  Nix default and a registry default can silently disagree. The
-  module option maps were rebuilt from the module.nix files in the
-  docs restructure wave — this sweep is the machine check that keeps
-  them honest.
-- The parse is heuristic (the first type=/default= line in the
-  option block) — the verdicts in the findings are editorial; the
-  table is the starting point for the module review."""
+- **check_options gates the structure** ("the NixOS module declares
+  exactly the structural options"): enable/package/openFirewall/settings,
+  the dashboard's solarConfig/staticDir, and every registry secret row's
+  *File option present — nothing else may be declared. The inline secret
+  options are removed-option tombstones the module system refuses at
+  eval; the env-file keys are freeform and carry no parity claim.
+- The registry keeps its docs-side role: gen_env.py renders the
+  docker/env examples the settings key list is lifted from, and the
+  nixos/README.md tables document the contract per tool."""
 
 DOCKER_FINDINGS = """\
 The findings:
@@ -1249,28 +1256,48 @@ def emit():
     ap(RENDER_FINDINGS)
     ap('')
 
-    # ---- 7. the nixos sweep
+    # ---- 7. the nixos sweep (structural: the settings wave removed the
+    # knob options — there is nothing per-knob left to diff)
     nix = nixos(rows)
     ap(NIXOS_HEAD)
     ap('')
-    ap('| tool | mkOption blocks |')
+    ap('| tool | module options declared |')
     ap('|---|---|')
     for t in TOOLS:
-        ap(f'| {t} | {len(nix[t]) if nix[t] else "no module.nix"} |')
+        ap(f'| {t} | {", ".join(f"`{n}`" for n in sorted(nix[t])) if nix[t] else "no module.nix"} |')
     ap('')
-    ap('**The module options NOT matching a registry knob name** (after')
-    ap('the kebab/camel normalization; the `*File` suffix is the NixOS')
-    ap('LoadCredential pattern, not a knob):')
+    ap('**The structural contract** — exactly `enable`/`package`/')
+    ap('`openFirewall`/`settings`, every registry secret row\'s `*File`,')
+    ap("and the dashboard's `solarConfig`/`staticDir` (the removed knob")
+    ap('options and inline secrets are tombstones the module system refuses):')
     ap('')
     for t in TOOLS:
         if nix[t]:
             def norm(s):
                 return s.lower().replace('-', '').replace('_', '')
+
+            def camel_file(name):
+                parts = name.split('-')
+                return parts[0] + ''.join(p.capitalize() for p in parts[1:]) + 'File'
+
             reg_names = {norm(n) for n in rows[t]}
-            orphan = sorted(n for n in nix[t]
-                            if norm(n) not in reg_names and not n.endswith('File')
-                            and n not in ('package', 'enable', 'openFirewall', 'configFile', 'settings'))
-            ap(f'- {t}: ' + (', '.join(f'`{n}`' for n in orphan) or 'every option is a knob or plumbing'))
+            want = {'enable', 'package', 'openFirewall', 'settings'}
+            # the secret-marked rows ride *File credentials — except the two
+            # marks that are not secrets in the credential sense (the
+            # dashboard's static dir and the public front-end config)
+            want |= {camel_file(n) for n, r in rows[t].items()
+                     if r.get('secret') and n not in ('static-dir', 'config-js')}
+            if t == 'dashboard':
+                want |= {'solarConfig', 'staticDir'}
+            missing = sorted(n for n in want if n not in nix[t])
+            unexpected = sorted(n for n in nix[t] if n not in want
+                                and norm(n) in reg_names)
+            verdict = []
+            if missing:
+                verdict.append('missing: %s' % ', '.join(f'`{n}`' for n in missing))
+            if unexpected:
+                verdict.append('unexpected knob options: %s' % ', '.join(f'`{n}`' for n in unexpected))
+            ap(f'- {t}: ' + ('; '.join(verdict) if verdict else 'exactly the structural contract'))
     ap('')
     ap(NIXOS_FINDINGS)
     ap('')

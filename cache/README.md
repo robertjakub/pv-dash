@@ -110,6 +110,7 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--control-ops-verbs` | `show,flush` | the read-only ops role's RBAC policy |
 | `--control-trust-uids` | none | extra peer uids the unix control socket trusts without the token (`SO_PEERCRED`) |
 | `--control-socket-group` | off | leave the unix control socket group-accessible (`0660` instead of `0600`) |
+| `--control-log-replies` | off | DEBUG-log the full output of every control command (plainly: the command and its status); live: `set system log-replies` |
 | **Persistence** | | |
 | `--dump-path` | off | the state dump (write-behind) — see [Persistence](#persistence) |
 | `--dump-key` | off | the key that **seals** the state dumps and the reload state file; startup-only; `file:<path>` welcome |

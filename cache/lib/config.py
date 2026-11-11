@@ -490,6 +490,8 @@ def resolve_config(args, script_dir=None):
                                                        'control_trust_uids', DEFAULTS['control_trust_uids'], str)),
         'control_socket_group': resolve_bool(getattr(args, 'control_socket_group', False) or None,
                                              'CONTROL_SOCKET_GROUP', 'control_socket_group', DEFAULTS['control_socket_group']),
+        'control_log_replies': resolve_bool(getattr(args, 'control_log_replies', False) or None,
+                                            None, 'control_log_replies', False),
     }
     validate_config(cfg)
     return cfg

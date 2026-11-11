@@ -25,6 +25,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
+from common.runtime.audit import load_audit_tags
 from common.wire import cli
 from common.render.texts import T
 from lib.config import DEFAULT_CONTROL_SOCKET
@@ -80,7 +81,9 @@ def _render_special(low, reply):
     return False
 
 
-SPEC = dict(label='the cache proxy', daemon_label='modbus-cache control server',
+TAGS = load_audit_tags('cache')
+
+SPEC = dict(audit_tag=TAGS, label='the cache proxy', daemon_label='modbus-cache control server',
             cli_name='modbus-cache-cli', app='modbus-cache', self_note='the proxy itself',
             command_help='e.g. inspect, show config, show cache, request flush cache, request reload-config, request restart, shutdown',
             prompt_word='cache', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,

@@ -25,7 +25,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.runtime.audit import audit_params_of, build_audit, default_path as default_audit_path
+from common.runtime.audit import audit_params_of, build_audit, default_path as default_audit_path, load_audit_tags
 from common.settings.config import is_loopback_host, parse_control_target, parse_listen, parse_upstream
 from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, parse_ops_verbs, setup_logging, \
     install_signal_handlers as install_family_signals
@@ -89,8 +89,8 @@ def install_signal_handlers(proxy, cache, apply_reload):
             except OSError as e:
                 logger.error('the shutdown dump to %s failed: %s', proxy.dump_path, e)
         if proxy.audit:
-            proxy.audit.event('SHUTDOWN', '%s: uptime=%ds clients=%d hits=%d misses=%d'
-                              % (reason, int(time.monotonic() - proxy.started), proxy.client_count,
+            proxy.audit.event('SHUTDOWN', 'reason=%s uptime=%ds clients=%d hits=%d misses=%d'
+                              % (reason.replace(' ', '-'), int(time.monotonic() - proxy.started), proxy.client_count,
                                  proxy.cache_hits, proxy.cache_misses))
         proxy.stopping = True
         ctl = getattr(proxy, 'control', None)
@@ -225,7 +225,8 @@ def main():
                     'off' if control_target is None else
                     ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target))
         return
-    audit = build_audit(cfg, 'CACHE', 'modbus-cache', logger)
+    tag = load_audit_tags('cache')
+    audit = build_audit(cfg, tag, 'modbus-cache', logger)
     proxy.audit = audit
     if audit:
         audit.event('START', 'version=%s upstream=%s:%d unit=%d listen=%s:%d control=%s profile=%s'
@@ -288,6 +289,7 @@ def main():
                     'control-ops-verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
                     'control-trust-uids': ','.join(str(u) for u in sorted(cfg['control_trust_uids'] or [])) or 'off',
                     'control-socket-group': 'on' if cfg['control_socket_group'] else 'off',
+                    'control-log-replies': 'on' if cfg['control_log_replies'] else 'off',
                     'audit-log': 'off' if cfg['no_audit_log'] else (cfg['audit_log'] or default_audit_path('modbus-cache')),
                     'audit-max-mb': '%g' % cfg['audit_max_mb'],
                     'audit-daily': 'on' if cfg['audit_daily'] else 'off',
@@ -305,6 +307,7 @@ def main():
                                       token=control_token, defaults=defaults,
                                       trust_uids=cfg['control_trust_uids'],
                                       socket_group=cfg['control_socket_group'],
+                                      log_replies=cfg['control_log_replies'],
                                       ops_token=control_ops_token,
                                       ops_verbs=ops_verbs,
                                       config_path=args.config)

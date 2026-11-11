@@ -22,6 +22,7 @@ from common.modbus import AUTH_MIN_KEY
 from common.render.human import secs
 from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
 from common.render.texts import T
+from common.runtime.audit import load_audit_tags
 from .statics import DEFAULT_LISTEN_PORT, LOG_LEVELS
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_OPTIONS, NODE_BY_NAME, \
     CFG_KEYS, CFG_FORMATTERS, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
@@ -56,7 +57,7 @@ class ControlServer(_ControlServer):
     CFG_KEYS = CFG_KEYS               # the registry's knob -> cfg-key renames (show config)
     CFG_FORMATTERS = CFG_FORMATTERS   # the structured values (the ACLs, the write map, the selection)
     APP = 'modbus-cache'
-    AUDIT_PREFIX = 'CACHE'
+    AUDIT_PREFIX = load_audit_tags('cache')
     AUDIT_APP = 'modbus-cache'
     CONTROL_PORT_DEFAULT = DEFAULT_LISTEN_PORT
     CONTROL_SOCKET_TEMPLATE = CONTROL_SOCKET_TEMPLATE
@@ -94,11 +95,11 @@ class ControlServer(_ControlServer):
         return self.proxy.config
 
     def __init__(self, proxy, target, stopper=None, audit=None, token=None, defaults=None, trust_uids=None,
-                 socket_group=False, ops_token=None, ops_verbs=None, config_path=None):
+                 socket_group=False, ops_token=None, ops_verbs=None, config_path=None, log_replies=False):
         self.proxy = proxy
         super().__init__(target, stopper=stopper, audit=audit, token=token, defaults=defaults,
                          trust_uids=trust_uids, socket_group=socket_group, ops_token=ops_token,
-                         ops_verbs=ops_verbs, config_path=config_path)
+                         ops_verbs=ops_verbs, config_path=config_path, log_replies=log_replies)
         self.audit_params = proxy.audit_params   # the family handler rebuilds from the proxy's params
 
     def command_help(self):
@@ -711,6 +712,7 @@ class ControlServer(_ControlServer):
             'metrics-max-conn-per-ip': p.metrics_caps[2],
             'requests-audit': p.requests_audit_s,
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
+            'log-access': 'on' if p.log_access else 'off',
             'profile': p.config.get('profile'), 'selection': p.config.get('selection') or 'all',
             'connect-acl': self._acl_text(p.connect_acl), 'write-acl': self._acl_text(p.write_acl),
             'metrics-acl': self._acl_text(p.metrics_acl),
@@ -724,6 +726,7 @@ class ControlServer(_ControlServer):
             'control-ops-verbs': ','.join(sorted(self.ops_verbs)) or 'off',
             'control-trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control-socket-group': 'on' if self.socket_group else 'off',
+            'control-log-replies': 'on' if self.log_replies else 'off',
             **self.audit_dump_rows(),
             'dump-path': p.dump_path or 'off',
             'dump-with-cache': 'on' if p.dump_with_cache else 'off',

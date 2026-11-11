@@ -93,9 +93,7 @@ translate). The namespaces group them.
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `cache-ttl` | `set cache ttl` | settable | `s\|off` | `--cache-ttl` / `TTL` | per-register cache TTL: older entries are refetched |
-| `local-time` | `set local-time` | settable | `on\|off` | `--local-time` / `LOCAL_TIME` | log timestamps in the system time zone instead of UTC |
 | `log-level` | `set log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
-| `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the cached words + the setting overrides) |
 
 ### acl
 
@@ -134,6 +132,8 @@ verbosity
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `listen` | `set system listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
+| `local-time` | `set system local-time` | settable | `on\|off` | `--local-time` / `LOCAL_TIME` | log timestamps in the system time zone instead of UTC |
+| `control-log-replies` | `set system log-replies` | settable | `on\|off` | `--control-log-replies` / — | DEBUG-log the full output of every control command (plainly: the command and its status log) |
 | `log-access` | `set system log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log client connects/disconnects at INFO instead of DEBUG *(hidden)* |
 
 ### control
@@ -214,6 +214,7 @@ the state dump: the path, the cache words, the restore-on-start
 | `dump-path` | `set dump path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: written behind, on request dump and every dump-interval |
 | `dump-key` | — | startup-only (secret) | `TEXT` | `--dump-key` / `DUMP_KEY` | the key that seals the state dumps (the words and the settings, the reload's state file too) (`file:<path>` reads an owner-only file) *(hidden)* |
 | `dump-with-cache` | `set dump with-cache` | settable | `on\|off` | `--dump-with-cache` / `DUMP_WITH_CACHE` | the dump carries the cached register words too |
+| `dump-interval` | `set dump interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the cached words + the setting overrides) |
 | `restore-on-start` | `set dump restore-on-start` | settable (restart) | `on\|off` | `--restore-on-start` / `RESTORE_ON_START` | the dump loads on start (off: on demand with request restore) |
 
 ### limits

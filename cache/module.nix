@@ -70,6 +70,7 @@ let
     (lib.optionals (cfg.controlOpsVerbs != null) [ (setLine "control ops verbs" cfg.controlOpsVerbs) ])
     (lib.optionals (cfg.controlTrustUids != null) [ (setLine "control trust-uids" cfg.controlTrustUids) ])
     (setLine "control socket-group" (lib.boolToString cfg.controlSocketGroup))
+    (setLine "system log-replies" (lib.boolToString cfg.controlLogReplies))
     ""
     "# --- the own Prometheus /metrics endpoint ---"
     (lib.optionals (cfg.metricsMaxClients != null) [ (setLine "metrics limits max-clients" (toString cfg.metricsMaxClients)) ])
@@ -591,6 +592,15 @@ in
         Leave the unix control socket group-accessible (chmod 0660 instead
         of the default 0600): a local group may speak to the control
         without being the service user.
+      '';
+    };
+
+    controlLogReplies = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        DEBUG-log the full output of every control command (plainly: the
+        command and its status log; the live `set system log-replies` toggle).
       '';
     };
 

@@ -6,16 +6,20 @@ never logged. The file is opened append-only and flushed per event, so a
 crash keeps everything up to the last command.
 
 Every entry carries a short chained hash in its hash= token (12 hex chars,
-no decoration): `<stamp> AUDIT tag=<TAG> type=<type> hash=<hash>
-[message=<detail>]` — h = sha256(prev | stamp | tag | type + message)
-truncated, the material exactly the line's own stamp, tag= and
-type=/message= words (the tag always uppercase — the tags.json spelling).
-The chain is
-per writer tag (CACHE, INV, INV-CLI, each chain their own lines), so
-several writers can interleave in one file and every chain stays
-verifiable on its own — scripts/audit_verify.py walks a file (and its
-rotated backups, oldest first), recomputes each prefix's chain and names the
-line where it breaks. The chain is tamper-EVIDENT: any edited, reordered or
+no decoration): `<stamp> AUDIT application=<TAG> tag=<writer>
+instance=<id> type=<type> hash=<hash> [message=<detail>]` —
+h = sha256(prev | stamp | tag | instance + type + message)
+truncated, the material exactly the line's own stamp, tag=,
+instance= and type=/message= words (the tag always uppercase — the
+tags.json spelling). The chain is
+per (application, writer, instance) triple (CACHE:daemon:15020,
+INV:cli:15991, each chain their own lines), so several writers — and
+several instances of one tool — can interleave in one file and every chain
+stays verifiable on its own — scripts/audit_verify.py walks a file (and its
+rotated backups, oldest first), recomputes each chain and names the
+line where it breaks. The instance= word names the writer's daemon: the
+control port when the knob is unset (unique per host by construction),
+the --audit-instance override when spelled. The chain is tamper-EVIDENT: any edited, reordered or
 deleted middle entry breaks it; trailing deletion and a full rechain by
 someone holding the algorithm are outside its reach. The stronger answers
 are BUILT IN as the trail's three tiers (docs/SECURITY.md): the local chain,
@@ -78,6 +82,21 @@ AUDIT_FORWARD_FORMATS = ('rfc5424', 'cef')
 # The remote connect/send timeout (the lazy re-arm's cost ceiling: one
 # audit event stalls at most this long while a collector is down).
 FORWARD_TIMEOUT = 2.0
+# The instance= word's grammar (audit-instance; the daemon derives its
+# control port when the knob is unset): 1-64 characters, no spaces — the
+# KV line is space-delimited, so the word must ride one token.
+AUDIT_INSTANCE_RE = re.compile(r'[A-Za-z0-9_.:@-]{1,64}')
+AUDIT_INSTANCE_GRAMMAR = 'audit-instance must be 1-64 characters (letters, digits, . _ : @ -)'
+
+
+def validate_instance(value):
+    """One audit-instance value -> the word verbatim; a grammar miss raises
+    ValueError with the one-liner (the wire's audit/instance, the argparse
+    gates and the registries' check repeat it). None/'' refuse: the word is
+    ALWAYS on the line (the fixed grammar), the daemon derives its port."""
+    if not value or not AUDIT_INSTANCE_RE.fullmatch(value):
+        raise ValueError(AUDIT_INSTANCE_GRAMMAR)
+    return value
 # The envelope severity table: a line ending '-> ok' (and the verdict-less
 # START/SHUTDOWN events) ride 4; '-> err' (a refused/failed command) rides 7.
 FORWARD_SEV_OK = 4
@@ -171,7 +190,7 @@ def open_syslog_handler(path):
 
 def sd_escape(text):
     """The RFC5424 PARAM-VALUE escaping: `\\`, `"` and `]` carry a
-    backslash (the prefix and the chain hash are safe by construction —
+    backslash (the tag words and the chain hash are safe by construction —
     the escape keeps the envelope honest anyway)."""
     return text.replace('\\', '\\\\').replace('"', '\\"').replace(']', '\\]')
 
@@ -205,26 +224,29 @@ class RemoteForwardHandler(logging.Handler):
     def envelope(self, line):
         """The wire payload for one native audit line: the RFC5424 envelope
         `<PRI>1 <RFC3339-ms> <hostname> <app> <pid> <type> [pvDash@1
-        prefix=... role=... chain=...] <line>` or the CEF additive wrapping
-        (`msg=` carries the exact native line, so chain verification reads
-        the same text under both). The extracted fields speak the line's own
-        KV words: prefix= the tool's tag, role= the writer, chain= the hash,
-        the MSGID the type."""
+        application=... role=... instance=... chain=...] <line>` or the CEF
+        additive wrapping (`msg=` carries the exact native line, so chain
+        verification reads the same text under both). The extracted fields
+        speak the line's own KV words: application= the tool's tag,
+        role= the writer, instance= the daemon's port/override, chain= the
+        hash, the MSGID the type."""
         parts = line.split(' ')
-        etype = parts[4][5:] if parts[4].startswith('type=') else parts[3]
-        chain = parts[5][5:] if parts[5].startswith('hash=') else parts[4]
-        tag = parts[2][6:] if parts[2].startswith('tools=') else parts[2]
+        etype = parts[5][5:] if parts[5].startswith('type=') else parts[5]
+        chain = parts[6][5:] if parts[6].startswith('hash=') else parts[6]
+        app_tag = parts[2][12:] if parts[2].startswith('application=') else parts[2]
         role = parts[3][4:] if parts[3].startswith('tag=') else 'daemon'
+        inst = parts[4][9:] if parts[4].startswith('instance=') else ''
         if self.fmt == 'cef':
             msg = line.replace('\\', '\\\\').replace('=', '\\=')
             return ('CEF:0|pv-dash|%s|%s|%s|%s|%d| rt=%d cs1Label=AuditChain cs1=%s '
-                    'cs2Label=AuditPrefix cs2=%s msg=%s'
+                    'cs2Label=AuditApplication cs2=%s cs3Label=AuditInstance cs3=%s msg=%s'
                     % (self.app, VERSION, etype, etype, self.severity(line),
-                       int(time.time() * 1000), chain, sd_escape(tag), msg)).encode('utf-8')
+                       int(time.time() * 1000), chain, sd_escape(app_tag), sd_escape(inst), msg)).encode('utf-8')
         now = time.time()
         stamp = time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(now)) + '.%03dZ' % (int(now * 1000) % 1000)
         pri = logging.handlers.SysLogHandler.LOG_DAEMON * 8 + self.severity(line)
-        sd = '[pvDash@1 prefix="%s" role="%s" chain="%s"]' % (sd_escape(tag), sd_escape(role), sd_escape(chain))
+        sd = '[pvDash@1 application="%s" role="%s" instance="%s" chain="%s"]' % (
+            sd_escape(app_tag), sd_escape(role), sd_escape(inst), sd_escape(chain))
         return ('<%d>1 %s %s %s %d %s %s %s'
                 % (pri, stamp, self._host, self.app, os.getpid(), etype, sd, line)).encode('utf-8')
 
@@ -301,13 +323,14 @@ def entry_hash(prev, stamp, tag, body):
 
 def parse_entry_hash(line):
     """The chained hash of one audit line (None when absent/malformed): the
-    `hash=` token's HASH_LEN hex chars — `<stamp> AUDIT tools=<TAG> tag=<writer>
-    type=<type> hash=<hash> [message=...]` (the token rides parts[5]). The
-    validator speaks the current grammar only: a pre-KV line reads malformed."""
+    `hash=` token's HASH_LEN hex chars — `<stamp> AUDIT application=<TAG>
+    tag=<writer> instance=<id> type=<type> hash=<hash> [message=...]` (the
+    token rides parts[6]). The validator speaks the current grammar only:
+    a pre-KV line (tools=, no instance=) reads malformed."""
     parts = line.rstrip().split(' ')
-    if len(parts) < 6 or parts[1] != 'AUDIT' or not parts[2].startswith('tools='):
+    if len(parts) < 7 or parts[1] != 'AUDIT' or not parts[2].startswith('application='):
         return None
-    h = parts[5]
+    h = parts[6]
     if h.startswith('hash='):
         h = h[5:]
     if len(h) != HASH_LEN or not all(c in '0123456789abcdef' for c in h):
@@ -316,18 +339,20 @@ def parse_entry_hash(line):
 
 
 def entry_body(line):
-    """The hashed text of one audit line: `<tag> <type> [message...]` —
-    parts[3] is the tag= word, parts[4] the type= word, parts[6:] the
-    message= text verbatim; the writer's material is exactly this."""
+    """The hashed text of one audit line: `<tag> <instance> <type>
+    [message...]` — parts[3] is the tag= word, parts[4] the instance= word,
+    parts[5] the type= word, parts[7:] the message= text verbatim; the
+    writer's material is exactly this."""
     parts = line.rstrip().split(' ')
-    return ' '.join(parts[3:5] + parts[6:])
+    return ' '.join(parts[3:6] + parts[7:])
 
 
-def tail_hash(path, prefix, writer='daemon'):
-    """The last `h=` this prefix left in an existing file (or its rotated
+def tail_hash(path, prefix, writer='daemon', instance=''):
+    """The last `h=` this writer left in an existing file (or its rotated
     backups), so a restarted writer chains seamlessly from its own previous
-    entries. Reads each file's trailing 64 KB, live file first; GENESIS when
-    nothing is found."""
+    entries. The chain key is the (application, tag, instance) triple — two
+    instances of one tool sharing a file walk separate chains. Reads each
+    file's trailing 64 KB, live file first; GENESIS when nothing is found."""
     candidates = [path] + ['%s.%d' % (path, i) for i in range(1, 17)]
     for p in candidates:
         try:
@@ -342,7 +367,8 @@ def tail_hash(path, prefix, writer='daemon'):
         except OSError:
             continue
         for line in reversed(data.splitlines()):
-            if (' tools=%s ' % prefix) not in line or (' tag=%s ' % writer) not in line:
+            if (' application=%s ' % prefix) not in line or (' tag=%s ' % writer) not in line \
+                    or (' instance=%s ' % instance) not in line:
                 continue
             h = parse_entry_hash(line)
             if h:
@@ -359,16 +385,21 @@ def default_path(app):
     return os.path.join(d, 'audit.log')
 
 
-def audit_params_of(cfg):
+def audit_params_of(cfg, derive=None):
     """The audit family's live-swap params off the resolved mapping (the
     keys the resolver spells: audit_log, audit_max_mb, audit_files,
-    audit_daily, audit_forward, audit_forward_format, no_audit_log) —
-    the one shape the four bins pass their control servers."""
+    audit_daily, audit_forward, audit_forward_format, audit_instance,
+    no_audit_log) — the one shape the four bins pass their control servers.
+    `derive` is the daemon's port-derived instance word (the control port
+    when the knob is unset): pinned at start, a live rebind never re-keys
+    the lines."""
     return {'path': None if cfg['no_audit_log'] else cfg['audit_log'],
             'max_mb': cfg['audit_max_mb'], 'files': cfg['audit_files'],
             'daily': cfg['audit_daily'],
             'forward': None if cfg['audit_forward'] in (None, '', 'none') else cfg['audit_forward'],
             'forward_format': cfg['audit_forward_format'],
+            'instance': cfg.get('audit_instance') or None,
+            'instance_derived': derive or '',
             'disabled': bool(cfg['no_audit_log'])}
 
 
@@ -396,29 +427,34 @@ def load_audit_tags(tool):
     return tag
 
 
-def build_audit(cfg, prefix, app, logger, rc=1):
+def build_audit(cfg, prefix, app, logger, rc=1, derive=None):
     """The start's AuditLog: None when the trail is off, the refuse-loud
     SystemExit when the trail's parameters are invalid (the four bins'
-    one shape; `path` rides audit_params_of's None-when-disabled rule)."""
+    one shape; `path` rides audit_params_of's None-when-disabled rule).
+    `derive` is the port-derived instance word the daemon falls back to."""
     try:
         return None if cfg['no_audit_log'] else AuditLog(
             None if cfg['no_audit_log'] else (cfg['audit_log'] or None), prefix, app=app,
             max_mb=cfg['audit_max_mb'], daily=cfg['audit_daily'], files=cfg['audit_files'],
-            forward=cfg['audit_forward'], forward_format=cfg['audit_forward_format'])
+            forward=cfg['audit_forward'], forward_format=cfg['audit_forward_format'],
+            instance=cfg.get('audit_instance') or derive)
     except ValueError as e:
         logger.error(str(e))
         raise SystemExit(rc)
 
 
 class AuditLog:
-    """'<UTC stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<chain hash>
-    [message=<detail>]' per line — the 12-hex hash chains the entry to this
-    writer's previous one (entry_hash), making any edit/reorder/middle-deletion
-    evident to scripts/audit_verify.py. tools= names the tool (the uppercase
-    tag from shared/tags.json — CACHE / SCR / INV / DSH), tag= the writer
-    role (the daemon's own 'daemon', the ctl and cli clients' 'cli') — the
-    pair is the chain key, so interleaved writers
-    in one file verify independently. Opening failure = fatal: an audit
+    """'<UTC stamp> AUDIT application=<TAG> tag=<writer> instance=<id>
+    type=<type> hash=<chain hash> [message=<detail>]' per line — the 12-hex
+    hash chains the entry to this writer's previous one (entry_hash), making
+    any edit/reorder/middle-deletion evident to scripts/audit_verify.py.
+    application= names the tool (the uppercase tag from shared/tags.json —
+    CACHE / SCR / INV / DSH), tag= the writer role (the daemon's own
+    'daemon', the ctl and cli clients' 'cli'), instance= the daemon's
+    identity (the control port when --audit-instance is unset, the override
+    when spelled — the client tools spell their target's port) — the triple
+    is the chain key, so interleaved writers — and several instances of one
+    tool — verify independently. Opening failure = fatal: an audit
     trail that silently vanishes is worse than no session.
     All writers share one process-wide file, so every write+flush+rotate
     cycle is serialized — without the lock, a rotation (size/daily) races a
@@ -430,14 +466,15 @@ class AuditLog:
 
     def __init__(self, path=None, prefix='AUDIT', app='pv-suite', writer='daemon',
                  max_mb=10.0, daily=False, files=3, forward=None,
-                 forward_format='rfc5424'):
+                 forward_format='rfc5424', instance=None):
         if not AUDIT_MAX_MB_MIN <= max_mb <= AUDIT_MAX_MB_MAX:
             raise ValueError('audit-max-mb must be %d..%d MB' % (AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX))
         if not AUDIT_FILES_MIN <= files <= AUDIT_FILES_MAX:
             raise ValueError('audit-files must be %d..%d' % (AUDIT_FILES_MIN, AUDIT_FILES_MAX))
         if forward_format not in AUDIT_FORWARD_FORMATS:
             raise ValueError('audit-forward-format must be one of %s' % ', '.join(AUDIT_FORWARD_FORMATS))
-        self.prefix = prefix   # the tool's tag (shared/tags.json) — the line's tools= word, always uppercase
+        self.instance = validate_instance(instance)   # the line's instance= word — the writer daemon's identity
+        self.prefix = prefix   # the tool's tag (shared/tags.json) — the line's application= word, always uppercase
         self.writer = writer   # the writer role — the line's tag= word: 'daemon' or 'cli'
         self.app = app          # the syslog tag / APP-NAME (the bin name) when forwarding
         self.max_bytes = int(max_mb * 1024 * 1024) if max_mb and max_mb > 0 else 0
@@ -476,7 +513,7 @@ class AuditLog:
         else:
             try:
                 self._f = open(self.path, 'a', encoding='utf-8')
-                self._last = tail_hash(self.path, self.prefix, self.writer)   # chain from the writer's own trail
+                self._last = tail_hash(self.path, self.prefix, self.writer, self.instance)   # chain from this writer's own trail
             except OSError:
                 # a read-only working directory (a container, a packaged install):
                 # the trail belongs in the service log rather than nowhere
@@ -566,6 +603,13 @@ class AuditLog:
             self._rotate()
 
     def event(self, event, detail=''):
+        """One event, its KV detail, the chain hash, the flush and the
+        forward. The detail's own rules: whitespace folds (one event = one
+        physical line) and an EMPTY-VALUED KV word never lands — a `key=`
+        token with no value is dropped at the writer (an absent pair, not an
+        empty one), so a builder passing nothing never renders `reason=`
+        mid-line; a bare `=` (the write lines' `register 47415 = 5`) and a
+        quoted empty (`x=''`) stay."""
         if self.disabled:
             return
         with self._lock:
@@ -573,12 +617,14 @@ class AuditLog:
                 self._maybe_rotate()
             stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
             detail = ' '.join(detail.split())   # fold \n\r\t etc: one event = one physical line
-            body = 'tag=%s type=%s%s' % (self.writer, event.lower(), (' message=%s' % detail) if detail else '')
+            detail = ' '.join(w for w in detail.split(' ') if w == '=' or not w.endswith('='))
+            body = 'tag=%s instance=%s type=%s%s' % (self.writer, self.instance, event.lower(),
+                                                     (' message=%s' % detail) if detail else '')
             h = entry_hash(self._last, stamp, self.prefix, body)
             self._last = h
-            native = '%s AUDIT tools=%s tag=%s type=%s hash=%s%s' % (stamp, self.prefix, self.writer,
-                                                                     event.lower(), h,
-                                                                     (' message=%s' % detail) if detail else '')
+            native = '%s AUDIT application=%s tag=%s instance=%s type=%s hash=%s%s' % (
+                stamp, self.prefix, self.writer, self.instance, event.lower(), h,
+                (' message=%s' % detail) if detail else '')
             if not self._suppressed:
                 self._f.write('%s\n' % native)
                 self._f.flush()

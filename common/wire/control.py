@@ -21,7 +21,8 @@ import threading
 import time
 
 from common.settings import dump as state
-from common.runtime.audit import AuditLog, AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward
+from common.runtime.audit import AuditLog, AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward, \
+    validate_instance
 from common.runtime.logutil import UtcFormatter
 from common.wire.cred import peer_uid, parse_trust_uids
 from common.settings.config import parse_control_target
@@ -732,6 +733,7 @@ class ControlServer:
         return {
             'audit-log': ('off' if (self.audit is None or self.audit.disabled) else self.audit.path),
             'audit-forward': prm.get('forward') or 'none',
+            'audit-instance': prm.get('instance') or 'none',
             'audit-forward-format': prm.get('forward_format') or 'rfc5424',
             'audit-max-mb': '%g' % prm['max_mb'],
             'audit-daily': 'on' if prm.get('daily') else 'off',
@@ -810,6 +812,18 @@ class ControlServer:
             self.record_cfg({'audit_forward': raw})
             self._rebuild_audit()   # the fresh forward re-arms the sender, the collector-only fold re-chains
             return True, val
+        if key == 'audit-instance':
+            if val not in ('', 'none'):
+                try:
+                    validate_instance(raw)
+                except ValueError:
+                    raise ValueError(T('wire.audit_instance_invalid'))
+            self.audit_params['instance'] = None if val in ('', 'none') else raw
+            self.record_cfg({'audit_instance': self.audit_params['instance']})
+            self._rebuild_audit()   # the fresh key forks a new chain group (the old entries verify on)
+            # the shown word is the effective one: a clear back to the
+            # derived port shows the port (the word the lines carry again)
+            return True, (self.audit_params['instance'] or self.audit_params.get('instance_derived') or 'none')
         if key == 'audit-forward-format':
             if val not in AUDIT_FORWARD_FORMATS:
                 raise ValueError(T('wire.audit_forward_format_invalid') % ', '.join(AUDIT_FORWARD_FORMATS))
@@ -979,6 +993,10 @@ class ControlServer:
             return True, ('remote' if self.audit.path == 'none' else self.audit.path)
         if key == 'audit-forward':
             return True, (self.audit_params.get('forward') or 'none')
+        if key == 'audit-instance':
+            # the effective word: the override when spelled, else the
+            # port-derived identity the lines actually carry
+            return True, (self.audit_params.get('instance') or self.audit_params.get('instance_derived'))
         if key == 'audit-forward-format':
             return True, (self.audit_params.get('forward_format') or 'rfc5424')
         if key == 'audit-max-mb':
@@ -1339,7 +1357,8 @@ class ControlServer:
         return AuditLog(prm['path'], prefix, app=app, max_mb=prm['max_mb'],
                         daily=prm.get('daily', False), files=prm['files'],
                         forward=prm.get('forward'),
-                        forward_format=prm.get('forward_format') or 'rfc5424')
+                        forward_format=prm.get('forward_format') or 'rfc5424',
+                        instance=prm.get('instance') or prm.get('instance_derived'))
 
     def shutdown_dump(self):
         """The graceful stop's write-behind: the overrides to the dump path

@@ -8,7 +8,7 @@ one level below its tree root, which is what the loader's walk leans on).
 | path | what |
 |---|---|
 | `texts.json` | the family's static texts — the console's faces and reconnect ladder, the ctl's, the welcome banners, the wire's fixed replies, the daemon bind/startup lines — the one home `common/render/texts.py`'s dotted `T(key)` reads; `scripts/lint_texts.py --check` gates the references both ways (every reference resolves, every key referenced, no duplicated value) |
-| `tags.json` | the audit trail's tool tags, one per tool — `{"cache": "CACHE", "scraper": "SCR", "inverter": "INV", "dashboard": "DSH"}`; `common/runtime/audit.py`'s `load_audit_tags(tool)` reads the tag and fails loud on a malformed file — the daemon's line speaks `tools=CACHE tag=daemon`, the ctl and cli clients `tools=CACHE tag=cli`, so a deployment renames its `CACHE`/`SCR`/`INV`/`DSH` tool tag in one place |
+| `tags.json` | the audit trail's tool tags, one per tool — `{"cache": "CACHE", "scraper": "SCR", "inverter": "INV", "dashboard": "DSH"}`; `common/runtime/audit.py`'s `load_audit_tags(tool)` reads the tag and fails loud on a malformed file — the daemon's line speaks `application=CACHE tag=daemon`, the ctl and cli clients `application=CACHE tag=cli`, so a deployment renames its `CACHE`/`SCR`/`INV`/`DSH` tool tag in one place |
 | [`schema/`](schema/README.md) | the shared JSON Schemas (draft 2020-12) — a schema lives here when the file it describes is shared; today that is the standalone acl file's two gates (the [ip-prefix](../extras/examples/README.md) connect gate + the write-registers gate), validated by `scripts/validate_json.py` |
 
 How the tree is found: the texts loader reads it one `shared/` segment

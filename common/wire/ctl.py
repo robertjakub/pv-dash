@@ -53,14 +53,6 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         sys.stdout.write(ctl_page(p))
         raise SystemExit(0)
 
-    try:
-        audit = None if args.no_audit_log else AuditLog(args.audit_log, audit_tag, app=app, writer='cli',
-                                                        max_mb=args.audit_max_mb, files=args.audit_files,
-                                                        forward=args.audit_forward,
-                                                        forward_format=args.audit_forward_format)
-    except ValueError as e:
-        p.error(str(e))
-
     commands = [' '.join(args.command)] if args.command else None
     if not commands:
         if sys.stdin.isatty():
@@ -80,6 +72,15 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         addr, label = ('127.0.0.1', int(target)), '127.0.0.1:%s' % target
     else:
         addr, label = target, 'unix:%s' % target
+    try:
+        audit = None if args.no_audit_log else AuditLog(args.audit_log, audit_tag, app=app, writer='cli',
+                                                        max_mb=args.audit_max_mb, files=args.audit_files,
+                                                        forward=args.audit_forward,
+                                                        forward_format=args.audit_forward_format,
+                                                        instance=target if target.isdigit() else 'unix')
+    except ValueError as e:
+        p.error(str(e))
+
     try:
         s = socket.socket(socket.AF_UNIX if isinstance(addr, str) else socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(args.timeout)

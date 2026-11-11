@@ -679,14 +679,6 @@ def run_cli(spec):
 
     _keepalive_s = keepalive_env(spec['keepalive_s'])
 
-    try:
-        audit = None if args.no_audit_log else AuditLog(args.audit_log, spec.get('audit_tag', 'CLI'), app=spec['app'], writer='cli',
-                                                        max_mb=args.audit_max_mb, files=args.audit_files,
-                                                        forward=args.audit_forward,
-                                                        forward_format=args.audit_forward_format)
-    except ValueError as e:
-        p.error(str(e))
-
     token = args.control_token or os.environ.get('CONTROL_TOKEN')
     token = parse_secret(token, 'control-token')   # the inline form may be file:<path> — the same loader
     target = resolve_target(args.control_port, spec['ctl_socket'])
@@ -696,6 +688,15 @@ def run_cli(spec):
         addr, label = ('127.0.0.1', int(target)), '127.0.0.1:%s' % target
     else:
         addr, label = target, 'unix:%s' % target
+    try:
+        audit = None if args.no_audit_log else AuditLog(args.audit_log, spec.get('audit_tag', 'CLI'), app=spec['app'], writer='cli',
+                                                        max_mb=args.audit_max_mb, files=args.audit_files,
+                                                        forward=args.audit_forward,
+                                                        forward_format=args.audit_forward_format,
+                                                        instance=target if target.isdigit() else 'unix')
+    except ValueError as e:
+        p.error(str(e))
+
     try:
         s = connect_once(addr, isinstance(addr, str), args.timeout)
     except OSError as e:

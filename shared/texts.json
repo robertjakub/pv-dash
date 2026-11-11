@@ -68,6 +68,7 @@
     "timeout_range": "timeout must be 0 < N <= 60 seconds",
     "audit_forward_grammar": "audit-forward must be %s",
     "audit_forward_format_invalid": "audit-forward-format must be one of %s",
+    "audit_instance_invalid": "audit-instance must be 1-64 characters (letters, digits, . _ : @ -)",
     "cannot_bind": "cannot bind %s:%d: %s",
     "malformed_request": "malformed request: expected {\"cmd\": \"<command>\"} JSON",
     "malformed_request_short": "malformed request",

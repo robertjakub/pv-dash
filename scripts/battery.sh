@@ -15,6 +15,7 @@
 #   scripts/battery.sh quick          # all ten, the fuzzes at 300 (~3 min) — serial
 #   scripts/battery.sh full           # all ten, the suite defaults — the nightly, serial
 #   scripts/battery.sh <suite> ...    # explicit names, e.g. cache-regtest inverter-regtest
+#   scripts/battery.sh --stop ...     # the flag may sit anywhere: the first FAILED suite ends the run — the tally marks the rest SKIPPED
 #
 # Every run works inside its own dedicated dir: /tmp/pvbattery/<run-id>/
 # (the suites' /tmp scratch is rewritten into it, and TMPDIR points there
@@ -77,6 +78,13 @@ ls -1dt $LOGROOT/2* 2>/dev/null | tail -n +9 | while read -r d; do
   [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && continue   # a live run's dir is untouchable
   rm -rf "$d"
 done
+# the flags: --stop ends the battery at the first FAILED suite (the tally
+# marks the rest SKIPPED); the flag may sit anywhere in the args
+STOP=''
+for a in "$@"; do
+  [ "$a" = "--stop" ] && STOP=1
+done
+[ -n "$STOP" ] && set -- $(for a in "$@"; do [ "$a" != "--stop" ] && printf '%s\n' "$a"; done)
 PROFILE="${1:-commit}"
 RUNID="$(date +%Y%m%d-%H%M%S)-$PROFILE"
 RUNDIR=$LOGROOT/$RUNID
@@ -309,6 +317,7 @@ for s in $SUITES; do
   else
     say "$(date '+%H:%M:%S') SUITE $N/$TOTAL $s: FAILED ($dur)"
     tail -6 "$RUNDIR/$s.log"
+    [ -n "$STOP" ] && { say "$(date '+%H:%M:%S') STOP --stop: the batch ends here"; break; }
   fi
 done
 [ "$PARALLEL" = 1 ] || kill_daemons
@@ -319,7 +328,9 @@ fail=0
 N=0
 for s in $SUITES; do
   N=$((N + 1))
-  if grep -q "^ALL PASS" "$RUNDIR/$s.log" 2>/dev/null && ! grep -q "^FAIL" "$RUNDIR/$s.log" 2>/dev/null; then
+  if [ -n "$STOP" ] && [ ! -f "$RUNDIR/$s.log" ]; then
+    say "$N/$TOTAL $s: SKIPPED (--stop)"
+  elif grep -q "^ALL PASS" "$RUNDIR/$s.log" 2>/dev/null && ! grep -q "^FAIL" "$RUNDIR/$s.log" 2>/dev/null; then
     say "$N/$TOTAL $s: PASS"
   else
     fail=$((fail+1)); say "$N/$TOTAL $s: NOT-GREEN"

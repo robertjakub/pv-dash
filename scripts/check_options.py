@@ -61,6 +61,15 @@ def load_registry(tool_dir):
     return mod.OPTIONS, mod.KNOWN_VERBS
 
 
+def control_checks(tool_dir):
+    """The CHECKS registry's names, out of the tool's control module source
+    (a textual scan — importing the module would drag the daemon's whole
+    wire stack into the lint)."""
+    path = os.path.join(REPO, tool_dir, 'lib', 'control.py')
+    m = re.search(r'CHECKS\s*=\s*\{([^}]*)\}', open(path).read(), re.S)
+    return set(re.findall(r"['\"]([a-z0-9-]+)['\"]\s*:", m.group(1))) if m else set()
+
+
 def parser_flags(bin_script):
     """The flags the tool's argparse actually defines (run --help and read)."""
     script = os.path.join(REPO, bin_script)
@@ -162,6 +171,29 @@ def check_tool(tool):
             bad_typed.append('--' + o.name)
     rows.append((not bad_typed, '%s: every row default parses as the row\'s conv%s'
                  % (tool, ' — mistyped: %s' % ', '.join(bad_typed) if bad_typed else '')))
+    # the row's own validation contract (row_value reads it at every layer):
+    # a named `check` resolves to the tool's CHECKS registry (lib/control.py —
+    # a typo'd name would be a wire-time KeyError), the bounds are sane and
+    # numeric-only (a str row's min/max would TypeError the comparison), a
+    # bool row carries neither (its vocabulary is the on/off words)
+    checks = control_checks(tool_dir)
+    bad_check, bad_bounds = [], []
+    for o in options:
+        if o.node:
+            continue
+        if o.check and o.check not in checks:
+            bad_check.append('%s (check %r)' % (o.name, o.check))
+        if o.conv is bool and (o.min is not None or o.max is not None):
+            bad_bounds.append('--' + o.name)
+        elif o.conv in (int, float):
+            if o.min is not None and o.max is not None and o.min > o.max:
+                bad_bounds.append('--' + o.name)
+        elif o.min is not None or o.max is not None:
+            bad_bounds.append('--' + o.name)
+    rows.append((not bad_check, '%s: every row check resolves to the tool\'s CHECKS registry%s'
+                 % (tool, ' — unresolved: %s' % ', '.join(bad_check) if bad_check else '')))
+    rows.append((not bad_bounds, '%s: the row bounds are numeric and sane%s'
+                 % (tool, ' — bad rows: %s' % ', '.join(bad_bounds) if bad_bounds else '')))
     # the ops-verbs policy: the row's `default` is the resolver's static
     # rung, the registry's default_ops_verbs the derivation the prose
     # renders — the gate pins the two together (one truth, two faces)

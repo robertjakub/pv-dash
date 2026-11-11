@@ -31,6 +31,7 @@ Groups are free words each registry files its knobs under; a row without
 one renders ungrouped — bare, no header. Stdlib only."""
 import argparse
 import json
+import math
 import os
 
 from common.settings.dump import SECRET_REMOVED
@@ -98,14 +99,59 @@ class Option:
         return self.env if isinstance(self.env, tuple) else (self.env,)
 
 
+def row_value(opt, raw, checks=None):
+    """The one value validator, row-driven — every layer judges a knob
+    value through it (the flag parser, the env/config resolver, the wire's
+    typed fallback, the restart fold), so a value the wire refuses is a
+    value no other layer accepts either: the row's documented value words
+    first ('off' and friends — the words a numeric conv cannot spell; the
+    bounds do not apply to them, the consumer owns what the word means),
+    then the conv parse (a float row refuses nan/inf), the row's choices,
+    the min/max bounds and finally the named check — the tool's CHECKS
+    registry, passed only by the wire dispatcher (the startup layers run
+    their own hand parsers, a None `checks` skips the step). Raises
+    ValueError carrying the knob's name; returns the parsed value — a
+    value word rides as its lower-cased spelling. Bool rows never come
+    through here (the bool vocabulary is str_to_bool's)."""
+    text = str(raw).strip()
+    for w in opt.values:
+        if text.lower() == w.lower():
+            return w   # the canonical spelling ('info' rides as the row's 'INFO')
+    try:
+        value = opt.conv(text)
+    except (TypeError, ValueError):
+        raise ValueError('%s must be %s, got %r'
+                         % (opt.name, {int: 'an integer', float: 'a number'}.get(opt.conv, 'text'), text))
+    if isinstance(value, bool):
+        value = int(value)   # bool is an int subclass: keep the bounds arithmetic numeric
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError('%s must be a finite number, got %r' % (opt.name, text))
+        if (opt.min is not None and value < opt.min) or (opt.max is not None and value > opt.max):
+            raise ValueError('%s must be %s..%s, got %r' % (opt.name, opt.min, opt.max, text))
+    if opt.choices is not None and value not in opt.choices and text not in opt.choices:
+        raise ValueError('%s must be one of %s, got %r' % (opt.name, '|'.join(opt.choices), text))
+    if opt.check:
+        if not checks or opt.check not in checks:
+            return value   # the startup layers re-run their own shape parsers
+        checked = checks[opt.check](value)
+        if isinstance(checked, dict):   # the check's normalized updates: the knob's own key rides back
+            value = checked[opt.name.replace('-', '_')]
+        elif checked is not None:
+            value = checked
+    return value
+
+
 def build_parser(options, prog=None, description=None, epilog=None, add_help=True):
     """The argparse parser for one tool, built from its registry: the one
     source renders --help (and the man pages render from the parser —
     common/render/manpage.py). Boolean flags become store_true (a `negates` row
-    becomes the matching store_false on the negated knob's dest), int/float
-    convs type the value, `choices` constrains it; everything else takes a
-    free string. The rows carry the defaults (None = unset). Control-only
-    settings (no flag) render nowhere here — they live on the wire only."""
+    becomes the matching store_false on the negated knob's dest), every other
+    row's value parses through row_value — the conv shape, the choices, the
+    min/max bounds and the row's value words all gate at the flag layer (the
+    named checks stay the startup parsers' business). The rows carry the
+    defaults (None = unset). Control-only settings (no flag) render nowhere
+    here — they live on the wire only."""
     p = argparse.ArgumentParser(prog=prog, description=description, epilog=epilog, add_help=add_help)
     for opt in options:
         if not opt.flag:
@@ -118,9 +164,17 @@ def build_parser(options, prog=None, description=None, epilog=None, add_help=Tru
                            default=opt.default, help=opt.help)
         else:
             p.add_argument(opt.flag, dest=opt.name.replace('-', '_'), default=opt.default,
-                           type=(opt.conv if opt.conv in (int, float) else None),
-                           choices=opt.choices, help=opt.help)
+                           type=_row_type(opt), choices=opt.choices, help=opt.help)
     return p
+
+
+def _row_type(opt):
+    """The argparse `type` callable over row_value — named for the knob so a
+    refused flag value reads 'argument --unit: invalid unit: ...'."""
+    def parse(raw):
+        return row_value(opt, raw)
+    parse.__name__ = opt.name
+    return parse
 
 
 def _config_word_index(options):

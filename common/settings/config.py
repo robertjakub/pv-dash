@@ -109,7 +109,18 @@ class Resolver:
         self.cfg = cfg
         self.logger = logger
 
-    def resolve(self, cli_value, env_name, cfg_key, default, conv):
+    def resolve(self, cli_value, env_name, cfg_key, default, conv, row=None):
+        """The family's precedence for one knob: CLI flags > env > config
+        script > defaults. An empty flag or env value counts as unset (the
+        value falls through to the next layer); a bad value logs and falls
+        back to the default (keep-last-good). `row` (the registry Option —
+        never a bool row) upgrades the parse to the row's whole contract
+        (row_value: the value words, the conv, the choices, the min/max
+        bounds; the named checks stay the startup parsers' business) — a
+        value the wire refuses, the env/config layer no longer keeps. A
+        row's value word on a numeric conv refuses too: what the word means
+        is the wire branch's own mapping ('off' is 0 there), and the
+        startup layers keep their documented defaults."""
         raw = cli_value
         if raw is None or raw == '':
             raw = os.environ.get(env_name) if env_name else None
@@ -118,7 +129,13 @@ class Resolver:
         if raw is None or raw == '':
             return default
         try:
-            return conv(raw)
+            if row is None:
+                return conv(raw)
+            from common.settings.options import row_value   # lazy: options sits above config in the layering
+            value = row_value(row, raw)
+            if row.conv in (int, float) and isinstance(value, str):
+                raise ValueError('the value word %r has no startup value' % value)
+            return value
         except (TypeError, ValueError) as e:
             self.logger.error('invalid %s = %r: %s (using %r)', cfg_key, raw, e, default)
             return default

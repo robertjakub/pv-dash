@@ -132,10 +132,18 @@ def apply_restart_state(target, config_path, dump_key, server, extra=None):
     FLAT registry names (the wire's one spelling)."""
     for name, pending in server.fold_restart_state(config_path, dump_key).items():
         if name == 'restore-on-start':
-            target['restore_on_start'] = str(pending).strip() in ('on', 'true', '1', 'yes')
+            from common.settings.config import str_to_bool   # lazy: no import cycle at load
+            try:
+                target['restore_on_start'] = str_to_bool(pending)
+                logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
+            except (TypeError, ValueError):
+                logger.warning('reload: the pending restore-on-start %r is not a boolean '
+                               '(on/true/1/yes/off/false/0/no) — the flag keeps its value', pending)
         elif extra and name in extra:
             extra[name](target, pending)
-        logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
+            logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
+        else:
+            logger.info('reload: the startup-only override %s=%s folds into the startup config', name, pending)
 
 
 def parse_ops_verbs(raw, known, default, rc=2, label='--control-ops-verbs'):

@@ -28,7 +28,7 @@ from common.settings.config import parse_control_target
 from common.settings.dump import SECRET_REMOVED
 from common.settings.options import config_value, control_command, default_ops_verbs, describe_command_node, \
     describe_node, describe_root, grouped_rows, knob_dictionary, known_verbs, make_describe, \
-    match_setting_path, render_config_script
+    match_setting_path, render_config_script, row_value
 from common.render.human import secs
 from common.render.texts import T
 from common.runtime.version import version_string
@@ -123,6 +123,7 @@ class ControlServer:
     CONTROL_PORT_DEFAULT = None           # the ctl socket's default port (the subclass's statics)
     CONTROL_SOCKET_TEMPLATE = None        # the ctl unix-socket path template
     LOG_LEVELS = ()                       # the log-level words (the subclass's defaults.json list)
+    CHECKS = {}                           # the subclass's named shape validators (the rows' `check` names)
 
     def __init__(self, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None,
@@ -813,6 +814,29 @@ class ControlServer:
             self._rebuild_audit()   # the kill-switch swaps the live trail for None (the commands stop landing)
             return True, 'on' if on else 'off'
         return False, None
+
+    def apply_typed_key(self, key, val):
+        """The typed-row fallback the _apply ladders end on: a registry row
+        with no hand branch judges its value through row_value — the row's
+        value words, the conv (a float row refuses nan/inf), the choices,
+        the min/max bounds and the named check (the subclass's CHECKS
+        registry; a check's fail-fast SystemExit answers as the err it is)
+        — and the cfg key takes the value (record_cfg; the subclass's
+        _after_set does the live rebuilds a bare write cannot reach).
+        Returns the value, None when key is no live typed row (the
+        caller's unknown-setting tail answers): bool rows keep their
+        branches' on_off grammar, and a restart-marked row never takes the
+        bare cfg write — the tool owns that branch (the pending rides the
+        set's restart preamble)."""
+        opt = self.option_by_name.get(key)
+        if opt is None or opt.conv is bool or opt.restart or opt.node:
+            return None
+        try:
+            value = row_value(opt, val, self.CHECKS)
+        except SystemExit as e:
+            raise ValueError(str(e))
+        self.record_cfg({opt.name.replace('-', '_'): value})
+        return value
 
     def apply_family_key(self, key, val, raw=None):
         """The family's shared live knobs: the control plane (the port

@@ -465,7 +465,7 @@ def main():
         if control:
             control.reloaded(summary, dump_interval=new_cfg['dump_interval'])
         if audit:
-            audit.event('RELOAD', 'upstream %s' % new_cfg['upstream'])
+            audit.event('RELOAD', 'result=ok upstream=%s' % audit_quote(new_cfg['upstream']))
         return summary
 
     if control:
@@ -490,7 +490,7 @@ def main():
                     % (version_string(), audit_quote(cfg['upstream']), listen_host, listen_port,
                        audit_quote(control_desc)))
         if metrics_acl_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
-            audit.event('ACL-FILE', metrics_acl_warn)
+            audit.event('ACL-FILE', 'warn=%s' % audit_quote(metrics_acl_warn))
     try:
         httpd.serve_forever()
         logger.info('stopped')

@@ -10,6 +10,26 @@ This file keeps **Unreleased and the current release** only — the release
 history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Unreleased
+### Added
+
+- **extras** — **the audit trail's Graylog content pack lands under
+  `extras/graylog/`** (the new extras/ home for the operator-side packs
+  nothing in the build or runtime path consumes):
+  `pv-suite-content-pack.json` imports as one unit — the syslog UDP
+  input on 1514, three pipeline rules + one pipeline (the `audit_*` KV
+  parse, the quoted `cmd=` pick, the **GIM normalization** — the
+  Graylog Information Model field names from the Illuminate schema:
+  `event_action`/`event_uid`/`event_outcome`/`event_severity(+level)`/
+  `event_error_code`/`event_duration`, `source_ip`+`source_port`,
+  `destination_ip`+`destination_port`, `user_name`, `user_command`,
+  `application_name`, with the source-specific `audit_*` forms staying
+  beside), the five dedicated Audit streams routing on the raw message
+  (remove_matches pulls the trail out of the Default stream) and the
+  four event definitions (no notifications attached); the README
+  carries the import steps and the GIM mapping table, the chain verify
+  stays off-box in audit_verify, and the pack is verified by inspection
+  only (no Graylog on the dev machine).
+
 ### Changed
 
 - **everywhere** — **the control exchange's DEBUG line slims, and the

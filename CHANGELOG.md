@@ -74,7 +74,10 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   ride backslash-escaped (logfmt-style — `audit_escape`; `cmd='set note
   it\'s fine'` can no longer break the quoting), a bare (unquoted) value
   carries no escapes. The trailing empty `message=` lines in old
-  rotated backups predate the writer's guard and stay as written.
+  rotated backups predate the writer's guard and stay as written. The
+  graylog content pack revs to 3 to follow — the `pv-suite audit cmd`
+  rule captures across the escaped quotes and unescapes (`\\(.)` →
+  `$1`), the kv extractor's bare words ride unchanged.
 - **the audit line's `tools=` word renames to
   `application=` and every line gains an `instance=<id>` word** naming the
   writer daemon: the control port when `--audit-instance`/`AUDIT_INSTANCE`

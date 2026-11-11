@@ -33,9 +33,13 @@ unit (System → Content packs → upload, then Install) and creates:
   `audit_hash`, the simple
   message pairs `audit_result` / `audit_peer` / `audit_reason` /
   `audit_wire` / ... ride beside them (the reserved-key rule in
-  docs/SECURITY.md is what makes one flat namespace safe). `pv-suite audit
-  cmd` picks the quoted value — `cmd='set pv 3000'` truncates under any
-  space-split kv — into `audit_cmd`. `pv-suite audit gim` normalizes
+   docs/SECURITY.md is what makes one flat namespace safe). `pv-suite audit
+   cmd` picks the quoted value — `cmd='set pv 3000'` truncates under any
+   space-split kv — into `audit_cmd`; since the audit escapes
+   (docs/SECURITY.md's logfmt rule — `cmd='set note it\'s fine'`) it
+   captures across the escaped quotes and strips them (the `\\(.)` → `$1`
+   replace pass; key_value's quoting has no escape handling, so the
+   always-quoted words ride this rule). `pv-suite audit gim` normalizes
   onto the Graylog Information Model (the next section). The pipeline
   connects to the Audit · all stream.
 - **five streams** — Audit · all / commands / security / lifecycle /
@@ -139,7 +143,10 @@ pipeline parsing, the streams and dashboards key directly:
 ```
 
 Every `key=value` of the message becomes `_<key>` — the uniqueness rule
-(docs/SECURITY.md) is what makes that mapping safe. Recommendation: **GELF
+(docs/SECURITY.md) is what makes that mapping safe. The GELF fields also
+carry the decoded values — the tool unescapes its own grammar, so the
+logfmt escapes die at the sender and no unescape pass rides the receiver
+(the syslog routes need the cmd rule's). Recommendation: **GELF
 for Graylog** (the structured trail is the whole point of the KV
 reformat), keep `rfc5424`/`cef` for the SIEMs that speak syslog.
 

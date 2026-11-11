@@ -3,6 +3,8 @@ result
 result*
 .DS_Store
 .env
+__pycache__/
+*.pyc
 docker/env/*.env
 scraper/metrics.json
 

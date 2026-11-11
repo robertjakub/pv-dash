@@ -124,7 +124,6 @@ translate). The namespaces group them.
 | `metrics-max-clients` | — | startup-only | `N` | `--metrics-max-clients` / — | maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited |
 | `metrics-client-timeout` | — | startup-only | `s` | `--metrics-client-timeout` / — | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
 | `metrics-max-conn-per-ip` | — | startup-only | `N` | `--metrics-max-conn-per-ip` / — | maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit |
-| `log-level` | `set log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
 | `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 
 ### system
@@ -137,6 +136,7 @@ the daemon's own serving socket: the Modbus listen address
 | `log-access` | `set system log-access` | settable | `on\|off` | `--log-access` / — | log client connects/disconnects at INFO instead of DEBUG |
 | `local-time` | `set system local-time` | settable | `on\|off` | `--local-time` / — | log timestamps in the system time zone instead of UTC |
 | `control-log-replies` | `set system log-replies` | settable | `on\|off` | `--control-log-replies` / — | DEBUG-log the full output of every control command (plainly: the command and its status log) |
+| `log-level` | `set system log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
 
 ### modbus
 

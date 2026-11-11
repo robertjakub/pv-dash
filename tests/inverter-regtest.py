@@ -1047,16 +1047,16 @@ def main():
         tx = ctl(L_CTL, 'show modbus')
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
-        check('node walk: the modbus listing answers the flat names (the key never lists)',
-              words == ['modbus-auth', 'profile'] and 'auth-key' not in tx, tx[:160])
+        check('node walk: the modbus listing answers the live words (the key never lists)',
+              words == ['auth', 'profile'] and 'auth-key' not in tx, tx[:160])
         tx = ctl(L_CTL, 'show')
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
-        check("node walk: the bare show answers the flat grammar's root",
+        check("node walk: the bare show answers the root in the console's own words",
               words == ['audit', 'batt', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
-                        'config', 'connect-acl', 'connections', 'control', 'dump', 'dump-interval', 'grid',
+                        'connect-acl', 'connections', 'control', 'dump', 'dump-interval', 'grid',
                         'grid-frequency', 'grid-frequency-wander', 'grid-outage',
-                        'grid-voltage', 'grid-voltage-wander', 'knobs', 'load', 'log-level', 'max-clients', 'max-conn-per-ip', 'max-kwp',
+                        'grid-voltage', 'grid-voltage-wander', 'load', 'max-clients', 'max-conn-per-ip', 'max-kwp',
                         'metrics', 'modbus', 'mppt', 'pv', 'registers', 'scenario', 'seed',
                         'soc', 'static', 'strict', 'system', 'time', 'time-scale', 'timezone', 'version',
                         'write'], tx[:220])

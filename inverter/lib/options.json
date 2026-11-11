@@ -284,7 +284,7 @@
     { "name": "no-audit-log", "flag": "--no-audit-log", "env": "NO_AUDIT_LOG", "conv": "bool",
       "live": "audit/disable", "setting-help": "disable the INV audit trail", "values": [ "on", "off" ],
       "default": false, "help": "disable the INV audit trail" },
-    { "name": "log-level", "flag": "--log-level", "env": "LOG_LEVEL", "conv": "str", "live": "log-level",
+    { "name": "log-level", "flag": "--log-level", "env": "LOG_LEVEL", "conv": "str", "live": "system/log-level",
       "setting-help": "log verbosity", "value-help": { "DEBUG": "client traffic + per-poll detail",
                       "INFO": "lifecycle, control commands, writes",
                       "WARNING": "problems only",

@@ -40,8 +40,8 @@ def check(name, ok, detail=''):
         FAILURES.append(name)
 
 
-def verify(*paths, rc=0, quiet=False, contain=None, absent=None):
-    cmd = [sys.executable, V] + ([] if not quiet else ['-q']) + list(paths)
+def verify(*paths, rc=0, quiet=False, verbose=False, contain=None, absent=None):
+    cmd = [sys.executable, V] + (['-v'] if verbose else []) + (['-q'] if quiet else []) + list(paths)
     r = subprocess.run(cmd, capture_output=True, text=True)
     out = r.stdout + r.stderr
     ok = r.returncode == rc
@@ -120,6 +120,12 @@ def main():
         open(log, 'w').write('\n'.join(lines) + '\n')
         ok, out = verify(log, rc=1, contain=['line 3 [CACHE:daemon:1]: hash mismatch'])
         check('edited line detected (right line, right chain key)', ok, out)
+        # 2b. the verbose walk: one row per entry — the verdict names the
+        # break, the anchors and the chained links
+        ok, out = verify(log, rc=1, verbose=True,
+                         contain=['anchored', 'chained', 'broken',
+                                  'line 3 [CACHE:daemon:1] ', 'hash mismatch'])
+        check('the verbose walk names every entry and its verdict', ok, out)
 
         # 3. a deleted line breaks the chain
         lines = open(log).read().splitlines()

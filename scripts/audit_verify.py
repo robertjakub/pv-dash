@@ -10,7 +10,16 @@ validator speaks the current grammar only: a pre-KV line reads malformed.
 
   python3 scripts/audit_verify.py [FILE|- ...]      # default: the family's XDG trails
   python3 scripts/audit_verify.py -q ~/.local/state/modbus-cache/audit.log
+  python3 scripts/audit_verify.py -v ~/.local/state/modbus-cache/audit.log   # the per-entry walk
+  python3 scripts/audit_verify.py --verbose -       # --verbose, the same flag spelled long
   journalctl -u modbus-cache | python3 scripts/audit_verify.py -
+
+-v/--verbose walks the trail per entry — one row each: the line number, the
+chain key, the stamp, the type, the hash and the verdict (`anchored` — the
+key's first visible entry (the older ones may have rotated away or belong to
+a sibling file), `chained` — the recomputed hash links it to the previous
+entry of the same key, `broken` — it does not, `unsigned` — no hash, or
+`malformed` — not an audit line at all).
 
 For a real file the rotated backups (FILE.1 .. FILE.16) are verified first
 (oldest last-written first), so a chain that crossed a rotation still
@@ -44,11 +53,12 @@ def split_line(line):
     return parts[0], '%s:%s:%s' % (tools, parts[3][4:], parts[4][9:]), tools
 
 
-def verify_stream(name, lines, quiet):
+def verify_stream(name, lines, quiet, verbose=False):
     """One file (or stdin): per-prefix chain walk. Returns (broken, unsigned, events).
     Each prefix's chain anchors at its first visible entry (the writer's older
     entries may have rotated away or belong to a sibling file) — continuity is
-    verified from there onward."""
+    verified from there onward. verbose prints one row per entry: the line
+    number, the chain key, the stamp, the type, the hash and the verdict."""
     chains = {}                    # prefix -> last hash (None before the anchor)
     broken, unsigned, events = [], 0, 0
     for no, raw in enumerate(lines, 1):
@@ -60,21 +70,31 @@ def verify_stream(name, lines, quiet):
         h = parse_entry_hash(line)
         if parsed is None:
             broken.append((no, '-', 'not an audit line (malformed)'))
+            if verbose:
+                print('     line %d — malformed' % no)
             continue
         stamp, key, tools = parsed
         if h is None:
             unsigned += 1
+            if verbose:
+                print('     line %d [%s] %s unsigned' % (no, key, stamp))
             continue
         prev = chains.get(key)
-        if prev is not None:
-            want = entry_hash(prev, stamp, tools, entry_body(line))
-            if want != h:
-                broken.append((no, key, 'hash mismatch (the entry, its neighbours or the order were tampered with)'))
+        broken_here = prev is not None and \
+            entry_hash(prev, stamp, tools, entry_body(line)) != h
+        if verbose:
+            parts = line.split(' ')
+            etype = parts[5][5:] if parts[5].startswith('type=') else parts[5]
+            print('     line %d [%s] %s %s hash=%s %s'
+                  % (no, key, stamp, etype, h,
+                     'broken' if broken_here else ('anchored' if prev is None else 'chained')))
+        if broken_here:
+            broken.append((no, key, 'hash mismatch (the entry, its neighbours or the order were tampered with)'))
         chains[key] = h
     return broken, unsigned, events
 
 
-def verify_path(path, quiet):
+def verify_path(path, quiet, verbose=False):
     """One path plus its rotated backups, oldest first. Returns (ok, summary)."""
     backups = ['%s.%d' % (path, i) for i in range(16, 0, -1) if os.path.exists('%s.%d' % (path, i))]
     ordered = backups + ([path] if os.path.exists(path) else [])
@@ -84,7 +104,11 @@ def verify_path(path, quiet):
     for f in ordered:
         with open(f, encoding='utf-8', errors='replace') as fh:
             lines.extend(fh.readlines())
-    broken, unsigned, events = verify_stream(path, lines, quiet)
+    if verbose and len(ordered) > 1:
+        print('%s:' % path)
+        for f in ordered:
+            print('     backup %s' % f)
+    broken, unsigned, events = verify_stream(path, lines, quiet, verbose)
     label = '%s%s' % (path, (' (+%d backup(s))' % len(backups)) if backups else '')
     if broken:
         print('FAIL %s — %d broken entr(y/ies):' % (label, len(broken)))
@@ -100,8 +124,10 @@ def verify_path(path, quiet):
 
 
 def main():
-    quiet = '-q' in sys.argv
-    paths = [a for a in sys.argv[1:] if a != '-q']
+    argv = sys.argv[1:]
+    verbose = '-v' in argv or '--verbose' in argv
+    quiet = '-q' in argv and not verbose   # verbose wins: the walk answers both
+    paths = [a for a in argv if a not in ('-q', '-v', '--verbose')]
     if not paths:
         paths = [default_path(app) for app in DEFAULT_TRAILS]
         paths = [p for p in paths if os.path.exists(p)]
@@ -111,7 +137,7 @@ def main():
     ok = True
     for path in paths:
         if path == '-':
-            broken, unsigned, events = verify_stream('stdin', sys.stdin.readlines(), quiet)
+            broken, unsigned, events = verify_stream('stdin', sys.stdin.readlines(), quiet, verbose)
             if broken:
                 ok = False
                 print('FAIL <stdin> — %d broken entr(y/ies):' % len(broken))
@@ -121,7 +147,7 @@ def main():
                 note = ', %d unsigned' % unsigned if unsigned else ''
                 print('OK   <stdin> — %d entr(y/ies)%s' % (events, note))
         else:
-            good, _ = verify_path(path, quiet)
+            good, _ = verify_path(path, quiet, verbose)
             ok = ok and good
     return 0 if ok else 1
 

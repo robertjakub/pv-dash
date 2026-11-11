@@ -1,9 +1,13 @@
 # TODO (one file to rule them all)
 
-Every **open** item lives here — grouped by theme, each tagged
-`[cache]` `[scraper]` `[inverter]` `[dashboard]` `[common]` `[docker]`
-(untagged = the whole family). The per-subproject `TODO.md` files keep
-only the **Done/history** records for their tool —
+Every **open** item lives here — grouped by theme. The tool-owned
+themes bucket their items under `###` headings (`SCRAPER`,
+`INVERTER`, `DASHBOARD`, `COMMON` — no tag where the heading carries
+it), the spanning items keep the `[cache]` `[scraper]` `[inverter]`
+`[dashboard]` `[common]` `[docker]` tags under `CROSS-TOOL` (untagged
+means the whole family), and every other theme stays tag-per-item.
+The per-subproject `TODO.md` files keep only the **Done/history**
+records for their tool —
 [cache](../cache/TODO.md), [scraper](../scraper/TODO.md),
 [inverter](../inverter/TODO.md), [dashboard](../dashboard/TODO.md).
 The **one-product sweep** (the consistency items — the same knobs, the
@@ -430,17 +434,9 @@ re-open — is the history half:
 
 ## The security wave (the audit follow-ups)
 
-- **the remaining audit findings** `[cache]` `[scraper]` `[inverter]`
-  `[docker]` — the open set (per [SECURITY.md](SECURITY.md) rev. 28): F17
-  (the volume secrets), F14 (TLS — the item below), F15 (INFO — the
-  bearer token + the localhost bind are the controls, the scraper
-  README carries the privacy note), F1 (accepted); re-run the audit
-  after the TLS story (F14) lands, after the multi-target /
-  control-plane evolutions, or any new listener or file format; at
-  least yearly otherwise. The closed findings F2–F13, F16, F18–F23
-  with their fix and verification:
-  [history/AUDIT.md](history/AUDIT.md).
-- **the RBAC rewrite** `[common]` — the role gate decides on the head
+### COMMON
+
+- **the RBAC rewrite** — the role gate decides on the head
   verb (`command_verb` = the first word, `common/wire/wiresec.py`) with the
   flat verb-set policies (`ROLE_POLICIES`); the request-namespace grammar
   (`request flush cache` — the flush/unset rename wave) already needs
@@ -451,6 +447,25 @@ re-open — is the history half:
   policies (`request/flush` in the ops set, `request/reload` out) —
   instead of patching the head-word verb; the audit `role=` entries and
   the `--control-ops-verbs` validation follow the same units.
+- **TLS on the audit forward** — the target grammar's `tls://`
+  spelling (deliberately out of rev. 27): RFC5425 (TLS over the
+  octet-count framing) with the client certificates needs a real TLS
+  collector to test against (the suite cannot generate the certificates),
+  so the anchor lives here until one exists; `tls://…` today gets the
+  generic unknown-scheme refusal.
+
+### CROSS-TOOL
+
+- **the remaining audit findings** `[cache]` `[scraper]` `[inverter]`
+  `[docker]` — the open set (per [SECURITY.md](SECURITY.md) rev. 28): F17
+  (the volume secrets), F14 (TLS — the item below), F15 (INFO — the
+  bearer token + the localhost bind are the controls, the scraper
+  README carries the privacy note), F1 (accepted); re-run the audit
+  after the TLS story (F14) lands, after the multi-target /
+  control-plane evolutions, or any new listener or file format; at
+  least yearly otherwise. The closed findings F2–F13, F16, F18–F23
+  with their fix and verification:
+  [history/AUDIT.md](history/AUDIT.md).
 - **a connect ACL for the control plane** `[common]` `[cache]`
   `[scraper]` `[inverter]` `[dashboard]` — SKETCH (Nov 8, decided against
   for today): the control TCP bind is hardcoded `127.0.0.1`
@@ -507,12 +522,6 @@ re-open — is the history half:
   (`--metrics-cert`/`--metrics-key`, stdlib `ssl`) would make a
   proxy-less LAN install defensible: the bearer token stops travelling in
   clear text. The Modbus side stays F1 (accepted, protocol-inherent).
-- **TLS on the audit forward** `[common]` — the target grammar's `tls://`
-  spelling (deliberately out of rev. 27): RFC5425 (TLS over the
-  octet-count framing) with the client certificates needs a real TLS
-  collector to test against (the suite cannot generate the certificates),
-  so the anchor lives here until one exists; `tls://…` today gets the
-  generic unknown-scheme refusal.
 ## The pipeline (CI, releases, supply chain)
 
 - **schema every family JSON** `[common]` — `scripts/validate_json.py`
@@ -552,64 +561,38 @@ re-open — is the history half:
 
 ## The product (what the tools do next)
 
-- **the dashboard UI redesign** `[dashboard]` — battery support is always
-  on now (the `--battery` knob retired family-wide, the served
-  `config.js` always carries `battery: true`), but the front end still
-  treats the battery as an add-on: the `batteryEnabled` gate (config.js +
-  the `?battery=1` URL escape), the dimmed-node / "no battery detected"
-  banner path, and the generation-first layout. Redesign the UI around
-  the battery as a first-class, always-present citizen (the flow diagram,
-  the KPI row, the energy split) — and reconsider the layout while in
-  there.
+### SCRAPER
 
-- **the demo's write-poke conf** `[docker]` `[cache]` — the demo stack
-  is complete (the four services + Prometheus, the dashboard renders
-  it, the token story seeded); what remains of the old demo-stack item
-  is the demo nicety: a seeded cache conf (or a ctl poke script) that
-  turns `allow-write` on with a small register allow-list, so the
-  write-through pokes land in the charts live — deliberately NOT the
-  default (the demo README documents `allow-write` off).
-- **the multi-target scrape** `[scraper]` — one process polling several
+- **the multi-target scrape** — one process polling several
   inverters (per-target metrics with a unit/host label) for the
   two-string-roof households; the metrics endpoint and the audit are
   already per-process.
-- **the priced grid machine** `[inverter]` — a tariff-aware import/export
+
+### INVERTER
+
+- **the priced grid machine** — a tariff-aware import/export
   model on top of the `grid` setpoint (a price curve → the battery
   greedy/eco strategies).
-- **the tariff / cost panels** `[dashboard]` — once the priced grid
-  machine defines a price curve: import cost, export revenue, self-cost —
-  the money view next to the energy view.
-- **the forecast curve** `[inverter]` — the PV/cloud machines follow a
+- **the forecast curve** — the PV/cloud machines follow a
   day-ahead forecast file, so a demo runs repeatable weather instead of
   the RNG.
-- **the forecast overlay** `[dashboard]` — when the fake grows the
-  forecast curve and a real forecast source exists: the expected-PV curve
-  behind the measured one, the underperformance visible without doing
-  math.
-- **the battery ageing** `[inverter]` — the SoH drift over the simulated
+- **the battery ageing** — the SoH drift over the simulated
   days (the capacity shrinks a %/week of the simulated time) + the
   `battery_soh` gauge on /metrics.
-- **the battery SoH panels** `[dashboard]` — when the ageing model lands,
-  add the SoH gauge and let the capacity panels use the live value.
-- **the machine gauges on /metrics** `[inverter]` — the state machines'
+- **the machine gauges on /metrics** — the state machines'
   internals as Prometheus gauges (cloud factor, outage state, per-string
   power, the battery's decision): dashboards and the scrape fuzzing could
   watch the machines, not just the registers they feed.
-- **the frequency-based derate** `[inverter]` — the machine already
+- **the frequency-based derate** — the machine already
   wanders ±0.2 Hz around `--grid-frequency`; beyond a deviation bound the
   output power should derate (exposed on /metrics too).
-- **the multi-unit serve** `[inverter]` — one process serving two Modbus
+- **the multi-unit serve** — one process serving two Modbus
   units (the inverter + the meter as separate unit ids) for the
   gateway-style setups.
-- **the fault/alarm registers** `[inverter]` → `[cache]` `[scraper]`
-  `[dashboard]` — device health words driven by the machines (an outage
-  raises a fault, the derate a warning, the battery cap a SoC notice): the
-  cache/scrape export them and the dashboard can banner a fault, not just
-  a blackout.
-- **the user-defined scenarios** `[inverter]` — scene files (the time +
+- **the user-defined scenarios** — scene files (the time +
   the pins + the machines) loadable with `set scenario <file>`; the audit
   trail of a manual session could *record* one.
-- **set/show the registers (F1/2/3/4)** `[inverter]` — the fake's control
+- **set/show the registers (F1/2/3/4)** — the fake's control
   plane goes fc-aware: the pin verbs take a space qualifier
   (`set register [fc3|fc4] <addr> <value>`, `set coil [fc1|fc2] <addr>
   <0|1>` — the bare form keeps today's space; `discrete`/`input-register`
@@ -621,41 +604,84 @@ re-open — is the history half:
   column + per-space pin markers (today the overlay `*` misfires on fc4
   rows); reset/SIGUSR1/inspect count the fourth map; the suite drives
   `profiles/profiles/demo-fc4.json` for it.
-- **the dongle latency profile** `[inverter]` — a persistent slow-reply
+- **the dongle latency profile** — a persistent slow-reply
   mode (the laggy-modem character: every response delayed, not dropped) to
   exercise read-delay and poll pacing against a realistic SDongle — the
   chaos `stall` is a one-shot, a real dongle is a lifestyle.
-- **the cache gauges panels** `[dashboard]` — the cache's metrics endpoint
+
+### DASHBOARD
+
+- **the dashboard UI redesign** — battery support is always
+  on now (the `--battery` knob retired family-wide, the served
+  `config.js` always carries `battery: true`), but the front end still
+  treats the battery as an add-on: the `batteryEnabled` gate (config.js +
+  the `?battery=1` URL escape), the dimmed-node / "no battery detected"
+  banner path, and the generation-first layout. Redesign the UI around
+  the battery as a first-class, always-present citizen (the flow diagram,
+  the KPI row, the energy split) — and reconsider the layout while in
+  there.
+- **the tariff / cost panels** — once the priced grid
+  machine defines a price curve: import cost, export revenue, self-cost —
+  the money view next to the energy view.
+- **the forecast overlay** — when the fake grows the
+  forecast curve and a real forecast source exists: the expected-PV curve
+  behind the measured one, the underperformance visible without doing
+  math.
+- **the battery SoH panels** — when the ageing model lands,
+  add the SoH gauge and let the capacity panels use the live value.
+- **the cache gauges panels** — the cache's metrics endpoint
   exists (the `modbus_cache_*` gauges); chart the hit/miss ratio, the
   cache age and the poll health next to the generation panels.
-- **the outage banner** `[dashboard]` — the inverter simulates grid
+- **the outage banner** — the inverter simulates grid
   outages and the meter goes dark; the dashboard could show a standing
   banner (and an annotation gap on the charts) instead of a silent zero
   flatline.
-- **the write console** `[dashboard]` `[cache]` — a guarded panel issuing
-  single-register writes through the cache's allow-list (the write-through
-  lands the value in the charts instantly): the ops poke, audited with the
-  writer's identity.
-- **the event feed** `[dashboard]` — the audit vocabulary (writes,
+- **the event feed** — the audit vocabulary (writes,
   refusals, outages, reloads) as a dashboard side panel, instead of the
   journalctl detour.
-- **the Prometheus annotations** `[dashboard]` — outages, reloads and
+- **the Prometheus annotations** — outages, reloads and
   (with the write console) manual pokes rendered as chart annotations,
   once the event feed exists.
-- **the range picker** `[dashboard]` — the time-range control beyond the
+- **the range picker** — the time-range control beyond the
   default window (presets + a from/to picker) on top of the existing query
   plumbing.
-- **the German strings** `[dashboard]` — the i18n merge makes a third
+- **the German strings** — the i18n merge makes a third
   language cheap (`de: { ... }` in `i18n.js`, the switcher grows
   automatically).
-- **the mobile pass** `[dashboard]` — the flow diagram and the header
+- **the mobile pass** — the flow diagram and the header
   controls assume a desk-sized window; a small-screen layout (the chart
   full-width, the KPI row scrollable) makes the LAN page phone-friendly.
-- **an ops `doctor` command per tool** `[common]` — one shot: validate the
+
+### COMMON
+
+- **an ops `doctor` command per tool** — one shot: validate the
   config, check the token-file modes, probe the upstream (Modbus read),
   probe the metrics endpoint (auth + scrape), stat the dump/audit files,
   print the findings as one report — the "why is my scrape red" first
   stop.
+- **the docs site** — **the scaffold is in** (`docs/book/`, the
+  mdBook form: the READMEs/audit/TODO/changelog included via
+  `{{#include}}`); what remains is the publishing: build + deploy the book
+  on GH Pages in the CI item's workflow.
+
+### CROSS-TOOL
+
+- **the demo's write-poke conf** `[docker]` `[cache]` — the demo stack
+  is complete (the four services + Prometheus, the dashboard renders
+  it, the token story seeded); what remains of the old demo-stack item
+  is the demo nicety: a seeded cache conf (or a ctl poke script) that
+  turns `allow-write` on with a small register allow-list, so the
+  write-through pokes land in the charts live — deliberately NOT the
+  default (the demo README documents `allow-write` off).
+- **the fault/alarm registers** `[inverter]` → `[cache]` `[scraper]`
+  `[dashboard]` — device health words driven by the machines (an outage
+  raises a fault, the derate a warning, the battery cap a SoC notice): the
+  cache/scrape export them and the dashboard can banner a fault, not just
+  a blackout.
+- **the write console** `[dashboard]` `[cache]` — a guarded panel issuing
+  single-register writes through the cache's allow-list (the write-through
+  lands the value in the charts instantly): the ops poke, audited with the
+  writer's identity.
 - **a Modbus capture/replay tool** `[common]` `[inverter]` — a `pv-suite`
   sidecar that sits on a TCP connection and dumps the wire to a file (and
   replays it): debugging the poll planning, the write-through and the
@@ -665,10 +691,6 @@ re-open — is the history half:
   SUN2000/SDongle week (poll pacing, the dongle's single-client
   behaviour, real exception codes, the FC4 input registers, reconnect
   storms; the Deye profiles through the cache) is the last mile.
-- **the docs site** `[common]` — **the scaffold is in** (`docs/book/`, the
-  mdBook form: the READMEs/audit/TODO/changelog included via
-  `{{#include}}`); what remains is the publishing: build + deploy the book
-  on GH Pages in the CI item's workflow.
 - **the REST API** — an HTTP/JSON face beside the ctl/cli, mostly
   control-plane and statistics: the control verbs over REST (GET a value,
   POST a set — the same `/`-path names, token + RBAC and audit story as

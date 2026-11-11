@@ -36,6 +36,12 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Changed
 
+- **docs** — **docs/TODO.md's open items bucket per tool**: the product
+  and the security wave group their items under `### SCRAPER` /
+  `INVERTER` / `DASHBOARD` / `COMMON` headings (the tag drops where the
+  heading carries it) with the spanning items keeping their `[tool]`
+  tags under `### CROSS-TOOL`; the comparison themes (the control
+  plane, the one-product sweep, the pipeline) stay tag-per-item.
 - **docs** — **the family-wide stale-docs sweep**: the pre-KV audit
   transcripts in the cache's and the fake's READMEs rewritten to the
   KV line (`tools=/tag=/type=/hash=/message=`, the `-> ok` arrow

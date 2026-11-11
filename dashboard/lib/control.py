@@ -199,7 +199,7 @@ class ControlServer(_ControlServer):
             raise ValueError('metrics-server must be on or off')
         if key == 'metrics-acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError(T('wire.acl_table_value') % ('a metrics-acl', 'metrics-acl-table'))
+                raise ValueError(T('wire.acl_table_value') % ('metrics-acl', 'metrics-acl-table'))
             try:
                 gate, warn = resolve_metrics_acl(val)
             except SystemExit as e:
@@ -214,6 +214,11 @@ class ControlServer(_ControlServer):
             if warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % warn
             return shown
+        shown = self.apply_typed_key(key, val)   # the typed-row fallback: the row's words, conv, choices, bounds, check
+        if shown is not None:
+            return str(shown)
+        raise ValueError(T('wire.unknown_setting_bare') % key)
+
     def _get(self, key):
         h = self.httpd.RequestHandlerClass
         handled, value = self.get_family_key(key)   # the family's shared knobs (the control plane,

@@ -12,6 +12,7 @@ format is gone (the breaking wave in docs/TODO.md).
 """
 import logging
 import os
+import re
 
 from .options import DEFAULT_OPS_VERBS, OPTIONS
 from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
@@ -21,6 +22,21 @@ from common.settings.config import check_control_tokens, check_token_chars, load
 from .statics import CONTROL_SOCKET_TEMPLATE, DEFAULTS, DEFAULT_LISTEN, DEFAULT_CONTROL_SOCKET, DEFAULT_LISTEN_PORT, LOG_LEVELS
 
 logger = logging.getLogger('dashboard')
+
+# the registry rows by knob name — the resolver's row-driven validation
+# (row_value: the words, the conv, the choices, the min/max bounds)
+OPT = {o.name: o for o in OPTIONS}
+
+
+def prom_url(text):
+    """The proxy target's shape: a http(s) URL with a host (the dashboard
+    proxies every metric read to it — a typo'd scheme surfaces only as a
+    request-time 502 otherwise)."""
+    from urllib.parse import urlparse
+    u = urlparse(str(text).strip())
+    if u.scheme not in ('http', 'https') or not u.netloc:
+        raise ValueError('must be an http:// or https:// URL with a host')
+    return text
 
 
 def load_config(path):
@@ -50,12 +66,16 @@ def resolve_config(args, script_dir=None):
                         next_to_script(script_dir, 'config.js'), str)
     config_js = os.path.realpath(config_js if os.path.isabs(config_js)
                                  else os.path.join(script_dir or '.', config_js))
-    prom_prefix = resolve(args.prom_prefix, 'PROM_PREFIX', 'prom_prefix',
-                          DEFAULTS['prom_prefix'], str).rstrip('/')
+    prom_prefix = (resolve(args.prom_prefix, 'PROM_PREFIX', 'prom_prefix',
+                           DEFAULTS['prom_prefix'], str, row=OPT['prom-prefix'])
+                   or DEFAULTS['prom_prefix']).rstrip('/')
+    if prom_prefix and not re.match(r'^/[A-Za-z0-9_./-]*$', prom_prefix):
+        raise SystemExit("invalid prom_prefix = %r: must be a URL path ('/' + letters/digits/underscore/dot/dash, "
+                         "or '' to proxy everything)" % prom_prefix)
 
     cfg = {
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULT_LISTEN, str),
-        'upstream': resolve(args.upstream, 'PROM_URL', 'upstream', DEFAULTS['upstream'], str),
+        'upstream': resolve(args.upstream, 'PROM_URL', 'upstream', DEFAULTS['upstream'], prom_url),
         'prom_prefix': prom_prefix,
         'static_dir': static_dir,
         'config_js': config_js,
@@ -65,11 +85,13 @@ def resolve_config(args, script_dir=None):
         'local_time': resolve(getattr(args, 'local_time', None), 'LOCAL_TIME',
                               'local_time', DEFAULTS['local_time'], str_to_bool),
         'max_clients': resolve(getattr(args, 'max_clients', None), 'MAX_CLIENTS',
-                               'max_clients', DEFAULTS['max_clients'], int),
+                               'max_clients', DEFAULTS['max_clients'], int, row=OPT['max-clients']),
         'client_timeout': resolve(getattr(args, 'client_timeout', None), 'CLIENT_TIMEOUT',
-                                  'client_timeout', DEFAULTS['client_timeout'], float),
+                                  'client_timeout', DEFAULTS['client_timeout'], float,
+                                  row=OPT['client-timeout']),
         'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MAX_CONN_PER_IP',
-                                   'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
+                                   'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int,
+                                   row=OPT['max-conn-per-ip']),
         'level': resolve(args.log_level, 'LOG_LEVEL', 'log_level', DEFAULTS['log_level'], str).strip().upper(),
     }
     cfg['control_port'] = resolve(getattr(args, 'control_port', None), 'CTL',
@@ -80,9 +102,9 @@ def resolve_config(args, script_dir=None):
     cfg['audit_forward_format'] = resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
                                           'audit_forward_format', DEFAULTS['audit_forward_format'], str)
     cfg['audit_max_mb'] = resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
-                                  'audit_max_mb', DEFAULTS['audit_max_mb'], float)
+                                  'audit_max_mb', DEFAULTS['audit_max_mb'], float, row=OPT['audit-max-mb'])
     cfg['audit_files'] = resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
-                                 'audit_files', DEFAULTS['audit_files'], int)
+                                 'audit_files', DEFAULTS['audit_files'], int, row=OPT['audit-files'])
     cfg['audit_daily'] = resolve(getattr(args, 'audit_daily', False) or None,
                                  'AUDIT_DAILY', 'audit_daily', DEFAULTS['audit_daily'], str_to_bool)
     cfg['no_audit_log'] = resolve(getattr(args, 'no_audit_log', False) or None,
@@ -129,18 +151,21 @@ def resolve_config(args, script_dir=None):
                                               'auth_token', None, str) or '').strip() or None, 'auth/token')
     check_token_chars(cfg['auth_token'], 'auth_token')
     cfg['metrics_max_clients'] = resolve(getattr(args, 'metrics_max_clients', None), 'METRICS_MAX_CLIENTS',
-                                         'metrics_max_clients', DEFAULTS['metrics_max_clients'], int)
+                                         'metrics_max_clients', DEFAULTS['metrics_max_clients'], int,
+                                         row=OPT['metrics-max-clients'])
     cfg['metrics_client_timeout'] = resolve(getattr(args, 'metrics_client_timeout', None),
                                             'METRICS_CLIENT_TIMEOUT', 'metrics_client_timeout',
-                                            DEFAULTS['metrics_client_timeout'], float)
+                                            DEFAULTS['metrics_client_timeout'], float,
+                                            row=OPT['metrics-client-timeout'])
     cfg['metrics_max_conn_per_ip'] = resolve(getattr(args, 'metrics_max_conn_per_ip', None),
                                              'METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
-                                             DEFAULTS['metrics_max_conn_per_ip'], int)
+                                             DEFAULTS['metrics_max_conn_per_ip'], int,
+                                             row=OPT['metrics-max-conn-per-ip'])
     cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', DEFAULTS['dump_path'], str)
     cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
                                             None, str) or '').strip() or None, 'dump/key')
     cfg['dump_interval'] = resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
-                                   'dump_interval', DEFAULTS['dump_interval'], float)
+                                   'dump_interval', DEFAULTS['dump_interval'], float, row=OPT['dump-interval'])
     cfg['restore_on_start'] = resolve(getattr(args, 'restore_on_start', False) or None, 'RESTORE_ON_START',
                                       'restore_on_start', DEFAULTS['restore_on_start'], str_to_bool)
     if cfg['dump_interval'] < 0:

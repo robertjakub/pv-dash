@@ -22,7 +22,7 @@ import time
 
 from common.settings import dump as state
 from common.runtime.audit import AuditLog, AUDIT_FORWARD_FORMATS, AUDIT_FORWARD_GRAMMAR, parse_forward, \
-    validate_instance, audit_quote
+    validate_instance, audit_quote, audit_escape
 from common.runtime.logutil import UtcFormatter
 from common.wire.cred import peer_uid, parse_trust_uids
 from common.settings.config import parse_control_target
@@ -329,7 +329,8 @@ class ControlServer:
                         self.audit.event('AUTH-FAIL', 'peer=%s' % audit_quote(who))
                 elif self.audit and cmd.lower() != 'ping':
                     self.audit.event('COMMAND', "peer=%s%s cmd='%s'%s result=%s%s"
-                                     % (audit_quote(who), role_tag(role), cmd, proof_tag(obj), reply.split(' ', 1)[0],
+                                     % (audit_quote(who), role_tag(role), audit_escape(cmd), proof_tag(obj),
+                                        reply.split(' ', 1)[0],
                                         (' reason=%s' % reason) if reason else ''))
                 self.log_exchange(who, cmd, reply, proof_tag(obj))
                 if obj is not None:

@@ -144,7 +144,10 @@ the intended demo feature, gated by control-server access only.
   override when spelled; the clients spell their target's port), and every
   word after `hash=` is the event's detail — `key=value` pairs, no wrapper
   word (a value carrying a space wears single quotes around the WHOLE value —
-  `cmd='set pv 3000'`, `peer='unix socket'`; the builders' `audit_quote`; a
+  `cmd='set pv 3000'`, `peer='unix socket'`; the builders' `audit_quote`; inside
+  the quotes `\`, `'` and `"` ride backslash-escaped — `it\'s`, the builders'
+  `audit_escape`, one un-escape rule for the parsers; a bare (unquoted) value
+  carries no escapes; a
   free-text phrase rides as the quoted VALUE of a named key — `reason=`,
   `error=`, `warn=` — there is no generic prose slot), the
   command's `result=ok|err|bye|local|aborted` and — when the exchange was

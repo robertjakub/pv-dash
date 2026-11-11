@@ -111,14 +111,27 @@ EMPTY_VALUE_RE = re.compile(r"[^\s=]+=(\"\"|'')")
 RESERVED_KEYS = ('application', 'tag', 'instance', 'type', 'hash')
 
 
+def audit_escape(value):
+    """One audit detail VALUE's escapes (logfmt-style, applied INSIDE the
+    quotes): `\\` -> `\\\\`, `'` -> `\\'`, `\"` -> `\\"` — both quotes ride
+    escaped regardless of the wrapping one, one un-escape rule for the
+    parsers. A bare (unquoted) value carries no escapes — a quote there is
+    harmless, the word ends at the next space."""
+    return str(value).replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"')
+
+
 def audit_quote(value):
     """One audit detail VALUE: verbatim when it rides one token, wrapped in
     single quotes when it carries a space — the KV word is space-delimited,
     so a spanning value must ride one quoted token (peer='unix socket').
-    The builders wrap every free-text value (the wire's peer=, the
-    user-spelled paths) so the line's words stay parseable."""
+    The quoted form is audit_escape'd (an embedded quote or backslash rides
+    `\\'`/`\\\\`). The builders wrap every free-text value (the wire's
+    peer=, the user-spelled paths) so the line's words stay parseable; the
+    always-quoted builders (cmd=) spell `cmd='%s' % audit_escape(cmd)`."""
     value = str(value)
-    return "'%s'" % value if ' ' in value else value
+    if ' ' not in value:
+        return value
+    return "'%s'" % audit_escape(value)
 # The envelope severity table: a line ending '-> ok' (and the verdict-less
 # START/SHUTDOWN events) ride 4; '-> err' (a refused/failed command) rides 7.
 FORWARD_SEV_OK = 4
@@ -666,7 +679,7 @@ class AuditLog:
 
     def command(self, cmd, result):
         """A command the user entered and its outcome (ok/err/bye/local/aborted)."""
-        self.event('COMMAND', "cmd='%s' result=%s" % (cmd, result))
+        self.event('COMMAND', "cmd='%s' result=%s" % (audit_escape(cmd), result))
 
     def close(self):
         with self._lock:

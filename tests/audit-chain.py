@@ -29,7 +29,7 @@ PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V = os.path.join(REPO, 'scripts', 'audit_verify.py')
 sys.path.insert(0, REPO)
-from common.runtime.audit import AuditLog, entry_hash, GENESIS, audit_quote   # noqa: E402
+from common.runtime.audit import AuditLog, entry_hash, GENESIS, audit_quote, audit_escape   # noqa: E402
 
 FAILURES = []
 
@@ -97,6 +97,15 @@ def main():
         first = open(log).read().splitlines()[-1]
         check("a space value rides quoted (peer='unix socket')",
               "peer='unix socket' cmd='show version' result=ok" in first, first)
+
+        # 1c2. the escape rule (logfmt-style): inside the quotes a `\`, ' or
+        # " rides backslash-escaped; a bare value carries no escapes
+        a2.event('COMMAND', "cmd='%s' result=ok" % audit_escape("set note it's \"fine\" \\ ok"))
+        first = open(log).read().splitlines()[-1]
+        check('an embedded quote/backslash rides escaped inside the quotes',
+              "cmd='set note it\\'s \\\"fine\\\" \\\\ ok' result=ok" in first, first)
+        check('a bare value carries no escapes', audit_quote("don't.sock") == "don't.sock",
+              audit_quote("don't.sock"))
 
         # 1d. the reserved outer keys: a detail word spelling one never lands
         a2.event('COMMAND', "cmd='show version' type=forged tag=forged application=forged result=ok")

@@ -50,7 +50,10 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   `target='unix:…'`, the user-spelled `control=`/`listen=`/`profile=`
   paths), and an explicitly-quoted empty value (`key=''`) reads the same as
   the bare `key=` token — dropped at the writer (an absent pair, not an
-  empty one; a bare `=` stays). The trailing empty `message=` lines in old
+  empty one; a bare `=` stays). Inside the quoted values a `\`, `'` and `"`
+  ride backslash-escaped (logfmt-style — `audit_escape`; `cmd='set note
+  it\'s fine'` can no longer break the quoting), a bare (unquoted) value
+  carries no escapes. The trailing empty `message=` lines in old
   rotated backups predate the writer's guard and stay as written.
 - **the audit line's `tools=` word renames to
   `application=` and every line gains an `instance=<id>` word** naming the

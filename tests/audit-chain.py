@@ -62,8 +62,8 @@ def main():
         log = os.path.join(tmp, 'audit.log')
 
         # 1. two interleaved prefixes: every chain holds
-        a = AuditLog(log, 'CACHE')
-        c = AuditLog(log, 'CLI')
+        a = AuditLog(log, 'CACHE', instance='1')
+        c = AuditLog(log, 'CLI', instance='1')
         a.event('START', 'version=test')
         c.event('CONNECT', 'target=127.0.0.1:1')
         a.event('COMMAND', "cmd='show version' result=ok")
@@ -71,20 +71,30 @@ def main():
         a.event('REQUESTS', 'clients=1 reads=3 writes=0')
         ok, out = verify(log, contain=['OK'])
         check('interleaved writers verify', ok, out)
-        # the layout: the hash sits right after the event name, no decoration
+        # the layout: the instance rides tag=, the hash its hash= token, the detail its message=
         first = open(log).read().splitlines()[0].split(' ')
-        check('layout: the hash rides its hash= token, the detail its message=', len(first) >= 7 and first[1] == 'AUDIT'
-              and first[2] == 'tools=CACHE' and first[3] == 'tag=daemon'
-              and first[5].startswith('hash=') and len(first[5]) == 17
-              and all(ch in '0123456789abcdef' for ch in first[5][5:])
-              and first[6] == 'message=version=test', ' '.join(first[:7]))
+        check('layout: the instance word, the hash token, the message detail', len(first) >= 8 and first[1] == 'AUDIT'
+              and first[2] == 'application=CACHE' and first[3] == 'tag=daemon' and first[4] == 'instance=1'
+              and first[6].startswith('hash=') and len(first[6]) == 17
+              and all(ch in '0123456789abcdef' for ch in first[6][5:])
+              and first[7] == 'message=version=test', ' '.join(first[:8]))
+
+        # 1b. the detail's empty-value rule: a `key=` token with no value is
+        # dropped at the writer; a bare `=` and a quoted empty stay
+        a2 = AuditLog(log, 'CACHE', instance='1')
+        a2.event('COMMAND', "peer=1.2.3.4 reason= uptime=9s register 47415 = 5 x='' result=")
+        first = open(log).read().splitlines()[-1]
+        check('the detail drops an empty-valued word, keeps the bare = and the quoted empty',
+              'message=peer=1.2.3.4 uptime=9s register 47415 = 5' in first
+              and "x=''" in first and 'reason=' not in first.replace('message=', '')
+              and not first.rstrip().endswith('result='), first)
 
         # 2. an edited line breaks the chain at that line
         lines = open(log).read().splitlines()
         lines[2] = lines[2].replace("'show version'", "'show secrets'")
         open(log, 'w').write('\n'.join(lines) + '\n')
-        ok, out = verify(log, rc=1, contain=['line 3 [CACHE:daemon]: hash mismatch'])
-        check('edited line detected (right line, right prefix)', ok, out)
+        ok, out = verify(log, rc=1, contain=['line 3 [CACHE:daemon:1]: hash mismatch'])
+        check('edited line detected (right line, right chain key)', ok, out)
 
         # 3. a deleted line breaks the chain
         lines = open(log).read().splitlines()
@@ -100,28 +110,53 @@ def main():
         ok, out = verify(log, rc=1)
         check('reordered lines detected', ok, out)
 
-        # 5. the pre-KV lines: the validator speaks the current grammar only
+        # 5. the pre-KV and pre-rename lines: the validator speaks the
+        # current grammar only
         open(log, 'w').write(
             '2026-01-01T00:00:00Z AUDIT CACHE START version=old\n'
-            '2026-01-01T00:00:01Z AUDIT CACHE COMMAND \'x\' -> ok\n')
-        ok, out = verify(log, rc=1, contain=['2 broken', 'malformed'])
-        check('pre-KV lines read malformed (the current grammar only)', ok, out)
+            '2026-01-01T00:00:01Z AUDIT CACHE COMMAND \'x\' -> ok\n'
+            '2026-01-01T00:00:02Z AUDIT tools=CACHE tag=daemon type=command hash=0123456789abcdef\n')
+        ok, out = verify(log, rc=1, contain=['3 broken', 'malformed'])
+        check('pre-KV and pre-rename lines read malformed (the current grammar only)', ok, out)
 
         # 6. a restarted writer chains from its own trail (no false break)
         open(log, 'w').write('')
-        a = AuditLog(log, 'CACHE')
+        a = AuditLog(log, 'CACHE', instance='1')
         a.event('START', 'v1')
         a.event('SHUTDOWN', 'clean')
-        b = AuditLog(log, 'CACHE')          # the "restart": a fresh instance, same prefix
+        b = AuditLog(log, 'CACHE', instance='1')   # the "restart": a fresh writer, same key
         b.event('START', 'v2')
         ok, out = verify(log, contain=['OK'])
         check('restarted writer chains seamlessly', ok, out)
+
+        # 6b. the instance word: two daemons of one tool share one file,
+        # their chains verify independently (the triple key); an edit breaks
+        # only its own group; an empty/None instance refuses
+        open(log, 'w').write('')
+        one = AuditLog(log, 'CACHE', instance='15020')
+        two = AuditLog(log, 'CACHE', instance='15021')
+        one.event('START', 'v1')
+        two.event('START', 'v1')
+        one.event('COMMAND', "cmd='a' result=ok")
+        two.event('COMMAND', "cmd='b' result=ok")
+        ok, out = verify(log, contain=['OK'])
+        check('two instances of one tool verify independently', ok, out)
+        lines = open(log).read().splitlines()
+        lines[2] = lines[2].replace("'a'", "'X'")
+        open(log, 'w').write('\n'.join(lines) + '\n')
+        ok, out = verify(log, rc=1, contain=['CACHE:daemon:15020'])
+        check('the break names the instance chain (the triple key)', ok, out)
+        try:
+            AuditLog(log, 'CACHE', instance=None)
+            check('the instance word is required', False, 'no ValueError')
+        except ValueError as e:
+            check('the instance word is required', 'audit-instance must be 1-64' in str(e), str(e))
 
         if PROFILE == 'quick':
             raise QuickDone()   # quick: the core sections only
         # 7. rotation: the chain spans the backups (verified oldest-first)
         open(log, 'w').write('')
-        a = AuditLog(log, 'CACHE', max_mb=0.000001, files=3)   # ~every event rotates
+        a = AuditLog(log, 'CACHE', max_mb=0.000001, files=3, instance='1')   # ~every event rotates
         for i in range(6):
             a.event('COMMAND', 'batch-%d -> ok' % i)
         a.close()
@@ -167,7 +202,7 @@ def main():
         saved_sockets = audit_mod.SYSLOG_SOCKETS
         audit_mod.SYSLOG_SOCKETS = (ssock_path,)
         try:
-            fwd = AuditLog(log, 'CACHE', app='modbus-cache', forward='syslog')
+            fwd = AuditLog(log, 'CACHE', app='modbus-cache', forward='syslog', instance='1')
             fwd.event('COMMAND', "'show version' -> ok")
             data = ssock.recv(65536).decode('utf-8')
             import re
@@ -186,7 +221,7 @@ def main():
             esock = sockmod.socket(sockmod.AF_UNIX, sockmod.SOCK_DGRAM)
             esock.bind(explicit_path)
             esock.settimeout(5)
-            fwd2 = AuditLog(log + '.x', 'CACHE', app='modbus-cache', forward='syslog:' + explicit_path)
+            fwd2 = AuditLog(log + '.x', 'CACHE', app='modbus-cache', forward='syslog:' + explicit_path, instance='1')
             fwd2.event('COMMAND', "'show version' -> ok")
             data = esock.recv(65536).decode('utf-8')
             mirrored = re.sub(r'^<\d+>', '', data).rstrip('\x00')
@@ -208,12 +243,12 @@ def main():
 
             audit_mod.SYSLOG_SOCKETS = ()
             try:
-                AuditLog(log, 'CACHE', forward='syslog')
+                AuditLog(log, 'CACHE', forward='syslog', instance='1')
                 check('a socket-less syslog spelling refuses', False, 'no ValueError')
             except ValueError as e:
                 check('a socket-less syslog spelling refuses', 'no local syslog socket' in str(e), str(e))
             try:
-                AuditLog(log, 'CACHE', forward='udp')
+                AuditLog(log, 'CACHE', forward='udp', instance='1')
                 check('a foreign forward spelling refuses', False, 'no ValueError')
             except ValueError as e:
                 check('a foreign forward spelling refuses', 'must be none, syslog' in str(e), str(e))
@@ -289,23 +324,23 @@ def main():
 
         def chain_of(frame):
             """The pieces of one remote frame: the native line's stamp, the
-            SD-ELEMENT's prefix + chain hash and the hashed body — the
+            SD-ELEMENT's application + chain hash and the hashed body — the
             envelope's extracted fields, exactly what a collector's
             chain-verifying search reads."""
             text = frame.decode('utf-8', 'replace')
             sd = text.split('[pvDash@1 ', 1)[1].split(']', 1)[0]
-            prefix = sd.split('prefix="')[1].split('"')[0]
+            app_tag = sd.split('application="')[1].split('"')[0]
             chain = sd.split('chain="')[1].split('"')[0]
             native = text.split('] ', 1)[1]
             parts = native.split(' ')
-            if parts[2].startswith('tools='):   # the KV line: the body carries tag= type= message=
-                return parts[0], prefix, chain, ' '.join(parts[3:5] + parts[6:])
-            return parts[0], prefix, chain, ' '.join(parts[3:4] + parts[5:])
+            if parts[2].startswith('application='):   # the KV line: the body carries tag= instance= type= message=
+                return parts[0], app_tag, chain, ' '.join(parts[3:6] + parts[7:])
+            return parts[0], app_tag, chain, ' '.join(parts[3:4] + parts[5:])
 
         col = TcpCollector()
         try:
             tlog = os.path.join(tmp, 'tcp.log')
-            w = AuditLog(tlog, 'CACHE', app='modbus-cache', forward='tcp://127.0.0.1:%d' % col.port)
+            w = AuditLog(tlog, 'CACHE', app='modbus-cache', forward='tcp://127.0.0.1:%d' % col.port, instance='1')
             w.event('COMMAND', "'show version' -> ok")
             deadline = time.time() + 10
             while not col.frames and time.time() < deadline:
@@ -314,14 +349,14 @@ def main():
             stamp, prefix, chain, body = chain_of(col.frames[0])
             last = open(tlog).read().rstrip().splitlines()[-1]
             ok = (frame.startswith('<28>1 ') and frame.split(' ')[5] == 'command'
-                  and '[pvDash@1 prefix="CACHE" role="daemon" chain="' in frame
+                  and '[pvDash@1 application="CACHE" role="daemon" instance="1" chain="' in frame
                   and frame.split('] ', 1)[1] == last
                   and chain == entry_hash(GENESIS, stamp, prefix, body))
             check('the tcp:// mirror: RFC6587 framing + the RFC5424 envelope + the chain in the SD', ok, frame[:160])
 
             # 9d. CEF: the additive wrapping, msg= verbatim, the severity table
             w2 = AuditLog(tlog + '.cef', 'CACHE', app='modbus-cache',
-                          forward='tcp://127.0.0.1:%d' % col.port, forward_format='cef')
+                          forward='tcp://127.0.0.1:%d' % col.port, forward_format='cef', instance='1')
             w2.event('COMMAND', "'show version' -> ok")
             w2.event('COMMAND', "cmd='set x\\\\1=y' result=err")
             deadline = time.time() + 10
@@ -333,7 +368,8 @@ def main():
             for fr in col.frames[1:]:
                 cef = fr.decode('utf-8', 'replace')
                 if 'CEF:0|pv-dash|modbus-cache|' in cef and '|command|command|4| rt=' in cef \
-                        and ' cs1Label=AuditChain cs1=' in cef and ' cs2Label=AuditPrefix cs2=CACHE msg=' in cef \
+                        and ' cs1Label=AuditChain cs1=' in cef \
+                        and ' cs2Label=AuditApplication cs2=CACHE cs3Label=AuditInstance cs3=1 msg=' in cef \
                         and cef.split('msg=', 1)[1] == esc:
                     okc = True
                 if '|command|command|7|' in cef and 'msg=' in cef and r'\\\\1\=y' in cef.split('msg=', 1)[1]:
@@ -346,12 +382,12 @@ def main():
             usock.bind(('127.0.0.1', 0))
             uport = usock.getsockname()[1]
             usock.settimeout(10)
-            w3 = AuditLog(tlog + '.udp', 'CACHE', app='modbus-cache', forward='udp://127.0.0.1:%d' % uport)
+            w3 = AuditLog(tlog + '.udp', 'CACHE', app='modbus-cache', forward='udp://127.0.0.1:%d' % uport, instance='1')
             w3.event('COMMAND', "'show version' -> ok")
             uframe = usock.recv(65536).decode()
             usock.close()
             check('the udp:// mirror: one datagram, the RFC5424 envelope',
-                  uframe.startswith('<28>1 ') and '[pvDash@1 prefix="CACHE" role="daemon" chain="' in uframe, uframe[:120])
+                  uframe.startswith('<28>1 ') and '[pvDash@1 application="CACHE" role="daemon" instance="1" chain="' in uframe, uframe[:120])
         finally:
             col.down()
 
@@ -361,7 +397,7 @@ def main():
         col2 = TcpCollector()
         try:
             rlog = os.path.join(tmp, 'rearm.log')
-            wr = AuditLog(rlog, 'CACHE', app='modbus-cache', forward='tcp://127.0.0.1:%d' % col2.port)
+            wr = AuditLog(rlog, 'CACHE', app='modbus-cache', forward='tcp://127.0.0.1:%d' % col2.port, instance='1')
             with redirect_stderr(err):
                 wr.event('COMMAND', 'one -> ok')
                 col2.down()
@@ -390,7 +426,7 @@ def main():
             never = os.path.join(tmp, 'never', 'audit.log')
             rlog2 = os.path.join(tmp, 'remote.log')
             with redirect_stderr(io.StringIO()) as rerr:
-                wr2 = AuditLog('none', 'INV', app='fake-inverter', forward='tcp://127.0.0.1:%d' % col3.port)
+                wr2 = AuditLog('none', 'INV', app='fake-inverter', forward='tcp://127.0.0.1:%d' % col3.port, instance='1')
             wr2.event('START', 'version=test')
             wr2.event('COMMAND', 'x -> ok')
             deadline = time.time() + 10
@@ -402,7 +438,7 @@ def main():
                   not os.path.exists(never) and wr2.path == 'none'
                   and h1 == entry_hash(GENESIS, s1, p1, b1) and h2 == entry_hash(h1, s2, p2, b2),
                   b''.join(col3.frames).decode('utf-8', 'replace'))
-            wr3 = AuditLog('none', 'INV', app='fake-inverter', forward='tcp://127.0.0.1:%d' % col3.port)
+            wr3 = AuditLog('none', 'INV', app='fake-inverter', forward='tcp://127.0.0.1:%d' % col3.port, instance='1')
             wr3.event('START', 'version=test2')   # the "restart": the fresh writer reseeds
             deadline = time.time() + 10
             while len(col3.frames) < 3 and time.time() < deadline:
@@ -413,7 +449,7 @@ def main():
             # 9h. the full-off fold: none without a forward = --no-audit-log's state
             err2 = io.StringIO()
             with redirect_stderr(err2):
-                wr4 = AuditLog('none', 'CACHE', app='modbus-cache')
+                wr4 = AuditLog('none', 'CACHE', app='modbus-cache', instance='1')
             wr4.event('COMMAND', 'x -> ok')
             check('none without a forward folds to the audit disabled (the warn line)',
                   wr4.disabled and not os.path.exists(os.path.join(tmp, 'none'))
@@ -443,13 +479,17 @@ def main():
                     proc.kill()
             deadline = time.time() + 10
             while time.time() < deadline and not any(
-                    (b'tools=INV tag=daemon type=start' in fr and b'version=' in fr) and b'tools=INV tag=daemon type=command' in b''.join(col3.frames)
+                    (b'application=INV tag=daemon instance=15988 type=start' in fr and b'version=' in fr)
+                    and b'application=INV tag=daemon instance=15988 type=command' in b''.join(col3.frames)
                     for fr in col3.frames):
                 time.sleep(0.1)
-            events = [tuple(chain_of(fr)[1:3]) + (chain_of(fr)[3].split(' ')[1],) for fr in col3.frames]
-            check('the fake, remote-only: the INV trail arrives at the collector, no local state',
-                  any(e[0] == 'INV' and e[2] == 'type=start' for e in events)
-                  and any(e[0] == 'INV' and e[2] == 'type=command' for e in events)
+            events = []
+            for fr in col3.frames:
+                body_words = chain_of(fr)[3].split(' ')
+                events.append(tuple(chain_of(fr)[1:3]) + (body_words[1], body_words[2]))
+            check('the fake, remote-only: the INV trail arrives at the collector (the instance is its control port), no local state',
+                  any(e[0] == 'INV' and e[3] == 'type=start' for e in events)
+                  and any(e[0] == 'INV' and e[2] == 'instance=15988' and e[3] == 'type=command' for e in events)
                   and not os.path.exists(os.path.join(xdg, 'fake-inverter')))
         finally:
             col3.down()
@@ -473,6 +513,11 @@ def main():
                            capture_output=True, text=True, timeout=15)
         check('a bad format refuses (rc 1, no traceback)',
               r.returncode == 1 and 'audit-forward-format must be one of rfc5424, cef' in r.stderr
+              and 'Traceback' not in r.stderr, r.stderr)
+        r = subprocess.run([sys.executable, fake, '--static', '--dry-run', '--audit-instance', 'bad word'],
+                           capture_output=True, text=True, timeout=15)
+        check('a bad --audit-instance refuses (rc 1, no traceback)',
+              r.returncode == 1 and 'audit-instance must be 1-64 characters' in r.stderr
               and 'Traceback' not in r.stderr, r.stderr)
         r = subprocess.run([sys.executable, fake, '--static', '--dry-run', '--audit-log', 'none'],
                            env=dict(os.environ, XDG_STATE_HOME=os.path.join(tmp, 'xdg')),

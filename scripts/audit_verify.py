@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Verify the audit trails' hash chains (docs/SECURITY.md F10): every entry
 carries a short chained hash in its hash= token —
-`<stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<hash>
-[message=<detail>]` — chained to the writer's previous entry: h =
-sha256(prev | stamp | tools | tag + type + message), 12 hex chars, chained
-per (tools, writer) pair so interleaved writers verify independently. The
+`<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type>
+hash=<hash> [message=<detail>]` — chained to the writer's previous entry:
+h = sha256(prev | stamp | tools | tag + instance + type + message), 12 hex
+chars, chained per (application, writer, instance) triple so interleaved
+writers — and several instances of one tool — verify independently. The
 validator speaks the current grammar only: a pre-KV line reads malformed.
 
   python3 scripts/audit_verify.py [FILE|- ...]      # default: the family's XDG trails
@@ -31,15 +32,16 @@ DEFAULT_TRAILS = ('modbus-cache', 'modbus-scraper', 'fake-inverter')
 
 
 def split_line(line):
-    """'<stamp> AUDIT tools=<TAG> tag=<writer> ...' -> (stamp, key, tools) —
-    the key names the writer's chain (the tool's tag + its role) and tools is
-    the hash material's tag word. None (malformed) is the rest's business
-    (the shared parsers)."""
+    """'<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> ...' ->
+    (stamp, key, tools) — the key names the writer's chain (the tool's tag +
+    its role + its instance) and tools is the hash material's tag word. None
+    (malformed) is the rest's business (the shared parsers)."""
     parts = line.split(' ')
-    if len(parts) < 6 or parts[1] != 'AUDIT' or not parts[2].startswith('tools='):
+    if len(parts) < 7 or parts[1] != 'AUDIT' or not parts[2].startswith('application=') \
+            or not parts[4].startswith('instance='):
         return None
-    tools = parts[2][6:]
-    return parts[0], '%s:%s' % (tools, parts[3][4:]), tools
+    tools = parts[2][12:]
+    return parts[0], '%s:%s:%s' % (tools, parts[3][4:], parts[4][9:]), tools
 
 
 def verify_stream(name, lines, quiet):

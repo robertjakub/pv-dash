@@ -950,7 +950,8 @@ try:
                     'show', 'pv'], capture_output=True, text=True)
     rows = open(AUD).read().strip().split('\n')
     check('audit: ctl logs CONNECT/DISCONNECT; the commands belong to the server trail',
-          len(rows) == 2 and rows[0].split(' ')[1] == 'AUDIT' and rows[0].split(' ')[2] == 'tools=INV'
+          len(rows) == 2 and rows[0].split(' ')[1] == 'AUDIT' and rows[0].split(' ')[2] == 'application=INV'
+          and rows[0].split(' ')[4] == 'instance=15571'
           and 'tag=cli' in rows[0] and 'type=connect' in rows[0]
           and 'type=disconnect' in rows[1], '\n'.join(rows))
     AUD2 = '/tmp/scr_audit_cli.log'
@@ -959,9 +960,9 @@ try:
     r = cli('show version\nping\nquit\n', audit=AUD2)
     cli_rows = open(AUD2).read()
     check('audit: cli logs the session + the local commands; the wire commands = the server trail',
-          'tools=INV tag=cli type=connect' in cli_rows and 'target=' in cli_rows
-          and 'tools=INV tag=cli type=command' in cli_rows and "cmd='quit' result=local" in cli_rows
-          and 'tools=INV tag=cli type=disconnect' in cli_rows and "message='show" not in cli_rows
+          'application=INV tag=cli instance=15571 type=connect' in cli_rows and 'target=' in cli_rows
+          and 'application=INV tag=cli' in cli_rows and 'type=command' in cli_rows and "cmd='quit' result=local" in cli_rows
+          and 'type=disconnect' in cli_rows and "message='show" not in cli_rows
           and 'ping' not in cli_rows and 'pong' not in cli_rows, cli_rows)
     r = cli('inspect\nquit\n')
     rows = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
@@ -1049,7 +1050,8 @@ try:
     time.sleep(1)
     inv_rows = open(AUDD).read()
     check('audit: INV logs START, COMMAND (peer), RELOAD, RESET, SHUTDOWN; ping skipped',
-          'tools=INV tag=daemon type=start' in inv_rows and 'version=' in inv_rows and "tools=INV tag=daemon type=command" in inv_rows
+          'application=INV tag=daemon' in inv_rows and 'instance=' in inv_rows and 'type=start' in inv_rows
+          and 'version=' in inv_rows and 'type=command' in inv_rows
           and 'peer=127.0.0.1' in inv_rows
           and "cmd='set soc 55' result=ok" in inv_rows and 'type=reload' in inv_rows
           and 'type=reset' in inv_rows and 'SIGUSR1' in inv_rows and 'type=shutdown' in inv_rows
@@ -2079,7 +2081,7 @@ try:
     check('scraper control: inspect', r.startswith('ok inspect\n') and 'version   modbus-scraper' in r, r[:120])
     aud = open('/tmp/scr_regtest_audit.log').read()
     check('scraper control: the SCR audit trail with the wire mac',
-          'tools=SCR tag=daemon type=command' in aud and "cmd='set interval 5' wire=h" in aud
+          'application=SCR tag=daemon' in aud and 'type=command' in aud and "cmd='set interval 5' wire=h" in aud
           and 'result=ok' in aud, aud[-200:])
 
     # 6c. the read-only ops token: show allowed, everything that steers the

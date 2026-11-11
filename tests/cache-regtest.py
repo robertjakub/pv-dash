@@ -243,8 +243,8 @@ try:
     check('fc16 readback', struct.unpack('>2H', b[2:6]) == (2, 6000))
     audit_txt = open('/tmp/reg_audit.log').read()
     check('audit: START + forwarded writes land in the trail',
-          'tools=CACHE tag=daemon type=start' in audit_txt and 'tools=CACHE tag=daemon type=write' in audit_txt
-          and 'register 47415 = 5' in audit_txt, audit_txt[-200:])
+          'application=CACHE tag=daemon instance=' in audit_txt and 'type=start' in audit_txt
+          and 'type=write' in audit_txt and 'register 47415 = 5' in audit_txt, audit_txt[-200:])
 
     # write-through invalidation: the written range serves the NEW value immediately
     b = rd(47415, 1)
@@ -535,7 +535,8 @@ try:
           r.get('status') == 'fail' and 'mac does not verify' in r.get('text', ''), str(r))
     tok_audit = open('/tmp/reg_audit_ctl.log').read()
     check('audit: AUTH-FAIL + COMMAND events with the peer and the wire mac',
-          'type=auth-fail' in tok_audit and 'tools=CACHE tag=daemon type=command' in tok_audit
+          'type=auth-fail' in tok_audit and 'application=CACHE tag=daemon instance=' in tok_audit
+          and 'type=command' in tok_audit
           and 'peer=127.0.0.1:' in tok_audit and "'show version' wire=h" in tok_audit
           and 'result=ok' in tok_audit, tok_audit[-240:])
 
@@ -1469,6 +1470,7 @@ try:
         '    disable        disable the audit trail entirely',
         '    forward        also forward every audit line: the local syslog mirror or a remote collector (the off-box copy)',
         '    forward-format the remote forward\'s envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send',
+        '    instance       the audit lines\' instance word: the writer daemon\'s identity — the control port when unset, the override when spelled',
         '    log-file       the audit trail\'s file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home',
         '    requests       audit one REQUESTS tally per client per this many seconds',
         '    rotate         the audit trail\'s rotation: the size trigger, the UTC-midnight trigger and the backup count'])
@@ -1504,7 +1506,8 @@ try:
     r = ctl_cmd('set audit-log %s' % live_audit, 15530)
     check('audit log-file: the trail moves live', r.startswith('ok audit-log=%s' % live_audit), r[:120])
     ctl_cmd('show version', 15530 + BASE)
-    check('audit log-file: the new sink takes the commands', 'tools=CACHE tag=daemon type=command' in open(live_audit).read(),
+    check('audit log-file: the new sink takes the commands', 'application=CACHE tag=daemon' in open(live_audit).read()
+          and 'type=command' in open(live_audit).read(),
           open(live_audit).read()[-120:])
     r = ctl_cmd('set audit-daily on', 15530 + BASE)
     check('audit rotate: daily set', r.startswith('ok audit-daily=on'), r[:90])
@@ -1537,6 +1540,19 @@ try:
     r = ctl_cmd('set audit-forward bogus', 15530 + BASE)
     check('audit forward: a bad spelling refuses with the grammar one-liner',
           r.startswith('fail audit-forward must be none, syslog, syslog:/path'), r)
+    r = ctl_cmd('show audit-instance', 15530 + BASE)
+    check('audit instance: the derived control port renders',
+          r == 'ok audit-instance=%d' % (15530 + BASE), r)
+    r = ctl_cmd('set audit-instance cache-a', 15530 + BASE)
+    check('audit instance: the override takes', r.startswith('ok audit-instance=cache-a'), r)
+    r = ctl_cmd('show audit-instance', 15530 + BASE)
+    check('audit instance: the override renders', r == 'ok audit-instance=cache-a', r)
+    r = ctl_cmd('set audit-instance bad word', 15530 + BASE)
+    check('audit instance: a spaced word refuses with the grammar one-liner',
+          r.startswith('fail audit-instance must be 1-64 characters'), r)
+    r = ctl_cmd('set audit-instance none', 15530 + BASE)
+    check('audit instance: none returns to the derived port',
+          r.startswith('ok audit-instance=%d' % (15530 + BASE)), r)
     r = ctl_cmd('set audit-log none', 15530 + BASE)
     check('audit log-file: none with a forward spells the remote-only mode',
           r.startswith('ok audit-log=remote'), r)
@@ -1794,7 +1810,7 @@ try:
           and 'write-registers 47400:100' in r and 'fc4' in r, repr(r[:160]))
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     check('audit: WRITE + WRITE-REFUSED (allow-list) events',
-          'tools=CACHE tag=daemon type=write' in fc4_audit and 'type=write-refused' in fc4_audit
+          'application=CACHE tag=daemon' in fc4_audit and 'type=write' in fc4_audit and 'type=write-refused' in fc4_audit
           and 'outside the write allow-list' in fc4_audit, fc4_audit[-160:])
 
     # SIGHUP reloads the allow-list from the config script
@@ -2344,7 +2360,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     time.sleep(0.5)
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     check('audit: per-client REQUESTS tallies (periodic + disconnect)',
-          'tools=CACHE tag=daemon type=requests' in fc4_audit and 'peer=127.0.0.1:' in fc4_audit
+          'application=CACHE tag=daemon' in fc4_audit and 'type=requests' in fc4_audit and 'peer=127.0.0.1:' in fc4_audit
           and '(last 1s:' in fc4_audit and 'connected=' in fc4_audit, fc4_audit[-160:])
 
     # the control token as a file: reference (the LoadCredential pattern);

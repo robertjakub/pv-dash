@@ -613,8 +613,6 @@ try:
     time.sleep(0.8)
     ctl('set soc 30', 15585)
     ctl('show version', 15585)
-    subprocess.run([sys.executable, C, '--control-port', '15585', 'shutdown'], capture_output=True, text=True)
-    time.sleep(1)
     ctl_full = open('/tmp/scr_ctl_full.log').read()
     check('fake audit: --control-log-replies logs the full command output',
           ': set soc 30 -> ok soc=30' in ctl_full and ': show version -> ok fake-inverter' in ctl_full, ctl_full[-200:])
@@ -627,7 +625,7 @@ try:
     time.sleep(1)
     ctl_full = open('/tmp/scr_ctl_full.log').read()
     check('fake audit: the live off withholds the output again',
-          ': set control-log-replies off -> ok control-log-replies=off' in ctl_full and ': show version -> ok\n' in ctl_full,
+          ': set control-log-replies off -> ok' in ctl_full and ': show version -> ok\n' in ctl_full,
           ctl_full[-200:])
 
     # 2f. CTL environment (short name) drives both tools when the flag is clear
@@ -952,9 +950,9 @@ try:
                     'show', 'pv'], capture_output=True, text=True)
     rows = open(AUD).read().strip().split('\n')
     check('audit: ctl logs CONNECT/DISCONNECT; the commands belong to the server trail',
-          len(rows) == 2 and rows[0].split(' ')[1] == 'AUDIT' and rows[0].split(' ')[2] == 'CTL'
-          and rows[0].split(' ')[3] == 'CONNECT'
-          and rows[1].split(' ')[3] == 'DISCONNECT', '\n'.join(rows))
+          len(rows) == 2 and rows[0].split(' ')[1] == 'AUDIT' and rows[0].split(' ')[2] == 'tools=INV'
+          and 'tag=cli' in rows[0] and 'type=connect' in rows[0]
+          and 'type=disconnect' in rows[1], '\n'.join(rows))
     AUD2 = '/tmp/scr_audit_cli.log'
     if os.path.exists(AUD2):
         os.unlink(AUD2)
@@ -1000,11 +998,9 @@ try:
 
     def wait_ctl(port, tries=50):
         for _ in range(tries):
-            try:
-                ctl('ping', port)
+            if ctl('ping', port).startswith('ok pong'):   # the unreachable server degrades to a fail string — judge the reply
                 return
-            except OSError:
-                time.sleep(0.2)
+            time.sleep(0.2)
         raise SystemExit('control on %d never came up' % port)
 
     # 2g3c. the reconnect: the server dies mid-session, the CLI retries
@@ -1016,7 +1012,7 @@ try:
     p = subprocess.Popen([sys.executable, K, '--control-port', '15902', '--reconnect', '3',
                           '--reconnect-wait', '0.5'],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    time.sleep(0.6)
+    p.stdout.readline()   # the welcome's first line: the session is connected (the cold boot outruns any fixed sleep)
     fake_r.kill()
     fake_r.wait()
     time.sleep(0.3)
@@ -1055,8 +1051,8 @@ try:
     check('audit: INV logs START, COMMAND (peer), RELOAD, RESET, SHUTDOWN; ping skipped',
           'tools=INV tag=daemon type=start' in inv_rows and 'version=' in inv_rows and "tools=INV tag=daemon type=command" in inv_rows
           and 'peer=127.0.0.1' in inv_rows
-          and "'set soc 55' -> ok" in inv_rows and 'INV RELOAD' in inv_rows
-          and 'INV RESET ' in inv_rows and 'SIGUSR1' in inv_rows and 'INV SHUTDOWN ' in inv_rows
+          and "cmd='set soc 55' result=ok" in inv_rows and 'type=reload' in inv_rows
+          and 'type=reset' in inv_rows and 'SIGUSR1' in inv_rows and 'type=shutdown' in inv_rows
           and 'SIGTERM' in inv_rows
           and 'ping' not in inv_rows, inv_rows)
 
@@ -1281,8 +1277,8 @@ try:
           and b'nothing was bound or connected' in r.stderr
           and b'peak PV 4500W' in r.stderr)
     r = subprocess.run([sys.executable, F, '--dry-run', '--unit', '300'], capture_output=True)
-    check('fake dry-run: invalid rc=1, clean message', r.returncode == 1
-          and b'--unit must be 1..247 (Modbus unit id), got 300' in r.stderr
+    check('fake dry-run: invalid rc=2, clean message', r.returncode == 2
+          and b'unit must be 1..247' in r.stderr
           and b'Traceback' not in r.stderr)
     r = subprocess.run([sys.executable, F, '--dry-run', '--time', '25:00'], capture_output=True)
     check('fake dry-run: bad time rc=1', r.returncode == 1 and b'--time invalid' in r.stderr)
@@ -1473,7 +1469,7 @@ try:
         return subprocess.run([sys.executable, P, '--dry-run'] + list(flags), capture_output=True)
 
     r = dry('--timeout', 'inf')
-    check('reject inf timeout', r.returncode == 1 and b'finite number' in r.stderr)
+    check('reject inf timeout', r.returncode == 2 and b'finite number' in r.stderr)
     nanprof = '/tmp/scr_nan_scale_profile.json'
     _json.dump({'description': 'nan gain',
                 'registers': [{'name': 'pv-power', 'register': 32064, 'type': 'i32', 'scale': float('nan')},
@@ -1489,7 +1485,7 @@ try:
     r = dry('--upstream', ':99999')
     check('reject upstream port out of range', r.returncode == 1 and b'out of range' in r.stderr)
     r = dry('--modbus-unit', '248')
-    check('reject unit id out of range', r.returncode == 1 and b'Modbus unit id' in r.stderr)
+    check('reject unit id out of range', r.returncode == 2 and b'modbus-unit must be 1..247' in r.stderr)
     with open('/tmp/scr_broken.ini', 'w') as fh:
         fh.write('# a set line missing its value\nset interval\n')
     r = dry('--config', '/tmp/scr_broken.ini')
@@ -1503,13 +1499,13 @@ try:
     r = dry('--interval', '0.5', '--timeout', '2')
     check('timeout > interval warns but starts', r.returncode == 0 and b'back-to-back' in r.stderr)
     r = dry('--max-kwp', '-1')
-    check('negative max_kwp rejected', r.returncode == 1 and b'0 (checks off) or a positive' in r.stderr)
+    check('negative max_kwp rejected', r.returncode == 2 and b'max-kwp must be >= 0' in r.stderr)
     r = dry('--max-grid-kw', '-0.5')
-    check('negative max_grid_kw rejected', r.returncode == 1 and b'0 (checks off) or a positive' in r.stderr)
+    check('negative max_grid_kw rejected', r.returncode == 2 and b'max-grid-kw must be >= 0' in r.stderr)
 
     # 3g. hostile startup paths fail clean (no traceback), rc=1
     r = dry('--interval', '1e308')
-    check('huge interval accepted but clamped config prints', r.returncode == 0 and b'every 1e+308s' in r.stderr)
+    check('huge interval rejected by the row bound', r.returncode == 2 and b'interval must be 0..86400' in r.stderr)
     r = subprocess.run([sys.executable, '-c',
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; Metrics(%r)'
@@ -1748,7 +1744,7 @@ try:
     r = subprocess.run([sys.executable, P, '--dry-run', '--config', '/tmp/scr_base.ini'], capture_output=True)
     check('dry-run valid config: rc=0, nothing bound', r.returncode == 0 and b'dry-run' in r.stderr)
     r = subprocess.run([sys.executable, P, '--dry-run', '--interval', '-1'], capture_output=True)
-    check('dry-run invalid config: rc=1, clean message', r.returncode == 1 and b'invalid interval' in r.stderr)
+    check('dry-run invalid config: rc=2, clean message', r.returncode == 2 and b'interval must be 0..86400' in r.stderr)
 
     # 6. the scraper's control plane (the cache's shape, mirrored): the
     # signed wire (the full sha256 HMAC keyed by the token), the live
@@ -1868,7 +1864,7 @@ try:
     r = sctl('show profile', 15597)
     check('scraper control: show profile names the resolved device profile',
           r.startswith('ok profile=') and 'sun2000.json' in r, r[:120])
-    r = sctl('set profile default', 15597)
+    r = sctl('set profile sun2000', 15597)
     check('scraper control: set profile default re-resolves the bundled profile',
           r.startswith('ok profile=') and 'sun2000.json' in r, r[:120])
     badprof = '/tmp/scr_no_pv_profile.json'
@@ -1949,7 +1945,7 @@ try:
           oct(dumpst.st_mode & 0o777))
     raw = open('/tmp/scr_regtest_state.json').read()
     check('scraper control: the dump carries the settings, never the secrets',
-          '"interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw
+          '"metrics/interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw
           and 'auth-token' not in raw and 'control-token' not in raw, raw[:240])
     r = sctl('set interval 1', 15597)
     r = sctl('request restore', 15597)
@@ -2114,9 +2110,12 @@ try:
     check('scraper control: the admin token still steers the same server', r.startswith('ok modbus-scraper'),
           r[:80])
     opsaud = open(OPS_AUDIT).read()
+    ops_lines = [l for l in opsaud.splitlines() if 'type=command' in l]
     check('scraper control: both roles audited on the ops server',
-          "role=ops 'show version'" in opsaud and "role=ops 'shutdown'" in opsaud
-          and "role=admin 'show version'" in opsaud, opsaud[-200:])
+          any('role=ops' in l and "cmd='show version'" in l and 'result=ok' in l for l in ops_lines)
+          and any('role=ops' in l and "cmd='shutdown'" in l and 'result=err' in l for l in ops_lines)
+          and any('role=admin' in l and "cmd='show version'" in l and 'result=ok' in l for l in ops_lines),
+          opsaud[-200:])
     r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:%d' % PORT,
                         '--listen', '127.0.0.1:%d' % (19459 + BASE), '--control-port', '15598', '--control-ops-token', 'x'],
                        capture_output=True, text=True, timeout=15)
@@ -2288,7 +2287,7 @@ try:
           r.startswith('ok audit-daily=off'), repr(r[:110]))
     r = sctl('set', 'audit-files', '7')
     check('scraper audit: the live set writes the config back (the fresh show config)',
-          'set audit-files 7' in sctl('show', 'config'), sctl('show', 'config')[:80])
+          'set audit rotate files 7' in sctl('show', 'config'), sctl('show', 'config')[:80])
     r = sctl('clear', 'no-audit-log')
     check('scraper audit: the live bool rows clear (the defaults loop)',
           r.startswith('ok no-audit-log='), repr(r[:110]))

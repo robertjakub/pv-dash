@@ -2129,7 +2129,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           acl_start_log[-200:])
     acl_audit = open('/tmp/reg_acl_audit.log').read()
     check('acl file: the warning lands in the audit trail (ACL-FILE)',
-          'ACL-FILE' in acl_audit and 'group/world-readable' in acl_audit, acl_audit[-200:])
+          'type=acl-file' in acl_audit and 'group/world-readable' in acl_audit, acl_audit[-200:])
     b = wr6(149, 1, port=15600)
     check('acl file: 149 passes (the allow 148:30)', b[0] == 6, b.hex())
     b = wr6(148, 1, port=15600)
@@ -2321,7 +2321,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           b == bytes.fromhex('8603'), b.hex())
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     check('audit: the unparseable write is a WRITE-REFUSED event',
-          'WRITE-REFUSED' in fc4_audit and 'too short to carry a register address' in fc4_audit,
+          'type=write-refused' in fc4_audit and 'too short to carry a register address' in fc4_audit,
           fc4_audit[-160:])
 
     # the audit trail folds control characters: a \n inside a command cannot
@@ -2331,7 +2331,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     forged = [line for line in fc4_audit.splitlines() if 'AUDIT CACHE WRITE forged' in line]
     check('audit: the trail injection folds to one physical line',
-          forged and all('COMMAND' in line and line.startswith('2026-11-') for line in forged),
+          forged and all('type=command' in line and line.startswith('2026-11-') for line in forged),
           str(forged[-1:]))
 
     # per-client REQUESTS accounting: the periodic tally + the disconnect line

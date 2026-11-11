@@ -579,22 +579,22 @@ def main():
 
         # ---- the grid wander knobs: the machines' ranges ride the flags
         #      and set live (the tree's grid block backs the defaults)
-        tx = ctl(H_CTL, 'show grid-voltage-wander')
+        tx = ctl(H_CTL, 'show grid-voltage-wander', token='tok')
         check('grid wander: the voltage-machine range reads the tree default',
               tx == 'ok grid-voltage-wander=0.1', tx)
-        tx = ctl(H_CTL, 'set grid-voltage-wander 0.05')
+        tx = ctl(H_CTL, 'set grid-voltage-wander 0.05', token='tok')
         check('grid wander: the voltage range sets live',
               tx.startswith('ok grid-voltage-wander=0.05'), tx)
-        tx = ctl(H_CTL, 'set grid-frequency-wander 0')
+        tx = ctl(H_CTL, 'set grid-frequency-wander 0', token='tok')
         check('grid wander: the flat frequency clamps',
               tx.startswith('ok grid-frequency-wander=0'), tx)
-        tx = ctl(H_CTL, 'set grid-frequency-wander 5')
+        tx = ctl(H_CTL, 'set grid-frequency-wander 5', token='tok')
         check('grid wander: the frequency clamp refuses beyond 0..2',
               tx.startswith('% error'), tx)
-        tx = ctl(H_CTL, 'set grid-voltage-wander 2')
+        tx = ctl(H_CTL, 'set grid-voltage-wander 2', token='tok')
         check('grid wander: the fraction refuses beyond 0..1',
               tx.startswith('% error'), tx)
-        tx = ctl(H_CTL, 'set grid-voltage-wander 0.1')
+        tx = ctl(H_CTL, 'set grid-voltage-wander 0.1', token='tok')
         check('grid wander: the default restores',
               tx.startswith('ok grid-voltage-wander=0.1'), tx)
 
@@ -1130,10 +1130,10 @@ def main():
         # off retires the listener; the CONNECTED session keeps serving
         # (the raw wire: one JSON object per line)
         m = socket.create_connection(('127.0.0.1', M_TCP1), timeout=5)
-        m.sendall(b'{"cmd": "set control port off"}\n')
+        m.sendall(b'{"cmd": "set control-port off"}\n')
         off_reply = m.recv(4096)
         check('fake control: off retires the listener', b'control-port=off' in off_reply, off_reply[:120])
-        m.sendall(b'{"cmd": "show control port"}\n')
+        m.sendall(b'{"cmd": "show control-port"}\n')
         off_show = m.recv(4096)
         check('fake control: the session keeps serving after the retire', b'ok control-port=off' in off_show
               or b'"control-port=off"' in off_show, off_show[:120])
@@ -1143,7 +1143,7 @@ def main():
         except OSError:
             gone = True
         check('fake control: no new connection lands on the retired port', gone)
-        m.sendall(b'{"cmd": "clear control port"}\n')
+        m.sendall(b'{"cmd": "clear control-port"}\n')
         unset_reply = m.recv(4096)
         check('fake control: clear restores the configured target', b'unix:%s' % msock.encode() in unset_reply,
               unset_reply[:120])
@@ -1211,12 +1211,14 @@ def main():
         r = subprocess.run([sys.executable, F, '--control-port', '0', '--dry-run',
                             '--audit-files', '0'], capture_output=True, text=True)
         check('fake audit: the files bound refuses at start (the clean one-liner)',
-              r.returncode == 1 and 'audit-files must be 1..100' in r.stdout + r.stderr,
+              r.returncode == 2 and 'audit-files must be 1..100' in r.stdout + r.stderr
+              and 'Traceback' not in r.stdout + r.stderr,
               (r.stdout + r.stderr)[-160:])
         r = subprocess.run([sys.executable, F, '--control-port', '0', '--dry-run',
                             '--audit-max-mb', '-1'], capture_output=True, text=True)
         check('fake audit: the max-mb bound refuses at start',
-              r.returncode == 1 and 'audit-max-mb must be 0..1048576 MB' in r.stdout + r.stderr,
+              r.returncode == 2 and 'audit-max-mb must be 0..1048576' in r.stdout + r.stderr
+              and 'Traceback' not in r.stdout + r.stderr,
               (r.stdout + r.stderr)[-160:])
         env = dict(os.environ, AUDIT_DAILY='1', MAX_CLIENTS='7', AUDIT_MAX_MB='77', AUDIT_FILES='9')
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:15987',
@@ -1229,8 +1231,8 @@ def main():
         check('fake audit: $MAX_CLIENTS drives the cap', tx == 'ok max-clients=7', tx[:90])
         tx = ctl(15988, 'show config')
         check('fake audit: the env-driven rotation renders in show config',
-              'set audit-max-mb 77.0' in tx and 'set audit-daily true' in tx
-              and 'set audit-files 9' in tx, tx[:160])
+              'set audit rotate max-size 77.0' in tx and 'set audit rotate daily true' in tx
+              and 'set audit rotate files 9' in tx, tx[:160])
 
         # ---- the config file: the family ladder (flag > env > config >
         #      static), the sample's grammar, the fail-fast shapes

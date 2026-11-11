@@ -313,8 +313,8 @@ def main():
             frame = col.frames[0].decode()
             stamp, prefix, chain, body = chain_of(col.frames[0])
             last = open(tlog).read().rstrip().splitlines()[-1]
-            ok = (frame.startswith('<28>1 ') and frame.split(' ')[5] == 'COMMAND'
-                  and '[pvDash@1 prefix="CACHE" chain="' in frame
+            ok = (frame.startswith('<28>1 ') and frame.split(' ')[5] == 'command'
+                  and '[pvDash@1 prefix="CACHE" role="daemon" chain="' in frame
                   and frame.split('] ', 1)[1] == last
                   and chain == entry_hash(GENESIS, stamp, prefix, body))
             check('the tcp:// mirror: RFC6587 framing + the RFC5424 envelope + the chain in the SD', ok, frame[:160])
@@ -323,18 +323,20 @@ def main():
             w2 = AuditLog(tlog + '.cef', 'CACHE', app='modbus-cache',
                           forward='tcp://127.0.0.1:%d' % col.port, forward_format='cef')
             w2.event('COMMAND', "'show version' -> ok")
-            w2.event('COMMAND', "'set x\\\\1=y' -> err")
+            w2.event('COMMAND', "cmd='set x\\\\1=y' result=err")
             deadline = time.time() + 10
             while len(col.frames) < 3 and time.time() < deadline:
                 time.sleep(0.05)
             okc, oke = False, False
+            last_cef = open(tlog + '.cef').read().rstrip().splitlines()[0]   # the CEF writer's own first row
+            esc = last_cef.replace('\\', '\\\\').replace('=', '\\=')   # the CEF msg= escaping: the backslash first, then the =
             for fr in col.frames[1:]:
                 cef = fr.decode('utf-8', 'replace')
-                if 'CEF:0|pv-dash|modbus-cache|' in cef and '|COMMAND|COMMAND|4| rt=' in cef \
+                if 'CEF:0|pv-dash|modbus-cache|' in cef and '|command|command|4| rt=' in cef \
                         and ' cs1Label=AuditChain cs1=' in cef and ' cs2Label=AuditPrefix cs2=CACHE msg=' in cef \
-                        and cef.split('msg=', 1)[1] == last:
+                        and cef.split('msg=', 1)[1] == esc:
                     okc = True
-                if '|COMMAND|COMMAND|7|' in cef and 'msg=' in cef and '\\\\1\\=y' in cef.split('msg=', 1)[1]:
+                if '|command|command|7|' in cef and 'msg=' in cef and r'\\\\1\=y' in cef.split('msg=', 1)[1]:
                     oke = True
             check('the CEF envelope: the header fields + cs1/cs2 + the msg verbatim', okc, b''.join(col.frames).decode('utf-8', 'replace'))
             check('the CEF severity table (err = 7) + the backslash/equals escaping', oke)
@@ -349,7 +351,7 @@ def main():
             uframe = usock.recv(65536).decode()
             usock.close()
             check('the udp:// mirror: one datagram, the RFC5424 envelope',
-                  uframe.startswith('<28>1 ') and '[pvDash@1 prefix="CACHE" chain="' in uframe, uframe[:120])
+                  uframe.startswith('<28>1 ') and '[pvDash@1 prefix="CACHE" role="daemon" chain="' in uframe, uframe[:120])
         finally:
             col.down()
 

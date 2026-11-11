@@ -175,20 +175,6 @@ they name the wire.
   form its sibling supports (`cache/lib/options.json:80` vs
   `inverter:138`). Outcome: the node-ful
   spelling wins each time.
-- **the NixOS render bugs** `[cache]` `[dashboard]` — the dashboard
-  emits `--metrics-server` whenever `metricsServer` is set, including
-  explicit `false` (the flag turns the endpoint ON,
-  `nixos/modules/dashboard.nix:61`); the cache renders `set audit requests`
-  with an empty value from an unset `requestsAudit`
-  (`nixos/modules/modbus-cache.nix:87` — `toString null`, and the config parser
-  refuses a valueless set line) and the metrics pair likewise
-  (`:105-108`); the dashboard's metrics-token LoadCredential is passed
-  even when undeclared (`:63` vs `:530`); `nixos/modules/modbus-cache.nix:341`
-  documents `metricsServerToken` for options named `metricsToken`.
-  Outcome: the bool semantics from the registry, guarded set lines,
-  the doc names fixed; the inverter has no module.nix at all (68 rows
-  — 59 knobs + 9 nodes — with no NixOS parity; accepted, but say so in
-  the doc).
 - **the knob sweep's blind spots** `[common]` — `family_drift.py`
   still intersects by literal row name (`knobs_shared()`: **30** names
   present in all four today), so every near-miss pair above
@@ -413,7 +399,7 @@ they name the wire.
   field table reads the rows (`default`/`min`/`max`/`live`).
 - the env examples are **GENERATED from the registries**
   (`scripts/gen_env.py --check`): the full registry env-twin set per
-  tool (50/39/34/36), grouped by the knob's namespace node, the image's
+  tool (50/39/34/38), grouped by the knob's namespace node, the image's
   own CMD/ENV values as the sample lines with the pin notes (the
   compose's environment pins marked per knob), the secrets' lines
   empty, the prometheus example's `PROM_*` names cross-checked against
@@ -456,6 +442,21 @@ re-open — is the history half:
 
 ### CROSS-TOOL
 
+- **the nightly-depth battery debt** `[cache]` `[inverter]` `[scraper]`
+  `[dashboard]` — the full profile (`PV_SUITE_PROFILE=full`) fails five
+  checks the commit profile never runs (the regtests and the deep
+  audit/fuzz legs are full-only, so the ~5-minute loop stayed green
+  while the depth rotted): cache-regtest's alias `?` walk-on shape, the
+  acl-file audit warning, the WRITE-REFUSED audit spelling and the
+  trail-injection fold; inverter-regtest's `authenticate first` /
+  `unknown setting control port` console spellings; the scrape-regtest
+  leg; audit-chain's framing legs; dashboard-control-fuzz's
+  `AUDIT_FILES=0` refusal (the row fallback answers `(using 3)` and the
+  dry-run calls it valid where the check wants the bound to refuse).
+  Proven pre-existing at cd2e831 (the worktree full run reproduced
+  four; the dashboard one is hand-proven identical) — not the settings
+  wave's; the cache-regtest stale `examples/` join it also tripped is
+  fixed in the settings wave.
 - **the remaining audit findings** `[cache]` `[scraper]` `[inverter]`
   `[docker]` — the open set (per [SECURITY.md](SECURITY.md) rev. 28): F17
   (the volume secrets), F14 (TLS — the item below), F15 (INFO — the

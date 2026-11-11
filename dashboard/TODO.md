@@ -5,6 +5,25 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The NixOS settings wave inverted the module (nixos/modules/dashboard.nix):
+the dedicated knob options are gone — one freeform `settings` attrset
+renders verbatim `NAME=value` lines into the unit's systemd EnvironmentFile
+(restartIfChanged now), the secrets keep only the `<secret>File` credential
+options (controlTokenFile, controlOpsTokenFile, metricsTokenFile,
+authTokenFile, dumpKeyFile — dumpKeyFile is new; absolute paths outside the
+store only, the inline value options are removed-option tombstones the eval
+refuses, a `/nix/store/` source errors too, and a secret env name inside
+settings errors as well). The old `settings` option (the SOLAR_CONFIG
+attrset) renames **`solarConfig`** (the render feeds the generated
+config.js; a settings CONFIG_JS entry wins; the `configFile` option is a
+removed-option tombstone), **`staticDir`** stays dedicated and the Exec
+pins it explicitly (`--static-dir`, default the package's own
+`share/dashboard/static`), and the module ships default-free (`package` via
+the flake's mkDefault wrapper — the nixpkgs shape). The registry's last two
+`no-env` rows gained their env twins (LOG_QUERIES, CONTROL_LOG_REPLIES —
+the resolver reads them now), so the generated dashboard env example covers
+every knob (38). The option tables moved to nixos/README.md.
+
 The external surfaces speak the console spellings (the flat wire's
 completion): the one-shot ctl translates the live/alias words like the
 cli's (`set auth token file:...`), `show config` renders the live

@@ -5,6 +5,22 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The NixOS settings wave inverted the module (nixos/modules/
+modbus-scraper.nix): the dedicated knob options are gone — one freeform
+`settings` attrset renders verbatim `NAME=value` lines into the unit's
+systemd EnvironmentFile (restartIfChanged now — EnvironmentFile is
+start-only, the SIGHUP ExecReload stays), the secrets keep only the
+`<secret>File` credential options (authKeyFile, controlTokenFile,
+controlOpsTokenFile, authTokenFile, dumpKeyFile — authTokenFile now mounts
+via LoadCredential like the family instead of passing its path through,
+so the token is read at start; absolute paths outside the store only — the
+inline value options are removed-option tombstones the eval refuses, a
+`/nix/store/` source errors too, and a secret env name inside settings
+errors as well), the maxKwp/maxGridKw module assertions died with the
+options (the daemon's own 503 caps stand), the module ships default-free
+(`package` via the flake's mkDefault wrapper — the nixpkgs shape), and the
+option tables moved to nixos/README.md.
+
 The external surfaces speak the console spellings (the flat wire's
 completion): the one-shot ctl translates the live/alias words like the
 cli's (`set caps max-pv 6`, `set metrics interval 10` — a piped config

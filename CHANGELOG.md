@@ -10,6 +10,41 @@ This file keeps **Unreleased and the current release** only — the release
 history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Unreleased
+### Changed
+
+- **nixos** — **the service modules invert to one freeform `settings` +
+  credentials-only secrets** (the settings wave): the ~40 dedicated per-knob
+  options are gone
+  — `settings` is a freeform string attrset rendered verbatim as
+  `NAME=value` into the unit's systemd `EnvironmentFile` (the keys are the
+  daemon's bare env twins, unvalidated — the generated docker/env examples
+  are the key list), and the units flip `restartIfChanged` (EnvironmentFile
+  is start-only; ExecReload keeps the SIGHUP surface). The secrets keep ONE
+  dedicated option each, the `<secret>File` form — an absolute path string
+  outside the store, mounted via LoadCredential — while the inline value
+  options are removed-option tombstones the eval REFUSES ("secrets may not
+  be rendered into the world-readable nix store") and a `/nix/store/`-based
+  `<secret>File` errors the same way; the module also refuses a secret env
+  name inside `settings` (the store env file is world-readable). The
+  dashboard renames its old `settings` (the SOLAR_CONFIG attrset) to
+  **`solarConfig`** (its `configFile` folds in), keeps **`staticDir`**
+  dedicated (the Exec pins the package's own `share/dashboard/static` by
+  default), and gains the two missing env twins (`LOG_QUERIES`,
+  `CONTROL_LOG_REPLIES` — the registry's last `no-env` rows). The modules
+  ship default-free (`package` has no in-repo default — the nixpkgs shape)
+  and the flake's `nixosModules` wrappers carry the defaults via `mkDefault`;
+  tests/hardening.nix names the packages explicitly and fixes its phantom
+  `port` option (`listenPort` now spelled through settings). The gates
+  follow: check_options' NIX gate inverts (the structural options + every
+  secret row's `*File`, nothing else — NIX_NAMES retired) and
+  family_drift's NIXOS sweep shrinks to the structural check;
+  nixos/README.md's module story and the three option tables rebuilt.
+  **Migrating:** every old option becomes a `settings.<ENV_TWIN>` string
+  (`upstream = "..."` → `settings.UPSTREAM = "..."`, `listenHost` +
+  `listenPort` → `settings.LISTEN = "HOST:PORT"`), every `<secret> = "value"`
+  becomes `<secret>File = "/absolute/path"`, the dashboard's `settings`
+  attrset moves to `solarConfig`.
+
 ### Added
 
 - **extras** — **the audit trail's Graylog content pack lands under

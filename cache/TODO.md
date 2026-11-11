@@ -5,6 +5,21 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The NixOS settings wave inverted the module (nixos/modules/
+modbus-cache.nix): the ~40 dedicated knob options are gone — one freeform
+`settings` attrset renders verbatim `NAME=value` lines into the unit's
+systemd EnvironmentFile (the keys are the bare env twins; restartIfChanged
+now — EnvironmentFile is start-only, the SIGHUP ExecReload stays), the
+secrets keep only the `<secret>File` credential options (authKeyFile,
+authUpstreamKeyFile, controlTokenFile, controlOpsTokenFile, metricsTokenFile,
+dumpKeyFile — absolute paths outside the store; the inline value options are
+removed-option tombstones the eval refuses, and a `/nix/store/` source
+errors too; a secret env name inside settings errors as well), the module
+ships default-free (`package` via the flake's mkDefault wrapper — the
+nixpkgs shape), the ReadWritePaths/ RuntimeDirectory derivations read
+AUDIT_LOG/DUMP_PATH/CTL back out of settings, and the option tables moved
+to nixos/README.md.
+
 The external surfaces speak the console spellings (the flat wire's
 completion): the one-shot ctl translates the live/alias words like the
 cli's (`set acl connect any` rides the wire as `set connect-acl any` —

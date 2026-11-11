@@ -472,23 +472,26 @@ try:
     # 5b. JSON framing + token auth: malformed frames are answered cleanly,
     #     TCP control needs the token, the unix socket does not
     def ctl_raw(wire_bytes, port, reads=1, token=None):
-        s = socket.create_connection(('127.0.0.1', port), timeout=5)
-        if token:
-            s.sendall(_json.dumps({'cmd': 'auth', 'token': token}).encode() + b'\n')
+        try:
+            s = socket.create_connection(('127.0.0.1', port), timeout=5)
+            if token:
+                s.sendall(_json.dumps({'cmd': 'auth', 'token': token}).encode() + b'\n')
+                buf = b''
+                while not buf.endswith(b'\n'):
+                    buf += s.recv(4096)
+                buf = b''
+            s.sendall(wire_bytes)
             buf = b''
-            while not buf.endswith(b'\n'):
-                buf += s.recv(4096)
-            buf = b''
-        s.sendall(wire_bytes)
-        buf = b''
-        for _ in range(reads):
-            while not buf.endswith(b'\n'):
-                b2 = s.recv(4096)
-                if not b2:
-                    break
-                buf += b2
-        s.close()
-        return _json.loads(buf.decode())
+            for _ in range(reads):
+                while not buf.endswith(b'\n'):
+                    b2 = s.recv(4096)
+                    if not b2:
+                        break
+                    buf += b2
+            s.close()
+            return _json.loads(buf.decode())
+        except OSError as e:
+            return {'status': 'fail', 'text': 'cannot reach control server at 127.0.0.1:%d: %s' % (port, e)}
 
     r = ctl_raw(b'not json at all\n', 15514, token='sekrit')
     check('control: malformed frame rejected cleanly', r.get('status') == 'fail'
@@ -2169,7 +2172,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           '%s %r' % (p.returncode, p.stderr[-120:]))
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
                         '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
-                        '--write-registers', 'file:' + os.path.join(REPO, 'examples', 'acl-write-registers.json'),
+                        '--write-registers', 'file:' + os.path.join(REPO, 'extras', 'examples', 'acl-write-registers.json'),
                         '--dry-run'],
                        capture_output=True, text=True, timeout=60)
     check('acl file: the shipped example loads (the deye gate)',
@@ -2787,6 +2790,13 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('cache_cli: confirm stops the TCP-control proxy', 'bye shutdown' in r.stdout, repr(r.stdout))
 except QuickDone:
     pass
+except KeyboardInterrupt:
+    print()
+    print('INTERRUPTED')
+    raise SystemExit(130)
+except Exception as e:
+    print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
+    failures.append('suite crashed: %s: %s' % (type(e).__name__, e))
 finally:
     for p in procs:
         p.kill()

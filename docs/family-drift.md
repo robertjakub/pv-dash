@@ -164,13 +164,14 @@ four registries; 33 names carry in all four:
 | inverter | `allow-write`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
 | dashboard | `auth`, `auth-token`, `config-js`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
-**The shared knobs whose fields disagree** (8 of
-33 knobs, 9 drifted field(s)) — one row per
+**The shared knobs whose fields disagree** (9 of
+33 knobs, 10 drifted field(s)) — one row per
 knob+field, the tools grouped by the value each carries:
 
 | knob | field | the values (the tools carrying each) |
 |---|---|---|
 | `client-timeout` | `live` | `limits/client-timeout` (cache) · `metrics/limits/timeout` (scraper) · `client-timeout` (inverter, dashboard) |
+| `control-log-replies` | `env` | *absent* (cache, scraper, inverter) · `CONTROL_LOG_REPLIES` (dashboard) |
 | `control-ops-verbs` | `default` | `show,flush` (cache) · `show` (scraper, inverter, dashboard) |
 | `dump-interval` | `live` | `dump/interval` (cache) · `dump-interval` (scraper, inverter, dashboard) |
 | `listen` | `default` | `127.0.0.1:15502` (cache) · `127.0.0.1:9350` (scraper) · `127.0.0.1:5502` (inverter) · `127.0.0.1:8080` (dashboard) |
@@ -370,38 +371,40 @@ The findings:
 
 ## The NixOS-parity sweep — the modules vs the registries
 
-Each `module.nix` option's type and default against the same knob's
-registry row — the units drift (MB vs bytes, seconds vs ms) and the
-missing options are what this finds. Heuristic parse: the type/default
-LINES are quoted, the verdicts curated.
+The settings wave inverted the modules: no knob options at all — one
+freeform `settings` attrset rendered verbatim into the unit's
+EnvironmentFile (the keys are the bare env twins, unvalidated), the
+secrets ride the `<secret>File` LoadCredential options only, and the
+survivors are the structural options. There is no per-knob Nix-side
+type/default left to drift; the check is structural.
 
-| tool | mkOption blocks |
+| tool | module options declared |
 |---|---|
-| cache | 12 |
-| scraper | 47 |
+| cache | `authKeyFile`, `authUpstreamKeyFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `metricsTokenFile`, `openFirewall`, `package`, `settings` |
+| scraper | `authKeyFile`, `authTokenFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `openFirewall`, `package`, `settings` |
 | inverter | no module.nix |
-| dashboard | 46 |
+| dashboard | `authTokenFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `metricsTokenFile`, `openFirewall`, `package`, `settings`, `solarConfig`, `staticDir` |
 
-**The module options NOT matching a registry knob name** (after
-the kebab/camel normalization; the `*File` suffix is the NixOS
-LoadCredential pattern, not a knob):
+**The structural contract** — exactly `enable`/`package`/
+`openFirewall`/`settings`, every registry secret row's `*File`,
+and the dashboard's `solarConfig`/`staticDir` (the removed knob
+options and inline secrets are tombstones the module system refuses):
 
-- cache: `unitId`
-- scraper: `listenHost`, `listenPort`
-- dashboard: `listenHost`, `listenPort`, `prometheusUrl`
+- cache: exactly the structural contract
+- scraper: exactly the structural contract
+- dashboard: exactly the structural contract
 
 The findings:
 
-- **check_options gates the presence** ("the NixOS module defines
-  every option"); the TYPE and DEFAULT parity is not gated — the
-  units drift (the audit's MB, the intervals' seconds) is where a
-  Nix default and a registry default can silently disagree. The
-  module option maps were rebuilt from the module.nix files in the
-  docs restructure wave — this sweep is the machine check that keeps
-  them honest.
-- The parse is heuristic (the first type=/default= line in the
-  option block) — the verdicts in the findings are editorial; the
-  table is the starting point for the module review.
+- **check_options gates the structure** ("the NixOS module declares
+  exactly the structural options"): enable/package/openFirewall/settings,
+  the dashboard's solarConfig/staticDir, and every registry secret row's
+  *File option present — nothing else may be declared. The inline secret
+  options are removed-option tombstones the module system refuses at
+  eval; the env-file keys are freeform and carry no parity claim.
+- The registry keeps its docs-side role: gen_env.py renders the
+  docker/env examples the settings key list is lifted from, and the
+  nixos/README.md tables document the contract per tool.
 
 ## The docker/env sweep — the env twins and the ports
 
@@ -423,7 +426,7 @@ published port not backed by a registry default is a lie.
 | `docker/entrypoints/entrypoint-prometheus.sh` | `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `SECURITY`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
 | `docker/entrypoints/entrypoint.sh` | `JSON`, `README`, `REQUIRED`, `SECURITY` | — |
 | `docker/env/cache.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
-| `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONFIG_JS`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS` … | — |
+| `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONFIG_JS`, `CONTROL_LOG_REPLIES`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN` … | — |
 | `docker/env/fake.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `CHAOS`, `CIDR`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
 | `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS` … | — |

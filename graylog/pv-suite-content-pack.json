@@ -75,6 +75,23 @@
       }
     },
     {
+      "id": "2f7da5d5-807a-542a-8ede-b25dd20deb6d",
+      "type": {
+        "name": "pipeline_rule",
+        "version": "1"
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=4.0.0"
+        }
+      ],
+      "data": {
+        "title": "pv-suite audit gim",
+        "source": "rule \"pv-suite audit gim\"\nwhen\n    has_field(\"audit_type\")\nthen\n    set_field(\"event_source_product\", \"pv-suite\");\n    set_field(\"event_action\", to_string($message.audit_type));\n    set_field(\"event_uid\", to_string($message.audit_hash));\n    set_field(\"application_name\", to_string($message.audit_tools));\n    set_field(\"event_outcome\", \"success\");\n    set_field(\"event_severity\", \"informational\");\n    set_field(\"event_severity_level\", 1);\n    if has_field(\"audit_result\") AND to_string($message.audit_result) == \"err\" then\n        set_field(\"event_outcome\", \"failure\");\n        set_field(\"event_severity\", \"medium\");\n        set_field(\"event_severity_level\", 3);\n    end\n    if to_string($message.audit_type) == \"auth-fail\" then\n        set_field(\"event_severity\", \"high\");\n        set_field(\"event_severity_level\", 4);\n    end\n    if has_field(\"audit_reason\") then\n        set_field(\"event_error_code\", to_string($message.audit_reason));\n    end\n    if has_field(\"audit_uptime\") then\n        set_field(\"event_duration\", to_long($message.audit_uptime));\n    end\n    if has_field(\"audit_cmd\") then\n        set_field(\"user_command\", to_string($message.audit_cmd));\n    end\n    if has_field(\"audit_role\") then\n        set_field(\"user_name\", to_string($message.audit_role));\n    end\n    if has_field(\"audit_user\") then\n        set_field(\"user_name\", to_string($message.audit_user));\n    end\n    if has_field(\"audit_peer\") AND contains(to_string($message.audit_peer), \":\") then\n        let peer_parts = split(\":\", to_string($message.audit_peer));\n        set_field(\"source_ip\", to_string(peer_parts[0]));\n        set_field(\"source_port\", to_long(peer_parts[1]));\n    end\n    if has_field(\"audit_target\") AND contains(to_string($message.audit_target), \":\") then\n        let target_parts = split(\":\", to_string($message.audit_target));\n        if to_string(target_parts[0]) != \"unix\" then\n            set_field(\"destination_ip\", to_string(target_parts[0]));\n            set_field(\"destination_port\", to_long(target_parts[1]));\n        end\n    end\nend"
+      }
+    },
+    {
       "id": "900c3b19-7aef-55a6-955b-1735d2046496",
       "type": {
         "name": "pipeline",
@@ -89,7 +106,7 @@
       "data": {
         "title": "pv-suite audit",
         "description": "Parses the family audit line (docs/AUDIT.md) into audit_* fields.",
-        "source": "pipeline \"pv-suite audit\"\nrule \"pv-suite audit kv\"\nrule \"pv-suite audit cmd\"\nend\n",
+        "source": "pipeline \"pv-suite audit\"\nrule \"pv-suite audit kv\"\nrule \"pv-suite audit cmd\"\nrule \"pv-suite audit gim\"\nend\n",
         "connected_streams": [
           {
             "$ref": "705ca793-7249-5b6a-b1ba-13160de2f31b"

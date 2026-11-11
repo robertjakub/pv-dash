@@ -21,7 +21,7 @@ unit (System → Content packs → upload, then Install) and creates:
   (unprivileged — never 514), full message stored; point the family at
   it: `--audit-forward udp://<graylog>:1514` (the default `rfc5424`
   format, the native line rides the envelope's message verbatim).
-- **two pipeline rules + one pipeline** — `pv-suite audit kv` runs
+- **three pipeline rules + one pipeline** — `pv-suite audit kv` runs
   `key_value(msg, quote: "'", ignore_empty_values: true)` over the line
   and `set_fields(kv, prefix: "audit_")`: the outer words become
   `audit_tools` / `audit_tag` / `audit_type` / `audit_hash`, the simple
@@ -29,8 +29,9 @@ unit (System → Content packs → upload, then Install) and creates:
   `audit_wire` / ... ride beside them (the reserved-key rule in
   docs/AUDIT.md is what makes one flat namespace safe). `pv-suite audit
   cmd` picks the quoted value — `cmd='set pv 3000'` truncates under any
-  space-split kv — into `audit_cmd`. The pipeline connects to the
-  Audit · all stream.
+  space-split kv — into `audit_cmd`. `pv-suite audit gim` normalizes
+  onto the Graylog Information Model (the next section). The pipeline
+  connects to the Audit · all stream.
 - **five streams** — Audit · all / commands / security / lifecycle /
   writes. The rules key on the RAW `message` with REGEX (` type=command
   ` and friends), not on the audit_* fields: the StreamRouter runs
@@ -49,6 +50,60 @@ collected file (the cron), the same three-tier story as docs/AUDIT.md.
 The pack was written against the content-pack v3 schema and verified by
 inspection only (no Graylog on the dev machine) — a schema refusal on
 your server names the entity; the fix rides this file.
+
+## The GIM schema (the audit trail, normalized)
+
+The **Graylog Information Model (GIM)** is the schema Graylog
+Illuminate normalizes every log source onto: field names are
+`entity_property` pairs (`source_ip`, `event_outcome`, `user_name`,
+...) — the *entity* names the object the property belongs to
+(source, destination, event, user, process, application, ...), the
+*property* describes it. The Field Schema Reference (the Illuminate
+docs, generated from the graylog-schema definitions) lists every
+entity and field; the point is that the same question has one spelling
+across sources — `source_ip` is the attacker's address whether the log
+came from a firewall, auditd, or pv-suite, so dashboards, alerts and
+Illuminate detections work unchanged.
+
+The pack's `pv-suite audit gim` rule emits the GIM fields beside the
+source-specific `audit_*` forms (both forms may be included — the
+schema's own note for vendor-specific identifiers):
+
+| the audit KV | the GIM field(s) | entity |
+|---|---|---|
+| `tools=` | `application_name` | application |
+| `type=` | `event_action` (the word verbatim: start, command, auth-fail, ...) | event |
+| `hash=` | `event_uid` (the chain hash — the event's unique id) | event |
+| `result=` | `event_outcome` — `ok`/`bye`/`local` → `success`, `err` → `failure` | event |
+| (derived) | `event_severity` + `event_severity_level` — informational/1 by default, medium/3 on an `err` result, high/4 for `auth-fail` | event |
+| `reason=` | `event_error_code` (`unsigned` / `bad-mac`) | event |
+| `uptime=` | `event_duration` (seconds) | event |
+| `peer=` | `source_ip` + `source_port` (the `IP:port` split — the control plane binds loopback v4; a unix peer carries no colon and is skipped) | source |
+| `target=` | `destination_ip` + `destination_port` (`unix:` targets skipped) | destination |
+| `role=` | `user_name` (the authenticated RBAC principal) | user |
+| `user=` | `user_name` (the OS user on the cli connect/disconnect trail) | user |
+| `cmd=` | `user_command` (the control command the user invoked) | user |
+| (constant) | `event_source_product` = `pv-suite` | event |
+
+The severity pair follows the GIM scale (1 informational, 2 low,
+3 medium, 4 high, 5 critical) — `event_severity` is the word,
+`event_severity_level` the number.
+
+**What the pack does not do:** Illuminate Core assigns message-type
+codes and derives category/subcategory enrichment from them via its
+lookup tables — that machinery is licensed content keyed to the shipped
+processing packs. The pack emits the GIM field names directly instead;
+an operator running Graylog Enterprise/Security can key their own
+processing on them, and the audit-trail questions (who ran what from
+where, did it succeed, how hard did the gates refuse) already answer in
+the normalized spelling:
+
+    event_source_product:pv-suite AND event_action:auth-fail
+    event_outcome:failure AND event_severity:high
+    user_name:ops AND event_action:command AND event_outcome:success
+
+The `audit_*` fields stay the drill-down truth (the full KV pair set,
+nothing lost to the mapping).
 
 ## The ingestion routes (pick one)
 

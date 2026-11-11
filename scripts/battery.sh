@@ -16,6 +16,7 @@
 #   scripts/battery.sh full           # all ten, the suite defaults — the nightly, serial
 #   scripts/battery.sh <suite> ...    # explicit names, e.g. cache-regtest inverter-regtest
 #   scripts/battery.sh --stop ...     # the flag may sit anywhere: the first FAILED suite ends the run — the tally marks the rest SKIPPED
+#   scripts/battery.sh --name <label> ...  # label the run with the wave/chat that asked for it — the flag may sit anywhere: the status carries a `wave:` line (the battery_status view shows it)
 #
 # Every run works inside its own dedicated dir: <root>/<run-id>/ where the
 # root is ~/.local/state/pvbattery (XDG_STATE_HOME respected — the state
@@ -92,12 +93,28 @@ ls -1dt $LOGROOT/2* 2>/dev/null | tail -n +9 | while read -r d; do
   rm -rf "$d"
 done
 # the flags: --stop ends the battery at the first FAILED suite (the tally
-# marks the rest SKIPPED); the flag may sit anywhere in the args
-STOP=''
-for a in "$@"; do
-  [ "$a" = "--stop" ] && STOP=1
+# marks the rest SKIPPED); --name labels the run with the wave/chat that
+# asked for it. Both flags may sit anywhere in the args.
+STOP=''; NAME=''
+ARGS=''
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --stop)   STOP=1 ;;
+    --name)   [ $# -ge 2 ] && { NAME=$2; shift; } ;;
+    --name=*) NAME=${1#--name=} ;;
+    *)        ARGS="$ARGS
+$1" ;;
+  esac
+  shift
 done
-[ -n "$STOP" ] && set -- $(for a in "$@"; do [ "$a" != "--stop" ] && printf '%s\n' "$a"; done)
+[ -n "$ARGS" ] && set -- $ARGS
+# the label is prose, not a filename (the run id keeps its plain
+# <date>-<profile> shape) — one line, whitespace collapsed and trimmed,
+# 64 chars max; a label that trims away to nothing is no label
+case "$NAME" in
+  '') ;;
+  *)  NAME=$(printf '%s' "$NAME" | tr '\t\n' '  ' | tr -s ' ' | cut -c 1-64 | sed -E 's/^ //; s/ $//') ;;
+esac
 PROFILE="${1:-commit}"
 RUNID="$(date +%Y%m%d-%H%M%S)-$PROFILE"
 RUNDIR=$LOGROOT/$RUNID
@@ -208,6 +225,7 @@ fi
 export PYTHONUNBUFFERED=1   # the daemons' stderr (their logs) must not sit in a lost block buffer
 
 say "battery $RUNID (pid $$) profile=$PROFILE budget=${BUDGET:-suite defaults} slot=${SLOT:-none} base=$BASE"
+[ -n "$NAME" ] && say "wave: $NAME"
 say "suites: $SUITES"
 TOTAL=$(echo $SUITES | wc -w | tr -d ' ')
 N=0
@@ -255,16 +273,25 @@ window_busy() {
 name_busy() {
   pgrep -f '[m]odbus-cache.py|[m]odbus-scraper.py|[m]odbus-fake-inverter.py|bin/[d]ashboard.py' >/dev/null
 }
+# the one-time WAIT row: on the first busy poll the queued suite says it
+# sits on the quiet window — battery_status.sh reads the row while it is
+# the status's last word, and the START row retires it when the wait ends
+w_note() {
+  [ -n "$waited" ] && return
+  waited=1
+  say "$(date '+%H:%M:%S') WAIT $N/$TOTAL $s — the quiet window: family daemons still hold the ports"
+}
 quiet() {
+  waited=''
   for i in $(seq 1 120); do
     if [ "$PARALLEL" = 1 ]; then
       # the parallel gate: only the daemons inside this run's own shifted
       # port window — the other slots' suites (and their zz_ copies) live on
       # disjoint ports and are none of this run's business
-      window_busy && { sleep 15; continue; }
+      window_busy && { w_note; sleep 15; continue; }
     else
-      pgrep -f '[z]z_[a-z]*[.]py' >/dev/null && { sleep 15; continue; }
-      name_busy && { sleep 15; continue; }
+      pgrep -f '[z]z_[a-z]*[.]py' >/dev/null && { w_note; sleep 15; continue; }
+      name_busy && { w_note; sleep 15; continue; }
     fi
     break
   done

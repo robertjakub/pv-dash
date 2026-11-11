@@ -24,7 +24,7 @@
 #
 # One suite at a time within a run; a suite's verdict = its own ALL PASS
 # with no FAIL lines; the tally lands at the end of the status file, and
-# the whole run archives to backups/<run-id>.tar.gz (the newest 8 kept —
+# the whole run archives to backups/<run-id>.tar.gz (the newest 32 kept —
 # the green runs drop the tmp scratch after, the failed ones keep it to
 # post-mortem).
 
@@ -48,8 +48,15 @@ RUNDIR=$LOGROOT/$RUNID
 mkdir -p "$RUNDIR/tmp"
 export PV_RUN_DIR="$RUNDIR/tmp"   # the suites' gate marker (a standalone run refuses)
 export PV_SUITE_PROFILE=$([ "$PROFILE" = full ] && echo full || echo quick)   # the suites' depth (quick default; full = the nightly depth)
-[ -e "$LOGROOT/latest" ] && ln -sfn "$(readlink "$LOGROOT/latest")" "$LOGROOT/previous"   # the run before this one (the old latest spelling migrates too)
-[ -e "$LOGROOT/latest" ] && [ ! -e "$LOGROOT/current" ] && ln -sfn "$(readlink "$LOGROOT/latest")" "$LOGROOT/current" && rm "$LOGROOT/latest"
+# the legacy latest spelling migrates to current once; previous then takes
+# the run current pointed at, before this run takes the current slot over
+[ -e "$LOGROOT/latest" ] && [ ! -e "$LOGROOT/current" ] && ln -sfn "$(readlink "$LOGROOT/latest")" "$LOGROOT/current"
+rm -f "$LOGROOT/latest"
+if [ -e "$LOGROOT/current" ]; then
+  ln -sfn "$(readlink "$LOGROOT/current")" "$LOGROOT/previous"   # the run before this one
+else
+  rm -f "$LOGROOT/previous"   # nothing live to be previous to
+fi
 ln -sfn "$RUNDIR" $LOGROOT/current
 STATUS=$RUNDIR/status.txt
 
@@ -117,26 +124,28 @@ trap '[ -n "$SLOT" ] && rm -rf $LOGROOT/slots/slot$SLOT' EXIT INT TERM
 
 say "battery $RUNID (pid $$) profile=$PROFILE budget=${BUDGET:-suite defaults} slot=${SLOT:-none} base=$BASE"
 say "suites: $SUITES"
-say "previous: $(basename "$(readlink "$LOGROOT/previous" 2>/dev/null)" 2>/dev/null || echo none)"
+say "previous: $(basename "$(readlink "$LOGROOT/previous" 2>/dev/null || echo none)")"
 TOTAL=$(echo $SUITES | wc -w | tr -d ' ')
 N=0
 BT0=$(date +%s)
 
-# the eta: the complete prior tally of the same profile predicts the batch;
-# each finished suite's actual time is subtracted as it lands
-ETAFILE=$LOGROOT/eta-$PROFILE.txt   # the per-suite wall times; every run's tally rewrites it
-REMAIN=
-if [ -f "$ETAFILE" ]; then
-  total=0; have=all
-  for s in $SUITES; do
-    d=$(awk -v s="$s" '$1 == s { print $2; exit }' "$ETAFILE" 2>/dev/null)
-    if [ -n "$d" ]; then total=$((total + d)); else have=missing; break; fi
-  done
-  [ "$have" = all ] && REMAIN=$total
+# the eta: the prior history of the same profile predicts the batch; a
+# suite without history goes partial instead of zeroing the whole batch,
+# and every finished suite's actual lands in the file right away — an
+# interrupted run keeps its finished rows (the end-of-run rewrite lost them)
+ETAFILE=$LOGROOT/eta-$PROFILE.txt   # the per-suite wall times, one '<suite> <seconds>' row each
+REMAIN=; MISSING=0
+for s in $SUITES; do
+  d=$(awk -v s="$s" '$1 == s { print $2; exit }' "$ETAFILE" 2>/dev/null)
+  if [ -n "$d" ]; then REMAIN=$(( ${REMAIN:-0} + d )); else MISSING=$((MISSING + 1)); fi
+done
+if [ -n "$REMAIN" ] && [ "$MISSING" -eq 0 ]; then
+  say "estimate: ~$(fmt "$REMAIN") total, done ~$(etatime "$REMAIN") (the $PROFILE eta history)"
+elif [ -n "$REMAIN" ]; then
+  say "estimate: ~$(fmt "$REMAIN") for $((TOTAL - MISSING))/$TOTAL suites, done ~$(etatime "$REMAIN") (partial $PROFILE history)"
+else
+  say "estimate: none (no $PROFILE eta history yet)"
 fi
-[ -n "$REMAIN" ] && say "estimate: ~$(fmt "$REMAIN") total, done ~$(etatime "$REMAIN") (the $PROFILE eta history)" \
-                 || say "estimate: none (no complete $PROFILE eta history yet)"
-ETANEW=$RUNDIR/tmp/eta.txt; : > "$ETANEW"
 
 # the quiet window: the parallel profiles wait only for daemons whose
 # ports fall inside their own shifted range (the other slots' daemons
@@ -224,7 +233,9 @@ for s in $SUITES; do
   rc=$?
   ds=$(( $(date +%s) - t0 ))
   dur=$(fmt $ds)
-  echo "$s $ds" >> "$ETANEW"
+  # the history row lands per-suite, right away — an interrupted run keeps
+  # its finished suites
+  { [ -f "$ETAFILE" ] && awk -v s="$s" '$1 != s' "$ETAFILE" 2>/dev/null; echo "$s $ds"; } > "$ETAFILE.n" && mv "$ETAFILE.n" "$ETAFILE"
   if [ -n "$REMAIN" ]; then
     r=$((REMAIN - ds))
     [ $r -ge 0 ] && REMAIN=$r || REMAIN=0
@@ -251,15 +262,14 @@ for s in $SUITES; do
   fi
 done
 [ $fail -eq 0 ] && say "BATTERY: ALL PASS" || say "BATTERY: $fail NOT GREEN"
-cp "$ETANEW" "$ETAFILE"   # the eta history for the next run
 
 # the archive: the run's evidence (the status, the logs, the scratch) into
 # one tarball under backups/ — the scratch is text and compresses hard; the
 # green runs drop tmp/ after (nothing to post-mortem), the failed ones keep
-# it live. The backups keep the newest 8 (the keep-4 housekeeping ages the
+# it live. The backups keep the newest 32 (the keep-4 housekeeping ages the
 # run dirs separately)
 BACKUPS=$LOGROOT/backups
 mkdir -p $BACKUPS
 COPYFILE_DISABLE=1 tar --exclude='._*' -czf "$BACKUPS/$RUNID.tar.gz" -C $LOGROOT $RUNID 2>/dev/null
 [ $fail -eq 0 ] && rm -rf $RUNDIR/tmp
-ls -1dt $BACKUPS/*.tar.gz 2>/dev/null | tail -n +9 | xargs rm -f 2>/dev/null
+ls -1dt $BACKUPS/*.tar.gz 2>/dev/null | tail -n +33 | xargs rm -f 2>/dev/null

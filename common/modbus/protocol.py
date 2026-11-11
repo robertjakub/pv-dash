@@ -25,6 +25,18 @@ def unit_in_range(unit):
     return lo <= unit <= hi
 
 
+def apply_socket_timeout(options, name='timeout'):
+    """The Modbus socket timeout's default lives in the tree — the one
+    home: the tool's `timeout` knob (the cache's and scraper's
+    `modbus timeout`) takes its static default from
+    PROTOCOL['socket_timeout'] and the registries hand-copy no number.
+    The lib/options.py loaders call this over their rows before the
+    defaults build; scripts/check_options.py pins the splice."""
+    for opt in options:
+        if opt.name == name:
+            opt.static_default = PROTOCOL['socket_timeout']
+
+
 class ModbusError(Exception):
     pass
 

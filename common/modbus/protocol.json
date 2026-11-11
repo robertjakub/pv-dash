@@ -3,6 +3,7 @@
   "max_registers": 65536,
   "max_count": 125,
   "max_bits": 2000,
+  "socket_timeout": 3.0,
   "unit_id_range": [1, 247],
   "read_funcs": [1, 2, 3, 4],
   "write_funcs": [5, 6, 15, 16, 22, 23],

@@ -31,7 +31,6 @@ and as a full pass whenever a wave landed doc ripples across tools.
 | the mechanism specs (the shared core) | [common/MODBUS.md](common/MODBUS.md) (the protocol, the profiles, the auth), [common/ACL.md](common/ACL.md) (the gates), [common/static-defaults.md](common/static-defaults.md) (the defaults ladder + the gate) |
 | the security ledger | [SECURITY.md](SECURITY.md) — the open findings, the posture, the NIS2/DORA map; the closed half in [history/AUDIT.md](history/AUDIT.md) (the closed findings with fix + verification, the per-revision walk) |
 | the ledgers (open vs history) | [TODO.md](TODO.md) — the open items (the one-product sweep rides as its section) + the per-tool `TODO.md` Done records; [history/family-unify.md](history/family-unify.md) — the sweep's verified-aligned ledger (do not re-open); the generated [family-drift.md](family-drift.md) (the census + the open findings) + [history/family-drift.md](history/family-drift.md) (the landed legs) |
-| the generated family views | [OPTIONS.md](OPTIONS.md) (the knob census) beside family-drift.md — the generators + gates in [scripts/README.md](../scripts/README.md) |
 | the release history | the root [CHANGELOG](../CHANGELOG.md) (Unreleased + the current release), [history/CHANGELOG.md](history/CHANGELOG.md) (the archive — `scripts/release.py` maintains the split) |
 | the maintenance | this page's redo (below), [scripts/README.md](../scripts/README.md) (the gates + the editors) |
 | the deployment | [docker/README.md](../docker/README.md) (the stacks, the env files, the secrets), [nixos/README.md](../nixos/README.md) (the one Nix reference) |
@@ -54,8 +53,8 @@ answers "what is true now", the history half "how did we get here"):
   the history half only grows.
 - The main docs link their history half; the history half links back.
 
-The generated pages — the drift doc + the seed ledger, OPTIONS.md, the
-four MANUALs, the four env examples, the man pages, the SBOM pair —
+The generated pages — the drift doc + the seed ledger, the four
+MANUALs, the four env examples, the man pages, the SBOM pair —
 are inventoried with their generators and gates in the generators
 section of [scripts/README.md](../scripts/README.md). An editorial
 change to a generated doc lands in the GENERATOR's constants (the

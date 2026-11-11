@@ -25,9 +25,10 @@ and the console tools (`*-ctl`, `*-cli`) share the family pattern (a
 JSON-lines control server, a settings registry, an append-only audit trail,
 a reconnecting console session — TAB/`?` complete and describe every word,
 the registry's hierarchy nodes file the listings, the non-value reply lines
-ride the `% ` prefix). Every knob of the four daemons, side by
-side — name, the live `set` command, who has it: [OPTIONS.md](docs/OPTIONS.md)
-(generated from the option registries).
+ride the `% ` prefix). Every knob lives in its registry
+(`<tool>/lib/options.json`); the per-tool [MANUAL.md](cache/MANUAL.md)
+tables render it (generated, `--check`-gated), and
+`python3 scripts/list_options.py` is the cross-tool census on demand.
 
 ## The flake
 
@@ -57,7 +58,7 @@ pv-suite/
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))
 ├── common/       # the shared Python package — render/ runtime/ settings/ wire/ serve/ modbus/ ([docs](common/README.md))
 ├── tests/        # the test suites, one or more per Modbus tool
-├── scripts/      # the gates + editors: check/lint/gen_options, editor.py,
+├── scripts/      # the gates + editors: check/lint, editor.py,
 │                 #   lint_readmes/lint_texts/lint_acl, family_drift, gen_man/gen_manual/gen_env,
 │                 #   gen_sbom, validate_json, set_group/set_live, battery.sh, release.py,
 │                 #   audit_verify.py
@@ -68,7 +69,7 @@ pv-suite/
 │                 #   [design doc](docs/DESIGN.md) (the shape + the docs redo): the
 │                 #   [security doc](docs/SECURITY.md), the
 │                 #   [Modbus protocol reference](docs/common/MODBUS.md), the
-│                 #   [ACL map](docs/common/ACL.md), the [knob census](docs/OPTIONS.md), the
+│                 #   [ACL map](docs/common/ACL.md), the
 │                 #   [family-wide TODO](docs/TODO.md) (every open item — the one-product
 │                 #   sweep rides as its section), the
 │                 #   [SBOM](docs/sbom/SBOM.md) and the history home

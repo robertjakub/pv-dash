@@ -780,7 +780,7 @@ The findings:
   (the page's auth namespace), the other three's is the modbus auth
   enum (`suite|none`). One spelling, two meanings in the family's
   set-grammar space — legal (the registries are per-tool), but the
-  merged-knob view (docs/OPTIONS.md) and any future family-wide
+  merged-knob view (scripts/list_options.py) and any future family-wide
   grammar should note it.
 - **`KNOWN_VERBS` derives from the rows** (the landed leg): the
   loaders build the RBAC vocabulary from the registry's command rows

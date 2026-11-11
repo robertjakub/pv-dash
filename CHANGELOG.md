@@ -53,7 +53,12 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   cache README's access-control section collapses its three tellings
   to their homes (the flag table owns the defaults + the inline
   grammar, docs/common/ACL.md owns the family rules) — the ACL.md
-  pointer and the cache's four-gates shape stay.
+  pointer and the cache's four-gates shape stay; the shipped
+  OPTIONS.md retires — the knob census's one home is
+  `scripts/list_options.py` (the superset: options/show/commands
+  rows), the per-tool MANUALs stay the reference, and the only
+  generated page without a `--check` gate is gone (gen_options.py
+  with it).
 
 - **nixos** — **the Nix tree gets its own home under `nixos/`**: the four
   `package.nix` files move to `nixos/pkgs/<tool>/` (flat, one dir per

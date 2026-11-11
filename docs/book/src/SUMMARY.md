@@ -10,7 +10,6 @@
 - [Nix / NixOS](nixos.md)
 - [ACLs — the access-control map](acl.md)
 - [Configuration — the set grammar](config.md)
-- [The knobs (OPTIONS)](options.md)
 - [Security](security.md)
 - [Security-audit history](audit-history.md)
 - [Roadmap / TODO](todo.md)

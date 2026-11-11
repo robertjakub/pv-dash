@@ -70,7 +70,7 @@ WIDTH = 76
 
 
 def load(tool_dir):
-    """The tool's wired rows (gen_options.py's import dance: one module
+    """The tool's wired rows (the import dance: one module
     named `options` at a time) plus the raw registry (the commands/show
     sections' row order and flags — the loader keys them by live word and
     drops the node rows, the page wants both)."""

@@ -36,7 +36,9 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   stay hidden unless `--nodes`, `--sort` orders by knob name,
   `--hide` drops whole sections / `--show` keeps only them, comma
   separated, `--tool` names the tools comma separated with `all`
-  the default).
+  the default). The census's one home since the shipped OPTIONS.md
+  retired — the registries are the truth, this is the cross-tool view
+  on demand.
 
 ## The checks (the shipped artifacts)
 
@@ -70,8 +72,6 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
 - **`gen_man.py`** — the man pages from the live parsers + each
   tool's `lib/man.py` prose (`--man` renders through the bin; the
   shipped pages regenerate).
-- **`gen_options.py`** — docs/OPTIONS.md from the registries (the
-  one-table knob census).
 - **`gen_manual.py`** — the four `<tool>/MANUAL.md` pages from the
   registries: every command, knob and show report the tool's control
   wire answers, the kind of each (command, settable — set/clear — or
@@ -92,7 +92,6 @@ edit to the rendered page dies at the next run):
 | Page | Generator | Gate |
 |---|---|---|
 | [docs/family-drift.md](../docs/family-drift.md) + the seed ledger | `family_drift.py` | `--check` |
-| [docs/OPTIONS.md](../docs/OPTIONS.md) | `gen_options.py` | regenerate (no `--check`) |
 | `<tool>/MANUAL.md` (×4) | `gen_manual.py` | `--check` |
 | `docker/env/<tool>.env.example` (×4) | `gen_env.py` | `--check` |
 | `<tool>/man/*.1` (×4) | `gen_man.py` | `mandoc -Tlint` |
@@ -127,7 +126,7 @@ python3 scripts/family_drift.py --check    # stale doc fails
     canon buckets the `SystemExit(variable)` sites properly (the
     nearest-text walk is linear over the enclosing block; make it the
     enclosing function's last literal).
-  - the dropped riders: gen_man.py/gen_options.py regenerations ride
+  - the dropped riders: gen_man.py's regeneration rides
     release.py's flow explicitly (the `--tests none` re-run path
     should not skip the doc regens silently).
 - **consolidate**
@@ -141,7 +140,7 @@ python3 scripts/family_drift.py --check    # stale doc fails
     the sweeps on it.
   - the doc-writer helper: the emit-and-check pattern (render, diff,
     exit 1 on stale) is family_drift.py's `--check` and
-    gen_options/gen_sbom's shape — one helper, all generators on it.
+    gen_sbom's shape — one helper, all generators on it.
 - **drift check**
   - `family_drift.py --check` joins release.py's gates: a stale
     drift doc (or a regenerating sweep that would change it) fails

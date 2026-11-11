@@ -117,8 +117,8 @@ they name the wire.
   still declares `min: 0, max: 255` and only its live set gates on it
   (`scraper/lib/control.py:306`) while start refuses `<1`; the cache's
   live `set unit` is ungated entirely (`cache/lib/control.py:244`);
-  docs/OPTIONS.md still lists `modbus-unit` and `unit` as two knobs
-  (`:110`, `:132`) — both rendering the same console spelling
+  the registries still name `modbus-unit` (scraper) and `unit` (cache,
+  inverter) as two knobs — both rendering the same console spelling
   `set modbus unit`. Outcome: one name, one flag, one env, live
   everywhere, the row bounds = the shared tree's range (the NixOS
   `unitId`/`modbusUnit` renames follow).
@@ -130,8 +130,7 @@ they name the wire.
   own metrics leaf is `metrics/limits/timeout` while its socket leaf
   is `limits/client-timeout` (one family, two leaves, `:186` vs
   `:107`). The wire speaks the bare flat names on every tool, so the
-  drift hides behind the console spellings (docs/OPTIONS.md renders
-  the union, `:89`). Outcome:
+  drift hides behind the console spellings. Outcome:
   `<surface>/limits/{max-clients,client-timeout,max-conn-per-ip}`; the
   leaf is `client-timeout` everywhere.
 - **the /metrics caps, four postures** `[scraper]` `[inverter]`
@@ -292,8 +291,7 @@ they name the wire.
   `shared/texts.json:82` — plus the set-path hand copy), `, restart` /
   `startup-only — pass it by flag/env/config (set/clear refuse)`
   (show knobs + help config via `control_command()`,
-  `common/settings/options.py:390-408`, and the OPTIONS.md generator's
-  own copy of the strings, `scripts/gen_options.py:71-76`),
+  `common/settings/options.py:390-408`),
   `*(restart)*` / `startup-only (secret)` (MANUAL.md,
   `scripts/gen_manual.py:143-146`), `restart: true` + the wire phrase
   (only the cache's man carries the trio now, `cache/lib/man.py:98-107`),
@@ -443,8 +441,9 @@ they name the wire.
 - `lint_texts.py` flags a **literal that equals a leaf** after
   `%`-normalisation — still missing.
 - the breaking renames (the scraper's `auth-token` → `metrics-token`,
-  the unit unification) ship with the **alias map + the migration
-  note** in docs/OPTIONS.md — still ungated (check_options checks the
+  the unit unification) ship with the **alias map** (the rows' `alias`
+  field) + the **migration note** (the CHANGELOG's Unreleased + the
+  help surfaces) — still ungated (check_options checks the
   aliases' cleanliness only).
 
 The verified-aligned ledger — the swept-and-closed alignments, do not

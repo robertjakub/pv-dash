@@ -294,6 +294,17 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Fixed
 
+- **cache** — **the metrics-token knob resolves through the full ladder**:
+  the config layer was missing — a config line `set metrics-token …`
+  parsed and was silently dropped (the bin read the flag/env pair only),
+  so a token standing in the config file never reached the F13 gate (a
+  tokenless non-loopback /metrics refused to start despite the knob's own
+  flag/env/config claim). `resolve_config` carries `metrics_token` now
+  (flag > env > config, the `file:` form works from every layer), the
+  bin's local flag/env read and the post-hoc show-config injection are
+  gone — the key rides the resolved dict and the secret placeholder rule
+  renders as before.
+
 - **cache, scraper, inverter** — **the Modbus protocol limits are one
   tree**: `common/modbus/protocol.json` (max_pdu **253**, max_registers
   **65536**, max_count 125, max_bits 2000, unit_id_range 1..247) —

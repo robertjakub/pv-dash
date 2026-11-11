@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common.runtime.audit import audit_params_of, build_audit, default_path as default_audit_path
-from common.settings.config import is_loopback_host, parse_control_target, parse_listen, parse_secret, parse_upstream
+from common.settings.config import is_loopback_host, parse_control_target, parse_listen, parse_upstream
 from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, parse_ops_verbs, setup_logging, \
     install_signal_handlers as install_family_signals
 from common.settings.options import build_parser
@@ -151,7 +151,7 @@ def main():
                      'set --control-token (the default unix socket needs none), '
                      'or disable it with --control-port 0', control_target)
         raise SystemExit(2)
-    metrics_token = parse_secret(args.metrics_token or os.environ.get('METRICS_TOKEN'), 'metrics-token')
+    metrics_token = cfg['metrics_token']
     metrics_listen = parse_listen(cfg['metrics_listen'], '--metrics-listen')
     if cfg['metrics_server'] and not metrics_token and not is_loopback_host(metrics_listen[0]):
         logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
@@ -182,8 +182,7 @@ def main():
                                       max_per_ip=cfg['metrics_max_conn_per_ip'],
                                       started=time.monotonic()) if cfg['metrics_server'] else None
     proxy.metrics_listen = metrics_listen
-    proxy.metrics_token = metrics_token
-    proxy.config['metrics_token'] = metrics_token   # the secret row renders in show config (the placeholder rule)
+    proxy.metrics_token = metrics_token   # the key rides proxy.config natively (the show-config placeholder rule)
     proxy.metrics_caps = (cfg['metrics_max_clients'], cfg['metrics_client_timeout'],
                           cfg['metrics_max_conn_per_ip'])
     proxy.dump_path = cfg['dump_path'] or None

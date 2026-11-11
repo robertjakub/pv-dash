@@ -416,6 +416,8 @@ def resolve_config(args, script_dir=None):
                                        'METRICS_SERVER', 'metrics_server', DEFAULTS['metrics_server']),
         'metrics_listen': resolve(getattr(args, 'metrics_listen', None), 'METRICS_LISTEN',
                                   'metrics_listen', DEFAULTS['metrics_listen'], str),
+        'metrics_token': parse_secret((resolve(getattr(args, 'metrics_token', None), 'METRICS_TOKEN',
+                                               'metrics_token', None, str) or '').strip() or None, 'metrics-token'),
         'metrics_acl': parse_acl_value(resolve(getattr(args, 'metrics_acl', None), 'METRICS_ACL',
                                                'metrics_acl', DEFAULTS['metrics_acl'], str), 'metrics-acl'),
         'connect_acl': parse_acl_value(resolve(args.connect_acl, 'CONNECT_ACL', 'connect_acl',

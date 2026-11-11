@@ -2393,6 +2393,15 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
                        capture_output=True, text=True, timeout=15)
     check('metrics: a non-loopback endpoint with a token starts',
           r.returncode == 0 and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
+    mtc = '/tmp/reg_metrics_token.conf'
+    open(mtc, 'w').write('# the token rides the config layer\n'
+                         'set metrics-token sekrit\n')
+    r = subprocess.run([sys.executable, P, '--config', mtc, '--upstream', '127.0.0.1:%d' % (15512 + BASE), '--dry-run',
+                        '--listen', '127.0.0.1:%d' % (15599 + BASE), '--metrics-listen', '0.0.0.0:15598', '--metrics-server', '--profile', R],
+                       capture_output=True, text=True, timeout=15)
+    check('metrics: a non-loopback endpoint with the config-file token starts (the full ladder)',
+          r.returncode == 0 and '(bearer token)' in (r.stderr + r.stdout)
+          and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
 
     # the paste-back gate: a rendered `set <secret> *** SECRET REMOVED ***`
     # line refuses to parse — the placeholder is never a value

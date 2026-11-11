@@ -70,14 +70,14 @@ design); the top non-man pairs:
 | 0.88 | `scraper/lib/options.py:27` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
-| 0.82 | `cache/bin/modbus-cache.py:337` `watch_dump` <-> `common/wire/control.py:1315` `run_dump_interval` |
+| 0.82 | `cache/bin/modbus-cache.py:336` `watch_dump` <-> `common/wire/control.py:1339` `run_dump_interval` |
 | 0.82 | `inverter/lib/control.py:102` `__init__` <-> `dashboard/lib/control.py:72` `__init__` |
 | 0.78 | `inverter/lib/signals.py:77` `__init__` <-> `common/modbus/client.py:20` `__init__` |
-| 0.78 | `inverter/lib/control.py:463` `acl_table_report` <-> `dashboard/lib/control.py:288` `acl_table_report` |
+| 0.78 | `inverter/lib/control.py:468` `acl_table_report` <-> `dashboard/lib/control.py:293` `acl_table_report` |
 | 0.76 | `scraper/lib/server.py:89` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.74 | `scraper/lib/control.py:114` `__init__` <-> `dashboard/lib/control.py:72` `__init__` |
-| 0.74 | `cache/lib/config.py:116` `load_profile_write_gate` <-> `common/settings/config.py:421` `load_write_gate_file` |
-| 0.73 | `scraper/lib/control.py:114` `__init__` <-> `inverter/lib/control.py:102` `__init__` |
+| 0.74 | `scraper/lib/control.py:116` `__init__` <-> `dashboard/lib/control.py:72` `__init__` |
+| 0.74 | `cache/lib/config.py:127` `load_profile_write_gate` <-> `common/settings/config.py:438` `load_write_gate_file` |
+| 0.73 | `scraper/lib/control.py:116` `__init__` <-> `inverter/lib/control.py:102` `__init__` |
 | 0.72 | `common/settings/config.py:14` `resolve_target` <-> `common/runtime/daemon.py:44` `default_config_path` |
 
 ## The surface sweep — the listeners, the wire and the loops
@@ -234,7 +234,7 @@ canon the operators grep for.
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
 **The phrase canon**: 24 log phrase(s) shared by >= 2 tools;
-88 tool-local. The canon (the lead clause, the tools that speak it):
+89 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
@@ -296,6 +296,7 @@ The refusal texts (the literal SystemExit args, sorted):
 - `metrics-listen cannot move beyond loopback while the endpoint serves without a token (F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config and restart`
 - `metrics-server must be on or off`
 - `mppt must be both|east|west|none`
+- `must be an http:// or https:// URL with a host`
 - `no http server attached`
 - `no modbus device attached`
 - `non-finite result`
@@ -413,16 +414,16 @@ published port not backed by a registry default is a lie.
 | `docker/Dockerfile.modbus-cache` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `README`, `REQUIRED`, `SELECTION`, `SO_PEERCRED`, `UPSTREAM`, `VOLUME`, `WORKDIR` | 15502 |
 | `docker/Dockerfile.modbus-scraper` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `METRICS_SPEC`, `README`, `REQUIRED`, `SO_PEERCRED`, `UPSTREAM`, `VOLUME` … | 9350 |
 | `docker/Dockerfile.prometheus` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `VOLUME` | — |
-| `docker/README.md` | `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CHAOS`, `CONFIG`, `CONFIG_JS`, `COPY`, `EDITOR`, `ENTRYPOINT`, `HEALTHCHECK`, `HMAC`, `HOST`, `INTERVAL` … | 15502, 5502, 8080, 9350 |
+| `docker/README.md` | `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CHAOS`, `CONFIG`, `CONFIG_JS`, `COPY`, `EDITOR`, `ENTRYPOINT`, `GENERATED`, `HEALTHCHECK`, `HMAC`, `HOST` … | 15502, 5502, 8080, 9350 |
 | `docker/demo/README.md` | `DEMO`, `HOST`, `JSON`, `PROM_URL`, `README`, `TSDB`, `UPSTREAM` | 8080, 9090 |
 | `docker/demo/compose.yaml` | `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `MODBUS_AUTH`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
 | `docker/entrypoints/entrypoint-prometheus.sh` | `AUDIT`, `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
 | `docker/entrypoints/entrypoint.sh` | `AUDIT`, `JSON`, `README`, `REQUIRED` | — |
-| `docker/env/cache.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL` … | — |
-| `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `INFO`, `LISTEN`, `LOG_LEVEL`, `NO_AUDIT_LOG`, `PLAIN`, `PROM_URL` | — |
-| `docker/env/fake.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CLIENT_TIMEOUT`, `INFO`, `LISTEN`, `LOG_LEVEL`, `MAX_CLIENTS`, `MAX_CONN_PER_IP`, `MAX_KWP` … | — |
+| `docker/env/cache.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
+| `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONFIG_JS`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS` … | — |
+| `docker/env/fake.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `CHAOS`, `CIDR`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
-| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `DEBUG`, `ERROR`, `HOST`, `INFO`, `INTERVAL`, `LOG_LEVEL`, `METRIC_PREFIX` … | — |
+| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS` … | — |
 | `docker/prod/README.md` | `AUDIT`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `EDITOR`, `HOST`, `JSON`, `PORT`, `PROM_URL`, `README`, `UPSTREAM`, `YOUR` | 8080, 9350 |
 | `docker/prod/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `MODBUS_AUTH`, `ONLY`, `PORT` … | 8080, 9350 |
 | `docker/prometheus.yml` | `AUDIT` | — |

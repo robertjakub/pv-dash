@@ -12,6 +12,34 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **everywhere** — **every knob's value is judged by its registry row at
+  every layer** (the row-driven validation): a row's `conv`, `choices`,
+  `min`/`max` and the named `check` validators now gate the flag parser
+  (`build_parser` types through `row_value` — a refused flag reads
+  `argument --unit: invalid unit value: '999'`), the env and config layers
+  (the `Resolver` takes the row and judges the whole contract, keep-last-good
+  as before — a value the wire refuses no longer lands from a file), the
+  wire's typed fallback (the scraper's `_typed` generalized into the base's
+  `apply_typed_key` — a row with no hand branch still validates and records;
+  the four tools' `_apply` ladders end on it) and the dump restore (which
+  re-applies through `_apply`, so it inherits all of it). The restart fold
+  refuses a garbage restore-on-start instead of silently reading False.
+  Row fills: the cache's unit/timeout/interval bounds, the scraper's unit
+  row now the Modbus range 1..247 (matching the startup's own check — a
+  live-accepted 0 or 248 could not survive a restart), max-kwp/max-grid-kw
+  minimums, the timeout/interval caps, the dashboard's metrics caps. The
+  scraper's `profile`, `metrics-spec` and `metric-prefix` sets rebuild live
+  now (the map, the spec and the exported names swap under the poller's
+  lock, a bad file rolls back) instead of the silent cfg write. The fake
+  accepts the documented `--time auto` at start, applies `--timezone`
+  (it resolved and never applied), and a lowercase LOG_LEVEL rides as its
+  canonical word instead of the AttributeError traceback; the cache runs
+  the token-charset check the family already had; the dashboard's PROM_URL
+  must be an http(s) URL with a host and PROM_PREFIX a clean URL path.
+  The lint follows: `check_options` resolves every row `check` against the
+  tool's CHECKS registry and pins the bounds' sanity (numeric rows only,
+  min <= max, no bool bounds).
+
 - **scripts** — **`editor.py` replaces `edit_options.py` and
   `edit_acl.py`** (the one combined terminal editor, the word
   subcommands): the two old editors are gone, every reference
@@ -294,6 +322,15 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Fixed
 
+- **everywhere** — **`CLI_KEEPALIVE` is validated**: a non-float value
+  raised an uncaught ValueError traceback inside the cli session (the
+  enclosing try caught only DaemonExit/ConnectionLost). The env is
+  parsed once at startup, before the connect — a bad value is the
+  family's one-line refusal (`invalid CLI_KEEPALIVE '…': must be a
+  number of seconds (0 = off)`, exit 1) on every console that
+  documents the knob, and a blank value now counts as unset (the
+  resolver's rule) instead of crashing the float().
+
 - **cache** — **the metrics-token knob resolves through the full ladder**:
   the config layer was missing — a config line `set metrics-token …`
   parsed and was silently dropped (the bin read the flag/env pair only),
@@ -402,6 +439,21 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   describe/audit pins included).
 
 ### Added
+
+- **docker** — **the env examples are GENERATED from the registries**
+  (`scripts/gen_env.py`; `--check` gates the drift): every env twin the
+  four registries declare is in the file now (50/39/34/36 — the hand
+  files carried 13/12/18/11), grouped by the knob's namespace node the
+  MANUAL.md knobs tables speak, the sample value the image itself runs
+  (the CMD flag or an ENV where one pins the knob — `LISTEN`/
+  `AUDIT_LOG` carry the pinned-by-the-CMD note, `UPSTREAM`/`SELECTION`/
+  `METRICS_SPEC`/`CONFIG_JS` the image-ENV one), the compose stacks'
+  environment pins marked per knob (the suite keys, the generated
+  tokens), the secrets' lines empty with the `file:<path>` discipline,
+  and the dashboard's example gains the twins header it never had. The
+  prometheus example stays hand-written (its `PROM_*` knobs belong to
+  `entrypoint-prometheus.sh`) — the check cross-checks its names
+  against the entrypoint.
 
 - **tests** — **the battery learns quick/full and tells time**: every
   suite takes a `quick|full` profile (`PV_SUITE_PROFILE` — the runner

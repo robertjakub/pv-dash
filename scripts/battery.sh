@@ -3,8 +3,9 @@
 # budgets — the ~5-minute loop per commit. Concurrent batteries take
 # disjoint port spaces (the runner hands a slot; the suites shift their
 # ports by SUITE_PORT_BASE), so parallel runs cannot kill each other.
-# The release gates keep their own matrix (scripts/release.py); the
-# nightly keeps the full budgets.
+# The release's local battery rides this runner too (release.py's
+# `full` profile); the CI release workflow keeps its own per-suite
+# matrix legs; the nightly keeps the full budgets.
 #
 #   scripts/battery.sh                # commit: the fast set, cache-fuzz at 100 (~3 min) — parallel-safe
 #   scripts/battery.sh common         # the spine's commit set (~4 min) — parallel-safe
@@ -15,6 +16,7 @@
 #   scripts/battery.sh quick          # all ten, the fuzzes at 300 (~3 min) — serial
 #   scripts/battery.sh full           # all ten, the suite defaults — the nightly, serial
 #   scripts/battery.sh <suite> ...    # explicit names, e.g. cache-regtest inverter-regtest
+#   scripts/battery.sh --depth full <suite> ...  # explicit names at the nightly depth (the regtests' full profile + the fuzzes' full spread) — the release's recovery pair rides this
 #   scripts/battery.sh --stop ...     # the flag may sit anywhere: the first FAILED suite ends the run — the tally marks the rest SKIPPED
 #   scripts/battery.sh --name <label> ...  # label the run with the wave/chat that asked for it — the flag may sit anywhere: the status carries a `wave:` line (the battery_status view shows it)
 #
@@ -94,20 +96,28 @@ ls -1dt $LOGROOT/2* 2>/dev/null | tail -n +9 | while read -r d; do
 done
 # the flags: --stop ends the battery at the first FAILED suite (the tally
 # marks the rest SKIPPED); --name labels the run with the wave/chat that
-# asked for it. Both flags may sit anywhere in the args.
-STOP=''; NAME=''
+# asked for it; --depth overrides the suites' depth for explicit names
+# (quick | full — full is the nightly depth the `full` profile implies).
+# All flags may sit anywhere in the args.
+STOP=''; NAME=''; DEPTH=''
 ARGS=''
 while [ $# -gt 0 ]; do
   case "$1" in
     --stop)   STOP=1 ;;
     --name)   [ $# -ge 2 ] && { NAME=$2; shift; } ;;
     --name=*) NAME=${1#--name=} ;;
+    --depth)  [ $# -ge 2 ] && { DEPTH=$2; shift; } ;;
+    --depth=*) DEPTH=${1#--depth=} ;;
     *)        ARGS="$ARGS
 $1" ;;
   esac
   shift
 done
 [ -n "$ARGS" ] && set -- $ARGS
+case "$DEPTH" in
+  ''|quick|full) ;;
+  *) echo "battery: --depth must be quick or full (got '$DEPTH')" >&2; exit 1 ;;
+esac
 # the label is prose, not a filename (the run id keeps its plain
 # <date>-<profile> shape) — one line, whitespace collapsed and trimmed,
 # 64 chars max; a label that trims away to nothing is no label
@@ -122,7 +132,7 @@ mkdir -p "$RUNDIR/tmp"
 echo $$ > "$RUNDIR/pid"   # the housekeeping's liveness marker (a live pid = untouchable, a dead one = canceled)
 export PV_RUN_DIR="$RUNDIR/tmp"   # the suites' gate marker (a standalone run refuses)
 export TMPDIR="$RUNDIR/tmp" TMP="$RUNDIR/tmp"   # the tempfile users land in the run dir — /tmp keeps only the daemon sockets
-export PV_SUITE_PROFILE=$([ "$PROFILE" = full ] && echo full || echo quick)   # the suites' depth (quick default; full = the nightly depth)
+export PV_SUITE_PROFILE=${DEPTH:-$([ "$PROFILE" = full ] && echo full || echo quick)}   # the suites' depth (quick default; full = the nightly depth; --depth overrides for explicit names)
 rm -f $LOGROOT/latest $LOGROOT/current $LOGROOT/previous   # the retired spellings — the live view is slots/slot<N>, the finished one the newest dir
 rm -rf $LOGROOT/links   # the pre-rename spelling of slots/
 STATUS=$RUNDIR/status.txt
@@ -335,8 +345,9 @@ for s in $SUITES; do
   t0=$(date +%s)
   if [ "$s" = "cache-fuzz" -o "$s" = "scrape-fuzz" ]; then
     # the fuzz budget + the mode: quick pools the basic shapes, full the
-    # nightly spread (both fuzz suites take [iterations] [quick|full])
-    FUZZPROF=quick; [ "$PROFILE" = full ] && FUZZPROF=full
+    # nightly spread (both fuzz suites take [iterations] [quick|full]) —
+    # the spread follows the depth (the full profile, or --depth full)
+    FUZZPROF=$PV_SUITE_PROFILE
     python3 tests/zz_bx.py "${BUDGET:-3000}" "$FUZZPROF" > "$RUNDIR/$s.log" 2>&1
   else
     python3 tests/zz_bx.py > "$RUNDIR/$s.log" 2>&1
@@ -389,3 +400,6 @@ COPYFILE_DISABLE=1 tar --exclude='._*' -czf "$BACKUPS/$RUNID.tar.gz" -C $LOGROOT
 [ $fail -eq 0 ] && rm -rf $RUNDIR/tmp
 ls -1dt $BACKUPS/*.tar.gz 2>/dev/null | tail -n +33 | xargs rm -f 2>/dev/null
 DONE=1   # the EXIT trap stays quiet — the run finished (the trap still frees the slot + the link)
+# the machine verdict beside the tally text: 0 green, 1 red — the release
+# orchestrator keys its gate off this (the status file stays the human record)
+[ $fail -eq 0 ] && exit 0 || exit 1

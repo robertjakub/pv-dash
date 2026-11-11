@@ -103,7 +103,9 @@ edit to the rendered page dies at the next run):
 
 ## The release
 
-- **`release.py`** — the orchestrator: the suites + the nix build
+- **`release.py`** — the orchestrator: the battery (scripts/battery.sh
+  `full` — the runner owns the run dir, the tally and the failed-run
+  backups; the `--tests quick` pair rides `--depth full`) + the nix build
   gate first, the version bump, the CHANGELOG split maintenance
   (Unreleased + current in the root, the archive in
   docs/history/CHANGELOG.md), the tag + the GH release cut. Dry-run leaks

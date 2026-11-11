@@ -3,7 +3,8 @@
 
 One command per release: bump the version everywhere it lives, rename the
 CHANGELOG's Unreleased section, (optionally) refresh flake.lock, verify
-(the suites + the nix build), commit with the expanded note, tag
+(the battery via scripts/battery.sh + the nix build), commit with the
+expanded note, tag
 (annotated, signed when a key exists — the bare X.Y.Z the suite has
 always used) and push. The GitHub release is the tag-triggered workflow's
 job (it gates on the suites + the nix build first — docs/SECURITY.md F19);
@@ -11,7 +12,7 @@ pass --release to cut it locally and skip that gate.
 
     python3 scripts/release.py 0.4.2               # the full flight
     python3 scripts/release.py 0.4.2 --dry-run     # everything but the landing
-    python3 scripts/release.py 0.4.2 --tests quick # the two regtests only
+    python3 scripts/release.py 0.4.2 --tests quick # the two regtests only (via the runner, full depth)
     python3 scripts/release.py 0.4.2 --keep-lock   # keep the nixpkgs pin
     python3 scripts/release.py 0.4.2 --release     # cut the GH release locally
 
@@ -23,21 +24,15 @@ still go out. Stdlib only, like the rest of the family.
 import argparse
 import datetime
 import json
-import os
 import pathlib
 import re
 import subprocess
 import sys
-import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHANGELOG = ROOT / 'CHANGELOG.md'
 ARCHIVE = ROOT / 'docs' / 'history' / 'CHANGELOG.md'
-SUITES_QUICK = ['tests/cache-regtest.py', 'tests/scrape-regtest.py']
-SUITES_FULL = SUITES_QUICK + ['tests/inverter-regtest.py', 'tests/audit-chain.py',
-                              'tests/cache-stress.py', 'tests/cache-fuzz.py',
-                              'tests/scrape-fuzz.py', 'tests/cache-control-fuzz.py',
-                              'tests/control-fuzz.py', 'tests/dashboard-control-fuzz.py']
+SUITES_QUICK = ['cache-regtest', 'scrape-regtest']   # the runner names — the `full` profile (battery.sh's QUICK_ALL) owns the ten
 
 def run(cmd, **kw):
     print('  $ ' + ' '.join(str(c) for c in cmd))
@@ -151,18 +146,26 @@ def update_lock(dry, keep):
         print('release: nixpkgs pinned at %s' % rev)
 
 
-def tests(which, dry):
+def tests(which, dry, version):
+    # the battery rides the runner: scripts/battery.sh owns the run dir,
+    # the tally, the eta history and the failed-run backups, and its
+    # rows stream live (a captured 27-minute silence serves nobody)
     if which == 'none':
         print('release: skipping the suites (--tests none)')
         return
-    rundir = tempfile.mkdtemp(prefix='pvrelease-')
-    env = {**os.environ, 'PV_RUN_DIR': rundir}   # the suites' battery marker (they refuse the standalone runs)
-    for suite in (SUITES_QUICK if which == 'quick' else SUITES_FULL):
-        print('release: %s' % suite)
-        # the release always runs full depth — the quick battery is dev feedback only
-        r = run(['python3', suite, 'full'], dry=dry, env=env)
-        if not dry and 'ALL PASS' not in r.stdout:
-            sys.exit('release: %s did not report ALL PASS' % suite)
+    cmd = ['sh', 'scripts/battery.sh']   # the runner is 644 by the family's exec-bit rule — it rides sh
+    if which == 'quick':
+        cmd += ['--depth', 'full'] + SUITES_QUICK   # the recovery pair, still at the nightly depth
+    else:
+        cmd += ['full']                              # all ten at suite defaults
+    cmd += ['--name', 'release %s' % version]
+    print('release: the battery — ' + ' '.join(cmd))
+    if dry:
+        return
+    r = subprocess.run(cmd, cwd=ROOT)
+    if r.returncode != 0:
+        sys.exit("release: the battery is NOT GREEN (rc=%d) — the run's status, logs and the "
+                 "failed-run backup live in the newest ~/.local/state/pvbattery/<run-id>" % r.returncode)
 
 
 def nix_build(dry, skip):
@@ -221,7 +224,7 @@ def main():
     bump(old, new, dry)
     changelog(new, dry)
     update_lock(dry, a.keep_lock)
-    tests(a.tests, dry)
+    tests(a.tests, dry, new)
     nix_build(dry, a.skip_nix)
 
     if git('status', '--porcelain', dry=dry):

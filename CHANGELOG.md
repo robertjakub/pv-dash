@@ -12,6 +12,21 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **scripts** — **the release battery rides the runner**: release.py's
+  tests() no longer spawns the suites bare — the legs are
+  `scripts/battery.sh full` (the ten at suite defaults) and, for the
+  `--tests quick` recovery pair, `--depth full cache-regtest
+  scrape-regtest`; the run dir, the tally, the eta history and the
+  failed-run backups are the runner's, the battery's rows stream live
+  into the release log (a captured 27-minute silence serves nobody), and
+  the verdict keys off the runner's new machine exit (0 green, 1 red —
+  the tally text stays the human record). The runner gains `--depth
+  quick|full` (explicit suite names at the nightly depth — the
+  PV_SUITE_PROFILE export and the fuzzes' full spread follow it). The
+  break that surfaced it: the fuzz suites' `[iterations] [quick|full]`
+  argv outlived release.py's bare `python3 tests/cache-fuzz.py full` leg
+  — the 0.4.3 flight died on `int('full')` mid-bump, before its commit.
+
 - **the family** — **the Modbus socket timeout's default lives in the
   protocol tree**: `common/modbus/protocol.json` carries `socket_timeout`
   (3.0 s) and the cache's and scraper's `modbus timeout` knobs ride it —

@@ -8,7 +8,7 @@ emits, Graylog consumes.
 
 The trail it consumes is docs/SECURITY.md's: one KV line per event —
 `<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type>
-hash=<12-hex> [message=<kv pairs>]` — carried **verbatim** inside every
+hash=<12-hex> [<detail kv words>]` — carried **verbatim** inside every
 forward envelope, so chain verification (scripts/audit_verify.py) works
 identically at the collector. The `instance=` word names the writer
 daemon — the control port when the tool's `--audit-instance` is unset,

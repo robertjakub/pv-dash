@@ -2,8 +2,8 @@
 """Verify the audit trails' hash chains (docs/SECURITY.md F10): every entry
 carries a short chained hash in its hash= token —
 `<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type>
-hash=<hash> [message=<detail>]` — chained to the writer's previous entry:
-h = sha256(prev | stamp | tools | tag + instance + type + message), 12 hex
+hash=<hash> [<detail kv words>]` — chained to the writer's previous entry:
+h = sha256(prev | stamp | tools | tag + instance + type + detail), 12 hex
 chars, chained per (application, writer, instance) triple so interleaved
 writers — and several instances of one tool — verify independently. The
 validator speaks the current grammar only: a pre-KV line reads malformed.

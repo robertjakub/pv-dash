@@ -71,13 +71,14 @@ def main():
         a.event('REQUESTS', 'clients=1 reads=3 writes=0')
         ok, out = verify(log, contain=['OK'])
         check('interleaved writers verify', ok, out)
-        # the layout: the instance rides tag=, the hash its hash= token, the detail its message=
+        # the layout: the instance rides tag=, the hash its hash= token, the
+        # detail's KV words ride bare after it (flat KV, no wrapper word)
         first = open(log).read().splitlines()[0].split(' ')
-        check('layout: the instance word, the hash token, the message detail', len(first) >= 8 and first[1] == 'AUDIT'
+        check('layout: the instance word, the hash token, the bare detail words', len(first) >= 8 and first[1] == 'AUDIT'
               and first[2] == 'application=CACHE' and first[3] == 'tag=daemon' and first[4] == 'instance=1'
               and first[6].startswith('hash=') and len(first[6]) == 17
               and all(ch in '0123456789abcdef' for ch in first[6][5:])
-              and first[7] == 'message=version=test', ' '.join(first[:8]))
+              and first[7] == 'version=test', ' '.join(first[:8]))
 
         # 1b. the detail's empty-value rule: a KV word whose value is empty —
         # the bare `key=` token or the quoted empty (`key=''`) — is dropped
@@ -86,8 +87,8 @@ def main():
         a2.event('COMMAND', "peer=1.2.3.4 reason= uptime=9s register 47415 = 5 x='' result=")
         first = open(log).read().splitlines()[-1]
         check('the detail drops an empty-valued word (bare or quoted empty), keeps the bare =',
-              'message=peer=1.2.3.4 uptime=9s register 47415 = 5' in first
-              and "x=''" not in first and 'reason=' not in first.replace('message=', '')
+              'peer=1.2.3.4 uptime=9s register 47415 = 5' in first
+              and "x=''" not in first and 'reason=' not in first
               and not first.rstrip().endswith('result='), first)
 
         # 1c. the quoting rule: a value carrying a space rides one quoted
@@ -95,7 +96,14 @@ def main():
         a2.event('COMMAND', "peer=%s cmd='show version' result=ok" % audit_quote('unix socket'))
         first = open(log).read().splitlines()[-1]
         check("a space value rides quoted (peer='unix socket')",
-              "message=peer='unix socket' cmd='show version' result=ok" in first, first)
+              "peer='unix socket' cmd='show version' result=ok" in first, first)
+
+        # 1d. the reserved outer keys: a detail word spelling one never lands
+        a2.event('COMMAND', "cmd='show version' type=forged tag=forged application=forged result=ok")
+        first = open(log).read().splitlines()[-1]
+        check('a detail word spelling a reserved outer key is dropped',
+              'type=command' in first and 'tag=daemon' in first and 'application=CACHE' in first
+              and 'forged' not in first, first)
 
         # 2. an edited line breaks the chain at that line
         lines = open(log).read().splitlines()
@@ -341,7 +349,7 @@ def main():
             chain = sd.split('chain="')[1].split('"')[0]
             native = text.split('] ', 1)[1]
             parts = native.split(' ')
-            if parts[2].startswith('application='):   # the KV line: the body carries tag= instance= type= message=
+            if parts[2].startswith('application='):   # the KV line: the body carries tag= instance= type= + the detail words
                 return parts[0], app_tag, chain, ' '.join(parts[3:6] + parts[7:])
             return parts[0], app_tag, chain, ' '.join(parts[3:4] + parts[5:])
 

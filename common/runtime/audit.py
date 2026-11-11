@@ -7,11 +7,12 @@ crash keeps everything up to the last command.
 
 Every entry carries a short chained hash in its hash= token (12 hex chars,
 no decoration): `<stamp> AUDIT application=<TAG> tag=<writer>
-instance=<id> type=<type> hash=<hash> [message=<detail>]` —
-h = sha256(prev | stamp | tag | instance + type + message)
+instance=<id> type=<type> hash=<hash> [<detail kv words>]` —
+h = sha256(prev | stamp | tag | instance + type + detail)
 truncated, the material exactly the line's own stamp, tag=,
-instance= and type=/message= words (the tag always uppercase — the
-tags.json spelling). The chain is
+instance=, type= and detail words (the tag always uppercase — the
+tags.json spelling). The line is FLAT KV: every word after hash= is a
+`key=value` pair — there is no message= wrapper word. The chain is
 per (application, writer, instance) triple (CACHE:daemon:15020,
 INV:cli:15991, each chain their own lines), so several writers — and
 several instances of one tool — can interleave in one file and every chain
@@ -102,6 +103,12 @@ def validate_instance(value):
 # An explicitly-quoted EMPTY value (key='' / key="") reads the same as the
 # bare key= word: the pair names no value, so the word never lands.
 EMPTY_VALUE_RE = re.compile(r"[^\s=]+=(\"\"|'')")
+
+# The line's outer words are RESERVED: a detail word spelling one of these
+# keys never lands (the writer drops it) — the flat KV line must keep
+# exactly one application=/tag=/instance=/type=/hash= word, at the fixed
+# position the parsers index.
+RESERVED_KEYS = ('application', 'tag', 'instance', 'type', 'hash')
 
 
 def audit_quote(value):
@@ -331,7 +338,7 @@ def entry_hash(prev, stamp, tag, body):
     """The chained entry hash: sha256(prev | stamp | tag | body), hex-truncated.
     Shared by the writer and scripts/audit_verify.py — one implementation. The
     tag and body are the line's own rendered words (the KV line's uppercase
-    tag= value and its type=/message= text)."""
+    tag= value and its type= and detail words)."""
     material = '%s|%s|%s|%s' % (prev, stamp, tag, body)
     return hashlib.sha256(material.encode('utf-8')).hexdigest()[:HASH_LEN]
 
@@ -339,7 +346,7 @@ def entry_hash(prev, stamp, tag, body):
 def parse_entry_hash(line):
     """The chained hash of one audit line (None when absent/malformed): the
     `hash=` token's HASH_LEN hex chars — `<stamp> AUDIT application=<TAG>
-    tag=<writer> instance=<id> type=<type> hash=<hash> [message=...]` (the
+    tag=<writer> instance=<id> type=<type> hash=<hash> [<detail words>]` (the
     token rides parts[6]). The validator speaks the current grammar only:
     a pre-KV line (tools=, no instance=) reads malformed."""
     parts = line.rstrip().split(' ')
@@ -355,8 +362,8 @@ def parse_entry_hash(line):
 
 def entry_body(line):
     """The hashed text of one audit line: `<tag> <instance> <type>
-    [message...]` — parts[3] is the tag= word, parts[4] the instance= word,
-    parts[5] the type= word, parts[7:] the message= text verbatim; the
+    [<detail words>]` — parts[3] is the tag= word, parts[4] the instance=
+    word, parts[5] the type= word, parts[7:] the detail words verbatim; the
     writer's material is exactly this."""
     parts = line.rstrip().split(' ')
     return ' '.join(parts[3:6] + parts[7:])
@@ -460,7 +467,7 @@ def build_audit(cfg, prefix, app, logger, rc=1, derive=None):
 
 class AuditLog:
     """'<UTC stamp> AUDIT application=<TAG> tag=<writer> instance=<id>
-    type=<type> hash=<chain hash> [message=<detail>]' per line — the 12-hex
+    type=<type> hash=<chain hash> [<detail kv words>]' per line — the 12-hex
     hash chains the entry to this writer's previous one (entry_hash), making
     any edit/reorder/middle-deletion evident to scripts/audit_verify.py.
     application= names the tool (the uppercase tag from shared/tags.json —
@@ -618,15 +625,21 @@ class AuditLog:
             self._rotate()
 
     def event(self, event, detail=''):
-        """One event, its KV detail, the chain hash, the flush and the
-        forward. The detail's own rules: whitespace folds (one event = one
-        physical line); an EMPTY-VALUED KV word never lands — a `key=` token
-        with no value and a quoted empty (`key=''`) are dropped at the
-        writer (an absent pair, not an empty one), so a builder passing
-        nothing never renders `reason=` mid-line; a bare `=` (the write
-        lines' `register 47415 = 5`) stays; a value carrying a space rides
-        single-quoted (the builders' audit_quote — `peer='unix socket'`),
-        and an empty tail attaches no message= word."""
+        """One event, its KV detail words, the chain hash, the flush and the
+        forward. The line is FLAT KV — the detail rides bare after hash=,
+        there is no message= wrapper word. The detail's own rules:
+        whitespace folds (one event = one physical line); an EMPTY-VALUED
+        KV word never lands — a `key=` token with no value and a quoted
+        empty (`key=''`) are dropped at the writer (an absent pair, not an
+        empty one), so a builder passing nothing never renders `reason=`
+        mid-line; a bare `=` stays (prose tolerance); a value carrying a
+        space rides single-quoted (the builders' audit_quote —
+        `peer='unix socket'`); a detail word spelling one of the RESERVED
+        outer keys (application/tag/instance/type/hash) is dropped — the
+        line carries exactly one of each, at the fixed position the parsers
+        index; and an empty detail attaches no words at all. A free-text
+        phrase rides as the quoted VALUE of a named key (reason=, error=,
+        warn=) — there is no generic prose slot."""
         if self.disabled:
             return
         with self._lock:
@@ -634,15 +647,17 @@ class AuditLog:
                 self._maybe_rotate()
             stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
             detail = ' '.join(detail.split())   # fold \n\r\t etc: one event = one physical line
-            detail = ' '.join(w for w in detail.split(' ') if w == '='
-                              or (not w.endswith('=') and not EMPTY_VALUE_RE.fullmatch(w)))
+            detail = ' '.join(w for w in detail.split(' ')
+                              if w == '=' or '=' not in w
+                              or (not w.endswith('=') and not EMPTY_VALUE_RE.fullmatch(w)
+                                  and w.split('=', 1)[0] not in RESERVED_KEYS))
             body = 'tag=%s instance=%s type=%s%s' % (self.writer, self.instance, event.lower(),
-                                                     (' message=%s' % detail) if detail else '')
+                                                     (' %s' % detail) if detail else '')
             h = entry_hash(self._last, stamp, self.prefix, body)
             self._last = h
             native = '%s AUDIT application=%s tag=%s instance=%s type=%s hash=%s%s' % (
                 stamp, self.prefix, self.writer, self.instance, event.lower(), h,
-                (' message=%s' % detail) if detail else '')
+                (' %s' % detail) if detail else '')
             if not self._suppressed:
                 self._f.write('%s\n' % native)
                 self._f.flush()

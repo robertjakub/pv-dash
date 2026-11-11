@@ -12,6 +12,19 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **the family** — **the audit line is FLAT KV: the `message=` wrapper word
+  is gone.** The detail's KV words ride bare after `hash=` — every word on
+  the line is a `key=value` pair (`<stamp> AUDIT application=… tag=…
+  instance=… type=… hash=… fc=6 register=47415 value=5 unit=1`). The five
+  outer words (`application`/`tag`/`instance`/`type`/`hash`) are reserved —
+  the writer drops a detail word spelling one (the boundary the wrapper
+  used to give, now enforced at the writer); an empty detail attaches no
+  words. **Migrating:** the outer words keep their positions, so
+  `scripts/audit_verify.py` and the remote envelopes work unchanged and
+  older trails still verify (the hash material is the line's own words) —
+  parsers and greps keying on the literal `message=` move to the detail
+  keys directly; the graylog kv extractor now sees them as fields
+  (`audit_fc`, `audit_register`, …) beside the mapped ones.
 - **the family** — **every audit event type now speaks KV** (the pending
   prose pass): the write family describes itself as `fc=`/`register=`/
   `value=`/`unit=` words (`common/modbus/writes.py write_kv` — the logs

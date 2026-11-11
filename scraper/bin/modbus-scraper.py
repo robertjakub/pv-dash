@@ -21,7 +21,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.runtime.audit import audit_params_of, build_audit, default_path
+from common.runtime.audit import load_audit_tags, audit_params_of, build_audit, default_path
 from common.settings.config import parse_listen, resolve_control_target
 from common.wire.cred import parse_trust_uids
 from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, install_signal_handlers, log_state_dumps, \
@@ -111,7 +111,8 @@ def main():
     ops_verbs = parse_ops_verbs(cfg.get('control_ops_verbs'), KNOWN_VERBS, default=DEFAULT_OPS_VERBS)
     trust_uids = parse_trust_uids(cfg['control_trust_uids'], 'control-trust-uids')
     audit_params = audit_params_of(cfg)
-    audit = build_audit(cfg, 'SCR', 'modbus-scraper', logger)
+    tag = load_audit_tags('scraper')
+    audit = build_audit(cfg, tag, 'modbus-scraper', logger)
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target) \
         + (', read-only ops token accepted' if control_ops_token else '')
@@ -186,6 +187,7 @@ def main():
         control = ControlServer(scraper, httpd, int(control_target) if control_target.isdigit() else control_target,
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
                                 socket_group=cfg['control_socket_group'],
+                                log_replies=cfg['control_log_replies'],
                                 ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
                                 dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'],
                                 dump_key=cfg['dump_key'], dump_interval=cfg['dump_interval'],
@@ -240,8 +242,8 @@ def main():
                     reason, time.monotonic() - started, scraper.errors)
         a = the_audit()
         if a:
-            a.event('SHUTDOWN', '%s: uptime=%ds errors=%d'
-                    % (reason, int(time.monotonic() - started), scraper.errors))
+            a.event('SHUTDOWN', 'reason=%s uptime=%ds errors=%d'
+                    % (reason.replace(' ', '-'), int(time.monotonic() - started), scraper.errors))
         if control:
             control.shutdown_dump()   # the write-behind: the overrides ride the next start
             control.announce_exit(reason)   # the consoles print the notice and exit

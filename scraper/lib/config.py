@@ -272,6 +272,8 @@ def resolve_config(args, script_dir=None):
                                         'control_trust_uids', DEFAULTS['control_trust_uids'], str)
     cfg['control_socket_group'] = resolve(getattr(args, 'control_socket_group', False) or None,
                                           'CONTROL_SOCKET_GROUP', 'control_socket_group', DEFAULTS['control_socket_group'], str_to_bool)
+    cfg['control_log_replies'] = resolve(getattr(args, 'control_log_replies', False) or None,
+                                         None, 'control_log_replies', False, str_to_bool)
     cfg['audit_log'] = resolve(getattr(args, 'audit_log', None), 'AUDIT_LOG', 'audit_log', DEFAULTS['audit_log'], str)
     cfg['audit_forward'] = resolve(getattr(args, 'audit_forward', None), 'AUDIT_FORWARD',
                                    'audit_forward', DEFAULTS['audit_forward'], str)

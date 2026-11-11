@@ -28,6 +28,7 @@ from common.settings.config import acl_table, acl_value_text, parse_auth_type, \
     parse_listen, parse_upstream, resolve_profile_file
 from common.modbus import AUTH_MIN_KEY
 from common.render.texts import T
+from common.runtime.audit import load_audit_tags
 from .config import CONTROL_SOCKET_TEMPLATE, build_sources, load_device_profile, resolve_metrics_acl
 from .metrics import Metrics
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_OPTIONS, \
@@ -97,7 +98,7 @@ class ControlServer(_ControlServer):
     EXIT_TEXT = 'the modbus-scraper is shutting down'
     RELOAD_TEXT = 'the modbus-scraper is reloading — the daemon restarts with the saved configuration'
     APP = 'modbus-scraper'
-    AUDIT_PREFIX = 'SCR'
+    AUDIT_PREFIX = load_audit_tags('scraper')
     AUDIT_APP = 'modbus-scraper'
     CONTROL_PORT_DEFAULT = DEFAULT_LISTEN_PORT
     CONTROL_SOCKET_TEMPLATE = CONTROL_SOCKET_TEMPLATE
@@ -116,7 +117,7 @@ class ControlServer(_ControlServer):
     def __init__(self, scraper, httpd, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None,
                  config_path=None, dump_path=None, restore_on_start=False, dump_key=None,
-                 audit_params=None, dump_interval=0.0):
+                 audit_params=None, dump_interval=0.0, log_replies=False):
         self.scraper = scraper
         self.httpd = httpd
         self.metrics_acl_warn = None   # the metrics-acl file's permission warning (the stash, None = no warning standing)
@@ -124,7 +125,7 @@ class ControlServer(_ControlServer):
                          defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
                          ops_token=ops_token, ops_verbs=ops_verbs, audit_params=audit_params,
                          config_path=config_path, dump_path=dump_path, restore_on_start=restore_on_start,
-                         dump_key=dump_key, dump_interval=dump_interval)
+                         dump_key=dump_key, dump_interval=dump_interval, log_replies=log_replies)
 
     def _after_restore(self):
         self.scraper.wake.set()   # the poll loop re-reads the config-driven knobs now
@@ -410,6 +411,7 @@ class ControlServer(_ControlServer):
             'local-time': self._get('local-time'),
             'control-port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
             'control-socket-group': 'on' if self.socket_group else 'off',
+            'control-log-replies': 'on' if self.log_replies else 'off',
             **self.audit_dump_rows(),
             'dump-path': self.dump_path or 'off',
             'restore-on-start': 'on' if self.dump_restore else 'off',

@@ -100,6 +100,7 @@ set log-level INFO
 | `--control-token` / `--control-ops-token` | off | the control tokens (a TCP control port refuses to start without the admin token, F5); `file:<path>` welcome |
 | `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`flush` is not a verb here — there is nothing to flush) |
 | `--control-trust-uids` / `--control-socket-group` | none / off | the unix socket's extra trusted uids (`SO_PEERCRED`) / its 0660 group-accessible mode |
+| `--control-log-replies` | off | DEBUG-log the full output of every control command (plainly: the command and its status); live: `set system log-replies` |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
 | `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | XDG state | the SCR audit trail: a file path, `-` for stdout (the docker/journald way) or `none` (no local file — the forward carries the trail); the forward mirrors every line onward (F10) |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (overflow gets an immediate `503 # rate limited`) |

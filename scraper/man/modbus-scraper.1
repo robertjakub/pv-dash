@@ -50,75 +50,75 @@ key, both roles audited.
 
 .SH OPTIONS
 .TP
-.B \-\-upstream
+.BI \-\-upstream " upstream"
 the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502)
 .TP
-.BI \-\-modbus\-unit " N"
+.BI \-\-modbus\-unit " modbus-unit"
 Modbus unit id
 .TP
-.BI \-\-modbus\-offset " N"
+.BI \-\-modbus\-offset " modbus-offset"
 added to register addresses
 .TP
-.B \-\-modbus\-auth
+.BI \-\-modbus\-auth " modbus-auth"
 the inverter's Modbus auth scheme: `suite` proves the shared auth\-key
 with a crypt handshake right after every connect (the peer answers OK,
 or ERR and the connection fails — the poller keeps retrying); none/empty
 = no auth at all
 .TP
-.B \-\-auth\-key
+.BI \-\-auth\-key " auth-key"
 the shared key the suite handshake proves (min 16 characters); the value
 may be `file:<path>` — the first line of an owner\-only 0600 file (a
 systemd LoadCredential rides as file:/run/credentials/...)
 .TP
-.BI \-\-timeout " N"
+.BI \-\-timeout " timeout"
 Modbus timeout in seconds
 .TP
-.B \-\-profile
+.BI \-\-profile " profile"
 device profile JSON (the shared profiles/ schema; scrape\-marked entries
 feed the metric registers)
 .TP
-.B \-\-metrics\-spec
+.BI \-\-metrics\-spec " metrics-spec"
 metrics spec JSON, sectioned: {inputs: {name: {help}}, metrics: {key:
 {profile?, expr?, when?, help, type?}}, scraper:...} — the metrics
 entries are register\- (profile) or expression\-fed (expr/when) over the
 declared inputs (show inputs), merged in memory over the built\-in
 lib/metrics.json scraper_* block
 .TP
-.B \-\-metric\-prefix
+.BI \-\-metric\-prefix " metric-prefix"
 the prefix on the profile\- and compute\-fed metric names; the bundled
 scraper_* names are fixed
 .TP
-.BI \-\-max\-kwp " N"
+.BI \-\-max\-kwp " max-kwp"
 maximum PV array kWp
 .TP
-.BI \-\-max\-grid\-kw " N"
+.BI \-\-max\-grid\-kw " max-grid-kw"
 maximum grid kW, either direction
 .TP
 .B \-\-grid\-positive\-import
 grid register positive when importing
 .TP
-.B \-\-listen
+.BI \-\-listen " listen"
 listen address HOST:PORT
 .TP
 .B \-\-local\-time
 log timestamps in the system time zone instead of UTC
 .TP
-.BI \-\-max\-clients " N"
+.BI \-\-max\-clients " max-clients"
 maximum concurrent HTTP clients; extras get an immediate 503
 .TP
-.BI \-\-client\-timeout " N"
+.BI \-\-client\-timeout " client-timeout"
 seconds an idle keep\-alive HTTP client is kept before being kicked
 .TP
-.BI \-\-max\-conn\-per\-ip " N"
+.BI \-\-max\-conn\-per\-ip " max-conn-per-ip"
 maximum concurrent HTTP connections from one peer IP; extras get an
 immediate 503
 .TP
-.B \-\-control\-port
+.BI \-\-control\-port " control-port"
 JSON\-lines control server target: unix socket path or TCP port number
 on 127.0.0.1 (e.g. 15599); 0 = off. Talk to it with
 modbus\-scraper\-ctl.py
 .TP
-.B \-\-control\-token
+.BI \-\-control\-token " control-token"
 require a token on control connections: the client authenticates with
 {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root,
 the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED) skips
@@ -126,7 +126,7 @@ the token; the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
 file:/run/credentials/...)
 .TP
-.B \-\-control\-ops\-token
+.BI \-\-control\-ops\-token " control-ops-token"
 a second, read\-only control token: sessions authenticating with it may
 run its policy's verbs only (the default policy: show) (no set/clear, no
 poll now, no request reload, no restart, no shutdown) — the ops shift
@@ -134,11 +134,11 @@ against the admin key, both audited; the value may be `file:<path>` —
 the first line of an owner\-only 0600 file (a systemd LoadCredential
 rides as file:/run/credentials/...)
 .TP
-.B \-\-control\-ops\-verbs
+.BI \-\-control\-ops\-verbs " control-ops-verbs"
 the read\-only ops role's RBAC policy: the verbs its sessions may run,
 comma\-separated
 .TP
-.B \-\-control\-trust\-uids
+.BI \-\-control\-trust\-uids " control-trust-uids"
 extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
 the daemon's own user are always trusted
@@ -147,12 +147,15 @@ the daemon's own user are always trusted
 leave the unix control socket group\-accessible (chmod 0660 instead of
 the plain 0600) ($CONTROL_SOCKET_GROUP)
 .TP
-.B \-\-auth\-token
+.B \-\-control\-log\-replies
+DEBUG\-log the full output of every control command
+.TP
+.BI \-\-auth\-token " auth-token"
 require Authorization: Bearer <token> on all requests; the value may be
 `file:<path>` — the first line of an owner\-only 0600 file (a systemd
 LoadCredential rides as file:/run/credentials/...)
 .TP
-.B \-\-metrics\-acl
+.BI \-\-metrics\-acl " metrics-acl"
 clients allowed to connect to /metrics: "any", "none" (refuse everyone),
 comma\-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or
 "file:<path>" — the standalone ip\-prefix acl file (the gate object
@@ -160,46 +163,46 @@ comma\-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or
 \&...}]}: the last matching rule decides, a client no rule decides
 refuses; "any" = 0.0.0.0/0, the whole space)
 .TP
-.B \-\-audit\-log
+.BI \-\-audit\-log " audit-log"
 SCR audit trail: a file path or \- for stdout (the docker/journald way);
 `none` turns the local file off (with a forward spelled that is the
 remote\-only mode); the XDG state home
 (~/.local/state/modbus\-scraper/audit.log) when unset
 .TP
-.B \-\-audit\-forward
+.BI \-\-audit\-forward " audit-forward"
 also forward the SCR audit trail: syslog (the local socket auto\-scan),
 syslog:/path (an explicit socket), udp://host[:514] (RFC5426,
 best\-effort) or tcp://host[:514] (RFC6587 framing) — the off\-box copy
 carries the per\-writer hash chain, so a scheduled search at the
 collector can alert on a chain break; docs/AUDIT.md
 .TP
-.B \-\-audit\-forward\-format
+.BI \-\-audit\-forward\-format " audit-forward-format"
 the remote forward's envelope: RFC5424 (the default) or CEF — the local
 syslog forms keep the verbatim send (remote targets only)
 .TP
-.BI \-\-audit\-max\-mb " N"
+.BI \-\-audit\-max\-mb " audit-max-mb"
 rotate the audit log at this size in MB, keeping N backups; 0 = no size
 rotation
 .TP
 .B \-\-audit\-daily
 also rotate the audit log at UTC midnight
 .TP
-.BI \-\-audit\-files " N"
+.BI \-\-audit\-files " audit-files"
 rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
 disable the SCR audit trail
 .TP
-.BI \-\-interval " N"
+.BI \-\-interval " interval"
 seconds between polls
 .TP
 .B \-\-log\-access
 log every HTTP request at INFO
 .TP
-.B \-\-log\-level
+.BI \-\-log\-level " log-level"
 log level
 .TP
-.B \-\-dump\-path
+.BI \-\-dump\-path " dump-path"
 the state dump: the live setting overrides (the poll plan, the caps, the
 log surface — the tokens apart) as one JSON, written 0600 with an
 integrity hash (a restore refuses a tampered, unsigned or
@@ -207,7 +210,7 @@ group\-writable dump); dumped on the request dump command, the graceful
 shutdown and every \-\-dump\-interval seconds; loaded on start only with
 \-\-restore\-on\-start, on demand with the request restore command
 .TP
-.B \-\-dump\-key
+.BI \-\-dump\-key " dump-key"
 the key that seals the state dumps and the reload's state file: the
 state rides encrypted (an HMAC\-SHA256 counter\-mode keystream,
 authenticated — a restore refuses a wrong or missing key, and a
@@ -218,7 +221,7 @@ without a key warns at start and on set; the value may be `file:<path>`
 — the first line of an owner\-only 0600 file (a systemd LoadCredential
 rides as file:/run/credentials/...)
 .TP
-.BI \-\-dump\-interval " N"
+.BI \-\-dump\-interval " dump-interval"
 seconds between the automatic state dumps, 0 = on request (the request
 dump command and the shutdown)
 .TP

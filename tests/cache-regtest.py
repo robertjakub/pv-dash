@@ -244,7 +244,7 @@ try:
     audit_txt = open('/tmp/reg_audit.log').read()
     check('audit: START + forwarded writes land in the trail',
           'application=CACHE tag=daemon instance=' in audit_txt and 'type=start' in audit_txt
-          and 'type=write' in audit_txt and 'register 47415 = 5' in audit_txt, audit_txt[-200:])
+          and 'type=write' in audit_txt and 'register=47415 value=5' in audit_txt, audit_txt[-200:])
 
     # write-through invalidation: the written range serves the NEW value immediately
     b = rd(47415, 1)
@@ -2337,7 +2337,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           b == bytes.fromhex('8603'), b.hex())
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     check('audit: the unparseable write is a WRITE-REFUSED event',
-          'type=write-refused' in fc4_audit and 'too short to carry a register address' in fc4_audit,
+          'type=write-refused' in fc4_audit and 'reason=too-short' in fc4_audit,
           fc4_audit[-160:])
 
     # the audit trail folds control characters: a \n inside a command cannot
@@ -2361,7 +2361,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     fc4_audit = open('/tmp/reg_audit_fc4.log').read()
     check('audit: per-client REQUESTS tallies (periodic + disconnect)',
           'application=CACHE tag=daemon' in fc4_audit and 'type=requests' in fc4_audit and 'peer=127.0.0.1:' in fc4_audit
-          and '(last 1s:' in fc4_audit and 'connected=' in fc4_audit, fc4_audit[-160:])
+          and 'window=1s' in fc4_audit and 'recent=' in fc4_audit and 'connected=' in fc4_audit, fc4_audit[-160:])
 
     # the control token as a file: reference (the LoadCredential pattern);
     # the file must be owner-only 0600 (F12 in docs/AUDIT.md)

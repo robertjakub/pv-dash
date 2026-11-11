@@ -111,11 +111,11 @@ def install_signal_handlers(proxy, cache, apply_reload):
         proxy.poll_wake.set()
         logger.info('SIGUSR1: cache cleared (%d register(s) dropped), repolling now', dropped)
         if proxy.audit:
-            proxy.audit.event('RESET', 'SIGUSR1: %d register(s) dropped' % dropped)
+            proxy.audit.event('RESET', 'signal=SIGUSR1 dropped=%d' % dropped)
 
     def on_reload_failed(e):
         if proxy.audit:
-            proxy.audit.event('RELOAD', 'failed: %s' % e)
+            proxy.audit.event('RELOAD', 'result=err error=%s' % audit_quote(e))
 
     install_family_signals(apply_reload=apply_reload, graceful_stop=graceful_stop,
                            usr1=clean_cache, on_reload_failed=on_reload_failed)
@@ -238,10 +238,10 @@ def main():
                                    ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target)),
                        audit_quote(cfg['selection'] or cfg['profile'])))
         if proxy.write_gate_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
-            audit.event('ACL-FILE', proxy.write_gate_warn)
+            audit.event('ACL-FILE', 'warn=%s' % audit_quote(proxy.write_gate_warn))
         for warn in (proxy.connect_acl_warn, proxy.write_acl_warn, proxy.metrics_acl_warn):
             if warn:
-                audit.event('ACL-FILE', warn)
+                audit.event('ACL-FILE', 'warn=%s' % audit_quote(warn))
     def apply_reload():
         """The SIGHUP and the `request reload-config` command share this: re-resolve
         the config, swap the register map and the poll posture, clear the
@@ -255,7 +255,8 @@ def main():
         proxy.dump_interval = proxy.config['dump_interval']
         proxy.dump_wake.set()
         if proxy.audit:
-            proxy.audit.event('RELOAD', summary)
+            proxy.audit.event('RELOAD', 'result=ok ranges=%d profile=%s'
+                              % (len(proxy.cache.ranges), audit_quote(proxy.config['profile'])))
         return summary
 
     stop = install_signal_handlers(proxy, cache, apply_reload)
@@ -331,7 +332,8 @@ def main():
                             proxy.dump_path, n, applied,
                             (' (%d skipped: %s)' % (len(failed), ', '.join(failed))) if failed else '')
                 if audit:
-                    audit.event('RESTORE', '%s: %d word(s), %d setting(s)' % (proxy.dump_path, n, applied))
+                    audit.event('RESTORE', 'file=%s words=%d settings=%d'
+                                % (audit_quote(proxy.dump_path), n, applied))
             except ValueError as e:
                 logger.error('cannot restore the state dump %s: %s (starting cold)', proxy.dump_path, e)
         else:

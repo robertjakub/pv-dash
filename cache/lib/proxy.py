@@ -8,8 +8,9 @@ from collections import deque
 
 from common.modbus import (DeviceError, ModbusError, describe_fc, describe_write,
                            exception_frame, frame, pack_bits, serve_modbus,
-                           unit_in_range, unpack_bits, write_shape_error,
+                           unit_in_range, unpack_bits, write_kv, write_shape_error,
                            write_target)
+from common.runtime.audit import audit_quote
 from common.serve.connlimit import ConnGate
 from .config import (IPGate, acl_admits, acl_file_warn, acl_gate_summary, acl_value_text,
                      load_profile_write_gate, load_write_gate_file, compile_write_acl,
@@ -313,7 +314,7 @@ class Proxy:
                 if delta <= 0:
                     continue
                 entry['audited'] = entry['requests']
-                self.audit.event('REQUESTS', 'peer=%s requests=%d (last %ds: %d)'
+                self.audit.event('REQUESTS', 'peer=%s requests=%d window=%ds recent=%d'
                                  % (key, entry['requests'], int(self.requests_audit_s), delta))
 
     def _allowed(self, acl, ip):
@@ -345,7 +346,7 @@ class Proxy:
             if warn is not None:
                 logger.warning('acl file: %s', warn)
                 if self.audit is not None:
-                    self.audit.event('ACL-FILE', warn)
+                    self.audit.event('ACL-FILE', 'warn=%s' % audit_quote(warn))
             return IPGate(t, desc, rules)
         setattr(self, '%s_acl_warn' % knob, None)   # an inline set clears a standing file warning
         try:
@@ -408,7 +409,7 @@ class Proxy:
                 if self.write_gate_warn is not None:
                     logger.warning('acl file: %s', self.write_gate_warn)
                     if self.audit is not None:
-                        self.audit.event('ACL-FILE', self.write_gate_warn)
+                        self.audit.event('ACL-FILE', 'warn=%s' % audit_quote(self.write_gate_warn))
             else:
                 self.write_gate_warn = None
                 return val
@@ -509,21 +510,22 @@ class Proxy:
                 logger.info('write: refused %s (the frame is too short to carry a register address)', desc)
                 self.write_refused += 1
                 if self.audit:
-                    self.audit.event('WRITE-REFUSED', '%s (the frame is too short to carry a register address)' % desc)
+                    self.audit.event('WRITE-REFUSED', 'fc=%d unit=%d reason=too-short' % (func, unit))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
             if not self.allow_write:
                 desc = _write_desc(func, pdu, unit)
                 logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)
                 self.write_refused += 1
                 if self.audit:
-                    self.audit.event('WRITE-REFUSED', '%s (write support disabled)' % desc)
+                    self.audit.event('WRITE-REFUSED', '%s reason=write-disabled' % write_kv(pdu, unit))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
             if not self._allowed(self.write_acl, addr[0]):
                 desc = _write_desc(func, pdu, unit)
                 logger.info('write: refused %s (client %s not on the write ACL)', desc, addr[0])
                 self.write_refused += 1
                 if self.audit:
-                    self.audit.event('WRITE-REFUSED', '%s (client %s not on the write ACL)' % (desc, addr[0]))
+                    self.audit.event('WRITE-REFUSED', '%s reason=not-on-write-acl client=%s'
+                                     % (write_kv(pdu, unit), addr[0]))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
             if not self._write_allowed(target):
                 desc = _write_desc(func, pdu, unit)
@@ -531,7 +533,7 @@ class Proxy:
                             desc, self.describe_write_gate())
                 self.write_refused += 1
                 if self.audit:
-                    self.audit.event('WRITE-REFUSED', '%s (registers outside the write allow-list)' % desc)
+                    self.audit.event('WRITE-REFUSED', '%s reason=outside-allow-list' % write_kv(pdu, unit))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
             shape_err = write_shape_error(pdu)
             if shape_err:
@@ -539,7 +541,8 @@ class Proxy:
                 logger.info('write: refused %s (malformed frame: %s)', desc, shape_err)
                 self.write_refused += 1
                 if self.audit:
-                    self.audit.event('WRITE-REFUSED', '%s (malformed frame: %s)' % (desc, shape_err))
+                    self.audit.event('WRITE-REFUSED', '%s reason=malformed-frame error=%s'
+                                     % (write_kv(pdu, unit), audit_quote(shape_err)))
                 return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
         if func in READ_FUNCS:
             if len(pdu) < 5:
@@ -592,7 +595,7 @@ class Proxy:
         if desc:
             logger.info('write: %s', desc)
             if self.audit:
-                self.audit.event('WRITE', desc)
+                self.audit.event('WRITE', write_kv(pdu, unit))
         is_read = bool(pdu) and pdu[0] in READ_FUNCS and len(pdu) >= 5
         fc = addr = count = None
         if is_read:
@@ -616,7 +619,7 @@ class Proxy:
                 if desc:
                     logger.warning('write rejected by the device: %s (modbus exception %d)', desc, code)
                     if self.audit:
-                        self.audit.event('WRITE-REJECTED', '%s (modbus exception %d)' % (desc, code))
+                        self.audit.event('WRITE-REJECTED', '%s exception=%d' % (write_kv(pdu, unit), code))
                 elif not is_read:
                     logger.info('forwarded %s rejected by the device (modbus exception %d)',
                                 describe_fc(pdu[0]), code)
@@ -659,7 +662,7 @@ class Proxy:
             if desc:
                 logger.warning('write failed: %s (%s)', desc, e)
                 if self.audit:
-                    self.audit.event('WRITE-FAILED', '%s (%s)' % (desc, e))
+                    self.audit.event('WRITE-FAILED', '%s error=%s' % (write_kv(pdu, unit), audit_quote(e)))
             elif is_read:
                 logger.warning('read: fc%d registers %d:%d failed (%s)', fc, addr, count, e)
             return exception_frame(txn, proto, unit, pdu[0], GATEWAY_FAILED)

@@ -30,6 +30,7 @@ from common.wire.wiresec import sign_request, verify_reply
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
 
 _SPEC = None   # the tool's specifics — set by run_cli() before anything reads it
+_keepalive_s = 0.0   # the parsed CLI_KEEPALIVE interval — run_cli() sets it before session() runs
 
 
 def translate(cmd, spellings=None):
@@ -206,6 +207,21 @@ _require_reply_mac = False   # True once the token handshake happened (TCP): uns
 
 _send_lock = threading.Lock()   # the keepalive thread and exchange() share the wire
 _stop_ping = threading.Event()
+
+
+def keepalive_env(default_s):
+    """The CLI_KEEPALIVE override, parsed once at startup: unset or blank
+    rides the spec's default, a number is the ping interval (0 and the
+    negatives keep the thread off), anything else is the family's one-line
+    refusal — SystemExit before the connect, never the bare float()
+    traceback deep in the session."""
+    raw = os.environ.get(KEEPALIVE_ENV, '')
+    if not raw.strip():
+        return default_s
+    try:
+        return float(raw)
+    except ValueError:
+        raise SystemExit(T('cli.keepalive_invalid') % raw)
 
 
 def keepalive(sock, interval, audit=None):
@@ -408,7 +424,7 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
                     _require_reply_mac = True   # the handshake holds: unsigned replies are fatal
                 if sys.stdin.isatty():
                     _SPEC['welcome'](sock)
-                interval = float(os.environ.get(KEEPALIVE_ENV, '') or _SPEC['keepalive_s'])
+                interval = _keepalive_s   # the env override parsed (and refused) once, at startup
                 if interval > 0:
                     _stop_ping.clear()
                     threading.Thread(target=keepalive, args=(sock, interval, audit), daemon=True).start()
@@ -622,7 +638,7 @@ def run_cli(spec):
     """The whole cli ladder: the parser (the tool's name, socket, examples),
     the man page, the audit trail, the token parse, the connect, the CONNECT
     audit, the readline bootstrap and the session with its reconnect cycle."""
-    global _SPEC
+    global _SPEC, _keepalive_s
     _SPEC = spec
     p = argparse.ArgumentParser(description='console-style CLI for the %s (TCP or unix socket).' % spec['daemon_label'])
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (env CTL when unset) — same flag as %s' % spec['self_note'])
@@ -643,6 +659,8 @@ def run_cli(spec):
     if args.man:
         sys.stdout.write(spec['cli_page'](p))
         raise SystemExit(0)
+
+    _keepalive_s = keepalive_env(spec['keepalive_s'])
 
     try:
         audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CLI', app=spec['app'],

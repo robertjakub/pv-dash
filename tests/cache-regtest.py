@@ -599,6 +599,11 @@ try:
     check('cache_cli: keepalive keeps an idle session alive (pongs absorbed)',
           p.returncode == 0 and '127.0.0.1:%d' % (15512 + BASE) in out
           and 'ok pong' not in out, repr(out[-120:]))
+    r = cli('quit\n', 15514 + BASE, {'CLI_KEEPALIVE': 'soon'})
+    check('cache_cli: a non-float CLI_KEEPALIVE is the one-line refusal at startup, not a traceback',
+          r.returncode == 1 and 'invalid CLI_KEEPALIVE' in r.stderr and 'Traceback' not in r.stderr
+          and r.stdout == '',
+          repr((r.returncode, r.stderr[-160:])))
     p_unix = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                                '--listen', '127.0.0.1:%d' % (15515 + BASE), '--interval', '1', '--profile', R],
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

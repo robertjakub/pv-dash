@@ -374,40 +374,11 @@ action, and the flat name where they name the wire.
 ## The env plane — the same env layer everywhere
 
 - **the cache's metrics-token ladder** — see short list item 2.
-- **the image CMDs pin what the env files advertise** — four
-  Dockerfile CMDs carry `--listen` (the cache/fake add `--audit-log -`;
-  `docker/Dockerfile.modbus-cache:69`, `Dockerfile.modbus-scraper:71`,
-  `Dockerfile.fake-inverter:58`, `Dockerfile.dashboard:62` — the
-  prometheus image ships an ENTRYPOINT, no CMD), so `LISTEN`/
-  `AUDIT_LOG` in `docker/env/*.env.example` are inert in the images;
-  the cache/scraper/dashboard examples do not hint at the pin and the
-  fake only partially (`docker/env/fake.env.example:17-25`), while the
-  Dockerfiles' own comments forbid exactly this for `UPSTREAM`
-  (`docker/Dockerfile.modbus-cache:59-62`); the compose stacks still
-  set the shadowed `LISTEN` (`docker/demo/compose.yaml:176`,
-  `docker/prod/compose.yaml:140`). Outcome: the container defaults
-  move to `ENV` like `UPSTREAM`, or the example lines carry a "pinned
-  by the image CMD" note.
 - **the dashboard's man still sells `PORT`/`BIND`** `[dashboard]` —
   `dashboard/lib/man.py:136-138` (baked into the generated page,
   `dashboard/man/dashboard.1:314`) while the README and the config
   docstring were fixed — the last stale env claim of the first sweep.
   Outcome: the man prose follows the resolvers, regenerate.
-- **the env examples are samples that read as the contract** —
-  coverage is 13/50 (cache), 12/39 (scraper), 18/34 (fake), 11/36
-  (dashboard) twins; whole blocks (control, dump, ACLs, secrets) are
-  absent; the dashboard's example has no twins header at all; no gate
-  reads the files (`check_options.py` never looks at `docker/env/*`;
-  `family_drift`'s `docker_env()` is a census, not a gate). No file
-  lies (every `NAME=` is a real twin). Outcome: generate the common
-  block from the registries, or one honest header line ("sample, not
-  exhaustive — `show knobs` lists all N"), and a coverage gate.
-- **`CLI_KEEPALIVE` is unvalidated** — a non-float raises an
-  uncaught ValueError traceback (`common/wire/cli.py:411`; the
-  enclosing try catches only DaemonExit/ConnectionLost), unlike the
-  family's one-line refusals; documented in `cache/README.md:249` and
-  `inverter/README.md:270`. Outcome: the one-liner treatment,
-  everywhere it is documented.
 - **"empty = unset" means empty string, not blank** — the shared
   Resolver tests `raw == ''` (`common/settings/config.py:112-119`)
   while `resolve_target`/`CONFIG` strip (`:18-22`,
@@ -426,9 +397,15 @@ action, and the flat name where they name the wire.
   ops-verbs row's default pins the `default_ops_verbs` derivation —
   flanked by the unit-range and audit-bounds rows, and the sweep's
   field table reads the rows (`default`/`min`/`max`/`live`).
-- `check_options.py` (or family_drift) diffs the **registry env twins
-  against `docker/env/*.env.example`** and the image CMD/ENV lines —
-  still missing.
+- the env examples are **GENERATED from the registries**
+  (`scripts/gen_env.py --check`): the full registry env-twin set per
+  tool (50/39/34/36), grouped by the knob's namespace node, the image's
+  own CMD/ENV values as the sample lines with the pin notes (the
+  compose's environment pins marked per knob), the secrets' lines
+  empty, the prometheus example's `PROM_*` names cross-checked against
+  the entrypoint — the gate that replaced the "check_options (or
+  family_drift) diffs the registry env twins against
+  `docker/env/*.env.example`" open item;
 - `lint_texts.py` flags a **literal that equals a leaf** after
   `%`-normalisation — still missing.
 - the breaking renames (the scraper's `auth-token` → `metrics-token`,

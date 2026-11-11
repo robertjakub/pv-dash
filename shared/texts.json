@@ -26,7 +26,8 @@
     "connection_failed": "the control connection failed",
     "mac_verify_failed": "the reply mac does not verify — the wire was tampered with",
     "command_too_long": "the typed command exceeds the control wire's line cap (%d bytes) — shorten it",
-    "reply_too_long": "the reply exceeds the control wire's line cap (%d bytes)"
+    "reply_too_long": "the reply exceeds the control wire's line cap (%d bytes)",
+    "keepalive_invalid": "invalid CLI_KEEPALIVE %r: must be a number of seconds (0 = off)"
   },
   "ctl": {
     "daemon_exit_done": "%% %s — done",

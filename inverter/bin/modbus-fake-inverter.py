@@ -41,7 +41,7 @@ import logging
 import math
 import threading
 
-from common.runtime.audit import load_audit_tags, audit_params_of, build_audit, default_path
+from common.runtime.audit import load_audit_tags, audit_params_of, build_audit, default_path, audit_quote
 from common.settings.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
     parse_secret, resolve_control_target, resolve_metrics_acl
 from common.wire.cred import parse_trust_uids
@@ -388,8 +388,8 @@ def main():
     if audit:
         audit.event('START', 'version=%s modbus=%s:%d control=%s profile=%s: %s'
                     % (version_string(), listen_host, listen_port,
-                       ('127.0.0.1:' + target) if target != '0' else 'off',
-                       profile_label(profile_path), simulator.profile.description))
+                       audit_quote(('127.0.0.1:' + target) if target != '0' else 'off'),
+                       audit_quote(profile_label(profile_path)), simulator.profile.description))
         if metrics_acl_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
             audit.event('ACL-FILE', metrics_acl_warn)
     try:

@@ -22,7 +22,40 @@ for l in $ROOT/slots/slot*; do
     else
         state=STALE
     fi
+    # the elapsed wall time, read off the run id's <YYYYMMDD>-<HHMMSS>
+    # head (the same mm:ss-over-the-minute shape battery.sh prints)
+    e=''
+    rid=${d##*/}
+    sd=${rid%%-*}
+    st=${rid#*-}; st=${st%%-*}
+    e0=$(date -j -f '%Y%m%d-%H%M%S' "$sd-$st" +%s 2>/dev/null)
+    [ -n "$e0" ] && e=$(( $(date +%s) - e0 ))
+    [ -n "$e" ] && [ "$e" -lt 0 ] && e=0
+    [ -n "$e" ] && { [ "$e" -ge 60 ] && e=$(printf '%dm%02ds' $((e / 60)) $((e % 60))) || e="${e}s"; }
     printf '%s %s pid=%s\n' "$(basename "$l")" "$state" "${pid:-none}"
+    if [ "$state" = RUNNING ]; then
+        # the launch config rides the battery header line (the run id and
+        # pid prefix is stripped — both already sit on the slot line above)
+        hdr=$(grep -m1 '^battery ' "$d/status.txt" 2>/dev/null)
+        [ -n "$hdr" ] && printf '  run:    %s\n' "${hdr#*) }"
+        # the run's own start estimate (battery.sh wrote it into status.txt);
+        # the last line below carries the sharpened remaining eta
+        est=$(grep -m1 '^estimate: ' "$d/status.txt" 2>/dev/null)
+        [ -n "$est" ] && printf '  %s\n' "$est"
+        # the live tally: the SUITE verdicts so far over the run's total
+        # (the total rides the last START/SKIP's N/T; before the first
+        # suite it falls back to the `suites:` row's word count)
+        pass=$(grep -c ': PASS (' "$d/status.txt" 2>/dev/null)
+        fail=$(grep -c ': FAILED (' "$d/status.txt" 2>/dev/null)
+        skip=$(grep -c ' SKIP ' "$d/status.txt" 2>/dev/null)
+        total=$(awk '$2 == "START" || $2 == "SKIP" { split($3, a, "/"); t = a[2] } END { print t + 0 }' "$d/status.txt" 2>/dev/null)
+        [ "$total" -eq 0 ] && total=$(( $(grep -m1 '^suites: ' "$d/status.txt" 2>/dev/null | wc -w | tr -d ' ') - 1 ))
+        [ "$total" -lt 0 ] && total=0
+        line="  stats:  $((pass + fail + skip))/$total done, $pass pass, $fail failed"
+        [ "$skip" -gt 0 ] && line="$line, $skip skipped"
+        [ -n "$e" ] && line="$line, $e elapsed"
+        printf '%s\n' "$line"
+    fi
     printf '  status: %s/status.txt\n' "$d"
     last=$(tail -1 "$d/status.txt" 2>/dev/null)
     [ -n "$last" ] && printf '  last:   %s\n' "$last"

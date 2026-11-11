@@ -7,7 +7,7 @@
       "bom-ref": "pv-suite",
       "type": "application",
       "name": "pv-suite",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "licenses": [
         {
           "expression": "BSD-3-Clause"
@@ -26,7 +26,7 @@
       "bom-ref": "pv-suite:common",
       "type": "library",
       "name": "common",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "licenses": [
         {
           "expression": "BSD-3-Clause"
@@ -43,7 +43,7 @@
       "bom-ref": "pv-suite:profiles",
       "type": "file",
       "name": "profiles",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "licenses": [
         {
           "expression": "BSD-3-Clause"
@@ -60,7 +60,7 @@
       "bom-ref": "pv-suite:modbus-cache",
       "type": "application",
       "name": "modbus-cache",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "licenses": [
         {
           "expression": "BSD-3-Clause"
@@ -71,7 +71,7 @@
       "bom-ref": "pv-suite:modbus-scraper",
       "type": "application",
       "name": "modbus-scraper",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "licenses": [
         {
           "expression": "BSD-3-Clause"
@@ -82,7 +82,7 @@
       "bom-ref": "pv-suite:modbus-fake-inverter",
       "type": "application",
       "name": "modbus-fake-inverter",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "licenses": [
         {
           "expression": "BSD-3-Clause"
@@ -93,7 +93,7 @@
       "bom-ref": "pv-suite:dashboard",
       "type": "application",
       "name": "dashboard",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "licenses": [
         {
           "expression": "BSD-3-Clause"
@@ -207,7 +207,7 @@
       "bom-ref": "image:fake-inverter",
       "type": "container",
       "name": "fake-inverter",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "properties": [
         {
           "name": "pv-suite:dockerfile",
@@ -219,7 +219,7 @@
       "bom-ref": "image:modbus-cache",
       "type": "container",
       "name": "modbus-cache",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "properties": [
         {
           "name": "pv-suite:dockerfile",
@@ -231,7 +231,7 @@
       "bom-ref": "image:modbus-scraper",
       "type": "container",
       "name": "modbus-scraper",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "properties": [
         {
           "name": "pv-suite:dockerfile",

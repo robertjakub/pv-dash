@@ -9,7 +9,7 @@ before the repo restructured into one suite.
 This file keeps **Unreleased and the current release** only — the release
 history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
-## Unreleased
+## 0.4.3 — 2026-11-11
 ### Changed
 
 - **scripts** — **battery_status is python**: the read-only view moves
@@ -1812,75 +1812,3 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   `printf` pipelines render their `\n` for the first time (`\\n` ate a
   character and printed a `0` — latent since the pages were ported),
   and the cache page's three over-long `.BR`/`.I` rows rewrap.
-## 0.4.2 — 2026-11-08
-### Changed
-
-- **everywhere** — **the control wire's reply status speaks `ok` | `fail` |
-  `bye`** (breaking): the servers' internal `err` verdicts map to `fail` at
-  the frame and the reply mac signs the wire form; the console prints the
-  ok replies' messages **bare** (quiet success — the `% ` marker rides the
-  non-ok faces only) and the failures as **`% error: <message>`** (was
-  `% err …`); the `set`/`unset` pair confirms **`% changed`** (the one ok
-  face keeping the marker), the other silent confirms (`request clear
-  cache`, `request restart`, `poll now`, `request reload-config`) went
-  fully silent, the local `ping` answers bare `pong`; **the wire's help
-  branch speaks the commands** — `help unset` describes the registry's
-  command row, `help request` lists the namespace (the `?` shape),
-  `help request reload` describes the deep path, and the unknown topic
-  answers `unknown command or setting <words> (try ?)` (was
-  `err unknown setting <words> (try help)`).
-- **everywhere** — **the node listing mimics the `?` output byte for
-  byte — the console's listing is the golden master**: a hierarchy
-  node's wire help (`show audit`, `show audit rotate`) renders the
-  node's own children as the next words — the console's sectioned render
-  exactly (the aligned one-column rows, the display groups' `[section]`
-  blocks, no head line of its own; the depth rides the walk — the
-  flattened `rotate/max-size` rows are gone from `show audit`). The
-  wire's node help answers multi-word paths on every tool and on both
-  verbs that describe nodes (`show control ops`, `show metrics limits`,
-  `help audit` — the cache, dashboard and fake help branches gain the
-  node describe the scraper's already had); the bare `show` answers the
-  walk's first position the same way (every visible top-level word — the
-  namespaces, the knobs, the show reports; the cache's dump-gated
-  `dump-interval` lists only while the dump node is on, the console's
-  session gate); a node whose every child is
-  hidden falls back to its own `name - help` line. The hidden rows (the
-  secrets) never list — the pools' rule, the typed path still answers
-  (`show modbus auth key` keeps refusing as a secret). The alias marking
-  (`(the alias of acl/write)`) rides the console's word-help now too —
-  one shape, both surfaces. The console's `?`/`help` at the empty prompt
-  print the word listing itself now — the same rows TAB lists (the
-  internal machinery's words never list; the command tree's descr rides
-  its row) — and the expanded command-reference block (the header line,
-  the full-path rows, the pinned syntax) retires with its renderer. The
-  command tree speaks its own descr: a
-  `commands` row may carry `node` (the name = the tree path —
-  `request`, `request/clear`, `poll`) and its `help` carries the
-  namespace's word-help (the walk-on borrows the row instead of the
-  first child); the lint files the missing command namespaces the same
-  way it files the settings'. The render is one function
-  (`render_word_sections`) shared by the console's `?`/TAB listings and
-  the wire's `describe_node`.
-
-### Fixed
-
-- **everywhere** — **the cli reconnect tries before it waits**: the first
-  attempt runs immediately after the loss (a daemon that is already back
-  answers on the spot), the announced `--reconnect-wait` sleep only sits
-  between the tries; when every try fails the console says
-  **`% error: reconnect failed, exiting`** and exits 1 (was: a bare
-  stderr note and a `NoneType.close` traceback from the session
-  teardown).
-
-- **cache** — **the metrics listen rebinds live again**: the system/
-  namespace wave dropped a stray `restart` mark on the metrics-listen
-  row, so `set metrics listen …` answered restart-required and the
-  regtest's live-rebind check died — the row's own setting-help, the
-  `_apply` rebind branch and the regtest all speak live.
-
-- **fake** — **the wire keeps a path's case**: `set dump path /srv/State/…`
-  stored and echoed the lowercased value (the simulator pins' `_apply`
-  lowers its value words up front and the path knob rode it) — the dump
-  landed wherever the lowercase spelling pointed. The knob keeps the raw
-  spelling now; the keywords still answer case-insensitively.
-

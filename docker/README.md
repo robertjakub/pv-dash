@@ -389,8 +389,8 @@ dashboard is the stack's one human surface, published loopback-only.
 
 ## The version inside the image
 
-The version reports as `0.4.2` inside the image (no git metadata; a checkout
-shows `0.4.2-<short git>`).
+The version reports as `0.4.3` inside the image (no git metadata; a checkout
+shows `0.4.3-<short git>`).
 
 ## License
 

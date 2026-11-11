@@ -472,7 +472,7 @@ carry no host — pooled there, name them apart. The chain groups by the
 (application, writer, instance) triple:
 
 ```
-2026-11-04T07:16:40Z AUDIT application=CACHE tag=daemon instance=15502 type=start hash=4e1b92f0c7a3 version=0.4.2 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
+2026-11-04T07:16:40Z AUDIT application=CACHE tag=daemon instance=15502 type=start hash=4e1b92f0c7a3 version=0.4.3 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
 2026-11-04T07:16:43Z AUDIT application=CACHE tag=daemon instance=15502 type=write hash=b2c4e17f90d8 fc=6 register=47415 value=5 unit=1
 2026-11-04T07:17:12Z AUDIT application=CACHE tag=daemon instance=15502 type=command hash=09ab57d3f4e1 peer=127.0.0.1:54426 cmd='clear cache' result=ok
 2026-11-04T07:17:20Z AUDIT application=CACHE tag=daemon instance=15502 type=command hash=5c92f1b8d3a7 peer=127.0.0.1:54427 role=ops cmd='clear cache' wire=h1e6070592485 result=ok

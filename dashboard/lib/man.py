@@ -6,7 +6,7 @@ here as roff. scripts/gen_man.py writes the shipped man/*.1 from these;
 from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_CTL, EXIT_STATUS_DAEMON, options_section, page
 
 DATE = '2026-11-05'
-VERSION = 'pv-suite 0.4.2'
+VERSION = 'pv-suite 0.4.3'
 MANUAL = 'User Commands'
 
 

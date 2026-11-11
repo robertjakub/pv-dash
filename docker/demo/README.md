@@ -13,7 +13,7 @@
 The images are the parent directory's one per tool — the demo only wires
 them: `compose.yaml` runs the fake inverter, the cache, the scraper, the
 Prometheus collector (`../Dockerfile.prometheus` — it bakes the family's
-alert rules pack, `alerts/*.yml`, and `prometheus.yml`
+alert rules pack, `alerts/*.yml` (under `extras/`), and `prometheus.yml`
 wires it under `rule_files:`) and the dashboard on
 one `internal: true` network.
 

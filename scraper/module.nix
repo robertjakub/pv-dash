@@ -270,7 +270,7 @@ in
       default = null;
       description = ''
         Path to the standalone ip-prefix acl file the metrics/acl gate reads
-        (examples/acl-ip-prefix.json at the repo root is the shared example of the
+        (extras/examples/acl-ip-prefix.json is the shared example of the
         shape; schema/acl-ip-prefix.schema.json is its JSON Schema). Re-read at
         startup and on every SIGHUP reload; a group/world-readable file warns —
         chmod 0600 silences it.

@@ -84,7 +84,7 @@ services:
         scripts: ..
         common: ../../common
         shared: ../../shared
-        examples: ../../examples
+        examples: ../../extras/examples
     image: modbus-cache
     environment:
       # the upstream side: the cache proves the same suite key to the fake
@@ -138,7 +138,7 @@ services:
       context: ..
       dockerfile: Dockerfile.prometheus
       additional_contexts:
-        alerts: ../../alerts
+        alerts: ../../extras/alerts
     image: prometheus
     env_file:
       - path: ../env/prometheus.env

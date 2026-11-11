@@ -1,6 +1,6 @@
 # Shared examples
 
-The suite-wide sample files — one copy each, at the repo root. A file
+The suite-wide sample files — one copy each, under `extras/`. A file
 lives here when two or more tools ship it, or when the family's acl
 tools and schemas treat it as a shared shape: the standalone acl files
 are ONE format (the gate validator in `common/settings/config.py` reads

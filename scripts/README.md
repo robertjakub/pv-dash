@@ -41,7 +41,7 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
 ## The checks (the shipped artifacts)
 
 - **`lint_acl.py`** — the acl gate-objects: the standalone
-  `file:<path>` targets and the root `examples/` acl files; the typed
+  `file:<path>` targets and the `extras/examples/` acl files; the typed
   rule chain's grammar. Bare run globs the root.
 - **`validate_json.py`** — the JSON documents against a JSON Schema
   (stdlib only): the loader-valid ⊂ schema-valid contract.

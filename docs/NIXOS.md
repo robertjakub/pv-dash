@@ -117,7 +117,7 @@ services.modbus-scraper = {
 | `logLevel` / `logAccess` / `localTime` | the log surface |
 | `openFirewall` | open `listenPort` |
 
-The packages also ship the **alert rules pack** (`alerts/` in the repo —
+The packages also ship the **alert rules pack** (`extras/alerts/` in the repo —
 the F16 closure, the audit vocabulary's detection half, one file per
 watched exporter): the scraper's copy sits at
 `share/modbus-scraper/alerts.yml`, the cache's at

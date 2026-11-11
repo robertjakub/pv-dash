@@ -12,17 +12,13 @@ grammar).
   the syslog input, the `audit_*` parse, the GIM (Illuminate)
   normalization, the five dedicated streams and the four event
   definitions.
-
-## The candidates for the same home (the move is mechanical)
-
-- **alerts/** — the Prometheus/Loki alert packs (the closest sibling
-  under the charter). The move touches: the two package.nix installs
-  (`${../alerts}` → share/<daemon>/alerts.yml), the docker prometheus
-  build context (`../alerts`), NIXOS.md's ruleFiles paths, the
-  shared/README's not-here line.
-- **examples/** — the shared config samples at the root (the acl
-  pairs). The loader has no examples/ fallback by design; the move
-  touches docs/ACL.md and the lint/edit scripts' paths.
+- [alerts/](alerts/) — the Prometheus rule pack, one file per watched
+  exporter (`scraper.yml`, `cache.yml`); the watched exporters'
+  packages ship their half (`share/<daemon>/alerts.yml`), the docker
+  prometheus image bakes both.
+- [examples/](examples/) — the suite-wide sample files, one copy each
+  (the standalone acl pairs); every `package.nix` installs its packaged
+  copy, no tool loads from here.
 
 ## The fenced dirs (NOT candidates)
 

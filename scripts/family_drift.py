@@ -535,11 +535,11 @@ def schemas(rows):
 def examples(rows):
     """Every shipped example config re-parsed through the tool's own
     reader (the set-grammar path; the JSON examples parse only). The
-    tool-local examples/ dirs plus the shared root examples/ home."""
+    tool-local examples/ dirs plus the shared extras/examples/ home."""
     out = []
     sys.path.insert(0, REPO)
     dirs = [(t, f'{t}/examples', os.path.join(REPO, t, 'examples')) for t in TOOLS]
-    dirs.append((None, 'examples', os.path.join(REPO, 'examples')))
+    dirs.append((None, 'extras/examples', os.path.join(REPO, 'extras', 'examples')))
     for t, label, ed in dirs:
         if not os.path.isdir(ed):
             continue
@@ -891,7 +891,7 @@ The findings:
 
 - **The shared pair is the pattern**: the standalone acl file's two
   gates (ip-prefix + write-registers) ship their example + schema ONCE
-  at the root examples/ + shared/schema/ — the four per-tool ip-prefix
+  at extras/examples/ + shared/schema/ — the four per-tool ip-prefix
   copies died in the shared-examples wave, the cache-local write pair
   joined (one gate validator in common/settings/config.py reads both
   kinds). The per-tool schema/ dirs that remain carry the

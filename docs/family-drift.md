@@ -566,14 +566,14 @@ shipped example re-parsed through the tool's own set-grammar reader
 | `scraper/examples/scraper.conf` | ok (18 setting line(s)) |
 | `inverter/examples/inverter.conf` | ok (3 setting line(s)) |
 | `dashboard/examples/server.conf` | ok (19 setting line(s)) |
-| `examples/acl-ip-prefix.json` | json ok |
-| `examples/acl-write-registers.json` | json ok |
+| `extras/examples/acl-ip-prefix.json` | json ok |
+| `extras/examples/acl-write-registers.json` | json ok |
 
 The findings:
 
 - **The shared pair is the pattern**: the standalone acl file's two
   gates (ip-prefix + write-registers) ship their example + schema ONCE
-  at the root examples/ + shared/schema/ — the four per-tool ip-prefix
+  at extras/examples/ + shared/schema/ — the four per-tool ip-prefix
   copies died in the shared-examples wave, the cache-local write pair
   joined (one gate validator in common/settings/config.py reads both
   kinds). The per-tool schema/ dirs that remain carry the

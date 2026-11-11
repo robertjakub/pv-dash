@@ -28,7 +28,11 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   four event definitions (no notifications attached); the README
   carries the import steps and the GIM mapping table, the chain verify
   stays off-box in audit_verify, and the pack is verified by inspection
-  only (no Graylog on the dev machine).
+  only (no Graylog on the dev machine). **`extras/` also takes in
+  `alerts/` and the root `examples/`** (the other operator-side packs —
+  the packages' `../extras/...` installs, the docker build contexts,
+  the docker/NIXOS/shared/scripts README pointers and lint_acl's glob
+  follow; the tool-local `examples/` dirs stay with their tools).
 
 ### Changed
 

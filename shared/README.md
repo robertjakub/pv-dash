@@ -9,7 +9,7 @@ one level below its tree root, which is what the loader's walk leans on).
 |---|---|
 | `texts.json` | the family's static texts — the console's faces and reconnect ladder, the ctl's, the welcome banners, the wire's fixed replies, the daemon bind/startup lines — the one home `common/render/texts.py`'s dotted `T(key)` reads; `scripts/lint_texts.py --check` gates the references both ways (every reference resolves, every key referenced, no duplicated value) |
 | `tags.json` | the audit trail's tool tags, one per tool — `{"cache": "CACHE", "scraper": "SCR", "inverter": "INV", "dashboard": "DSH"}`; `common/runtime/audit.py`'s `load_audit_tags(tool)` reads the tag and fails loud on a malformed file — the daemon's line speaks `tools=CACHE tag=daemon`, the ctl and cli clients `tools=CACHE tag=cli`, so a deployment renames its `CACHE`/`SCR`/`INV`/`DSH` tool tag in one place |
-| [`schema/`](schema/README.md) | the shared JSON Schemas (draft 2020-12) — a schema lives here when the file it describes is shared; today that is the standalone acl file's two gates (the [ip-prefix](../examples/README.md) connect gate + the write-registers gate), validated by `scripts/validate_json.py` |
+| [`schema/`](schema/README.md) | the shared JSON Schemas (draft 2020-12) — a schema lives here when the file it describes is shared; today that is the standalone acl file's two gates (the [ip-prefix](../extras/examples/README.md) connect gate + the write-registers gate), validated by `scripts/validate_json.py` |
 
 How the tree is found: the texts loader reads it one `shared/` segment
 below the directory that contains `common/` — the same walk in every
@@ -25,10 +25,12 @@ layout:
 
 Deliberately *not* here: [`profiles/`](../profiles/README.md) (the
 device profiles — one JSON format with a linter and a formatter of
-their own), [`examples/`](../examples/README.md) (the sample files
-the tools' `file:` gates point at) and [`alerts/`](../alerts/README.md)
-(the Prometheus rule pack — shipped by the watched exporters' packages,
-loaded by no tool) stay their own root dirs; the
+their own) stays its own root dir, while
+[`extras/examples/`](../extras/examples/README.md) (the sample files
+the tools' `file:` gates point at) and
+[`extras/alerts/`](../extras/alerts/README.md) (the Prometheus rule
+pack — shipped by the watched exporters' packages, loaded by no tool)
+live under `extras/` with the other operator-side packs; the
 tool-local schemas stay in each tool's `schema/` dir.
 
 ## License

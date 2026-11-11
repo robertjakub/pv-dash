@@ -46,7 +46,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../common}/modbus/protocol.json $out/share/modbus-fake-inverter/common/modbus/
     install -dm755 $out/share/modbus-fake-inverter/profiles
     install -m644 ${../profiles/profiles}/*.json $out/share/modbus-fake-inverter/profiles/
-    install -Dm644 ${../examples}/acl-ip-prefix.json $out/share/modbus-fake-inverter/acl-ip-prefix.json
+    install -Dm644 ${../extras/examples}/acl-ip-prefix.json $out/share/modbus-fake-inverter/acl-ip-prefix.json
     install -Dm644 ${../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-fake-inverter/acl-ip-prefix.schema.json
     install -Dm644 examples/inverter.conf $out/share/modbus-fake-inverter/inverter.conf
     install -dm755 $out/share/man/man1

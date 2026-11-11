@@ -11,7 +11,7 @@
 # both compose stacks — demo/ and prod/ — build this image):
 #   cd docker
 #   docker build -t prometheus -f Dockerfile.prometheus \
-#       --build-context alerts=../alerts .
+#       --build-context alerts=../extras/alerts .
 #   # or: cd docker/demo (or docker/prod) && docker compose up -d prometheus
 #
 # The entrypoint waits for /config/metrics.token (the modbus-scraper's

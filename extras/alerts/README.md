@@ -6,7 +6,8 @@ events and the log lines it correlates with, so a fired page tells the
 operator where the trail lives. No tool loads these files — the consumer
 is the Prometheus collector; each watched exporter's package ships its
 half (the same ruling shape as [`profiles/`](../profiles/README.md) and
-[`examples/`](../examples/README.md), the other root dirs no tool owns).
+[`extras/examples/`](../extras/examples/README.md), the other dirs no tool
+owns).
 
 | file | watches | group |
 |---|---|---|

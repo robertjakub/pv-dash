@@ -1770,8 +1770,8 @@ try:
     check('write allow-list: fc23 write span outside refused (0x97/01)',
           b[0] == 0x97 and b[1] == 1, b.hex())
     check('write allow-list: the refused fc23 write is a WRITE-REFUSED naming the span',
-          'registers 47999:1 = [5], read back 47415:2 (read/write multiple registers, unit 1) '
-          '(registers outside the write allow-list)' in open('/tmp/reg_audit_fc4.log').read())
+          'fc=23 registers=47999:1 read=47415:2 values=5 unit=1 reason=outside-allow-list'
+          in open('/tmp/reg_audit_fc4.log').read())
     b = txn(struct.pack('>BHHHH', 23, 47415, 2, 47498, 1) + struct.pack('>BH', 2, 5), port=15521 + BASE)
     fc4_log = open('/tmp/reg_fc4.log').read()
     check('write allow-list: fc23 spans inside pass the gate (the device answers)',

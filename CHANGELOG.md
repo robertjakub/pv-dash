@@ -1482,6 +1482,18 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
 
 ### Fixed
 
+- **scripts** — **cache-regtest's write-allow-list audit expectations
+  speak the flat-KV grammar**: the fc23 refusal row greps
+  `fc=23 registers=47999:1 read=47415:2 values=5 unit=1
+  reason=outside-allow-list` and the trail check wants
+  `reason=outside-allow-list` beside `type=write`/`type=write-refused`
+  (the old `message=`-wrapper prose greps died with the audit flat-KV
+  wave). The staleness hid since that wave: quick depth raises
+  QuickDone before the section, and the direct full runs grepped
+  `/tmp/reg_audit_fc4.log` — an append file still carrying a pre-wave
+  prose line — so only the release battery's fresh run-dir trails (the
+  runner's isolation) exposed it.
+
 - **scripts** — **release.py's version read path follows the runtime/
   split**: `old_version()` still read the flat `common/version.py` home
   the common/ subdir wave (b10995d) had moved into

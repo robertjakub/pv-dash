@@ -150,7 +150,7 @@
     { "name": "no-audit-log", "flag": "--no-audit-log", "env": "NO_AUDIT_LOG", "conv": "bool",
       "live": "audit/disable", "setting-help": "disable the DSH audit trail", "values": [ "on", "off" ],
       "default": false, "help": "disable the DSH audit trail" },
-    { "name": "log-level", "flag": "--log-level", "env": "LOG_LEVEL", "conv": "str", "live": "log-level",
+    { "name": "log-level", "flag": "--log-level", "env": "LOG_LEVEL", "conv": "str", "live": "system/log-level",
       "setting-help": "log verbosity",
       "value-help": { "DEBUG": "every request, the proxy detail, the gate decisions",
                       "INFO": "lifecycle, control commands, the upstream up/down flips",
@@ -220,6 +220,7 @@
     { "name": "set", "help": "configure a setting (set log-queries on, set metrics enable on)" },
     { "name": "show", "help": "print a setting's live value, or a report" },
     { "name": "shutdown", "help": "stop the dashboard server (asks to confirm)" },
-    { "name": "clear", "help": "restore a setting to its configured value (clear log-queries, clear log-level)" }
+    { "name": "clear",
+      "help": "restore a setting to its configured value (clear log-queries, clear system log-level)" }
   ]
 }

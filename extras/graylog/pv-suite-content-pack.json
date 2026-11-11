@@ -1,7 +1,7 @@
 {
   "v": 1,
   "id": "293b2334-b70e-5e1d-b5fe-c55c38acb34b",
-  "rev": 1,
+  "rev": 2,
   "name": "pv-suite audit trail",
   "summary": "The pv-suite family audit trail: the syslog input, the audit_* parse, the streams and the event definitions.",
   "description": "Operator content for pointing Graylog at the pv-suite audit trail (--audit-forward udp://<graylog>:1514 with the default rfc5424 format). Creates one syslog UDP input on 1514, two pipeline rules that parse the KV line into audit_* fields, one pipeline wired to the Audit - all stream, five streams and four event definitions (no notifications attached - attach your own). The chain verification stays off-box: scripts/audit_verify.py over the collected file.",
@@ -88,7 +88,7 @@
       ],
       "data": {
         "title": "pv-suite audit gim",
-        "source": "rule \"pv-suite audit gim\"\nwhen\n    has_field(\"audit_type\")\nthen\n    set_field(\"event_source_product\", \"pv-suite\");\n    set_field(\"event_action\", to_string($message.audit_type));\n    set_field(\"event_uid\", to_string($message.audit_hash));\n    set_field(\"application_name\", to_string($message.audit_tools));\n    set_field(\"event_outcome\", \"success\");\n    set_field(\"event_severity\", \"informational\");\n    set_field(\"event_severity_level\", 1);\n    if has_field(\"audit_result\") AND to_string($message.audit_result) == \"err\" then\n        set_field(\"event_outcome\", \"failure\");\n        set_field(\"event_severity\", \"medium\");\n        set_field(\"event_severity_level\", 3);\n    end\n    if to_string($message.audit_type) == \"auth-fail\" then\n        set_field(\"event_severity\", \"high\");\n        set_field(\"event_severity_level\", 4);\n    end\n    if has_field(\"audit_reason\") then\n        set_field(\"event_error_code\", to_string($message.audit_reason));\n    end\n    if has_field(\"audit_uptime\") then\n        set_field(\"event_duration\", to_long($message.audit_uptime));\n    end\n    if has_field(\"audit_cmd\") then\n        set_field(\"user_command\", to_string($message.audit_cmd));\n    end\n    if has_field(\"audit_role\") then\n        set_field(\"user_name\", to_string($message.audit_role));\n    end\n    if has_field(\"audit_user\") then\n        set_field(\"user_name\", to_string($message.audit_user));\n    end\n    if has_field(\"audit_peer\") AND contains(to_string($message.audit_peer), \":\") then\n        let peer_parts = split(\":\", to_string($message.audit_peer));\n        set_field(\"source_ip\", to_string(peer_parts[0]));\n        set_field(\"source_port\", to_long(peer_parts[1]));\n    end\n    if has_field(\"audit_target\") AND contains(to_string($message.audit_target), \":\") then\n        let target_parts = split(\":\", to_string($message.audit_target));\n        if to_string(target_parts[0]) != \"unix\" then\n            set_field(\"destination_ip\", to_string(target_parts[0]));\n            set_field(\"destination_port\", to_long(target_parts[1]));\n        end\n    end\nend"
+        "source": "rule \"pv-suite audit gim\"\nwhen\n    has_field(\"audit_type\")\nthen\n    set_field(\"event_source_product\", \"pv-suite\");\n    set_field(\"event_action\", to_string($message.audit_type));\n    set_field(\"event_uid\", to_string($message.audit_hash));\n    set_field(\"application_name\", to_string($message.audit_application));\n    set_field(\"event_outcome\", \"success\");\n    set_field(\"event_severity\", \"informational\");\n    set_field(\"event_severity_level\", 1);\n    if has_field(\"audit_result\") AND to_string($message.audit_result) == \"err\" then\n        set_field(\"event_outcome\", \"failure\");\n        set_field(\"event_severity\", \"medium\");\n        set_field(\"event_severity_level\", 3);\n    end\n    if to_string($message.audit_type) == \"auth-fail\" then\n        set_field(\"event_severity\", \"high\");\n        set_field(\"event_severity_level\", 4);\n    end\n    if has_field(\"audit_reason\") then\n        set_field(\"event_error_code\", to_string($message.audit_reason));\n    end\n    if has_field(\"audit_uptime\") then\n        set_field(\"event_duration\", to_long($message.audit_uptime));\n    end\n    if has_field(\"audit_cmd\") then\n        set_field(\"user_command\", to_string($message.audit_cmd));\n    end\n    if has_field(\"audit_role\") then\n        set_field(\"user_name\", to_string($message.audit_role));\n    end\n    if has_field(\"audit_user\") then\n        set_field(\"user_name\", to_string($message.audit_user));\n    end\n    if has_field(\"audit_peer\") AND contains(to_string($message.audit_peer), \":\") then\n        let peer_parts = split(\":\", to_string($message.audit_peer));\n        set_field(\"source_ip\", to_string(peer_parts[0]));\n        set_field(\"source_port\", to_long(peer_parts[1]));\n    end\n    if has_field(\"audit_target\") AND contains(to_string($message.audit_target), \":\") then\n        let target_parts = split(\":\", to_string($message.audit_target));\n        if to_string(target_parts[0]) != \"unix\" then\n            set_field(\"destination_ip\", to_string(target_parts[0]));\n            set_field(\"destination_port\", to_long(target_parts[1]));\n        end\n    end\nend"
       }
     },
     {
@@ -133,7 +133,7 @@
           {
             "type": "REGEX",
             "field": "message",
-            "value": " AUDIT tools=",
+            "value": " AUDIT application=",
             "inverted": false,
             "description": ""
           }
@@ -603,7 +603,7 @@
             }
           ],
           "group_by": [
-            "audit_tools"
+            "audit_application"
           ],
           "series": [
             {
@@ -630,12 +630,12 @@
         },
         "field_spec": [
           {
-            "field": "audit_tools",
-            "alias": "tools"
+            "field": "audit_application",
+            "alias": "application"
           }
         ],
         "key_spec": [
-          "audit_tools"
+          "audit_application"
         ],
         "notification_settings": {
           "grace_period_ms": 300000,

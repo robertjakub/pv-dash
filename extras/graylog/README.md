@@ -7,10 +7,15 @@ is loaded by any tool — `alerts/`' charter, Graylog flavour: the family
 emits, Graylog consumes.
 
 The trail it consumes is docs/SECURITY.md's: one KV line per event —
-`<stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<12-hex>
-[message=<kv pairs>]` — carried **verbatim** inside every forward
-envelope, so chain verification (scripts/audit_verify.py) works
-identically at the collector.
+`<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type>
+hash=<12-hex> [message=<kv pairs>]` — carried **verbatim** inside every
+forward envelope, so chain verification (scripts/audit_verify.py) works
+identically at the collector. The `instance=` word names the writer
+daemon — the control port when the tool's `--audit-instance` is unset,
+the override when spelled — the per-instance grouping key at the
+collector (two caches on different hosts may share a name only while
+they never share a collector: the native line and CEF carry no
+hostname).
 
 ## The shipped content pack
 
@@ -24,7 +29,8 @@ unit (System → Content packs → upload, then Install) and creates:
 - **three pipeline rules + one pipeline** — `pv-suite audit kv` runs
   `key_value(msg, quote: "'", ignore_empty_values: true)` over the line
   and `set_fields(kv, prefix: "audit_")`: the outer words become
-  `audit_tools` / `audit_tag` / `audit_type` / `audit_hash`, the simple
+  `audit_application` / `audit_tag` / `audit_instance` / `audit_type` /
+  `audit_hash`, the simple
   message pairs `audit_result` / `audit_peer` / `audit_reason` /
   `audit_wire` / ... ride beside them (the reserved-key rule in
   docs/SECURITY.md is what makes one flat namespace safe). `pv-suite audit
@@ -71,7 +77,8 @@ schema's own note for vendor-specific identifiers):
 
 | the audit KV | the GIM field(s) | entity |
 |---|---|---|
-| `tools=` | `application_name` | application |
+| `application=` | `application_name` | application |
+| `instance=` | — (rides raw as `audit_instance` — the collector's per-instance grouping key) | application |
 | `type=` | `event_action` (the word verbatim: start, command, auth-fail, ...) | event |
 | `hash=` | `event_uid` (the chain hash — the event's unique id) | event |
 | `result=` | `event_outcome` — `ok`/`bye`/`local` → `success`, `err` → `failure` | event |
@@ -117,8 +124,8 @@ the content pack above; hand-roll them only to move off the pack's
 defaults.
 
 The CEF format (`--audit-forward-format cef`) feeds Graylog's CEF input
-the same way — the `cs1`/`cs2` extracted fields carry the chain hash and
-the tool tag for the collectors that prefer CEF.
+the same way — the `cs1`/`cs2`/`cs3` extracted fields carry the chain hash,
+the application tag and the instance for the collectors that prefer CEF.
 
 ### 2. GELF-native — the proposed third format (the tool change)`--audit-forward-format gelf` (the proposal): one JSON datagram per
 event, the KV words as **native GELF fields** — no extractors, no
@@ -126,7 +133,7 @@ pipeline parsing, the streams and dashboards key directly:
 
 ```json
 {"version": "1.1", "short_message": "command peer=10.0.0.9 cmd='set pv 3000' result=ok",
- "host": "pv-cache-1", "level": 4, "_tools": "CACHE", "_tag": "daemon",
+ "host": "pv-cache-1", "level": 4, "_application": "CACHE", "_tag": "daemon", "_instance": "15502",
  "_type": "command", "_hash": "1a07cac1f910", "_peer": "10.0.0.9",
  "_result": "ok", "timestamp": 1699699200.0}
 ```
@@ -142,7 +149,7 @@ The rules below are spelled in the GELF route's `_`-fields; the shipped
 pack's route-1 streams route on the raw `message` regex instead (the
 StreamRouter runs before the pipelines — a stream rule on a pipeline-set
 field never matches) and the same names wear the `audit_` prefix
-(`audit_type`, `audit_peer`, `audit_tools`, `audit_result`, `audit_reason`).
+(`audit_type`, `audit_peer`, `audit_application`, `audit_instance`, `audit_result`, `audit_reason`).
 
 | stream | rule |
 |---|---|
@@ -154,13 +161,13 @@ field never matches) and the same names wear the `audit_` prefix
 
 ## The dashboards
 
-- **Commands** — `_type:command` per `_tools` over time, split by
+- **Commands** — `_type:command` per `_application` (and `_instance`) over time, split by
   `_result` (the ok/err share), the top `_peer` values, the `cmd=` word
   cloud.
 - **Security** — `_type:auth-fail` and `_result:err reason:*` per `_peer`
-  and per `_tools` (the unsigned/bad-mac attempts are the tamper signal),
+  and per `_application`/`_instance` (the unsigned/bad-mac attempts are the tamper signal),
   the write-refused per register range.
-- **Lifecycle** — `_type:start` per `_tools` (the restart count — a START
+- **Lifecycle** — `_type:start` per `_application`/`_instance` (the restart count — a START
   without a preceding SHUTDOWN is a crash), the `uptime=` distribution at
   `type:shutdown`.
 
@@ -173,7 +180,7 @@ field never matches) and the same names wear the `audit_` prefix
   not noise.
 - **the write-refused** — any (the write ACL doing its job is worth a
   look, not necessarily a page).
-- **the restart churn** — `_type:start` > 3 in 15 minutes per `_tools`
+- **the restart churn** — `_type:start` > 3 in 15 minutes per `_application`/`_instance`
   (the crash loop).
 - **the chain break** — NOT a Graylog search: the chain is stateful per
   writer tag, so the off-box verify is `scripts/audit_verify.py` over the

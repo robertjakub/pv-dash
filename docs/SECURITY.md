@@ -131,25 +131,30 @@ the intended demo feature, gated by control-server access only.
   writes, refusals,
   auth-fails, control commands and lifecycle events recorded; control
   characters folded at the writer so one event is one physical line (F2);
+  an empty-valued word never lands — a `key=` token with no value is
+  dropped at the writer (the pair is absent, not empty);
   falls back to stdout (journald). The line grammar is KV:
-  `<stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<12-hex>
-  [message=<kv pairs>]` —
-  `tools=<TAG>` is always uppercase and names the tool (the daemon's own tag
+  `<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type>
+  hash=<12-hex> [message=<kv pairs>]` —
+  `application=<TAG>` is always uppercase and names the tool (the daemon's own tag
   from `shared/tags.json`), `tag=` names the writer — the daemon's own
-  `daemon` or the ctl and cli clients' shared `cli` —, the message is
+  `daemon` or the ctl and cli clients' shared `cli` —, `instance=` names the
+  writer's daemon (the control port when `--audit-instance` is unset, the
+  override when spelled; the clients spell their target's port), the message is
   the last key and runs to end-of-line, its values carry `key=value` pairs
   (values with spaces wear single quotes — `cmd='set pv 3000'`), the
   command's `result=ok|err|bye|local|aborted` and — when the exchange was
   signed — its `wire=h<12-hex>` mac proof ride beside it, and the wire-policy
   refusals name themselves (`reason=unsigned` / `reason=bad-mac`). The keys
-  are unique: the five outer words (`tools`/`tag`/`type`/`hash`/`message`)
+  are unique: the six outer words (`application`/`tag`/`instance`/`type`/`hash`/`message`)
   are reserved — no message emits them — and a message never repeats a key.
   The outer keys:
 
   | key | value |
   |---|---|
-  | `tools=` | the tool's tag, always uppercase — the `shared/tags.json` spelling (`CACHE` / `SCR` / `INV` / `DSH`) |
+  | `application=` | the tool's tag, always uppercase — the `shared/tags.json` spelling (`CACHE` / `SCR` / `INV` / `DSH`) |
   | `tag=` | the writer role: `daemon` (the service's own trail) or `cli` (the ctl and cli clients, one role) |
+  | `instance=` | the writer daemon's identity: the control port (the derived default) or the `--audit-instance` override — the chain groups by it |
   | `type=` | the event type, lowercase — see the table below |
   | `hash=` | the entry's chained hash (12 hex) |
   | `message=` | the detail — the last key, its value runs to end-of-line |

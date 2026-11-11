@@ -12,6 +12,24 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **the family** — **the audit line's `tools=` word renames to
+  `application=` and every line gains an `instance=<id>` word** naming the
+  writer daemon: the control port when `--audit-instance`/`AUDIT_INSTANCE`
+  is unset (unique per host by construction), the override when spelled
+  (1-64 characters, letters/digits/`. _ : @ -`; live-settable as
+  `audit/instance`, the raw `none`/clear returns to the derived port; the
+  ctl and cli clients spell their target's port). The chain key widens to
+  the (application, writer, instance) triple — two daemons of one tool
+  sharing a trail now verify independently instead of reading as a chain
+  break — and the remote envelopes carry the word too (the RFC5424
+  SD-ELEMENT's `instance=`, CEF's `cs3Label=AuditInstance`). The forwarded
+  `prefix=` SD param and the CEF `AuditPrefix` label rename to
+  `application=`/`AuditApplication` with the native word. **Migrating:**
+  trails written by the previous grammar read malformed under
+  `scripts/audit_verify.py` (the validator speaks the current grammar
+  only, as at the KV rename); the Graylog content pack revs to 2 (the
+  stream rule keys on ` AUDIT application=`, the GIM rule maps
+  `audit_application`, the restart-churn alert groups per application).
 - **an out-of-bounds audit rotation env/flag refuses at
   start now** (`AUDIT_FILES`/`AUDIT_MAX_MB` and their flags): the row
   bounds are a spelled configuration error — the one-line refusal, no

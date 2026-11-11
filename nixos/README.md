@@ -70,7 +70,10 @@ All three modules behave the same way:
   to keep a file. `settings.AUDIT_FORWARD` mirrors every audit line onward
   (the F10 external copy): `"syslog"`, `"syslog:/path"`,
   `"udp://host[:514]"`, `"tcp://host[:514]"` (the envelope:
-  `AUDIT_FORWARD_FORMAT` = `"rfc5424"`/`"cef"`).
+  `AUDIT_FORWARD_FORMAT` = `"rfc5424"`/`"cef"`). `settings.AUDIT_INSTANCE`
+  names the writer daemon on every line — the control port when unset, the
+  override when spelled (unique among everything that shares one
+  collector).
 - **The control socket needs a path, not `/tmp`.** The services run with
   `PrivateTmp` — a `/tmp` socket is unreachable from outside (the module
   warns); give `settings.CTL` a path under `/run/<tool>/` and the module
@@ -157,7 +160,7 @@ services.modbus-scraper = {
 
 | Option | Meaning |
 |---|---|
-| `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (UPSTREAM, LISTEN, MODBUS_AUTH, MODBUS_UNIT, TIMEOUT, INTERVAL, READ_DELAY, MERGE_GAP, CACHE_TTL, ALLOW_WRITE, WRITE_REGISTERS, CONNECT_ACL, WRITE_ACL, PROFILE, SELECTION, METRICS_SERVER, METRICS_LISTEN, METRICS_ACL, MAX_CLIENTS, CTL, DUMP_PATH, DUMP_WITH_CACHE, DUMP_INTERVAL, RESTORE_ON_START, REQUESTS_AUDIT, AUDIT_LOG, AUDIT_FORWARD, LOG_LEVEL, ...; `docker/env/cache.env.example` is the key list) |
+| `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (UPSTREAM, LISTEN, MODBUS_AUTH, MODBUS_UNIT, TIMEOUT, INTERVAL, READ_DELAY, MERGE_GAP, CACHE_TTL, ALLOW_WRITE, WRITE_REGISTERS, CONNECT_ACL, WRITE_ACL, PROFILE, SELECTION, METRICS_SERVER, METRICS_LISTEN, METRICS_ACL, MAX_CLIENTS, CTL, DUMP_PATH, DUMP_WITH_CACHE, DUMP_INTERVAL, RESTORE_ON_START, REQUESTS_AUDIT, AUDIT_LOG, AUDIT_FORWARD, AUDIT_INSTANCE, LOG_LEVEL, ...; `docker/env/cache.env.example` is the key list) |
 | `authKeyFile` / `authUpstreamKeyFile` | the key the cache's **own clients** prove (needs `MODBUS_AUTH = "suite"`) / the key **toward the inverter** (`suite` or `waveshare`), from a file outside the store (LoadCredential) |
 | `controlTokenFile` / `controlOpsTokenFile` | the control plane's admin / read-only ops tokens, from a file |
 | `metricsTokenFile` | the cache's own `/metrics` bearer token (mandatory when `settings.METRICS_SERVER = "true"`; bind `METRICS_LISTEN` 127.0.0.1:9351) |
@@ -190,7 +193,7 @@ services.modbus-scraper = {
 
 | Option | Meaning |
 |---|---|
-| `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (LISTEN, PROM_URL, PROM_PREFIX, MAX_CLIENTS, CLIENT_TIMEOUT, MAX_CONN_PER_IP, CTL, AUDIT_LOG, AUDIT_FORWARD, LOG_LEVEL, LOG_ACCESS, LOG_QUERIES, LOCAL_TIME, METRICS_SERVER, METRICS_LISTEN, METRICS_ACL, METRICS_MAX_CLIENTS, DUMP_PATH, RESTORE_ON_START, ...; `docker/env/dashboard.env.example` is the key list) |
+| `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (LISTEN, PROM_URL, PROM_PREFIX, MAX_CLIENTS, CLIENT_TIMEOUT, MAX_CONN_PER_IP, CTL, AUDIT_LOG, AUDIT_FORWARD, AUDIT_INSTANCE, LOG_LEVEL, LOG_ACCESS, LOG_QUERIES, LOCAL_TIME, METRICS_SERVER, METRICS_LISTEN, METRICS_ACL, METRICS_MAX_CLIENTS, DUMP_PATH, RESTORE_ON_START, ...; `docker/env/dashboard.env.example` is the key list) |
 | `solarConfig` | the SOLAR_CONFIG attrset rendered to the served `config.js` (a settings `CONFIG_JS` entry — a path — takes precedence) |
 | `staticDir` | override the packaged `static/` (the Exec pins the package's own assets by default) |
 | `authTokenFile` | the page's bearer token, from a file — mandatory beyond loopback (F21) |

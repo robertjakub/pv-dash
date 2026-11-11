@@ -12,6 +12,14 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **the family** — **an out-of-bounds audit rotation env/flag refuses at
+  start now** (`AUDIT_FILES`/`AUDIT_MAX_MB` and their flags): the row
+  bounds are a spelled configuration error — the one-line refusal, no
+  fallback to the default (a value the wire refuses is a value no layer
+  keeps; a PARSE stumble still keeps last good, the live
+  `set audit-files` semantics unchanged); the argparse flag layer
+  carries the row's message now ('argument --unit: unit must be
+  1..247, got 300') instead of the bare 'invalid value' wrapper
 - **nixos** — **the service modules invert to one freeform `settings` +
   credentials-only secrets** (the settings wave): the ~40 dedicated per-knob
   options are gone

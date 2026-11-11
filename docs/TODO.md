@@ -442,21 +442,6 @@ re-open — is the history half:
 
 ### CROSS-TOOL
 
-- **the nightly-depth battery debt** `[cache]` `[inverter]` `[scraper]`
-  `[dashboard]` — the full profile (`PV_SUITE_PROFILE=full`) fails five
-  checks the commit profile never runs (the regtests and the deep
-  audit/fuzz legs are full-only, so the ~5-minute loop stayed green
-  while the depth rotted): cache-regtest's alias `?` walk-on shape, the
-  acl-file audit warning, the WRITE-REFUSED audit spelling and the
-  trail-injection fold; inverter-regtest's `authenticate first` /
-  `unknown setting control port` console spellings; the scrape-regtest
-  leg; audit-chain's framing legs; dashboard-control-fuzz's
-  `AUDIT_FILES=0` refusal (the row fallback answers `(using 3)` and the
-  dry-run calls it valid where the check wants the bound to refuse).
-  Proven pre-existing at cd2e831 (the worktree full run reproduced
-  four; the dashboard one is hand-proven identical) — not the settings
-  wave's; the cache-regtest stale `examples/` join it also tripped is
-  fixed in the settings wave.
 - **the remaining audit findings** `[cache]` `[scraper]` `[inverter]`
   `[docker]` — the open set (per [SECURITY.md](SECURITY.md) rev. 28): F17
   (the volume secrets), F14 (TLS — the item below), F15 (INFO — the

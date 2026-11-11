@@ -250,7 +250,7 @@ def keepalive(sock, interval, audit=None):
             if 'daemon-exit' in data:
                 daemon_exit_notice(data)
                 if audit:
-                    audit.event('DISCONNECT', 'daemon exit')
+                    audit.event('DISCONNECT', 'reason=daemon-exit')
                     audit.close()
                 os._exit(0)
             return   # unannounced: the main loop notices on the next command
@@ -407,19 +407,20 @@ def reconnect(addr, is_unix, args, audit=None):
         except OSError as e:
             print(T('cli.reconnect_attempt_failed') % (attempt, e))
             if audit:
-                audit.event('RECONNECT', 'attempt %d of %d failed: %s' % (attempt, args.reconnect, e))
+                audit.event('RECONNECT', 'attempt=%d total=%d status=failed error=%s'
+                            % (attempt, args.reconnect, audit_quote(e)))
             if attempt < args.reconnect:
                 print(T('cli.reconnecting_in')
                       % (secs(args.reconnect_wait), attempt + 1, args.reconnect))
                 time.sleep(args.reconnect_wait)
             continue
         if audit:
-            audit.event('RECONNECT', 'attempt %d of %d ok' % (attempt, args.reconnect))
+            audit.event('RECONNECT', 'attempt=%d total=%d status=ok' % (attempt, args.reconnect))
         print(T('cli.reconnected') % _SPEC['label'])
         return s
     print(T('cli.reconnect_failed'))
     if audit:
-        audit.event('RECONNECT', 'gave up after %d attempts' % args.reconnect)
+        audit.event('RECONNECT', 'total=%d status=gave-up' % args.reconnect)
     return None
 
 
@@ -449,7 +450,7 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
             except DaemonExit as e:
                 daemon_exit_notice(str(e))
                 if audit:
-                    audit.event('DISCONNECT', 'daemon exit')
+                    audit.event('DISCONNECT', 'reason=daemon-exit')
                 return
             except ConnectionLost:
                 try:

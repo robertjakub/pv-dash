@@ -12,5 +12,5 @@ from .protocol import (AUTH_DOMAIN, AUTH_ERR, AUTH_FRAME_LEN, AUTH_MAGIC,
                        waveshare_handshake_client)
 from .client import ClientBase, check_data_bytes, check_reply, open_socket
 from .server import serve_modbus
-from .writes import describe_write, write_shape_error, write_target
+from .writes import describe_write, write_kv, write_shape_error, write_target
 

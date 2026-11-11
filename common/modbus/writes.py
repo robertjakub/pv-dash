@@ -57,6 +57,72 @@ def describe_write(pdu, unit):
     return None
 
 
+def write_kv(pdu, unit):
+    """The write request as the audit line's KV words (None when pdu is
+    empty or the function code is no known write): fc= first, the write's
+    own words, unit= last. register=/coil= name a single target,
+    registers=/coils= an addr:count span, value=/values= the payload (the
+    lists comma-joined, one token), the mask write and=/or=, the FC23 read=
+    span the read half. The words the frame is too short to carry don't
+    render — a refused malformed write still parses (fc= register=
+    reason=...). The logs keep describe_write's human form; the audit
+    speaks this."""
+    if not pdu:
+        return None
+    func = pdu[0]
+    if func == 5:
+        words = ['fc=5']
+        if len(pdu) >= 3:
+            words.append('coil=%d' % struct.unpack('>H', pdu[1:3])[0])
+        if len(pdu) == 5:
+            value = struct.unpack('>H', pdu[3:5])[0]
+            if value in (0x0000, 0xFF00):
+                words.append('value=%d' % (1 if value else 0))
+    elif func == 6:
+        words = ['fc=6']
+        if len(pdu) >= 3:
+            words.append('register=%d' % struct.unpack('>H', pdu[1:3])[0])
+        if len(pdu) == 5:
+            words.append('value=%d' % struct.unpack('>H', pdu[3:5])[0])
+    elif func == 15:
+        words = ['fc=15']
+        if len(pdu) >= 5:
+            addr, count = struct.unpack('>HH', pdu[1:5])
+            words.append('coils=%d:%d' % (addr, count))
+            if len(pdu) >= 6 and count and pdu[5] == (count + 7) // 8 and len(pdu) == 6 + pdu[5]:
+                words.append('values=%s' % ''.join(str((pdu[6 + (i >> 3)] >> (i & 7)) & 1)
+                                                   for i in range(count)))
+    elif func == 16:
+        words = ['fc=16']
+        if len(pdu) >= 5:
+            addr, count = struct.unpack('>HH', pdu[1:5])
+            words.append('registers=%d:%d' % (addr, count))
+            if len(pdu) >= 6 and count and pdu[5] == count * 2 and len(pdu) == 6 + pdu[5]:
+                words.append('values=%s' % ','.join(str(v) for v in
+                                                    struct.unpack('>%dH' % count, pdu[6:6 + pdu[5]])))
+    elif func == 22:
+        words = ['fc=22']
+        if len(pdu) >= 3:
+            words.append('register=%d' % struct.unpack('>H', pdu[1:3])[0])
+        if len(pdu) == 7:
+            and_mask, or_mask = struct.unpack('>HH', pdu[3:7])
+            words.append('and=%04x' % and_mask)
+            words.append('or=%04x' % or_mask)
+    elif func == 23:
+        words = ['fc=23']
+        if len(pdu) >= 9:
+            raddr, rcount, waddr, wcount = struct.unpack('>HHHH', pdu[1:9])
+            words.append('registers=%d:%d' % (waddr, wcount))
+            words.append('read=%d:%d' % (raddr, rcount))
+            if len(pdu) >= 10 and wcount and pdu[9] == wcount * 2 and len(pdu) == 10 + pdu[9]:
+                words.append('values=%s' % ','.join(str(v) for v in
+                                                    struct.unpack('>%dH' % wcount, pdu[10:10 + pdu[9]])))
+    else:
+        return None
+    words.append('unit=%d' % unit)
+    return ' '.join(words)
+
+
 def write_target(pdu):
     """The register span a write request touches: (addr, count) for the
     known write function codes, None when the frame is too short to tell."""

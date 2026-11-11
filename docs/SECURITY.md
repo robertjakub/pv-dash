@@ -1,4 +1,4 @@
-# Security — the pv-suite tree (rev. 29)
+# Security — the pv-suite tree (rev. 30)
 
 This is the family's **one security document**: the posture, the trust
 boundaries, the implemented controls, the per-tool stories, the audit
@@ -161,18 +161,26 @@ the intended demo feature, gated by control-server access only.
   | `hash=` | the entry's chained hash (12 hex) |
   | `message=` | the detail — the last key, its value runs to end-of-line |
 
-  The message keys per type (a message never repeats a key; the types not
-  listed still speak prose — the pending KV pass):
+  The message keys per type (every type speaks KV — a message never repeats
+  a key, a value carrying a space rides single-quoted):
 
   | type | message keys |
   |---|---|
-  | `start` | `version`, `upstream` (the fake: `modbus`), `unit` (not the dashboard), `listen`, `control`, `profile` (the cache and the fake) |
+  | `start` | `version`, `upstream` (the fake: `modbus`), `unit`, `listen`, `control`, `profile` (the cache and the fake), `description` (the fake) |
   | `shutdown` | `reason` (`control-command`, `sigterm`, …), `uptime` — plus the tool's counters: `clients`/`hits`/`misses` (the cache), `errors` (the scraper), `conns`/`requests`/`chaos_hits` (the fake) |
   | `command` | `peer`, `role` (the session's RBAC role, when authenticated), `cmd` (single-quoted), `wire` (the frame mac's 12-hex head, when signed), `result` (`ok`/`err`/`bye`), `reason` (the wire-policy refusals only: `unsigned` / `bad-mac`) |
-  | `connect` / `disconnect` | `target`, `user` (the clients' session trail) |
+  | `connect` / `disconnect` | `target`, `user` (the clients' session trail); the keepalive watcher's daemon-exit disconnect spells `reason=daemon-exit` |
+  | `reconnect` | `attempt`, `total`, `status` (`ok`/`failed`/`gave-up`), `error` (when failed) |
   | `auth-fail` | `peer` |
-  | `requests` | `peer`, `requests` |
-  | `write` / `write-refused` / `write-rejected` / `write-failed` | the write describer's words (the pending KV pass) |
+  | `requests` | `peer`, `requests`, `window`, `recent` (the cache's per-window evidence) |
+  | `write` | `fc`, the target (`register`/`coil` or the `registers=`/`coils=` `addr:count` span), `value`/`values`, the mask write's `and`/`or`, the FC23 `read` span, `unit` — `common/modbus/writes.py write_kv` |
+  | `write-refused` | the write's words plus `reason` (`too-short`/`write-disabled`/`not-on-write-acl`/`outside-allow-list`/`malformed-frame`), `client` (the ACL refusal), `error` (the shape error) |
+  | `write-rejected` | the write's words plus `exception` (the device's modbus exception code) |
+  | `write-failed` | the write's words plus `error` (the transport failure) |
+  | `reset` | `signal` (`SIGUSR1`), `dropped` (the cache) / `pins`, `coils`, `overlay` (the fake) |
+  | `reload` | `result` (`ok`/`err`), `error` (when err); the payload keys: `ranges`+`profile` (the cache), `settings`+`changed` (the fake), `upstream` (the scraper, the dashboard), `restored`+`file` (the state-file restore), `action=exec`+`pid` (the re-exec) |
+  | `restore` | `file`, `words`, `settings` (the cache's state dump) |
+  | `acl-file` | `warn` (the file's permission posture, single-quoted) |
 - **Audit forwarding** — the trail's defense is three tiers: the local
   chain (the file of record, per-writer hashes, `scripts/audit_verify.py`),
   the local journald mirror and **the off-box copy** — `--audit-forward`
@@ -316,7 +324,7 @@ list decide who may drive the control socket (§ 4), and the Modbus
 ### 8.2 Closed
 
 Every closed finding — F2–F13, F16, F18–F23 — with its fix, its
-verification and the per-revision walk (rev. 1–29):
+verification and the per-revision walk (rev. 1–30):
 [history/AUDIT.md](history/AUDIT.md).
 
 ## 9. Verification

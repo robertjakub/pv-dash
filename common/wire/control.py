@@ -1245,7 +1245,7 @@ class ControlServer:
             self.LOG.info('reload: %d override(s) re-applied from %s%s', applied, path,
                           (T('wire.skipped_suffix') % (len(failed), ', '.join(failed))) if failed else '')
             if self.audit:
-                self.audit.event('RELOAD', 'restored %d override(s) from %s' % (applied, path))
+                self.audit.event('RELOAD', 'restored=%d file=%s' % (applied, audit_quote(path)))
         except (OSError, ValueError) as e:
             self.LOG.error('reload: the state file %s is unreadable (%s) — starting without it', path, e)
 
@@ -1296,7 +1296,7 @@ class ControlServer:
         config, the fresh daemon rebinds the control target (stale sockets
         are replaced) and restores the saved overrides."""
         if self.audit:
-            self.audit.event('RELOAD', 'exec: the daemon re-execs (pid %d)' % os.getpid())
+            self.audit.event('RELOAD', 'action=exec pid=%d' % os.getpid())
         self.announce_exit('reload', text='daemon-exit: %s' % self.RELOAD_TEXT)
         sys.stdout.flush()
         sys.stderr.flush()

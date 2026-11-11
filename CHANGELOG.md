@@ -12,6 +12,25 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **the family** — **every audit event type now speaks KV** (the pending
+  prose pass): the write family describes itself as `fc=`/`register=`/
+  `value=`/`unit=` words (`common/modbus/writes.py write_kv` — the logs
+  keep the human form), the refusals add `reason=`
+  (`too-short`/`write-disabled`/`not-on-write-acl`/`outside-allow-list`/
+  `malformed-frame`) with `client=`/`error=`/`exception=` where they
+  apply;   `reset` counts `signal=`/`dropped=` (the cache) and
+  `pins=`/`coils=`/`overlay=` (the fake); `reload` carries
+  `result=`/`error=` (the family's ok/err verdict) plus its payload keys
+  (`ranges`+`profile`, `settings`+`changed`, `upstream`, `restored`+`file`,
+  `action=exec`+`pid`); `restore` speaks `file=`/`words=`/`settings=`; `reconnect`
+  `attempt=`/`total=`/`status=`; the keepalive daemon-exit disconnect
+  `reason=daemon-exit`; `acl-file` spells `warn=`; `requests` gains
+  `window=`/`recent=`; the fake's START trails `description=` instead of
+  a prose tail and the scraper's START spells `unit=`. The breaker:
+  trails written by the previous grammar still VERIFY (the chain hashes
+  the line as written) — parsers keyed on the old prose shapes need the
+  new keys; the graylog pack's GIM mappings key the generic words
+  (`type=`/`result=`/`peer=`/…) and hold unchanged.
 - **the family** — the audit detail's KV words tighten: a value carrying a
   space now wears single quotes around the WHOLE value (the builders'
   `audit_quote` — the wire's `peer='unix socket'`, the ctl and cli

@@ -167,9 +167,9 @@ syslog forms keep the verbatim send (remote targets only)
 .TP
 .BI \-\-audit\-instance " audit-instance"
 the audit lines' instance=<id> word — which daemon wrote the line: the
-control port when unset (unique per host by construction), the override
-when spelled; 1\-64 characters (letters, digits, . _ : @ \-); make an
-override unique among everything that shares one collector
+control port when unset/empty (unique per host by construction), the
+override when spelled; 1\-64 characters (letters, digits, . _ : @ \-);
+make an override unique among everything that shares one collector
 .TP
 .BI \-\-audit\-max\-mb " audit-max-mb"
 rotate the audit log at this size in MB, keeping N backups; 0 = no size

@@ -36,8 +36,8 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   stay hidden unless `--nodes`, `--sort` orders by knob name,
   `--hide` drops whole sections / `--show` keeps only them, comma
   separated, `--tool` names the tools comma separated with `all`
-  the default). The census's one home since the shipped OPTIONS.md
-  retired — the registries are the truth, this is the cross-tool view
+  the default). The census's one home — the registries are the truth,
+  this is the cross-tool view
   on demand.
 
 ## The checks (the shipped artifacts)

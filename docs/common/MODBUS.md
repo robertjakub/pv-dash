@@ -42,9 +42,9 @@ Each frame is the standard **MBAP header (7 bytes) + PDU**, read with
 
 A bad `length` (out of bounds) means the reader **closes the connection
 without replying** — the frame is not even parseable enough to answer.
-`MAX_PDU` is 253 for the cache and scraper, **260** for the fake, so the
-effective `length` ceiling is 255 vs 262. `MAX_COUNT` (registers per read)
-is 125 everywhere.
+`MAX_PDU` is 253 everywhere (the shared tree's `max_pdu`), so the
+effective `length` ceiling is 255; `MAX_COUNT` (registers per read) is
+125 everywhere.
 
 Default endpoints: the real inverter on `:502`; the fake's Modbus listener
 on `127.0.0.1:5502`; the cache's Modbus listener on `127.0.0.1:15502`; the
@@ -160,41 +160,13 @@ pv-suite tool ever demands a Waveshare password from its own clients.
 
 The one table is `FC_NAMES` (`common/modbus/protocol.py`); `describe_fc`
 renders `FC6 (write single register)` or bare `FC<n>` for unlisted codes.
-
-| FC | Name | Cache | Scraper | Fake |
-|---|---|---|---|---|
-| 1 | read coils | cached / forwarded | reads (`bit`, `fc: 1`) | serves the coil space |
-| 2 | read discrete inputs | cached / forwarded | reads (`bit`, `fc: 2`) | serves the discrete-input space |
-| 3 | read holding registers | cached / forwarded, diag block | reads | reads |
-| 4 | read input registers | cached / forwarded (separate space) | reads | reads (the input space) |
-| 5 | write single coil | gated + forwarded | — | writes (coil overlay; `0x0000`/`0xFF00` only) |
-| 6 | write single register | gated + forwarded | — | writes (overlay) |
-| 7 | read exception status | forwards | — | exception 01 |
-| 8 | diagnostics | forwards | — | exception 01 |
-| 11 | get comm event counter | forwards | — | exception 01 |
-| 12 | get comm event log | forwards | — | exception 01 |
-| 13 | program 484 | forwards | — | exception 01 |
-| 14 | poll 484 | forwards | — | exception 01 |
-| 15 | write multiple coils | gated + forwarded | — | writes (coil overlay) |
-| 16 | write multiple registers | gated + forwarded | — | writes (overlay) |
-| 17 | report slave id | forwards | — | exception 01 |
-| 18 | program 884 | forwards | — | exception 01 |
-| 19 | reset comm link 884 | forwards | — | exception 01 |
-| 20 | read file record | forwards | — | exception 01 |
-| 21 | write file record | forwards | — | exception 01 |
-| 22 | mask write register | gated + forwarded | — | exception 01 |
-| 23 | read/write multiple registers | gated + forwarded | — | exception 01 |
-| 24 | read fifo queue | forwards | — | exception 01 |
-| 43 | read device identification | forwards | — | exception 01 |
-
 The cache's sets: `READ_FUNCS = (1, 2, 3, 4)` — the four address spaces,
-each cached separately — and `WRITE_FUNCS = {5, 6, 15, 16, 22, 23}`
-the shared
-`common/modbus/protocol.json`'s `read_funcs`/`write_funcs`). Unknown
-codes forward untouched. The
-scraper is **read-only** — it never issues writes (no write API — the
-shared client exposes reads only); only the cache originates them (when
-enabled), and the fake implements FC5/6/15/16 behind its write gate.
+each cached separately — and `WRITE_FUNCS = {5, 6, 15, 16, 22, 23}`, both
+from the shared `common/modbus/protocol.json`'s `read_funcs`/`write_funcs`.
+Unknown codes forward untouched. The scraper is **read-only** — it never
+issues writes (no write API — the shared client exposes reads only); only
+the cache originates them (when enabled), and the fake implements
+FC5/6/15/16 behind its write gate.
 
 ### The support map — the surface, then every standard FC
 
@@ -205,10 +177,10 @@ code, tool by tool ("—" = the tool has no surface for it).
 | Surface | modbus-cache | modbus-scraper | fake inverter |
 |---|---|---|---|
 | MBAP framing (txn/proto/length/unit; `proto` must be 0) | serve + forward | client | server |
-| MBAP overruns (length < 7 / over the PDU cap) | ✅ shared `read_frame`, frame refused (`protocol.py:191`) | ✅ same | ✅ same — logged, connection closed |
+| MBAP overruns (length < 7 / over the PDU cap) | ✅ shared `read_frame`, frame refused | ✅ same | ✅ same — logged, connection closed |
 | Exception replies (`func\|0x80` + code) | ✅ passes device codes through; emits 01/02/03/04 itself | ✅ surfaces them on `ctl` | ✅ emits 01/02/03/04 |
-| The suite handshake (PVA1, HMAC-SHA256 — rides the MBAP leg) | ✅ client + server (`protocol.py:50`, `protocol.py:67`) | ✅ client (`protocol.py:50`) | ✅ server (`protocol.py:67`) |
-| The waveshare handshake (upstream auth) | ✅ client, upstream leg (`protocol.py:94`) | — | — |
+| The suite handshake (PVA1, HMAC-SHA256 — rides the MBAP leg) | ✅ client + server (`auth_handshake_client`/`auth_handshake_server`) | ✅ client | ✅ server |
+| The waveshare handshake (upstream auth) | ✅ client, upstream leg (`waveshare_handshake_client`) | — | — |
 | Transport | Modbus TCP only | Modbus TCP only | Modbus TCP only — RTU/ASCII out of scope |
 
 **The function codes:**
@@ -219,26 +191,26 @@ for it):
 
 | FC | Name | Scraper (client) | Cache (server) | Fake (server) | Verdict |
 |---|---|---|---|---|---|
-| FC01 | Read Coils | ✅ per-profile `fc` (`poller.py:65`) | ✅ cached, first-class bit space (`proxy.py:504`) | ✅ coil map + `--allow-write` overlays (`inverter.py:213`) | **Complete** |
-| FC02 | Read Discrete Inputs | ✅ per-profile `fc` (`poller.py:65`) | ✅ cached, own `(fc, addr)` space (`proxy.py:504`) | ✅ discrete map + overlays (`inverter.py:213`) | **Complete** |
-| FC03 | Read Holding Registers | ✅ `read_registers` (`protocol.py:83`) | ✅ cached, first-class (`proxy.py:493`) | ✅ register map + write overlay (`inverter.py:193`) | **Complete** |
-| FC04 | Read Input Registers | ✅ per-profile `fc` (`poller.py:65`) | ✅ cached, separate `(fc, addr)` space (`proxy.py:493`) | ✅ own per-profile `fc4` space — no overlay (the pins are the open TODO, `inverter.py:202`) | **Complete** |
-| FC05 | Write Single Coil | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, audited (`inverter.py:229`) | **Complete** (cache + fake) |
-| FC06 | Write Single Register | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, audited (`inverter.py:241`) | **Complete** (cache + fake) |
-| FC07 | Read Exception Status | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
-| FC08 | Diagnostics | — | ✅ forwarded, named — the sub-functions are not interpreted (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade (sub-functions by design) |
-| FC11 | Get Comm Event Counter | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
-| FC12 | Get Comm Event Log | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
-| FC15 | Write Multiple Coils | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, bit overlays (`inverter.py:247`) | **Complete** (cache + fake) |
-| FC16 | Write Multiple Registers | — no write API | ✅ gated forward (`proxy.py:447`) | ✅ behind the gate, register overlays (`inverter.py:260`) | **Complete** (cache + fake) |
-| FC17 | Report Server ID | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
-| FC20/21 | File Record Read/Write | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
-| FC22 | Mask Write Register | — no write API | ✅ gated forward, shape-checked (`writes.py:80`) | ⚠️ exception 01 — nothing to gate (`inverter.py:273`) | Complete except fake |
-| FC23 | Read/Write Multiple Regs | — no write API | ✅ gated forward, shape-checked (`writes.py:80`) | ⚠️ exception 01 — nothing to gate (`inverter.py:273`) | Complete except fake |
-| FC24 | Read FIFO Queue | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade |
-| FC43/14 | Read Device Identification | — | ✅ forwarded, named (`proxy.py:527`) | ⚠️ named refusal, exception 01 (`inverter.py:273`) | Forward-grade (native MEI by design) |
-| FC09/10, 25–42, 44–64 | reserved / legacy | — | ✅ forwarded bare (`FC<n>`, `proxy.py:527`) | ⚠️ exception 01 (`inverter.py:273`) | Forward-grade |
-| FC65–72/73–94/100+ | vendor-specific | — | ✅ forwarded bare (`FC<n>`, `proxy.py:527`) | ⚠️ exception 01 (`inverter.py:273`) | Forward-grade |
+| FC01 | Read Coils | ✅ per-profile `fc` | ✅ cached, first-class bit space | ✅ coil map + `--allow-write` overlays | **Complete** |
+| FC02 | Read Discrete Inputs | ✅ per-profile `fc` | ✅ cached, own `(fc, addr)` space | ✅ discrete map + overlays | **Complete** |
+| FC03 | Read Holding Registers | ✅ `read_registers` | ✅ cached, first-class | ✅ register map + write overlay | **Complete** |
+| FC04 | Read Input Registers | ✅ per-profile `fc` | ✅ cached, separate `(fc, addr)` space | ✅ own per-profile `fc4` space — no overlay (the pins are the open TODO) | **Complete** |
+| FC05 | Write Single Coil | — no write API | ✅ gated forward | ✅ behind the gate, audited | **Complete** (cache + fake) |
+| FC06 | Write Single Register | — no write API | ✅ gated forward | ✅ behind the gate, audited | **Complete** (cache + fake) |
+| FC07 | Read Exception Status | — | ✅ forwarded, named | ⚠️ named refusal, exception 01 | Forward-grade |
+| FC08 | Diagnostics | — | ✅ forwarded, named — the sub-functions are not interpreted | ⚠️ named refusal, exception 01 | Forward-grade (sub-functions by design) |
+| FC11 | Get Comm Event Counter | — | ✅ forwarded, named | ⚠️ named refusal, exception 01 | Forward-grade |
+| FC12 | Get Comm Event Log | — | ✅ forwarded, named | ⚠️ named refusal, exception 01 | Forward-grade |
+| FC15 | Write Multiple Coils | — no write API | ✅ gated forward | ✅ behind the gate, bit overlays | **Complete** (cache + fake) |
+| FC16 | Write Multiple Registers | — no write API | ✅ gated forward | ✅ behind the gate, register overlays | **Complete** (cache + fake) |
+| FC17 | Report Server ID | — | ✅ forwarded, named | ⚠️ named refusal, exception 01 | Forward-grade |
+| FC20/21 | File Record Read/Write | — | ✅ forwarded, named | ⚠️ named refusal, exception 01 | Forward-grade |
+| FC22 | Mask Write Register | — no write API | ✅ gated forward, shape-checked (`writes.py`) | ⚠️ exception 01 — nothing to gate | Complete except fake |
+| FC23 | Read/Write Multiple Regs | — no write API | ✅ gated forward, shape-checked (`writes.py`) | ⚠️ exception 01 — nothing to gate | Complete except fake |
+| FC24 | Read FIFO Queue | — | ✅ forwarded, named | ⚠️ named refusal, exception 01 | Forward-grade |
+| FC43/14 | Read Device Identification | — | ✅ forwarded, named | ⚠️ named refusal, exception 01 | Forward-grade (native MEI by design) |
+| FC09/10, 13, 18/19, 25–42, 44–64 | reserved / legacy | — | ✅ forwarded bare (`FC<n>`) | ⚠️ exception 01 | Forward-grade |
+| FC65–72/73–94/100+ | vendor-specific | — | ✅ forwarded bare (`FC<n>`) | ⚠️ exception 01 | Forward-grade |
 
 (The cache's write gate is the three-layer ladder — allow-write, client
 ACL, register allow-list — then the shared shape check; every refusal is
@@ -382,10 +354,12 @@ undefined register/bit → 02 (otherwise missing addresses read 0);
 FC5 with a value outside `0x0000`/`0xFF00` → 03; FC5/6/15/16 with a
 consistent shape → overlay write + echo (audited `WRITE`); an
 implemented FC with a malformed shape — **including a frame too short
-to carry its address** — → 03; any other FC → 01. The fake does **not**
-validate the unit id — it serves any requested unit and echoes it back.
-The cache's cached and diag replies echo the client's unit too; the
-configured unit knob (`unit` / `modbus-unit`) governs only its own poll reads.
+to carry its address** — → 03; any other FC → 01. The fake refuses an
+out-of-range unit id in-band (exception 03 — the shared tree's range: 0
+is the broadcast id, 248-255 are reserved) and serves any in-range
+requested unit, echoing it back. The cache's cached and diag replies
+echo the client's unit too; the configured unit knob (`unit` /
+`modbus-unit`) governs only its own poll reads.
 
 Shared client error texts: `transaction id mismatch`,
 `unexpected protocol id %d`, `reply from unit id %d, expected %d`,
@@ -447,20 +421,31 @@ replayed to clients).
 
 ## 9. Limits and defaults
 
+The knobs name the cell's owner — the console spelling of the knob behind
+the number (`set modbus timeout <v>` on the ctl speaks it). The knob-less
+rows are the shared tree's constants (`common/modbus/protocol.json`) —
+`max_pdu`, `max_count`, the register space and the listen backlog carry
+no knob.
+
 | | cache | scraper | fake |
 |---|---|---|---|
-| `max_pdu` | 253 | 253 | 260 |
+| `max_pdu` | 253 | 253 | 253 |
 | `max_count` | 125 | 125 | 125 |
-| register space | 65536 | 65535 | 65536 |
-| unit id | 1..247 (validated at start) | 1..247 (validated at start) | 1 default, unvalidated |
-| socket timeout | 3.0 s | 3.0 s | 3.0 s |
-| client idle timeout | 300 s | — | 300 s |
-| max clients | 64 | — | 64 |
-| max conn per IP | 0 (off) | — | 0 (off) |
+| register space | 65536 | 65536 | 65536 |
+| unit id | 1..247, validated at start (`modbus unit`) | 1..247, validated at start (`modbus unit`) | 1 default, 1..247 validated at start (`--unit`) |
+| socket timeout | 3.0 s (`modbus timeout`) | 3.0 s (`modbus timeout`) | — |
+| client idle timeout | 300 s (`limits client-timeout`) | — | 300 s (`client-timeout`) |
+| max clients | 64 (`limits max-clients`) | — | 64 (`max-clients`) |
+| max conn per IP | 0 (off) (`limits max-conn-per-ip`) | — | 0 (off) (`max-conn-per-ip`) |
 | listen backlog | 128 | — | 128 |
-| poll interval | 10 s | 10 s | — |
-| read delay between device reads | 0.05 s | — | — |
-| cache TTL | 30 s | — | — |
+| poll interval | 10 s (`modbus interval`) | 10 s (`metrics interval`) | — |
+| read delay between device reads | 0.05 s (`modbus read-delay`) | — | — |
+| cache TTL | 30 s (`cache ttl`) | — | — |
+
+The socket timeout's default is the tree's `socket_timeout` (3.0 s) — the
+cache's and scraper's `modbus timeout` knobs ride it, their registries
+hand-copy no number. The fake is a server: its accepted sockets carry the
+client idle timeout, no socket timeout.
 
 Pacing and caps, not rate limiting: one serialized upstream connection;
 `read-delay` sleeps between consecutive device reads in a healthy cycle
@@ -533,9 +518,11 @@ interval/...` rows. Startup logs name the schemes
 
 ## 11. Behaviors worth knowing
 
-- **Unit ids are advisory server-side**: the cache and the fake both echo
-  the client's unit without validating it; only the clients validate
-  their own configured unit on replies.
+- **Unit ids are advisory server-side**: the server faces refuse an
+  out-of-range id in-band (exception 03 — the shared tree's range) and
+  echo any in-range requested unit without matching it against their own
+  configured unit; only the clients validate their configured unit on
+  replies.
 - **The cache answers exceptions with the client's `proto` echoed** when
   it sent a nonzero one.
 - **`Upstream.errors` counts transport failures only** — connect, send,

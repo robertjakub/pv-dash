@@ -50,9 +50,8 @@ compared two ways: the exact pass groups identical bodies (the
 copy-paste twins), the similarity pass pairs cross-file bodies over the
 0.72 ratio (the near-copies that already drifted).
 
-**The exact pass**: 1 duplicate group(s) in >= 2 files.
+**The exact pass**: 0 duplicate group(s) in >= 2 files.
 
-- 25L `_load_options`: `dashboard/lib/options.py:25`, `scraper/lib/options.py:27`
 
 **The similarity pass**: 49 cross-file pair(s) over the ratio
 floor (30 of them the man-page prose, per-tool by
@@ -60,14 +59,14 @@ design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
-| 1.00 | `scraper/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.94 | `cache/lib/options.py:24` `_load_options` <-> `scraper/lib/options.py:27` `_load_options` |
-| 0.94 | `cache/lib/options.py:24` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
+| 0.98 | `scraper/lib/options.py:28` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
+| 0.94 | `cache/lib/options.py:25` `_load_options` <-> `scraper/lib/options.py:28` `_load_options` |
 | 0.93 | `scraper/bin/modbus-scraper.py:46` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
+| 0.92 | `cache/lib/options.py:25` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.90 | `scraper/bin/modbus-scraper.py:241` `graceful_stop` <-> `dashboard/bin/dashboard.py:474` `graceful_stop` |
-| 0.88 | `cache/lib/options.py:24` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.88 | `inverter/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.88 | `scraper/lib/options.py:27` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
+| 0.86 | `cache/lib/options.py:25` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
+| 0.86 | `scraper/lib/options.py:28` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.83 | `inverter/lib/control.py:96` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |

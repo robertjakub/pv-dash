@@ -12,6 +12,26 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **the family** — **the Modbus socket timeout's default lives in the
+  protocol tree**: `common/modbus/protocol.json` carries `socket_timeout`
+  (3.0 s) and the cache's and scraper's `modbus timeout` knobs ride it —
+  the lib/options.py loaders splice the tree's value over the row's
+  static default (`apply_socket_timeout` beside `unit_in_range`), the
+  registries hand-copy no number, and `check_options` pins the splice
+  (the row's default must equal the tree's). The knob's ladder is
+  unchanged — flag > env > config > the tree's default, live-settable as
+  before; the fake stays server-side (no socket timeout — its face
+  timeout is the client idle knob). **docs/common/MODBUS.md is redone**:
+  the §9 limits table speaks the post-unification truth and names every
+  cell's knob (the fake's 260-PDU/65535-space/unvalidated-unit cells and
+  the §1 255-vs-262 drift story are gone), the doubled FC tables are one
+  support map (the drifting `file.py:line` refs dropped, the reserved
+  row widened to FC13/18/19), §6/§11 say the out-of-range unit ids are
+  refused in-band (they claimed the fake never validates — the tree wave
+  made it refuse), and the socket timeout's home is documented;
+  `common/README.md`'s tree row gains `socket_timeout`. The retired
+  OPTIONS.md's dangling references are cleaned (the four per-tool TODO
+  records, scripts/README.md's census note, the Unreleased entries).
 - **the family** — **the audit line is FLAT KV: the `message=` wrapper word
   is gone.** The detail's KV words ride bare after `hash=` — every word on
   the line is a `key=value` pair (`<stamp> AUDIT application=… tag=…
@@ -193,14 +213,13 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   ledger stays the history half (`docs/history/family-unify.md`) and
   the current/history split rule holds; the generated-docs
   inventory hands to scripts/README.md (which gains the missing
-  gen_env.py bullet + the page/generator/gate table); the two
-  MODBUS.md citation repairs (the pre-move `docs/ACL.md` spelling, the
-  OPTIONS.md relative link that breaks out of `docs/common/`); the
+  gen_env.py bullet + the page/generator/gate table); the
+  MODBUS.md citation repair (the pre-move `docs/ACL.md` spelling); the
   cache README's access-control section collapses its three tellings
   to their homes (the flag table owns the defaults + the inline
   grammar, docs/common/ACL.md owns the family rules) — the ACL.md
   pointer and the cache's four-gates shape stay; the shipped
-  OPTIONS.md retires — the knob census's one home is
+  knob-table page retires — the knob census's one home is
   `scripts/list_options.py` (the superset: options/show/commands
   rows), the per-tool MANUALs stay the reference, and the only
   generated page without a `--check` gate is gone (gen_options.py
@@ -258,7 +277,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   surface**: no
   tool-tagged env twin (`MCH_*`/`CACHE_*`/…, the retired era — the one
   control env stays the common `CTL`) may return in a registry row or a
-  tool's own code. The NixOS modules, READMEs, OPTIONS.md, the MANUALs
+  tool's own code. The NixOS modules, READMEs, the MANUALs
   and the man pages follow.   **The audit line itself is KV now**:
   `<stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<12-hex>
   [message=<kv pairs>]` —
@@ -327,7 +346,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   true now). `show config` renders the live paths as words (the config
   files' own spelling — the output pipes back through the console, a ctl
   or a config file), `help config` / `show knobs` and the generated
-  MANUAL.md + OPTIONS.md tables spell the console words in their set
+  MANUAL.md tables spell the console words in their set
   columns (the knob column keeps the flat registry key — the
   identifier), and the state dumps + the reload state files key the live
   paths (`acl/write`, `modbus/interval`) — the flat names read beside
@@ -356,7 +375,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   audit-forward grammar text, the F5 tokenless line and the dump-family
   texts spell the flat names; docs/common/MODBUS.md's table column
   re-heads to the console spelling, docs/common/ACL.md and the four
-  READMEs follow the flat forms, the man pages + MANUAL.md + OPTIONS.md
+  READMEs follow the flat forms, the man pages + MANUAL.md
   regenerate, the ten suites speak the flat wire. Closes the family-TODO
   item "internally key on the flattened name, not the live".
 
@@ -388,7 +407,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   re-pointed), the READMEs' flag/default/verb tables match the
   registries, the demo/prod stacks' `AUTH` → `MODBUS_AUTH` (the env
   nothing read — the Modbus hops ship authenticated as documented),
-  the man pages + MANUALs + OPTIONS.md regenerate.
+  the man pages + MANUALs regenerate.
 
 - **everywhere** — **the knob defaults move into the registry rows**
   (the one-knob-one-source closure): every non-secret flag knob's
@@ -548,8 +567,8 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   word-help follow the registries.
 
 - **everywhere** — **the family-wide documentation regeneration and the
-  stale sweep**: every generated surface re-emitted (`docs/OPTIONS.md`
-  was two waves stale — the audit-forward pair was missing from the
+  stale sweep**: every generated surface re-emitted (the
+  generated knob census was two waves stale — the audit-forward pair was missing from the
   common-knob census, 29 -> 31), the three tools' `--control-ops-verbs`
   default rows speak the derived policy (`show` — the READMEs claimed
   the family's old `show,clear`; the cache keeps it), the ops-role
@@ -928,7 +947,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   ruling — a journald-only deployment disables the file trail from the
   env file). A knob ruled env-free carries the registry's `no-env` note
   instead of a silent gap (the fake's F11 flags-first demo knobs, the
-  dashboard's `log-queries`), rendered in OPTIONS.md's env-free footnote
+  dashboard's `log-queries`), rendered in the env-free footnote
   and gated: `check_options` fails a flag row with neither an env twin
   nor a note.
 
@@ -947,7 +966,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   loopback while the page serves tokenless (the F21 shape at set time).
   The NixOS module options are `listenHost`/`listenPort` rendering one
   `--listen` (the cache's shape), the docker CMDs and the compose
-  `LISTEN` env follow, and the MANUALs, the man pages, OPTIONS.md and the
+  `LISTEN` env follow, and the MANUALs, the man pages and the
   drift census ride along.
 
 - **everywhere** — **the `dump-interval` knob is family-wide** (the cache
@@ -963,7 +982,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   SIGHUP/`request reload-config` path re-reads the configured interval
   (the scraper and the dashboard; the fake's SIGHUP layer does not touch
   the dump family — the dump-path parity). The dump-path rows' help
-  spells the timer; the MANUALs, the man pages, OPTIONS.md and the
+  spells the timer; the MANUALs, the man pages and the
   modules' `dumpInterval` option follow.
 
 - **docker** — **the stacks split by wiring, and both ship
@@ -1075,7 +1094,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   resolution and the floors (min-16, the scheme-aware key floor,
   ops ≠ admin, the F13 token-mandatory binds) already check it. The live
   rotation branches and their `<set>`/`<set>`-render backs are deleted;
-  `help config`/`show knobs`/OPTIONS.md render the secrets
+  `help config`/`show knobs` render the secrets
   `startup-only — pass it by flag/env/config (set/clear refuse)` instead
   of a set recipe; the scraper's SIGHUP/`request reload-config` path
   still re-reads the `file:` references, and the dump/reload state files

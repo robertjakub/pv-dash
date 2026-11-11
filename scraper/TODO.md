@@ -153,8 +153,8 @@ control-ops-token, auth-token, dump-key) is `restart`-marked and the wire
 refuses set/unset on it with the dump-key answer — the live rotation
 branches die, the SIGHUP/`request reload-config` path still re-reads the
 `file:` references, and the regtest's §6b speaks one control token per
-daemon (spawned `ctok9`, no live rotation); `help config` and OPTIONS.md
-render the startup-only recipe.
+daemon (spawned `ctok9`, no live rotation); `help config` renders the
+startup-only recipe.
 
 The man-ladder wave: the page runs the family's one daemon ladder — it
 gains ENVIRONMENT (the bare-twin catch-all beside the clients' CTL) and

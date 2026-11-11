@@ -144,8 +144,8 @@ The secrets-startup-only wave: every secret row (auth-token,
 control-token, control-ops-token, metrics-token, dump-key) is
 `restart`-marked and the wire refuses set/unset on it with the dump-key
 answer — the page-token off/rotate dance and the tokenless-rebind-then-
-tokenize flow respawn tokenized instances now; `help config` and
-OPTIONS.md render the startup-only recipe.
+tokenize flow respawn tokenized instances now; `help config` renders
+the startup-only recipe.
 
 The man-ladder wave: the page runs the family's one daemon ladder — it
 gains ENVIRONMENT (the flags' twins, `PROM_URL` named as the upstream's)

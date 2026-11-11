@@ -12,6 +12,14 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
+- **scripts** — **battery_status ages and aligns its rows**: the
+  `last:` row (the slot block's and the newest run's) carries an
+  `(Xm Ys ago)` age read off the status file's mtime — say() appends on
+  every row and several row shapes carry no HH:MM:SS stamp of their own,
+  so the growing age is the tell a suite sits quiet too long; every
+  label under `slot<N>` pads to one column (`run:`/`wave:`/`estimate:`/
+  `stats:`/`wait:`/`status:`/`last:` — `estimate:` is the longest at 9).
+
 - **scripts** — **the release battery rides the runner**: release.py's
   tests() no longer spawns the suites bare — the legs are
   `scripts/battery.sh full` (the ten at suite defaults) and, for the

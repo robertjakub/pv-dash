@@ -11,6 +11,25 @@ if [ ! -d "$ROOT" ]; then
     exit 1
 fi
 
+# the status's last word, aged off the status file's mtime (say() appends
+# on every row, so the mtime is when the last line landed — a `last:` row
+# with a growing age is the tell a suite sits quiet too long; several row
+# shapes carry no HH:MM:SS stamp of their own, the mtime covers all)
+print_last() {
+    local f=$1 line t a
+    line=$(tail -1 "$f" 2>/dev/null)
+    [ -n "$line" ] || return 0
+    t=$(stat -f %m "$f" 2>/dev/null)
+    if [ -n "$t" ]; then
+        a=$(( $(date +%s) - t ))
+        [ "$a" -lt 0 ] && a=0
+        [ "$a" -ge 60 ] && a=$(printf '%dm%02ds' $((a / 60)) $((a % 60))) || a="${a}s"
+        printf '  %-9s %s (%s ago)\n' 'last:' "$line" "$a"
+    else
+        printf '  %-9s %s\n' 'last:' "$line"
+    fi
+}
+
 n=0
 for l in $ROOT/slots/slot*; do
     [ -L "$l" ] || continue
@@ -38,15 +57,15 @@ for l in $ROOT/slots/slot*; do
         # the launch config rides the battery header line (the run id and
         # pid prefix is stripped — both already sit on the slot line above)
         hdr=$(grep -m1 '^battery ' "$d/status.txt" 2>/dev/null)
-        [ -n "$hdr" ] && printf '  run:    %s\n' "${hdr#*) }"
+        [ -n "$hdr" ] && printf '  %-9s %s\n' 'run:' "${hdr#*) }"
         # the run's wave label (battery.sh wrote a `wave:` line when the
         # run carries a --name; unlabeled runs stay quiet)
         wv=$(grep -m1 '^wave: ' "$d/status.txt" 2>/dev/null)
-        [ -n "$wv" ] && printf '  %s\n' "$wv"
+        [ -n "$wv" ] && printf '  %-9s %s\n' 'wave:' "${wv#wave: }"
         # the run's own start estimate (battery.sh wrote it into status.txt);
         # the last line below carries the sharpened remaining eta
         est=$(grep -m1 '^estimate: ' "$d/status.txt" 2>/dev/null)
-        [ -n "$est" ] && printf '  %s\n' "$est"
+        [ -n "$est" ] && printf '  %-9s %s\n' 'estimate:' "${est#estimate: }"
         # the live tally: the SUITE verdicts so far over the run's total
         # (the total rides the last START/SKIP's N/T; before the first
         # suite it falls back to the `suites:` row's word count)
@@ -56,10 +75,10 @@ for l in $ROOT/slots/slot*; do
         total=$(awk '$2 == "START" || $2 == "SKIP" { split($3, a, "/"); t = a[2] } END { print t + 0 }' "$d/status.txt" 2>/dev/null)
         [ "$total" -eq 0 ] && total=$(( $(grep -m1 '^suites: ' "$d/status.txt" 2>/dev/null | wc -w | tr -d ' ') - 1 ))
         [ "$total" -lt 0 ] && total=0
-        line="  stats:  $((pass + fail + skip))/$total done, $pass pass, $fail failed"
+        line="$((pass + fail + skip))/$total done, $pass pass, $fail failed"
         [ "$skip" -gt 0 ] && line="$line, $skip skipped"
         [ -n "$e" ] && line="$line, $e elapsed"
-        printf '%s\n' "$line"
+        printf '  %-9s %s\n' 'stats:' "$line"
         # the queued suite: the WAIT row (battery.sh wrote it on the first
         # busy poll) is the status's last word exactly while the runner
         # sits in the quiet window — the START row (or a cancellation
@@ -73,15 +92,14 @@ for l in $ROOT/slots/slot*; do
                   wl=$(( $(date +%s) - w0 ))
                   [ "$wl" -lt 0 ] && wl=0
                   [ "$wl" -ge 60 ] && wl=$(printf '%dm%02ds' $((wl / 60)) $((wl % 60))) || wl="${wl}s"
-                  printf '  wait:   %s (%s so far)\n' "$wr" "$wl"
+                  printf '  %-9s %s (%s so far)\n' 'wait:' "$wr" "$wl"
               else
-                  printf '  wait:   %s\n' "$wr"
+                  printf '  %-9s %s\n' 'wait:' "$wr"
               fi ;;
         esac
     fi
-    printf '  status: %s/status.txt\n' "$d"
-    last=$(tail -1 "$d/status.txt" 2>/dev/null)
-    [ -n "$last" ] && printf '  last:   %s\n' "$last"
+    printf '  %-9s %s/status.txt\n' 'status:' "$d"
+    print_last "$d/status.txt"
 done
 [ $n -eq 0 ] && echo 'no batteries running (no slot links)'
 
@@ -104,7 +122,6 @@ if [ -n "$newest" ]; then
         else
             printf 'newest run (no tally): %s\n' "${newest##*/}"
         fi
-        last=$(tail -1 "$newest/status.txt" 2>/dev/null)
-        [ -n "$last" ] && printf '  last:   %s\n' "$last"
+        print_last "$newest/status.txt"
     fi
 fi

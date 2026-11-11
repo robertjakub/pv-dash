@@ -21,7 +21,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.runtime.audit import load_audit_tags, audit_params_of, build_audit, default_path
+from common.runtime.audit import load_audit_tags, audit_params_of, build_audit, default_path, audit_quote
 from common.settings.config import parse_listen, resolve_control_target
 from common.wire.cred import parse_trust_uids
 from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, install_signal_handlers, log_state_dumps, \
@@ -256,8 +256,8 @@ def main():
     install_signal_handlers(apply_reload=apply_reload, graceful_stop=graceful_stop)
     if audit:
         audit.event('START', 'version=%s upstream=%s:%d unit %d listen=%s control=%s'
-                    % (version_string(), cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['listen'],
-                       control_desc))
+                    % (version_string(), cfg['host'], cfg['modbus_port'], cfg['modbus_unit'],
+                       audit_quote(cfg['listen']), audit_quote(control_desc)))
         if metrics_acl_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
             audit.event('ACL-FILE', metrics_acl_warn)
     try:

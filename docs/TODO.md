@@ -27,7 +27,7 @@ below; its verified-aligned ledger lives in
   words — `modbus/selection`'s `<file>|all|none`), but the rows drift:
   `modbus/profile`'s hint is `<file>` while its values carry `default`
   (the word missing from the hint), and the bool rows carry no hint at
-  all while   `modbus/auth` spells `suite|none` — walk every row in the
+  all while `modbus/auth` spells `suite|none` — walk every row in the
   four registries, align the hints (the missing value words in, the
   stale words out) and decide the bool rule once (a hint or not).
 
@@ -72,19 +72,7 @@ they name the wire.
    alias `metrics/listen` is a console spelling that translates to
    `listen`). Outcome: the F21 move-refusal template, verbatim, in the
    scraper's restart preamble.
-2. **The cache's `metrics-token` has no config layer** — the bin reads
-   flag/env only (`cache/bin/modbus-cache.py:154`); a config line
-   `set metrics-token ...` parses (the word index takes both spellings,
-   `common/settings/options.py:126-139`) and is silently dropped —
-   `cache/lib/config.py` has no `metrics_token` key at all — while
-   scraper (its bearer `auth_token`, `scraper/lib/config.py:249-250`),
-   inverter (`resolve_args`, `inverter/lib/config.py:36-75`) and
-   dashboard (`dashboard/lib/config.py:123-124`) resolve the token
-   through the full ladder. `show config` cannot reveal the gap either
-   (a secret row's `config_value` is `None`,
-   `common/settings/options.py:378-379`). Outcome: resolve it in
-   `cache/lib/config.py`, drop the bin-local read.
-3. **`AUTH_TOKEN` means two different secrets** — the /metrics bearer
+2. **`AUTH_TOKEN` means two different secrets** — the /metrics bearer
    on the scraper (`scraper/lib/options.json:117`, flag `--auth-token`,
    console `metrics/auth/token`) and the page bearer on the dashboard
    (`dashboard/lib/options.json:38`, console `auth/token`), while the
@@ -152,13 +140,6 @@ they name the wire.
   same-words-different-socket in the family, now one translation step
   away. Outcome: the alias dies; `metrics/listen` is the /metrics bind
   only.
-- **`local-time` and `log-access` skip the inverter** `[inverter]`
-  — cache/scraper/dashboard carry both rows (the cache nests
-  `system/log-access`, the only `system/` child besides `listen`
-  (`cache/lib/options.json:239`); the dashboard's `local-time` is
-  startup-only, `dashboard/lib/options.json:162`); the inverter logs
-  too and has neither row. Outcome: both rows family-wide, live,
-  top-level.
 - **the access-audit trio, three names, one job** `[all]` —
   `requests-audit` (cache, `cache/lib/options.json:230`, an interval
   knob), `log-access` (scraper/dashboard, on/off), `log-queries`
@@ -188,9 +169,7 @@ they name the wire.
   `inverter:57`); `connect-acl` consoles as `acl/connect` on the cache
   and bare on the inverter, whose help also omits the `file:<path>`
   form its sibling supports (`cache/lib/options.json:80` vs
-  `inverter:138`); the cache's `dump-interval` is the only dump child
-  outside the `dump/` node (`:256`, beside `dump/path`, `dump/key`,
-  `dump/with-cache`, `dump/restore-on-start`). Outcome: the node-ful
+  `inverter:138`). Outcome: the node-ful
   spelling wins each time.
 - **the NixOS render bugs** `[cache]` `[dashboard]` — the dashboard
   emits `--metrics-server` whenever `metricsServer` is set, including
@@ -405,7 +384,6 @@ they name the wire.
 
 ### The env plane — the same env layer everywhere
 
-- **the cache's metrics-token ladder** — see short list item 2.
 - **the dashboard's man still sells `PORT`/`BIND`** `[dashboard]` —
   `dashboard/lib/man.py:136-138` (baked into the generated page,
   `dashboard/man/dashboard.1:314`) while the README and the config
@@ -541,7 +519,7 @@ re-open — is the history half:
   speaks the draft-2020-12 core but only the shipped spec pairs meet it
   today (the drift sweep's schema/example pass). Give the family's
   remaining JSON artifacts schemas and one gate: `shared/texts.json`,
-  the four `options.json`/`static.json` pairs, the profiles' format
+  the four `options.json`/`defaults.json` pairs, the profiles' format
   (profile-lint checks it in code — a schema would let editors speak
   it) and the config-defaults placeholders; decide the surface (a lint
   script riding the release battery, a drift-sweep type or its own CI

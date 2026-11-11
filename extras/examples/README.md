@@ -33,7 +33,7 @@ samples, and every `package.nix` installs its packaged copy into
 
 ```bash
 python3 scripts/lint_acl.py --check                       # lints the whole dir (bare run)
-python3 scripts/editor.py acl examples/acl-ip-prefix.json  # the terminal editor
+python3 scripts/editor.py acl extras/examples/acl-ip-prefix.json  # the terminal editor
 ```
 
 The loader (`common/settings/config.py`'s `_write_gate_object` — one gate

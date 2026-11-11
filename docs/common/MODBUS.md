@@ -121,7 +121,7 @@ not tracked server-side, so a captured 52-byte proof **can be replayed**
 to any server holding the same key; traffic after `OK` is unauthenticated
 and unencrypted. This is a connection gate for a trusted LAN, not a
 transport security layer. Keys are secrets: min 16 characters (enforced
-at start — the key knobs are startup-only, the wire refuses set/unset),
+at start — the key knobs are startup-only, the wire refuses set/clear),
 never rendered back, loadable via `file:<path>` from an owner-only
 `0600` file.
 
@@ -488,14 +488,14 @@ either way).
 | `auth-key` *(secret)* | `--auth-key` | `AUTH_KEY` | `modbus auth key` | all three |
 | `auth-upstream` | `--auth-upstream suite\|waveshare\|none` | `AUTH_UPSTREAM` | `modbus auth-upstream` | cache |
 | `auth-upstream-key` *(secret)* | `--auth-upstream-key` | `AUTH_UPSTREAM_KEY` | `modbus auth upstream-key` | cache |
-| `upstream` | `--upstream HOST:PORT` | `UPSTREAM` | `upstream` | cache, scraper |
-| `unit` / `modbus-unit` | `--unit` / `--modbus-unit` | `UNIT` / `MODBUS_UNIT` | `modbus/unit` | cache, scraper, fake (flag only) |
-| `timeout` | `--timeout` | `TIMEOUT` | `timeout` | cache, scraper |
-| `offset` | `--modbus-offset` | `MODBUS_OFFSET` | `modbus-offset` | scraper |
-| `allow-write` | `--allow-write` | `ALLOW_WRITE` | `allow-write` | cache, fake |
-| `write-registers` | `--write-registers` | `WRITE_REGISTERS` | `write-registers` (`show write-registers-table` answers the acl-chain report) | cache |
-| `connect-acl` | `--connect-acl` | `CONNECT_ACL` | `connect-acl` (the fake's is the bare `connect-acl`) | cache, fake |
-| `write-acl` | `--write-acl` | `WRITE_ACL` | `write-acl` | cache |
+| `upstream` | `--upstream HOST:PORT` | `UPSTREAM` | `modbus upstream` | cache, scraper |
+| `unit` / `modbus-unit` | `--unit` / `--modbus-unit` | `UNIT` / `MODBUS_UNIT` | `modbus unit` | cache, scraper, fake (flag only) |
+| `timeout` | `--timeout` | `TIMEOUT` | `modbus timeout` | cache, scraper |
+| `offset` | `--modbus-offset` | `MODBUS_OFFSET` | `modbus offset` | scraper |
+| `allow-write` | `--allow-write` | `ALLOW_WRITE` | `write allow` | cache, fake |
+| `write-registers` | `--write-registers` | `WRITE_REGISTERS` | `write registers` (`show write-registers-table` answers the acl-chain report) | cache |
+| `connect-acl` | `--connect-acl` | `CONNECT_ACL` | `acl connect` (the fake's is the bare `connect-acl`) | cache, fake |
+| `write-acl` | `--write-acl` | `WRITE_ACL` | `acl write` | cache |
 
 Validation: `parse_auth_type` accepts the leg's schemes — `suite`
 everywhere, the cache's upstream leg also `waveshare` — or `none`/empty
@@ -516,7 +516,7 @@ Secret behavior: the keys never render — `show auth-key` answers
 (the value never does), the parser and the wire `set` refuse that
 placeholder back, and the state dumps cannot carry a secret at all —
 the secret rows are restart-marked, so nothing secret rides the reload
-state. The keys are startup-only: a live `set`/`unset` of a key answers
+state. The keys are startup-only: a live `set`/`clear` of a key answers
 `err restart required (startup-only knob)` — changing one is a
 flag/env/config edit plus a restart. The scheme itself still sets live:
 a scheme change re-proves the NEW connections (the cache's inbound
@@ -524,7 +524,7 @@ scheme change does **not** drop standing sessions; they keep theirs).
 
 Useful verbs (`modbus-*-ctl` / `modbus-*-cli`): `set modbus auth suite`,
 `set modbus auth key <KEY|file:path>`, `set modbus auth-upstream …`,
-`show modbus-auth`, `show auth-upstream` (the two legs' schemes),
+`show modbus auth`, `show modbus auth-upstream` (the two legs' schemes),
 plus the ordinary `set modbus upstream/unit/timeout/
 interval/...` rows. Startup logs name the schemes
 (`client auth: suite, upstream auth: suite`).
@@ -558,7 +558,7 @@ interval/...` rows. Startup logs name the schemes
 
 `tests/cache-regtest.py` (framing helpers at the top; the suite-auth block
 at the end — good key, wrong key, non-handshake `ERR`+EOF, the scheme
-toggles live on both legs, the keys startup-only (set/unset refuse),
+toggles live on both legs, the keys startup-only (set/clear refuse),
 secret refusal), `tests/inverter-regtest.py` (server-side
 handshake, silent client, bad magic, the no-live-rotation respawn pins),
 `tests/scrape-regtest.py`

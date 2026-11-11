@@ -145,7 +145,7 @@ read the root file.
 
 The docs restructure wave: the README re-laid on the family's one skeleton
 and shortened (965 → ~430 lines) — the Nix/NixOS section moved to
-[docs/NIXOS.md](../docs/NIXOS.md) (the module's option list rebuilt from
+[docs/NIXOS.md (now nixos/README.md)](../nixos/README.md) (the module's option list rebuilt from
 `module.nix`: the README's had gone stale — it predated the metrics ACL,
 the dump knobs and the control-plane options), and the family-wide
 stories (the ACL grammar, the Modbus handshake, the audit chain

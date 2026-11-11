@@ -153,7 +153,7 @@ and shortened (404 → ~300 lines) — the Files table folded into the Source
 layout, the Control wall became the command table; the NixOS section
 (the flake example + the stale option list — it predated the metrics
 endpoint, the dump knobs and the auth-token pair) moved to
-[docs/NIXOS.md](../docs/NIXOS.md); the Testing section ADDED (the
+[docs/NIXOS.md (now nixos/README.md)](../nixos/README.md); the Testing section ADDED (the
 control-fuzz suite + the /config.js fuzz pin).
 
 The metrics/acl family wave: the dashboard's own `/metrics` takes the

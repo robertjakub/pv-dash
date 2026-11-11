@@ -43,7 +43,7 @@ token shape beyond the loopback (the page's F21 closed it — rev. 21).
 | tool | listener | the default bind | the stack at it |
 |---|---|---|---|
 | cache | the Modbus mirror | `127.0.0.1:15502` | `connect-acl` (accept, ahead of the caps) → the caps → the suite auth; the write path then adds `--allow-write` + `write-acl` + `write-registers` |
-| all four | control | unix \| TCP `127.0.0.1` | ONE listener for the family (`common/wire/control.py`'s tier, lifted from the cache): the TCP bind refuses without the admin token (F5 — the fake exempt, F11's test-tool posture); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660`; the target rebinds live (`set control port` — bind-first, the sessions keep serving), the tokens, the ops policy, the trust uids and the socket-group all set live |
+| all four | control | unix \| TCP `127.0.0.1` | ONE listener for the family (`common/wire/control.py`'s tier, lifted from the cache): the TCP bind refuses without the admin token (F5 — the fake exempt, F11's test-tool posture); the ops RBAC, the signed wire, peer-cred on unix; the socket `0600`/`0660`; the target rebinds live (`set control port` — bind-first, the sessions keep serving), the ops policy, the trust uids and the socket-group set live (the tokens are startup-only — the restart is the rotation) |
 | all four | /metrics | the scraper always on at `127.0.0.1:9350`; the cache, fake and dashboard off at `9351`/`9352`/`9353` | ONE stack for the family: the token mandatory beyond loopback (F13's refusal) → `metrics-acl` (the inline grammar or `file:<path>`, checked at accept — a client off the ACL is closed without a reply) → the caps |
 | fake | the Modbus listener | `:5502` | `connect-acl` (the system grammar, no `file:`) → the caps → the suite auth; `--allow-write` |
 | dashboard | the page + the config proxy | `127.0.0.1:8080` | the bearer token (`auth-token`, F21 closed — the `?auth=` bootstrap sets the session cookie, the header for scripts; a token-less non-loopback bind refuses to start) — GET-only, the realpath guard, the cap gate |
@@ -117,8 +117,8 @@ everything it decides a later rule re-decides — and the canonical layout)
 and `scripts/editor.py acl` (the dialog and the line mode, `--type` seeds a
 fresh gate and migrates a typeless one). Both speak both kinds; the
 embedded profile gates belong to `profiles/bin/profile-lint.py`. The
-shipped examples — one shared copy each at the repo root:
-`examples/acl-write-registers.json` (the deye register policy: the
+shipped examples — one shared copy each under `extras/examples/`:
+`acl-write-registers.json` (the deye register policy: the
 clean-slate deny, the allows, the deny carves, the re-opens) and
 `examples/acl-ip-prefix.json` (every tool's ip-prefix gate). The
 **JSON Schemas** ship beside them (`shared/schema/acl-ip-prefix.schema.json`
@@ -205,7 +205,7 @@ metrics ACL`).
 
 The Modbus leg is outgoing and needs no gate. The scraper is a client:
 it dials the inverter or the cache's mirror (`--upstream`, live
-`upstream`), and an acl gates listeners, not clients — on that
+`modbus upstream`), and an acl gates listeners, not clients — on that
 leg the scraper is the peer the server's connect gate decides about (the
 cache's `connect-acl`, the fake's mirror of it), and what it presents is
 the suite-auth key (`modbus-auth` + `auth-key`, the PVA1
@@ -214,8 +214,8 @@ the register plane is write-only, and the poller sends no write (it
 speaks `read_registers`/`read_bits`), so there is nothing read-side for
 an acl to decide.
 
-`--metrics-acl` (env `METRICS_ACL`, live `set metrics-acl <value>` /
-`clear metrics-acl`, config `metrics_acl`, NixOS `metricsAcl` +
+`--metrics-acl` (env `METRICS_ACL`, live `set metrics acl <value>` /
+`clear metrics acl`, config `metrics_acl`, NixOS `metricsAcl` +
 `metricsAclFile` — the split options, the file rides a LoadCredential
 mount) takes the same one value grammar as the cache's IP knobs. The acl
 file re-resolves on every `set`/`clear` and on SIGHUP, a bad file keeps

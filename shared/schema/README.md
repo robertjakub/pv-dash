@@ -20,8 +20,8 @@ feedback while editing.
 ## Validate
 
 ```bash
-python3 scripts/validate_json.py shared/schema/acl-ip-prefix.schema.json examples/acl-ip-prefix.json
-python3 scripts/validate_json.py shared/schema/acl-write-registers.schema.json examples/acl-write-registers.json
+python3 scripts/validate_json.py shared/schema/acl-ip-prefix.schema.json extras/examples/acl-ip-prefix.json
+python3 scripts/validate_json.py shared/schema/acl-write-registers.schema.json extras/examples/acl-write-registers.json
 ```
 
 The repo's own stdlib-only checker speaks the draft-2020-12 core the

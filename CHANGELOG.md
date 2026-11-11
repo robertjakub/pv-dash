@@ -36,6 +36,32 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Changed
 
+- **docs** — **the family-wide stale-docs sweep**: the pre-KV audit
+  transcripts in the cache's and the fake's READMEs rewritten to the
+  KV line (`tools=/tag=/type=/hash=/message=`, the `-> ok` arrow
+  gone) and the writer-prefix vocabulary re-worded (the shared `cli`
+  role, the ctl/cli trails); the secrets-era leftovers fixed (the
+  cache README's "the whole surface is live" metrics sentence — the
+  listen set is restart-pending and the token startup-only; the
+  fake's "the tokens rotate" rows; ACL.md's control row claiming the
+  tokens set live; the dashboard's kill switch spelled the canonical
+  `set audit disable`); the `extras/examples/` re-home's missed
+  pointers repaired (the root README's row + the repo-layout block,
+  DESIGN.md's filing table, ACL.md, the cache README, the two usage
+  lines in the examples/schema READMEs); nixos/README.md's restart
+  list drops the live log level and its option tables carry the
+  renamed `modbusAuth`; MODBUS.md speaks set/clear and its
+  configuration table's console spellings normalize to the
+  registries' live words (`modbus upstream`, `write allow`,
+  `acl connect`, …); common/README.md's audit.py row spells the KV
+  line shape; the landed items leave docs/TODO.md (the cache's
+  metrics-token ladder, the inverter's log-access/local-time rows,
+  the dump-interval near-miss clause) and the scraper's env list
+  points at the generated env example instead of a stale closed
+  list; the per-tool TODOs' dead `docs/NIXOS.md` links repoint and
+  the F16 history row carries its re-home pointer; the regeneration
+  the waves skipped caught up (the man pages' docs/SECURITY.md
+  re-point, the env examples' log-level namespace move).
 - **docs** — **the doc set consolidates (one home per story)**: the
   design doc (`docs/DESIGN.md` — the shape in one screen, every doc
   filed by grain, and the docs redo fused in — the map and the redo

@@ -45,7 +45,7 @@ All three modules behave the same way:
   `restartIfChanged`. What the reload picks up and what needs a manual
   `systemctl restart` is the tool's own SIGHUP surface (each README's
   *Runtime control* section has the row); roughly: poll plans, caps, ACLs,
-  profiles and the upstream apply live, the **listen binds and log level
+  profiles, the upstream and the log surface apply live, the **listen binds
   need a restart**.
 - **Secrets ride `LoadCredential`.** Every `*TokenFile` option mounts the
   file via systemd `LoadCredential` and renders the daemon a
@@ -101,7 +101,7 @@ services.modbus-scraper = {
 |---|---|
 | `upstream` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:PORT` = loopback) |
 | `modbusUnit` / `modbusOffset` | unit id (1) / register-address offset (0; −1 for 0-based gateways) |
-| `auth` / `authKey` | the suite scheme + shared key toward the inverter (null = no auth) |
+| `modbusAuth` / `authKey` | the suite scheme + shared key toward the inverter (null = no auth) |
 | `profile` | device-profile JSON path (null = the bundled `sun2000`) |
 | `metricsSpec` / `metricPrefix` | the metrics spec JSON / the profile- and compute-fed metric prefix (`huawei`) |
 | `maxKwp` / `maxGridKw` | the sanity caps in kW (6 / 12) |
@@ -158,7 +158,7 @@ services.modbus-scraper = {
 | Option | Meaning |
 |---|---|
 | `upstream` / `unitId` / `timeout` | the inverter endpoint / unit id (1) / timeout (3 s) |
-| `auth` / `authKey` | the suite scheme + key the cache's **own clients** must speak |
+| `modbusAuth` / `authKey` | the suite scheme + key the cache's **own clients** must speak |
 | `authUpstream` / `authUpstreamKey` | the scheme + key **toward the inverter** (`suite` or `waveshare`) |
 | `profile` / `selection` | the device-profile path (null = bundled `sun2000`) / what is fetched: `all`, `none`, a name list (rendered to the selection JSON), or a JSON path |
 | `interval` / `readDelay` / `mergeGap` / `cacheTtl` | the poll plan (10 s / 0.05 s / 8 / 3× interval) |

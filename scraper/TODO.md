@@ -92,7 +92,8 @@ diag block mirrors two of the shapes). The annotations quote the audit
 vocabulary (the WRITE-REFUSED events, the SCR trail) so a fired page
 names where the trail lives; the demo image bakes the pack
 (`rule_files:`), the package installs the scraper half,
-docs/NIXOS.md shows the services.prometheus.ruleFiles wiring.
+docs/NIXOS.md (now nixos/README.md) shows the
+services.prometheus.ruleFiles wiring.
 
 The audit-family wave (the bounds, the daily knob, the env twins, the
 shared accept ladder): the audit rotation bounds are family-wide —
@@ -163,7 +164,7 @@ registers keeps them absent), the `when: battery` gates and the
 
 The docs restructure wave: the README re-laid on the family's one skeleton
 and shortened (587 → ~330 lines) — the Nix/NixOS section moved to
-[docs/NIXOS.md](../docs/NIXOS.md) (the README's option list still carried
+[docs/NIXOS.md (now nixos/README.md)](../nixos/README.md) (the README's option list still carried
 the RETIRED register/scale options — `pvRegister`, `gridRegister`,
 `scale`, `gridScale`, `batteryRegister`, `batterySocRegister` — and the
 stale "config INI" claim; both died with the move, the list is rebuilt

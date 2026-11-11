@@ -220,8 +220,8 @@ form is legitimate here in a way it never is on the daemons.
 | `max-clients` / `client-timeout` / `max-conn-per-ip` / `connect-acl` | — | the Modbus caps + who may connect (the flags above, tunable live) |
 | `allow-write` | `on` \| `off` | the write gate (off refuses every write with exception 01) |
 | `modbus auth` / `modbus auth key` | `suite` \| `none` / key | the auth scheme + key (secrets: `show` and `clear` refuse them) |
-| `metrics enable` / `metrics token` / `metrics acl` | — | the /metrics endpoint, its bearer, its connect ACL (live) |
-| `control port` / `control token` / `control ops token` / `control ops verbs` / `control trust-uids` / `control socket-group` | — | the control plane's live knobs (the listener rebinds, the tokens rotate, the socket re-modes) |
+| `metrics enable` / `metrics token` / `metrics acl` | — | the /metrics endpoint and its connect ACL (live); the bearer is startup-only — pass it by flag/env/config, `file:<path>` welcome |
+| `control port` / `control token` / `control ops token` / `control ops verbs` / `control trust-uids` / `control socket-group` | — | the control plane's live knobs (the listener rebinds, the socket re-modes; the tokens are startup-only — the restart is the rotation) |
 | `dump path` / `dump restore-on-start` / `dump-interval` | — | the state dump's file, its restore mark, the automatic rewrite interval |
 | `register` / `coil` / `discrete` | `set register <addr> <value>` etc. | the write-overlay emulation: raw register / coil / discrete-input pins (`reset` clears, `show registers` marks them) |
 | `profile` / `log-level` | `<file>` / level | swap the register-map profile live / the live log level (`set system log-level`) |
@@ -339,15 +339,15 @@ re-arms. `--audit-log none` turns the local file off: with a forward
 spelled that is the **remote-only mode** (the collector is the sole
 holder, the chain reseeds at GENESIS per run), without one the audit is
 disabled (the state `--no-audit-log` spells).
-The
-prefix names the writer — `INV` (the fake), `CLI`, `CTL`:
+The line names its writer — the fake `tools=INV tag=daemon`, the ctl and
+cli clients the shared `tools=INV tag=cli` role:
 
 ```
-2026-11-03T20:10:06Z INV START 3f9a21c04de7 version=0.4.2 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
-2026-11-03T20:10:07Z AUDIT INV COMMAND 9c41e2b7a058 peer=127.0.0.1:54425 'set soc 40' -> ok
-2026-11-03T20:10:07Z AUDIT INV COMMAND 3d82f6c05e19 peer=127.0.0.1:54426 role=ops 'show connections' wire=h4b91de207a86 -> ok
-2026-11-03T20:10:08Z INV RESET 77b0c4e19d23 SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
-2026-11-03T20:10:08Z INV SHUTDOWN 5e2af8c30b61 SIGTERM: uptime=2s conns=0 requests=0 chaos_hits=0
+2026-11-03T20:10:06Z AUDIT tools=INV tag=daemon type=start hash=3f9a21c04de7 message=version=0.4.2 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000: ...
+2026-11-03T20:10:07Z AUDIT tools=INV tag=daemon type=command hash=9c41e2b7a058 message=peer=127.0.0.1:54425 cmd='set soc 40' result=ok
+2026-11-03T20:10:07Z AUDIT tools=INV tag=daemon type=command hash=3d82f6c05e19 message=peer=127.0.0.1:54426 role=ops cmd='show connections' wire=h4b91de207a86 result=ok
+2026-11-03T20:10:08Z AUDIT tools=INV tag=daemon type=reset hash=77b0c4e19d23 message=SIGUSR1: 1 pin(s), 0 overlay register(s) cleared
+2026-11-03T20:10:08Z AUDIT tools=INV tag=daemon type=shutdown hash=5e2af8c30b61 message=reason=SIGTERM-received uptime=2s conns=0 requests=0 chaos_hits=0
 ```
 
 The 12-hex token after the event name is the entry's **chained hash** (the
@@ -397,7 +397,7 @@ inverter/
     ├── inverter.py     # Modbus TCP server: FC1-FC4 reads, writes behind the write gate, chaos
     ├── control.py      # JSON-lines control server (set/clear/show, scenarios)
     ├── metrics.py      # the fake's own Prometheus /metrics endpoint
-    ├── audit.py        # the append-only audit trail (AUDIT INV/CLI/CTL lines)
+    ├── audit.py        # the append-only audit trail (the KV lines, tools=INV)
     ├── chaos.py        # seeded hostile-reply dice layer
     ├── signals.py      # SIGHUP/SIGUSR1/SIGTERM handling
     ├── statics.py      # static configuration loader (lib/defaults.json)

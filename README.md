@@ -15,7 +15,7 @@ the Deye hybrids — packaged together as one Nix flake:
 | [`cache/`](cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
 | [`inverter/`](inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
 | [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `sun2000_full`, `demo-fc4`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; a linter and a formatter keep them in shape |
-| [`examples/`](examples/README.md) | — | The shared sample file the tools' `file:` acl gates point at — `acl-ip-prefix.json`, the ip-prefix connect policy every tool reads ([docs/common/ACL.md](docs/common/ACL.md)) |
+| [`extras/`](extras/README.md) | — | The operator-side packs nothing in the suite loads: the alert rules (`alerts/`, one file per watched exporter), the shared sample files the tools' `file:` acl gates point at (`examples/` — `acl-ip-prefix.json`, [docs/common/ACL.md](docs/common/ACL.md)) and the Graylog content pack (`graylog/`) |
 | [`shared/`](shared/README.md) | — | The family's shared data, outside every package — `texts.json` (the static texts `common/render/texts.py`'s `T()` reads) and [`shared/schema/`](shared/schema/README.md) (the shared JSON Schemas, draft 2020-12 — `acl-ip-prefix.schema.json`, the standalone acl file's schema (the loader stays the strict word)) |
 | [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`), six functional subpackages: `render/` (texts, man pages), `runtime/` (daemon ladder, audit, version), `settings/` (the option registry — one knob, one source — config plumbing, dumps), `wire/` (the signed wire + RBAC, both ctl/cli ends), `serve/` (the gates + metrics skeleton), `modbus/` (the wire core) |
 
@@ -64,6 +64,7 @@ pv-suite/
 │                 #   audit_verify.py
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))
+├── extras/       # the operator-side packs: alerts/, examples/, graylog/ ([docs](extras/README.md))
 ├── flake.nix     # the suite entry point
 ├── docs/         # the family-level docs, filed by grain in the
 │                 #   [design doc](docs/DESIGN.md) (the shape + the docs redo): the

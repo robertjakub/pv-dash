@@ -197,13 +197,14 @@ python3 bin/dashboard-cli.py                        # the console: TAB completio
 
 A SIGHUP or `request reload-config` also clears the live overrides. Every
 control command, auth failure, reload and shutdown lands in the audit
-trail (prefix `DSH`, default `~/.local/state/dashboard/audit.log`;
-`--audit-log -` for stdout — the journald way; the ctl/cli keep their own
-`CTL`/`CLI` trails). The family is live-settable on the control wire
+trail (the DSH trail, `tools=DSH`, default
+`~/.local/state/dashboard/audit.log`; `--audit-log -` for stdout — the
+journald way; the ctl and cli clients keep their own trails — the shared
+`cli` writer role). The family is live-settable on the control wire
 (the cache's shape): `set audit log-file <path|-|none>` swaps the sink,
 `set audit rotate max-size <MB>` / `set audit rotate files <N>` /
 `set audit rotate daily on/off` steer the rotation live and
-`set no-audit-log on/off` is the kill switch. `--audit-forward` mirrors every line — the
+`set audit disable on/off` is the kill switch. `--audit-forward` mirrors every line — the
 per-writer hash chain included — onward: `syslog` (the local socket
 auto-scan), `syslog:/path`, `udp://host[:514]` (RFC5426, best-effort) or
 `tcp://host[:514]` (RFC6587 framing) — the **off-box copy** (the F10

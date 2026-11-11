@@ -250,8 +250,9 @@ TAB completes commands, settings and their values; `set`/`clear` confirm
 While idle the CLI sends wire pings (every 55 s, `CLI_KEEPALIVE` to tune);
 when the connection dies it retries `--reconnect` times (default 3) with
 `--reconnect-wait` seconds (default 10) and resumes on the first success.
-The session is audited (prefix `CLI`), the commands are audited by the
-server (prefix `CACHE`).
+The session is audited (the clients' shared `cli` writer role,
+`tools=CACHE tag=cli`), the commands are audited by the
+server (`tools=CACHE tag=daemon`).
 
 ## Diagnostics registers
 
@@ -318,7 +319,7 @@ client on the write ACL, every touched register inside the allow-list —
 with `write-acl` and `write-registers` defaulting to `none`, enabling
 `--allow-write` alone still refuses every write until the operator opens
 those two deliberately. A worked write-gate example ships as
-`examples/acl-write-registers.json` at the repo root (the deye policy,
+`extras/examples/acl-write-registers.json` (the deye policy,
 worked out).
 
 ## Modbus auth
@@ -388,11 +389,11 @@ Prometheus `/metrics` on `--metrics-listen` (default `127.0.0.1:9351`). The
 bearer token is **mandatory beyond loopback** — a token-less non-loopback
 bind refuses to start (the F13 posture); beside the token the endpoint
 carries the **metrics ACL** (`--metrics-acl`, live `set metrics acl`),
-checked at accept. The whole surface is live: `set metrics listen` rebinds
-the endpoint, the `metrics limits` caps apply to the running gate, and
-`set metrics token` rotates the credential without a restart (the value
-never renders back; `set metrics token off` takes the endpoint tokenless on
-the loopback listen). A scrape job reads it like any bearer endpoint —
+checked at accept. The caps are live (the `metrics limits` values apply to
+the running gate); `set metrics listen` records the bind and the restart
+applies it; the token is startup-only — pass it by flag/env/config (or as
+`file:<path>`, which re-reads on the SIGHUP re-resolve); the value never
+renders back. A scrape job reads it like any bearer endpoint —
 `authorization: {type: Bearer, credentials_file: …}` in the job config (the
 docker demo's `prometheus.yml` wires the job for the exporter this way).
 
@@ -458,16 +459,15 @@ the local file off: with a forward spelled that is the **remote-only
 mode** (the collector is the sole holder — no file, no XDG directory,
 the chain reseeds at GENESIS per run), without one the audit is disabled
 (the state `--no-audit-log` spells).
-The prefix names the
-writer — `CACHE` (the proxy), `CLI` (modbus-cache-cli), `CTL`
-(modbus-cache-ctl):
+The line names its writer — the proxy `tools=CACHE tag=daemon`, the
+ctl and cli clients the shared `tools=CACHE tag=cli` role:
 
 ```
-2026-11-04T07:16:40Z AUDIT CACHE START 4e1b92f0c7a3 version=0.4.2 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
-2026-11-04T07:16:43Z AUDIT CACHE WRITE b2c4e17f90d8 register 47415 = 5 (single register, unit 1)
-2026-11-04T07:17:12Z AUDIT CACHE COMMAND 09ab57d3f4e1 peer=127.0.0.1:54426 'clear cache' -> ok
-2026-11-04T07:17:20Z AUDIT CACHE COMMAND 5c92f1b8d3a7 peer=127.0.0.1:54427 role=ops 'clear cache' wire=h1e6070592485 -> ok
-2026-11-04T07:17:45Z AUDIT CACHE SHUTDOWN d94a1f07c3e2 SIGTERM received: uptime=65s clients=1 hits=412 misses=9
+2026-11-04T07:16:40Z AUDIT tools=CACHE tag=daemon type=start hash=4e1b92f0c7a3 message=version=0.4.2 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
+2026-11-04T07:16:43Z AUDIT tools=CACHE tag=daemon type=write hash=b2c4e17f90d8 message=register 47415 = 5 (single register, unit 1)
+2026-11-04T07:17:12Z AUDIT tools=CACHE tag=daemon type=command hash=09ab57d3f4e1 message=peer=127.0.0.1:54426 cmd='clear cache' result=ok
+2026-11-04T07:17:20Z AUDIT tools=CACHE tag=daemon type=command hash=5c92f1b8d3a7 message=peer=127.0.0.1:54427 role=ops cmd='clear cache' wire=h1e6070592485 result=ok
+2026-11-04T07:17:45Z AUDIT tools=CACHE tag=daemon type=shutdown hash=d94a1f07c3e2 message=reason=SIGTERM-received uptime=65s clients=1 hits=412 misses=9
 ```
 
 The 12-hex token after the event name is the entry's **chained hash** (the

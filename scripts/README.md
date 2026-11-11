@@ -118,7 +118,7 @@ python3 scripts/family_drift.py --check    # stale doc fails
 
 - **cleanup**
   - the prose-mangling class guard: the editor.py replace paths
-    (edit_options.py's, that produced the scraper's audit rows'
+    (the ones that produced the scraper's audit rows'
     "keeps)"/"rotations)" (docs/family-drift.md's knobs findings) get a
     render-and-diff guard — a row edit that changes sibling rows' text
     fails loud.

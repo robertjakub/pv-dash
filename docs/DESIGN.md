@@ -35,7 +35,7 @@ and as a full pass whenever a wave landed doc ripples across tools.
 | the maintenance | this page's redo (below), [scripts/README.md](../scripts/README.md) (the gates + the editors) |
 | the deployment | [docker/README.md](../docker/README.md) (the stacks, the env files, the secrets), [nixos/README.md](../nixos/README.md) (the one Nix reference) |
 | the supply chain | [sbom/SBOM.md](sbom/SBOM.md) |
-| the samples | [examples/](../examples/README.md) (the shared acl files the `file:` gates read) |
+| the operator packs | [extras/](../extras/README.md) — the [alert rules](../extras/alerts/README.md) (one file per watched exporter), the [shared sample files](../extras/examples/README.md) the `file:` acl gates point at, the [graylog pack](../extras/graylog/README.md) |
 
 The per-tool surfaces live in the tools' own READMEs and MANUALs; the
 book (`docs/book/`, built from `book/src/`) carries the reader tour,
@@ -96,8 +96,8 @@ release.
    tokenless TCP on the serving tools), retired shapes (the ini
    config).
 
-3. **Verify each suspect against the code** (the registries, the
-   static.json defaults, the control.py branches) before editing — a
+3. **Verify each suspect against the code**    (the registries, the
+   `lib/defaults.json` statics, the control.py branches) before editing — a
    doc claim that reads wrong may be the DOC being right and the code
    having drifted; that is a finding, not an edit.
 

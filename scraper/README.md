@@ -52,11 +52,10 @@ Settings are resolved in this order (first hit wins), mirroring
 
 1. CLI flags (`--upstream`, `--listen`, …)
 2. Environment variables — the same names, bare (no tool prefix):
-   `CONFIG`, `METRICS_SPEC`, `UPSTREAM`, `MODBUS_UNIT`, `MODBUS_OFFSET`,
-   `TIMEOUT`, `PROFILE`, `METRIC_PREFIX`, `MAX_KWP`, `MAX_GRID_KW`,
-   `GRID_POSITIVE_IMPORT`, `LISTEN`, `INTERVAL`, `LOCAL_TIME`,
-   `LOG_ACCESS`, `LOG_LEVEL`, `AUTH_TOKEN`, `MAX_CLIENTS`,
-   `CLIENT_TIMEOUT`
+   `CONFIG`, `UPSTREAM`, `MODBUS_UNIT`, `MODBUS_OFFSET`, `TIMEOUT`,
+   `INTERVAL`, `LISTEN`, `PROFILE`, `LOG_LEVEL`, `AUTH_TOKEN`, … —
+   the full twin set is the generated
+   [`docker/env/scraper.env.example`](../docker/env/scraper.env.example)
 3. Config file — the set-grammar script (`set <name> <value>` lines) —
    `--config` picks the file (default: `$CONFIG`, then `scraper.conf` next
    to the script, then the subproject root's sample; missing file is fine)

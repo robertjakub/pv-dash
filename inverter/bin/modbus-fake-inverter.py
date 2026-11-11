@@ -41,7 +41,7 @@ import logging
 import math
 import threading
 
-from common.runtime.audit import audit_params_of, build_audit, default_path
+from common.runtime.audit import load_audit_tags, audit_params_of, build_audit, default_path
 from common.settings.config import acl_text, acl_value_text, check_auth_key, parse_acl, parse_auth_type, parse_listen, \
     parse_secret, resolve_control_target, resolve_metrics_acl
 from common.wire.cred import parse_trust_uids
@@ -140,6 +140,8 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'max-conn-per-ip': str(args.max_conn_per_ip),
         'connect-acl': acl_text(connect_acl),
         'allow-write': 'on' if args.allow_write else 'off',
+        'log-access': 'on' if args.log_access else 'off',
+        'local-time': 'on' if args.local_time else 'off',
         'modbus-auth': modbus_auth or 'none',
         'metrics-server': 'on' if args.metrics_server else 'off',
         'metrics-acl': acl_value_text(metrics_acl),
@@ -285,7 +287,8 @@ def main():
         logger.warning('the state dump %s is not sealed (the integrity hash only — plaintext at rest): '
                        'set dump/key (--dump-key, $DUMP_KEY or set dump-key, a file: reference works) '
                        'to encrypt it', args.dump_path)
-    audit = build_audit(vars(args), 'INV', 'fake-inverter', logger)
+    tag = load_audit_tags('inverter')
+    audit = build_audit(vars(args), tag, 'fake-inverter', logger)
     audit_params = audit_params_of(vars(args))
     if args.dry_run:
         mode = 'static values' if args.static else (
@@ -311,7 +314,7 @@ def main():
                         max_clients=args.max_clients, client_timeout=args.client_timeout,
                         max_conn_per_ip=args.max_conn_per_ip, connect_acl=connect_acl,
                         auth=modbus_auth, auth_key=modbus_auth_key,
-                        allow_write=args.allow_write, audit=audit)
+                        allow_write=args.allow_write, audit=audit, log_access=args.log_access)
     control = None
     if target != '0':
         control = ControlServer(simulator, chaos, target, fake=fake,

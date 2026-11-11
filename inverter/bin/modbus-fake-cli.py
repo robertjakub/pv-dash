@@ -25,6 +25,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
+from common.runtime.audit import load_audit_tags
 from common.wire import cli
 from common.render.texts import T
 from lib.man import cli_page
@@ -38,7 +39,9 @@ POOL_NAMES, describe_word, command_pool, setting_pool, welcome = cli.pools(
     POOL_NAMES, 'fake-inverter')
 
 
-SPEC = dict(label='the fake inverter', daemon_label='fake inverter control server',
+TAGS = load_audit_tags('inverter')
+
+SPEC = dict(audit_tag=TAGS, label='the fake inverter', daemon_label='fake inverter control server',
             cli_name='modbus-fake-cli', app='fake-inverter', self_note='the fake itself',
             command_help='e.g. set pv 2500, set scenario noon, show registers, reset, shutdown',
             prompt_word='fake-inverter', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,

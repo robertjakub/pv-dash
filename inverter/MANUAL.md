@@ -120,7 +120,6 @@ translate). The namespaces group them.
 | `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous Modbus client limit |
 | `client-timeout` | `set client-timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | disconnect Modbus clients silent for this long |
 | `max-conn-per-ip` | `set max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous Modbus connections from one peer IP |
-| `control-log-replies` | — | startup-only | `on\|off` | `--control-log-replies` / — | DEBUG-log the full output of every control command (plainly: only the command logs) |
 | `metrics-listen` | — | startup-only | `HOST:PORT` | `--metrics-listen` / — | the metrics bind address HOST:PORT |
 | `metrics-max-clients` | — | startup-only | `N` | `--metrics-max-clients` / — | maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited |
 | `metrics-client-timeout` | — | startup-only | `s` | `--metrics-client-timeout` / — | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
@@ -135,6 +134,9 @@ the daemon's own serving socket: the Modbus listen address
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `listen` | `set system listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
+| `log-access` | `set system log-access` | settable | `on\|off` | `--log-access` / — | log client connects/disconnects at INFO instead of DEBUG |
+| `local-time` | `set system local-time` | settable | `on\|off` | `--local-time` / — | log timestamps in the system time zone instead of UTC |
+| `control-log-replies` | `set system log-replies` | settable | `on\|off` | `--control-log-replies` / — | DEBUG-log the full output of every control command (plainly: the command and its status log) |
 
 ### modbus
 

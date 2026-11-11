@@ -51,27 +51,27 @@ overlay, audited WRITE.
 
 .SH OPTIONS
 .TP
-.B \-\-listen
+.BI \-\-listen " listen"
 listen address HOST:PORT
 .TP
-.BI \-\-unit " N"
+.BI \-\-unit " unit"
 Modbus unit id served
 .TP
-.B \-\-profile
+.BI \-\-profile " profile"
 inverter profile JSON: name \-> register (+ optional type/scale), e.g.
 profiles/profiles/sun2000.json; PROFILE when unset
 .TP
-.BI \-\-max\-kwp " N"
+.BI \-\-max\-kwp " max-kwp"
 PV array size in kWp, peak = 75%% of it
 .TP
-.B \-\-timezone
+.BI \-\-timezone " timezone"
 clock the state machines integrate over (the PV bell, the home load, the
 clouds, the battery, the grid voltage): UTC or the local wall clock
 .TP
-.B \-\-time
+.BI \-\-time " time"
 freeze simulated time HH:MM
 .TP
-.BI \-\-time\-scale " N"
+.BI \-\-time\-scale " time-scale"
 the simulated clock speed: N times real time \- every machine (the
 battery, the clouds, the voltages, the day counters) integrates over it,
 so a full simulated day takes 24/N real hours
@@ -79,51 +79,51 @@ so a full simulated day takes 24/N real hours
 .B \-\-static
 constant demo values instead of the day simulation
 .TP
-.BI \-\-battery\-kwh " N"
+.BI \-\-battery\-kwh " battery-kwh"
 usable battery capacity in kWh
 .TP
 .B \-\-strict
 reject reads of undefined registers with exception 02 (like the real
 device)
 .TP
-.BI \-\-chaos " N"
+.BI \-\-chaos " chaos"
 probability 0..1 that a request is answered hostile and dropped; seed
 with \-\-seed for reproducibility
 .TP
-.BI \-\-grid\-voltage " N"
+.BI \-\-grid\-voltage " grid-voltage"
 nominal grid phase voltage in V (120 or 230; the machine wanders
 ±grid\-voltage\-wander around it, the grid\-voltage setpoint overrides)
 .TP
-.BI \-\-grid\-voltage\-wander " N"
+.BI \-\-grid\-voltage\-wander " grid-voltage-wander"
 the per\-phase voltage machine's wander range as a fraction of the
 nominal (0.1 = the phases wander ±10 %%; 0 = the flat grid); the live
 set re\-clamps the walk
 .TP
-.BI \-\-grid\-frequency " N"
+.BI \-\-grid\-frequency " grid-frequency"
 nominal grid frequency in Hz (the machine wanders
 ±grid\-frequency\-wander around it, the grid\-frequency setpoint
 overrides)
 .TP
-.BI \-\-grid\-frequency\-wander " N"
+.BI \-\-grid\-frequency\-wander " grid-frequency-wander"
 the frequency machine's clamp in Hz around the nominal (0.2 = ±0.2 Hz; 0
 = the flat frequency); the live set re\-clamps the walk
 .TP
-.BI \-\-seed " N"
+.BI \-\-seed " seed"
 chaos RNG seed
 .TP
-.B \-\-modbus\-auth
+.BI \-\-modbus\-auth " modbus-auth"
 the auth scheme the fake's Modbus clients must speak: `suite` demands
 the crypt handshake (magic + nonce + HMAC proof of the shared key) right
 after every connect and drops the client on ERR/anything else;
 none/empty = no auth at all — the trusted\-LAN posture
 .TP
-.B \-\-auth\-key
+.BI \-\-auth\-key " auth-key"
 the shared key the fake's clients prove with the suite handshake (min 16
 characters); the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
 file:/run/credentials/...)
 .TP
-.B \-\-connect\-acl
+.BI \-\-connect\-acl " connect-acl"
 the Modbus clients allowed to connect (the cache's connect\-acl,
 mirrored): "any" (the trusted\-LAN posture), "none", or a
 comma\-separated IP/CIDR list
@@ -135,23 +135,23 @@ forwarded ones; off = every write is refused with exception 01 and
 audited WRITE\-REFUSED — the cache's \-\-allow\-write gate, mirrored
 (env ALLOW_WRITE)
 .TP
-.BI \-\-max\-clients " N"
+.BI \-\-max\-clients " max-clients"
 refuse further Modbus connections past this many simultaneous clients, 0
 = no limit
 .TP
-.BI \-\-client\-timeout " N"
+.BI \-\-client\-timeout " client-timeout"
 disconnect Modbus clients silent for this many seconds, 0 = never —
 sheds connections from clients that died without closing
 .TP
-.BI \-\-max\-conn\-per\-ip " N"
+.BI \-\-max\-conn\-per\-ip " max-conn-per-ip"
 refuse further Modbus connections from one peer IP past this many
 simultaneous connections, 0 = no per\-IP limit
 .TP
-.B \-\-control\-port
+.BI \-\-control\-port " control-port"
 control server target: unix socket path or TCP port number on 127.0.0.1
 (e.g. 15599); 0 = off. Talk to it with modbus\-fake\-ctl.py
 .TP
-.B \-\-control\-token
+.BI \-\-control\-token " control-token"
 require a token on control connections: the client authenticates with
 {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root,
 the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED) skips
@@ -159,7 +159,7 @@ the token; the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as
 file:/run/credentials/...)
 .TP
-.B \-\-control\-ops\-token
+.BI \-\-control\-ops\-token " control-ops-token"
 a second, read\-only control token: sessions authenticating with it may
 run its policy's verbs only (the default policy: show) (no set/clear, no
 reset, no shutdown) — the ops shift against the admin key, both audited;
@@ -167,11 +167,11 @@ the value may be `file:<path>` — the first line of an owner\-only 0600
 file (a systemd LoadCredential rides as file:/run/credentials/...) (env
 CONTROL_OPS_TOKEN)
 .TP
-.B \-\-control\-ops\-verbs
+.BI \-\-control\-ops\-verbs " control-ops-verbs"
 the read\-only ops role's RBAC policy: the verbs its sessions may run,
 comma\-separated
 .TP
-.B \-\-control\-trust\-uids
+.BI \-\-control\-trust\-uids " control-trust-uids"
 extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
 the daemon's own user are always trusted (env CONTROL_TRUST_UIDS)
@@ -181,26 +181,31 @@ leave the unix control socket group\-accessible (chmod 0660 instead of
 the plain 0600): a local group may speak to the control wire without the
 token ($CONTROL_SOCKET_GROUP)
 .TP
+.B \-\-log\-access
+log client connects/disconnects at INFO instead of DEBUG
+.TP
+.B \-\-local\-time
+log timestamps in the system time zone instead of UTC
+.TP
 .B \-\-control\-log\-replies
-DEBUG\-log the full output of every control command (plainly: only the
-command logs)
+DEBUG\-log the full output of every control command
 .TP
 .B \-\-metrics\-server
 serve the fake's own Prometheus /metrics endpoint (the live `set metrics
 enable` toggle exists too)
 .TP
-.B \-\-metrics\-listen
+.BI \-\-metrics\-listen " metrics-listen"
 the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every
 interface, a token is mandatory beyond loopback (a token\-less
 non\-loopback bind refuses to start, F13)
 .TP
-.B \-\-metrics\-token
+.BI \-\-metrics\-token " metrics-token"
 require Authorization: Bearer <token> on the /metrics endpoint (the same
 scheme the scraper speaks); the value may be `file:<path>` — the first
 line of an owner\-only 0600 file (a systemd LoadCredential rides as
 file:/run/credentials/...)
 .TP
-.B \-\-metrics\-acl
+.BI \-\-metrics\-acl " metrics-acl"
 clients allowed to connect to the /metrics endpoint: "any", "none"
 (refuse everyone), comma\-separated IPs/prefixes like
 10.0.0.7,10.48.0.0/16, or "file:<path>" — the standalone ip\-prefix acl
@@ -209,52 +214,52 @@ file (the gate object {"type": "ip\-prefix", "rules": [{"type":
 client no rule decides refuses; "any" = 0.0.0.0/0, the whole space);
 checked at accept — a client off the ACL is closed without a reply
 .TP
-.BI \-\-metrics\-max\-clients " N"
+.BI \-\-metrics\-max\-clients " metrics-max-clients"
 maximum concurrent HTTP clients on the /metrics endpoint; extras get an
 immediate 503, 0 = unlimited
 .TP
-.BI \-\-metrics\-client\-timeout " N"
+.BI \-\-metrics\-client\-timeout " metrics-client-timeout"
 seconds an idle /metrics client is kept before the socket times out, 0 =
 the built\-in 5 s cap
 .TP
-.BI \-\-metrics\-max\-conn\-per\-ip " N"
+.BI \-\-metrics\-max\-conn\-per\-ip " metrics-max-conn-per-ip"
 maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
 limit
 .TP
-.B \-\-audit\-log
+.BI \-\-audit\-log " audit-log"
 INV audit trail: a file path or \- for stdout (the docker/journald way);
 `none` turns the local file off (with a forward spelled that is the
 remote\-only mode); ~/.local/state/fake\-inverter/audit.log — the XDG
 state home when unset
 .TP
-.B \-\-audit\-forward
+.BI \-\-audit\-forward " audit-forward"
 also forward the INV audit trail: syslog (the local socket auto\-scan),
 syslog:/path (an explicit socket), udp://host[:514] (RFC5426,
 best\-effort) or tcp://host[:514] (RFC6587 framing) — the off\-box copy
 carries the per\-writer hash chain, so a scheduled search at the
 collector can alert on a chain break; docs/AUDIT.md
 .TP
-.B \-\-audit\-forward\-format
+.BI \-\-audit\-forward\-format " audit-forward-format"
 the remote forward's envelope: RFC5424 (the default) or CEF — the local
 syslog forms keep the verbatim send (remote targets only)
 .TP
-.BI \-\-audit\-max\-mb " N"
+.BI \-\-audit\-max\-mb " audit-max-mb"
 rotate the audit log at this size in MB, keeping N backups; 0 = no size
 rotation
 .TP
 .B \-\-audit\-daily
 also rotate the audit log at UTC midnight
 .TP
-.BI \-\-audit\-files " N"
+.BI \-\-audit\-files " audit-files"
 rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
 disable the INV audit trail
 .TP
-.B \-\-log\-level
+.BI \-\-log\-level " log-level"
 the log verbosity: DEBUG adds client traffic and per\-poll detail
 .TP
-.B \-\-dump\-path
+.BI \-\-dump\-path " dump-path"
 the state dump: the live setting overrides (the pins, the machines, the
 tokens apart) as one JSON, written 0600 with an integrity hash (a
 restore refuses a tampered, unsigned or group\-writable dump); dumped on
@@ -262,7 +267,7 @@ the request dump command, the graceful shutdown and every
 \-\-dump\-interval seconds; loaded on start only with
 \-\-restore\-on\-start, on demand with the request restore command
 .TP
-.B \-\-dump\-key
+.BI \-\-dump\-key " dump-key"
 the key that seals the state dumps and the reload's state file: the
 state rides encrypted (an HMAC\-SHA256 counter\-mode keystream,
 authenticated — a restore refuses a wrong or missing key, and a
@@ -273,7 +278,7 @@ without a key warns at start and on set; the value may be `file:<path>`
 — the first line of an owner\-only 0600 file (a systemd LoadCredential
 rides as file:/run/credentials/...)
 .TP
-.BI \-\-dump\-interval " N"
+.BI \-\-dump\-interval " dump-interval"
 seconds between the automatic state dumps, 0 = on request (the request
 dump command and the shutdown)
 .TP

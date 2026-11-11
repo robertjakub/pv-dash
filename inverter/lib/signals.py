@@ -176,8 +176,8 @@ class SignalBox:
         logger.info('shutdown: %s received after %.0fs (%d client connection(s), %d request(s), %d chaos hit(s))',
                     name, dur, self.fake.conns, self.fake.requests, self.chaos.hits)
         if self.audit:
-            self.audit.event('SHUTDOWN', '%s: uptime=%.0fs conns=%d requests=%d chaos_hits=%d'
-                             % (name, dur, self.fake.conns, self.fake.requests, self.chaos.hits))
+            self.audit.event('SHUTDOWN', 'reason=%s uptime=%.0fs conns=%d requests=%d chaos_hits=%d'
+                             % (name.replace(' ', '-'), dur, self.fake.conns, self.fake.requests, self.chaos.hits))
         if self.control:
             self.control.shutdown_dump()   # the write-behind: the overrides ride the next start
             self.control.announce_exit(name)   # the consoles print the notice and exit

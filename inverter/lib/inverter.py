@@ -24,7 +24,7 @@ logger = logging.getLogger('fake-inverter')
 class FakeInverter:
     def __init__(self, unit, simulator, strict=False, chaos=None, max_clients=64, client_timeout=300.0,
                  max_conn_per_ip=0, connect_acl=None, auth=None, auth_key=None,
-                 allow_write=False, audit=None):
+                 allow_write=False, audit=None, log_access=False):
         self.unit = unit
         self.simulator = simulator
         self.strict = strict
@@ -33,6 +33,7 @@ class FakeInverter:
         self.coils = {}        # FC05/FC15 writes + `set coil`: addr -> 0/1 (FC1 reads)
         self.discrete = {}     # `set discrete` pins: addr -> 0/1 (FC2 reads)
         self.allow_write = allow_write   # the write gate: off = every Modbus write is refused (01)
+        self.log_access = log_access   # the connect/disconnect lines: INFO when on, DEBUG by default
         self.audit = audit     # the INV audit trail (common.audit), None = off — WRITE / WRITE-REFUSED ride it
         self.listen_sock = None   # the shared ladder's listener (the signal box closes it)
         self.listen_addr = None
@@ -70,7 +71,7 @@ class FakeInverter:
     log = logger
 
     def access(self, fmt, *args):
-        logger.info(fmt, *args)
+        (logger.info if self.log_access else logger.debug)(fmt, *args)
 
     def on_session(self):
         self.conns += 1

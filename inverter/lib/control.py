@@ -12,6 +12,7 @@ the unix socket a kernel-vouched peer (root, the daemon's own user or
 --control-trust-uids — SO_PEERCRED) skips the handshake. A second,
 read-only token (--control-ops-token) authenticates into its policy's verbs (the
 verbs only — the ops shift against the admin key, both audited."""
+import os
 import logging
 import math
 import time
@@ -26,6 +27,7 @@ from .profile import load_profile, profile_label, resolve_profile
 from .signals import parse_time
 from common.runtime.version import version_string
 from common.render.texts import T
+from common.runtime.audit import load_audit_tags
 from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, \
     SHOW_OPTIONS, NODE_BY_NAME, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
@@ -52,14 +54,6 @@ class ControlServer(_ControlServer):
     swaps the socket (bind first, the failed bind rolls back, the sessions
     keep serving, off retires) — tokenless TCP included (F11)."""
 
-    def log_exchange(self, who, cmd, reply):
-        """The reply text is demo state: logged only when --log-replies
-        (the base line carries it unconditionally)."""
-        if self.log_replies:
-            self.LOG.debug('control from %s: %s -> %s', who, cmd, reply)
-        else:
-            self.LOG.debug('control from %s: %s', who, cmd)
-
     def _signalbox_stop(self, source='control command'):
         """The base's post-loop stopper: hand the shutdown to the
         signalbox when the entry has set one."""
@@ -84,7 +78,7 @@ class ControlServer(_ControlServer):
     APPLY_FIRST = ('scenario',)   # a preset release is the state the pins were pinned after — pins land on top
     TOKENLESS_TCP = 'allow'   # the F11 test-tool posture: a tokenless TCP control bind is fine here (the family refuses — F5)
     APP = 'fake-inverter'
-    AUDIT_PREFIX = 'INV'
+    AUDIT_PREFIX = load_audit_tags('inverter')
     AUDIT_APP = 'fake-inverter'
     CONTROL_PORT_DEFAULT = DEFAULT_LISTEN_PORT
     CONTROL_SOCKET_TEMPLATE = CONTROL_SOCKET_TEMPLATE
@@ -107,8 +101,7 @@ class ControlServer(_ControlServer):
                          socket_group=socket_group, ops_token=ops_token, ops_verbs=ops_verbs,
                          audit_params=audit_params, config_path=config_path, dump_path=dump_path,
                          restore_on_start=restore_on_start, dump_key=dump_key, dump_interval=dump_interval,
-                         stopper=self._signalbox_stop)
-        self.log_replies = log_replies   # DEBUG also logs the full command output
+                         stopper=self._signalbox_stop, log_replies=log_replies)
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
         self.simulator = simulator
         self.chaos = chaos
@@ -239,6 +232,9 @@ class ControlServer(_ControlServer):
                 sim.set_outage_machine('on')
                 return sim.outage_display()
             raise ValueError('grid-outage must be on|off|outage')
+        if key == 'log-access':
+            fake.log_access = on_off(val, 'log-access')
+            return 'on' if fake.log_access else 'off'
         if key == 'strict':
             fake.strict = on_off(val, 'strict')
             return 'on' if fake.strict else 'off'
@@ -421,6 +417,8 @@ class ControlServer(_ControlServer):
             return '%g' % sim.grid_frequency_wander
         if key == 'grid-outage':
             return sim.outage_display()
+        if key == 'log-access':
+            return ('on' if fake.log_access else 'off') if fake else '?'
         if key == 'strict':
             return 'on' if fake.strict else 'off'
         if key == 'static':
@@ -684,6 +682,8 @@ class ControlServer(_ControlServer):
             'battery-state': sim.batt_state or 'auto',
             'battery-kwh': '%g' % sim.battery_kwh,
             'strict': 'on' if fake.strict else 'off',
+            'log-access': 'on' if fake.log_access else 'off',
+            'local-time': self._get('local-time'),
             'chaos': '%.2f' % chaos.p,
             'seed': 'random' if chaos.seed is None else str(chaos.seed),
             'grid-voltage': '%g' % sim.grid_voltage,
@@ -709,6 +709,7 @@ class ControlServer(_ControlServer):
             'control-ops-verbs': ','.join(sorted(self.ops_verbs)) or 'off',
             'control-trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control-socket-group': 'on' if self.socket_group else 'off',
+            'control-log-replies': 'on' if self.log_replies else 'off',
             **self.audit_dump_rows(),
         }
         return self.dump_settings_tail(raw)

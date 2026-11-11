@@ -21,10 +21,13 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
+from common.runtime.audit import load_audit_tags
 from common.wire.ctl import run_ctl
 from lib.man import ctl_page
 from lib.options import SETTING_SPELLINGS
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_MAX_LINE_BYTES_S, CLI_TIMEOUT_S, DEFAULT_CONTROL_SOCKET
+
+TAGS = load_audit_tags('inverter')
 
 if __name__ == '__main__':
     run_ctl(daemon='fake inverter', bin_name='modbus-fake-ctl', app='fake-inverter',
@@ -32,4 +35,5 @@ if __name__ == '__main__':
             command_help='e.g. set pv 2500, set scenario noon, show registers, reset, shutdown',
             ctl_socket=DEFAULT_CONTROL_SOCKET, timeout_s=CLI_TIMEOUT_S,
             audit_max_mb=AUDIT_MAX_MB, audit_files=AUDIT_FILES, ctl_page=ctl_page,
-            max_line_bytes=CLI_MAX_LINE_BYTES_S, spellings=SETTING_SPELLINGS)
+            max_line_bytes=CLI_MAX_LINE_BYTES_S, spellings=SETTING_SPELLINGS,
+            audit_tag=TAGS)

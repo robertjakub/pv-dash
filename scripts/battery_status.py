@@ -164,11 +164,12 @@ def render():
         status = last / 'status.txt'
         rows = status.read_text() if status.exists() else ''
         if 'NOTE battery canceled' in rows:
-            print('previous canceled: %s' % last.name)
+            state = 'canceled'
         elif re.search(r'^=== TALLY ', rows, re.M):
-            print('previous finished: %s' % last.name)
+            state = 'finished'
         else:
-            print('previous run (no tally): %s' % last.name)
+            state = 'no tally'
+        print('previous slot: %s (%s)' % (last.name, state))
         last_line(status)
 
 

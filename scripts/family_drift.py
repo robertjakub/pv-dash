@@ -362,14 +362,24 @@ def rendered():
 
 # ------------------------------------------------------- the nixos sweep
 
+# the service modules' flat home (nixos/modules/<tool>.nix; the inverter
+# ships no module — the test-tool posture)
+NIX_MODULES = {
+    'cache': 'nixos/modules/modbus-cache.nix',
+    'scraper': 'nixos/modules/modbus-scraper.nix',
+    'dashboard': 'nixos/modules/dashboard.nix',
+}
+
 def nixos(rows):
-    """Each tool's module.nix: the `name = mkOption` blocks (nested
+    """Each tool's service module (nixos/modules/<tool>.nix): the
+    `name = mkOption` blocks (nested
     under options.services.<tool>) with their type/default lines, then
     compared with the registry rows by name."""
     out = {}
     for t in TOOLS:
-        p = os.path.join(REPO, t, 'module.nix')
-        if not os.path.exists(p):
+        rel = NIX_MODULES.get(t)
+        p = os.path.join(REPO, rel) if rel else None
+        if not p or not os.path.exists(p):
             out[t] = None
             continue
         blocks = {}

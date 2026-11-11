@@ -8,7 +8,7 @@ The canon — every tool README, in this order:
 
     How it works -> Usage -> Configuration -> Runtime control
     -> <the tool's own sections> -> Security -> Testing
-    -> Nix / NixOS -> Source layout -> License
+    -> Source layout -> License
 
 The rules: every canon section present exactly once and in canon order; a
 section the canon does not name (the tool's feature/reference sections) is
@@ -31,7 +31,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 CANON = ('How it works', 'Usage', 'Configuration', 'Runtime control',
-         'Security', 'Testing', 'Nix / NixOS', 'Source layout', 'License')
+         'Security', 'Testing', 'Source layout', 'License')
 
 SLOT_AFTER = 'Runtime control'   # the free-name slot opens here...
 SLOT_BEFORE = 'Security'         # ...and closes here

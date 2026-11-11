@@ -162,12 +162,12 @@ action, and the flat name where they name the wire.
 - **the NixOS render bugs** `[cache]` `[dashboard]` — the dashboard
   emits `--metrics-server` whenever `metricsServer` is set, including
   explicit `false` (the flag turns the endpoint ON,
-  `dashboard/module.nix:61`); the cache renders `set audit requests`
+  `nixos/modules/dashboard.nix:61`); the cache renders `set audit requests`
   with an empty value from an unset `requestsAudit`
-  (`cache/module.nix:87` — `toString null`, and the config parser
+  (`nixos/modules/modbus-cache.nix:87` — `toString null`, and the config parser
   refuses a valueless set line) and the metrics pair likewise
   (`:105-108`); the dashboard's metrics-token LoadCredential is passed
-  even when undeclared (`:63` vs `:530`); `cache/module.nix:341`
+  even when undeclared (`:63` vs `:530`); `nixos/modules/modbus-cache.nix:341`
   documents `metricsServerToken` for options named `metricsToken`.
   Outcome: the bool semantics from the registry, guarded set lines,
   the doc names fixed; the inverter has no module.nix at all (68 rows

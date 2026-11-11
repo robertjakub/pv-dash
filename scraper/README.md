@@ -228,7 +228,7 @@ this pack.
 Wire-in: the demo image bakes the pack (`docker/prometheus.yml` sets
 `rule_files:`); a NixOS Prometheus points `services.prometheus.ruleFiles`
 at the packaged copy (`share/modbus-scraper/alerts.yml`, see
-[NIXOS.md](../docs/NIXOS.md)); an external collector copies the file and
+[nixos/README.md](../nixos/README.md)); an external collector copies the file and
 lists it under its own `rule_files:`. Thresholds assume the default 10 s
 poll interval — tune them to yours.
 
@@ -362,17 +362,6 @@ scripts/battery.sh scraper        # the scraper profile: the regtest, the fuzz, 
 
 Every scenario must end with the exporter serving correct metrics and
 **zero tracebacks** in the logs.
-
-## Nix / NixOS
-
-```bash
-nix run .#modbus-scraper -- --upstream 192.168.1.100:502
-```
-
-The package installs the man page too (`share/man/man1/`). The
-**`services.modbus-scraper`** NixOS module — the option map, the secrets
-discipline, the reload/restart story — is documented once in
-[docs/NIXOS.md](../docs/NIXOS.md).
 
 ## Source layout
 

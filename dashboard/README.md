@@ -285,17 +285,6 @@ Plus the `/config.js` fuzz pin in the same suite (a bogus override file
 must not crash the server). The scenario must end with the server alive
 and **zero tracebacks** in the logs.
 
-## Nix / NixOS
-
-```bash
-nix run .#dashboard
-```
-
-`package.nix` builds the dashboard (`static/` + the wrapped `dashboard`
-launcher); `module.nix` adds the **`services.dashboard`** option — the
-option map, the secrets discipline, the reload story — documented once in
-[docs/NIXOS.md](../docs/NIXOS.md).
-
 ## Source layout
 
 | File | Purpose |
@@ -313,7 +302,6 @@ option map, the secrets discipline, the reload story — documented once in
 | `lib/defaults.json` / `lib/statics.py` | the non-knob statics (log levels, the proxy timeout) / its loader — the knobs' defaults ride the registry rows |
 | `examples/config.js` | the user-settings example (`SOLAR_CONFIG`), served at `/config.js` |
 | `man/*.1` | the man pages — **generated** (`--man`, `scripts/gen_man.py`) |
-| `package.nix` / `module.nix` | Nix packaging and service module (the flake entry point lives at the suite root) |
 
 ## License
 

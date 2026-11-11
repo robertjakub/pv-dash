@@ -9,7 +9,7 @@ stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-cache";
   version = "0.4.2";
 
-  src = lib.cleanSource ./.;
+  src = lib.cleanSource ../../../cache;
 
   nativeBuildInputs = [ makeWrapper ];
 
@@ -26,34 +26,34 @@ stdenv.mkDerivation (finalAttrs: {
     install -dm755 $out/share/modbus-cache/lib
     install -m644 lib/*.py lib/defaults.json lib/options.json $out/share/modbus-cache/lib/
     install -dm755 $out/share/modbus-cache/common
-    install -m644 ${../common}/*.py $out/share/modbus-cache/common/
+    install -m644 ${../../../common}/*.py $out/share/modbus-cache/common/
     install -dm755 $out/share/modbus-cache/common/render
-    install -m644 ${../common}/render/*.py $out/share/modbus-cache/common/render/
+    install -m644 ${../../../common}/render/*.py $out/share/modbus-cache/common/render/
     install -dm755 $out/share/modbus-cache/common/runtime
-    install -m644 ${../common}/runtime/*.py $out/share/modbus-cache/common/runtime/
+    install -m644 ${../../../common}/runtime/*.py $out/share/modbus-cache/common/runtime/
     install -dm755 $out/share/modbus-cache/common/settings
-    install -m644 ${../common}/settings/*.py $out/share/modbus-cache/common/settings/
+    install -m644 ${../../../common}/settings/*.py $out/share/modbus-cache/common/settings/
     install -dm755 $out/share/modbus-cache/common/serve
-    install -m644 ${../common}/serve/*.py $out/share/modbus-cache/common/serve/
+    install -m644 ${../../../common}/serve/*.py $out/share/modbus-cache/common/serve/
     install -dm755 $out/share/modbus-cache/common/wire
-    install -m644 ${../common}/wire/*.py $out/share/modbus-cache/common/wire/
-    install -m644 ${../common}/wire/defaults.json $out/share/modbus-cache/common/wire/
+    install -m644 ${../../../common}/wire/*.py $out/share/modbus-cache/common/wire/
+    install -m644 ${../../../common}/wire/defaults.json $out/share/modbus-cache/common/wire/
     install -dm755 $out/share/modbus-cache/shared
-    install -m644 ${../shared}/texts.json $out/share/modbus-cache/shared/
-    install -m644 ${../shared}/tags.json $out/share/modbus-cache/shared/
+    install -m644 ${../../../shared}/texts.json $out/share/modbus-cache/shared/
+    install -m644 ${../../../shared}/tags.json $out/share/modbus-cache/shared/
     install -dm755 $out/share/modbus-cache/common/modbus
-    install -m644 ${../common}/modbus/*.py $out/share/modbus-cache/common/modbus/
-    install -m644 ${../common}/modbus/protocol.json $out/share/modbus-cache/common/modbus/
+    install -m644 ${../../../common}/modbus/*.py $out/share/modbus-cache/common/modbus/
+    install -m644 ${../../../common}/modbus/protocol.json $out/share/modbus-cache/common/modbus/
     install -Dm644 examples/modbus_cache.conf $out/share/modbus-cache/modbus_cache.conf
     install -Dm644 examples/selection.json $out/share/modbus-cache/selection.json
-    install -Dm644 ${../extras/examples}/acl-write-registers.json $out/share/modbus-cache/acl-write-registers.json
-    install -Dm644 ${../extras/examples}/acl-ip-prefix.json $out/share/modbus-cache/acl-ip-prefix.json
-    install -Dm644 ${../shared}/schema/acl-write-registers.schema.json $out/share/modbus-cache/acl-write-registers.schema.json
-    install -Dm644 ${../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-cache/acl-ip-prefix.schema.json
+    install -Dm644 ${../../../extras/examples}/acl-write-registers.json $out/share/modbus-cache/acl-write-registers.json
+    install -Dm644 ${../../../extras/examples}/acl-ip-prefix.json $out/share/modbus-cache/acl-ip-prefix.json
+    install -Dm644 ${../../../shared}/schema/acl-write-registers.schema.json $out/share/modbus-cache/acl-write-registers.schema.json
+    install -Dm644 ${../../../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-cache/acl-ip-prefix.schema.json
     install -Dm644 schema/selection.schema.json $out/share/modbus-cache/selection.schema.json
-    install -Dm644 ${../extras/alerts}/cache.yml $out/share/modbus-cache/alerts.yml
+    install -Dm644 ${../../../extras/alerts}/cache.yml $out/share/modbus-cache/alerts.yml
     install -dm755 $out/share/modbus-cache/profiles
-    install -m644 ${../profiles/profiles}/*.json $out/share/modbus-cache/profiles/
+    install -m644 ${../../../profiles/profiles}/*.json $out/share/modbus-cache/profiles/
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-cache \

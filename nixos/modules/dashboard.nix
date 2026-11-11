@@ -83,8 +83,8 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.callPackage ./package.nix { };
-      defaultText = lib.literalExpression "pkgs.callPackage ./package.nix { }";
+      default = pkgs.callPackage ../pkgs/dashboard/package.nix { };
+      defaultText = lib.literalExpression "pkgs.callPackage ../pkgs/dashboard/package.nix { }";
       description = "The dashboard package to run.";
     };
 

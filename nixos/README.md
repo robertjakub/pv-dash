@@ -2,14 +2,15 @@
 
 One flake at the repo root packages the whole suite: four packages, an
 overlay, and a **NixOS service module for every daemon** (the fake inverter
-is the exception — it is a test tool, not a deployment). This file is the
-one Nix reference; the per-tool READMEs link here instead of carrying their
-own Nix sections.
+is the exception — it is a test tool, not a deployment). This README is the
+one Nix reference and lives beside the tree it describes — `pkgs/<tool>/`
+the four packages, `modules/<tool>.nix` the three service modules. The
+per-tool READMEs carry no Nix sections.
 
 - **Packages:** `dashboard` (the flake's `default`), `modbus-scraper`,
   `modbus-cache`, `modbus-fake-inverter`
-- **Overlay:** `overlays.default` (exposes `dashboard`; the other packages
-  come from the same callPackage shape)
+- **Overlay:** `overlays.default` (= `overlays.pv-suite`) — all four
+  packages onto `final`
 - **Modules:** `nixosModules.modbus-scraper`, `nixosModules.modbus-cache`,
   `nixosModules.dashboard` (`default` = dashboard)
 - **Checks:** `nix flake check` runs the **hardening VM test**

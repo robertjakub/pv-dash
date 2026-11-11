@@ -36,6 +36,20 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Changed
 
+- **nixos** — **the Nix tree gets its own home under `nixos/`**: the four
+  `package.nix` files move to `nixos/pkgs/<tool>/` (flat, one dir per
+  package), the three service modules flatten to `nixos/modules/<tool>.nix`
+  (`modbus-scraper.nix`, `modbus-cache.nix`, `dashboard.nix`), and
+  `docs/NIXOS.md` becomes **`nixos/README.md`** beside them — the one Nix
+  reference living next to the tree it describes. The flake's overlay
+  becomes `overlays.pv-suite` (= `default`) carrying **all four packages**
+  (the dashboard-only `overlays.dashboard` retires). The per-tool READMEs'
+  `## Nix / NixOS` sections retire (the lint_readmes canon loses the
+  heading), the flake's packages/overlay/nixosModules and the hardening VM
+  test follow the new paths, the modules' `package` defaults point at
+  `../pkgs/<tool>/package.nix`, and the check_options/family_drift gates
+  read the modules from the new home.
+
 - **everywhere** — **the control exchange's DEBUG line slims, and the
   logging knobs gather family-wide under the system/ namespace**: the
   daemons' debug exchange line carries the command and the outcome status

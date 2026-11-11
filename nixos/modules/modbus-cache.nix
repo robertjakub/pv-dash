@@ -121,8 +121,8 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.callPackage ./package.nix { };
-      defaultText = lib.literalExpression "pkgs.callPackage ./package.nix { }";
+      default = pkgs.callPackage ../pkgs/modbus-cache/package.nix { };
+      defaultText = lib.literalExpression "pkgs.callPackage ../pkgs/modbus-cache/package.nix { }";
       description = "The modbus-cache package to run.";
     };
 

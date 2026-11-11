@@ -33,7 +33,7 @@ watches the poll and the gates.
 
 Wire-in: the demo's [`prometheus.yml`](../docker/prometheus.yml) sets
 `rule_files: [/etc/prometheus/alerts/*.yml]`; a NixOS Prometheus lists the
-packaged copies — [NIXOS.md](../docs/NIXOS.md). Thresholds assume the
+packaged copies — [nixos/README.md](../../nixos/README.md). Thresholds assume the
 default 10 s poll interval — tune them to yours.
 
 ## License

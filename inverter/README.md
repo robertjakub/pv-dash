@@ -391,17 +391,6 @@ scripts/battery.sh inverter        # the inverter profile: the fake's regtest, t
 Every scenario must end with the fake alive and **zero tracebacks** in the
 logs.
 
-## Nix / NixOS
-
-```bash
-nix run .#modbus-fake-inverter -- --static --control-port 15599
-```
-
-The package ships the three binaries plus the man pages under
-`share/man/man1/`. There is **no NixOS service module** — the fake is a
-test/demo tool, not a daemon you deploy (see
-[docs/NIXOS.md](../docs/NIXOS.md)).
-
 ## Source layout
 
 ```

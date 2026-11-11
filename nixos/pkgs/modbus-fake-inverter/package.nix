@@ -9,7 +9,7 @@ stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-fake-inverter";
   version = "0.4.2";
 
-  src = lib.cleanSource ./.;
+  src = lib.cleanSource ../../../inverter;
 
   nativeBuildInputs = [ makeWrapper ];
 
@@ -26,28 +26,28 @@ stdenv.mkDerivation (finalAttrs: {
     install -dm755 $out/share/modbus-fake-inverter/lib
     install -m644 lib/*.py lib/defaults.json lib/options.json $out/share/modbus-fake-inverter/lib/
     install -dm755 $out/share/modbus-fake-inverter/common
-    install -m644 ${../common}/*.py $out/share/modbus-fake-inverter/common/
+    install -m644 ${../../../common}/*.py $out/share/modbus-fake-inverter/common/
     install -dm755 $out/share/modbus-fake-inverter/common/render
-    install -m644 ${../common}/render/*.py $out/share/modbus-fake-inverter/common/render/
+    install -m644 ${../../../common}/render/*.py $out/share/modbus-fake-inverter/common/render/
     install -dm755 $out/share/modbus-fake-inverter/common/runtime
-    install -m644 ${../common}/runtime/*.py $out/share/modbus-fake-inverter/common/runtime/
+    install -m644 ${../../../common}/runtime/*.py $out/share/modbus-fake-inverter/common/runtime/
     install -dm755 $out/share/modbus-fake-inverter/common/settings
-    install -m644 ${../common}/settings/*.py $out/share/modbus-fake-inverter/common/settings/
+    install -m644 ${../../../common}/settings/*.py $out/share/modbus-fake-inverter/common/settings/
     install -dm755 $out/share/modbus-fake-inverter/common/serve
-    install -m644 ${../common}/serve/*.py $out/share/modbus-fake-inverter/common/serve/
+    install -m644 ${../../../common}/serve/*.py $out/share/modbus-fake-inverter/common/serve/
     install -dm755 $out/share/modbus-fake-inverter/common/wire
-    install -m644 ${../common}/wire/*.py $out/share/modbus-fake-inverter/common/wire/
-    install -m644 ${../common}/wire/defaults.json $out/share/modbus-fake-inverter/common/wire/
+    install -m644 ${../../../common}/wire/*.py $out/share/modbus-fake-inverter/common/wire/
+    install -m644 ${../../../common}/wire/defaults.json $out/share/modbus-fake-inverter/common/wire/
     install -dm755 $out/share/modbus-fake-inverter/shared
-    install -m644 ${../shared}/texts.json $out/share/modbus-fake-inverter/shared/
-    install -m644 ${../shared}/tags.json $out/share/modbus-fake-inverter/shared/
+    install -m644 ${../../../shared}/texts.json $out/share/modbus-fake-inverter/shared/
+    install -m644 ${../../../shared}/tags.json $out/share/modbus-fake-inverter/shared/
     install -dm755 $out/share/modbus-fake-inverter/common/modbus
-    install -m644 ${../common}/modbus/*.py $out/share/modbus-fake-inverter/common/modbus/
-    install -m644 ${../common}/modbus/protocol.json $out/share/modbus-fake-inverter/common/modbus/
+    install -m644 ${../../../common}/modbus/*.py $out/share/modbus-fake-inverter/common/modbus/
+    install -m644 ${../../../common}/modbus/protocol.json $out/share/modbus-fake-inverter/common/modbus/
     install -dm755 $out/share/modbus-fake-inverter/profiles
-    install -m644 ${../profiles/profiles}/*.json $out/share/modbus-fake-inverter/profiles/
-    install -Dm644 ${../extras/examples}/acl-ip-prefix.json $out/share/modbus-fake-inverter/acl-ip-prefix.json
-    install -Dm644 ${../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-fake-inverter/acl-ip-prefix.schema.json
+    install -m644 ${../../../profiles/profiles}/*.json $out/share/modbus-fake-inverter/profiles/
+    install -Dm644 ${../../../extras/examples}/acl-ip-prefix.json $out/share/modbus-fake-inverter/acl-ip-prefix.json
+    install -Dm644 ${../../../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-fake-inverter/acl-ip-prefix.schema.json
     install -Dm644 examples/inverter.conf $out/share/modbus-fake-inverter/inverter.conf
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/

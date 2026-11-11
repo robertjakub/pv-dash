@@ -40,7 +40,7 @@ nix run .#modbus-fake-inverter   # fake inverter for development and testing
 
 The flake also exposes the packages (`nix build .#<name>`), an overlay and
 the NixOS service modules (`services.dashboard`, `services.modbus-scraper`,
-`services.modbus-cache`). **[docs/NIXOS.md](docs/NIXOS.md) is the one Nix
+`services.modbus-cache`). **[nixos/README.md](nixos/README.md) is the one Nix
 reference** — the modules, their option maps, the secrets discipline
 (`LoadCredential`), the reload/restart story and the hardening check.
 
@@ -48,10 +48,12 @@ reference** — the modules, their option maps, the secrets discipline
 
 ```
 pv-suite/
-├── dashboard/    # the dashboard web UI + proxy server (package + NixOS module)
-├── scraper/      # modbus-scraper exporter (package + NixOS module)
-├── cache/        # modbus-cache proxy (package + NixOS module)
-├── inverter/     # fake inverter + control clients (package, no service module)
+├── dashboard/    # the dashboard web UI + proxy server
+├── scraper/      # modbus-scraper exporter
+├── cache/        # modbus-cache proxy
+├── inverter/     # fake inverter + control clients (test/demo tool)
+├── nixos/        # the Nix tree: the packages (pkgs/<tool>/), the service
+│                 #   modules (modules/<tool>.nix) and the [Nix reference](nixos/README.md)
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))
 ├── common/       # the shared Python package — render/ runtime/ settings/ wire/ serve/ modbus/ ([docs](common/README.md))
 ├── tests/        # the test suites, one or more per Modbus tool
@@ -62,8 +64,7 @@ pv-suite/
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
-├── docs/         # the family-level docs: the [Nix reference](docs/NIXOS.md), the
-│                 #   [security audit](docs/AUDIT.md), the
+├── docs/         # the family-level docs: the [security audit](docs/AUDIT.md), the
 │                 #   [Modbus protocol reference](docs/common/MODBUS.md), the
 │                 #   [ACL map](docs/common/ACL.md) (who may connect, whose writes forward,
 │                 #   which registers a write may touch — family-wide), the

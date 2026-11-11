@@ -9,7 +9,7 @@
 # Wire-in: `rule_files: [/etc/prometheus/alerts/*.yml]` — the demo image
 # bakes it (docker/Dockerfile.prometheus); a NixOS Prometheus points
 # services.prometheus.ruleFiles at the packaged copy
-# (share/modbus-scraper/alerts.yml — docs/NIXOS.md). Thresholds assume
+# (share/modbus-scraper/alerts.yml — nixos/README.md). Thresholds assume
 # the default 10 s poll interval — tune them to yours. The exporter's
 # own death (the scrape itself failing) is the collector's stock
 # `up{job}` gauge and its scrape-failure hygiene, not this pack: this

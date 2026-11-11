@@ -9,7 +9,7 @@ stdenv.mkDerivation (finalAttrs: {
   pname = "dashboard";
   version = "0.4.2";
 
-  src = lib.cleanSource ./.;
+  src = lib.cleanSource ../../../dashboard;
 
   nativeBuildInputs = [ makeWrapper ];
 
@@ -26,29 +26,29 @@ stdenv.mkDerivation (finalAttrs: {
     install -dm755 $out/share/dashboard/lib
     install -m644 lib/*.py lib/defaults.json lib/options.json $out/share/dashboard/lib/
     install -dm755 $out/share/dashboard/common
-    install -m644 ${../common}/*.py $out/share/dashboard/common/
+    install -m644 ${../../../common}/*.py $out/share/dashboard/common/
     install -dm755 $out/share/dashboard/common/render
-    install -m644 ${../common}/render/*.py $out/share/dashboard/common/render/
+    install -m644 ${../../../common}/render/*.py $out/share/dashboard/common/render/
     install -dm755 $out/share/dashboard/common/runtime
-    install -m644 ${../common}/runtime/*.py $out/share/dashboard/common/runtime/
+    install -m644 ${../../../common}/runtime/*.py $out/share/dashboard/common/runtime/
     install -dm755 $out/share/dashboard/common/settings
-    install -m644 ${../common}/settings/*.py $out/share/dashboard/common/settings/
+    install -m644 ${../../../common}/settings/*.py $out/share/dashboard/common/settings/
     install -dm755 $out/share/dashboard/common/serve
-    install -m644 ${../common}/serve/*.py $out/share/dashboard/common/serve/
+    install -m644 ${../../../common}/serve/*.py $out/share/dashboard/common/serve/
     install -dm755 $out/share/dashboard/common/wire
-    install -m644 ${../common}/wire/*.py $out/share/dashboard/common/wire/
-    install -m644 ${../common}/wire/defaults.json $out/share/dashboard/common/wire/
+    install -m644 ${../../../common}/wire/*.py $out/share/dashboard/common/wire/
+    install -m644 ${../../../common}/wire/defaults.json $out/share/dashboard/common/wire/
     install -dm755 $out/share/dashboard/shared
-    install -m644 ${../shared}/texts.json $out/share/dashboard/shared/
-    install -m644 ${../shared}/tags.json $out/share/dashboard/shared/
+    install -m644 ${../../../shared}/texts.json $out/share/dashboard/shared/
+    install -m644 ${../../../shared}/tags.json $out/share/dashboard/shared/
     install -dm755 $out/share/dashboard/common/modbus
-    install -m644 ${../common}/modbus/*.py $out/share/dashboard/common/modbus/
-    install -m644 ${../common}/modbus/protocol.json $out/share/dashboard/common/modbus/
+    install -m644 ${../../../common}/modbus/*.py $out/share/dashboard/common/modbus/
+    install -m644 ${../../../common}/modbus/protocol.json $out/share/dashboard/common/modbus/
     cp -r static $out/share/dashboard/static
     install -Dm644 examples/config.js $out/share/dashboard/config.js
     install -Dm644 examples/server.conf $out/share/dashboard/server.conf
-    install -Dm644 ${../extras/examples}/acl-ip-prefix.json $out/share/dashboard/acl-ip-prefix.json
-    install -Dm644 ${../shared}/schema/acl-ip-prefix.schema.json $out/share/dashboard/acl-ip-prefix.schema.json
+    install -Dm644 ${../../../extras/examples}/acl-ip-prefix.json $out/share/dashboard/acl-ip-prefix.json
+    install -Dm644 ${../../../shared}/schema/acl-ip-prefix.schema.json $out/share/dashboard/acl-ip-prefix.schema.json
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/
 

@@ -93,8 +93,8 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.callPackage ./package.nix { };
-      defaultText = lib.literalExpression "pkgs.callPackage ./package.nix { }";
+      default = pkgs.callPackage ../pkgs/modbus-scraper/package.nix { };
+      defaultText = lib.literalExpression "pkgs.callPackage ../pkgs/modbus-scraper/package.nix { }";
       description = "The modbus-scraper package to run.";
     };
 

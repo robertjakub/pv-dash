@@ -20,10 +20,10 @@
           pkgs = nixpkgs.legacyPackages.${system};
         in
         {
-          dashboard = pkgs.callPackage ./dashboard/package.nix { };
-          modbus-scraper = pkgs.callPackage ./scraper/package.nix { };
-          modbus-cache = pkgs.callPackage ./cache/package.nix { };
-          modbus-fake-inverter = pkgs.callPackage ./inverter/package.nix { };
+          dashboard = pkgs.callPackage ./nixos/pkgs/dashboard/package.nix { };
+          modbus-scraper = pkgs.callPackage ./nixos/pkgs/modbus-scraper/package.nix { };
+          modbus-cache = pkgs.callPackage ./nixos/pkgs/modbus-cache/package.nix { };
+          modbus-fake-inverter = pkgs.callPackage ./nixos/pkgs/modbus-fake-inverter/package.nix { };
           default = self.packages.${system}.dashboard;
         }
       );
@@ -61,14 +61,19 @@
       });
 
       overlays = {
-        dashboard = final: _prev: { dashboard = final.callPackage ./dashboard/package.nix { }; };
-        default = self.overlays.dashboard;
+        pv-suite = final: _prev: {
+          dashboard = final.callPackage ./nixos/pkgs/dashboard/package.nix { };
+          modbus-scraper = final.callPackage ./nixos/pkgs/modbus-scraper/package.nix { };
+          modbus-cache = final.callPackage ./nixos/pkgs/modbus-cache/package.nix { };
+          modbus-fake-inverter = final.callPackage ./nixos/pkgs/modbus-fake-inverter/package.nix { };
+        };
+        default = self.overlays.pv-suite;
       };
 
       nixosModules = {
-        dashboard = import ./dashboard/module.nix;
-        modbus-scraper = import ./scraper/module.nix;
-        modbus-cache = import ./cache/module.nix;
+        dashboard = import ./nixos/modules/dashboard.nix;
+        modbus-scraper = import ./nixos/modules/modbus-scraper.nix;
+        modbus-cache = import ./nixos/modules/modbus-cache.nix;
         default = self.nixosModules.dashboard;
       };
     };

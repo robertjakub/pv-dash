@@ -539,18 +539,6 @@ Every scenario must end with the proxy alive and **zero tracebacks** in the
 logs — the hostile-upstream phase proves that per mode, including recovery
 when the device starts answering sanely again.
 
-## Nix / NixOS
-
-```bash
-nix run .#modbus-cache -- --upstream 192.168.1.100:5502
-```
-
-The package ships three binaries (`modbus-cache`, `modbus-cache-ctl`,
-`modbus-cache-cli`) plus the man pages under `share/man/man1/`. The
-**`services.modbus-cache`** NixOS module — the option map, the secrets
-discipline, the reload/restart story — is documented once in
-[docs/NIXOS.md](../docs/NIXOS.md).
-
 ## Source layout
 
 ```
@@ -564,8 +552,6 @@ cache/
 │   └── selection.json       # example selection: the essential monitoring set
 ├── schema/                  # the JSON Schema (draft 2020-12): the selection file
 ├── man/                     # the generated man pages (scripts/gen_man.py)
-├── module.nix               # the NixOS service module
-├── package.nix              # the package (the bins, the libs, the examples, the man pages)
 └── lib/
     ├── defaults.json     # the static constants: diagnostics block, log levels (the protocol
     ├── statics.py       #   limits live in common/modbus/protocol.json)

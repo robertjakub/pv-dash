@@ -1,3 +1,3 @@
 # Nix / NixOS
 
-{{#include ../../../docs/NIXOS.md}}
+{{#include ../../../nixos/README.md}}

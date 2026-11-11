@@ -1335,7 +1335,7 @@ try:
     # chain, checked at accept: a client off the ACL is closed without a reply
     r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:%d' % (15512 + BASE),
                         '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
-                        '--metrics-acl', 'file:' + os.path.join(REPO, 'examples', 'acl-ip-prefix.json')],
+                        '--metrics-acl', 'file:' + os.path.join(REPO, 'extras', 'examples', 'acl-ip-prefix.json')],
                        capture_output=True, text=True, timeout=60)
     check('metrics acl: the shipped ip-prefix example loads (dry-run)',
           r.returncode == 0 and 'dry-run: configuration and register map are valid' in (r.stdout + r.stderr),
@@ -1463,20 +1463,20 @@ try:
     r = ctl_cmd('show audit-max-mb', 15530 + BASE)
     check('audit rotate: show answers the configured MB', r == 'ok audit-max-mb=10', r)
     listing = '\n'.join([
-        '    audit-forward        also forward every audit line: the local syslog mirror or a remote collector (the off-box copy)',
-        '    audit-forward-format the remote forward\'s envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send',
-        '    audit-log            the audit trail\'s file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home',
-        '    no-audit-log         disable the audit trail entirely',
-        '    requests-audit       audit one REQUESTS tally per client per this many seconds',
-        '    rotate               the audit trail\'s rotation: the size trigger, the UTC-midnight trigger and the backup count'])
+        '    disable        disable the audit trail entirely',
+        '    forward        also forward every audit line: the local syslog mirror or a remote collector (the off-box copy)',
+        '    forward-format the remote forward\'s envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send',
+        '    log-file       the audit trail\'s file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home',
+        '    requests       audit one REQUESTS tally per client per this many seconds',
+        '    rotate         the audit trail\'s rotation: the size trigger, the UTC-midnight trigger and the backup count'])
     r = ctl_cmd('show audit', 15530 + BASE)
-    check('audit node: the listing answers the flat names under the namespace', r == 'ok ' + listing, r)
+    check('audit node: the listing answers the live words under the namespace', r == 'ok ' + listing, r)
     r = ctl_cmd('show audit rotate', 15530 + BASE)
     check('audit node: the walk answers the intermediate node in the same shape',
           r == 'ok ' + '\n'.join([
-              '    audit-daily  also rotate the audit trail at UTC midnight',
-              '    audit-files  the rotated audit backups kept',
-              '    audit-max-mb rotate the audit trail at this size in MB, 0 = no size rotation']), r)
+              '    daily    also rotate the audit trail at UTC midnight',
+              '    files    the rotated audit backups kept',
+              '    max-size rotate the audit trail at this size in MB, 0 = no size rotation']), r)
     r = ctl_cmd('help audit', 15530 + BASE)
     check('audit node: help answers the same listing', r == 'ok ' + listing, r)
     r = ctl_cmd('show modbus', 15530 + BASE)
@@ -1485,9 +1485,9 @@ try:
     r = ctl_cmd('show', 15530 + BASE)
     words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
-    check("bare show: the flat grammar's root (the gated word hidden while the dump is off)",
-          words == ['acl', 'audit', 'cache', 'cache-ttl', 'config', 'connections', 'control', 'dump',
-                    'knobs', 'limits', 'log-level', 'metrics', 'modbus', 'system',
+    check("bare show: the root in the console's own words (the gated word hidden while the dump is off)",
+          words == ['acl', 'audit', 'cache', 'config', 'connections', 'control', 'dump',
+                    'knobs', 'limits', 'metrics', 'modbus', 'system',
                     'uplink', 'version', 'write'],
           r[:220])
     r = ctl_cmd('set audit-max-mb 5', 15530 + BASE)
@@ -1548,7 +1548,7 @@ try:
     check('dump path: set live', r.startswith('ok dump-path=%s' % live_dump), r[:120])
     r = ctl_cmd('show dump', 15530 + BASE)
     check('bare show: the dump on, the interval word lists under the dump node (the dump/ grammar)',
-          'dump-interval' in r, r[:160])
+          'interval' in r, r[:160])
     r = ctl_cmd('request dump', 15530 + BASE)
     check('dump path: request dump writes the live path', r.startswith('ok dumped') and live_dump in r, r[:90])
     r = ctl_cmd('set dump-with-cache on', 15530 + BASE)
@@ -1970,8 +1970,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     r = ctl_cmd('help write-acl', 15532 + BASE)
     check('alias: help write-acl describes the row', r.startswith('ok write-acl -'), r[:80])
     r = ctl_cmd('show write', 15532 + BASE)
-    check('write node: the listing answers the flat names (the alias lists on the cli only)',
-          'write-registers' in r and 'write-registers-table' in r and 'write-acl' not in r, r[:200])
+    check('write node: the listing answers the live words (the alias lists on the cli only)',
+          'allow' in r and 'registers' in r and 'write-acl' not in r, r[:200])
 
     # the profile write acl: --write-registers profile compiles the device
     # profile's write-acl rule chain (the whitelist: the last matching rule
@@ -2304,7 +2304,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # and the ip-prefix reader takes it: the connect acl file the example ships
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
                         '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
-                        '--connect-acl', 'file:' + os.path.join(REPO, 'examples', 'acl-ip-prefix.json'),
+                        '--connect-acl', 'file:' + os.path.join(REPO, 'extras', 'examples', 'acl-ip-prefix.json'),
                         '--dry-run'],
                        capture_output=True, text=True, timeout=60)
     check('acl connect: the shipped ip-prefix example loads (dry-run)',

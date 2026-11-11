@@ -88,7 +88,7 @@ let
     (setLine "audit requests" (toString cfg.requestsAudit))
     ""
     "# --- the log surface ---"
-    (setLine "log-level" cfg.logLevel)
+    (setLine "system log-level" cfg.logLevel)
     (setLine "system log-access" (lib.boolToString cfg.logAccess))
     ""
     "# --- the state dump (write-behind) ---"

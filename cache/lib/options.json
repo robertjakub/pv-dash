@@ -236,7 +236,7 @@
       "live": "audit/requests", "setting-help": "audit one REQUESTS tally per client per this many seconds",
       "values": [ "off" ], "hint": "s|off", "value-help": { "off": "no per-client request tallies" }, "default": 300,
       "help": "audit one REQUESTS tally per client per this many seconds, 0 = off", "min": 1, "max": 86400 },
-    { "name": "log-level", "flag": "--log-level", "env": "LOG_LEVEL", "conv": "str", "live": "log-level",
+    { "name": "log-level", "flag": "--log-level", "env": "LOG_LEVEL", "conv": "str", "live": "system/log-level",
       "setting-help": "log verbosity", "value-help": { "DEBUG": "client traffic + per-poll detail",
                       "INFO": "lifecycle, control commands, writes",
                       "WARNING": "problems only",

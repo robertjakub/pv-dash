@@ -93,7 +93,6 @@ translate). The namespaces group them.
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `cache-ttl` | `set cache ttl` | settable | `s\|off` | `--cache-ttl` / `TTL` | per-register cache TTL: older entries are refetched |
-| `log-level` | `set log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
 
 ### acl
 
@@ -134,6 +133,7 @@ verbosity
 | `listen` | `set system listen` | settable (restart) | `HOST:PORT` | `--listen` / `LISTEN` | listen address HOST:PORT *(hidden)* |
 | `local-time` | `set system local-time` | settable | `on\|off` | `--local-time` / `LOCAL_TIME` | log timestamps in the system time zone instead of UTC |
 | `control-log-replies` | `set system log-replies` | settable | `on\|off` | `--control-log-replies` / — | DEBUG-log the full output of every control command (plainly: the command and its status log) |
+| `log-level` | `set system log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
 | `log-access` | `set system log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log client connects/disconnects at INFO instead of DEBUG *(hidden)* |
 
 ### control

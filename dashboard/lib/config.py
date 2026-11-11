@@ -79,7 +79,8 @@ def resolve_config(args, script_dir=None):
         'prom_prefix': prom_prefix,
         'static_dir': static_dir,
         'config_js': config_js,
-        'log_queries': resolve(args.log_queries, None, 'log_queries', DEFAULTS['log_queries'], str_to_bool),
+        'log_queries': resolve(args.log_queries or None, 'LOG_QUERIES', 'log_queries',
+                               DEFAULTS['log_queries'], str_to_bool),
         'log_access': resolve(args.log_access, 'LOG_ACCESS', 'log_access',
                               DEFAULTS['log_access'], str_to_bool),
         'local_time': resolve(getattr(args, 'local_time', None), 'LOCAL_TIME',
@@ -119,7 +120,7 @@ def resolve_config(args, script_dir=None):
     cfg['control_socket_group'] = resolve(getattr(args, 'control_socket_group', None), 'CONTROL_SOCKET_GROUP',
                                           'control_socket_group', DEFAULTS['control_socket_group'], str_to_bool)
     cfg['control_log_replies'] = resolve(getattr(args, 'control_log_replies', False) or None,
-                                         None, 'control_log_replies', False, str_to_bool)
+                                         'CONTROL_LOG_REPLIES', 'control_log_replies', False, str_to_bool)
     check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
     check_token_chars(cfg['control_token'], 'control_token')
     parse_listen(cfg['listen'])   # the serve address validates: HOST:PORT, the port in range

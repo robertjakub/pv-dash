@@ -12,7 +12,7 @@
       "setting-help": "the Modbus unit id the session speaks", "hint": "ID", "default": 1, "help": "Modbus unit id",
       "min": 1, "max": 247 },
     { "name": "timeout", "flag": "--timeout", "env": "TIMEOUT", "conv": "float", "live": "modbus/timeout",
-      "setting-help": "upstream Modbus connect/read timeout in seconds", "hint": "s", "default": 3.0,
+      "setting-help": "upstream Modbus connect/read timeout in seconds", "hint": "s",
       "help": "Modbus connect/read timeout in seconds", "min": 0, "max": 60 },
     { "name": "modbus-auth", "flag": "--modbus-auth", "env": "MODBUS_AUTH", "conv": "str", "live": "modbus/auth",
       "setting-help": "the auth scheme the cache's own Modbus clients must speak: suite (the crypt handshake) or none",

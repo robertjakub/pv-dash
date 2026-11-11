@@ -246,12 +246,14 @@ def bucket_key(live, nodes):
 
 def env_value_of(opt, raw, demo):
     """The sample value: the DEMO override (the image's own) else the
-    raw registry row's default — bools render on|off, floats %g, an
-    absent default renders empty (the secrets: pass a value or a
+    raw registry row's default — the wired row's static default answers
+    when the raw row carries none (the protocol tree's splice: the
+    `timeout` rows hand-copy no number) — bools render on|off, floats
+    %g, an absent default renders empty (the secrets: pass a value or a
     file:<path>)."""
     if opt.name in demo:
         return demo[opt.name]
-    d = raw.get('default')
+    d = raw.get('default', opt.static_default)
     if raw.get('conv') == 'bool':
         return 'on' if d in (True, 'on') else 'off'
     if d is None or d == '':

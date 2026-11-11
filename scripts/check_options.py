@@ -21,6 +21,7 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, REPO)
 
+from common.modbus.protocol import PROTOCOL
 from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 from common.settings.options import default_ops_verbs
 
@@ -234,6 +235,18 @@ def check_tool(tool):
         range_checked = 'UNIT_ID_RANGE' in tool_src
         rows.append((range_checked, '%s: the unit knob checks the shared unit-id range%s'
                      % (tool, '' if range_checked else ' — no UNIT_ID_RANGE check in lib/ or bin/')))
+    # the socket timeout's one home is the protocol tree: the tool's
+    # `timeout` knob (the Modbus one) takes its static default from
+    # PROTOCOL['socket_timeout'] — the loader splices it, the gate pins
+    # (a registry row hand-copying the number, or a loader missing the
+    # splice, drifts here)
+    timeout_row = next((o for o in options if o.name == 'timeout'), None)
+    if timeout_row is not None:
+        rows.append((timeout_row.static_default == PROTOCOL['socket_timeout'],
+                     "%s: the modbus timeout's default is the protocol tree's socket_timeout%s"
+                     % (tool, '' if timeout_row.static_default == PROTOCOL['socket_timeout']
+                        else ' — row: %r, tree: %r' % (timeout_row.static_default,
+                                                       PROTOCOL['socket_timeout']))))
     # the audit rotation bounds are the audit module's one constants — the
     # registries repeat them (the _gate_range reads the rows), never drift
     bad_bounds = sorted(o.name for o in options

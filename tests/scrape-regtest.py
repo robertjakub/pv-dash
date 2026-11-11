@@ -483,15 +483,18 @@ try:
     # 2c. fake extras: control server (runtime overrides) + chaos injection
     def ctl(cmd, port):
         # the JSON-lines control transport: one request object, one reply object
-        s = socket.create_connection(('127.0.0.1', port), timeout=5)
-        s.sendall((_json.dumps({'cmd': cmd}, ensure_ascii=False) + '\n').encode())
-        buf = b''
-        while not buf.endswith(b'\n'):
-            chunk = s.recv(65536)
-            if not chunk:
-                break
-            buf += chunk
-        s.close()
+        try:
+            s = socket.create_connection(('127.0.0.1', port), timeout=5)
+            s.sendall((_json.dumps({'cmd': cmd}, ensure_ascii=False) + '\n').encode())
+            buf = b''
+            while not buf.endswith(b'\n'):
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                buf += chunk
+            s.close()
+        except OSError as e:
+            return 'fail cannot reach control server at 127.0.0.1:%d: %s' % (port, e)
         # the first frame only: the daemon-exit bye can ride the same
         # segment on a shutdown (announce_exit)
         obj = _json.loads(buf.split(b'\n', 1)[0].decode('utf-8', 'replace'))
@@ -2552,6 +2555,13 @@ try:
               r.returncode == 0 and r.stdout.startswith('.TH %s 1' % title), r.stdout[:40] or r.stderr[-80:])
 except QuickDone:
     pass
+except KeyboardInterrupt:
+    print()
+    print('INTERRUPTED')
+    raise SystemExit(130)
+except Exception as e:
+    print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
+    failures.append('suite crashed: %s: %s' % (type(e).__name__, e))
 finally:
     for p in procs:
         p.kill()

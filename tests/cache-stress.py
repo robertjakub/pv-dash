@@ -153,6 +153,13 @@ try:
     b = txn(s, struct.pack('>BHH', 3, 32064, 2))               # known-value pass-through still works
     check('post-stress passthrough value correct', struct.unpack('>i', b[2:6])[0] == 4000)
     s.close()
+except KeyboardInterrupt:
+    print()
+    print('INTERRUPTED')
+    raise SystemExit(130)
+except Exception as e:
+    print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
+    errs.append('suite crashed: %s: %s' % (type(e).__name__, e))
 finally:
     for p in procs:
         p.kill()

@@ -71,8 +71,8 @@ try:
     s = conn()
     trickle_frame = struct.pack('>HHHB', 1, 0, 3, 1) + b'\x03\x20\x40'   # 9 bytes, len-3 frame
     for i in range(ITERATIONS):
-        if i and i % 500 == 0:
-            print('... %d of %d iterations' % (i, ITERATIONS))
+        if i and i % 100 == 0:
+            print('NOTE %d of %d iterations at %s' % (i, ITERATIONS, time.strftime('%Y-%m-%d %H:%M:%S %z')))
         k = rnd.random()
         try:
             if k < 0.30:                              # random garbage PDUs
@@ -128,6 +128,13 @@ try:
     check('every iteration handled (%d of %d)' % (done, ITERATIONS), done == ITERATIONS)
     check('no tracebacks in the proxy log', 'Traceback' not in open('/tmp/fuzz_cache.log').read())
     check('proxy still alive after the fuzz', procs[1].poll() is None)
+except KeyboardInterrupt:
+    print()
+    print('INTERRUPTED')
+    raise SystemExit(130)
+except Exception as e:
+    print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
+    failures.append('suite crashed: %s: %s' % (type(e).__name__, e))
 finally:
     for p in procs:
         p.kill()

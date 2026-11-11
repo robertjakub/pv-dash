@@ -496,4 +496,15 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except KeyboardInterrupt:
+        print()
+        print('INTERRUPTED')
+        raise SystemExit(130)
+    except Exception as e:
+        print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
+        if FAILURES:
+            print('FAILURES: %s' % FAILURES)

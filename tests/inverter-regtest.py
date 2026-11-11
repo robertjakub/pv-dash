@@ -1178,15 +1178,19 @@ def main():
                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                  text=True, env={**os.environ, 'CTL': msock})
         time.sleep(1.0)          # the banner + the prompt
-        p_cli.stdin.write('logout\n')
-        p_cli.stdin.flush()
+        closed = False
+        out = ''
         try:
-            p_cli.wait(timeout=5)
-            closed = True
-        except subprocess.TimeoutExpired:
-            closed = False
-            p_cli.kill()
-        out, _ = p_cli.communicate()
+            p_cli.stdin.write('logout\n')
+            p_cli.stdin.flush()
+            try:
+                p_cli.wait(timeout=5)
+                closed = True
+            except subprocess.TimeoutExpired:
+                p_cli.kill()
+            out, _ = p_cli.communicate()
+        except OSError as e:
+            out = 'broken pipe: %s' % e
         check('fake_cli: logout closes the session', closed and p_cli.returncode == 0
               and 'fake-inverter' in out, repr(out[-120:] if out else 'no output'))
 
@@ -1300,4 +1304,15 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except KeyboardInterrupt:
+        print()
+        print('INTERRUPTED')
+        raise SystemExit(130)
+    except Exception as e:
+        print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
+        if FAILURES:
+            print('FAILURES: %s' % FAILURES)

@@ -93,6 +93,8 @@ try:
     t0 = time.time()
     for i, f in enumerate(frames, 1):
         conn(f)                                    # steady fire
+        if i % 100 == 0:
+            print('NOTE %d of %d frames at %s' % (i, len(frames), time.strftime('%Y-%m-%d %H:%M:%S %z')))
         if i % 500 == 0:                            # periodic bursts of 50
             for _ in range(50):
                 conn(frames[random.randrange(len(frames))])
@@ -116,6 +118,13 @@ try:
     check('no tracebacks in fuzz log', 'Traceback' not in log)
     check('client errors logged as one-liners', 'ConnectionResetError: ' in log or 'Request timed out' in log
           or 'Bad request' in log or '400' in log, 'some client-error lines expected at DEBUG')
+except KeyboardInterrupt:
+    print()
+    print('INTERRUPTED')
+    raise SystemExit(130)
+except Exception as e:
+    print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
+    failures.append('suite crashed: %s: %s' % (type(e).__name__, e))
 finally:
     for p in procs:
         p.kill()

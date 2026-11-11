@@ -245,7 +245,7 @@ def main():
             check('fuzz: the right token authenticates', False, str(e))
 
         # 6b. the token as a file: reference: the fake reads it, the ctl authenticates
-        #     with it (the file must be owner-only 0600 — F12 in docs/AUDIT.md)
+        #     with it (the file must be owner-only 0600 — F12 in docs/SECURITY.md)
         open('/tmp/ctl_fuzz_token', 'w').write('filesecret\n')
         os.chmod('/tmp/ctl_fuzz_token', 0o600)
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15965 + BASE),

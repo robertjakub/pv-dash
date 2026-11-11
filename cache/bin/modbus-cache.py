@@ -154,7 +154,7 @@ def main():
     metrics_token = cfg['metrics_token']
     metrics_listen = parse_listen(cfg['metrics_listen'], '--metrics-listen')
     if cfg['metrics_server'] and not metrics_token and not is_loopback_host(metrics_listen[0]):
-        logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
+        logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/SECURITY.md): '
                      'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
                      % cfg['metrics_listen'])
         raise SystemExit(2)

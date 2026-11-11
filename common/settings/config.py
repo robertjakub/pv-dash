@@ -165,7 +165,7 @@ def check_control_tokens(token, ops_token, sep=': '):
 
 
 def check_token_file_mode(path, label='token-file'):
-    """The token-file discipline (F12 in docs/AUDIT.md): a token file must
+    """The token-file discipline (F12 in docs/SECURITY.md): a token file must
     be owner-only (0600) — a group- or world-accessible token file is
     refused before the read (a leaked file mode is a leaked token).
     os.stat follows symlinks, so a LoadCredential symlink is judged by its
@@ -578,7 +578,7 @@ def load_token_file(path, label='token-file'):
     LoadCredential or a plain key file — anything but the rendered ini,
     which lands world-readable in the store). The file must be owner-only
     (0600) — group/world-accessible token files are refused (F12 in
-    docs/AUDIT.md). Fails fast with a clean one-liner (so is a token that
+    docs/SECURITY.md). Fails fast with a clean one-liner (so is a token that
     silently vanishes)."""
     check_token_file_mode(path, label)
     try:

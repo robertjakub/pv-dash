@@ -1460,6 +1460,17 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
 
 ### Docs
 
+- **docs** — **AUDIT.md is SECURITY.md (rev. 28) — the one security
+  document**: the audit (the F-ledger unchanged since rev. 27) absorbs the
+  four tool READMEs' Security sections (which shrink to pointers under the
+  same `## Security` heading), a reporting-a-finding note, the one-screen
+  posture and the deployment-hardening + supply-chain/ACL summaries beside
+  the links (ACL.md, SBOM.md, nixos/README.md stay the mechanism
+  references); the citations follow the rename — the wire texts and the
+  refusal strings (`shared/texts.json`, the four `control.py`s, the bins),
+  the docstrings, the scripts (family_drift's F-ledger sweep reads the new
+  path), the extras packs, the book page — and `history/AUDIT.md` gains
+  the rev. 28 row.
 - **docs** — **AUDIT.md condensed to the current state (rev. 24)**: the
   revision history (rev. 1–24), the closed findings' fix/verification
   detail and the per-finding evidence move to the new

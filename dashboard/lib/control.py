@@ -135,7 +135,7 @@ class ControlServer(_ControlServer):
                     raise ValueError(str(e))
                 if not self.httpd.RequestHandlerClass.auth_token and not is_loopback_host(t[0]):
                     raise ValueError('listen cannot move beyond loopback while the page serves '
-                                     'without a token (F21 in docs/AUDIT.md) — pass auth-token by '
+                                     'without a token (F21 in docs/SECURITY.md) — pass auth-token by '
                                      'flag/env/config and restart')
                 self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
@@ -175,7 +175,7 @@ class ControlServer(_ControlServer):
                     host, _port = self.metrics_listen
                     if not is_loopback_host(host):
                         raise ValueError('the metrics endpoint serves the request counters: refusing to expose '
-                                         '/metrics beyond loopback without a token (F13 in docs/AUDIT.md) — '
+                                         '/metrics beyond loopback without a token (F13 in docs/SECURITY.md) — '
                                          'pass metrics-token by flag/env/config and restart, or bind '
                                          'metrics-listen on 127.0.0.1')
                 from .metrics import MetricsServer, describe_metrics

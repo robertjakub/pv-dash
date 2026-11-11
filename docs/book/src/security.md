@@ -1,3 +1,3 @@
-# Security audit
+# Security
 
-{{#include ../../../docs/AUDIT.md}}
+{{#include ../../../docs/SECURITY.md}}

@@ -6,7 +6,7 @@ streams and dashboards worth drawing, and what to alert on. Nothing here
 is loaded by any tool — `alerts/`' charter, Graylog flavour: the family
 emits, Graylog consumes.
 
-The trail it consumes is docs/AUDIT.md's: one KV line per event —
+The trail it consumes is docs/SECURITY.md's: one KV line per event —
 `<stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<12-hex>
 [message=<kv pairs>]` — carried **verbatim** inside every forward
 envelope, so chain verification (scripts/audit_verify.py) works
@@ -27,7 +27,7 @@ unit (System → Content packs → upload, then Install) and creates:
   `audit_tools` / `audit_tag` / `audit_type` / `audit_hash`, the simple
   message pairs `audit_result` / `audit_peer` / `audit_reason` /
   `audit_wire` / ... ride beside them (the reserved-key rule in
-  docs/AUDIT.md is what makes one flat namespace safe). `pv-suite audit
+  docs/SECURITY.md is what makes one flat namespace safe). `pv-suite audit
   cmd` picks the quoted value — `cmd='set pv 3000'` truncates under any
   space-split kv — into `audit_cmd`. `pv-suite audit gim` normalizes
   onto the Graylog Information Model (the next section). The pipeline
@@ -45,7 +45,7 @@ unit (System → Content packs → upload, then Install) and creates:
 
 The chain verification stays off-box: the pack does not watch the
 chain — the off-box verify is scripts/audit_verify.py over the
-collected file (the cron), the same three-tier story as docs/AUDIT.md.
+collected file (the cron), the same three-tier story as docs/SECURITY.md.
 
 The pack was written against the content-pack v3 schema and verified by
 inspection only (no Graylog on the dev machine) — a schema refusal on
@@ -132,7 +132,7 @@ pipeline parsing, the streams and dashboards key directly:
 ```
 
 Every `key=value` of the message becomes `_<key>` — the uniqueness rule
-(docs/AUDIT.md) is what makes that mapping safe. Recommendation: **GELF
+(docs/SECURITY.md) is what makes that mapping safe. Recommendation: **GELF
 for Graylog** (the structured trail is the whole point of the KV
 reformat), keep `rfc5424`/`cef` for the SIEMs that speak syslog.
 
@@ -178,13 +178,13 @@ field never matches) and the same names wear the `audit_` prefix
 - **the chain break** — NOT a Graylog search: the chain is stateful per
   writer tag, so the off-box verify is `scripts/audit_verify.py` over the
   collected file (the cron), and the collector pages on its FAIL line
-  (docs/AUDIT.md's three-tier story).
+  (docs/SECURITY.md's three-tier story).
 
 ## The layout (the alerts/ charter)
 
 Shipped content lands here as the operators copy it: the pipeline rule +
 the extractor JSON exports, the stream/dashboard definitions, the event
 definitions — each as the Graylog UI's own export shape, versioned with
-the trail grammar (docs/AUDIT.md gates the drift). The GELF format
+the trail grammar (docs/SECURITY.md gates the drift). The GELF format
 proposal rides the tool's `--audit-forward-format` — its wave lands the
 format, the README documents the input.

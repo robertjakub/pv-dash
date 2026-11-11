@@ -16,7 +16,7 @@ with `file:<path>` or a profile carries it embedded.
 The control-plane auth is NOT an ACL: the tokens, the RBAC ops role and
 the `trust-uids` list decide who may drive the control socket, and the
 suite auth (`modbus-auth`) is a wire-level proof between Modbus peers.
-Those stories live in docs/AUDIT.md and docs/common/MODBUS.md; the Related
+Those stories live in docs/SECURITY.md and docs/common/MODBUS.md; the Related
 section below maps the boundary.
 
 ## The surfaces (the family at a glance)
@@ -50,7 +50,7 @@ token shape beyond the loopback (the page's F21 closed it — rev. 21).
 
 The defaults come from each tool's registry rows (the `default` field —
 the static rung, docs/common/static-defaults.md); the authoritative
-per-surface detail is docs/AUDIT.md's surfaces table.
+per-surface detail is docs/SECURITY.md's surfaces table.
 
 ## The rule chain (the one semantics)
 
@@ -187,7 +187,7 @@ semantics (the ip must land in one network). The refusals log `connection
 rejected: … not on the connect ACL`, and the fake's ctl/cli carry the
 knob like the cache's. The fake takes NO `file:` gates and no chains — a
 test instrument on a trusted LAN keeps its soft-edge posture (F11 in
-docs/AUDIT.md); its write gate is `--allow-write` alone (off = every
+docs/SECURITY.md); its write gate is `--allow-write` alone (off = every
 Modbus write refused), with no IP write-acl and no register allow-list.
 Its /metrics listener is the family's other gate — `metrics-acl`, the
 full grammar with `file:` included (the /metrics row above).
@@ -230,7 +230,7 @@ The gate never replaces the bearer: `--auth-token`'s request-time check
 and F13's non-loopback refusal stand on top of it — the ACL decides who
 may connect, the token decides whether the scrape authenticates (an
 ACL'd but tokenless non-loopback listen still refuses to start;
-docs/AUDIT.md).
+docs/SECURITY.md).
 
 The control socket is NOT this gate — see below.
 
@@ -242,7 +242,7 @@ tools ride, live-rebindable via `set control port`, the target parsers
 unified in `common/settings/config.py`; the unix sockets are peer-cred), so
 no control surface carries an IP gate — an IP filter on loopback decides
 on the one address that always matches. The plane's admission story is
-the tokens + the signed wire + the RBAC roles (docs/AUDIT.md, F5). An
+the tokens + the signed wire + the RBAC roles (docs/SECURITY.md, F5). An
 explicit `acl/control` gate is sketched in docs/TODO.md's security
 section and earns its place the moment the control target learns to bind
 beyond loopback — until then the fake's tokenless-loopback TCP exemption
@@ -256,7 +256,7 @@ beyond loopback — until then the fake's tokenless-loopback TCP exemption
   docs/common/MODBUS.md.
 - **the control-plane auth** — the admin token, the read-only ops token
   and its verb set (the RBAC roles), the `trust-uids` peer-cred path, the
-  signed wire. docs/AUDIT.md.
+  signed wire. docs/SECURITY.md.
 - **the bearer token** — the request-time auth on the HTTP surfaces: the
   cache's /metrics, the scraper's, the dashboard's own /metrics and the
   fake's (all mandatory beyond loopback — F13's refusal; the loopback
@@ -265,7 +265,7 @@ beyond loopback — until then the fake's tokenless-loopback TCP exemption
   cookie, the raw header stays for scripts). The accept-time
    ACL decides who may connect, the bearer decides whether the request
    authenticates — both stack, neither replaces the other
-   (docs/AUDIT.md).
+   (docs/SECURITY.md).
 - **the connection caps** — `max-clients`, `client-timeout`,
   `max-conn-per-ip` (and the metrics triple): the DoS posture, applied
   beside the connect ACL, never instead of it — and always answered

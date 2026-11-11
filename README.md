@@ -64,7 +64,7 @@ pv-suite/
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
-├── docs/         # the family-level docs: the [security audit](docs/AUDIT.md), the
+├── docs/         # the family-level docs: the [security doc](docs/SECURITY.md), the
 │                 #   [Modbus protocol reference](docs/common/MODBUS.md), the
 │                 #   [ACL map](docs/common/ACL.md) (who may connect, whose writes forward,
 │                 #   which registers a write may touch — family-wide), the
@@ -121,14 +121,9 @@ documented in [`docker/README.md`](docker/README.md), the demo's
 topology diagram included. Both stacks ship authenticated: the Modbus
 hops prove a shared suite key (the PVA1/HMAC handshake, generated into
 the config volume), the exporter's `/metrics` and the dashboard's page
-ride generated bearer tokens. Every
-`/metrics` surface ships with the caps (`--metrics-max-clients`,
-`--metrics-client-timeout`, `--metrics-max-conn-per-ip`; the scraper's own
-are `--max-clients`/`--client-timeout`/`--max-conn-per-ip`), every HTTP
-surface refuses a non-loopback bind without a token (the F13 shape — the
-scraper's refusal is the family's golden master; the dashboard's page
-rides it too, F21), and the audit trails
-carry a per-writer hash chain verified by `scripts/audit_verify.py` (F10).
+ride generated bearer tokens — the family's whole security story (the
+posture, the caps, the audit trail and its F-ledger) is
+[docs/SECURITY.md](docs/SECURITY.md).
 
 ## License
 

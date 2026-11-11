@@ -41,7 +41,7 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN); a file:<path> value reads the first line of an owner-only 0600 file')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path, - for stdout, or none for no local file (the forward carries the trail); the XDG state home when unset")
     p.add_argument('--audit-forward', default='none', metavar='TARGET',
-                   help='also forward every audit line: none, syslog, syslog:/path, udp://host[:port] or tcp://host[:port] (the off-box copy, docs/AUDIT.md)')
+                   help='also forward every audit line: none, syslog, syslog:/path, udp://host[:port] or tcp://host[:port] (the off-box copy, docs/SECURITY.md)')
     p.add_argument('--audit-forward-format', default='rfc5424', choices=AUDIT_FORWARD_FORMATS,
                    help="the remote forward's envelope: rfc5424 (the default) or cef — the local syslog forms keep the verbatim send")
     p.add_argument('--audit-max-mb', type=float, default=audit_max_mb, help='rotate the audit log at this size, 0 = off')

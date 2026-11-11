@@ -1,4 +1,12 @@
-# Security audit — the pv-suite tree: /cache, /common, /dashboard, /docker, /inverter, /profiles, /scraper, /scripts (rev. 27)
+# Security — the pv-suite tree (rev. 28)
+
+This is the family's **one security document**: the posture, the trust
+boundaries, the implemented controls, the per-tool stories, the audit
+findings and the supply-chain claim. The mechanism references of their own
+stay separate and are linked where they answer a security question —
+[common/ACL.md](common/ACL.md) (the ACL grammar), [sbom/SBOM.md](sbom/SBOM.md)
+(the supply chain), [../nixos/README.md](../nixos/README.md) (the NixOS
+hardening and the option map).
 
 Scope: the `cache/`, `scraper/`, `inverter/` and `dashboard/` subprojects plus
 the shared `common/` package, `profiles/`, `docker/` and `scripts/`. Method:
@@ -10,11 +18,39 @@ verification of the suspicious paths found. This is a design-and-code audit,
 not a penetration test. The `inverter/` fake is a test device simulator —
 its risk class is "developer/demo infrastructure", not production OT;
 findings there are weighted accordingly. Findings keep their numbers across
-revisions; the open ones are in §3.1 — every closed finding's fix and
+revisions; the open ones are in § 8.1 — every closed finding's fix and
 verification, and the per-revision walk, live in
-[history/AUDIT.md](history/AUDIT.md) (next number: F24).
+[history/AUDIT.md](history/AUDIT.md) (next number: F24). Rev. 28 is the
+consolidation: docs/AUDIT.md became this file and absorbed the four tool
+READMEs' Security sections; the F-ledger itself is unchanged since rev. 27.
 
-## 1. Assets and trust boundaries
+## 1. Reporting a finding
+
+Found something? Open a security advisory on the repository (the GitHub
+Security tab) instead of a public issue. The suite is homelab-grade and
+answers are best-effort; the audit re-runs after every new listener or file
+format, and at least yearly otherwise (§ 11).
+
+## 2. The posture in one screen
+
+- **Refuse by default** — writes quadruple-gated and closed; TCP control
+  refuses to start without a token; every HTTP surface refuses a
+  non-loopback bind without a token (the fake exempt by posture, § 5).
+- **Loopback by default** — every listener binds 127.0.0.1; widening the
+  bind is a deliberate act.
+- **Authenticating** — bearer tokens (constant-time), the signed wire
+  (HMAC both directions wherever a token is held), peer-cred on the unix
+  control sockets, the read-only ops role, the PVA1 suite handshake on the
+  Modbus hops.
+- **Capped** — per-IP and total connection caps on every serving surface,
+  MBAP/read-count/line bounds, the wire paths fuzzed.
+- **Accountable** — the append-only, hash-chained audit trail with the
+  off-box forward; secrets never log and never render.
+- **Hard to ship wrong** — stdlib only, 0600 token files enforced by the
+  shared loader, explicit socket modes, hardened systemd units,
+  unprivileged containers that drop root before exec.
+
+## 3. Assets and trust boundaries
 
 | Directory | What | Trust boundary / controls | Findings |
 |---|---|---|---|
@@ -58,7 +94,7 @@ register allow-list `write-registers` — **none by default**), so enabling
 `--allow-write` alone still refuses every write. The fake's write path is
 the intended demo feature, gated by control-server access only.
 
-## 2. Implemented controls (all modules)
+## 4. Implemented controls (all modules)
 
 - **Access control** — the four independent write gates
   (`proxy.py` `respond()`); control TCP requires the token and a token-less
@@ -185,9 +221,83 @@ the intended demo feature, gated by control-server access only.
   the session cookie, the `?auth=<token>` bootstrap), the default bind
   `127.0.0.1`, a token-less non-loopback bind refuses to start (F21).
 
-## 3. Findings
+## 5. The four tools
 
-### 3.1 Open findings
+**modbus-cache** — the production-relevant surface. Modbus TCP as spoken by
+the SUN2000 inverter has no auth, no encryption and no access control:
+anyone who can reach the listen port can read. The proxy therefore binds
+127.0.0.1 by default; widen the bind deliberately, keep it on a trusted
+LAN, and don't expose it to the internet. The ACLs add per-source control
+within the LAN; for stricter isolation use the firewall. The write path is
+gated four times and defaults fully closed — enabling `--allow-write`
+alone still refuses every write (§ 3, § 4).
+
+**modbus-scraper** — the privacy note is the scraper's security story
+(F15): the endpoint exposes production values, not telemetry — the current
+PV generation, the home consumption, the battery state of charge and the
+per-phase voltages/currents. A week of that is a home-occupancy profile —
+when the house is producing, when it draws, when nobody is home. The
+controls are the bearer token (mandatory beyond loopback — a token-less
+non-loopback bind refuses to start, F13) and the localhost bind (the
+default). Treat the endpoint as internal: do not publish it, and scope any
+reverse proxy that frontends it.
+
+**dashboard** — the F21 story is the bind's: loopback is open, the LAN
+needs the bearer token (a token-less non-loopback bind refuses to start),
+and TLS terminates at an authenticating reverse proxy. The page is fully
+offline (the vendored ECharts is the one dependency) and the audit trail
+records the control plane; static-only deployments expose the bare page —
+put auth in front.
+
+**modbus-fake-inverter** — a test instrument on a trusted LAN, deliberately
+*not* security-first design (F11): the Modbus surface speaks to any peer
+that can reach the port, `/metrics` serves without a token unless
+`--metrics-token` is set, and the control plane is plain-text by posture —
+a demo harness. The blunt mitigations are shipped: the caps, the
+read-count gate against oversized replies, the optional `--modbus-auth
+suite` handshake and the `--metrics-acl` IP gate for demos that want them.
+Synthetic data only — nothing served is measured from a real device; there
+is no PII and no production telemetry to protect.
+
+## 6. Deployment hardening
+
+The docker images run the tools as the unprivileged `pvsuite` user on
+alpine; the shared entrypoint runs as root **only** to seed the `/config`
+volume (bundled defaults copied in, existing files kept, `*.token`
+materialized as random 0600 values) and drops to `pvsuite` via `su-exec` —
+root exists for the seeding, never for the exec. The compose demo sits on
+one `internal: true` network and publishes nothing on the host; the prod
+stack fronts real hardware with your own external collector. The
+topologies and the env-file rules: [../docker/README.md](../docker/README.md).
+
+The NixOS modules sandbox every service (`DynamicUser`, `NoNewPrivileges`,
+`ProtectSystem=strict`, `PrivateTmp`, `LoadCredential` and the
+`SystemCallFilter`/`RestrictAddressFamilies` set), verified with
+`systemd-analyze security` (a score per unit asserted by
+`tests/hardening.nix`); the option map, the secrets discipline and the
+reload/restart story: [../nixos/README.md](../nixos/README.md).
+
+## 7. Supply chain and ACLs
+
+The suite is **Python stdlib only** — no pip, no venv, no vendored Python
+packages, no runtime network fetches. The third-party surface is exactly
+three items wide: the Python interpreter, the container base images (where
+docker is used) and the dashboard's vendored ECharts. The machine-readable
+claim (CycloneDX), import-scan-gated and release-checked:
+[sbom/SBOM.md](sbom/SBOM.md).
+
+The two ACL planes — who may reach a listener (the IP plane) and which
+registers a forwarded write may touch (the register plane) — speak one
+gate-object schema with two matcher kinds; the grammar, the per-tool knobs
+and the enforcement map: [common/ACL.md](common/ACL.md). The control-plane
+auth is NOT an ACL: the tokens, the RBAC ops role and the `trust-uids`
+list decide who may drive the control socket (§ 4), and the Modbus
+`modbus-auth` handshake is a wire-level proof between peers
+([common/MODBUS.md](common/MODBUS.md)).
+
+## 8. Findings
+
+### 8.1 Open findings
 
 | # | Module | Severity | Finding | Recommendation |
 |---|---|---|---|---|
@@ -196,20 +306,20 @@ the intended demo feature, gated by control-server access only.
 | F15 | scrape | INFO | The metrics expose production values (generation, consumption, battery SoC) — a home-occupancy privacy consideration. | the bearer token (F13) + the localhost bind are the controls; treat the endpoint as internal. |
 | F17 | docker | INFO | The `/config` volume holds live config in plaintext; the entrypoint seeds copies once (existing files are never refreshed); the generated `metrics.token` lives in the same volume. | prefer token files outside the volume / `LoadCredential` / secret-backed mounts; document `docker compose down -v` as the re-sync. |
 
-### 3.2 Closed
+### 8.2 Closed
 
 Every closed finding — F2–F13, F16, F18–F23 — with its fix, its
-verification and the per-revision walk (rev. 1–27):
+verification and the per-revision walk (rev. 1–28):
 [history/AUDIT.md](history/AUDIT.md).
 
-## 4. Verification
+## 9. Verification
 
 All ten suites print ALL PASS on the revised tree; `nix flake check`,
 `scripts/check_options.py` + `scripts/lint_options.py --check` clean; the
 man pages regenerate (`mandoc -Tlint` clean). The per-finding verification
 and the per-revision walk-throughs: [history/AUDIT.md](history/AUDIT.md).
 
-## 5. NIS2 / DORA mapping (all modules; cache is the production-relevant one)
+## 10. NIS2 / DORA mapping (all modules; cache is the production-relevant one)
 
 | Requirement | Status | Where |
 |---|---|---|
@@ -246,7 +356,7 @@ route set, the caps, the bearer gate; no TLS); DORA 11 — partial (no
 request-level access log by default, `--log-access`); DORA 12 — yes (a
 stateless viewer, restart-clean; Prometheus holds the history).
 
-## 6. Verdict
+## 11. Verdict
 
 The posture is sound for the deployment class the tools target (an
 operational/home LAN behind segmentation): refuse-by-default writes (closed

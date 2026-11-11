@@ -134,7 +134,7 @@ set system listen 127.0.0.1:8080
 # set auth token file:/path/to/page.token   (mandatory beyond loopback, F21)
 set upstream http://localhost:9090
 set prom-prefix /prom
-set log-level INFO
+set system log-level INFO
 ```
 
 `--prom-prefix ''` (empty) proxies *every* unmatched path to Prometheus.
@@ -187,7 +187,7 @@ python3 bin/dashboard-cli.py                        # the console: TAB completio
 
 | Command | Effect |
 |---|---|
-| `set` / `clear` | the live settings: the caps, `log-access`, `log-queries`, `log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — `system listen` (the serve address, `show listen` answers it) is startup-only and answers the restart note like the tokens (`control token`, `control ops token`, `metrics token`, `auth token`): pass them by flag/env/config |
+| `set` / `clear` | the live settings: the caps, `system log-access`, `log-queries`, `system log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — `system listen` (the serve address, `show listen` answers it) is startup-only and answers the restart note like the tokens (`control token`, `control ops token`, `metrics token`, `auth token`): pass them by flag/env/config |
 | `show <setting>` / `show knobs` / `show connections` | the value / the registry / the live HTTP clients per peer IP |
 | `inspect` | the one-page dump for a bug report |
 | `request reload-config` | re-read `server.conf` (the SIGHUP path; the listen address and port are bound and stay) |
@@ -265,13 +265,10 @@ so the scraper can share it with other tools:
 
 ## Security
 
-The F21 story is the bind's: **loopback is open, the LAN needs the
-bearer token** (a token-less non-loopback bind refuses to start), and
-TLS terminates at an authenticating reverse proxy. The HTTP surface
-carries the family's connection caps. The page is **fully offline** (the
-vendored ECharts is the one dependency) and the audit trail records the
-control plane. Static-only deployments expose the bare page — put auth in
-front.
+Loopback is open, the LAN needs the bearer token (a token-less
+non-loopback bind refuses to start, F21), and TLS terminates at an
+authenticating reverse proxy. The full story is
+[docs/SECURITY.md](../docs/SECURITY.md).
 
 ## Testing
 

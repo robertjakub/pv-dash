@@ -56,7 +56,7 @@ The sweep types — what we are sweeping:
    command word and canon phrase grepped against tests/*.py — the
    uncovered-promise list. Word-match honesty: a name inside another
    word counts, the suites are prose too.
-10. THE F-LEDGER SWEEP. docs/AUDIT.md's F-numbers vs the tree: which
+10. THE F-LEDGER SWEEP. docs/SECURITY.md's F-numbers vs the tree: which
     tools' files cite each F, and the F's title. The promise ledger
     against the code.
 11. THE STATICS SWEEP. The four lib/defaults.json blocks (the non-knob
@@ -674,7 +674,7 @@ are prose too — a name inside another word counts as covered; the
 list is the TODO seed, not a verdict."""
 
 FLEDGER_HEAD = """\
-## The F-ledger sweep — docs/AUDIT.md vs the tree
+## The F-ledger sweep — docs/SECURITY.md vs the tree
 
 Each F-number's title from the audit doc, and which of the family's
 files cite it — the promise ledger against the code."""
@@ -884,7 +884,7 @@ The findings:
   citations are the audit doc itself has no enforcement markers in
   the tree (either the F is enforced in code without a marker — add
   the marker — or it is not enforced — the ledger lies). The F-suffix
-  convention (the code comments cite `F13 in docs/AUDIT.md`) is the
+  convention (the code comments cite `F13 in docs/SECURITY.md`) is the
   family's traceability habit; the sweep keeps it honest."""
 
 STATICS_FINDINGS = """\
@@ -1018,10 +1018,10 @@ def seed_guard(fresh):
 
 
 def f_ledger():
-    """docs/AUDIT.md's F-numbers: the §3 tables' rows (| F1 | module |
+    """docs/SECURITY.md's F-numbers: the §3 tables' rows (| F1 | module |
     severity | finding |) give the title (the finding's first clause);
     the whole-tree files citing each."""
-    p = os.path.join(REPO, 'docs', 'AUDIT.md')
+    p = os.path.join(REPO, 'docs', 'SECURITY.md')
     fs = {}
     order = []
     for line in open(p, encoding='utf-8', errors='replace'):
@@ -1080,7 +1080,7 @@ def emit():
     ap('   ports against the registries.')
     ap('9. **The suite-coverage sweep** — the promises (knobs, commands,')
     ap('   canon phrases) grepped against the tests.')
-    ap('10. **The F-ledger sweep** — docs/AUDIT.md\'s F-numbers vs the')
+    ap('10. **The F-ledger sweep** — docs/SECURITY.md\'s F-numbers vs the')
     ap('    tree\'s enforcement markers.')
     ap('11. **The statics sweep** — the four defaults.json blocks by')
     ap('    key-path.')

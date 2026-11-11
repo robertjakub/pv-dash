@@ -12,7 +12,7 @@ F8/F12 pattern — the dump is config-equivalent trust at rest: the settings
 re-apply through the live validation, so the umask never gets a vote). Every
 dump carries a sha256 integrity hash of its canonical content; a restore
 recomputes it and refuses edited, truncated, foreign or pre-hash dumps (fail
-closed — F18 in docs/AUDIT.md), and a group/world-writable dump is refused
+closed — F18 in docs/SECURITY.md), and a group/world-writable dump is refused
 outright: whoever can write the dump holds config trust, so the write bits
 stay owner-only.
 

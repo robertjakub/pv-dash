@@ -3,7 +3,7 @@
 The home for content **nothing in the repo's build or runtime path
 consumes**: the family emits, the external system consumes. Each child
 dir is one integration pack, self-documented, versioned with the
-surface it feeds (the audit-trail packs gate on docs/AUDIT.md's
+surface it feeds (the audit-trail packs gate on docs/SECURITY.md's
 grammar).
 
 ## The dirs

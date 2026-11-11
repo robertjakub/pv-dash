@@ -180,7 +180,7 @@ socket, where root, the daemon's own user and the `--control-trust-uids`
 peers skip the handshake (`SO_PEERCRED`). The wire, the roles and the
 secrets discipline are the family's — see
 [docs/common/ACL.md](../docs/common/ACL.md) (the control-plane row) and the audit's F5/F9/F12
-in [docs/AUDIT.md](../docs/AUDIT.md).
+in [docs/SECURITY.md](../docs/SECURITY.md).
 
 The **read-only ops role**: a daemon may carry a second token
 (`--control-ops-token`) beside the admin one; its sessions may run the
@@ -509,18 +509,10 @@ journalctl -u modbus-cache | grep -i 'not on'                 # ACL rejections
 
 ## Security
 
-Modbus TCP (as spoken by the SUN2000 inverter and this proxy) has no auth,
-no encryption and no access control — **anyone who can reach the listen
-port can read** inverter registers. The proxy therefore **binds to
-127.0.0.1 by default**; widen the bind deliberately, keep it on a trusted
-LAN, and don't expose it to the internet. The ACLs add per-source control
-within the LAN; for stricter isolation use the firewall. Writes are gated
-four times and default closed (see [Access control](#access-control)).
-
-`--max-clients` (default **64**) caps simultaneous clients (each is a
-thread) and `--client-timeout` (default **300 s**) reaps clients that died
-without closing. The control server binds loopback (TCP) or a `0600` unix
-socket. Python is memory-safe, all request sizes bounds-checked and fuzzed.
+Modbus TCP has no auth, no encryption and no access control — the proxy
+binds 127.0.0.1 by default and the write path defaults fully closed. The
+full story — the four write gates, the ACLs, the caps, the audit trail —
+is [docs/SECURITY.md](../docs/SECURITY.md).
 
 ## Testing
 

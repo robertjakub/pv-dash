@@ -1,5 +1,5 @@
 # The pv-suite alert rules pack — the exporter's half (alerts/scraper.yml).
-# The detection half of the audit vocabulary (docs/AUDIT.md F16): every
+# The detection half of the audit vocabulary (docs/SECURITY.md F16): every
 # alert names the audit events and the log lines it correlates with, so a
 # fired page tells the operator where the trail lives. One rule file per
 # watched exporter: this one watches the modbus-scraper's own poll story

@@ -106,7 +106,7 @@ def validate_config(cfg):
     listen_host, _listen_port = parse_listen(cfg['listen'])
     check_hostname(listen_host, 'listen')
     if not is_loopback_host(listen_host) and not cfg['auth_token']:
-        raise SystemExit('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
+        raise SystemExit('refusing to expose /metrics beyond loopback without a token (F13 in docs/SECURITY.md): '
                          'listen = %r — set --auth-token (or file:<path>) or bind 127.0.0.1:PORT' % cfg['listen'])
     control_port = str(cfg.get('control_port') or '').strip()
     if control_port.isdigit() and control_port != '0' and int(control_port) <= 65535 and not cfg.get('control_token'):

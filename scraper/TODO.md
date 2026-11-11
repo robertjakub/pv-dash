@@ -204,7 +204,7 @@ the same day); the shipped example is `examples/acl-ip-prefix.json`, its
 JSON Schema `schema/acl-ip-prefix.schema.json` (`scripts/lint_acl.py`'s
 bare run globs the scraper's acl files too), and F13's non-loopback
 refusal stands on top of the gate (the ACL layers the who over the what,
-docs/AUDIT.md rev. 19).
+docs/SECURITY.md rev. 19).
 
 The re-namespace completion: the wire settings speak the family's path
 shapes (`set metrics interval`, `set modbus timeout`, `set metrics limits …`,

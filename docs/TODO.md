@@ -30,7 +30,7 @@ only the **Done/history** records for their tool —
 ## The security wave (the audit follow-ups)
 
 - **the remaining audit findings** `[cache]` `[scraper]` `[inverter]`
-  `[docker]` — the open set (per [AUDIT.md](AUDIT.md) rev. 27): F17
+  `[docker]` — the open set (per [SECURITY.md](SECURITY.md) rev. 28): F17
   (the volume secrets), F14 (TLS — the item below), F15 (INFO — the
   bearer token + the localhost bind are the controls, the scraper
   README carries the privacy note), F1 (accepted); re-run the audit
@@ -144,7 +144,7 @@ only the **Done/history** records for their tool —
   flake.lock refresh, the verification, the commit, the annotated tag —
   signed when a key exists — and the push) plus the tag-triggered
   workflow, which is the release's cutter now (**F19 closed**,
-  docs/AUDIT.md rev. 5): the local gate defaults to `--tests full`, the GH
+  docs/SECURITY.md rev. 5): the local gate defaults to `--tests full`, the GH
   release is the workflow's `needs: [test, build]`-gated job and the local
   cut is the opt-in `--release`. Watch the first few flights, then retire
   the training wheels.
@@ -285,7 +285,7 @@ only the **Done/history** records for their tool —
   ctl/cli clients; the loader discipline (0600 F12, fail-fast, the
   SIGHUP re-read) is unchanged, the user-facing secret strings say "by
   flag/env, or as `file:<path>`", and the NixOS modules + the compose
-  stack render the reference form. The audit wave is docs/AUDIT.md
+  stack render the reference form. The audit wave is docs/SECURITY.md
   rev. 13.
 - **the state machinery, family-wide** — the three remaining control
   servers gained `dump_settings`/`apply_dump_settings`, the settings
@@ -314,7 +314,7 @@ only the **Done/history** records for their tool —
   values); the cache gained the whole-daemon `reload` (the overrides to
   `<config>.reload`, re-exec, re-apply once — the restart-marked knobs
   take their configured values) and the live control-plane rebind/token
-  rotation; docs/AUDIT.md rev. 9 walked it (F23 raised and closed: the
+  rotation; docs/SECURITY.md rev. 9 walked it (F23 raised and closed: the
   reload state file is 0600 explicitly).
 - **the env-prefix retirement** — the env twins are the knobs' bare
   upper-snake names (`HOST`, `PORT`, `LISTEN`, `CTL`, `CONTROL_TOKEN`,
@@ -362,7 +362,7 @@ only the **Done/history** records for their tool —
   (`role=ops`/`role=admin` in the COMMAND entries). (The record's
   `--control-ops-token-file` spelling died with the `-file` removal —
   `file:` inside the plain token is the spelling.) The per-tool records name the flag/env forms; the audit wave
-  is docs/AUDIT.md rev. 7 (F22 raised and closed with it).
+  is docs/SECURITY.md rev. 7 (F22 raised and closed with it).
 - **the metrics endpoint wave** — the caps (max-clients/client-timeout/
   max-conn-per-ip) on every HTTP + Modbus surface, the fake's and the
   cache's endpoints live-togglable (`metrics-server` + `--metrics-listen`),

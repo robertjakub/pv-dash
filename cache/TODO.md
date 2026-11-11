@@ -149,7 +149,7 @@ and shortened (965 → ~430 lines) — the Nix/NixOS section moved to
 `module.nix`: the README's had gone stale — it predated the metrics ACL,
 the dump knobs and the control-plane options), and the family-wide
 stories (the ACL grammar, the Modbus handshake, the audit chain
-mechanics) now point at docs/common/ACL.md / docs/common/MODBUS.md / docs/AUDIT.md
+mechanics) now point at docs/common/ACL.md / docs/common/MODBUS.md / docs/SECURITY.md
 instead of re-running them.
 
 The metrics/acl family wave: the cache rides along — the default
@@ -173,7 +173,7 @@ not whenever on** — the startup refusal, the live `metrics/enable on`,
 the live `metrics/token` off and the restart-marked `metrics/listen`'s
 pending check all fire only for a non-loopback bind without a token; the
 loopback default serves tokenless (the scraper's F13 refusal is the
-family's golden master; F6's mandatory-when-on retires — docs/AUDIT.md
+family's golden master; F6's mandatory-when-on retires — docs/SECURITY.md
 rev. 20 records the move on the closure).
 
 The show-status removal: **`show status` is gone** (nothing replaces it) —
@@ -410,7 +410,7 @@ vocabulary is public, the value is not).
 
 The reload wave: the whole-daemon `reload` verb — the live overrides save
 to `<config>.reload` (created **0600 explicitly**: the file is
-config-equivalent trust at rest, docs/AUDIT.md rev. 9's F23), the process
+config-equivalent trust at rest, docs/SECURITY.md rev. 9's F23), the process
 re-execs with the same argv, the fresh start re-resolves the config (the
 `restart: true` knobs take their configured values) and re-applies the
 saved overrides once, consuming the file (a state older than two minutes

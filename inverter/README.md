@@ -224,7 +224,7 @@ form is legitimate here in a way it never is on the daemons.
 | `control port` / `control token` / `control ops token` / `control ops verbs` / `control trust-uids` / `control socket-group` | — | the control plane's live knobs (the listener rebinds, the tokens rotate, the socket re-modes) |
 | `dump path` / `dump restore-on-start` / `dump-interval` | — | the state dump's file, its restore mark, the automatic rewrite interval |
 | `register` / `coil` / `discrete` | `set register <addr> <value>` etc. | the write-overlay emulation: raw register / coil / discrete-input pins (`reset` clears, `show registers` marks them) |
-| `profile` / `log-level` | `<file>` / level | swap the register-map profile live / the live log level |
+| `profile` / `log-level` | `<file>` / level | swap the register-map profile live / the live log level (`set system log-level`) |
 
 The commands and settings — including their descriptions — live in the one
 option registry (`lib/options.json`) that both the control server and the
@@ -362,20 +362,9 @@ file is flushed per event.
 
 > **The fake is a development tool — run it on a trusted, LAN-isolated
 > network.** It is deliberately *not* security-first design (the audit's
-> F11): the Modbus surface speaks to any peer that can reach the port, the
-> `/metrics` serves without a token unless `--metrics-token` is set, and
-> the control plane is plain-text by design — a demo harness. The blunt
-> mitigations the audit asks for are shipped: the caps (`--max-clients`,
-> `--client-timeout`, both tunable live), the read-count gate against
-> oversized replies, the optional `--modbus-auth suite` handshake and
-> `--metrics-acl` IP gate for demos that want them.
-
-- **Minimal supply chain.** Python standard library only — the SBOM is two
-  lines (python + alpine in the container).
-- **Auditable by default.** The append-only audit trail above, on unless
-  explicitly disabled.
-- **Synthetic data only.** Nothing served is measured from a real device;
-  there is no PII and no production telemetry to protect.
+> F11). The full story — the caps, the optional `--modbus-auth suite`
+> handshake, the supply-chain claim — is
+> [docs/SECURITY.md](../docs/SECURITY.md).
 
 ## Testing
 

@@ -18,7 +18,7 @@ rotated backups, oldest first), recomputes each prefix's chain and names the
 line where it breaks. The chain is tamper-EVIDENT: any edited, reordered or
 deleted middle entry breaks it; trailing deletion and a full rechain by
 someone holding the algorithm are outside its reach. The stronger answers
-are BUILT IN as the trail's three tiers (docs/AUDIT.md): the local chain,
+are BUILT IN as the trail's three tiers (docs/SECURITY.md): the local chain,
 the local mirror (audit/forward = syslog — journald's sealed copy on the
 same box) and the off-box copy (audit/forward = udp:// or tcp:// — a line
 that left the box before an attacker arrived cannot be touched from it).

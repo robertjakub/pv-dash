@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression test for the audit trail's hash chain (docs/AUDIT.md F10):
+"""Regression test for the audit trail's hash chain (docs/SECURITY.md F10):
 every entry carries a short hash right after the event name, chaining to the
 writer's previous entry,
 and scripts/audit_verify.py detects tampering (an edited

@@ -6,7 +6,7 @@ CHANGELOG's Unreleased section, (optionally) refresh flake.lock, verify
 (the suites + the nix build), commit with the expanded note, tag
 (annotated, signed when a key exists — the bare X.Y.Z the suite has
 always used) and push. The GitHub release is the tag-triggered workflow's
-job (it gates on the suites + the nix build first — docs/AUDIT.md F19);
+job (it gates on the suites + the nix build first — docs/SECURITY.md F19);
 pass --release to cut it locally and skip that gate.
 
     python3 scripts/release.py 0.4.2               # the full flight
@@ -206,7 +206,7 @@ def main():
     ap.add_argument('--no-push', action='store_true', help='commit + tag locally, no push')
     ap.add_argument('--release', action='store_true',
                     help='cut the GitHub release locally (default: the tag-triggered '
-                         'workflow cuts it after its CI gate — docs/AUDIT.md F19)')
+                         'workflow cuts it after its CI gate — docs/SECURITY.md F19)')
     a = ap.parse_args()
     new = parse_version(a.version)
     old = old_version()

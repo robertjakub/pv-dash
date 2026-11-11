@@ -311,12 +311,12 @@ def main():
                                  '--metrics-listen')
     metrics_acl, metrics_acl_warn = resolve_metrics_acl(cfg.get('metrics_acl') or 'any', 'metrics-acl')
     if cfg['metrics_server'] and not metrics_token and not is_loopback_host(metrics_listen[0]):
-        logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
+        logger.error('refusing to expose /metrics beyond loopback without a token (F13 in docs/SECURITY.md): '
                      'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
                      % (cfg.get('metrics_listen') or DEFAULTS['metrics_listen']))
         raise SystemExit(2)
     if not cfg['auth_token'] and not is_loopback_host(listen_host):
-        logger.error('refusing to expose the page beyond loopback without a token (F21 in docs/AUDIT.md): '
+        logger.error('refusing to expose the page beyond loopback without a token (F21 in docs/SECURITY.md): '
                      'listen = %r — set --auth-token (or file:<path>) or bind 127.0.0.1' % cfg['listen'])
         raise SystemExit(2)
     metrics_desc = 'off'

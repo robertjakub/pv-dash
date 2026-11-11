@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Concurrent-connection gate shared by the serving surfaces (docs/AUDIT.md
+"""Concurrent-connection gate shared by the serving surfaces (docs/SECURITY.md
 F11/F13): a total client cap and a per-peer-IP cap, both 0 = no limit. The
 servers call admit(ip) at accept and release(ip) when the connection is
 done — refusals never count. One implementation for the family: the Modbus

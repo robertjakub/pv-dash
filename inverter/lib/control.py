@@ -309,7 +309,7 @@ class ControlServer(_ControlServer):
                     from common.settings.config import is_loopback_host
                     if not is_loopback_host(fake.metrics_listen[0]):
                         raise ValueError('refusing to expose /metrics beyond loopback without a token '
-                                         '(F13 in docs/AUDIT.md) — pass metrics-token by flag/env/config '
+                                         '(F13 in docs/SECURITY.md) — pass metrics-token by flag/env/config '
                                          'and restart, or bind 127.0.0.1:PORT')
                 srv = MetricsServer(sim, chaos, fake, self, fake.metrics_listen, token=fake.metrics_token,
                                     max_clients=fake.metrics_caps[0], client_timeout=fake.metrics_caps[1],

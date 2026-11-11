@@ -1,5 +1,5 @@
 # The pv-suite alert rules pack — the cache's half (alerts/cache.yml).
-# The detection half of the audit vocabulary (docs/AUDIT.md F16): every
+# The detection half of the audit vocabulary (docs/SECURITY.md F16): every
 # alert names the audit events and the log lines it correlates with, so a
 # fired page tells the operator where the trail lives. This one watches
 # the modbus-cache's side (the modbus_cache_* gauges): poll down, age

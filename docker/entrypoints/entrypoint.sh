@@ -25,7 +25,7 @@ for src in /pv-suite/config-defaults/*; do
                 # A token default is materialized, not copied: the first seed
                 # generates a random value (the bundled file is a placeholder
                 # and never reaches the volume). Owner-only 0600 — the F12
-                # discipline in docs/AUDIT.md.
+                # discipline in docs/SECURITY.md.
                 umask 077
                 od -An -N24 -tx1 /dev/urandom | tr -d ' \n' > "$dst"
                 umask "$umask_old"

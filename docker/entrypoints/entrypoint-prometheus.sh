@@ -2,7 +2,7 @@
 # The demo Prometheus's entrypoint: wait for the metrics bearer token in
 # the shared config volume (the modbus-scraper's entrypoint seeds it —
 # a random value, 0600, owner pvsuite), copy it for the prometheus user
-# (0600 — the token-file discipline, F12 in docs/AUDIT.md, the same rule the
+# (0600 — the token-file discipline, F12 in docs/SECURITY.md, the same rule the
 # file: references enforce), then exec
 # prometheus unprivileged via su-exec. Runs as root only for that
 # handoff; prometheus never runs as root.

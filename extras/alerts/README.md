@@ -1,6 +1,6 @@
 # alerts — the family's Prometheus rule pack
 
-The detection half of the audit vocabulary ([docs/AUDIT.md](../docs/AUDIT.md)
+The detection half of the audit vocabulary ([docs/SECURITY.md](../docs/SECURITY.md)
 F16): one rule file per watched exporter, every alert naming the audit
 events and the log lines it correlates with, so a fired page tells the
 operator where the trail lives. No tool loads these files — the consumer

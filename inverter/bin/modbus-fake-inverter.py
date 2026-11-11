@@ -280,7 +280,7 @@ def main():
     if args.metrics_server and metrics_token is None:
         from common.settings.config import is_loopback_host
         if not is_loopback_host(metrics_listen[0]):
-            raise SystemExit('refusing to expose /metrics beyond loopback without a token (F13 in docs/AUDIT.md): '
+            raise SystemExit('refusing to expose /metrics beyond loopback without a token (F13 in docs/SECURITY.md): '
                              'listen = %r — set --metrics-token (or file:<path>) or bind 127.0.0.1:PORT'
                              % args.metrics_listen)
     if args.dump_path and not dump_key:

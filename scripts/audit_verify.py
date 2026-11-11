@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the audit trails' hash chains (docs/AUDIT.md F10): every entry
+"""Verify the audit trails' hash chains (docs/SECURITY.md F10): every entry
 carries a short chained hash in its hash= token —
 `<stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<hash>
 [message=<detail>]` — chained to the writer's previous entry: h =

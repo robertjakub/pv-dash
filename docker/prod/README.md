@@ -149,7 +149,7 @@ collector's pull are the two routes through:
   `share/modbus-scraper/alerts.yml` (the cache package carries
   `share/modbus-cache/alerts.yml`) — list them under your
   Prometheus's `rule_files:` and the audit vocabulary's alerts ride
-  along (docs/AUDIT.md F16).
+  along (docs/SECURITY.md F16).
 - **the `config` volume** — mounted by the three Modbus services and
   the dashboard: the required file artifacts live there (the JSON
   specs, `config.js`); `/config/metrics.token` and

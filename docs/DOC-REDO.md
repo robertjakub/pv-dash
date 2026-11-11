@@ -14,7 +14,7 @@ walk).
 
 | family | the current half | the history half |
 |---|---|---|
-| the security audit | [AUDIT.md](AUDIT.md) — the open findings, the implemented controls, the posture, the NIS2/DORA map | [history/AUDIT.md](history/AUDIT.md) — the closed findings with fix + verification, the per-revision walk |
+| the security doc | [SECURITY.md](SECURITY.md) — the open findings, the implemented controls, the posture, the NIS2/DORA map | [history/AUDIT.md](history/AUDIT.md) — the closed findings with fix + verification, the per-revision walk |
 | the family drift | [family-drift.md](family-drift.md) (GENERATED) — the census, the open findings, the open remediation | [history/family-drift.md](history/family-drift.md) — the landed legs, the prose catch-ups, the growth rule |
 | the changelog | the root [CHANGELOG](../CHANGELOG.md) — Unreleased + the current release | [history/CHANGELOG.md](history/CHANGELOG.md) — the release archive (`scripts/release.py` maintains the split) |
 | the TODOs | [TODO.md](TODO.md) — the open items only | the per-tool `TODO.md` files — the Done records, newest first |
@@ -65,7 +65,7 @@ run, and `--check` fails a stale page.
 
 2. **The retired-vocabulary hunt** in the HAND-written docs (the
    READMEs, docs/common/ACL.md, docs/common/MODBUS.md, nixos/README.md, docs/TODO.md,
-   docs/AUDIT.md) — targeted greps for the vocabularies that died:
+   docs/SECURITY.md) — targeted greps for the vocabularies that died:
    retired commands (`show settings`), retired flags (`--host`,
    `--port`, the `-file` siblings), retired env prefixes
    (`MCH_`/`SCR_`/`INV_`/`DSH_`), retired paths (`scrape/`,
@@ -82,7 +82,7 @@ run, and `--check` fails a stale page.
    paragraphs, docs/history/*, the CHANGELOG's released halves) get
    pointers; present-tense claims get fixed. Status claims
    (an F-number open or closed, a knob live or startup-only) check
-   against the authority doc — docs/AUDIT.md owns the F-status, the
+   against the authority doc — docs/SECURITY.md owns the F-status, the
    registries own the knobs.
 
 5. **The line-number rule**: prose cites code by FILE + FUNCTION name

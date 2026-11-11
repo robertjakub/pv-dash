@@ -105,7 +105,7 @@
       ],
       "data": {
         "title": "pv-suite audit",
-        "description": "Parses the family audit line (docs/AUDIT.md) into audit_* fields.",
+        "description": "Parses the family audit line (docs/SECURITY.md) into audit_* fields.",
         "source": "pipeline \"pv-suite audit\"\nrule \"pv-suite audit kv\"\nrule \"pv-suite audit cmd\"\nrule \"pv-suite audit gim\"\nend\n",
         "connected_streams": [
           {

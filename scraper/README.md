@@ -79,7 +79,7 @@ set caps max-pv 6
 set caps max-grid 12
 set system listen 127.0.0.1:9350
 set metrics interval 10
-set log-level INFO
+set system log-level INFO
 ```
 
 | Flag | Default | Meaning |
@@ -131,7 +131,7 @@ in flags:
 
 | Signal | Effect |
 |---|---|
-| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, caps, the device profile, auth token (+ file re-read = rotation), client limits, the Modbus auth scheme/key and the upstream take effect immediately. An invalid value keeps the previous settings. The listen address and `metrics.json` need a restart (`log-level` is live — `set log-level`). |
+| `SIGHUP` | **Reload the configuration** without dropping the exporter: poll interval, caps, the device profile, auth token (+ file re-read = rotation), client limits, the Modbus auth scheme/key and the upstream take effect immediately. An invalid value keeps the previous settings. The listen address and `metrics.json` need a restart (`log-level` is live — `set system log-level`). |
 | `SIGTERM` / `SIGINT` | **Graceful shutdown** with a session summary (duration + poll-error count). |
 
 ### The control server
@@ -151,14 +151,14 @@ python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
 The wire (the signed frames, the peer-cred trusted peers, the read-only
 ops role, the F5 token rule) is the family's — one paragraph per piece in
 [docs/common/ACL.md](../docs/common/ACL.md) (the control-plane row) and
-[docs/AUDIT.md](../docs/AUDIT.md); a token value never renders back
+[docs/SECURITY.md](../docs/SECURITY.md); a token value never renders back
 (`show <secret>` refuses). Every command and knob the wire answers —
 command, settable (`set`/`clear`) or show-only — is tabled in
 [MANUAL.md](MANUAL.md) (generated from the registry). The commands:
 
 | Command | Effect |
 |---|---|
-| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `log-access`, `log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
+| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `system log-access`, `system log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
 | `poll now` | the loop wakes immediately |
 | `show connections` | the live HTTP clients of /metrics |
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |
@@ -204,7 +204,7 @@ The family's **alert rules pack** lives at
 [`alerts/`](../extras/alerts/README.md) — one rule file per watched exporter;
 this exporter's half is [`alerts/scraper.yml`](../extras/alerts/scraper.yml),
 the cache's half (`alerts/cache.yml`) ships with the cache package. The
-pack is the audit vocabulary's detection half (docs/AUDIT.md F16): every
+pack is the audit vocabulary's detection half (docs/SECURITY.md F16): every
 alert names the audit events and the log lines it correlates with, so a
 fired page tells the operator where the trail lives. Two groups, one per
 exporter:
@@ -338,15 +338,11 @@ chaos injection. Both regression suites start it automatically.
 
 ## Security
 
-The privacy note is the scraper's security story (the audit's F15): the
-endpoint exposes **production values, not telemetry** — the current PV
-generation, the home consumption, the battery state of charge and the
-per-phase voltages/currents. A week of that is a **home-occupancy
-profile** — when the house is producing, when it draws, when nobody is
-home. The controls are the **bearer token** (`--auth-token`, mandatory
-beyond loopback — a token-less non-loopback bind refuses to start, F13)
-and the **localhost bind** (the default). Treat the endpoint as internal:
-do not publish it, and scope any reverse proxy that frontends it.
+The endpoint exposes **production values, not telemetry** — a week of it
+is a home-occupancy profile (the privacy note, F15): the bearer token
+mandatory beyond loopback (F13), the localhost bind by default, the
+endpoint internal. The full story is
+[docs/SECURITY.md](../docs/SECURITY.md).
 
 ## Testing
 

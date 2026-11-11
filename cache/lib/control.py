@@ -176,7 +176,7 @@ class ControlServer(_ControlServer):
                     self.probe_bind(t, key)
                     if p.metrics_srv is not None and not p.metrics_token and not is_loopback_host(t[0]):
                         raise ValueError('metrics-listen cannot move beyond loopback while the endpoint '
-                                         'serves without a token (F13 in docs/AUDIT.md) — '
+                                         'serves without a token (F13 in docs/SECURITY.md) — '
                                          'pass metrics-token by flag/env/config and restart')
                 self.defaults[key] = '%s:%d' % t
                 return self.defaults[key]
@@ -317,7 +317,7 @@ class ControlServer(_ControlServer):
                     host, _port = p.metrics_listen
                     if not is_loopback_host(host):
                         raise ValueError('the metrics endpoint serves register values: refusing to expose '
-                                         '/metrics beyond loopback without a token (F13 in docs/AUDIT.md) — '
+                                         '/metrics beyond loopback without a token (F13 in docs/SECURITY.md) — '
                                          'pass metrics-token by flag/env/config and restart, or bind '
                                          'metrics-listen on 127.0.0.1')
                 srv = MetricsServer(p, p.metrics_listen, token=p.metrics_token,

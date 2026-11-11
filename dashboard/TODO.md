@@ -195,14 +195,14 @@ the raw Bearer header stays for scripts; the default `--bind` is
 scraper's F13 shape is the family's golden master). The demo compose
 rides a generated `page.token`; the NixOS module gained
 `authToken`/`authTokenFile`. The /metrics F6 posture moved to the F13
-shape in the same sweep (docs/AUDIT.md rev. 20-21).
+shape in the same sweep (docs/SECURITY.md rev. 20-21).
 
 The F13 conformance: **the /metrics token is mandatory beyond loopback,
 not whenever on** — the startup refusal, the live `metrics-server on`
 and the live `metrics/token` off fire only for a non-loopback bind
 without a token; the loopback default serves tokenless (the scraper's
 F13 refusal is the family's golden master; F6's mandatory-when-on
-retires — docs/AUDIT.md rev. 20 records the move on the closure).
+retires — docs/SECURITY.md rev. 20 records the move on the closure).
 
 The show-status removal: **`show status` is gone** (nothing replaces it) —
 the registry row, the dispatch branch and the key=value report body die;

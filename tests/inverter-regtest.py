@@ -22,6 +22,7 @@ if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh
     sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
              'a standalone run shares /tmp scratch and collides across sessions)')
 SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
+os.makedirs(SCRATCH, exist_ok=True)   # the CI legs set a fixed path the battery never made
 print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
 
 PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \

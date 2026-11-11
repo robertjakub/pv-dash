@@ -17,19 +17,23 @@
 #   scripts/battery.sh <suite> ...    # explicit names, e.g. cache-regtest inverter-regtest
 #   scripts/battery.sh --stop ...     # the flag may sit anywhere: the first FAILED suite ends the run — the tally marks the rest SKIPPED
 #
-# Every run works inside its own dedicated dir: /tmp/pvbattery/<run-id>/
+# Every run works inside its own dedicated dir: <root>/<run-id>/ where the
+# root is ~/.local/state/pvbattery (XDG_STATE_HOME respected — the state
+# home the family's audit trails already use; /tmp would lose the eta
+# history and the failed-run backups to the reboot/periodic cleaners, and
+# the one-time migration moves them over)
 # (the suites' /tmp scratch is rewritten into it, and TMPDIR points there
 # too, so the tempfile users land inside the run dir as well — only the
 # daemon-derived unix sockets stay at /tmp/modbus-*.socket, their paths
 # are the daemons' own constants). The live handles: a run holding a
 # port slot gets slots/slot<N> -> its run dir, so a concurrent battery
-# reads `tail -f /tmp/pvbattery/slots/slot2/status.txt`. The link dies
+# reads `tail -f ~/.local/state/pvbattery/slots/slot2/status.txt`. The link dies
 # with the run — the exit trap frees it; a battery killed outright
 # (SIGKILL, no trap) gets its link swept and its status.txt NOTE'd by
 # the next start's housekeeping. Four port slots: four concurrent
 # batteries max. The run dirs keep the newest 8 — the four a live
 # battery can hold plus the newest history (the newest finished run is
-# simply the newest dir — ls -1dt /tmp/pvbattery/2* | head -1) — and
+# simply the newest dir — ls -1dt ~/.local/state/pvbattery/2* | head -1) — and
 # the eta history lives in eta/<profile>.txt.
 #
 # One suite at a time within a run; a suite's verdict = its own ALL PASS
@@ -39,7 +43,16 @@
 # post-mortem).
 
 cd "$(dirname "$0")/.." || exit 1
-LOGROOT=/tmp/pvbattery
+LOGROOT=${XDG_STATE_HOME:-$HOME/.local/state}/pvbattery
+# the one-time /tmp migration: the battery lived at /tmp/pvbattery until
+# the state home (the reboot and the periodic cleaners ate the eta history
+# and the failed-run backups there)
+if [ -d /tmp/pvbattery ]; then
+  mkdir -p $LOGROOT
+  for d in /tmp/pvbattery/eta /tmp/pvbattery/backups /tmp/pvbattery/2*; do
+    [ -d "$d" ] && [ ! -e "$LOGROOT/$(basename "$d")" ] && mv "$d" "$LOGROOT/$(basename "$d")"
+  done
+fi
 mkdir -p $LOGROOT/slots $LOGROOT/eta
 # the one-time eta migration: the history files lived at the root as
 # eta-<profile>.txt before the eta/ dir

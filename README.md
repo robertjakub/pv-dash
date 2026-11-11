@@ -69,8 +69,9 @@ pv-suite/
 │                 #   [security doc](docs/SECURITY.md), the
 │                 #   [Modbus protocol reference](docs/common/MODBUS.md), the
 │                 #   [ACL map](docs/common/ACL.md), the [knob census](docs/OPTIONS.md), the
-│                 #   [family-wide TODO](docs/TODO.md) + the [one-product sweep](docs/family-unify.md),
-│                 #   the [SBOM](docs/sbom/SBOM.md) and the history home
+│                 #   [family-wide TODO](docs/TODO.md) (every open item — the one-product
+│                 #   sweep rides as its section), the
+│                 #   [SBOM](docs/sbom/SBOM.md) and the history home
 │                 #   ([docs/history/](docs/history) — the audit/changelog/drift/unify
 │                 #   archives behind the current halves)
 ├── CHANGELOG.md  # Unreleased + the current release (the history lives in docs/history/CHANGELOG.md)

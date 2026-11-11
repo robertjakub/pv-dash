@@ -41,9 +41,11 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   filed by grain, and the docs redo fused in — the map and the redo
   were two indexes of the same set) rides the book beside the index
   with the OPTIONS include page, and the root README's docs/ tree
-  slims to it; family-unify's verified-aligned ledger moves to the
-  history half (`docs/history/family-unify.md`, the current/history
-  split rule — the families table now rows five); the generated-docs
+  slims to it; family-unify retires into the TODO — the one-product
+  sweep rides as TODO.md's own theme section (the short list, the
+  three planes, the gates that keep it, verbatim), the verified-aligned
+  ledger stays the history half (`docs/history/family-unify.md`) and
+  the current/history split rule holds; the generated-docs
   inventory hands to scripts/README.md (which gains the missing
   gen_env.py bullet + the page/generator/gate table); the two
   MODBUS.md citation repairs (the pre-move `docs/ACL.md` spelling, the

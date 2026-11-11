@@ -30,7 +30,7 @@ and as a full pass whenever a wave landed doc ripples across tools.
 |---|---|
 | the mechanism specs (the shared core) | [common/MODBUS.md](common/MODBUS.md) (the protocol, the profiles, the auth), [common/ACL.md](common/ACL.md) (the gates), [common/static-defaults.md](common/static-defaults.md) (the defaults ladder + the gate) |
 | the security ledger | [SECURITY.md](SECURITY.md) — the open findings, the posture, the NIS2/DORA map; the closed half in [history/AUDIT.md](history/AUDIT.md) (the closed findings with fix + verification, the per-revision walk) |
-| the ledgers (open vs history) | [TODO.md](TODO.md) — the open items only, the per-tool `TODO.md` files keep the Done records; [family-unify.md](family-unify.md) + [history/family-unify.md](history/family-unify.md) (the verified-aligned ledger, do not re-open); the generated [family-drift.md](family-drift.md) (the census + the open findings) + [history/family-drift.md](history/family-drift.md) (the landed legs) |
+| the ledgers (open vs history) | [TODO.md](TODO.md) — the open items (the one-product sweep rides as its section) + the per-tool `TODO.md` Done records; [history/family-unify.md](history/family-unify.md) — the sweep's verified-aligned ledger (do not re-open); the generated [family-drift.md](family-drift.md) (the census + the open findings) + [history/family-drift.md](history/family-drift.md) (the landed legs) |
 | the generated family views | [OPTIONS.md](OPTIONS.md) (the knob census) beside family-drift.md — the generators + gates in [scripts/README.md](../scripts/README.md) |
 | the release history | the root [CHANGELOG](../CHANGELOG.md) (Unreleased + the current release), [history/CHANGELOG.md](history/CHANGELOG.md) (the archive — `scripts/release.py` maintains the split) |
 | the maintenance | this page's redo (below), [scripts/README.md](../scripts/README.md) (the gates + the editors) |
@@ -88,7 +88,7 @@ release.
 
 2. **The retired-vocabulary hunt** in the HAND-written docs (the
    READMEs, docs/DESIGN.md, docs/common/, nixos/README.md,
-   docs/TODO.md, docs/family-unify.md, docs/SECURITY.md) — targeted
+   docs/TODO.md, docs/SECURITY.md) — targeted
    greps for the vocabularies that died:
    retired commands (`show settings`), retired flags (`--host`,
    `--port`, the `-file` siblings), retired env prefixes

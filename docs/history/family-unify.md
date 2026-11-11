@@ -1,9 +1,9 @@
 # The family-unify history — the verified alignments
 
-The record behind [family-unify.md](../family-unify.md): the main doc
-keeps only the open items — what still breaks the one-product promise.
-The verified-aligned ledger (the swept-and-closed alignments, do not
-re-open) moves here as it grows. Newest first.
+The record behind the one-product sweep ([TODO.md](../TODO.md)'s
+section — the sweep's open items live there since the file folded
+into the TODO): the verified-aligned ledger (the swept-and-closed
+alignments, do not re-open) moves here as it grows. Newest first.
 
 ## The verified-aligned ledger (swept 2026-11-10, re-verified 2026-11-11)
 

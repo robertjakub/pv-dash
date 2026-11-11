@@ -16,5 +16,5 @@ implementation serves to all four tools
   static rung's one home and the gate that keeps it.
 
 The per-tool surfaces live in the tools' own READMEs and MANUALs; the
-family ledgers ([TODO.md](../TODO.md),
-[family-unify.md](../family-unify.md)) sit at the docs root.
+family-wide ledger ([TODO.md](../TODO.md) — every open item including
+the one-product sweep, one file) sits at the docs root.

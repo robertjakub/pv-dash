@@ -280,9 +280,11 @@ def resolve_config(args, script_dir=None):
     cfg['audit_forward_format'] = resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
                                           'audit_forward_format', DEFAULTS['audit_forward_format'], str)
     cfg['audit_max_mb'] = resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
-                                  'audit_max_mb', DEFAULTS['audit_max_mb'], float, row=OPT['audit-max-mb'])
+                                  'audit_max_mb', DEFAULTS['audit_max_mb'], float, row=OPT['audit-max-mb'],
+                                  strict_bounds=True)
     cfg['audit_files'] = resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
-                                 'audit_files', DEFAULTS['audit_files'], int, row=OPT['audit-files'])
+                                 'audit_files', DEFAULTS['audit_files'], int, row=OPT['audit-files'],
+                                 strict_bounds=True)
     cfg['audit_daily'] = resolve(getattr(args, 'audit_daily', False) or None,
                                  'AUDIT_DAILY', 'audit_daily', DEFAULTS['audit_daily'], str_to_bool)
     cfg['no_audit_log'] = resolve(getattr(args, 'no_audit_log', False) or None,

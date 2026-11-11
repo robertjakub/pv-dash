@@ -225,6 +225,15 @@ class ControlServer(_ControlServer):
             s.client.auth = v
             s.client.close()   # the next poll reconnects — and handshakes when suite is on
             return v or 'none'
+        if key == 'max-clients':   # the F13 cap: the one httpd's client gate (the metrics-max-clients row shares the cfg key)
+            v = numi(val, 'max-clients', 'clients')
+            self._gate_range(key, v)
+            if not self.httpd:
+                raise ValueError('no http server attached')
+            with s.lock:
+                s.cfg['max_clients'] = v
+            self.httpd.gate.max_total = v
+            return '%d' % v
         if key == 'metrics-max-clients':
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)

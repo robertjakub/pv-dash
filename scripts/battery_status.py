@@ -175,9 +175,9 @@ def render():
 
 def main():
     ap = argparse.ArgumentParser(description="the battery's live view (read-only)")
-    ap.add_argument('--watch', action='store_true',
+    ap.add_argument('-w', '--watch', action='store_true',
                     help='loop with the screen cleared per tick (default: one show)')
-    ap.add_argument('--interval', type=float, default=None, metavar='SECONDS',
+    ap.add_argument('-i', '--interval', type=float, default=None, metavar='SECONDS',
                     help='the watch period in seconds (default 1; implies --watch)')
     a = ap.parse_args()
     interval = a.interval if a.interval is not None else 1.0

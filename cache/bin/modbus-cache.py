@@ -25,7 +25,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.runtime.audit import audit_params_of, build_audit, default_path as default_audit_path, load_audit_tags
+from common.runtime.audit import audit_params_of, build_audit, default_path as default_audit_path, load_audit_tags, audit_quote
 from common.settings.config import is_loopback_host, parse_control_target, parse_listen, parse_upstream
 from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, parse_ops_verbs, setup_logging, \
     install_signal_handlers as install_family_signals
@@ -234,9 +234,9 @@ def main():
     if audit:
         audit.event('START', 'version=%s upstream=%s:%d unit=%d listen=%s:%d control=%s profile=%s'
                     % (version_string(), cfg['host'], cfg['port'], cfg['unit'], listen_host, listen_port,
-                       'off' if control_target is None else
-                       ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target),
-                       cfg['selection'] or cfg['profile']))
+                       audit_quote('off' if control_target is None else
+                                   ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target)),
+                       audit_quote(cfg['selection'] or cfg['profile'])))
         if proxy.write_gate_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
             audit.event('ACL-FILE', proxy.write_gate_warn)
         for warn in (proxy.connect_acl_warn, proxy.write_acl_warn, proxy.metrics_acl_warn):

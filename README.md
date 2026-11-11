@@ -64,14 +64,13 @@ pv-suite/
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
-├── docs/         # the family-level docs: the [security doc](docs/SECURITY.md), the
-│                 #   [Modbus protocol reference](docs/common/MODBUS.md), the
-│                 #   [ACL map](docs/common/ACL.md) (who may connect, whose writes forward,
-│                 #   which registers a write may touch — family-wide), the
-│                 #   [family-wide TODO](docs/TODO.md) (every open item, one file — the
-│                 #   per-tool TODOs keep the Done history), the [SBOM](docs/sbom/SBOM.md),
-│                 #   the release-history archive + the history home
-│                 #   ([docs/history/](docs/history) — the audit/changelog/drift
+├── docs/         # the family-level docs, filed by grain in the
+│                 #   [architecture map](docs/ARCHITECTURE.md): the [security doc](docs/SECURITY.md),
+│                 #   the [Modbus protocol reference](docs/common/MODBUS.md), the
+│                 #   [ACL map](docs/common/ACL.md), the [knob census](docs/OPTIONS.md), the
+│                 #   [family-wide TODO](docs/TODO.md) + the [one-product sweep](docs/family-unify.md),
+│                 #   the [SBOM](docs/sbom/SBOM.md), the history home
+│                 #   ([docs/history/](docs/history) — the audit/changelog/drift/unify
 │                 #   archives behind the current halves) and the
 │                 #   [docs redo workflow](docs/DOC-REDO.md)
 ├── CHANGELOG.md  # Unreleased + the current release (the history lives in docs/history/CHANGELOG.md)

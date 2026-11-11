@@ -36,6 +36,22 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ### Changed
 
+- **docs** — **the doc set consolidates (one home per story)**: the
+  architecture map (`docs/ARCHITECTURE.md` — the shape in one screen,
+  every doc filed by grain) rides the book beside the index with the
+  OPTIONS include page, and the root README's docs/ tree slims to the
+  map; family-unify's verified-aligned ledger moves to the history
+  half (`docs/history/family-unify.md`, the current/history split rule
+  — DOC-REDO's families table rows the fifth family); DOC-REDO hands
+  the generated-docs inventory to scripts/README.md (which gains the
+  missing gen_env.py bullet + the page/generator/gate table); the two
+  MODBUS.md citation repairs (the pre-move `docs/ACL.md` spelling, the
+  OPTIONS.md relative link that breaks out of `docs/common/`); the
+  cache README's access-control section collapses its three tellings
+  to their homes (the flag table owns the defaults + the inline
+  grammar, docs/common/ACL.md owns the family rules) — the ACL.md
+  pointer and the cache's four-gates shape stay.
+
 - **nixos** — **the Nix tree gets its own home under `nixos/`**: the four
   `package.nix` files move to `nixos/pkgs/<tool>/` (flat, one dir per
   package), the three service modules flatten to `nixos/modules/<tool>.nix`

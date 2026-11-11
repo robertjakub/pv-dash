@@ -11,7 +11,7 @@ import os
 import socket
 import sys
 
-from common.runtime.audit import AUDIT_FORWARD_FORMATS, AuditLog
+from common.runtime.audit import AUDIT_FORWARD_FORMATS, AuditLog, audit_quote
 from common.settings.config import parse_secret, resolve_target
 from common.render.texts import T
 from common.wire.cli import translate
@@ -89,7 +89,7 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         print(T('shared.cannot_reach') % (label, e), file=sys.stderr)
         raise SystemExit(1)
     if audit:
-        audit.event('CONNECT', 'target=%s user=%s' % (label, getpass.getuser()))
+        audit.event('CONNECT', 'target=%s user=%s' % (audit_quote(label), getpass.getuser()))
     required_auth = False   # set once the token handshake happened (the reply mac is then mandatory)
 
     def exchange(sock, cmd, **extra):
@@ -154,6 +154,6 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         raise SystemExit(1)
     finally:
         if audit:
-            audit.event('DISCONNECT', 'target=%s' % label)
+            audit.event('DISCONNECT', 'target=%s' % audit_quote(label))
             audit.close()
         s.close()

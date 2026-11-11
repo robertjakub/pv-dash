@@ -12,7 +12,15 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
-- **the family** — **the audit line's `tools=` word renames to
+- **the family** — the audit detail's KV words tighten: a value carrying a
+  space now wears single quotes around the WHOLE value (the builders'
+  `audit_quote` — the wire's `peer='unix socket'`, the ctl and cli
+  `target='unix:…'`, the user-spelled `control=`/`listen=`/`profile=`
+  paths), and an explicitly-quoted empty value (`key=''`) reads the same as
+  the bare `key=` token — dropped at the writer (an absent pair, not an
+  empty one; a bare `=` stays). The trailing empty `message=` lines in old
+  rotated backups predate the writer's guard and stay as written.
+- **the audit line's `tools=` word renames to
   `application=` and every line gains an `instance=<id>` word** naming the
   writer daemon: the control port when `--audit-instance`/`AUDIT_INSTANCE`
   is unset (unique per host by construction), the override when spelled

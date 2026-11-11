@@ -29,7 +29,7 @@ PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V = os.path.join(REPO, 'scripts', 'audit_verify.py')
 sys.path.insert(0, REPO)
-from common.runtime.audit import AuditLog, entry_hash, GENESIS   # noqa: E402
+from common.runtime.audit import AuditLog, entry_hash, GENESIS, audit_quote   # noqa: E402
 
 FAILURES = []
 
@@ -79,15 +79,23 @@ def main():
               and all(ch in '0123456789abcdef' for ch in first[6][5:])
               and first[7] == 'message=version=test', ' '.join(first[:8]))
 
-        # 1b. the detail's empty-value rule: a `key=` token with no value is
-        # dropped at the writer; a bare `=` and a quoted empty stay
+        # 1b. the detail's empty-value rule: a KV word whose value is empty —
+        # the bare `key=` token or the quoted empty (`key=''`) — is dropped
+        # at the writer; a bare `=` stays (the write lines' prose)
         a2 = AuditLog(log, 'CACHE', instance='1')
         a2.event('COMMAND', "peer=1.2.3.4 reason= uptime=9s register 47415 = 5 x='' result=")
         first = open(log).read().splitlines()[-1]
-        check('the detail drops an empty-valued word, keeps the bare = and the quoted empty',
+        check('the detail drops an empty-valued word (bare or quoted empty), keeps the bare =',
               'message=peer=1.2.3.4 uptime=9s register 47415 = 5' in first
-              and "x=''" in first and 'reason=' not in first.replace('message=', '')
+              and "x=''" not in first and 'reason=' not in first.replace('message=', '')
               and not first.rstrip().endswith('result='), first)
+
+        # 1c. the quoting rule: a value carrying a space rides one quoted
+        # token (the builders' audit_quote) — the words stay parseable
+        a2.event('COMMAND', "peer=%s cmd='show version' result=ok" % audit_quote('unix socket'))
+        first = open(log).read().splitlines()[-1]
+        check("a space value rides quoted (peer='unix socket')",
+              "message=peer='unix socket' cmd='show version' result=ok" in first, first)
 
         # 2. an edited line breaks the chain at that line
         lines = open(log).read().splitlines()

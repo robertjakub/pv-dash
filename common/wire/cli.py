@@ -20,7 +20,7 @@ try:
 except ImportError:
     readline = None
 
-from common.runtime.audit import AUDIT_FORWARD_FORMATS, AuditLog
+from common.runtime.audit import AUDIT_FORWARD_FORMATS, AuditLog, audit_quote
 from common.settings.config import parse_secret, resolve_target
 from common.render.human import secs
 from common.settings.options import command_path_pool, match_setting_path, render_word_sections, setting_path_pool
@@ -703,7 +703,7 @@ def run_cli(spec):
         print(T('shared.cannot_reach') % (label, e), file=sys.stderr)
         raise SystemExit(1)
     if audit:
-        audit.event('CONNECT', 'target=%s user=%s' % (label, getpass.getuser()))
+        audit.event('CONNECT', 'target=%s user=%s' % (audit_quote(label), getpass.getuser()))
     if readline and sys.stdin.isatty():
         readline.set_completer(complete)
         readline.set_completer_delims(' \t')
@@ -716,7 +716,7 @@ def run_cli(spec):
                      isinstance(addr, str), addr, args)
     finally:
         if audit:
-            audit.event('DISCONNECT', 'target=%s' % label)
+            audit.event('DISCONNECT', 'target=%s' % audit_quote(label))
             audit.close()
     if rc:
         raise SystemExit(rc)

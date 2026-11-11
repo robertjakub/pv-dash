@@ -97,6 +97,21 @@ def validate_instance(value):
     if not value or not AUDIT_INSTANCE_RE.fullmatch(value):
         raise ValueError(AUDIT_INSTANCE_GRAMMAR)
     return value
+
+
+# An explicitly-quoted EMPTY value (key='' / key="") reads the same as the
+# bare key= word: the pair names no value, so the word never lands.
+EMPTY_VALUE_RE = re.compile(r"[^\s=]+=(\"\"|'')")
+
+
+def audit_quote(value):
+    """One audit detail VALUE: verbatim when it rides one token, wrapped in
+    single quotes when it carries a space — the KV word is space-delimited,
+    so a spanning value must ride one quoted token (peer='unix socket').
+    The builders wrap every free-text value (the wire's peer=, the
+    user-spelled paths) so the line's words stay parseable."""
+    value = str(value)
+    return "'%s'" % value if ' ' in value else value
 # The envelope severity table: a line ending '-> ok' (and the verdict-less
 # START/SHUTDOWN events) ride 4; '-> err' (a refused/failed command) rides 7.
 FORWARD_SEV_OK = 4
@@ -605,11 +620,13 @@ class AuditLog:
     def event(self, event, detail=''):
         """One event, its KV detail, the chain hash, the flush and the
         forward. The detail's own rules: whitespace folds (one event = one
-        physical line) and an EMPTY-VALUED KV word never lands — a `key=`
-        token with no value is dropped at the writer (an absent pair, not an
-        empty one), so a builder passing nothing never renders `reason=`
-        mid-line; a bare `=` (the write lines' `register 47415 = 5`) and a
-        quoted empty (`x=''`) stay."""
+        physical line); an EMPTY-VALUED KV word never lands — a `key=` token
+        with no value and a quoted empty (`key=''`) are dropped at the
+        writer (an absent pair, not an empty one), so a builder passing
+        nothing never renders `reason=` mid-line; a bare `=` (the write
+        lines' `register 47415 = 5`) stays; a value carrying a space rides
+        single-quoted (the builders' audit_quote — `peer='unix socket'`),
+        and an empty tail attaches no message= word."""
         if self.disabled:
             return
         with self._lock:
@@ -617,7 +634,8 @@ class AuditLog:
                 self._maybe_rotate()
             stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
             detail = ' '.join(detail.split())   # fold \n\r\t etc: one event = one physical line
-            detail = ' '.join(w for w in detail.split(' ') if w == '=' or not w.endswith('='))
+            detail = ' '.join(w for w in detail.split(' ') if w == '='
+                              or (not w.endswith('=') and not EMPTY_VALUE_RE.fullmatch(w)))
             body = 'tag=%s instance=%s type=%s%s' % (self.writer, self.instance, event.lower(),
                                                      (' message=%s' % detail) if detail else '')
             h = entry_hash(self._last, stamp, self.prefix, body)

@@ -1,4 +1,4 @@
-# Security — the pv-suite tree (rev. 28)
+# Security — the pv-suite tree (rev. 29)
 
 This is the family's **one security document**: the posture, the trust
 boundaries, the implemented controls, the per-tool stories, the audit
@@ -131,8 +131,9 @@ the intended demo feature, gated by control-server access only.
   writes, refusals,
   auth-fails, control commands and lifecycle events recorded; control
   characters folded at the writer so one event is one physical line (F2);
-  an empty-valued word never lands — a `key=` token with no value is
-  dropped at the writer (the pair is absent, not empty);
+  an empty-valued word never lands — a `key=` token with no value, bare or
+  quoted-empty (`key=''`), is dropped at the writer (the pair is absent, not
+  empty);
   falls back to stdout (journald). The line grammar is KV:
   `<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type>
   hash=<12-hex> [message=<kv pairs>]` —
@@ -142,7 +143,8 @@ the intended demo feature, gated by control-server access only.
   writer's daemon (the control port when `--audit-instance` is unset, the
   override when spelled; the clients spell their target's port), the message is
   the last key and runs to end-of-line, its values carry `key=value` pairs
-  (values with spaces wear single quotes — `cmd='set pv 3000'`), the
+  (a value carrying a space wears single quotes around the WHOLE value —
+  `cmd='set pv 3000'`, `peer='unix socket'`; the builders' `audit_quote`), the
   command's `result=ok|err|bye|local|aborted` and — when the exchange was
   signed — its `wire=h<12-hex>` mac proof ride beside it, and the wire-policy
   refusals name themselves (`reason=unsigned` / `reason=bad-mac`). The keys
@@ -314,7 +316,7 @@ list decide who may drive the control socket (§ 4), and the Modbus
 ### 8.2 Closed
 
 Every closed finding — F2–F13, F16, F18–F23 — with its fix, its
-verification and the per-revision walk (rev. 1–28):
+verification and the per-revision walk (rev. 1–29):
 [history/AUDIT.md](history/AUDIT.md).
 
 ## 9. Verification

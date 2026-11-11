@@ -10,7 +10,7 @@ import logging
 from .options import OPTIONS
 from common.settings.config import (IPGate, _GATE_TYPES, _write_gate_object,
                            acl_admits, acl_file_warn, acl_gate_summary, acl_table,
-                           acl_value_text, check_auth_key, load_config_script,
+                           acl_value_text, check_auth_key, check_token_chars, load_config_script,
                            load_write_gate_file, parse_acl, parse_acl_value, parse_auth_type, parse_listen,
                            parse_secret, parse_upstream, resolve_profile_file, Resolver)
 from common.wire.cred import parse_trust_uids
@@ -25,6 +25,17 @@ logger = logging.getLogger('modbus-cache')
 # the default serving port)
 CONTROL_SOCKET_TEMPLATE = '/tmp/modbus-cache-%d.socket'
 DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_LISTEN_PORT
+
+# the registry rows by knob name — the resolver's row-driven validation
+# (row_value: the words, the conv, the choices, the min/max bounds)
+OPT = {o.name: o for o in OPTIONS}
+
+
+def off_float(text):
+    """The off-worded floats (cache-ttl, requests-audit): the documented
+    off word rides as 0 — the wire branches' own mapping. A plain number
+    parses as before; the row's min/max bounds stay validate_config's."""
+    return 0.0 if str(text).strip().lower() in ('off', 'none') else float(text)
 
 
 def parse_write_registers(text, label='write-registers'):
@@ -301,6 +312,10 @@ def validate_config(cfg):
         fail('merge_gap', 'must be >= 0')
     if cfg['cache_ttl'] < 0:
         fail('cache_ttl', 'must be >= 0')
+    if cfg['cache_ttl'] > OPT['cache-ttl'].max:
+        fail('cache_ttl', 'must be <= %g' % OPT['cache-ttl'].max)
+    if cfg['requests_audit_s'] > OPT['requests-audit'].max:
+        fail('requests_audit', 'must be <= %g' % OPT['requests-audit'].max)
     if cfg['max_clients'] < 0:
         fail('max_clients', 'must be >= 0')
     if cfg['client_timeout'] < 0:
@@ -340,6 +355,9 @@ def validate_config(cfg):
         if cfg['control_ops_token'] == cfg['control_token']:
             fail('control-ops-token', 'the ops token must differ from the admin token '
                  '(the same secret would hand every holder the role the server picks first)')
+    check_token_chars(cfg['control_token'], 'control-token')
+    check_token_chars(cfg['control_ops_token'], 'control-ops-token')
+    check_token_chars(cfg['metrics_token'], 'metrics-token')
     parse_listen(cfg['listen'])
 
 
@@ -360,7 +378,7 @@ def resolve_config(args, script_dir=None):
     resolve = r.resolve
     resolve_bool = r.resolve_bool
 
-    interval = resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval'], float)
+    interval = resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval'], float, row=OPT['interval'])
     upstream = resolve(getattr(args, 'upstream', None), 'UPSTREAM', 'upstream',
                        DEFAULTS['upstream'], str)
     host, port = parse_upstream(upstream or DEFAULTS['upstream'])
@@ -372,8 +390,8 @@ def resolve_config(args, script_dir=None):
         'upstream': '%s:%d' % (host, port),
         'host': host,
         'port': port,
-        'unit': resolve(args.unit, 'UNIT', 'unit', DEFAULTS['unit'], int),
-        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout'], float),
+        'unit': resolve(args.unit, 'UNIT', 'unit', DEFAULTS['unit'], int, row=OPT['unit']),
+        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout'], float, row=OPT['timeout']),
         'auth': parse_auth_type(resolve(args.modbus_auth, 'MODBUS_AUTH', 'modbus-auth', DEFAULTS['modbus_auth'], str), 'modbus-auth'),
         'auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
@@ -385,8 +403,10 @@ def resolve_config(args, script_dir=None):
             'auth-upstream-key', kind=upstream_auth),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
         'interval': interval,
-        'read_delay': resolve(args.read_delay, 'READ_DELAY', 'read_delay', DEFAULTS['read_delay'], float),
-        'merge_gap': resolve(args.merge_gap, 'MERGE_GAP', 'merge_gap', DEFAULTS['merge_gap'], int),
+        'read_delay': resolve(args.read_delay, 'READ_DELAY', 'read_delay', DEFAULTS['read_delay'], float,
+                              row=OPT['read-delay']),
+        'merge_gap': resolve(args.merge_gap, 'MERGE_GAP', 'merge_gap', DEFAULTS['merge_gap'], int,
+                             row=OPT['merge-gap']),
         'allow_write': resolve_bool(args.allow_write or None, 'ALLOW_WRITE', 'allow_write', DEFAULTS['allow_write']),
         'write_registers': parse_write_registers(
             resolve(getattr(args, 'write_registers', None), 'WRITE_REGISTERS',
@@ -396,22 +416,27 @@ def resolve_config(args, script_dir=None):
         'selection': parse_selection(resolve(getattr(args, 'selection', None), 'SELECTION',
                                             'selection', DEFAULTS['selection'], str)),
         'cache_ttl': resolve(args.cache_ttl, 'TTL', 'cache_ttl',
-                             DEFAULTS['cache_ttl'], float),
+                             DEFAULTS['cache_ttl'], off_float),
         'local_time': resolve_bool(args.local_time or None, 'LOCAL_TIME', 'local_time', DEFAULTS['local_time']),
         'log_access': resolve_bool(args.log_access or None, 'LOG_ACCESS', 'log_access', DEFAULTS['log_access']),
-        'max_clients': resolve(args.max_clients, 'MAX_CLIENTS', 'max_clients', DEFAULTS['max_clients'], int),
+        'max_clients': resolve(args.max_clients, 'MAX_CLIENTS', 'max_clients', DEFAULTS['max_clients'], int,
+                               row=OPT['max-clients']),
         'client_timeout': resolve(args.client_timeout, 'CLIENT_TIMEOUT', 'client_timeout',
-                                  DEFAULTS['client_timeout'], float),
+                                  DEFAULTS['client_timeout'], float, row=OPT['client-timeout']),
         'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MAX_CONN_PER_IP',
-                                   'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int),
+                                   'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int,
+                                   row=OPT['max-conn-per-ip']),
         'metrics_max_clients': resolve(getattr(args, 'metrics_max_clients', None), 'METRICS_MAX_CLIENTS',
-                                       'metrics_max_clients', DEFAULTS['metrics_max_clients'], int),
+                                       'metrics_max_clients', DEFAULTS['metrics_max_clients'], int,
+                                       row=OPT['metrics-max-clients']),
         'metrics_client_timeout': resolve(getattr(args, 'metrics_client_timeout', None),
                                           'METRICS_CLIENT_TIMEOUT', 'metrics_client_timeout',
-                                          DEFAULTS['metrics_client_timeout'], float),
+                                          DEFAULTS['metrics_client_timeout'], float,
+                                          row=OPT['metrics-client-timeout']),
         'metrics_max_conn_per_ip': resolve(getattr(args, 'metrics_max_conn_per_ip', None),
                                            'METRICS_MAX_CONN_PER_IP', 'metrics_max_conn_per_ip',
-                                           DEFAULTS['metrics_max_conn_per_ip'], int),
+                                           DEFAULTS['metrics_max_conn_per_ip'], int,
+                                           row=OPT['metrics-max-conn-per-ip']),
         'metrics_server': resolve_bool(getattr(args, 'metrics_server', False) or None,
                                        'METRICS_SERVER', 'metrics_server', DEFAULTS['metrics_server']),
         'metrics_listen': resolve(getattr(args, 'metrics_listen', None), 'METRICS_LISTEN',
@@ -430,7 +455,7 @@ def resolve_config(args, script_dir=None):
         'control_port': resolve(getattr(args, 'control_port', None), 'CTL',
                                 'control_port', DEFAULTS['control_port'], str),
         'control_token': parse_secret(resolve(getattr(args, 'control_token', None), 'CONTROL_TOKEN',
-                                              'control_token', '', str), 'control/token'),
+                                              'control_token', '', str), 'control-token'),
         'control_ops_token': parse_secret(resolve(getattr(args, 'control_ops_token', None), 'CONTROL_OPS_TOKEN',
                                                   'control_ops_token', '', str), 'control-ops-token'),
         'control_ops_verbs': resolve(getattr(args, 'control_ops_verbs', None), 'CONTROL_OPS_VERBS',
@@ -441,21 +466,21 @@ def resolve_config(args, script_dir=None):
         'audit_forward_format': resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
                                         'audit_forward_format', DEFAULTS['audit_forward_format'], str),
         'audit_max_mb': resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
-                                'audit_max_mb', DEFAULTS['audit_max_mb'], float),
+                                'audit_max_mb', DEFAULTS['audit_max_mb'], float, row=OPT['audit-max-mb']),
         'audit_daily': resolve_bool(getattr(args, 'audit_daily', False) or None, 'AUDIT_DAILY',
                                     'audit_daily', DEFAULTS['audit_daily']),
         'audit_files': resolve(getattr(args, 'audit_files', None), 'AUDIT_FILES',
-                               'audit_files', DEFAULTS['audit_files'], int),
+                               'audit_files', DEFAULTS['audit_files'], int, row=OPT['audit-files']),
         'no_audit_log': resolve_bool(getattr(args, 'no_audit_log', False) or None, 'NO_AUDIT_LOG',
                                      'no_audit_log', DEFAULTS['no_audit_log']),
         'requests_audit_s': resolve(getattr(args, 'requests_audit', None), 'REQUESTS_AUDIT',
-                                    'requests_audit_s', DEFAULTS['requests_audit'], float),
+                                    'requests_audit_s', DEFAULTS['requests_audit'], off_float),
         'dump_path': resolve(getattr(args, 'dump_path', None), 'DUMP_PATH',
                              'dump_path', DEFAULTS['dump_path'], str),
         'dump_key': parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY',
                                           'dump_key', None, str) or '').strip() or None, 'dump-key'),
         'dump_interval': resolve(getattr(args, 'dump_interval', None), 'DUMP_INTERVAL',
-                                 'dump_interval', DEFAULTS['dump_interval'], float),
+                                 'dump_interval', DEFAULTS['dump_interval'], float, row=OPT['dump-interval']),
         'dump_with_cache': resolve_bool(getattr(args, 'dump_with_cache', False) or None,
                                         'DUMP_WITH_CACHE', 'dump_with_cache', DEFAULTS['dump_with_cache']),
         'restore_on_start': resolve_bool(getattr(args, 'restore_on_start', False) or None,

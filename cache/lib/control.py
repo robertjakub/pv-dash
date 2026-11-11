@@ -396,21 +396,21 @@ class ControlServer(_ControlServer):
             return secs(v)
         if key == 'connect-acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError(T('wire.acl_table_value') % ('a connect-acl', 'connect-acl-table'))
+                raise ValueError(T('wire.acl_table_value') % ('connect-acl', 'connect-acl-table'))
             shown = p.set_connect_acl(val)
             if p.connect_acl_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % p.connect_acl_warn
             return shown
         if key == 'write-acl':
             if val.lower() == 'table':
-                raise ValueError(T('wire.acl_table_value') % ('a write-acl', 'write-acl-table'))
+                raise ValueError(T('wire.acl_table_value') % ('write-acl', 'write-acl-table'))
             shown = p.set_write_acl(val)
             if p.write_acl_warn:
                 shown += ' (%s)' % p.write_acl_warn
             return shown
         if key == 'metrics-acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
-                raise ValueError(T('wire.acl_table_value') % ('a metrics-acl', 'metrics-acl-table'))
+                raise ValueError(T('wire.acl_table_value') % ('metrics-acl', 'metrics-acl-table'))
             shown = p.set_metrics_acl(val)
             if p.metrics_acl_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % p.metrics_acl_warn
@@ -434,6 +434,9 @@ class ControlServer(_ControlServer):
                 p.write_registers, p.write_ranges = saved_gate
                 raise
             return cfg['profile'] if key == 'profile' else (cfg['selection'] or 'all')
+        shown = self.apply_typed_key(key, val)   # the typed-row fallback: the row's words, conv, choices, bounds, check
+        if shown is not None:
+            return str(shown)
         raise ValueError('unknown setting %s' % key)
 
     def _live_cfg(self):

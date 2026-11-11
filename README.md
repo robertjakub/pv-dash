@@ -65,14 +65,14 @@ pv-suite/
 │                 #   demo/ + prod/ ([docs](docker/README.md))
 ├── flake.nix     # the suite entry point
 ├── docs/         # the family-level docs, filed by grain in the
-│                 #   [architecture map](docs/ARCHITECTURE.md): the [security doc](docs/SECURITY.md),
-│                 #   the [Modbus protocol reference](docs/common/MODBUS.md), the
+│                 #   [design doc](docs/DESIGN.md) (the shape + the docs redo): the
+│                 #   [security doc](docs/SECURITY.md), the
+│                 #   [Modbus protocol reference](docs/common/MODBUS.md), the
 │                 #   [ACL map](docs/common/ACL.md), the [knob census](docs/OPTIONS.md), the
 │                 #   [family-wide TODO](docs/TODO.md) + the [one-product sweep](docs/family-unify.md),
-│                 #   the [SBOM](docs/sbom/SBOM.md), the history home
+│                 #   the [SBOM](docs/sbom/SBOM.md) and the history home
 │                 #   ([docs/history/](docs/history) — the audit/changelog/drift/unify
-│                 #   archives behind the current halves) and the
-│                 #   [docs redo workflow](docs/DOC-REDO.md)
+│                 #   archives behind the current halves)
 ├── CHANGELOG.md  # Unreleased + the current release (the history lives in docs/history/CHANGELOG.md)
 └── LICENSE       # BSD 3-Clause (whole suite)
 ```

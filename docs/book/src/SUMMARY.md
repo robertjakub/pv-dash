@@ -1,7 +1,7 @@
 # Summary
 
 - [The suite](index.md)
-- [The suite's shape](architecture.md)
+- [The suite's design](design.md)
 - [modbus-cache](cache.md)
 - [modbus-scraper](scraper.md)
 - [modbus-fake-inverter](fake.md)
@@ -14,5 +14,4 @@
 - [Security](security.md)
 - [Security-audit history](audit-history.md)
 - [Roadmap / TODO](todo.md)
-- [The docs redo — the workflow](doc-redo.md)
 - [Changelog](changelog.md)

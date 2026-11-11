@@ -70,10 +70,28 @@
         default = self.overlays.pv-suite;
       };
 
+      # the modules ship default-free (the nixpkgs shape — the file is
+      # contributed verbatim); the flake's wrappers carry the in-repo
+      # package defaults, mkDefault keeps a user override winning
       nixosModules = {
-        dashboard = import ./nixos/modules/dashboard.nix;
-        modbus-scraper = import ./nixos/modules/modbus-scraper.nix;
-        modbus-cache = import ./nixos/modules/modbus-cache.nix;
+        dashboard = {
+          pkgs, lib, ...
+        }: {
+          imports = [ ./nixos/modules/dashboard.nix ];
+          services.dashboard.package = lib.mkDefault (pkgs.callPackage ./nixos/pkgs/dashboard/package.nix { });
+        };
+        modbus-scraper = {
+          pkgs, lib, ...
+        }: {
+          imports = [ ./nixos/modules/modbus-scraper.nix ];
+          services.modbus-scraper.package = lib.mkDefault (pkgs.callPackage ./nixos/pkgs/modbus-scraper/package.nix { });
+        };
+        modbus-cache = {
+          pkgs, lib, ...
+        }: {
+          imports = [ ./nixos/modules/modbus-cache.nix ];
+          services.modbus-cache.package = lib.mkDefault (pkgs.callPackage ./nixos/pkgs/modbus-cache/package.nix { });
+        };
         default = self.nixosModules.dashboard;
       };
     };

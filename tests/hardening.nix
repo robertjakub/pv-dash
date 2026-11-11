@@ -33,33 +33,43 @@ pkgs.testers.nixosTest (
     name = "pv-suite-hardening";
 
     nodes.machine =
-      { lib, ... }:
+      { lib, pkgs, ... }:
       {
         imports = [
           ../nixos/modules/modbus-cache.nix
           ../nixos/modules/modbus-scraper.nix
           ../nixos/modules/dashboard.nix
         ];
+        # the raw modules (no flake wrapper) — the packages named explicitly
         services.modbus-cache = {
           enable = true;
-          listenPort = 15502;
-          # the audit trail to the journal: the hardened service has no XDG
-          # state home (ProtectHome + DynamicUser)
-          auditLog = "-";
+          package = pkgs.callPackage ../nixos/pkgs/modbus-cache/package.nix { };
+          settings = {
+            LISTEN = "127.0.0.1:15502";
+            # the audit trail to the journal: the hardened service has no
+            # XDG state home (ProtectHome + DynamicUser)
+            AUDIT_LOG = "-";
+          };
         };
         services.modbus-scraper = {
           enable = true;
-          listenPort = 9350;
-          auditLog = "-";
-          # the control surface over the unix socket under /run (PrivateTmp
-          # makes /tmp private) — the sockets must be reachable for the ctl
-          controlPort = "/run/modbus-scraper/control.socket";
+          package = pkgs.callPackage ../nixos/pkgs/modbus-scraper/package.nix { };
+          settings = {
+            LISTEN = "127.0.0.1:9350";
+            AUDIT_LOG = "-";
+            # the control surface over the unix socket under /run (PrivateTmp
+            # makes /tmp private) — the sockets must be reachable for the ctl
+            CTL = "/run/modbus-scraper/control.socket";
+          };
         };
         services.dashboard = {
           enable = true;
-          port = 8080;
-          auditLog = "-";
-          controlPort = "/run/dashboard/control.socket";
+          package = pkgs.callPackage ../nixos/pkgs/dashboard/package.nix { };
+          settings = {
+            LISTEN = "127.0.0.1:8080";
+            AUDIT_LOG = "-";
+            CTL = "/run/dashboard/control.socket";
+          };
         };
         virtualisation.graphics = false;
       };

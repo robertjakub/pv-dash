@@ -324,9 +324,10 @@ def main():
         metrics_desc = describe_metrics(metrics_listen, metrics_token,
                                         cfg.get('metrics_max_clients', DEFAULTS['metrics_max_clients']),
                                         cfg.get('metrics_max_conn_per_ip', DEFAULTS['metrics_max_conn_per_ip']))
-    audit_params = audit_params_of(cfg)
+    audit_derive = control_target if control_target.isdigit() and control_target != '0' else str(listen_port)
+    audit_params = audit_params_of(cfg, derive=audit_derive)
     tag = load_audit_tags('dashboard')
-    audit = build_audit(cfg, tag, 'dashboard', logger)
+    audit = build_audit(cfg, tag, 'dashboard', logger, derive=audit_derive)
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target)
     Handler.upstream = cfg['upstream']

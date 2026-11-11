@@ -102,6 +102,8 @@ def resolve_config(args, script_dir=None):
                                    'audit_forward', DEFAULTS['audit_forward'], str)
     cfg['audit_forward_format'] = resolve(getattr(args, 'audit_forward_format', None), 'AUDIT_FORWARD_FORMAT',
                                           'audit_forward_format', DEFAULTS['audit_forward_format'], str)
+    cfg['audit_instance'] = resolve(getattr(args, 'audit_instance', None), 'AUDIT_INSTANCE',
+                                    'audit_instance', DEFAULTS['audit_instance'], str)
     cfg['audit_max_mb'] = resolve(getattr(args, 'audit_max_mb', None), 'AUDIT_MAX_MB',
                                   'audit_max_mb', DEFAULTS['audit_max_mb'], float, row=OPT['audit-max-mb'],
                                   strict_bounds=True)

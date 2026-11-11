@@ -197,11 +197,12 @@ python3 bin/dashboard-cli.py                        # the console: TAB completio
 
 A SIGHUP or `request reload-config` also clears the live overrides. Every
 control command, auth failure, reload and shutdown lands in the audit
-trail (the DSH trail, `tools=DSH`, default
+trail (the DSH trail, `application=DSH`, default
 `~/.local/state/dashboard/audit.log`; `--audit-log -` for stdout — the
 journald way; the ctl and cli clients keep their own trails — the shared
 `cli` writer role). The family is live-settable on the control wire
 (the cache's shape): `set audit log-file <path|-|none>` swaps the sink,
+`set audit instance <id>` renames the writer daemon,
 `set audit rotate max-size <MB>` / `set audit rotate files <N>` /
 `set audit rotate daily on/off` steer the rotation live and
 `set audit disable on/off` is the kill switch. `--audit-forward` mirrors every line — the
@@ -211,7 +212,11 @@ auto-scan), `syslog:/path`, `udp://host[:514]` (RFC5426, best-effort) or
 answer); the remote envelope rides `--audit-forward-format` (`rfc5424`,
 the default, or `cef`), a send failure notes once and the next event
 re-arms, and `--audit-log none` (with a forward spelled) is the
-remote-only mode — the collector is the sole holder.
+remote-only mode — the collector is the sole holder. Every line names
+its writer daemon in `instance=<id>` — the control port when
+`--audit-instance` is unset, the override when spelled (keep an override
+unique among everything that shares one collector — the line carries no
+hostname; the chain groups by the application/writer/instance triple).
 
 ## Behind a reverse proxy
 

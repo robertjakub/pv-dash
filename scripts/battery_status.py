@@ -156,19 +156,19 @@ def render():
         last = cand
         break
     if last is not None:
-        print()   # the break: the last stopped run is its own block, not slot0's tail
-        # the last non-slotted run: its last word decides the label — the
+        print()   # the break: the previous stopped run is its own block, not slot0's tail
+        # the previous non-slotted run: its last word decides the label — the
         # TALLY line means it finished, a cancellation NOTE means the
         # runner died before it (SIGKILL leaves no trap), neither means it
         # never got far enough to say
         status = last / 'status.txt'
         rows = status.read_text() if status.exists() else ''
         if 'NOTE battery canceled' in rows:
-            print('last canceled: %s' % last.name)
+            print('previous canceled: %s' % last.name)
         elif re.search(r'^=== TALLY ', rows, re.M):
-            print('last finished: %s' % last.name)
+            print('previous finished: %s' % last.name)
         else:
-            print('last run (no tally): %s' % last.name)
+            print('previous run (no tally): %s' % last.name)
         last_line(status)
 
 

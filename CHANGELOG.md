@@ -30,14 +30,15 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   SUITE_PORT_BASE, PV_SUITE_PROFILE, the zz_ copy's pgrep tell) are
   unchanged.
 
-- **scripts** — **battery_status watches and says last**: `--watch`
-  loops with the screen cleared per tick behind a watch-style header
-  (`Every 1s: battery_status.py — HH:MM:SS (Ctrl-C quits)`),
+- **scripts** — **battery_status watches and renames the tail block**:
+  `--watch` loops with the screen cleared per tick behind a watch-style
+  header (`Every 1s: battery_status.py — HH:MM:SS (Ctrl-C quits)`),
   `--interval <s>` sets the period (default 1, implies `--watch`) —
   the default stays one show; and the newest-run block's labels say
-  **`last`** (`last finished:` / `last canceled:` / `last run (no
-  tally):`) — with the fall-through it names the previous stopped run,
-  not the newest dir.
+  **`previous`** (`previous finished:` / `previous canceled:` /
+  `previous run (no tally):`) — with the fall-through it names the
+  previous stopped run, not the newest dir, and `previous` keeps the
+  block head off the `last:` row's word.
 
 - **tests** — **the suites create their scratch dir at the gate**:
   `os.makedirs(SCRATCH, exist_ok=True)` beside the SCRATCH binding —

@@ -468,10 +468,10 @@ Pacing and caps, not rate limiting: one serialized upstream connection;
 free slot between poll reads; `max_clients` / per-IP caps gate the
 listeners (`common/serve/connlimit.py`); the connect ACL (`connect-acl`,
 default any, `none` refuses all — the inline grammar or the standalone
-ip-prefix acl file via `file:<path>`; see docs/ACL.md) filters before
-auth; audit `REQUESTS`
-events are throttled to one per client per 300 s. The handshake read uses
-the client idle timeout, so a silent plain client lingers until it drops.
+ip-prefix acl file via `file:<path>`; see docs/common/ACL.md) filters
+before auth; audit `REQUESTS` events are throttled to one per client per
+300 s. The handshake read uses the client idle timeout, so a silent plain
+client lingers until it drops.
 
 ---
 
@@ -575,4 +575,4 @@ random PDUs, pipelined bursts, trickled frames), `tests/cache-stress.py`
 [CONTRIBUTORS.md](CONTRIBUTORS.md). The per-tool behavior prose lives in
 the [cache](../../cache/README.md), [scraper](../../scraper/README.md) and
 [inverter](../../inverter/README.md) READMEs; the knob table is
-[OPTIONS.md](OPTIONS.md).*
+[OPTIONS.md](../OPTIONS.md).*

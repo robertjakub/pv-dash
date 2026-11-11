@@ -77,8 +77,26 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   wire answers, the kind of each (command, settable — set/clear — or
   show-only; the startup-only knobs marked), the flag/env twin, the
   value shape. `--check` fails a stale page.
+- **`gen_env.py`** — the four docker env examples
+  (`docker/env/<tool>.env.example`) from the registries: the full
+  env-twin set per tool, grouped by the knob's namespace node, the
+  image's own CMD/ENV values as the sample lines, the secrets' lines
+  empty. `--check` fails a drifted example.
 - **`gen_sbom.py`** — the CycloneDX 1.5 SBOM (docs/sbom/), the
   stdlib-only claim machine-checked.
+
+The generated pages and their gates (never hand-edit — an editorial
+change lands in the generator's constants, then regenerates; a hand
+edit to the rendered page dies at the next run):
+
+| Page | Generator | Gate |
+|---|---|---|
+| [docs/family-drift.md](../docs/family-drift.md) + the seed ledger | `family_drift.py` | `--check` |
+| [docs/OPTIONS.md](../docs/OPTIONS.md) | `gen_options.py` | regenerate (no `--check`) |
+| `<tool>/MANUAL.md` (×4) | `gen_manual.py` | `--check` |
+| `docker/env/<tool>.env.example` (×4) | `gen_env.py` | `--check` |
+| `<tool>/man/*.1` (×4) | `gen_man.py` | `mandoc -Tlint` |
+| [docs/sbom/](../docs/sbom/SBOM.md) (the SBOM pair) | `gen_sbom.py` | `--check` |
 
 ## The release
 

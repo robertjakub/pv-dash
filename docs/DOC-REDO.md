@@ -18,8 +18,9 @@ walk).
 | the family drift | [family-drift.md](family-drift.md) (GENERATED) — the census, the open findings, the open remediation | [history/family-drift.md](history/family-drift.md) — the landed legs, the prose catch-ups, the growth rule |
 | the changelog | the root [CHANGELOG](../CHANGELOG.md) — Unreleased + the current release | [history/CHANGELOG.md](history/CHANGELOG.md) — the release archive (`scripts/release.py` maintains the split) |
 | the TODOs | [TODO.md](TODO.md) — the open items only | the per-tool `TODO.md` files — the Done records, newest first |
+| the family unification | [family-unify.md](family-unify.md) — the open one-product items | [history/family-unify.md](history/family-unify.md) — the verified-aligned ledger (do not re-open) |
 
-Rules across all four families:
+Rules across all five families:
 
 - A history record is never rewritten to the present tense. When a
   later wave changes its truth, the record gets a reversing POINTER
@@ -32,17 +33,15 @@ Rules across all four families:
 
 ## The generated docs (never hand-edit)
 
-`docs/family-drift.md` (`scripts/family_drift.py`), `docs/OPTIONS.md`
-(`scripts/gen_options.py`), the four `<tool>/MANUAL.md` pages
-(`scripts/gen_manual.py --check`), the four tool env examples
-(`docker/env/<tool>.env.example`, `scripts/gen_env.py --check`), the man
-pages (`scripts/gen_man.py`), the SBOM pair (`scripts/gen_sbom.py
---check`), the seed ledger (`family_drift.py --seeds`). An editorial
-change to a
-generated doc lands in the GENERATOR's constants (the drift verdicts
-live in `family_drift.py`'s `*_FINDINGS`/`*_VERBS`/`*_CENSUS` blocks),
-then regenerates — a hand edit to the rendered page dies at the next
-run, and `--check` fails a stale page.
+The generated pages — the drift doc + the seed ledger, OPTIONS.md, the
+four MANUALs, the four env examples, the man pages, the SBOM pair —
+are inventoried with their generators and gates in the generators
+section of [scripts/README.md](../scripts/README.md). An editorial
+change to a generated doc lands in the GENERATOR's constants (the
+drift verdicts live in `family_drift.py`'s
+`*_FINDINGS`/`*_VERBS`/`*_CENSUS` blocks), then regenerates — a hand
+edit to the rendered page dies at the next run, and `--check` fails a
+stale page.
 
 ## The redo procedure
 
@@ -64,8 +63,9 @@ run, and `--check` fails a stale page.
    the generator's constants if the verdict prose moved), not the doc.
 
 2. **The retired-vocabulary hunt** in the HAND-written docs (the
-   READMEs, docs/common/ACL.md, docs/common/MODBUS.md, nixos/README.md, docs/TODO.md,
-   docs/SECURITY.md) — targeted greps for the vocabularies that died:
+   READMEs, docs/ARCHITECTURE.md, docs/common/, nixos/README.md,
+   docs/TODO.md, docs/family-unify.md, docs/SECURITY.md) — targeted
+   greps for the vocabularies that died:
    retired commands (`show settings`), retired flags (`--host`,
    `--port`, the `-file` siblings), retired env prefixes
    (`MCH_`/`SCR_`/`INV_`/`DSH_`), retired paths (`scrape/`,

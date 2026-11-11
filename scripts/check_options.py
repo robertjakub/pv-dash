@@ -32,6 +32,13 @@ TOOLS = {
     'dashboard': ('dashboard/bin/dashboard.py', 'dashboard', 'dashboard/module.nix', 'dashboard/README.md', 'dashboard/examples/server.conf'),
 }
 
+# the env twins spell bare names (DUMP_INTERVAL, LOG_ACCESS) — the one
+# control env is the common CTL, no tool-tag spelling may return (the
+# MCH_/SCR_/INV_/DSH_ era is retired, docs/TODO.md's rename + env-prefix
+# record): the historical shorts plus every tag the shared/tags.json file
+# can spell, checked against the registry rows and the tools' own sources
+TAG_ENV_PREFIXES = ('MCH_', 'SCR_', 'INV_', 'DSH_', 'CACHE_', 'SCRAPER_', 'DASHBOARD_', 'FAKE_')
+
 # the nix option names that deliberately diverge from lowerCamel(flag), and
 # the flags a module deliberately covers another way (documented in the
 # module's comments)
@@ -111,6 +118,23 @@ def check_tool(tool):
     bin_script, tool_dir, module_nix, readme, config = TOOLS[tool]
     options, verbs = load_registry(tool_dir)
     flags = {'--' + o.name for o in options if o.flag}   # control-only settings carry no flag
+
+    # the env twins and the tool's own sources carry no tool-tag prefix:
+    # the control port answers to the common CTL alone (the tagged *_CTL
+    # era is retired) — the registry rows and every lib/bin .py scan
+    tagged_env = sorted(e for o in options for e in ((o.env,) if isinstance(o.env, str) else (o.env or ()))
+                        if isinstance(e, str) and e.startswith(TAG_ENV_PREFIXES))
+    rows.append((not tagged_env, '%s: the env twins spell bare names%s'
+                 % (tool, ' — tagged: %s' % ', '.join(tagged_env) if tagged_env else '')))
+    src = ''
+    for root, dirs, files in os.walk(os.path.join(REPO, tool_dir)):
+        dirs[:] = [d for d in dirs if d not in ('__pycache__', 'man', 'examples')]
+        for fn in files:
+            if fn.endswith('.py'):
+                src += open(os.path.join(root, fn), encoding='utf-8').read()
+    tagged_src = sorted(set(re.findall(r"['\"](?:%s)[A-Z0-9_]+['\"]" % '|'.join(TAG_ENV_PREFIXES), src)))
+    rows.append((not tagged_src, '%s: no tool-tagged env in the code%s'
+                 % (tool, ' — found: %s' % ', '.join(tagged_src) if tagged_src else '')))
 
     # the control grammar's vocabulary rides the same rows: every live name
     # unique and one spellable word-path (a '/'-path spells as its words on

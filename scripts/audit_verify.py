@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Verify the audit trails' hash chains (docs/AUDIT.md F10): every entry
-carries a short hash right after the event name —
-`<stamp> AUDIT <PREFIX> <EVENT> <hash> [detail]` — chained to the writer's
-previous entry: h = sha256(prev | stamp | prefix | event + detail), 12 hex
-chars, chained per writer prefix (CACHE / INV / CLI / CTL) so interleaved
-writers verify independently.
+carries a short chained hash in its hash= token —
+`<stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<hash>
+[message=<detail>]` — chained to the writer's previous entry: h =
+sha256(prev | stamp | tools | tag + type + message), 12 hex chars, chained
+per (tools, writer) pair so interleaved writers verify independently. The
+validator speaks the current grammar only: a pre-KV line reads malformed.
 
   python3 scripts/audit_verify.py [FILE|- ...]      # default: the family's XDG trails
   python3 scripts/audit_verify.py -q ~/.local/state/modbus-cache/audit.log
@@ -30,12 +31,15 @@ DEFAULT_TRAILS = ('modbus-cache', 'modbus-scraper', 'fake-inverter')
 
 
 def split_line(line):
-    """'<stamp> AUDIT <PREFIX> ...' -> (stamp, prefix) or None (the rest is
-    read positionally by the shared parsers)."""
+    """'<stamp> AUDIT tools=<TAG> tag=<writer> ...' -> (stamp, key, tools) —
+    the key names the writer's chain (the tool's tag + its role) and tools is
+    the hash material's tag word. None (malformed) is the rest's business
+    (the shared parsers)."""
     parts = line.split(' ')
-    if len(parts) < 3 or parts[1] != 'AUDIT':
+    if len(parts) < 6 or parts[1] != 'AUDIT' or not parts[2].startswith('tools='):
         return None
-    return parts[0], parts[2]
+    tools = parts[2][6:]
+    return parts[0], '%s:%s' % (tools, parts[3][4:]), tools
 
 
 def verify_stream(name, lines, quiet):
@@ -55,16 +59,16 @@ def verify_stream(name, lines, quiet):
         if parsed is None:
             broken.append((no, '-', 'not an audit line (malformed)'))
             continue
-        stamp, prefix = parsed
+        stamp, key, tools = parsed
         if h is None:
             unsigned += 1
             continue
-        prev = chains.get(prefix)
+        prev = chains.get(key)
         if prev is not None:
-            want = entry_hash(prev, stamp, prefix, entry_body(line))
+            want = entry_hash(prev, stamp, tools, entry_body(line))
             if want != h:
-                broken.append((no, prefix, 'hash mismatch (the entry, its neighbours or the order were tampered with)'))
-        chains[prefix] = h
+                broken.append((no, key, 'hash mismatch (the entry, its neighbours or the order were tampered with)'))
+        chains[key] = h
     return broken, unsigned, events
 
 

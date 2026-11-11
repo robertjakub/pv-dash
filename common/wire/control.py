@@ -128,7 +128,7 @@ class ControlServer:
     def __init__(self, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None,
                  ops_verbs=None, audit_params=None, config_path=None, dump_path=None,
-                 restore_on_start=False, dump_key=None, dump_interval=0.0):
+                 restore_on_start=False, dump_key=None, dump_interval=0.0, log_replies=False):
         self.reloader = reloader         # request reload: re-resolve the config, apply, returns the summary
         self.audit = audit               # the audit trail (common.audit), None = off
         self.token = token               # the TCP auth token (the admin role); None = no auth (the unix = the perms)
@@ -156,6 +156,7 @@ class ControlServer:
         self.defaults = defaults or {}   # setting -> configured value (the restart-marked knobs' pending writes land here)
         self.baseline = dict(self.defaults)   # the startup-resolved values — what `clear` restores
         self.overridden = set()          # settings changed live (the dumps carry the overrides)
+        self.log_replies = bool(log_replies)   # DEBUG logs the full command output (log-cmd-replies; default: the status only)
         self.clients = set()             # the live control sockets (announce_exit)
         self.clients_lock = threading.Lock()
         self.started = time.monotonic()
@@ -320,15 +321,16 @@ class ControlServer:
                 if b'\n' not in buf:
                     continue
                 line, buf = buf.split(b'\n', 1)
-                cmd, obj, reply, role = self.framed(line.decode('utf-8', 'replace').strip(), who, role)
+                cmd, obj, reply, role, reason = self.framed(line.decode('utf-8', 'replace').strip(), who, role)
                 if cmd == 'auth':
                     ok = reply.startswith('ok')
                     if not ok and self.audit:
                         self.audit.event('AUTH-FAIL', 'peer=%s' % who)
                 elif self.audit and cmd.lower() != 'ping':
-                    self.audit.event('COMMAND', "peer=%s%s '%s'%s -> %s"
-                                     % (who, role_tag(role), cmd, proof_tag(obj), reply.split(' ', 1)[0]))
-                self.log_exchange(who, cmd, reply)
+                    self.audit.event('COMMAND', "peer=%s%s cmd='%s'%s result=%s%s"
+                                     % (who, role_tag(role), cmd, proof_tag(obj), reply.split(' ', 1)[0],
+                                        (' reason=%s' % reason) if reason else ''))
+                self.log_exchange(who, cmd, reply, proof_tag(obj))
                 if obj is not None:
                     client.sendall((json.dumps(obj, ensure_ascii=False) + '\n').encode())
                 if reply.startswith('bye'):
@@ -349,11 +351,17 @@ class ControlServer:
                 self.clients.discard(client)
             client.close()
 
-    def log_exchange(self, who, cmd, reply):
-        """The per-command debug line (the reply text rides it). A subclass
-        may shorten it — the fake hides the reply unless log_replies (the
-        words are demo state)."""
-        self.LOG.debug('control from %s: %s -> %s', who, cmd, reply)
+    def log_exchange(self, who, cmd, reply, proof=''):
+        """The per-command debug line: the command, the outcome status and —
+        when the exchange was signed — the frame's proof tag (the audit line's
+        wire=h fragment: grep one 12-hex value and the daemon's exchange line
+        and the audit entry both answer). The reply text joins only when
+        log-replies is on (log-cmd-replies / --control-log-replies; the
+        fake's words are demo state, the same flag toggles them in)."""
+        if self.log_replies:
+            self.LOG.debug('control from %s: %s%s -> %s', who, cmd, proof, reply)
+        else:
+            self.LOG.debug('control from %s: %s%s -> %s', who, cmd, proof, reply.split(' ', 1)[0])
 
     @staticmethod
     def peer(addr):
@@ -397,11 +405,13 @@ class ControlServer:
 
     def framed(self, line, who, role):
         """One wire frame in, one out: parse {"cmd": ...}, gate the TCP auth,
-        gate the ops role (the policy's verbs), verify the frame mac keyed by
+        the token, verify the frame mac keyed by
         the session's token, fold the client's utf-8 to the grammar's
         printable 8-bit, run the command. Returns (cmd, reply-obj,
-        internal-reply, role) — the role so the auth reply can promote the
-        session. The text of a multi-line reply keeps its embedded newlines;
+        internal-reply, role, reason) — the role so the auth reply can promote the
+        session, the reason naming the wire-policy refusals ('unsigned',
+        'bad-mac'; '' otherwise, the audit line's reason= token). The text of
+        a multi-line reply keeps its embedded newlines;
         the '.' terminator of the internal form is stripped (the JSON frame
         needs no framing)."""
         try:
@@ -410,27 +420,27 @@ class ControlServer:
             obj = None
         if not isinstance(obj, dict) or not isinstance(obj.get('cmd'), str):
             return '', {'status': 'fail',
-                        'text': T('wire.malformed_request')}, 'err ' + T('wire.malformed_request_short'), role
+                        'text': T('wire.malformed_request')}, 'err ' + T('wire.malformed_request_short'), role, ''
         cmd = obj['cmd']
         if self.token and cmd.lower() != 'auth' and role is None:
             return cmd, {'status': 'fail', 'text': T('wire.authenticate_first')}, \
-                'err ' + T('wire.authenticate_first_short'), role
+                'err ' + T('wire.authenticate_first_short'), role, ''
         if cmd.lower() == 'auth':
             granted = self.auth_role(obj.get('token'))
             if granted:
                 key = self.session_key(granted)
                 text = T('wire.authenticated')
                 reply = 'ok ' + text
-                return 'auth', {'status': 'ok', 'text': text, 'mac': sign_reply(key, reply)}, reply, granted
-            return 'auth', {'status': 'fail', 'text': T('wire.bad_token')}, 'err ' + T('wire.bad_token'), role
+                return 'auth', {'status': 'ok', 'text': text, 'mac': sign_reply(key, reply)}, reply, granted, ''
+            return 'auth', {'status': 'fail', 'text': T('wire.bad_token')}, 'err ' + T('wire.bad_token'), role, ''
         key = self.session_key(role)
         if key and obj.get('mac') is None and not self.is_unix:
             return cmd, {'status': 'fail',
                          'text': T('wire.unsigned_command')}, \
-                'err ' + T('wire.unsigned_command_short'), role
+                'err ' + T('wire.unsigned_command_short'), role, 'unsigned'
         if key and obj.get('mac') is not None and not verify_request_mac(key, cmd, obj.get('mac')):
             return cmd, {'status': 'fail',
-                         'text': T('wire.command_mac_failed')}, 'err ' + T('wire.command_mac_failed_short'), role
+                         'text': T('wire.command_mac_failed')}, 'err ' + T('wire.command_mac_failed_short'), role, 'bad-mac'
         folded = sanitize_command(cmd)   # the mac spoke the client's bytes; the grammar is printable 8-bit
         if not role_allows(role, folded, self.ops_verbs):
             verb = command_verb(folded) or folded
@@ -440,16 +450,16 @@ class ControlServer:
             if key:
                 reply_obj['mac'] = sign_reply(key, 'fail ' + text)   # the mac is over the wire form
             self.LOG.warning('control: ops session from %s denied %r (read-only role)', who, cmd)
-            return cmd, reply_obj, reply, role
+            return cmd, reply_obj, reply, role, ''
         reply = self.command(folded)
         if reply is None:              # quit: no reply, just close
-            return cmd, None, 'bye', role
+            return cmd, None, 'bye', role, ''
         status, _, text = reply.partition(' ')
         wstatus = 'fail' if status == 'err' else status   # the wire speaks ok|fail|note|bye; the internal err maps here
         reply_obj = {'status': wstatus, 'text': text}
         if key:
             reply_obj['mac'] = sign_reply(key, '%s %s' % (wstatus, text))   # over the wire form, not the internal
-        return cmd, reply_obj, reply, role
+        return cmd, reply_obj, reply, role, ''
 
     def announce_exit(self, reason, text=None):
         """The daemon is going down: send every connected control client a
@@ -886,6 +896,11 @@ class ControlServer:
             if self.is_unix and self._srv is not None and os.path.exists(self.sockpath):
                 os.chmod(self.sockpath, 0o660 if on else 0o600)   # the live socket re-modes too
             return True, 'on' if on else 'off'
+        if key == 'control-log-replies':
+            on = on_off(val, 'control-log-replies')
+            self.log_replies = on
+            self.record_cfg({'control_log_replies': on})
+            return True, 'on' if on else 'off'
         if key == 'log-level':
             lvl = val.upper()
             if lvl not in self.LOG_LEVELS:
@@ -944,6 +959,8 @@ class ControlServer:
             return True, (','.join(str(u) for u in sorted(self.trust_uids)) or 'off')
         if key == 'control-socket-group':
             return True, ('on' if self.socket_group else 'off')
+        if key == 'control-log-replies':
+            return True, ('on' if self.log_replies else 'off')
         if key == 'log-level':
             return True, logging.getLevelName(logging.getLogger().getEffectiveLevel())
         if key == 'local-time':

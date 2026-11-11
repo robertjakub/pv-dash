@@ -20,7 +20,7 @@ from common.wire.wiresec import sign_request, verify_reply
 
 def run_ctl(daemon, bin_name, app, self_note, command_help,
             ctl_socket, timeout_s, audit_max_mb, audit_files, ctl_page,
-            max_line_bytes, spellings=None):
+            max_line_bytes, spellings=None, audit_tag='CTL'):
     """The whole ctl ladder: the parser (the tool's name, socket, examples),
     the batch stdin strip (comments and blanks stay comments), the token
     parse, the connect, the CONNECT audit, the signed exchange closure, the
@@ -31,7 +31,9 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
     the console's live/alias knob spellings translate to the flat registry
     names here exactly as the interactive cli's — a config script's
     live-word lines pipe through the ctl unchanged (the bundled confs'
-    claim)."""
+    claim). `audit_tag` is the trail's tool tag (shared/tags.json) — the
+    client writes it with the cli writer role (tag=cli)."""
+
     p = argparse.ArgumentParser(description='Send commands to the %s control server (TCP or unix socket).' % daemon)
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (env CTL when unset) — same flag as %s' % self_note)
     p.add_argument('command', nargs='*', help='control command, %s' % command_help)
@@ -52,7 +54,7 @@ def run_ctl(daemon, bin_name, app, self_note, command_help,
         raise SystemExit(0)
 
     try:
-        audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CTL', app=app,
+        audit = None if args.no_audit_log else AuditLog(args.audit_log, audit_tag, app=app, writer='cli',
                                                         max_mb=args.audit_max_mb, files=args.audit_files,
                                                         forward=args.audit_forward,
                                                         forward_format=args.audit_forward_format)

@@ -1,14 +1,17 @@
 """Append-only audit trail shared by the tools and their control CLIs: one
 line per event — who, when, what, result. Every line carries the AUDIT level
-between the stamp and the writer prefix ('<stamp> AUDIT <PREFIX> <EVENT> ...')
+between the stamp and the writer tag ('<stamp> AUDIT tag=<tag> type=<type> ...')
 so the trail filters cleanly out of a mixed log. ping/pong keepalives are
 never logged. The file is opened append-only and flushed per event, so a
 crash keeps everything up to the last command.
 
-Every entry carries a short chained hash right after the event name (12 hex
-chars, no decoration): `<stamp> AUDIT <PREFIX> <EVENT> <hash> [detail]` —
-h = sha256(prev | stamp | prefix | event + detail) truncated. The chain is
-per writer prefix (CACHE, INV, CLI, CTL each chain their own lines), so
+Every entry carries a short chained hash in its hash= token (12 hex chars,
+no decoration): `<stamp> AUDIT tag=<TAG> type=<type> hash=<hash>
+[message=<detail>]` — h = sha256(prev | stamp | tag | type + message)
+truncated, the material exactly the line's own stamp, tag= and
+type=/message= words (the tag always uppercase — the tags.json spelling).
+The chain is
+per writer tag (CACHE, INV, INV-CLI, each chain their own lines), so
 several writers can interleave in one file and every chain stays
 verifiable on its own — scripts/audit_verify.py walks a file (and its
 rotated backups, oldest first), recomputes each prefix's chain and names the
@@ -44,9 +47,11 @@ failure stops the mirroring with one stderr note and the NEXT event
 re-arms (a success notes once with the dropped count) — no threads, no
 buffers, the sink keeps the chain either way."""
 import hashlib
+import json
 import logging
 import logging.handlers
 import os
+import re
 import socket
 import sys
 import threading
@@ -194,29 +199,34 @@ class RemoteForwardHandler(logging.Handler):
 
     @staticmethod
     def severity(line):
-        """The severity table: `-> err` = 7, everything else = 4."""
-        return FORWARD_SEV_ERR if ' -> err' in line else FORWARD_SEV_OK
+        """The severity table: `result=err` = 7, everything else = 4."""
+        return FORWARD_SEV_ERR if 'result=err' in line else FORWARD_SEV_OK
 
     def envelope(self, line):
         """The wire payload for one native audit line: the RFC5424 envelope
-        `<PRI>1 <RFC3339-ms> <hostname> <app> <pid> <EVENT> [pvDash@1
-        prefix=... chain=...] <line>` or the CEF additive wrapping
+        `<PRI>1 <RFC3339-ms> <hostname> <app> <pid> <type> [pvDash@1
+        prefix=... role=... chain=...] <line>` or the CEF additive wrapping
         (`msg=` carries the exact native line, so chain verification reads
-        the same text under both)."""
+        the same text under both). The extracted fields speak the line's own
+        KV words: prefix= the tool's tag, role= the writer, chain= the hash,
+        the MSGID the type."""
         parts = line.split(' ')
-        event, chain = parts[3], parts[4]
+        etype = parts[4][5:] if parts[4].startswith('type=') else parts[3]
+        chain = parts[5][5:] if parts[5].startswith('hash=') else parts[4]
+        tag = parts[2][6:] if parts[2].startswith('tools=') else parts[2]
+        role = parts[3][4:] if parts[3].startswith('tag=') else 'daemon'
         if self.fmt == 'cef':
             msg = line.replace('\\', '\\\\').replace('=', '\\=')
             return ('CEF:0|pv-dash|%s|%s|%s|%s|%d| rt=%d cs1Label=AuditChain cs1=%s '
                     'cs2Label=AuditPrefix cs2=%s msg=%s'
-                    % (self.app, VERSION, event, event, self.severity(line),
-                       int(time.time() * 1000), chain, sd_escape(parts[2]), msg)).encode('utf-8')
+                    % (self.app, VERSION, etype, etype, self.severity(line),
+                       int(time.time() * 1000), chain, sd_escape(tag), msg)).encode('utf-8')
         now = time.time()
         stamp = time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(now)) + '.%03dZ' % (int(now * 1000) % 1000)
         pri = logging.handlers.SysLogHandler.LOG_DAEMON * 8 + self.severity(line)
-        sd = '[pvDash@1 prefix="%s" chain="%s"]' % (sd_escape(parts[2]), sd_escape(chain))
+        sd = '[pvDash@1 prefix="%s" role="%s" chain="%s"]' % (sd_escape(tag), sd_escape(role), sd_escape(chain))
         return ('<%d>1 %s %s %s %d %s %s %s'
-                % (pri, stamp, self._host, self.app, os.getpid(), event, sd, line)).encode('utf-8')
+                % (pri, stamp, self._host, self.app, os.getpid(), etype, sd, line)).encode('utf-8')
 
 
 class UdpForwardHandler(RemoteForwardHandler):
@@ -280,34 +290,40 @@ AUDIT_MAX_MB_MIN = 0
 AUDIT_MAX_MB_MAX = 1048576
 
 
-def entry_hash(prev, stamp, prefix, body):
-    """The chained entry hash: sha256(prev | stamp | prefix | text), hex-truncated.
-    Shared by the writer and scripts/audit_verify.py — one implementation."""
-    material = '%s|%s|%s|%s' % (prev, stamp, prefix, body)
+def entry_hash(prev, stamp, tag, body):
+    """The chained entry hash: sha256(prev | stamp | tag | body), hex-truncated.
+    Shared by the writer and scripts/audit_verify.py — one implementation. The
+    tag and body are the line's own rendered words (the KV line's uppercase
+    tag= value and its type=/message= text)."""
+    material = '%s|%s|%s|%s' % (prev, stamp, tag, body)
     return hashlib.sha256(material.encode('utf-8')).hexdigest()[:HASH_LEN]
 
 
 def parse_entry_hash(line):
     """The chained hash of one audit line (None when absent/malformed): the
-    5th space-separated token, right after the event name, exactly
-    HASH_LEN hex chars — `<stamp> AUDIT <PREFIX> <EVENT> <hash> [detail...]`."""
+    `hash=` token's HASH_LEN hex chars — `<stamp> AUDIT tools=<TAG> tag=<writer>
+    type=<type> hash=<hash> [message=...]` (the token rides parts[5]). The
+    validator speaks the current grammar only: a pre-KV line reads malformed."""
     parts = line.rstrip().split(' ')
-    if len(parts) < 5 or parts[1] != 'AUDIT':
+    if len(parts) < 6 or parts[1] != 'AUDIT' or not parts[2].startswith('tools='):
         return None
-    h = parts[4]
+    h = parts[5]
+    if h.startswith('hash='):
+        h = h[5:]
     if len(h) != HASH_LEN or not all(c in '0123456789abcdef' for c in h):
         return None
     return h
 
 
 def entry_body(line):
-    """The hashed text of one audit line: `<EVENT> [detail...]` — the hash
-    token skipped, everything after it verbatim."""
+    """The hashed text of one audit line: `<tag> <type> [message...]` —
+    parts[3] is the tag= word, parts[4] the type= word, parts[6:] the
+    message= text verbatim; the writer's material is exactly this."""
     parts = line.rstrip().split(' ')
-    return ' '.join(parts[3:4] + parts[5:])
+    return ' '.join(parts[3:5] + parts[6:])
 
 
-def tail_hash(path, prefix):
+def tail_hash(path, prefix, writer='daemon'):
     """The last `h=` this prefix left in an existing file (or its rotated
     backups), so a restarted writer chains seamlessly from its own previous
     entries. Reads each file's trailing 64 KB, live file first; GENESIS when
@@ -326,7 +342,7 @@ def tail_hash(path, prefix):
         except OSError:
             continue
         for line in reversed(data.splitlines()):
-            if (' AUDIT %s ' % prefix) not in line:
+            if (' tools=%s ' % prefix) not in line or (' tag=%s ' % writer) not in line:
                 continue
             h = parse_entry_hash(line)
             if h:
@@ -356,6 +372,30 @@ def audit_params_of(cfg):
             'disabled': bool(cfg['no_audit_log'])}
 
 
+def load_audit_tags(tool):
+    """The audit trail's writer tag off shared/tags.json (the family's one
+    tag home, found by the texts loader's tree walk): the tool's daemon tag
+    ('cache' -> 'CACHE') — the daemon speaks it verbatim, the ctl and cli
+    clients derive theirs as '<tag>-CLI' (one client tag: the two client
+    kinds write the same trail role). A missing or malformed file fails
+    loud: the audit is data, the tag names its writer."""
+    tree = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    path = os.path.join(tree, 'shared', 'tags.json')
+    try:
+        with open(path, encoding='utf-8') as f:
+            tags = json.load(f)
+    except OSError as e:
+        raise SystemExit('audit tags: cannot read %s: %s' % (path, e))
+    except ValueError as e:
+        raise SystemExit('audit tags: %s is not valid JSON: %s' % (path, e))
+    if not isinstance(tags, dict) or tool not in tags:
+        raise SystemExit('audit tags: %s carries no %r tag' % (path, tool))
+    tag = tags[tool]
+    if not isinstance(tag, str) or not re.fullmatch(r'[A-Z][A-Z0-9_-]{0,15}', tag):
+        raise SystemExit("audit tags: %s: %s must be an uppercase word (the audit line's writer tag)" % (path, tool))
+    return tag
+
+
 def build_audit(cfg, prefix, app, logger, rc=1):
     """The start's AuditLog: None when the trail is off, the refuse-loud
     SystemExit when the trail's parameters are invalid (the four bins'
@@ -371,11 +411,13 @@ def build_audit(cfg, prefix, app, logger, rc=1):
 
 
 class AuditLog:
-    """'<UTC stamp> AUDIT <PREFIX> <EVENT> <chain hash> [detail]' per line —
-    the 12-hex hash chains the entry to this writer's previous one
-    (entry_hash), making any edit/reorder/middle-deletion evident to
-    scripts/audit_verify.py. PREFIX distinguishes the writer (CACHE / INV /
-    CLI / CTL) and each prefix chains its own lines, so interleaved writers
+    """'<UTC stamp> AUDIT tools=<TAG> tag=<writer> type=<type> hash=<chain hash>
+    [message=<detail>]' per line — the 12-hex hash chains the entry to this
+    writer's previous one (entry_hash), making any edit/reorder/middle-deletion
+    evident to scripts/audit_verify.py. tools= names the tool (the uppercase
+    tag from shared/tags.json — CACHE / SCR / INV / DSH), tag= the writer
+    role (the daemon's own 'daemon', the ctl and cli clients' 'cli') — the
+    pair is the chain key, so interleaved writers
     in one file verify independently. Opening failure = fatal: an audit
     trail that silently vanishes is worse than no session.
     All writers share one process-wide file, so every write+flush+rotate
@@ -386,7 +428,7 @@ class AuditLog:
     no XDG directory is created; `none` without a forward folds to the full
     off (--no-audit-log's state) with one warn line."""
 
-    def __init__(self, path=None, prefix='AUDIT', app='pv-suite',
+    def __init__(self, path=None, prefix='AUDIT', app='pv-suite', writer='daemon',
                  max_mb=10.0, daily=False, files=3, forward=None,
                  forward_format='rfc5424'):
         if not AUDIT_MAX_MB_MIN <= max_mb <= AUDIT_MAX_MB_MAX:
@@ -395,7 +437,8 @@ class AuditLog:
             raise ValueError('audit-files must be %d..%d' % (AUDIT_FILES_MIN, AUDIT_FILES_MAX))
         if forward_format not in AUDIT_FORWARD_FORMATS:
             raise ValueError('audit-forward-format must be one of %s' % ', '.join(AUDIT_FORWARD_FORMATS))
-        self.prefix = prefix
+        self.prefix = prefix   # the tool's tag (shared/tags.json) — the line's tools= word, always uppercase
+        self.writer = writer   # the writer role — the line's tag= word: 'daemon' or 'cli'
         self.app = app          # the syslog tag / APP-NAME (the bin name) when forwarding
         self.max_bytes = int(max_mb * 1024 * 1024) if max_mb and max_mb > 0 else 0
         self.daily = daily
@@ -433,7 +476,7 @@ class AuditLog:
         else:
             try:
                 self._f = open(self.path, 'a', encoding='utf-8')
-                self._last = tail_hash(self.path, self.prefix)   # chain from the writer's own trail
+                self._last = tail_hash(self.path, self.prefix, self.writer)   # chain from the writer's own trail
             except OSError:
                 # a read-only working directory (a container, a packaged install):
                 # the trail belongs in the service log rather than nowhere
@@ -530,10 +573,12 @@ class AuditLog:
                 self._maybe_rotate()
             stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
             detail = ' '.join(detail.split())   # fold \n\r\t etc: one event = one physical line
-            h = entry_hash(self._last, stamp, self.prefix, '%s%s' % (event, (' ' + detail) if detail else ''))
+            body = 'tag=%s type=%s%s' % (self.writer, event.lower(), (' message=%s' % detail) if detail else '')
+            h = entry_hash(self._last, stamp, self.prefix, body)
             self._last = h
-            native = '%s AUDIT %s %s %s%s' % (stamp, self.prefix, event, h,
-                                              (' ' + detail) if detail else '')
+            native = '%s AUDIT tools=%s tag=%s type=%s hash=%s%s' % (stamp, self.prefix, self.writer,
+                                                                     event.lower(), h,
+                                                                     (' message=%s' % detail) if detail else '')
             if not self._suppressed:
                 self._f.write('%s\n' % native)
                 self._f.flush()
@@ -542,7 +587,7 @@ class AuditLog:
 
     def command(self, cmd, result):
         """A command the user entered and its outcome (ok/err/bye/local/aborted)."""
-        self.event('COMMAND', "'%s' -> %s" % (cmd, result))
+        self.event('COMMAND', "cmd='%s' result=%s" % (cmd, result))
 
     def close(self):
         with self._lock:

@@ -663,7 +663,7 @@ def run_cli(spec):
     _keepalive_s = keepalive_env(spec['keepalive_s'])
 
     try:
-        audit = None if args.no_audit_log else AuditLog(args.audit_log, 'CLI', app=spec['app'],
+        audit = None if args.no_audit_log else AuditLog(args.audit_log, spec.get('audit_tag', 'CLI'), app=spec['app'], writer='cli',
                                                         max_mb=args.audit_max_mb, files=args.audit_files,
                                                         forward=args.audit_forward,
                                                         forward_format=args.audit_forward_format)

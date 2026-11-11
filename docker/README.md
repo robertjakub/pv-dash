@@ -63,17 +63,17 @@ your Prometheus is external and pulls the exporter's `/metrics`:
 
 ```bash
 cd docker/prod
-cp ../env/cache.env.example ../env/cache.env
-$EDITOR ../env/cache.env                            # UPSTREAM=192.168.1.100:5502 — the device
+cp ../env/cache.env.example ../env/cache-production.env
+$EDITOR ../env/cache-production.env                  # UPSTREAM=192.168.1.100:5502 — the device
 docker compose up -d                                # cache + scraper + dashboard
 ```
 
 Three operator decisions, each called out in the compose file's comments:
 
-- **the device address** — `env/cache.env` is **required** here (no
-  `required: false`): the stack refuses to start without it, because the
-  image's default `UPSTREAM` (`fake-inverter:5502`) only ever resolves in
-  the demo. Set `UPSTREAM=HOST:PORT` to the device.
+- **the device address** — `env/cache-production.env` is **required**
+  here (no `required: false`): the stack refuses to start without it,
+  because the image's default `UPSTREAM` (`fake-inverter:5502`) only ever
+  resolves in the demo. Set `UPSTREAM=HOST:PORT` to the device.
 - **the device's auth** (optional) — if the device or its gateway speaks
   an auth scheme, set `AUTH_UPSTREAM=suite|waveshare` and
   `AUTH_UPSTREAM_KEY` in the same env file: the upstream credential is
@@ -103,7 +103,11 @@ blockquote, usage and topology diagram:
 Each image has its own env file, shipped as an example:
 `env/cache.env.example`, `env/scraper.env.example`, `env/fake.env.example`,
 `env/dashboard.env.example`, `env/prometheus.env.example` — `cp
-env/<tool>.env.example env/<tool>.env` and edit. The names are the
+env/<tool>.env.example env/<tool>.env` and edit. The compose stacks
+copy-name the files per stack: the demo reads `env/<tool>.env`, prod reads
+`env/<tool>-production.env` (the cache's and the scraper's — the cache's
+required there), so one checkout runs both stacks without the copies
+colliding on knobs like `UPSTREAM`. The names are
 **bare env twins** the tool's own docs speak (`UPSTREAM`, `INTERVAL`,
 `TTL`, `PROFILE`, `METRIC_PREFIX`, `LOG_LEVEL`, …) — one file per tool,
 so no namespacing is needed (the Prometheus file is the exception: its
@@ -130,14 +134,15 @@ docker run --rm -p 127.0.0.1:15502:15502 \
     --env-file env/cache.env modbus-cache        # plain docker: --env-file
 
 cd demo && docker compose up -d modbus-cache     # the demo stack: env_file: (required: false)
-cd ../prod && docker compose up -d modbus-cache  # the prod stack: env_file: (cache's required)
+cd ../prod && docker compose up -d modbus-cache  # the prod stack: env_file: (cache-production.env, required)
 ```
 
 Compose reads the service's file via `env_file:` relative to the stack's
-own directory (`../env/<tool>.env`) — in the demo with
-`required: false` (compose ≥ 2.24; no file = the image defaults, so the
-demo runs out of the box), in prod with the cache's file **required**
-([the production stack](#the-production-stack-prod)). When a file
+own directory (`../env/<tool>.env` in the demo, `../env/<tool>-production.env`
+in prod) — in the demo with `required: false` (compose ≥ 2.24; no file =
+the image defaults, so the demo runs out of the box), in prod with the
+cache's file **required** ([the production
+stack](#the-production-stack-prod)). When a file
 exists its values ride the tools' resolution (**flag > env > the bundled
 conf > built-in defaults**) — an env value overrides the image's bundled
 conf script, the same layering a plain checkout has. Compose recreates a
@@ -197,8 +202,8 @@ default):
   (server), the cache proves it upstream and demands it from its own
   clients; in prod the cache demands it (server) and the scraper proves
   it — the upstream side stays the device's credential (the operator's
-  `AUTH_UPSTREAM*` in `env/cache.env`, or none for a device without
-  auth). The `environment:` blocks pin scheme + `file:` reference;
+  `AUTH_UPSTREAM*` in `env/cache-production.env`, or none for a device
+  without auth). The `environment:` blocks pin scheme + `file:` reference;
   opening a hop is a compose edit (an explicit operator act, the F7
   shape). Standalone runs stay auth-less — pass `-e MODBUS_AUTH=suite -e
   AUTH_KEY=file:/config/modbus-auth.token` on a shared named volume to

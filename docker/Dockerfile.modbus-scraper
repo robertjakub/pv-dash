@@ -24,7 +24,8 @@
 # the generated /config/metrics.token: edit the spec there, it survives
 # recreation. The bundled conf is NOT in the volume — the tool loads the
 # image's /pv-suite/scraper/scraper.conf (the default --config target) and
-# the per-tool env file env/scraper.env overrides its knobs (see
+# the per-tool env file (env/scraper.env — the demo and plain-docker
+# spelling; the prod copy carries -production) overrides its knobs (see
 # ../docker/README.md; a flag beats the env: `docker run ... modbus-scraper
 # --upstream 10.0.0.2:15502` on top). The compose stacks add
 # AUTH_TOKEN=file:/config/metrics.token (a random token the entrypoint

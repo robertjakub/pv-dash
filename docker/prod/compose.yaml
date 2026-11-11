@@ -12,15 +12,18 @@
 #     demo's `internal: true` would cut the route out)
 #
 # The operator's decisions, before `docker compose up -d`:
-#   1. cp ../env/cache.env.example ../env/cache.env and set UPSTREAM —
-#      the file is REQUIRED here (no required: false): the stack refuses
-#      to start without it, because the image default (fake-inverter:5502)
-#      only ever resolves in the demo. If the device (or its gateway)
-#      speaks an auth scheme, set AUTH_UPSTREAM=suite|waveshare and
-#      AUTH_UPSTREAM_KEY in the same file — the upstream credential is
-#      the device's, the env file is its edit surface (the stack's own
-#      hops are pre-wired below and cannot be overridden from the env
-#      file — environment beats env_file)
+#   1. cp ../env/cache.env.example ../env/cache-production.env and set
+#      UPSTREAM — the file is REQUIRED here (no required: false): the
+#      stack refuses to start without it, because the image default
+#      (fake-inverter:5502) only ever resolves in the demo. The prod copy
+#      carries the -production name (the demo stack reads
+#      ../env/cache.env) so one checkout can run both stacks. If the
+#      device (or its gateway) speaks an auth scheme, set
+#      AUTH_UPSTREAM=suite|waveshare and AUTH_UPSTREAM_KEY in the same
+#      file — the upstream credential is the device's, the env file is
+#      its edit surface (the stack's own hops are pre-wired below and
+#      cannot be overridden from the env file — environment beats
+#      env_file)
 #   2. your collector's way in (see the scraper's ports: comment)
 #   3. edit the dashboard's PROM_URL below — your collector's base URL
 #
@@ -68,8 +71,9 @@ services:
     env_file:
       # REQUIRED (no required: false): UPSTREAM is the operator's decision
       # — set it to the device's Modbus TCP HOST:PORT before up. The other
-      # lines stay commented; the image defaults stand.
-      - ../env/cache.env
+      # lines stay commented; the image defaults stand. The -production
+      # name keeps the prod copy apart from the demo stack's cache.env
+      - ../env/cache-production.env
     volumes:
       - config:/config
     networks:
@@ -93,11 +97,14 @@ services:
       AUTH_KEY: file:/config/modbus-auth.token
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the exporter never serves unauthenticated (the audit's F13) —
-      # environment beats env_file, so scraper.env cannot override this;
+      # environment beats env_file, so scraper-production.env cannot
+      # override this;
       # the value is a file: reference (the first line of the 0600 file)
       AUTH_TOKEN: file:/config/metrics.token
     env_file:
-      - path: ../env/scraper.env
+      # optional (required: false): no file = the image defaults stand —
+      # the prod copy's name (the demo stack reads ../env/scraper.env)
+      - path: ../env/scraper-production.env
         required: false
     volumes:
       - config:/config

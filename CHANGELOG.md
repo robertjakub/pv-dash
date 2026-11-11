@@ -12,7 +12,7 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Unreleased
 ### Changed
 
-- **the family** — **an out-of-bounds audit rotation env/flag refuses at
+- **an out-of-bounds audit rotation env/flag refuses at
   start now** (`AUDIT_FILES`/`AUDIT_MAX_MB` and their flags): the row
   bounds are a spelled configuration error — the one-line refusal, no
   fallback to the default (a value the wire refuses is a value no layer
@@ -52,6 +52,16 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   `listenPort` → `settings.LISTEN = "HOST:PORT"`), every `<secret> = "value"`
   becomes `<secret>File = "/absolute/path"`, the dashboard's `settings`
   attrset moves to `solarConfig`.
+- **docker** — **the env files split by stack copy**: the prod stack reads
+  `env/<tool>-production.env` (the cache's REQUIRED —
+  `cp ../env/cache.env.example ../env/cache-production.env` — the
+  scraper's optional) while the demo keeps `env/<tool>.env`, so one
+  checkout runs both stacks without the copies colliding on knobs like
+  `UPSTREAM` (the image default `fake-inverter:5502` is the demo's peer;
+  the prod copy points at the device). Still ONE generated example per
+  tool — the knobs are identical, the header's cp line and the cache
+  intro name both copy targets (`gen_env.py` renders them); the prod
+  compose's `env_file:` paths and the docker READMEs follow.
 
 ### Added
 

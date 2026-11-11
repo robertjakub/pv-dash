@@ -319,7 +319,24 @@ def candidates(buf):
     else:
         base = '/'.join(w.lower() for w in done)   # the command path spelled so far — a segment's
         pool, hint = command_path_pool(done, _SPEC['command_pool']()), None
-        desc = lambda w, base=base: _SPEC['describe']((base + '/' if base else '') + w)
+        # the double-meaning node (the alias-first-segment rule): the
+        # command word may also head the rows' alias/live paths — `write`
+        # walks its command children AND the write-acl alias's next
+        # segment; a whole live row answers with its values like set's
+        # walk-on (a show report never offers a value)
+        s, segs = setting_path_pool(done, _SPEC['setting_pool'](), _SPEC['spellings'])
+        if s is not None and s.show_report:
+            s = None
+        if s is not None:
+            values_mode = True
+            pool = tuple(s.values)
+            words = set(pool)
+            rest = [p for p in s.value_shape.split('|') if p and p not in words]
+            hint = '|'.join(rest) or None
+            desc = lambda w, s=s: s.value_help.get(w, s.value_help.get(w.lower(), '')) or None
+        else:
+            pool = tuple(pool) + tuple(g for g in segs if g not in pool)
+            desc = lambda w, base=base: _SPEC['describe']((base + '/' if base else '') + w)
     if pool is None:                      # a value shape with no completable words
         return [], hint, desc, [('values', [])]
     matches = [w for w in pool if w.startswith(text.lower())]

@@ -109,7 +109,7 @@ class Resolver:
         self.cfg = cfg
         self.logger = logger
 
-    def resolve(self, cli_value, env_name, cfg_key, default, conv, row=None):
+    def resolve(self, cli_value, env_name, cfg_key, default, conv, row=None, strict_bounds=False):
         """The family's precedence for one knob: CLI flags > env > config
         script > defaults. An empty flag or env value counts as unset (the
         value falls through to the next layer); a bad value logs and falls
@@ -120,7 +120,11 @@ class Resolver:
         value the wire refuses, the env/config layer no longer keeps. A
         row's value word on a numeric conv refuses too: what the word means
         is the wire branch's own mapping ('off' is 0 there), and the
-        startup layers keep their documented defaults."""
+        startup layers keep their documented defaults. `strict_bounds`
+        opts the call into the refuse shape for the row's min/max alone
+        (a parse stumble still keeps last good): an out-of-bounds value is
+        a spelled configuration error, not a stumble — the one-line
+        SystemExit refusal, the family's startup shape."""
         raw = cli_value
         if raw is None or raw == '':
             raw = os.environ.get(env_name) if env_name else None
@@ -131,12 +135,14 @@ class Resolver:
         try:
             if row is None:
                 return conv(raw)
-            from common.settings.options import row_value   # lazy: options sits above config in the layering
+            from common.settings.options import row_value, RowBounds   # lazy: options sits above config in the layering
             value = row_value(row, raw)
             if row.conv in (int, float) and isinstance(value, str):
                 raise ValueError('the value word %r has no startup value' % value)
             return value
         except (TypeError, ValueError) as e:
+            if strict_bounds and isinstance(e, RowBounds):
+                raise SystemExit('invalid %s = %r: %s' % (cfg_key, raw, e))
             self.logger.error('invalid %s = %r: %s (using %r)', cfg_key, raw, e, default)
             return default
 

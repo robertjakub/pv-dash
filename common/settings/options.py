@@ -99,6 +99,13 @@ class Option:
         return self.env if isinstance(self.env, tuple) else (self.env,)
 
 
+class RowBounds(ValueError):
+    """A row_value bounds failure: the value parsed fine but the row's
+    min/max forbids it. A ValueError like every row_value failure (the
+    resolvers' keep-last-good catches it as today) — the typed shape lets
+    a strict_bounds startup layer tell the two apart and refuse."""
+
+
 def row_value(opt, raw, checks=None):
     """The one value validator, row-driven — every layer judges a knob
     value through it (the flag parser, the env/config resolver, the wire's
@@ -128,7 +135,10 @@ def row_value(opt, raw, checks=None):
         if isinstance(value, float) and not math.isfinite(value):
             raise ValueError('%s must be a finite number, got %r' % (opt.name, text))
         if (opt.min is not None and value < opt.min) or (opt.max is not None and value > opt.max):
-            raise ValueError('%s must be %s..%s, got %r' % (opt.name, opt.min, opt.max, text))
+            bounds = ('%s..%s' % (opt.min, opt.max) if opt.min is not None and opt.max is not None
+                      else '>= %s' % opt.min if opt.max is None
+                      else '<= %s' % opt.max)
+            raise RowBounds('%s must be %s, got %r' % (opt.name, bounds, text))
     if opt.choices is not None and value not in opt.choices and text not in opt.choices:
         raise ValueError('%s must be one of %s, got %r' % (opt.name, '|'.join(opt.choices), text))
     if opt.check:
@@ -170,9 +180,15 @@ def build_parser(options, prog=None, description=None, epilog=None, add_help=Tru
 
 def _row_type(opt):
     """The argparse `type` callable over row_value — named for the knob so a
-    refused flag value reads 'argument --unit: invalid unit: ...'."""
+    refused flag value reads 'argument --unit: invalid unit: ...'. The
+    row_value message rides the ArgumentTypeError verbatim (the bounds
+    text 'unit must be ..' reaches the one error line instead of argparse's
+    bare 'invalid unit value' wrapper)."""
     def parse(raw):
-        return row_value(opt, raw)
+        try:
+            return row_value(opt, raw)
+        except ValueError as e:
+            raise argparse.ArgumentTypeError(str(e))
     parse.__name__ = opt.name
     return parse
 

@@ -292,13 +292,26 @@ def render_word_sections(sections):
     return rows
 
 
+def _slot(words, word, o, exact):
+    """One listing word's slot: the first row wins, and an exact word (the
+    spelling IS the word — a show report's own `cache`, a flat live
+    `dump-interval`) displaces a walk-on (a deeper path's next segment —
+    `cache/ttl` walks at `cache` beside the report's own word), never the
+    reverse; the ? face's describe resolves the exact spelling first too."""
+    cur = words.get(word)
+    if cur is None or (exact and not cur[1]):
+        words[word] = (o, exact)
+
+
 def _listing(name, options, node=None, hidden_words=()):
     """The walk listing describe_node and describe_root share — the
-    wire's flat-grammar listing of one position: the knobs' FLAT names
-    whose live path homes under `name` (the longest node prefix of the
-    row's live/alias spelling — the namespace walk survives as the prose
-    hierarchy over the flat-named knobs), the child nodes' next walk
-    words, the show reports' words; one per row, the node-first
+    listing of one position in the console's own words: the knobs whose
+    live/alias spelling homes under `name` (the longest node prefix of
+    the spelling — the namespace walk survives as the prose hierarchy)
+    list their next walk word (the ? face's word — the golden master the
+    wire's node help answers byte for byte; the clis translate the words
+    to the flat registry grammar when they send), the child nodes' next
+    walk words, the show reports' words; one per row, the node-first
     descriptions, the display groups' sections (the ungrouped on top,
     soft-alphabetical within), the hidden rows never listing (the pools'
     rule; `hidden_words` hides more — the runtime-gated words). A node
@@ -321,13 +334,16 @@ def _listing(name, options, node=None, hidden_words=()):
             continue   # the pools' rule: the hidden rows never list (the typed path still answers)
         if o.node:
             if o.name != name and o.name.startswith(prefix):
-                words.setdefault(o.name[len(prefix):].split('/')[0], o)
-        elif (o.live or o.alias) and o.name not in hidden_words and home(o) == name:
-            words.setdefault(o.name, o)   # the flat wire name — the word the wire answers
+                _slot(words, o.name[len(prefix):].split('/')[0], o, False)
+        elif o.name not in hidden_words and home(o) == name:
+            for spelling in (o.live, o.alias):   # the console's own words — the walk's next segment
+                if spelling and spelling.startswith(prefix):
+                    rest = spelling[len(prefix):]
+                    _slot(words, rest.split('/')[0], o, '/' not in rest)
     if not words:
         return ('%s - %s' % (name, node.setting_help or node.help)) if node is not None else None
     buckets = {}
-    for word, o in words.items():   # registry order = the sections' first-appearance order
+    for word, (o, _) in words.items():   # registry order = the sections' first-appearance order
         text = o.setting_help or o.help
         buckets.setdefault(o.group or '', []).append((word, text))
     bare = buckets.pop('', None)
@@ -338,10 +354,10 @@ def _listing(name, options, node=None, hidden_words=()):
 
 def describe_node(options, name):
     """The hierarchy node's wire help (`show audit`, `show audit rotate`;
-    also `help audit`): the node's own children as the wire's flat-grammar
-    listing renders them — the knobs' flat names homed here, the child
-    nodes' walk words (the golden master, byte for byte). None when the
-    name is no node."""
+    also `help audit`): the node's own children as the console's ? renders
+    them — the knobs' live/alias walk words homed here (the ? face's
+    golden master, byte for byte), the child nodes' walk words. None when
+    the name is no node."""
     node = next((o for o in options if o.node and o.name == name), None)
     if node is None:
         return None

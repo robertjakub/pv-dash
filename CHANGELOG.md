@@ -9,6 +9,46 @@ before the repo restructured into one suite.
 This file keeps **Unreleased and the current release** only — the release
 history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
+## Unreleased
+### Changed
+
+- **scripts** — **the battery runner is python**: `scripts/battery.py`
+  replaces the sh twin — the same CLI (the profiles, the explicit
+  suite names, `--stop`/`--name`/`--depth`), the same state home
+  (the run dirs, the slots, the eta history, the backups), the same
+  status.txt/eta row shapes `battery_status.py` parses, and the same
+  machine exit (0 green / 1 red). The port kills the sh class of
+  hazards the night demonstrated twice: the interpreter loads whole at
+  start, so editing the file under a live battery can no longer shift a
+  running shell's parse offset, and the BSD-only `date -j`/`stat -f`/
+  `ln -h` spellings go (os.symlink's atomic grab, datetime stamps) —
+  the runner is NixOS-portable now. The START rows carry the suite's
+  OWN historical eta (`eta 3m27s`, its own finish clock) — the batch
+  estimate stays on the `estimate:` row; the eta history files keep
+  their raw-seconds rows for the predictions. release.py's battery leg
+  invokes the python runner; the suites-side contracts (PV_RUN_DIR,
+  SUITE_PORT_BASE, PV_SUITE_PROFILE, the zz_ copy's pgrep tell) are
+  unchanged.
+
+- **scripts** — **battery_status watches and says last**: `--watch`
+  loops with the screen cleared per tick behind a watch-style header
+  (`Every 1s: battery_status.py — HH:MM:SS (Ctrl-C quits)`),
+  `--interval <s>` sets the period (default 1, implies `--watch`) —
+  the default stays one show; and the newest-run block's labels say
+  **`last`** (`last finished:` / `last canceled:` / `last run (no
+  tally):`) — with the fall-through it names the previous stopped run,
+  not the newest dir.
+
+- **tests** — **the suites create their scratch dir at the gate**:
+  `os.makedirs(SCRATCH, exist_ok=True)` beside the SCRATCH binding —
+  the CI matrix legs set `PV_RUN_DIR=/tmp/pvbattery-ci`, a fixed path
+  nothing makes: the pre-sweep suites only read the marker and never
+  wrote inside it, the SCRATCH sweep made every scratch file land in
+  it, and a fresh runner's first open would have FileNotFoundError'd.
+  The battery's run dir always pre-existed; the CI shape is the one
+  that needs the create (validated in the CI shape: a bare, non-
+  existent PV_RUN_DIR, cache-control-fuzz quick, ALL PASS).
+
 ## 0.4.3 — 2026-11-11
 ### Changed
 

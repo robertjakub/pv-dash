@@ -153,7 +153,7 @@ def tests(which, dry, version):
     if which == 'none':
         print('release: skipping the suites (--tests none)')
         return
-    cmd = ['sh', 'scripts/battery.sh']   # the runner is 644 by the family's exec-bit rule — it rides sh
+    cmd = ['python3', 'scripts/battery.py']   # the runner in python — the sh twin retired
     if which == 'quick':
         cmd += ['--depth', 'full'] + SUITES_QUICK   # the recovery pair, still at the nightly depth
     else:

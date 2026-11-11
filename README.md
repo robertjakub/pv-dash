@@ -60,7 +60,7 @@ pv-suite/
 ├── tests/        # the test suites, one or more per Modbus tool
 ├── scripts/      # the gates + editors: check/lint, editor.py,
 │                 #   lint_readmes/lint_texts/lint_acl, family_drift, gen_man/gen_manual/gen_examples,
-│                 #   gen_sbom, validate_json, set_group/set_live, battery.sh, battery_status.sh,
+│                 #   gen_sbom, validate_json, set_group/set_live, battery.sh, battery_status.py,
 │                 #   release.py, audit_verify.py
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))

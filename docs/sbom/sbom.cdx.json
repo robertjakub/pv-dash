@@ -144,8 +144,8 @@
       "bom-ref": "nixpkgs",
       "type": "framework",
       "name": "nixpkgs",
-      "version": "nixos-unstable @ f9a75f41be3a74eab55d3a7679d34ad6cc0da977",
-      "purl": "pkg:github/NixOS/nixpkgs@f9a75f41be3a74eab55d3a7679d34ad6cc0da977",
+      "version": "nixos-unstable @ f4a03c008967841f2a0b3cb7c436fc6fc31671f6",
+      "purl": "pkg:github/NixOS/nixpkgs@f4a03c008967841f2a0b3cb7c436fc6fc31671f6",
       "properties": [
         {
           "name": "pv-suite:provides",

@@ -27,7 +27,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
-from common.runtime.audit import audit_params_of, build_audit, default_path
+from common.runtime.audit import load_audit_tags, audit_params_of, build_audit, default_path
 from common.wire.cred import parse_trust_uids
 from common.serve.connlimit import GatedHTTPServer, limits_words, rate_limit_503
 from common.runtime.daemon import apply_restart_state, default_config_path, fold_listen, install_signal_handlers, log_state_dumps, \
@@ -325,7 +325,8 @@ def main():
                                         cfg.get('metrics_max_clients', DEFAULTS['metrics_max_clients']),
                                         cfg.get('metrics_max_conn_per_ip', DEFAULTS['metrics_max_conn_per_ip']))
     audit_params = audit_params_of(cfg)
-    audit = build_audit(cfg, 'DSH', 'dashboard', logger)
+    tag = load_audit_tags('dashboard')
+    audit = build_audit(cfg, tag, 'dashboard', logger)
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target)
     Handler.upstream = cfg['upstream']
@@ -369,6 +370,7 @@ def main():
             'control-ops-verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
             'control-trust-uids': ','.join(str(u) for u in sorted(trust_uids or [])) if trust_uids else 'off',
             'control-socket-group': 'on' if cfg['control_socket_group'] else 'off',
+            'control-log-replies': 'on' if cfg['control_log_replies'] else 'off',
             'metrics-listen': cfg['metrics_listen'],
             'metrics-acl': acl_value_text(metrics_acl),
             'metrics-max-clients': str(cfg['metrics_max_clients']),
@@ -391,6 +393,7 @@ def main():
                                 audit=audit, token=control_token, defaults=defaults, trust_uids=trust_uids,
                                 audit_params=audit_params,
                                 socket_group=cfg['control_socket_group'],
+                                log_replies=cfg['control_log_replies'],
                                 ops_token=control_ops_token, ops_verbs=ops_verbs, config_path=args.config,
                                 dump_path=cfg['dump_path'], restore_on_start=cfg['restore_on_start'],
                                 dump_key=cfg['dump_key'], dump_interval=cfg['dump_interval'],
@@ -471,7 +474,7 @@ def main():
         logger.info('shutdown: %s received after %ds, stopping the web server',
                     reason, time.monotonic() - started)
         if audit:
-            audit.event('SHUTDOWN', '%s: uptime=%ds' % (reason, int(time.monotonic() - started)))
+            audit.event('SHUTDOWN', 'reason=%s uptime=%ds' % (reason.replace(' ', '-'), int(time.monotonic() - started)))
         if control:
             control.shutdown_dump()   # the write-behind: the overrides ride the next start
             control.announce_exit(reason)   # the consoles print the notice and exit

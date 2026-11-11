@@ -118,6 +118,8 @@ def resolve_config(args, script_dir=None):
                                         'CONTROL_TRUST_UIDS', 'control_trust_uids', DEFAULTS['control_trust_uids'], str)
     cfg['control_socket_group'] = resolve(getattr(args, 'control_socket_group', None), 'CONTROL_SOCKET_GROUP',
                                           'control_socket_group', DEFAULTS['control_socket_group'], str_to_bool)
+    cfg['control_log_replies'] = resolve(getattr(args, 'control_log_replies', False) or None,
+                                         None, 'control_log_replies', False, str_to_bool)
     check_control_tokens(cfg['control_token'], cfg['control_ops_token'])
     check_token_chars(cfg['control_token'], 'control_token')
     parse_listen(cfg['listen'])   # the serve address validates: HOST:PORT, the port in range

@@ -25,6 +25,7 @@ here = os.path.dirname(os.path.realpath(__file__))   # .../bin (realpath: the im
 sys.path.insert(0, os.path.dirname(here))    # the subproject root — the lib/ lives next to bin/
 sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
+from common.runtime.audit import load_audit_tags
 from common.wire import cli
 from common.render.texts import T
 from lib.config import DEFAULT_CONTROL_SOCKET
@@ -38,7 +39,9 @@ POOL_NAMES, describe_word, command_pool, setting_pool, welcome = cli.pools(
     POOL_NAMES, 'dashboard')
 
 
-SPEC = dict(label='the dashboard', daemon_label='dashboard control server',
+TAGS = load_audit_tags('dashboard')
+
+SPEC = dict(audit_tag=TAGS, label='the dashboard', daemon_label='dashboard control server',
             cli_name='dashboard-cli', app='dashboard', self_note='the server itself',
             command_help='e.g. inspect, show config, set log-queries on, request reload-config, shutdown',
             prompt_word='dashboard', timeout_s=CLI_TIMEOUT_S, keepalive_s=CLI_KEEPALIVE_S,

@@ -58,6 +58,7 @@ let
     ++ lib.optionals (cfg.controlOpsVerbs != null) [ "--control-ops-verbs ${cfg.controlOpsVerbs}" ]
     ++ lib.optionals (cfg.controlTrustUids != null) [ "--control-trust-uids ${cfg.controlTrustUids}" ]
     ++ lib.optional cfg.controlSocketGroup "--control-socket-group"
+    ++ lib.optional cfg.controlLogReplies "--control-log-replies"
     ++ lib.optionals (cfg.metricsServer != null) [ "--metrics-server" ]
     ++ lib.optionals (cfg.metricsServer != null) [
       "--metrics-listen ${cfg.metricsListen}"
@@ -389,6 +390,15 @@ in
         Leave the unix control socket group-accessible (chmod 0660 instead
         of the plain 0600): a local group may speak to the control without
         being the service user.
+      '';
+    };
+
+    controlLogReplies = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        DEBUG-log the full output of every control command (plainly: the
+        command and its status log; the live `set system log-replies` toggle).
       '';
     };
 

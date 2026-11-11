@@ -25,6 +25,7 @@ from common.wire.control import ControlServer as _ControlServer, num, numi, on_o
 from common.settings.config import acl_table, acl_value_text, is_loopback_host, parse_listen, \
     resolve_metrics_acl
 from common.render.texts import T
+from common.runtime.audit import load_audit_tags
 from .options import OPTIONS, SETTING_BY_NAME, SET_BY_NAME, SHOW_OPTIONS, NODE_BY_NAME, CFG_KEYS, \
     COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .statics import CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, LOG_LEVELS
@@ -55,7 +56,7 @@ class ControlServer(_ControlServer):
     RELOAD_TEXT = 'the dashboard is reloading — the daemon restarts with the saved configuration'
     CFG_KEYS = CFG_KEYS   # the registry's knob -> cfg-key renames (show config)
     APP = 'dashboard'
-    AUDIT_PREFIX = 'DSH'
+    AUDIT_PREFIX = load_audit_tags('dashboard')
     AUDIT_APP = 'dashboard'
     CONTROL_PORT_DEFAULT = DEFAULT_LISTEN_PORT
     CONTROL_SOCKET_TEMPLATE = CONTROL_SOCKET_TEMPLATE
@@ -72,13 +73,13 @@ class ControlServer(_ControlServer):
     def __init__(self, httpd, target, reloader=None, stopper=None, audit=None, token=None,
                  defaults=None, trust_uids=None, socket_group=False, ops_token=None, ops_verbs=None,
                  startup_values=None, config_path=None, dump_path=None, restore_on_start=False,
-                 dump_key=None, dump_interval=0.0, audit_params=None):
+                 dump_key=None, dump_interval=0.0, audit_params=None, log_replies=False):
         self.httpd = httpd
         super().__init__(target, reloader=reloader, stopper=stopper, audit=audit, token=token,
                          defaults=defaults, trust_uids=trust_uids, socket_group=socket_group,
                          ops_token=ops_token, ops_verbs=ops_verbs, audit_params=audit_params,
                          config_path=config_path, dump_path=dump_path, restore_on_start=restore_on_start,
-                         dump_key=dump_key, dump_interval=dump_interval)
+                         dump_key=dump_key, dump_interval=dump_interval, log_replies=log_replies)
         self.startup_values = startup_values or {}   # the set-grammar form of the startup options (show config)
         self.metrics_srv = None          # set by the entry (the live metrics enable toggle)
         self.metrics_token = None        # the /metrics bearer token (the entry passes it)
@@ -259,6 +260,7 @@ class ControlServer(_ControlServer):
             'metrics-server': 'on' if self.metrics_srv else 'off',
             'metrics-acl': acl_value_text(self.metrics_acl),
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
+            'local-time': self._get('local-time'),
             'dump-path': self.dump_path or 'off',
             'restore-on-start': 'on' if self.dump_restore else 'off',
             'dump-interval': self.dump_interval,
@@ -266,6 +268,7 @@ class ControlServer(_ControlServer):
             'control-ops-verbs': ','.join(sorted(self.ops_verbs)) or 'off',
             'control-trust-uids': ','.join(str(u) for u in sorted(self.trust_uids)) or 'off',
             'control-socket-group': 'on' if self.socket_group else 'off',
+            'control-log-replies': 'on' if self.log_replies else 'off',
             **self.audit_dump_rows(),
         }
         return self.dump_settings_tail(raw)

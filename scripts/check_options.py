@@ -27,10 +27,10 @@ from common.settings.options import default_ops_verbs
 
 # tool -> (bin script, registry module dir, nixos module, README, bundled config, flag-table headings)
 TOOLS = {
-    'cache': ('cache/bin/modbus-cache.py', 'cache', 'nixos/modules/modbus-cache.nix', 'cache/README.md', 'cache/examples/modbus_cache.conf'),
-    'scraper': ('scraper/bin/modbus-scraper.py', 'scraper', 'nixos/modules/modbus-scraper.nix', 'scraper/README.md', 'scraper/examples/scraper.conf'),
-    'inverter': ('inverter/bin/modbus-fake-inverter.py', 'inverter', None, 'inverter/README.md', 'inverter/examples/inverter.conf'),
-    'dashboard': ('dashboard/bin/dashboard.py', 'dashboard', 'nixos/modules/dashboard.nix', 'dashboard/README.md', 'dashboard/examples/server.conf'),
+    'cache': ('cache/bin/modbus-cache.py', 'cache', 'nixos/modules/modbus-cache.nix', 'cache/README.md', 'cache/examples/modbus-cache.conf'),
+    'scraper': ('scraper/bin/modbus-scraper.py', 'scraper', 'nixos/modules/modbus-scraper.nix', 'scraper/README.md', 'scraper/examples/modbus-scraper.conf'),
+    'inverter': ('inverter/bin/modbus-fake-inverter.py', 'inverter', None, 'inverter/README.md', 'inverter/examples/modbus-fake-inverter.conf'),
+    'dashboard': ('dashboard/bin/dashboard.py', 'dashboard', 'nixos/modules/dashboard.nix', 'dashboard/README.md', 'dashboard/examples/dashboard.conf'),
 }
 
 # the env twins spell bare names (DUMP_INTERVAL, LOG_ACCESS) — the one

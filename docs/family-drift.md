@@ -64,9 +64,9 @@ design); the top non-man pairs:
 | 0.93 | `scraper/bin/modbus-scraper.py:46` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.92 | `cache/lib/options.py:25` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.90 | `scraper/bin/modbus-scraper.py:241` `graceful_stop` <-> `dashboard/bin/dashboard.py:474` `graceful_stop` |
-| 0.88 | `inverter/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.86 | `cache/lib/options.py:25` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
-| 0.86 | `scraper/lib/options.py:28` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
+| 0.88 | `inverter/lib/options.py:28` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
+| 0.86 | `cache/lib/options.py:25` `_load_options` <-> `inverter/lib/options.py:28` `_load_options` |
+| 0.86 | `scraper/lib/options.py:28` `_load_options` <-> `inverter/lib/options.py:28` `_load_options` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.83 | `inverter/lib/control.py:96` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
@@ -563,12 +563,12 @@ shipped example re-parsed through the tool's own set-grammar reader
 
 | example | the read |
 |---|---|
-| `cache/examples/modbus_cache.conf` | ok (0 setting line(s)) |
+| `cache/examples/modbus-cache.conf` | ok (0 setting line(s)) |
 | `cache/examples/selection.json` | json ok |
 | `scraper/examples/metrics.json` | json ok |
-| `scraper/examples/scraper.conf` | ok (0 setting line(s)) |
-| `inverter/examples/inverter.conf` | ok (0 setting line(s)) |
-| `dashboard/examples/server.conf` | ok (0 setting line(s)) |
+| `scraper/examples/modbus-scraper.conf` | ok (0 setting line(s)) |
+| `inverter/examples/modbus-fake-inverter.conf` | ok (0 setting line(s)) |
+| `dashboard/examples/dashboard.conf` | ok (0 setting line(s)) |
 | `extras/examples/acl-ip-prefix.json` | json ok |
 | `extras/examples/acl-write-registers.json` | json ok |
 

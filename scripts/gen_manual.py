@@ -30,23 +30,23 @@ TOOLS = (
      'single-client devices: it polls the inverter once and serves every '
      'client from the cache.',
      'modbus-cache-ctl', 'modbus-cache-cli', '/tmp/modbus-cache-15502.socket',
-     '15509', 'request flush cache', True, 'cache/examples/modbus_cache.conf'),
+     '15509', 'request flush cache', True, 'cache/examples/modbus-cache.conf'),
     ('scraper', 'modbus-scraper', 'modbus-scraper',
      'A dependency-free (Python stdlib only) Prometheus exporter that polls '
      'a Modbus device and exposes the metrics at /metrics.',
      'modbus-scraper-ctl', 'modbus-scraper-cli', '/tmp/modbus-scraper-9350.socket',
-     '15509', 'poll now', True, 'scraper/examples/scraper.conf'),
+     '15509', 'poll now', True, 'scraper/examples/modbus-scraper.conf'),
     ('inverter', 'fake-inverter', 'modbus-fake-inverter',
      'A dependency-free (Python stdlib only) Modbus TCP server that plays '
      'an inverter — the battery, the smart meter, the diagnostics — for '
      'the family to develop and test against.',
      'modbus-fake-ctl', 'modbus-fake-cli', '/tmp/fake-inverter-5502.socket',
-     '15599', 'show registers', False, 'inverter/examples/inverter.conf'),
+     '15599', 'show registers', False, 'inverter/examples/modbus-fake-inverter.conf'),
     ('dashboard', 'dashboard', 'dashboard',
      'A single-page dashboard for home PV monitoring, fed by Prometheus: '
      'it serves the page and proxies the upstream queries.',
      'dashboard-ctl', 'dashboard-cli', '/tmp/dashboard-8080.socket',
-     '15598', 'request reload-config', True, 'dashboard/examples/server.conf'),
+     '15598', 'request reload-config', True, 'dashboard/examples/dashboard.conf'),
 )
 
 # the wire words no registry row carries (the registries' own audit's

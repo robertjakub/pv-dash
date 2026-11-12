@@ -159,30 +159,32 @@ ENV_TOOLS = (
 # DEMO keys are registry row names and gated: an unknown key fails the
 # run.
 CONF_TOOLS = (
-    ('cache', 'modbus-cache', 'modbus_cache.conf',
+    ('cache', 'modbus-cache', 'modbus-cache.conf',
      ('The dev wrapper (`cache/dev`) points --config here; the docker '
-      'image copies the file to /pv-suite/cache/modbus_cache.conf — its '
+      'image copies the file to /pv-suite/cache/modbus-cache.conf — its '
       'default --config target — where the CMD flags and the env twins '
       'carry the deployment shape. Copy the file, uncomment what you '
       'change.',), {}),
-    ('scraper', 'modbus-scraper', 'scraper.conf',
+    ('scraper', 'modbus-scraper', 'modbus-scraper.conf',
      ('The dev wrapper (`scraper/dev`) points --config here; the docker '
-      'image copies the file to /pv-suite/scraper/scraper.conf — its '
+      'image copies the file to /pv-suite/scraper/modbus-scraper.conf — '
+      'its '
       'default --config target — where the CMD flags and the env twins '
       'carry the deployment shape. Copy the file, uncomment what you '
       'change.',), {}),
-    ('inverter', 'fake-inverter', 'inverter.conf',
+    ('inverter', 'fake-inverter', 'modbus-fake-inverter.conf',
      ('The dev wrapper (`inverter/dev`) points --config here; the docker '
-      'image copies the file to /pv-suite/inverter/inverter.conf — the '
+      'image copies the file to /pv-suite/inverter/'
+      'modbus-fake-inverter.conf — the '
       'default --config target. The fake\'s demo machines (`set pv`, '
       '`set load`, `set batt`, `set grid`, `set soc`, `set mppt`, `set '
       'cloud`, `set scenario`, `set battery-state`, `set grid-outage`) '
       'are runtime set words — no flag, no env twin — so they never '
       'render in a config file. Copy the file, uncomment what you '
       'change.',), {}),
-    ('dashboard', 'dashboard', 'server.conf',
+    ('dashboard', 'dashboard', 'dashboard.conf',
      ('The docker image copies the file to /pv-suite/dashboard/'
-      'server.conf — its default --config target — where the CMD flags '
+      'dashboard.conf — its default --config target — where the CMD flags '
       'carry the bind; the compose stacks\' PROM_URL and page token are '
       'compose-level environment. Copy the file, uncomment what you '
       'change.',), {}),

@@ -183,7 +183,7 @@ override it knob by knob — the env file is the edit surface. The
   points at it), same story
 
 Prefer the conf file after all? Point the tool at the volume —
-`CONFIG=/config/modbus_cache.conf` (env) or a `--config` flag — and edit
+`CONFIG=/config/modbus-cache.conf` (env) or a `--config` flag — and edit
 the file there; the entrypoint keeps whatever is in the volume. A volume
 carrying a legacy seeded conf (`modbus_cache.conf`, `scraper.conf`,
 `server.conf` from an older image) is simply no longer loaded.
@@ -262,7 +262,7 @@ docker run --rm -p 127.0.0.1:5502:5502 fake-inverter \
     fake-inverter --profile deye-sg04lp3 --timezone local    # any flags via the CMD override
 ```
 
-The bundled conf (`/pv-suite/inverter/inverter.conf`, the default
+The bundled conf (`/pv-suite/inverter/modbus-fake-inverter.conf`, the default
 `--config` target) loads from the image; its `/config` volume carries no
 conf — just the generated suite key (the compose stacks point the
 server-side auth at it) — and stays open for future use.
@@ -271,7 +271,7 @@ server-side auth at it) — and stays open for future use.
 
 The caching proxy multiplexing the inverter's single Modbus client — see the
 [cache](../cache/README.md). The bundled conf
-(`/pv-suite/cache/modbus_cache.conf`, the default `--config` target) loads
+(`/pv-suite/cache/modbus-cache.conf`, the default `--config` target) loads
 from the image; the volume carries `/config/selection.json` (`SELECTION`)
 — edit it there, it survives recreation; override the conf's knobs with
 `env/cache.env` (or flags):
@@ -297,7 +297,7 @@ named volume under all three tools keeps every config in one place.
 ### modbus-scraper (`Dockerfile.modbus-scraper`)
 
 The Prometheus exporter — see the [scraper](../scraper/README.md). The
-bundled conf (`/pv-suite/scraper/scraper.conf`, the default `--config`
+bundled conf (`/pv-suite/scraper/modbus-scraper.conf`, the default `--config`
 target) loads from the image; the volume carries `/config/metrics.json`
 (`METRICS_SPEC`) and the generated `/config/metrics.token` — edit the spec
 there, it survives recreation; override the conf's knobs with
@@ -361,8 +361,8 @@ or `-e` on a plain `docker run`):
 ### dashboard (`Dockerfile.dashboard`)
 
 The static single-page app with its stdlib Prometheus proxy — see the
-[dashboard](../dashboard/README.md). The bundled `server.conf`
-(`/pv-suite/dashboard/server.conf`, the default `--config` target: port
+[dashboard](../dashboard/README.md). The bundled `dashboard.conf`
+(`/pv-suite/dashboard/dashboard.conf`, the default `--config` target: port
 8080) loads from the image; the CMD binds `0.0.0.0` (a published port
 needs it) and **the page's bearer token is mandatory beyond loopback
 (F21)** — the compose carries the generated `page.token` (the entrypoint
@@ -378,11 +378,11 @@ docker run --rm -p 127.0.0.1:8080:8080 -e AUTH_TOKEN=dev-token dashboard
     # then open http://localhost:8080/?auth=dev-token (the bootstrap sets the cookie)
 docker run --rm -it dashboard bash                  # poke around as pvsuite
 docker run --rm -p 127.0.0.1:8080:8080 -e AUTH_TOKEN=dev-token -e PROM_URL=http://prometheus:9090 \
-    dashboard                                       # the upstream via env (env beats server.conf)
+    dashboard                                       # the upstream via env (env beats dashboard.conf)
 ```
 
 The upstream defaults to `http://localhost:9090` (the bundled
-`server.conf` leaves `upstream` commented); `PROM_URL` (env) or a
+`dashboard.conf` leaves `upstream` commented); `PROM_URL` (env) or a
 `--upstream` flag override it. In the compose stacks the compose sets
 `PROM_URL=http://prometheus:9090` (the in-stack collector) — the
 dashboard is the stack's one human surface, published loopback-only.

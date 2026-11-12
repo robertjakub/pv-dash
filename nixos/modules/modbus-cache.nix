@@ -104,6 +104,29 @@ in
       description = "The modbus-cache package to run.";
     };
 
+    user = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The account the daemon runs as. null (the default) keeps the systemd
+        DynamicUser; a name switches the unit to a static account — and the
+        module creates it (a system user, no login) unless the host already
+        defines the same users.users entry. The family's shared identity is
+        `pvsuite`: one owner across the three daemons for the state dumps
+        and the control sockets.
+      '';
+    };
+
+    group = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The account's group; null = the user's own (the auto-created
+        account's primary group of the same name). Refused without user —
+        a group alone would run the daemon as root.
+      '';
+    };
+
     settings = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = { };
@@ -143,6 +166,9 @@ in
       ]
       ++ lib.optionals (cfg.openFirewall && (listenHost == "127.0.0.1" || listenHost == "localhost")) [
         "services.modbus-cache: openFirewall is set but the proxy binds to ${listenHost} — the firewall hole is unreachable; set settings.LISTEN to 0.0.0.0:PORT (or the external IP) if Modbus clients live on other hosts."
+      ]
+      ++ lib.optionals (cfg.user == "root") [
+        "services.modbus-cache: user is root — the sandbox is built for a service account (the dynamic user, or pvsuite); root under the empty CapabilityBoundingSet is still root."
       ];
 
     assertions = [
@@ -162,7 +188,28 @@ in
         assertion = storeCreds == [ ];
         message = "services.modbus-cache: the credential source for ${lib.concatStringsSep ", " (map (c: c.name) storeCreds)} is inside the nix store — a store file is world-readable, and secrets never land there; use an absolute path outside the store (/etc/..., or a sops-nix/agenix render under /run).";
       }
+      {
+        assertion = cfg.group == null || cfg.user != null;
+        message = "services.modbus-cache: group is set without user — a group alone runs the daemon as root; set user (the family's shared identity is \"pvsuite\") or drop group.";
+      }
     ];
+
+    # the static account: created when the operator names one (a system
+    # user/group, no login) — an existing users.users/users.groups entry of
+    # the same name merges, every attribute rides mkDefault
+    users.users = lib.optionalAttrs (cfg.user != null) {
+      ${cfg.user} = {
+        isSystemUser = lib.mkDefault true;
+        group = lib.mkDefault (if cfg.group != null then cfg.group else cfg.user);
+      };
+    };
+    users.groups = lib.optionalAttrs (cfg.user != null) {
+      ${if cfg.group != null then cfg.group else cfg.user} = { };
+    };
+
+    # the ctl client on the host's PATH: the control surface is spoken
+    # through modbus-cache-cli, and the man pages ride the package
+    environment.systemPackages = [ cfg.package ];
 
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ listenPort ];
 
@@ -178,7 +225,6 @@ in
         ExecStart = "${lib.getExe cfg.package}";
         ExecReload = "${pkgs.util-linux}/bin/kill -HUP $MAINPID";
         EnvironmentFile = [ "${envFile}" ];
-        DynamicUser = true;
         Restart = "on-failure";
         RestartSec = 3;
         UMask = "0077";
@@ -211,13 +257,19 @@ in
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
         SystemCallArchitectures = "native";
         SystemCallFilter = [ "@system-service" ];
-      } // lib.optionalAttrs (rwPaths != [ ]) {
+        # the account: the DynamicUser unless the operator names one —
+        # user = "pvsuite" is the family's shared static identity (the
+        # module creates it); Group rides the user's own when unset
+      } // (if cfg.user == null then { DynamicUser = true; } else { User = cfg.user; })
+      // lib.optionalAttrs (cfg.group != null) { Group = cfg.group; }
+      // lib.optionalAttrs (rwPaths != [ ]) {
         ReadWritePaths = rwPaths;
       } // lib.optionalAttrs (credentials != [ ]) {
         LoadCredential = map (c: "${c.name}:${c.path}") credentials;
       } // lib.optionalAttrs (ctl != null
           && lib.hasPrefix "/run/modbus-cache/" ctl) {
-        # the control socket's directory, owned by the dynamic user
+        # the control socket's directory, owned by the service user (the
+        # dynamic user, or the named account)
         RuntimeDirectory = "modbus-cache";
         RuntimeDirectoryMode = "0755";
       };

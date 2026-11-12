@@ -15,22 +15,12 @@ import sys
 import threading
 import time
 
-if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
-    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
-             'a standalone run shares /tmp scratch and collides across sessions)')
-SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
-os.makedirs(SCRATCH, exist_ok=True)   # the CI legs set a fixed path the battery never made
-print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check accumulator
 
-PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
-    else os.environ.get('PV_SUITE_PROFILE', 'quick')
-
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(REPO, 'cache')
 
 P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
-BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
 PORT, CACHE_PORT = 15601 + BASE, 15602 + BASE
 CLIENTS, DURATION = (50, 5.0) if PROFILE == 'quick' else (100, 15.0)
 
@@ -46,15 +36,9 @@ json.dump({'registers': [{'name': 'r%d' % s, 'register': s, 'type': 'u32', 'cach
 procs = []
 stop = threading.Event()
 lat = {'cached': [], 'pass': [], 'write': []}
-errs = []
+errs = failures   # the suite's own name for the shared accumulator
 count = {'cached': 0, 'pass': 0, 'write': 0}
 lock = threading.Lock()
-
-
-def check(name, cond, detail=''):
-    print('%s %s%s' % ('PASS' if cond else 'FAIL', name, (' — ' + detail) if detail else ''))
-    if not cond:
-        errs.append(name)
 
 
 try:

@@ -1885,6 +1885,11 @@ try:
     check('scraper control: show knobs, the dictionary of the registry — flag, env twin, how it changes',
           r.startswith('ok knobs') and '--metric-prefix' in r and '$METRIC_PREFIX' in r
           and 'set modbus interval <value>' in r and ', secret' in r, r[:200])
+    body = r.split('\n')
+    names = [ln.split()[0] for ln in body[2:] if ln.strip()]
+    check('scraper control: show knobs is one flattened table sorted by name under a header',
+          body[1].split() == ['knob', 'flag', 'env', 'change'] and names == sorted(names)
+          and '# --- ' not in r, repr(body[1][:120]))
     r = sctl('show inputs', 15597)
     check('scraper control: show inputs shows the declared inputs only, aligned, the help capped',
           r.startswith('ok inputs') and '[battery_net_watts]' in r

@@ -495,25 +495,31 @@ def control_command(opt):
 
 
 def knob_dictionary(options, who='the tool'):
-    """The dictionary of all knobs (`show knobs`): every option of the
-    registry under its display group (the row's `group`, ungrouped and
-    headerless when none), one row per knob with every surface — the
-    config/set-grammar name, the argparse flag (control-only settings show
-    the set command in their flag's place), the env twin(s), the control
-    command that changes it (or the restart note, or the startup-only
-    secret note) and the secret marker.
+    """The dictionary of all knobs (`show knobs`): one flattened table
+    sorted by name — every option of the registry that is not a hierarchy
+    node, one row per knob with every surface — the config/set-grammar
+    name, the argparse flag (control-only settings show the set command in
+    their flag's place), the env twin(s), the control command that changes
+    it (or the restart note, or the startup-only secret note) and the
+    secret marker. The columns pad to the data's own widths (the uplink
+    report's rule), one header row over them.
     Registry data only — no values render here (`show config` is the
     values view), so secrets are named, never shown."""
-    lines = [T('wire.knobs_header') % who]
-    for key, rows in grouped_rows(options):
-        if key:
-            lines.append('# --- %s ---' % key)
-        for o in rows:
-            env = '/'.join('$' + e for e in o.env_names()) if o.env else '-'
-            notes = control_command(o)
-            if o.secret:
-                notes += ', secret'
-            lines.append('%-23s %-26s %-30s %s' % (o.name, o.flag or '(control-only)', env, notes))
+    rows = []
+    for o in options:
+        if o.node:
+            continue   # the hierarchy nodes ride out (they are not knobs)
+        env = '/'.join('$' + e for e in o.env_names()) if o.env else '-'
+        notes = control_command(o)
+        if o.secret:
+            notes += ', secret'
+        rows.append((o.name, o.flag or '(control-only)', env, notes))
+    rows.sort(key=lambda r: r[0])
+    head = ('knob', 'flag', 'env', 'change')
+    widths = [max(len(h), max((len(r[i]) for r in rows), default=0)) for i, h in enumerate(head)]
+    lines = [T('wire.knobs_header') % who,
+             '  '.join(h.ljust(w) for h, w in zip(head, widths))]
+    lines += ['  '.join(v.ljust(w) for v, w in zip(r, widths)) for r in rows]
     return '\n'.join(lines)
 
 

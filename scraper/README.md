@@ -7,7 +7,7 @@
 
 A dependency-free (Python stdlib only) Prometheus exporter that polls a
 Modbus TCP inverter and exposes the `huawei_*_watts` metrics (the
-`--metric-prefix` default) the [dashboard](../dashboard/README.md)
+`--metrics-prefix` default) the [dashboard](../dashboard/README.md)
 expects, plus health gauges. The bundled profiles cover the Huawei
 SUN2000 and the Deye hybrids. It can poll the inverter directly or
 through the [modbus-cache](../cache/README.md) proxy (which it detects
@@ -18,17 +18,17 @@ port **502**, unit id **1**.
 
 ## How it works
 
-- a poll loop reads the device profile's registers every `--interval`
+- a poll loop reads the device profile's registers every `--modbus-interval`
   seconds (the register map — addresses, types, gains, function codes —
   comes from the profile **alone**; there are no register override knobs);
-  the source ranges merge into as few **block reads** as the `--merge-gap`
+  the source ranges merge into as few **block reads** as the `--modbus-merge-gap`
   allows (a failed block splits to its sources — `show uplink` renders the
   plan and its latency);
 - the reading passes **sanity caps** (`--max-kwp`, `--max-grid-kw`): bad
   data answers **HTTP 503** with `# Error collecting metrics from
   inverter` until a good poll, never silently wrong numbers;
 - the exposition serves the profile- and compute-fed names (the
-  `--metric-prefix` prefix, default `huawei_`) and the fixed
+  `--metrics-prefix` prefix, default `huawei_`) and the fixed
   `scraper_*` self-observability gauges.
 
 ## Usage
@@ -55,8 +55,8 @@ Settings are resolved in this order (first hit wins), mirroring
 
 1. CLI flags (`--upstream`, `--listen`, …)
 2. Environment variables — the same names, bare (no tool prefix):
-   `CONFIG`, `UPSTREAM`, `MODBUS_UNIT`, `MODBUS_OFFSET`, `TIMEOUT`,
-   `INTERVAL`, `LISTEN`, `PROFILE`, `LOG_LEVEL`, `AUTH_TOKEN`, … —
+   `CONFIG`, `UPSTREAM`, `MODBUS_UNIT`, `MODBUS_OFFSET`, `MODBUS_TIMEOUT`,
+   `MODBUS_INTERVAL`, `LISTEN`, `MODBUS_PROFILE`, `LOG_LEVEL`, `AUTH_TOKEN`, … —
    the full twin set is the generated
    [`docker/env/scraper.env.example`](../docker/env/scraper.env.example)
 3. Config file — the set-grammar script (`set <name> <value>` lines) —
@@ -91,14 +91,14 @@ set system log-level INFO
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--modbus-unit` / `--modbus-offset` | `1` / `0` | Modbus unit id / added to register addresses (`-1` for gateways that need 0-based addressing) |
 | `--modbus-auth` / `--modbus-auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/common/MODBUS.md](../docs/common/MODBUS.md) |
-| `--profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set modbus profile` |
+| `--modbus-profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set modbus profile` |
 | `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
-| `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
+| `--metrics-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
 | `--max-kwp` / `--max-grid-kw` | `6` / `12` | the sanity caps in kW: above the cap → HTTP 503 + error log; `0` = off |
-| `--read-delay` | `0.05` | seconds between consecutive device reads within a poll cycle (the slow-dongle pacing); `0` = no wait |
-| `--merge-gap` | `8` | max register gap when merging the profile's source ranges into block reads (fewer round trips); `0` = read each range separately |
+| `--modbus-read-delay` | `0.05` | seconds between consecutive device reads within a poll cycle (the slow-dongle pacing); `0` = no wait |
+| `--modbus-merge-gap` | `8` | max register gap when merging the profile's source ranges into block reads (fewer round trips); `0` = read each range separately |
 | `--grid-positive-import` | off | grid register positive means import |
-| `--timeout` / `--interval` | `3` / `10` | Modbus timeout, seconds / seconds between Modbus polls |
+| `--modbus-timeout` / `--modbus-interval` | `3` / `10` | Modbus timeout, seconds / seconds between Modbus polls |
 | `--listen` | `127.0.0.1:9350` | exporter bind address `HOST:PORT` (loopback by default; beyond loopback `--auth-token` is mandatory, F13) |
 | `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; compared timing-safe); the value may be `file:<path>` — **re-read on every SIGHUP**: rotate by rewriting the file and reloading |
 | `--metrics-acl` | `any` | the clients allowed to **connect** to /metrics: `any`, `none`, comma-separated IPs/prefixes, `file:<path>` (the ip-prefix acl file — the grammar lives in [docs/common/ACL.md](../docs/common/ACL.md)); checked at accept; live-settable |
@@ -121,7 +121,7 @@ in flags:
   watts); **37113** — meter power, I32, `> 0` = feed-in (without a meter
   the inverter alone cannot report grid power).
 - Older **20200520** protocol: input power at **32089**, meter power at
-  **37258** — point `--profile` at a profile carrying those addresses.
+  **37258** — point `--modbus-profile` at a profile carrying those addresses.
 - Unit quirk: the inverter's `[Power meter collection]` copy of 37113 has
   been observed reporting **watts** (gain 1) while the meter-section table
   says kW (gain 1000). The bundled profile assumes watts; if grid power
@@ -247,7 +247,7 @@ shared schema the [fake inverter](../inverter/README.md) serves and the
 [cache](../cache/README.md) polls; the shipped profiles live in the suite's
 [`profiles/`](../profiles/) subproject (`sun2000.json` by default); the
 format is documented in [profiles/README.md](../profiles/README.md).
-Resolution: `--profile` flag, env `PROFILE`, config `set modbus profile`,
+Resolution: `--modbus-profile` flag, env `MODBUS_PROFILE`, config `set modbus profile`,
 then the bundled copy; re-read on `SIGHUP`. The live control surface swaps
 it at runtime: `set modbus profile <file-or-name>` loads the new map,
 rebuilds the metric sources and rolls back cleanly when the profile lacks

@@ -36,7 +36,7 @@
           "propertyNames": {
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
           },
-          "description": "The metric tree: the exported name is <metric-prefix>_<key>."
+          "description": "The metric tree: the exported name is <metrics-prefix>_<key>."
         },
         "scraper": {
           "type": "object",

@@ -66,10 +66,10 @@ def describe(cfg, args, control_desc):
     return ('polling %s:%d unit %d (profile %s, %d registers, positive=%s, modbus auth %s) every %gs; '
             '%s /metrics on %s:%d (config: %s, log level: %s, log time: %s, log access: %s, auth: %s, '
             'limits: %s, caps: %s, control server: %s, version: %s)' % (
-                cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['profile'], len(cfg['sources']),
+                cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['modbus_profile'], len(cfg['sources']),
                 'import' if cfg['grid_positive_import'] else 'export',
                 cfg['auth'] or 'none',
-                cfg['interval'],
+                cfg['modbus_interval'],
                 'would serve' if args.dry_run else 'serving',
                 listen_host, listen_port, args.config, cfg['level'],
                 'local' if cfg['local_time'] else 'UTC',
@@ -93,7 +93,7 @@ def main():
     # the spec the daemon exports: the CONFIGURED one (resolve_config binds
     # the sources from the same file) — a plain Metrics() here would silently
     # swap the default spec back in over --metrics-spec
-    spec = Metrics(cfg['metrics_spec'], prefix=cfg['metric_prefix'])
+    spec = Metrics(cfg['metrics_spec'], prefix=cfg['metrics_prefix'])
 
     setup_logging(cfg)
 
@@ -117,7 +117,7 @@ def main():
     control_desc = 'off' if control_target == '0' \
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target) \
         + (', read-only ops token accepted' if control_ops_token else '')
-    client = ModbusTCP(cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['timeout'], cfg['modbus_offset'],
+    client = ModbusTCP(cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['modbus_timeout'], cfg['modbus_offset'],
                        auth=cfg['auth'], auth_key=cfg['modbus_auth_key'])
     scraper = Scraper(cfg, client, spec)
     Handler.scraper = scraper
@@ -222,14 +222,14 @@ def main():
         if metrics_acl_warn:
             logger.warning('acl file: %s', metrics_acl_warn)
         summary = 'upstream %s:%d unit %d, interval %gs' % (new_cfg['host'], new_cfg['modbus_port'],
-                                                            new_cfg['modbus_unit'], new_cfg['interval'])
+                                                            new_cfg['modbus_unit'], new_cfg['modbus_interval'])
         if control:
             control.metrics_acl_warn = metrics_acl_warn
             control.reloaded(summary, dump_interval=new_cfg['dump_interval'])
         a = the_audit()
         if a:
             a.event('RELOAD', 'result=ok upstream=%s:%d unit=%d interval=%gs auth=%s'
-                    % (new_cfg['host'], new_cfg['modbus_port'], new_cfg['modbus_unit'], new_cfg['interval'],
+                    % (new_cfg['host'], new_cfg['modbus_port'], new_cfg['modbus_unit'], new_cfg['modbus_interval'],
                        'bearer' if new_cfg['auth_token'] else 'none'))
             if metrics_acl_warn:
                 a.event('ACL-FILE', 'warn=%s' % audit_quote(metrics_acl_warn))

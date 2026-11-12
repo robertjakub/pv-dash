@@ -69,10 +69,10 @@ def validate_config(cfg):
         fail('modbus_unit', 'must be %d..%d (Modbus unit id)' % UNIT_ID_RANGE)
     if not -100000 <= cfg['modbus_offset'] <= 100000:
         fail('modbus_offset', 'must be within +/-100000')
-    if cfg['timeout'] <= 0:
-        fail('timeout', 'must be > 0')
-    if cfg['interval'] <= 0:
-        fail('interval', 'must be > 0')
+    if cfg['modbus_timeout'] <= 0:
+        fail('modbus_timeout', 'must be > 0')
+    if cfg['modbus_interval'] <= 0:
+        fail('modbus_interval', 'must be > 0')
     if cfg['max_kwp'] < 0 or cfg['max_grid_kw'] < 0:
         fail('max_kwp', 'must be 0 (checks off) or a positive kW value')
     if cfg['level'] not in LOG_LEVELS:
@@ -83,16 +83,16 @@ def validate_config(cfg):
         fail('client_timeout', 'must be >= 0 (0 = off)')
     if cfg['max_conn_per_ip'] < 0:
         fail('max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
-    if cfg['read_delay'] < 0:
-        fail('read_delay', 'must be >= 0')
-    if cfg['merge_gap'] < 0:
-        fail('merge_gap', 'must be >= 0 (0 = read each source range separately)')
+    if cfg['modbus_read_delay'] < 0:
+        fail('modbus_read_delay', 'must be >= 0')
+    if cfg['modbus_merge_gap'] < 0:
+        fail('modbus_merge_gap', 'must be >= 0 (0 = read each source range separately)')
     if not (AUDIT_MAX_MB_MIN <= cfg['audit_max_mb'] <= AUDIT_MAX_MB_MAX):
         fail('audit_max_mb', 'must be %d..%d (0 = no size rotation)'
              % (AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX))
     if not (AUDIT_FILES_MIN <= cfg['audit_files'] <= AUDIT_FILES_MAX):
         fail('audit_files', 'must be %d..%d' % (AUDIT_FILES_MIN, AUDIT_FILES_MAX))
-    for key in ('timeout', 'interval', 'max_kwp', 'max_grid_kw', 'client_timeout'):
+    for key in ('modbus_timeout', 'modbus_interval', 'max_kwp', 'max_grid_kw', 'client_timeout'):
         if not math.isfinite(cfg[key]):
             fail(key, 'must be a finite number (nan/inf are nonsense here)')
     if cfg['dump_interval'] < 0:
@@ -101,9 +101,9 @@ def validate_config(cfg):
         fail('dump_interval', 'must be a finite number (nan/inf are nonsense here)')
     if cfg['dump_interval'] and not cfg['dump_path']:
         fail('dump_interval', 'needs dump_path set (there is nothing to dump into)')
-    if cfg['timeout'] > cfg['interval']:
+    if cfg['modbus_timeout'] > cfg['modbus_interval']:
         logger.warning('timeout (%gs) > interval (%gs): one poll can take longer than the poll '
-                       'interval; the loop simply runs back-to-back', cfg['timeout'], cfg['interval'])
+                       'interval; the loop simply runs back-to-back', cfg['modbus_timeout'], cfg['modbus_interval'])
     check_hostname(cfg['host'], 'upstream host')
     if cfg['auth'] and not cfg['modbus_auth_key']:
         fail('auth', "the suite auth needs a key: set --modbus-auth-key/$MODBUS_AUTH_KEY too (min 16 characters)")
@@ -200,16 +200,16 @@ def resolve_config(args, script_dir=None):
     r = Resolver(cfg, logger)
     resolve = r.resolve
 
-    profile_path = resolve_profile_file(resolve(getattr(args, 'profile', None), 'PROFILE',
-                                                'profile', DEFAULTS['profile'], str))
+    profile_path = resolve_profile_file(resolve(getattr(args, 'modbus_profile', None), 'MODBUS_PROFILE',
+                                                'modbus_profile', DEFAULTS['modbus_profile'], str))
     profile = load_device_profile(profile_path)
-    prefix_default = DEFAULTS['metric_prefix']
-    metric_prefix = (resolve(getattr(args, 'metric_prefix', None), 'METRIC_PREFIX',
-                             'metric_prefix', prefix_default, str)
-                     or prefix_default).strip() or prefix_default
+    prefix_default = DEFAULTS['metrics_prefix']
+    metrics_prefix = (resolve(getattr(args, 'metrics_prefix', None), 'METRICS_PREFIX',
+                              'metrics_prefix', prefix_default, str)
+                      or prefix_default).strip() or prefix_default
     metrics_spec = resolve(getattr(args, 'metrics_spec', None), 'METRICS_SPEC',
                            'metrics_spec', DEFAULTS['metrics_spec'], str)
-    spec = Metrics(metrics_spec, prefix=metric_prefix)
+    spec = Metrics(metrics_spec, prefix=metrics_prefix)
 
     # the metrics spec's "profile" fields pick the device registers feeding
     # the register-backed metrics; each source carries register/type/gain
@@ -223,7 +223,7 @@ def resolve_config(args, script_dir=None):
                        DEFAULTS['upstream'], str)
     host, modbus_port = parse_upstream(upstream or DEFAULTS['upstream'])
     cfg = {
-        'profile': profile_path,
+        'modbus_profile': profile_path,
         'metrics_spec': metrics_spec,
         'upstream': '%s:%d' % (host, modbus_port),
         'host': host,
@@ -236,19 +236,20 @@ def resolve_config(args, script_dir=None):
         'modbus_auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'modbus_auth_key', None), 'MODBUS_AUTH_KEY', 'modbus_auth_key', '', str)
                           or '').strip() or None, 'modbus-auth-key'), 'modbus-auth-key'),
-        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout'], float, row=OPT['timeout']),
-        'read_delay': resolve(args.read_delay, 'READ_DELAY', 'read_delay',
-                              DEFAULTS['read_delay'], float, row=OPT['read-delay']),
-        'merge_gap': resolve(args.merge_gap, 'MERGE_GAP', 'merge_gap',
-                             DEFAULTS['merge_gap'], int, row=OPT['merge-gap']),
+        'modbus_timeout': resolve(args.modbus_timeout, 'MODBUS_TIMEOUT', 'modbus_timeout',
+                                  DEFAULTS['modbus_timeout'], float, row=OPT['modbus-timeout']),
+        'modbus_read_delay': resolve(args.modbus_read_delay, 'MODBUS_READ_DELAY', 'modbus_read_delay',
+                                     DEFAULTS['modbus_read_delay'], float, row=OPT['modbus-read-delay']),
+        'modbus_merge_gap': resolve(args.modbus_merge_gap, 'MODBUS_MERGE_GAP', 'modbus_merge_gap',
+                                    DEFAULTS['modbus_merge_gap'], int, row=OPT['modbus-merge-gap']),
         'max_kwp': resolve(args.max_kwp, 'MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float, row=OPT['max-kwp']),
         'max_grid_kw': resolve(args.max_grid_kw, 'MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float,
                                row=OPT['max-grid-kw']),
         'grid_positive_import': resolve(args.grid_positive_import or None, 'GRID_POSITIVE_IMPORT',
                                         'grid_positive_import', DEFAULTS['grid_positive_import'], str_to_bool),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
-        'interval': resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval'], float,
-                            row=OPT['interval']),
+        'modbus_interval': resolve(args.modbus_interval, 'MODBUS_INTERVAL', 'modbus_interval',
+                                   DEFAULTS['modbus_interval'], float, row=OPT['modbus-interval']),
         'max_clients': resolve(args.max_clients, 'MAX_CLIENTS', 'max_clients',
                                DEFAULTS['max_clients'], int, row=OPT['max-clients']),
         'client_timeout': resolve(args.client_timeout, 'CLIENT_TIMEOUT', 'client_timeout',
@@ -260,7 +261,7 @@ def resolve_config(args, script_dir=None):
                                 'metrics_acl', DEFAULTS['metrics_acl'], str) or '').strip() or 'any',
         'local_time': resolve(args.local_time or None, 'LOCAL_TIME', 'local_time', DEFAULTS['local_time'], str_to_bool),
         'log_access': resolve(args.log_access or None, 'LOG_ACCESS', 'log_access', DEFAULTS['log_access'], str_to_bool),
-        'metric_prefix': metric_prefix,
+        'metrics_prefix': metrics_prefix,
         'auth_token': parse_secret((resolve(args.auth_token, 'AUTH_TOKEN', 'auth_token', None, str)
                                     or '').strip() or None, 'auth/token'),
         'level': resolve(args.log_level, 'LOG_LEVEL', 'log_level',
@@ -303,9 +304,9 @@ def resolve_config(args, script_dir=None):
     check_token_chars(cfg['control_token'], 'control_token')
     check_token_chars(cfg['auth_token'], 'auth_token')
     resolve_metrics_acl(cfg['metrics_acl'])   # a bad acl value or gate file refuses the start
-    if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', cfg['metric_prefix']):
-        raise SystemExit('invalid metric_prefix = %r: must be a valid metric-name start '
-                         '(letters/digits/underscore, not starting with a digit)' % cfg['metric_prefix'])
+    if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', cfg['metrics_prefix']):
+        raise SystemExit('invalid metrics_prefix = %r: must be a valid metric-name start '
+                         '(letters/digits/underscore, not starting with a digit)' % cfg['metrics_prefix'])
     cfg['dump_path'] = resolve(getattr(args, 'dump_path', None), 'DUMP_PATH', 'dump_path', DEFAULTS['dump_path'], str)
     cfg['dump_key'] = parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY', 'dump_key',
                                             None, str) or '').strip() or None, 'dump-key')

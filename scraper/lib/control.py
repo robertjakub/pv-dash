@@ -192,35 +192,35 @@ class ControlServer(_ControlServer):
         if handled:                                        # (the ops policy + the trusted peers ARRIVED here),
             return shown                                   # the audit family, the log level, local-time, the dump pair
 
-        if key == 'interval':
-            v = num(val, 'interval', 'seconds')
+        if key == 'modbus-interval':
+            v = num(val, 'modbus-interval', 'seconds')
             if not 0 < v <= 86400:
                 raise ValueError(T('wire.interval_range'))
             with s.lock:
-                s.cfg['interval'] = v
+                s.cfg['modbus_interval'] = v
             s.wake.set()
             return secs(v)
-        if key == 'read-delay':
-            v = num(val, 'read-delay', 'seconds')
+        if key == 'modbus-read-delay':
+            v = num(val, 'modbus-read-delay', 'seconds')
             self._gate_range(key, v, 'seconds')
             with s.lock:
-                s.cfg['read_delay'] = v
+                s.cfg['modbus_read_delay'] = v
             s.wake.set()
             return secs(v)
-        if key == 'merge-gap':
-            v = numi(val, 'merge-gap', 'registers')
+        if key == 'modbus-merge-gap':
+            v = numi(val, 'modbus-merge-gap', 'registers')
             self._gate_range(key, v, 'registers')
             with s.lock:
-                s.cfg['merge_gap'] = v
+                s.cfg['modbus_merge_gap'] = v
             s.rebuild_plan()   # the plan re-merges; the poll walk picks it up (the cache's gold shape)
             s.wake.set()
             return '%d' % v
-        if key == 'timeout':
-            v = num(val, 'timeout', 'seconds')
+        if key == 'modbus-timeout':
+            v = num(val, 'modbus-timeout', 'seconds')
             if not 0 < v <= 60:
                 raise ValueError(T('wire.timeout_range'))
             with s.lock:
-                s.cfg['timeout'] = v
+                s.cfg['modbus_timeout'] = v
             s.client.apply(timeout=v)
             return secs(v)
         if key == 'modbus-unit':
@@ -303,7 +303,7 @@ class ControlServer(_ControlServer):
             with s.lock:
                 s.cfg['log_access'] = on
             return 'on' if on else 'off'
-        if key == 'profile':
+        if key == 'modbus-profile':
             try:
                 path = resolve_profile_file(val)
                 profile = load_device_profile(path)   # SystemExit on an unreadable file
@@ -313,15 +313,15 @@ class ControlServer(_ControlServer):
                 spec = s.spec
             sources = build_sources(profile, spec, path)   # ValueError when the power math cannot bind
             with s.lock:   # build-first: a bad profile never lands, nothing to roll back
-                s.cfg['profile'] = path
+                s.cfg['modbus_profile'] = path
                 s.cfg['sources'] = sources
             s.rebuild_plan()   # the poll plan follows the new register map
             s.wake.set()
             return path
         if key == 'metrics-spec':
             try:
-                spec = Metrics(val, prefix=s.cfg['metric_prefix'])
-                profile = load_device_profile(s.cfg['profile'])
+                spec = Metrics(val, prefix=s.cfg['metrics_prefix'])
+                profile = load_device_profile(s.cfg['modbus_profile'])
             except SystemExit as e:
                 raise ValueError(str(e))
             sources = build_sources(profile, spec, val)
@@ -332,16 +332,16 @@ class ControlServer(_ControlServer):
             s.rebuild_plan()   # the poll plan follows the new register map
             s.wake.set()
             return val
-        if key == 'metric-prefix':
+        if key == 'metrics-prefix':
             if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', val):
-                raise ValueError('invalid metric_prefix = %r: must be a valid metric-name start '
+                raise ValueError('invalid metrics_prefix = %r: must be a valid metric-name start '
                                  '(letters/digits/underscore, not starting with a digit)' % val)
             spec = Metrics(s.cfg['metrics_spec'], prefix=val)
             with s.lock:
-                profile = load_device_profile(s.cfg['profile'])
+                profile = load_device_profile(s.cfg['modbus_profile'])
             sources = build_sources(profile, spec, s.cfg['metrics_spec'])
             with s.lock:
-                s.cfg['metric_prefix'] = val
+                s.cfg['metrics_prefix'] = val
                 s.cfg['sources'] = sources
                 s.spec = spec
             s.rebuild_plan()   # the poll plan follows the new register map
@@ -375,12 +375,12 @@ class ControlServer(_ControlServer):
             return value
         with s.lock:
             cfg = dict(s.cfg)
-        if key == 'interval':
-            return secs(cfg['interval'])
-        if key == 'read-delay':
-            return secs(cfg['read_delay'])
-        if key == 'timeout':
-            return secs(cfg['timeout'])
+        if key == 'modbus-interval':
+            return secs(cfg['modbus_interval'])
+        if key == 'modbus-read-delay':
+            return secs(cfg['modbus_read_delay'])
+        if key == 'modbus-timeout':
+            return secs(cfg['modbus_timeout'])
         if key == 'metrics-max-clients':
             return '%d' % (self.httpd.gate.max_total if self.httpd else cfg['max_clients'])
         if key == 'metrics-client-timeout':
@@ -392,8 +392,8 @@ class ControlServer(_ControlServer):
             return acl_value_text(self.httpd.metrics_acl) if self.httpd else (cfg['metrics_acl'] or 'any')
         if key == 'log-access':
             return 'on' if (self.httpd.RequestHandlerClass.log_access if self.httpd else cfg['log_access']) else 'off'
-        if key == 'profile':
-            return cfg['profile']
+        if key == 'modbus-profile':
+            return cfg['modbus_profile']
         if key == 'modbus-auth':
             return cfg.get('auth') or 'none'
         if key == 'metrics-spec':
@@ -429,14 +429,14 @@ class ControlServer(_ControlServer):
             'modbus-unit': cfg['modbus_unit'],
             'modbus-offset': cfg['modbus_offset'],
             'modbus-auth': cfg.get('auth') or 'none',
-            'timeout': cfg['timeout'],
-            'profile': cfg['profile'],
+            'modbus-timeout': cfg['modbus_timeout'],
+            'modbus-profile': cfg['modbus_profile'],
             'grid-positive-import': 'on' if cfg['grid_positive_import'] else 'off',
-            'interval': cfg['interval'],
-            'read-delay': cfg['read_delay'],
-            'merge-gap': cfg['merge_gap'],
+            'modbus-interval': cfg['modbus_interval'],
+            'modbus-read-delay': cfg['modbus_read_delay'],
+            'modbus-merge-gap': cfg['modbus_merge_gap'],
             'metrics-spec': cfg['metrics_spec'],
-            'metric-prefix': cfg['metric_prefix'],
+            'metrics-prefix': cfg['metrics_prefix'],
             'max-kwp': cfg['max_kwp'],
             'max-grid-kw': cfg['max_grid_kw'],
             'metrics-max-clients': cfg['max_clients'],
@@ -469,7 +469,7 @@ class ControlServer(_ControlServer):
         s = self.scraper
         age = 'never' if not s.last_poll else secs(time.time() - s.last_poll)
         return ('upstream=%s:%d interval=%s poll=%s last-poll=%s errors=%d'
-                % (s.cfg['host'], s.cfg['modbus_port'], secs(s.cfg['interval']),
+                % (s.cfg['host'], s.cfg['modbus_port'], secs(s.cfg['modbus_interval']),
                    'ok' if s.up else 'down', age, s.errors))
 
     @staticmethod
@@ -509,7 +509,7 @@ class ControlServer(_ControlServer):
             % (sess, u.connects, u.exchanges, self._bytes(u.bytes_in), self._bytes(u.bytes_out), u.errors),
             'last err  %s' % last_err,
             'poll      interval %s, read-delay %s, merge-gap %d, cycle last %s mean %s max %s, last ok %s, plan %d block(s)'
-            % (secs(s.cfg['interval']), secs(s.cfg.get('read_delay') or 0.0), s.cfg.get('merge_gap') or 0,
+            % (secs(s.cfg['modbus_interval']), secs(s.cfg.get('modbus_read_delay') or 0.0), s.cfg.get('modbus_merge_gap') or 0,
                secs(s.poll_secs_last), secs(mean), secs(s.poll_secs_max), last_ok, len(blocks)),
         ]
         if with_sources:
@@ -608,14 +608,14 @@ class ControlServer(_ControlServer):
         rows = [
             'version   modbus-scraper %s' % version_string(),
             'upstream  %s:%d unit %d (offset %d), timeout %s, modbus auth %s, last poll %s%s'
-            % (cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['modbus_offset'], secs(cfg['timeout']),
+            % (cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['modbus_offset'], secs(cfg['modbus_timeout']),
                cfg.get('auth') or 'none',
                'never' if not last_poll else '%s ago' % secs(now - last_poll),
                '' if s.up else ' (FAILING)'),
             'listen    %s, control %s' % (cfg['listen'], self.describe()),
-            'profile   %s' % cfg['profile'],
+            'profile   %s' % cfg['modbus_profile'],
             'poll      interval %s, errors %d, plan %d block(s): %s, sanity %s'
-            % (secs(cfg['interval']), s.errors, len(s.blocks),
+            % (secs(cfg['modbus_interval']), s.errors, len(s.blocks),
                ' '.join('%s%d:%d' % ('' if fc == 3 else 'fc%d ' % fc, st, c)
                         for fc, st, c, _ in s.blocks),
                'ok' if not s.error_state() else s.error_state()),

@@ -14,7 +14,7 @@ bundled sun2000 profile's 13 sources walk as 4 blocks, the read delay
 paces between blocks, a failed block bisects to its leaves (the cache's
 split-on-failure shape, a bad register never starves its pooled
 neighbors) and the ok replies slice back per source for the decode; the
-plan rebuilds live on set profile/metrics-spec/metric-prefix/merge-gap and
+plan rebuilds live on set profile/metrics-spec/metrics-prefix/merge-gap and
 on the restore/reload paths. `show uplink` rides the SHOW_REPORTS
 dispatch: the session counters (connects/exchanges/bytes/errors — the
 ModbusTCP client mirrors the cache's Upstream counter block

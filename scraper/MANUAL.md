@@ -97,12 +97,12 @@ the inverter Modbus settings
 | `modbus-offset` | `set modbus offset` | settable | `N` | `--modbus-offset` / `MODBUS_OFFSET` | added to register addresses |
 | `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth settings: the Modbus scheme the poll session speaks (modbus auth — suite or none) and the bearer token the metrics endpoint requires (auth token) |
 | `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
-| `timeout` | `set modbus timeout` | settable | `s` | `--timeout` / `TIMEOUT` | Modbus connect/read timeout |
-| `read-delay` | `set modbus read-delay` | settable | `s` | `--read-delay` / `READ_DELAY` | seconds between consecutive device reads within a poll cycle |
-| `merge-gap` | `set modbus merge-gap` | settable | `registers` | `--merge-gap` / `MERGE_GAP` | max register gap when merging the profile's source ranges into block reads; the plan rebuilds |
-| `profile` | `set modbus profile` | settable | `\<file>` | `--profile` / `PROFILE` | device profile JSON: the registers the metrics read (a bare name resolves in profiles/profiles/) |
+| `modbus-timeout` | `set modbus timeout` | settable | `s` | `--modbus-timeout` / `MODBUS_TIMEOUT` | Modbus connect/read timeout |
+| `modbus-read-delay` | `set modbus read-delay` | settable | `s` | `--modbus-read-delay` / `MODBUS_READ_DELAY` | seconds between consecutive device reads within a poll cycle |
+| `modbus-merge-gap` | `set modbus merge-gap` | settable | `registers` | `--modbus-merge-gap` / `MODBUS_MERGE_GAP` | max register gap when merging the profile's source ranges into block reads; the plan rebuilds |
+| `modbus-profile` | `set modbus profile` | settable | `\<file>` | `--modbus-profile` / `MODBUS_PROFILE` | device profile JSON: the registers the metrics read (a bare name resolves in profiles/profiles/) |
 | `grid-positive-import` | `set modbus grid-positive-import` | settable | `on\|off` | `--grid-positive-import` / `GRID_POSITIVE_IMPORT` | grid register positive when importing |
-| `interval` | `set modbus interval` | settable | `s` | `--interval` / `INTERVAL` | seconds between polls of the inverter |
+| `modbus-interval` | `set modbus interval` | settable | `s` | `--modbus-interval` / `MODBUS_INTERVAL` | seconds between polls of the inverter |
 
 ### metrics
 
@@ -112,7 +112,7 @@ the bearer auth, the connect ACL, the spec and the prefix
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `metrics-spec` | `set metrics filter` | settable | `PATH\|-` | `--metrics-spec` / `METRICS_SPEC` | metrics spec JSON, sectioned: {inputs: {name: {help}}, metrics: {key: {profile?, expr?, when?, help, type?}}, scraper:...} — the metrics entries are register- (profile) or expression-fed (expr/when) over the declared inputs (show inputs), merged in memory over the built-in lib/metrics.json scraper_* block |
-| `metric-prefix` | `set metrics prefix` | settable | `PREFIX` | `--metric-prefix` / `METRIC_PREFIX` | the prefix on the profile- and compute-fed metric names |
+| `metrics-prefix` | `set metrics prefix` | settable | `PREFIX` | `--metrics-prefix` / `METRICS_PREFIX` | the prefix on the profile- and compute-fed metric names |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
 
 ### modbus/caps

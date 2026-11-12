@@ -172,7 +172,7 @@ class EvilInverter:
 def write_ini(path, extra=''):
     # the set grammar (the ini format is gone): every line a `set`
     with open(path, 'w') as fh:
-        fh.write('# the regtest config\nset interval 0.3\nset timeout 1\n%s\n' % extra)
+        fh.write('# the regtest config\nset modbus-interval 0.3\nset modbus-timeout 1\n%s\n' % extra)
 
 
 procs = []
@@ -222,7 +222,7 @@ try:
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
                                     '--upstream', '127.0.0.1:%d' % (15590 + BASE),
-                                   '--listen', '127.0.0.1:%d' % (9361 + BASE), '--profile', prof],
+                                   '--listen', '127.0.0.1:%d' % (9361 + BASE), '--modbus-profile', prof],
                                   stdout=open(os.path.join(SCRATCH, 'scr_prof_scraper.log'), 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
         status, m = wait_metrics(9361 + BASE)
@@ -250,7 +250,7 @@ try:
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
                                     '--upstream', '127.0.0.1:%d' % (15547 + BASE),
-                                   '--listen', '127.0.0.1:%d' % (9362 + BASE), '--profile', prof4],
+                                   '--listen', '127.0.0.1:%d' % (9362 + BASE), '--modbus-profile', prof4],
                                   stdout=open(os.path.join(SCRATCH, 'scr_fc4.log'), 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
         status, m = wait_metrics(9362 + BASE)
@@ -266,7 +266,7 @@ try:
     evil4 = EvilInverter(15592, {40001: 4000, 40003: 0})
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
                                     '--upstream', '127.0.0.1:%d' % (15592 + BASE),
-                                   '--listen', '127.0.0.1:%d' % (9364 + BASE), '--profile', prof4],
+                                   '--listen', '127.0.0.1:%d' % (9364 + BASE), '--modbus-profile', prof4],
                                   stdout=open(os.path.join(SCRATCH, 'scr_fc4_evil.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(1.5)          # a few failed polls at the 0.3s interval
     status, m = wait_metrics(9364, want=None)
@@ -350,7 +350,7 @@ try:
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
-                                    '--upstream', '127.0.0.1:%d' % (15548 + BASE), '--profile', profx,
+                                    '--upstream', '127.0.0.1:%d' % (15548 + BASE), '--modbus-profile', profx,
                                    '--listen', '127.0.0.1:%d' % (9366 + BASE), '--metrics-spec', specx],
                                   stdout=open(os.path.join(SCRATCH, 'scr_bits.log'), 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
@@ -377,7 +377,7 @@ try:
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
-                                    '--upstream', '127.0.0.1:%d' % (15549 + BASE), '--profile', profs,
+                                    '--upstream', '127.0.0.1:%d' % (15549 + BASE), '--modbus-profile', profs,
                                    '--listen', '127.0.0.1:%d' % (9367 + BASE), '--metrics-spec', specx],
                                   stdout=open(os.path.join(SCRATCH, 'scr_swap.log'), 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
@@ -399,7 +399,7 @@ try:
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
                                     '--upstream', '127.0.0.1:%d' % (15596 + BASE),
-                                   '--listen', '127.0.0.1:%d' % (9363 + BASE), '--profile', 'deye-sg03lp1'],
+                                   '--listen', '127.0.0.1:%d' % (9363 + BASE), '--modbus-profile', 'deye-sg03lp1'],
                                   stdout=open(os.path.join(SCRATCH, 'scr_deye.log'), 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
         status, m = wait_metrics(9363 + BASE)
@@ -420,7 +420,7 @@ try:
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
                                     '--upstream', '127.0.0.1:%d' % (15598 + BASE),
-                                   '--listen', '127.0.0.1:%d' % (9365 + BASE), '--profile', 'deye-sg04lp3'],
+                                   '--listen', '127.0.0.1:%d' % (9365 + BASE), '--modbus-profile', 'deye-sg04lp3'],
                                   stdout=open(os.path.join(SCRATCH, 'scr_deye3.log'), 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
         status, m = wait_metrics(9365 + BASE)
@@ -1124,29 +1124,29 @@ try:
     prof2 = os.path.join(SCRATCH, 'scr_prof_custom2.json')
     _json.dump({'registers': [{'name': 'pv-power', 'register': 40003, 'type': 'i32', 'scale': 1}]},
                open(prof2, 'w'))
-    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'profile', prof2],
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'modbus-profile', prof2],
                        capture_output=True, text=True)
-    check('control: set profile swaps the map live', r.returncode == 0
-          and r.stdout.startswith('ok profile=unnamed profile (%s)' % prof2), r.stdout.strip())
+    check('control: set modbus-profile swaps the map live', r.returncode == 0
+          and r.stdout.startswith('ok modbus-profile=unnamed profile (%s)' % prof2), r.stdout.strip())
     r1, r2 = read3(40001, 2, 15570), read3(40003, 2, 15570)
     check('control: the swapped map serves the new addresses', r2[0] == 3
           and struct.unpack('>i', r2[2:6])[0] == 4000 and struct.unpack('>i', r1[2:6])[0] == 0, (r1 + r2).hex())
-    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'profile'],
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'show', 'modbus-profile'],
                        capture_output=True, text=True)
-    check('control: show profile reports description + path', r.stdout.strip() == 'ok profile=unnamed profile (%s)' % prof2, r.stdout.strip())
-    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'profile', os.path.join(SCRATCH, 'scr_nope.json')],
+    check('control: show modbus-profile reports description + path', r.stdout.strip() == 'ok modbus-profile=unnamed profile (%s)' % prof2, r.stdout.strip())
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'modbus-profile', os.path.join(SCRATCH, 'scr_nope.json')],
                        capture_output=True, text=True)
-    check('control: set profile of a bad file is rejected', r.returncode == 0
+    check('control: set modbus-profile of a bad file is rejected', r.returncode == 0
           and r.stdout.startswith('% error: '), r.stdout.strip())
-    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'clear', 'profile'],
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'clear', 'modbus-profile'],
                        capture_output=True, text=True)
-    check('control: clear profile restores the configured map (its description shows)', r.returncode == 0
+    check('control: clear modbus-profile restores the configured map (its description shows)', r.returncode == 0
           and 'profile=SUN2000 with optional LUNA2000 battery and meter' in r.stdout
           and 'pv=4000W' in r.stdout, r.stdout.strip())
-    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'profile', 'sun2000'],
+    r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'modbus-profile', 'sun2000'],
                        capture_output=True, text=True)
     check('control: the built-in profile answers to its name (sun2000)', r.returncode == 0
-          and r.stdout.startswith('ok profile=SUN2000 with optional LUNA2000 battery and meter (sun2000)'),
+          and r.stdout.startswith('ok modbus-profile=SUN2000 with optional LUNA2000 battery and meter (sun2000)'),
           r.stdout.strip())
     r = subprocess.run([sys.executable, F, '--dry-run', '--profile', 'sun2000'], capture_output=True, text=True)
     check('profile: --profile sun2000 resolves the built-in (dry-run rc 0)', r.returncode == 0, r.stderr[-80:])
@@ -1459,13 +1459,13 @@ try:
     def dry(*flags):
         return subprocess.run([sys.executable, P, '--dry-run'] + list(flags), capture_output=True)
 
-    r = dry('--timeout', 'inf')
+    r = dry('--modbus-timeout', 'inf')
     check('reject inf timeout', r.returncode == 2 and b'finite number' in r.stderr)
     nanprof = os.path.join(SCRATCH, 'scr_nan_scale_profile.json')
     _json.dump({'description': 'nan gain',
                 'registers': [{'name': 'pv-power', 'register': 32064, 'type': 'i32', 'scale': float('nan')},
                               {'name': 'grid-power', 'register': 37113, 'type': 'i32'}]}, open(nanprof, 'w'))
-    r = dry('--profile', nanprof)
+    r = dry('--modbus-profile', nanprof)
     check('reject nan scale (the profile gain is the divisor now)', r.returncode == 1
           and b'finite number > 0' in r.stderr, r.stderr.decode('utf-8', 'replace')[:160])
     r = dry('--upstream', 'inva lid:5502')
@@ -1478,7 +1478,7 @@ try:
     r = dry('--modbus-unit', '248')
     check('reject unit id out of range', r.returncode == 2 and b'modbus-unit must be 1..247' in r.stderr)
     with open(os.path.join(SCRATCH, 'scr_broken.ini'), 'w') as fh:
-        fh.write('# a set line missing its value\nset interval\n')
+        fh.write('# a set line missing its value\nset modbus-interval\n')
     r = dry('--config', os.path.join(SCRATCH, 'scr_broken.ini'))
     check('malformed config is fatal (no silent defaults)', r.returncode == 1
           and b'a set line needs a name and a value' in r.stderr)
@@ -1487,7 +1487,7 @@ try:
     r = subprocess.run([sys.executable, P, '--dry-run', '--config', os.path.join(SCRATCH, 'scr_base.ini')],
                        capture_output=True, env=dict(os.environ, LOG_LEVEL='  info  '))
     check('log level is stripped/normalized', r.returncode == 0 and b'log level: INFO' in r.stderr)
-    r = dry('--interval', '0.5', '--timeout', '2')
+    r = dry('--modbus-interval', '0.5', '--modbus-timeout', '2')
     check('timeout > interval warns but starts', r.returncode == 0 and b'back-to-back' in r.stderr)
     r = dry('--max-kwp', '-1')
     check('negative max_kwp rejected', r.returncode == 2 and b'max-kwp must be >= 0' in r.stderr)
@@ -1495,8 +1495,8 @@ try:
     check('negative max_grid_kw rejected', r.returncode == 2 and b'max-grid-kw must be >= 0' in r.stderr)
 
     # 3g. hostile startup paths fail clean (no traceback), rc=1
-    r = dry('--interval', '1e308')
-    check('huge interval rejected by the row bound', r.returncode == 2 and b'interval must be 0..86400' in r.stderr)
+    r = dry('--modbus-interval', '1e308')
+    check('huge modbus-interval rejected by the row bound', r.returncode == 2 and b'interval must be 0..86400' in r.stderr)
     r = subprocess.run([sys.executable, '-c',
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; Metrics(%r)'
@@ -1734,7 +1734,7 @@ try:
     # 5. dry-run exit codes
     r = subprocess.run([sys.executable, P, '--dry-run', '--config', os.path.join(SCRATCH, 'scr_base.ini')], capture_output=True)
     check('dry-run valid config: rc=0, nothing bound', r.returncode == 0 and b'dry-run' in r.stderr)
-    r = subprocess.run([sys.executable, P, '--dry-run', '--interval', '-1'], capture_output=True)
+    r = subprocess.run([sys.executable, P, '--dry-run', '--modbus-interval', '-1'], capture_output=True)
     check('dry-run invalid config: rc=2, clean message', r.returncode == 2 and b'interval must be 0..86400' in r.stderr)
 
     # 6. the scraper's control plane (the cache's shape, mirrored): the
@@ -1778,7 +1778,7 @@ try:
         return '%s %s' % (obj.get('status', 'fail'), str(obj.get('text', '')))
 
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % (19457 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19457 + BASE), '--modbus-interval', '1',
                                    '--control-port', '15597', '--control-token', STOK,
                                    '--audit-log', os.path.join(SCRATCH, 'scr_regtest_audit.log')],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
@@ -1794,8 +1794,8 @@ try:
     check('scraper control: the retired metrics caps spelling refuses', r.startswith('fail'), r[:80])
     r = sctl('clear max-kwp', 15597)
     check('scraper control: the caps clear returns the configured value', r.startswith('ok max-kwp=6'), r[:80])
-    r = sctl('set metric-prefix deye', 15597)
-    check('scraper control: the prefix set re-builds the spec', r.startswith('ok metric-prefix=deye'), r[:80])
+    r = sctl('set metrics-prefix deye', 15597)
+    check('scraper control: the prefix set re-builds the spec', r.startswith('ok metrics-prefix=deye'), r[:80])
     m = {}
     for _ in range(10):
         m = metrics_dict(get('/metrics', 19457 + BASE)[1])
@@ -1804,10 +1804,10 @@ try:
         time.sleep(0.3)
     check('control: the exported names carry the live prefix', 'deye_pv_generation_watts' in m
           and 'huawei_pv_generation_watts' not in m, str(sorted(m))[:80])
-    r = sctl('set metric-prefix 9bad', 15597)
-    check('control: an invalid prefix refuses', r.startswith('fail invalid metric_prefix'), r[:80])
-    r = sctl('clear metric-prefix', 15597)
-    check('control: the prefix clear re-applies huawei', r.startswith('ok metric-prefix=huawei'), r[:80])
+    r = sctl('set metrics-prefix 9bad', 15597)
+    check('control: an invalid prefix refuses', r.startswith('fail invalid metrics_prefix'), r[:80])
+    r = sctl('clear metrics-prefix', 15597)
+    check('control: the prefix clear re-applies huawei', r.startswith('ok metrics-prefix=huawei'), r[:80])
     m = {}
     for _ in range(10):
         m = metrics_dict(get('/metrics', 19457 + BASE)[1])
@@ -1827,12 +1827,12 @@ try:
     r = sctl('show version', 15597, badmac=True)
     check('scraper control: a bad command mac is refused',
           r.startswith('fail the command mac does not verify'), r[:80])
-    r = sctl('set interval 5', 15597)
-    check('scraper control: set interval', r.startswith('ok interval=5.00s'), r[:80])
-    r = sctl('show interval', 15597)
-    check('scraper control: show interval', r.startswith('ok interval=5.00s'), r[:80])
-    r = sctl('set interval 0', 15597)
-    check('scraper control: a bad value refused', r.startswith('fail interval must be'), r[:80])
+    r = sctl('set modbus-interval 5', 15597)
+    check('scraper control: set interval', r.startswith('ok modbus-interval=5.00s'), r[:80])
+    r = sctl('show modbus-interval', 15597)
+    check('scraper control: show modbus-interval', r.startswith('ok modbus-interval=5.00s'), r[:80])
+    r = sctl('set modbus-interval 0', 15597)
+    check('scraper control: a bad value refused', r.startswith('fail modbus-interval must be'), r[:80])
     r = sctl('help clear', 15597)
     check('scraper control: help <command> describes the row',
           r == 'ok restore a setting to its configured value (clear modbus interval, clear system log-level)', r)
@@ -1844,8 +1844,8 @@ try:
     r = sctl('help bogus', 15597)
     check('scraper control: help <unknown topic> is the reworded two-space error',
           r == 'fail unknown command or setting bogus (try ?)', r)
-    r = sctl('clear interval', 15597)
-    check('scraper control: clear restores the configured value', r.startswith('ok interval='), r[:80])
+    r = sctl('clear modbus-interval', 15597)
+    check('scraper control: clear restores the configured value', r.startswith('ok modbus-interval='), r[:80])
     r = sctl('set log-access on', 15597)
     check('scraper control: set log-access', r.startswith('ok log-access=on'), r[:80])
     r = sctl('set max-conn-per-ip 2', 15597)
@@ -1859,31 +1859,31 @@ try:
     check('scraper control: the hierarchy node answers its namespace (the ? shape)',
           words == ['auth', 'caps', 'grid-positive-import', 'interval', 'merge-gap', 'offset', 'profile',
                     'read-delay', 'timeout', 'unit', 'upstream'], r[:160])
-    # 6b-2. the register map lives in the device profile: `set profile` swaps
+    # 6b-2. the register map lives in the device profile: `set modbus-profile` swaps
     #        it live, a profile without the power registers rolls back
-    r = sctl('show profile', 15597)
-    check('scraper control: show profile names the resolved device profile',
-          r.startswith('ok profile=') and 'sun2000.json' in r, r[:120])
-    r = sctl('set profile sun2000', 15597)
-    check('scraper control: set profile default re-resolves the bundled profile',
-          r.startswith('ok profile=') and 'sun2000.json' in r, r[:120])
+    r = sctl('show modbus-profile', 15597)
+    check('scraper control: show modbus-profile names the resolved device profile',
+          r.startswith('ok modbus-profile=') and 'sun2000.json' in r, r[:120])
+    r = sctl('set modbus-profile sun2000', 15597)
+    check('scraper control: set modbus-profile default re-resolves the bundled profile',
+          r.startswith('ok modbus-profile=') and 'sun2000.json' in r, r[:120])
     badprof = os.path.join(SCRATCH, 'scr_no_pv_profile.json')
     _json.dump({'description': 'no power registers',
                 'registers': [{'name': 'device-status', 'register': 32000, 'type': 'u16', 'scrape': True}]},
                open(badprof, 'w'))
-    r = sctl('set profile %s' % badprof, 15597)
+    r = sctl('set modbus-profile %s' % badprof, 15597)
     check('scraper control: a profile without the power registers is refused (rollback)',
           r.startswith('fail ') and 'pv_generation_watts' in r, r[:160])
-    r = sctl('set profile ' + os.path.join(SCRATCH, 'scr_no_such_profile.json'), 15597)
+    r = sctl('set modbus-profile ' + os.path.join(SCRATCH, 'scr_no_such_profile.json'), 15597)
     check('scraper control: a missing profile file is refused', r.startswith('fail cannot read'), r[:120])
-    r = sctl('clear profile', 15597)
-    check('scraper control: clear profile restores the configured profile',
-          r.startswith('ok profile=') and 'sun2000.json' in r, r[:120])
+    r = sctl('clear modbus-profile', 15597)
+    check('scraper control: clear modbus-profile restores the configured profile',
+          r.startswith('ok modbus-profile=') and 'sun2000.json' in r, r[:120])
     r = sctl('show settings', 15597)
     check('scraper control: show settings is retired (fail)', r.startswith('fail'), r[:80])
     r = sctl('show knobs', 15597)
     check('scraper control: show knobs, the dictionary of the registry — flag, env twin, how it changes',
-          r.startswith('ok knobs') and '--metric-prefix' in r and '$METRIC_PREFIX' in r
+          r.startswith('ok knobs') and '--metrics-prefix' in r and '$METRICS_PREFIX' in r
           and 'set modbus interval <value>' in r and ', secret' in r, r[:200])
     body = r.split('\n')
     names = [ln.split()[0] for ln in body[2:] if ln.strip()]
@@ -1928,19 +1928,19 @@ try:
     check('scraper control: show uplink-sources spells the register map (fc, register, range, source)',
           r.startswith('ok uplink-sources\n') and vhead.split() == ['fc', 'register', 'range', 'source']
           and 'pv-power' in r and vrows and len(vrows) > len(uprows) - 1, repr(r.splitlines()[4:6]) if len(r.splitlines()) > 5 else r[:160])
-    r = sctl('set merge-gap 0', 15597)
-    check('scraper control: set merge-gap 0 rebuilds the plan (each range alone)',
-          r.startswith('ok merge-gap=0'), r[:90])
+    r = sctl('set modbus-merge-gap 0', 15597)
+    check('scraper control: set modbus-merge-gap 0 rebuilds the plan (each range alone)',
+          r.startswith('ok modbus-merge-gap=0'), r[:90])
     r = sctl('show uplink', 15597)
     check('scraper control: the uplink report speaks merge-gap 0 and the wider plan',
           'merge-gap 0' in r and uprows and len([ln for ln in r.splitlines() if ln.startswith('fc')]) >
           len(uprows), 'merge-gap 0: %s' % r.splitlines()[3][:120])
-    r = sctl('clear merge-gap', 15597)
-    check('scraper control: clear merge-gap restores the configured default',
-          r.startswith('ok merge-gap=8'), r[:90])
-    r = sctl('show read-delay', 15597)
-    check('scraper control: show read-delay answers the configured value (the fresh-start resolve)',
-          r.startswith('ok read-delay=50.00ms'), r[:90])
+    r = sctl('clear modbus-merge-gap', 15597)
+    check('scraper control: clear modbus-merge-gap restores the configured default',
+          r.startswith('ok modbus-merge-gap=8'), r[:90])
+    r = sctl('show modbus-read-delay', 15597)
+    check('scraper control: show modbus-read-delay answers the configured value (the fresh-start resolve)',
+          r.startswith('ok modbus-read-delay=50.00ms'), r[:90])
     r = sctl('request reload-config', 15597)
     check('scraper control: request reload-config', r.startswith('ok reloaded'), r[:80])
     # 6b-3. the secrets on the wire: startup-only (the dump-key treatment) —
@@ -1976,8 +1976,8 @@ try:
     check('scraper control: the dump path set live', r.startswith('ok dump-path=' + os.path.join(SCRATCH, 'scr_regtest_state.json')), r[:90])
     check('scraper control: the set dump path reply notes the unsealed dump (no key configured)',
           '(not sealed' in r and 'set dump-key' in r, r[:160])
-    r = sctl('set interval 9', 15597)
-    check('scraper control: the override before the dump', r.startswith('ok interval=9.00s'), r[:80])
+    r = sctl('set modbus-interval 9', 15597)
+    check('scraper control: the override before the dump', r.startswith('ok modbus-interval=9.00s'), r[:80])
     r = sctl('request dump', 15597)
     check('scraper control: request dump writes the live path', r.startswith('ok dumped 2 setting(s)'), r[:80])
     dumpst = os.stat(os.path.join(SCRATCH, 'scr_regtest_state.json'))
@@ -1987,12 +1987,12 @@ try:
     check('scraper control: the dump carries the settings, never the secrets',
           '"modbus/interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw
           and 'auth-token' not in raw and 'control-token' not in raw, raw[:240])
-    r = sctl('set interval 1', 15597)
+    r = sctl('set modbus-interval 1', 15597)
     r = sctl('request restore', 15597)
     check('scraper control: the restore re-applies the dump (the secrets never ride it)',
           r.startswith('ok restored 2 setting(s)'), r[:80])
-    r = sctl('show interval', 15597)
-    check('scraper control: the restored override reads back', r == 'ok interval=9.00s', r[:80])
+    r = sctl('show modbus-interval', 15597)
+    check('scraper control: the restored override reads back', r == 'ok modbus-interval=9.00s', r[:80])
     r = sctl('request dump', 15597)   # a tamper check: edit the dump, the restore refuses
     tampered = open(os.path.join(SCRATCH, 'scr_regtest_state.json')).read().replace('9.0', '3.0')
     open(os.path.join(SCRATCH, 'scr_regtest_state.json'), 'w').write(tampered)
@@ -2031,7 +2031,7 @@ try:
     #        the restore fails closed without the key (the restart matrix lives
     #        in the inverter and cache regtests — the same open_dump gate)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % (19466 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19466 + BASE), '--modbus-interval', '1',
                                    '--control-port', '15601', '--control-token', STOK,
                                    '--dump-path', os.path.join(SCRATCH, 'scr_regtest_state_sealed.json')],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -2043,7 +2043,7 @@ try:
     r = sctl('set dump-key other', 15601, token=STOK)
     check('scraper sealed dump: set dump-key answers the restart note',
           r.startswith('fail restart required (startup-only knob)'), r[:100])
-    r = sctl('set interval 7', 15601, token=STOK)
+    r = sctl('set modbus-interval 7', 15601, token=STOK)
     r = sctl('request dump', 15601, token=STOK)
     check('scraper sealed dump: request dump reports sealed (the DUMP_KEY env twin)',
           r.startswith('ok dumped 1 setting(s)') and '(sealed)' in r, r[:120])
@@ -2052,7 +2052,7 @@ try:
     check('scraper sealed dump: the envelope is sealed — the settings encrypted away',
           d.get('version') == 2 and d.get('cipher') == 'sha256-ctr' and 'settings' not in d
           and '"interval"' not in raw and d.get('box'), raw[:120])
-    r = sctl('set interval 1', 15601, token=STOK)
+    r = sctl('set modbus-interval 1', 15601, token=STOK)
     r = sctl('request restore', 15601, token=STOK)
     check('scraper sealed dump: the restore re-applies under the configured key',
           r.startswith('ok restored 1 setting(s)'), r[:120])
@@ -2065,7 +2065,7 @@ try:
         fh.write('scr-seal-key\n')
     os.chmod(scrkeyfile, 0o600)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % (19466 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19466 + BASE), '--modbus-interval', '1',
                                    '--control-port', '15601', '--control-token', STOK,
                                    '--dump-path', os.path.join(SCRATCH, 'scr_regtest_state_sealed.json')],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -2077,7 +2077,7 @@ try:
     procs[-1].kill()
     time.sleep(0.4)
     p_nofile = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                 '--listen', '127.0.0.1:%d' % (19466 + BASE), '--interval', '1',
+                                 '--listen', '127.0.0.1:%d' % (19466 + BASE), '--modbus-interval', '1',
                                  '--control-port', '15601', '--control-token', STOK,
                                  '--dump-path', os.path.join(SCRATCH, 'scr_regtest_state_sealed.json'),
                                  '--dump-key', 'file:/nonexistent/dump_key'],
@@ -2097,7 +2097,7 @@ try:
     # a dump path without a key warns at start (the plaintext posture is a
     # choice, and now a visible one)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % (19466 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19466 + BASE), '--modbus-interval', '1',
                                    '--control-port', '15601', '--control-token', STOK,
                                    '--dump-path', os.path.join(SCRATCH, 'scr_regtest_state_plain.json')],
                                   stdout=open(os.path.join(SCRATCH, 'scr_regtest_unsealed_warn.log'), 'w'),
@@ -2119,7 +2119,7 @@ try:
     check('scraper control: inspect', r.startswith('ok inspect\n') and 'version   modbus-scraper' in r, r[:120])
     aud = open(os.path.join(SCRATCH, 'scr_regtest_audit.log')).read()
     check('scraper control: the SCR audit trail with the wire mac',
-          'application=SCR tag=daemon' in aud and 'type=command' in aud and "cmd='set interval 5' wire=h" in aud
+          'application=SCR tag=daemon' in aud and 'type=command' in aud and "cmd='set modbus-interval 5' wire=h" in aud
           and 'result=ok' in aud, aud[-200:])
 
     # 6c. the read-only ops token: show allowed, everything that steers the
@@ -2127,7 +2127,7 @@ try:
     OPS_AUDIT = os.path.join(SCRATCH, 'scr_regtest_ops_audit.log')
     open(OPS_AUDIT, 'w').write('')
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % (19459 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19459 + BASE), '--modbus-interval', '1',
                                    '--control-port', '15598', '--control-token', STOK,
                                    '--control-ops-token', 'opssecret', '--audit-log', OPS_AUDIT],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
@@ -2136,7 +2136,7 @@ try:
     check('scraper control: the ops token reads (show version)', r.startswith('ok modbus-scraper'), r[:80])
     r = sctl('show knobs', 15598, token='opssecret')
     check('scraper control: the ops token reads (show knobs, a show verb)', r.startswith('ok knobs'), r[:80])
-    r = sctl('set interval 5', 15598, token='opssecret')
+    r = sctl('set modbus-interval 5', 15598, token='opssecret')
     check('scraper control: the ops token cannot set', r.startswith('fail forbidden:') and 'admin' in r, r[:80])
     r = sctl('request poll now', 15598, token='opssecret')
     check('scraper control: the ops token cannot request poll now', r.startswith('fail forbidden:'), r[:80])
@@ -2174,29 +2174,29 @@ try:
     #     lives beside ITS config): the overrides save, the process re-execs,
     #     the fresh daemon re-applies them once and consumes the file
     ini_r = os.path.join(SCRATCH, 'scr_reload.conf')
-    open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset timeout 2\n')
+    open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset modbus-timeout 2\n')
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % (19463 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19463 + BASE), '--modbus-interval', '1',
                                    '--config', ini_r, '--control-port', '15600', '--control-token', STOK,
                                    '--audit-log', os.path.join(SCRATCH, 'scr_regtest_reload_audit.log')],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(1.5)
-    r = sctl('set interval 7', 15600)
-    check('scraper reload: the override lands before the reload', r.startswith('ok interval=7.00s'), r[:90])
+    r = sctl('set modbus-interval 7', 15600)
+    check('scraper reload: the override lands before the reload', r.startswith('ok modbus-interval=7.00s'), r[:90])
     r = sctl('request reload', 15600)
     check('scraper reload: the reply reports the saved override', r.startswith('ok reload: 1 override(s) saved'),
           r[:100])
     back = None
     for _ in range(100):     # the exec is fast: a connect in the drain window rides the dying daemon's
         try:                 # unsigned bye frame — only the freshly re-resolved status settles it
-            back = sctl('show interval', 15600)
+            back = sctl('show modbus-interval', 15600)
         except Exception:
             back = None
-        if back is not None and back.startswith('ok interval=7.00s'):
+        if back is not None and back.startswith('ok modbus-interval=7.00s'):
             break
         time.sleep(0.1)
     check('scraper reload: the daemon came back with the override re-applied (above the config)',
-          back is not None and back.startswith('ok interval=7.00s'),
+          back is not None and back.startswith('ok modbus-interval=7.00s'),
           repr((back or '')[-200:]))
     gone = False
     for _ in range(100):     # the fresh daemon consumes the state at start — poll for the disappearance
@@ -2225,7 +2225,7 @@ try:
     CTLB = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py')
     CLIB = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-cli.py')
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % (19457 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19457 + BASE), '--modbus-interval', '1',
                                    '--control-port', '15597', '--control-token', STOK],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(1.5)
@@ -2234,8 +2234,8 @@ try:
     check('scraper_ctl: one-shot show version', r.returncode == 0 and 'ok modbus-scraper' in r.stdout,
           repr(r.stdout[:80]) + repr(r.stderr[-80:]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK],
-                       input='set interval 5\nshow version\n', capture_output=True, text=True, timeout=15)
-    check('scraper_ctl: a piped batch', r.returncode == 0 and 'ok interval=5.00s' in r.stdout
+                       input='set modbus-interval 5\nshow version\n', capture_output=True, text=True, timeout=15)
+    check('scraper_ctl: a piped batch', r.returncode == 0 and 'ok modbus-interval=5.00s' in r.stdout
           and 'ok modbus-scraper' in r.stdout, repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, CLIB, '--control-port', '15597', '--control-token', STOK],
                        input='set log-access off\nshow modbus interval\nquit\n', capture_output=True, text=True, timeout=15)
@@ -2336,7 +2336,7 @@ try:
           r.startswith('ok no-audit-log='), repr(r[:110]))
     env = dict(os.environ, AUDIT_MAX_MB='77', AUDIT_DAILY='1', AUDIT_FILES='9')
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % (19471 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19471 + BASE), '--modbus-interval', '1',
                                    '--control-port', '15609', '--control-token', STOK],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env))
     time.sleep(1.5)
@@ -2355,7 +2355,7 @@ try:
     # the group-accessible unix socket (--control-socket-group): 0660,
     # and the live set re-modes it
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % (19458 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19458 + BASE), '--modbus-interval', '1',
                                    '--control-socket-group'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(1.5)
@@ -2385,7 +2385,7 @@ try:
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth_fake.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
-                                   '--listen', '127.0.0.1:%d' % (19461 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19461 + BASE), '--modbus-interval', '1',
                                    '--control-port', '0', '--modbus-auth', 'suite', '--modbus-auth-key', SKEY],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth.log'), 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
@@ -2402,7 +2402,7 @@ try:
     check('suite auth: the start log names the scheme', 'modbus auth suite' in open(os.path.join(SCRATCH, 'scr_auth.log')).read())
     # the wrong key: the handshake is refused — the connector fails, the poll stays down
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
-                                   '--listen', '127.0.0.1:%d' % (19462 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19462 + BASE), '--modbus-interval', '1',
                                    '--control-port', '0', '--modbus-auth', 'suite',
                                    '--modbus-auth-key', 'wrong-key-16chars00'],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth_wrong.log'), 'w'), stderr=subprocess.STDOUT))
@@ -2415,7 +2415,7 @@ try:
     # the right key: a spawned instance (the key is startup-only) — the set
     # refuses on the wire, a fresh start applies the configured key
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
-                                   '--listen', '127.0.0.1:%d' % (19468 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19468 + BASE), '--modbus-interval', '1',
                                    '--control-port', '19469', '--control-token', 'ctok-a',
                                    '--modbus-auth', 'suite', '--modbus-auth-key', 'wrong-key-16chars00'],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth_rot.log'), 'w'), stderr=subprocess.STDOUT))
@@ -2428,7 +2428,7 @@ try:
     procs[-1].wait(timeout=10)
     time.sleep(0.5)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
-                                   '--listen', '127.0.0.1:%d' % (19468 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19468 + BASE), '--modbus-interval', '1',
                                    '--control-port', '19469', '--control-token', 'ctok-a',
                                    '--modbus-auth', 'suite', '--modbus-auth-key', SKEY],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth_rot.log'), 'w'), stderr=subprocess.STDOUT))
@@ -2463,7 +2463,7 @@ try:
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15911 + BASE),
-                                   '--listen', '127.0.0.1:%d' % (19464 + BASE), '--interval', '1',
+                                   '--listen', '127.0.0.1:%d' % (19464 + BASE), '--modbus-interval', '1',
                                    '--control-port', '0', '--modbus-auth', 'suite', '--modbus-auth-key', SKEY],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth_plain.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(4.5)   # the plain fake never answers the handshake: the failure lands at the 3s socket timeout

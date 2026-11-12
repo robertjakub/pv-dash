@@ -9,7 +9,7 @@ The spec is **sectioned** (docs/TODO.md — the metrics.json sections):
   per poll (over the declared inputs — pv, grid, batt, soc and
   every profile-bound metric key; an optional `"when"` gates the presence);
   compiled once at startup (lib/expr.py); the exported name is
-  `<prefix>_<key>` with `--metric-prefix` (default `huawei`). The
+  `<prefix>_<key>` with `--metrics-prefix` (default `huawei`). The
   `section` a metric reports (`profile`/`compute`) derives from the field;
 - `"scraper"` — the exporter's own observability, the bundled cache-diag
   gauges included; the keys ARE the exported names (`scraper_*` — the fixed

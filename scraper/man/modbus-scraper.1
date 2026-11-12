@@ -70,18 +70,18 @@ the shared key the suite handshake proves (min 16 characters); the value
 may be `file:<path>` — the first line of an owner\-only 0600 file (a
 systemd LoadCredential rides as file:/run/credentials/...)
 .TP
-.BI \-\-timeout " timeout"
+.BI \-\-modbus\-timeout " modbus-timeout"
 Modbus timeout in seconds
 .TP
-.BI \-\-read\-delay " read-delay"
+.BI \-\-modbus\-read\-delay " modbus-read-delay"
 seconds between consecutive inverter reads within a poll cycle, 0 = no
 delay
 .TP
-.BI \-\-merge\-gap " merge-gap"
+.BI \-\-modbus\-merge\-gap " modbus-merge-gap"
 max register gap when merging ranges into block reads, 0 = read ranges
 separately
 .TP
-.BI \-\-profile " profile"
+.BI \-\-modbus\-profile " modbus-profile"
 device profile JSON (the shared profiles/ schema; scrape\-marked entries
 feed the metric registers)
 .TP
@@ -92,7 +92,7 @@ entries are register\- (profile) or expression\-fed (expr/when) over the
 declared inputs (show inputs), merged in memory over the built\-in
 lib/metrics.json scraper_* block
 .TP
-.BI \-\-metric\-prefix " metric-prefix"
+.BI \-\-metrics\-prefix " metrics-prefix"
 the prefix on the profile\- and compute\-fed metric names; the bundled
 scraper_* names are fixed
 .TP
@@ -207,7 +207,7 @@ rotated audit backups to keep
 .B \-\-no\-audit\-log
 disable the SCR audit trail
 .TP
-.BI \-\-interval " interval"
+.BI \-\-modbus\-interval " modbus-interval"
 seconds between polls
 .TP
 .B \-\-log\-access

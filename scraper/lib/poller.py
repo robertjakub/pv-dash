@@ -59,7 +59,7 @@ class Scraper:
         """(Re)build the poll plan from the resolved sources: the ranges
         merged into blocks per function code, the leaf -> source names map
         beside it. Runs at start and whenever the sources or the merge gap
-        change (a live set profile/metrics-spec/metric-prefix/merge-gap)."""
+        change (a live set modbus-profile/metrics-spec/metrics-prefix/modbus-merge-gap)."""
         with self.lock:
             ranges = []
             leaf_sources = {}
@@ -67,7 +67,7 @@ class Scraper:
                 leaf = (src['fc'], src['register'], _words_for(src['type']))
                 ranges.append(leaf)
                 leaf_sources.setdefault(leaf, []).append(name)
-            self.blocks = build_blocks(ranges, self.cfg.get('merge_gap', 8))
+            self.blocks = build_blocks(ranges, self.cfg.get('modbus_merge_gap', 8))
             self.leaf_sources = leaf_sources
             self.block_stats = {}
             self.plan_gen += 1
@@ -82,7 +82,7 @@ class Scraper:
             old = self.cfg
             self.cfg = cfg
         self.client.apply(host=cfg['host'], port=cfg['modbus_port'],
-                          unit=cfg['modbus_unit'], timeout=cfg['timeout'],
+                          unit=cfg['modbus_unit'], timeout=cfg['modbus_timeout'],
                           auth=cfg.get('auth'), auth_key=cfg.get('auth_key'))
         if (old['host'], old['modbus_port'], old['modbus_unit']) != (cfg['host'], cfg['modbus_port'], cfg['modbus_unit']):
             self.client.close()
@@ -156,7 +156,7 @@ class Scraper:
     def poll_once(self):
         cfg = self.cfg
         started = time.monotonic()
-        delay = cfg.get('read_delay', 0.0)
+        delay = cfg.get('modbus_read_delay', 0.0)
         plan_gen = self.plan_gen
         pending = deque(self.blocks)
         done = []
@@ -349,7 +349,7 @@ class Scraper:
 
     def cfg_interval_wait(self):
         with self.lock:
-            interval = self.cfg['interval']
+            interval = self.cfg['modbus_interval']
         # clamp: a huge interval would overflow time.sleep and kill the poll thread
         self.wake.wait(timeout=min(max(0.05, interval), 86400.0))
         self.wake.clear()

@@ -90,9 +90,9 @@ translate). The namespaces group them.
 | `prom-prefix` | — | startup-only | `PREFIX` | `--prom-prefix` / `PROM_PREFIX` | path under which Prometheus is proxied |
 | `static-dir` | — | startup-only (secret) | `PATH` | `--static-dir` / `STATIC_DIR` | directory to serve (startup-only: flag/env/config and restart) *(hidden)* |
 | `config-js` | — | startup-only (secret) | `PATH` | `--config-js` / `CONFIG_JS` | config.js to serve at /config.js (startup-only: flag/env/config and restart) *(hidden)* |
-| `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous HTTP clients (static pages + the proxy); extras get an immediate 503 |
-| `client-timeout` | `set client-timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | kick idle keep-alive HTTP clients after this long |
-| `max-conn-per-ip` | `set max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous HTTP connections from one peer IP |
+| `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous client limit |
+| `client-timeout` | `set client-timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | disconnect clients silent for this long |
+| `max-conn-per-ip` | `set max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous connections from one peer IP |
 | `metrics-listen` | — | startup-only | `HOST:PORT` | `--metrics-listen` / `METRICS_LISTEN` | the metrics bind address HOST:PORT |
 | `metrics-max-clients` | — | startup-only | `N` | `--metrics-max-clients` / `METRICS_MAX_CLIENTS` | maximum concurrent /metrics clients; extras get an immediate 503, 0 = unlimited |
 | `metrics-client-timeout` | — | startup-only | `s` | `--metrics-client-timeout` / `METRICS_CLIENT_TIMEOUT` | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
@@ -148,21 +148,21 @@ scrape presents and the client ACL checked at accept
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / `METRICS_SERVER` | the dashboard's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
-| `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | require Authorization: Bearer \<token> on the /metrics endpoint — mandatory beyond loopback; startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / `METRICS_SERVER` | the tool's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
+| `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | the metrics bearer token (Authorization: Bearer) — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
 
 ### audit
 
-the DSH audit trail: the sink, the forwarding, the rotation, the kill switch
+the audit trail: the sink, the forwarding, the rotation, the kill switch
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-log` | `set audit log-file` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | DSH audit trail: a file path or - for stdout (the docker/journald way); `none` = no local file (the forward carries the trail); the XDG state home when unset |
+| `audit-log` | `set audit log-file` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | the audit trail's file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home |
 | `audit-forward` | `set audit forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
 | `audit-forward-format` | `set audit forward format` (the console also takes `set audit forward-format`) | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
 | `audit-instance` | `set audit instance` | settable | `ID` | `--audit-instance` / `AUDIT_INSTANCE` | the audit lines' instance word: the writer daemon's identity — the control port when unset, the override when spelled |
-| `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the DSH audit trail |
+| `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the audit trail entirely |
 
 ### audit/rotate
 

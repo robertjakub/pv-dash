@@ -7,7 +7,9 @@ replies pause at a page (the more(1) keys), piped output prints whole,
 and a too-small terminal refuses the tty edition. The per-tool bins keep
 their prose and their registry wiring — the pools, the candidates ladder,
 the welcome greeting and (for the fake) the verb-first loop — passed here
-as a spec dict to run_cli(). Stdlib only."""
+as a spec dict to run_client() — one ladder, three modes by the
+invocation shape (command words one-shot, piped stdin batch, bare tty
+console). Stdlib only."""
 import argparse
 import getpass
 import json
@@ -42,10 +44,10 @@ KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
 PAGE_ENV = 'CLI_PAGE_SIZE'        # lines per page; 0 = off, unset/blank = auto
 MORE_SUFFIX = ' ...'              # the screen cap's tail marker (a space then three dots)
 
-_SPEC = None   # the tool's specifics — set by run_cli() before anything reads it
-_keepalive_s = 0.0   # the parsed CLI_KEEPALIVE interval — run_cli() sets it before session() runs
+_SPEC = None   # the tool's specifics — set by run_client() before anything reads it
+_keepalive_s = 0.0   # the parsed CLI_KEEPALIVE interval — run_client() sets it before session() runs
 _page_size = None    # the pager: None = auto (the terminal height), 0 = off, N = fixed —
-                     # set by run_cli() (flag > env) and overridden by the session's `page` command
+                     # set by run_client() (flag > env) and overridden by the session's `page` command
 
 
 def translate(cmd, spellings=None):
@@ -847,17 +849,73 @@ def exchange(sock, wire_text):
         raise ConnectionLost(T('cli.connection_failed'))
 
 
-def run_cli(spec):
-    """The whole cli ladder: the parser (the tool's name, socket, examples),
-    the man page, the audit trail, the token parse, the connect, the CONNECT
-    audit, the readline bootstrap and the session with its reconnect cycle."""
+def raw_out(reply):
+    """The one-shot/batch face: the raw verdict head kept ('ok upstream=…',
+    '% error: …', '% note') — the scriptable contract the healthchecks and
+    the scripts read. Never paged, never capped: the pager door is the tty
+    console's; this is the byte contract (ruling 3)."""
+    if reply.startswith('err '):
+        sys.stdout.write(T('shared.error_face') % reply[4:] + '\n')
+    elif reply.startswith('note '):
+        sys.stdout.write(T('shared.plain_face') % reply[5:] + '\n')
+    else:
+        sys.stdout.write(reply + '\n')
+    sys.stdout.flush()
+
+
+def _scripted(s, addr, commands, token):
+    """The one-shot/batch command loop: the token handshake, each translated
+    line through the one exchange, the raw faces, the daemon-exit bye
+    short-circuit. A lost wire is the one-line refusal, rc 1 (the ctl's
+    old fail-print folds here); a fail REPLY is not an error — rc 0, the
+    landed contract. The CONNECT/DISCONNECT audit is the caller's. Returns
+    the rc."""
+    global _token, _require_reply_mac
+    _token = token
+    try:
+        if token and not isinstance(addr, str):
+            reply = exchange(s, json.dumps({'cmd': 'auth', 'token': token}, ensure_ascii=False))
+            if not reply or not reply.startswith('ok'):
+                page_out(T('shared.auth_failed') % (reply or 'no reply'), stream='err', pause='never')
+                return 1
+            _require_reply_mac = True   # the handshake holds: unsigned replies are fatal
+        for cmd in commands:
+            try:
+                reply = exchange(s, wire(translate(cmd, _SPEC['spellings'])))
+            except DaemonExit as e:
+                page_out(T('ctl.daemon_exit_done') % str(e)[4:].replace('daemon-exit', 'daemon exit', 1))
+                return 0
+            if reply is None:
+                page_out(T('cli.connection_lost'), stream='err', pause='never')
+                return 1
+            raw_out(reply)
+    except ConnectionLost as e:
+        page_out(str(e), stream='err', pause='never')
+        return 1
+    except OSError as e:
+        page_out(T('cli.connection_failed') + ': %s' % e, stream='err', pause='never')
+        return 1
+    return 0
+
+
+def run_client(spec):
+    """The whole client ladder — ONE implementation, THREE modes by the
+    invocation shape: command words = one-shot (the raw verdict head, rc
+    0/1/2), bare with piped stdin = batch (the script lines run in order,
+    the same raw faces), bare on a terminal = the console session (the
+    banner, TAB/?, the keepalive thread, the reconnect cycle, the pager).
+    The parser is the union — the console-only --reconnect/--page-size say
+    so in their help and ride inert in the scripted modes; one exchange,
+    one target/token/audit copy where two lived. The startup floors guard
+    the console edition only."""
     global _SPEC, _keepalive_s, _page_size
     _SPEC = spec
-    p = argparse.ArgumentParser(description='console-style CLI for the %s (TCP or unix socket).' % spec['daemon_label'])
+    p = argparse.ArgumentParser(description='the client for the %s control server (TCP or unix socket): command words one-shot, piped stdin batch, bare terminal the console.' % spec['daemon_label'])
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (env CTL when unset) — same flag as %s' % spec['self_note'])
+    p.add_argument('command', nargs='*', help='one-shot control command, %s (bare: piped stdin batch-runs a script, a terminal opens the console)' % spec['command_help'])
     p.add_argument('--timeout', type=float, default=spec['timeout_s'], help='socket timeout in seconds')
-    p.add_argument('--reconnect', type=int, default=spec['reconnect'], help='when the connection dies (an unanswered ping, a reset, a timeout), retry this many times before giving up; 0 = off')
-    p.add_argument('--reconnect-wait', type=float, default=spec['reconnect_wait'], help='seconds between the reconnect attempts')
+    p.add_argument('--reconnect', type=int, default=spec['reconnect'], help='console only: when the connection dies (an unanswered ping, a reset, a timeout), retry this many times before giving up; 0 = off')
+    p.add_argument('--reconnect-wait', type=float, default=spec['reconnect_wait'], help='console only: seconds between the reconnect attempts')
     p.add_argument('--control-token', default=None, help='control auth token for TCP (env CONTROL_TOKEN); a file:<path> value reads the first line of an owner-only 0600 file')
     p.add_argument('--audit-log', default=None, help="audit trail: a file path, - for stdout, or none for no local file (the forward carries the trail); the XDG state home when unset")
     p.add_argument('--audit-forward', default='none', metavar='TARGET',
@@ -878,11 +936,14 @@ def run_cli(spec):
     _keepalive_s = keepalive_env(spec['keepalive_s'])
     _page_size = args.page_size if args.page_size is not None else page_env()
 
-    # the tty edition's startup floors: a terminal too small to hold a
-    # console refuses before the connect — one line, rc 1, never a
-    # traceback. Piped/scripted runs never check; the terminal's own size
-    # is the only say (no env, knob or flag sets or waives a floor).
-    if sys.stdin.isatty() and sys.stdout.isatty():
+    # the mode decision — before the token/target ladder: a bare+tty
+    # invocation is the console edition, bare + piped stdin batch-runs the
+    # script, command words one-shot. The console's startup floors refuse
+    # (one line, rc 1, never a traceback) BEFORE the connect; the
+    # terminal's own size is the only say (no env, knob or flag sets or
+    # waives one); the scripted modes never check.
+    console = not args.command and sys.stdin.isatty()
+    if console:
         size = terminal_size()
         if size.lines < CLI_MIN_HEIGHT:
             raise SystemExit(T('cli.min_height') % (size.lines, CLI_MIN_HEIGHT))
@@ -914,7 +975,27 @@ def run_cli(spec):
         raise SystemExit(1)
     if audit:
         audit.event('CONNECT', 'target=%s user=%s' % (audit_quote(label), getpass.getuser()))
-    if readline and sys.stdin.isatty():
+
+    if not console:
+        if args.command:   # one-shot: the words are the script
+            commands = [' '.join(args.command)]
+        else:              # batch: the piped script — comments and blanks stay comments
+            commands = [line.strip() for line in sys.stdin
+                        if line.strip() and not line.strip().startswith('#')]
+            if not commands:
+                p.error('no commands on stdin')
+        try:
+            rc = _scripted(s, addr, commands, token)
+        finally:
+            if audit:
+                audit.event('DISCONNECT', 'target=%s' % audit_quote(label))
+                audit.close()
+            s.close()
+        if rc:
+            raise SystemExit(rc)
+        return
+
+    if readline:
         readline.set_completer(complete)
         readline.set_completer_delims(' \t')
         if 'libedit' in (readline.__doc__ or ''):

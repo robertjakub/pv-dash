@@ -37,13 +37,7 @@
     "min_width": "the terminal is %d columns wide — the console needs at least %d columns (cli_min_width)"
   },
   "ctl": {
-    "daemon_exit_done": "%% %s — done",
-    "connection_closed": "connection closed",
-    "malformed_reply": "malformed reply",
-    "mac_verify_failed": "the reply mac does not verify (tampered or corrupted frame)",
-    "control_error": "control error: %s",
-    "command_too_long": "the command exceeds the control wire's line cap (%d bytes) — shorten it",
-    "reply_too_long": "the reply exceeds the control wire's line cap (%d bytes) — the connection is gone"
+    "daemon_exit_done": "%% %s — done"
   },
   "banner": {
     "welcome": "%%   Welcome to the %s console",

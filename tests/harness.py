@@ -7,6 +7,7 @@ the star import; the suite's own paths, port consts and thin frame
 wrappers bind after and override."""
 
 import os
+import subprocess
 import sys
 import time
 
@@ -95,3 +96,53 @@ def mbap(pdu, port, unit=1):
         body += chunk
     s.close()
     return body
+
+
+def pty_cli(bin_path, rows, cols, args=(), env_extra=None, port=None):
+    """the cli bin on a real pty sized rows x cols: stdin/stdout/stderr on
+    the slave — the tty edition the suites' piped runs never see. Returns
+    (master, proc); the proc joins the kill list."""
+    import fcntl
+    import pty
+    import struct
+    import termios
+    m, s = pty.openpty()
+    fcntl.ioctl(s, termios.TIOCSWINSZ, struct.pack('HHHH', rows, cols, 0, 0))
+    env = {**os.environ, 'TERM': 'dumb'}
+    if env_extra:
+        env.update(env_extra)
+    cmd = [sys.executable, bin_path]
+    if port is not None:
+        cmd += ['--control-port', str(port)]
+    p = subprocess.Popen(cmd + list(args), stdin=s, stdout=s, stderr=s, env=env)
+    os.close(s)
+    procs.append(p)
+    return m, p
+
+
+def pty_read(m, quiet=0.5, limit=8.0):
+    """read the pty master until it goes quiet (the reply whole) or the
+    limit passes."""
+    import select
+    out = b''
+    end = time.time() + limit
+    while time.time() < end:
+        r, _, _ = select.select([m], [], [], quiet)
+        if not r:
+            if out:
+                break
+            continue
+        try:
+            chunk = os.read(m, 65536)
+        except OSError:
+            break
+        if not chunk:
+            break
+        out += chunk
+    return out.decode('utf-8', 'replace')
+
+
+def pty_send(m, text):
+    """one write to the pty master: a command line ('quit\\n') or one pause
+    key ('q' — no newline, the pager reads a single char)."""
+    os.write(m, text.encode())

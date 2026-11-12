@@ -45,7 +45,7 @@ tools' `statics.py` alias it).
 | `wiresec.py` | the control wire's integrity layer: the full-HMAC frame signing/verification, the token auth, the RBAC roles (admin / the read-only ops shift) |
 | `cred.py` | peer-credential lookup for the unix control sockets (`SO_PEERCRED`/`LOCAL_PEERCRED`) — the kernel-vouched trusted peers |
 | `protocol.json` | the Modbus family's one shared tree: the protocol limits (max_pdu/max_count/max_bits/max_registers/socket_timeout), the unit range, the read/write FC policy, the exception codes and the registers' type->words map — the three Modbus tools' `statics.py` project it, the `modbus timeout` knobs ride its socket_timeout |
-| `ctl.py` | the ctl client, one ladder for the family: one command or a stdin batch, the signed exchange, the auth handshake, the daemon-exit bye — the four `*-ctl` bins keep only their prose and constants |
+
 | `cli.py` | the console-style cli client, one implementation: the signed session with its reconnect cycle, the keepalive thread, the readline TAB completion and the typed-command loop with the confirm guards — the four `*-cli` bins keep their pools, candidates ladder, welcome and (the fake) its verb-first loop, passed as a spec dict |
 
 ## `serve/` — the serving-surface gates and faces

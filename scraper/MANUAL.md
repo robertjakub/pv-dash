@@ -5,7 +5,8 @@ Modbus device and exposes the metrics at /metrics. Part of the pv-suite
 family. The daemon's own `--help` and the man page (`modbus-scraper --man`)
 carry the startup surface; this page carries the control wire. **Generated**
 from `lib/options.json` (the one-knob-one-source rows) by
-`scripts/gen_manual.py` — edit the registry and re-run, never this file.
+`scripts/generators/gen_manual.py` — edit the registry and re-run, never
+this file.
 
 ## Speaking to the daemon
 

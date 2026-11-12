@@ -70,7 +70,7 @@ instead of failing later at runtime. The only soft spot is `timeout >
 interval`: that logs a warning (polls run back-to-back) instead of failing.
 
 `examples/modbus-scraper.conf` is a sample in the set grammar — GENERATED
-(`scripts/gen_examples.py`) from `lib/options.json`, every knob the
+(`scripts/generators/gen_examples.py`) from `lib/options.json`, every knob the
 registry declares, every line commented at its default; `show config`
 regenerates the script from the running scraper (secrets hidden):
 

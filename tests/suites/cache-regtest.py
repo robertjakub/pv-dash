@@ -528,38 +528,21 @@ try:
             args += ['--control-port', str(port)]
         return subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=30, env=env)
 
+    # the piped runs are the BATCH mode now (the ctl folded into the cli):
+    # the raw verdict head, no prompt, no console faces — the console
+    # shapes ride the pty smoke below
     r = cli('show modbus upstream\nquit\n')
-    check('cache_cli: the per-setting show prints the bare value', r.returncode == 0
-          and '\ncache:%d > 127.0.0.1:%d' % (15514 + BASE, 15512 + BASE) in r.stdout, repr(r.stdout[-160:]))
+    check('cache_cli: the piped batch keeps the raw verdict head', r.returncode == 0
+          and 'ok upstream=127.0.0.1:%d' % (15512 + BASE) in r.stdout
+          and 'cache:' not in r.stdout, repr(r.stdout[-160:]))
     r = cli('request flush cache\nquit\n')
-    check('cache_cli: request flush cache confirms silently', r.returncode == 0
-          and '\ncache:%d > \ncache:%d > ' % (15514 + BASE, 15514 + BASE) in r.stdout, repr(r.stdout[-120:]))
-    r = cli('show control-token ?\nshow control ops ?\nset connections ?\nrequest?\nquit\n')
-    check("cache_cli: ? at a hidden leaf describes it (the wire's help answer)",
-          'control-token - require a token on control connections' in r.stdout, repr(r.stdout[-300:]))
-    check("cache_cli: ? at the ops namespace lists its non-secret child (the verbs row rides the walk)",
-          'verbs the read-only ops role' in r.stdout, repr(r.stdout[-300:]))
-    check("cache_cli: ? at a show-only namespace stays Invalid input (the reports never join the set space)",
-          r.stdout.count('% Invalid input.') == 1, repr(r.stdout[-300:]))
-    check('cache_cli: the command tree describes by its registry row (the walk-on borrows the node descr)',
-          'request the state machinery: the dump written and restored' in r.stdout, repr(r.stdout[-300:]))
-    r = cli('shutdown\nn\n')
-    check('cache_cli: shutdown refuses without confirming', r.returncode == 0
-          and 'Proceed with shutdown? [confirm]' in r.stdout and '% Aborted.' in r.stdout, repr(r.stdout))
-    p = subprocess.Popen([sys.executable, K, '--control-port', '%d' % (15514 + BASE)],
-                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                         text=True,
-                         env={**os.environ, 'CLI_KEEPALIVE': '0.2', 'CONTROL_TOKEN': 'sekrit'})
-    time.sleep(1.2)          # the CLI idles, pinging every 0.2s
-    p.stdin.write('show modbus upstream\n')
-    p.stdin.flush()
-    time.sleep(0.4)
-    p.stdin.write('quit\n')
-    p.stdin.flush()
-    out, _ = p.communicate(timeout=15)
-    check('cache_cli: keepalive keeps an idle session alive (pongs absorbed)',
-          p.returncode == 0 and '127.0.0.1:%d' % (15512 + BASE) in out
-          and 'ok pong' not in out, repr(out[-120:]))
+    check('cache_cli: the piped batch prints the flush verdict raw', r.returncode == 0
+          and 'ok cache cleared' in r.stdout, repr(r.stdout[-120:]))
+    r = cli('help control-token\nhelp control\nquit\n')
+    check('cache_cli: the wire help answers the hidden leaf in batch',
+          'ok control-token - require a token on control connections' in r.stdout, repr(r.stdout[-300:]))
+    check('cache_cli: the wire help answers the ops namespace in batch',
+          'the read-only ops role' in r.stdout, repr(r.stdout[-300:]))
     r = cli('quit\n', 15514 + BASE, {'CLI_KEEPALIVE': 'soon'})
     check('cache_cli: a non-float CLI_KEEPALIVE is the one-line refusal at startup, not a traceback',
           r.returncode == 1 and 'invalid CLI_KEEPALIVE' in r.stderr and 'Traceback' not in r.stderr
@@ -575,14 +558,14 @@ try:
           os.stat('/tmp/modbus-cache-%d.socket' % (15515 + BASE)).st_mode & 0o777 == 0o600,
           oct(os.stat('/tmp/modbus-cache-%d.socket' % (15515 + BASE)).st_mode))
     r = cli('show modbus upstream\nquit\n', 15515 + BASE, {'CTL': '/tmp/modbus-cache-%d.socket' % (15515 + BASE)}, use_flag=False)
-    check('cache_cli: CTL reaches the default socket', r.returncode == 0
-          and '127.0.0.1:%d' % (15512 + BASE) in r.stdout and 'cache:15515 > ' in r.stdout, repr(r.stdout[-120:]))
+    check('cache_cli: CTL reaches the default unix socket', r.returncode == 0
+          and 'ok upstream=127.0.0.1:%d' % (15512 + BASE) in r.stdout, repr(r.stdout[-120:]))
     r = cli('show modbus upstream\nquit\n', 15515 + BASE, {'CTL': '/tmp/modbus-cache-%d.socket' % (15515 + BASE)}, use_flag=False)
     check('cache_cli: short CTL env works too', r.returncode == 0
-          and '127.0.0.1:%d' % (15512 + BASE) in r.stdout, repr(r.stdout[-120:]))
+          and 'ok upstream=127.0.0.1:%d' % (15512 + BASE) in r.stdout, repr(r.stdout[-120:]))
     r = cli('show modbus upstream\nquit\n', 15520 + BASE, {'CONTROL_TOKEN': 'sekrit'})
     check('cache_cli: token env authenticates the TCP control session', r.returncode == 0
-          and '127.0.0.1:%d' % (15512 + BASE) in r.stdout, repr(r.stdout[-120:]))
+          and 'ok upstream=127.0.0.1:%d' % (15512 + BASE) in r.stdout, repr(r.stdout[-120:]))
     r = cli('show version\nquit\n', 15520 + BASE, {'CONTROL_TOKEN': ''})
     check('cache_cli: token server refuses the token-less CLI', r.returncode == 0
           and '% error: authenticate first' in r.stdout, repr(r.stdout[-160:]))
@@ -606,11 +589,6 @@ try:
     #       floors refuse the tty edition, the listing pauses at the page,
     #       q stops the rest, the local `page` command retunes the session
     #       and never rides the wire — the daemon audit is the proof)
-    import fcntl
-    import pty
-    import select
-    import termios
-
     sys.path.insert(0, REPO)
     from common.wire import cli as cli_mod
 
@@ -630,50 +608,13 @@ try:
 
     PTY_CTL, PTY_LISTEN, PTY_DEAD = 15521 + BASE, 15522 + BASE, 15598 + BASE
 
-    def pty_cli(rows, cols, args=(), env_extra=None, port=PTY_CTL):
-        """the cli on a real pty sized rows x cols: stdin/stdout/stderr on
-        the slave — the tty edition the suites' piped runs never see."""
-        m, s = pty.openpty()
-        fcntl.ioctl(s, termios.TIOCSWINSZ, struct.pack('HHHH', rows, cols, 0, 0))
-        env = {**os.environ, 'CONTROL_TOKEN': 'sekrit', 'TERM': 'dumb'}
-        if env_extra:
-            env.update(env_extra)
-        p = subprocess.Popen([sys.executable, K, '--control-port', str(port), *args],
-                             stdin=s, stdout=s, stderr=s, env=env)
-        os.close(s)
-        procs.append(p)
-        return m, p
-
-    def pty_read(m, quiet=0.5, limit=8.0):
-        """read the master until it goes quiet (the reply whole) or the
-        limit passes."""
-        out = b''
-        end = time.time() + limit
-        while time.time() < end:
-            r, _, _ = select.select([m], [], [], quiet)
-            if not r:
-                if out:
-                    break
-                continue
-            try:
-                chunk = os.read(m, 65536)
-            except OSError:
-                break
-            if not chunk:
-                break
-            out += chunk
-        return out.decode('utf-8', 'replace')
-
-    def pty_send(m, text):
-        os.write(m, text.encode())
-
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
            '--listen', '127.0.0.1:%d' % PTY_LISTEN, '--modbus-interval', '1', '--modbus-profile', R,
            '--control-port', str(PTY_CTL), '--audit-log', os.path.join(SCRATCH, 'reg_audit_pty.log')],
           log=os.path.join(SCRATCH, 'reg_pty.log'), env_extra={'CONTROL_TOKEN': 'sekrit'})
     time.sleep(2)
 
-    m, p = pty_cli(24, 80, ['--page-size', '5', '--audit-log', os.path.join(SCRATCH, 'reg_audit_pty_cli.log')])
+    m, p = pty_cli(K, 24, 80, ['--page-size', '5', '--audit-log', os.path.join(SCRATCH, 'reg_audit_pty_cli.log')], env_extra={'CONTROL_TOKEN': 'sekrit'}, port=PTY_CTL)
     out = pty_read(m)
     check('pager pty: the welcome greets the pty session',
           'Welcome to the modbus-cache console' in out and 'cache:%d > ' % PTY_CTL in out, repr(out[-120:]))
@@ -692,7 +633,7 @@ try:
     os.close(m)
     check('pager pty: the paged session quits clean', p.returncode == 0, p.returncode)
 
-    m, p = pty_cli(24, 80, ['--page-size', '0'])
+    m, p = pty_cli(K, 24, 80, ['--page-size', '0'], env_extra={'CONTROL_TOKEN': 'sekrit'}, port=PTY_CTL)
     pty_read(m)
     pty_send(m, '?\n')
     out = pty_read(m, limit=10.0)
@@ -705,7 +646,7 @@ try:
     p.wait(timeout=10)
     os.close(m)
 
-    m, p = pty_cli(24, 80, ['--audit-log', os.path.join(SCRATCH, 'reg_audit_pty_cli.log')])
+    m, p = pty_cli(K, 24, 80, ['--audit-log', os.path.join(SCRATCH, 'reg_audit_pty_cli.log')], env_extra={'CONTROL_TOKEN': 'sekrit'}, port=PTY_CTL)
     pty_read(m)
     pty_send(m, 'page\n')
     out = pty_read(m)
@@ -734,7 +675,7 @@ try:
     p.wait(timeout=10)
     os.close(m)
 
-    m, p = pty_cli(10, 80, port=PTY_DEAD)
+    m, p = pty_cli(K, 10, 80, port=PTY_DEAD, env_extra={'CONTROL_TOKEN': 'sekrit'})
     out = pty_read(m)
     rc = p.wait(timeout=10)
     os.close(m)
@@ -742,7 +683,7 @@ try:
           rc == 1 and 'rows tall' in out and 'cli_min_height' in out
           and 'Traceback' not in out and 'cannot reach' not in out, repr((rc, out[:160])))
 
-    m, p = pty_cli(24, 50, port=PTY_DEAD)
+    m, p = pty_cli(K, 24, 50, port=PTY_DEAD, env_extra={'CONTROL_TOKEN': 'sekrit'})
     out = pty_read(m)
     rc = p.wait(timeout=10)
     os.close(m)
@@ -750,7 +691,7 @@ try:
           rc == 1 and 'columns wide' in out and 'cli_min_width' in out and 'Traceback' not in out,
           repr((rc, out[:160])))
 
-    m, p = pty_cli(24, 70, ['--page-size', '0'])
+    m, p = pty_cli(K, 24, 70, ['--page-size', '0'], env_extra={'CONTROL_TOKEN': 'sekrit'}, port=PTY_CTL)
     pty_read(m)
     pty_send(m, 'show knobs\n')
     out = pty_read(m, limit=10.0)
@@ -777,8 +718,44 @@ try:
     check('pager pty: the cli audit records the page command local',
           "cmd='page'" in pty_cli_audit and 'result=local' in pty_cli_audit, pty_cli_audit[-200:])
 
+    # the console-only furniture the piped batch can no longer reach: the
+    # confirm guard, the idle keepalive, the local ? shapes
+    m, p = pty_cli(K, 24, 80, ['--audit-log', os.path.join(SCRATCH, 'reg_audit_pty_cli.log')], env_extra={'CONTROL_TOKEN': 'sekrit'}, port=PTY_CTL)
+    pty_read(m)
+    pty_send(m, 'set connections ?\n')
+    out = pty_read(m)
+    check('console pty: ? at a show-only namespace stays Invalid input (the reports never join the set space)',
+          out.count('% Invalid input.') == 1, repr(out[-200:]))
+    pty_send(m, 'request?\n')
+    out = pty_read(m)
+    check('console pty: the command tree describes by its registry row (the walk-on borrows the node descr)',
+          'request the state machinery: the dump written and restored' in out, repr(out[-300:]))
+    pty_send(m, 'shutdown\n')
+    out = pty_read(m)
+    pty_send(m, 'n\n')   # the confirm reads a full line (input), not the pager's one key
+    out += pty_read(m)
+    check('console pty: shutdown refuses without confirming',
+          'Proceed with shutdown? [confirm]' in out and '% Aborted.' in out, repr(out[-200:]))
+    pty_send(m, 'quit\n')
+    pty_read(m)
+    p.wait(timeout=10)
+    os.close(m)
+
+    m, p = pty_cli(K, 24, 80, env_extra={'CLI_KEEPALIVE': '0.2', 'CONTROL_TOKEN': 'sekrit'}, port=PTY_CTL)
+    pty_read(m)
+    time.sleep(1.2)         # the console idles, pinging every 0.2s
+    pty_send(m, 'show modbus upstream\n')
+    out = pty_read(m)
+    pty_send(m, 'quit\n')
+    pty_read(m)
+    p.wait(timeout=10)
+    os.close(m)
+    check('console pty: keepalive keeps an idle session alive (pongs absorbed)',
+          p.returncode == 0 and '127.0.0.1:%d' % (15512 + BASE) in out
+          and 'ok pong' not in out, repr(out[-160:]))
+
     # 5c. cache_ctl: the one-shot client (args, piped batches, token)
-    ctl = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-ctl.py')
+    ctl = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py')
     r = subprocess.run([sys.executable, ctl, '--control-port', '%d' % (15514 + BASE), 'show', 'upstream'],
                        capture_output=True, text=True, timeout=30,
                        env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
@@ -2625,7 +2602,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     time.sleep(1.2)
 
     def ctl_auth(*cmds):
-        r = subprocess.run([sys.executable, os.path.join(CACHE_DIR, 'bin', 'modbus-cache-ctl.py'),
+        r = subprocess.run([sys.executable, os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py'),
                             '--control-port', str(AUTH_CTL), '--control-token', 'ctok-a'] + list(cmds),
                            capture_output=True, text=True, timeout=15)
         return r.stdout.strip()
@@ -2809,7 +2786,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     time.sleep(1.2)
 
     def ctl_ws(*cmds):
-        r = subprocess.run([sys.executable, os.path.join(CACHE_DIR, 'bin', 'modbus-cache-ctl.py'),
+        r = subprocess.run([sys.executable, os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py'),
                             '--control-port', str(WS_CTL), '--control-token', 'ctok-w'] + list(cmds),
                            capture_output=True, text=True, timeout=15)
         return r.stdout.strip()

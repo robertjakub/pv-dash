@@ -218,18 +218,14 @@ Live settings are runtime nudges — the config files stay the source of
 truth: the next `SIGHUP` re-resolves the config wholesale and the file
 always wins.
 
-### `modbus-cache-ctl` — one-shot commands
-
-```bash
-python3 cache/bin/modbus-cache-ctl.py --control-port 15509 show upstream
-python3 cache/bin/modbus-cache-ctl.py --control-port 15509 clear cache
-printf 'show cache\nclear cache\n' | python3 cache/bin/modbus-cache-ctl.py --control-port 15509
-```
-
-Same `--control-port` flag / `CTL` env as the proxy; a TCP token comes from
-`--control-token` or `CONTROL_TOKEN` (the ops staff pass the read-only ops
-token the same way). Exit codes: `0` = ok, `1` = connection/control error,
-`2` = CLI misuse. Every invocation lands in the audit log.
+`modbus-cache-cli` is the one client — the invocation shape picks the
+mode: command words one-shot (`modbus-cache-cli show upstream` — the raw
+verdict head prints, exit `0` ok / `1` connection error / `2` misuse),
+piped stdin batch (`printf 'show cache\nclear cache\n' | modbus-cache-cli`),
+a bare terminal the console. Same `--control-port` flag / `CTL` env as the
+proxy; a TCP token comes from `--control-token` or `CONTROL_TOKEN` (the ops
+staff pass the read-only ops token the same way). Every invocation lands in
+the audit log.
 
 ### `modbus-cache-cli` — console-style session
 
@@ -534,7 +530,6 @@ when the device starts answering sanely again.
 cache/
 ├── bin/
 │   ├── modbus-cache.py  # CLI, logging setup, signal handling
-│   ├── modbus-cache-ctl.py     # one-shot control client (args / piped commands)
 │   └── modbus-cache-cli.py     # console-style interactive control session
 ├── examples/
 │   └── modbus-cache.conf    # sample config in the set grammar

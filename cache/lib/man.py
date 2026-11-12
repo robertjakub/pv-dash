@@ -4,7 +4,7 @@ sections render from the tools' argparse parsers, the prose sections live
 here as roff (ported from the original hand-written pages). scripts/gen_man.py
 writes the shipped man/*.1 from these; `modbus-cache --man` (and the
 ctl/cli's --man) prints the same page."""
-from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_CTL, EXIT_STATUS_DAEMON, options_section, page
+from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_DAEMON, options_section, page
 
 DATE = '2026-11-05'
 VERSION = 'pv-suite 0.4.3'
@@ -159,10 +159,8 @@ previous settings),
 .RE
 .PP
 See
-.BR modbus-cache-ctl (1)
-and
 .BR modbus-cache-cli (1)
-for the clients."""
+for the client."""
     security = """.SH SECURITY
 The control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
 control-port without a token refuses to start (F5); with a token the
@@ -247,53 +245,17 @@ a group/world-readable acl file warns in the log, the audit trail
         options_section(parser),
         extra_sections=(signals, control, security, environment, files, exit_status),
         kind='daemon',
-        see_also='.BR modbus-cache-ctl (1),\n.BR modbus-cache-cli (1),\n.BR modbus-scraper (1),\n.BR modbus-fake-inverter (1)\n.PP\n\\fBcache/README.md\\fR in the suite checkout \\(em the full documentation.')
+        see_also='.BR modbus-cache-cli (1),\n.BR modbus-scraper (1),\n.BR modbus-fake-inverter (1)\n.PP\n\\fBcache/README.md\\fR in the suite checkout \\(em the full documentation.')
 
-
-def ctl_page(parser):
-    description = """\
-Sends one control command (or a batch piped on stdin, one per line) to the
-\\fBmodbus-cache\\fR JSON-lines control server and prints the replies on
-stdout, one per line. Every invocation lands in the audit trail (prefix
-\\fBCTL\\fR).
-.PP
-The command grammar is the daemon's: \\fBset\\fR/\\fBclear\\fR/\\fBshow\\fR/
-\\fBhelp\\fR (the settings registry), \\fBinspect\\fR,
-\\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR],
-\\fBshow write-registers-table\\fR, \\fBshow uplink\\fR,
-\\fBshow uplink-sources\\fR, \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
-\\fBrequest flush cache\\fR, \\fBrequest reload\\fR, \\fBrequest restart\\fR,
-\\fBshutdown\\fR,
-\\fBquit\\fR. See
-.BR modbus-cache (1)
-CONTROL."""
-    examples = """.SH EXAMPLES
-.RS
-.IP \\(bu 2
-.B modbus-cache-ctl show connections
-.IP \\(bu 2
-.B modbus-cache-ctl request flush cache
-.IP \\(bu 2
-.B printf 'show cache\\enrequest flush cache\\en' | modbus-cache-ctl
-.RE"""
-    exit_status = EXIT_STATUS_CTL
-    environment = """.SH ENVIRONMENT
-.TP
-.B CTL ", " CONTROL_TOKEN
-the control target and the TCP token when the flags are unset."""
-    return page(
-        'one-shot control client for the modbus-cache daemon',
-        'modbus-cache-ctl', 1, DATE, VERSION, MANUAL,
-        '.B modbus-cache-ctl\n.RI [ options ]\n.IB command " [args ...]"\n.br\n.B modbus-cache-ctl\n.RI [ options ]\n< commands',
-        description,
-        options_section(parser),
-        extra_sections=(examples, environment, exit_status),
-        kind='ctl',
-        see_also='.BR modbus-cache (1),\n.BR modbus-cache-cli (1)')
 
 
 def cli_page(parser):
     description = """\
+One client, three modes by the invocation shape: command words one-shot
+(\\fBmodbus-cache-cli\\fR show config\\fR \\(em the raw verdict head prints,
+exit 0 ok, 1 connection error, 2 misuse), piped stdin batch (the script lines
+run in order, the same raw faces), a bare terminal the interactive console.
+.PP
 An interactive console on the \\fBmodbus-cache\\fR JSON-lines control
 server: on connect it probes the daemon and greets you with the upstream,
 the poll health and the uptime; the prompt shows the connected port
@@ -338,9 +300,9 @@ the control target and TCP token when the flags are unset."""
     return page(
         'console-style control session for the modbus-cache daemon',
         'modbus-cache-cli', 1, DATE, VERSION, MANUAL,
-        '.B modbus-cache-cli\n.RI [ options ]',
+        '.B modbus-cache-cli\n.RI [ options ]\n.IB command " [args ...]"',
         description,
         options_section(parser),
         extra_sections=(environment, exit_status),
         kind='cli',
-        see_also='.BR modbus-cache (1),\n.BR modbus-cache-ctl (1)')
+        see_also='.BR modbus-cache (1)')

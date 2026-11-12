@@ -68,9 +68,9 @@ The kinds — every row of the tables below carries one:
 | `request dump` | command (hidden) | write the state dump: the live setting overrides, sealed (when the daemon has a dump path) |
 | `request poll` | namespace | the poll loop's manual wake |
 | `request poll now` | command | wake the poll loop immediately |
-| `request reload` | command | save the live overrides and restart the whole daemon (the config file and the flags are re-resolved) |
-| `request reload-config` | command | re-read the config file (the SIGHUP path) |
-| `request restart` | command | drop the Modbus session (reconnects on the next poll) |
+| `request reload` | command (hidden) | save the live overrides and restart the whole daemon (the config file and the flags are re-resolved) |
+| `request reload-config` | command (hidden) | re-read the config file (the SIGHUP path) |
+| `request restart` | command (hidden) | drop the Modbus session (reconnects on the next poll) |
 | `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
 | `set` | command | configure a setting live: set \<setting> \<value> |
 | `show` | command | print a setting's live value, or a report |

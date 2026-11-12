@@ -787,7 +787,7 @@ re-open — is the history half:
   `MemoryDenyWriteExecute`, `CapabilityBoundingSet=`,
   `RestrictAddressFamilies`, `SystemCallFilter`), verified with
   `systemd-analyze security` (a score per unit asserted by
-  tests/hardening.nix); nixos/README.md documents the posture.
+  nixos/tests/hardening.nix); nixos/README.md documents the posture.
 - **the token-file env honored** `[inverter]` — the help promised
   `CONTROL_TOKEN_FILE` / `METRICS_TOKEN_FILE`, the code never
   read them: both are honored now (the fake and the two clients — flag

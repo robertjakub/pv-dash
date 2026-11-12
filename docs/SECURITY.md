@@ -294,7 +294,7 @@ The NixOS modules sandbox every service (`DynamicUser`, `NoNewPrivileges`,
 `ProtectSystem=strict`, `PrivateTmp`, `LoadCredential` and the
 `SystemCallFilter`/`RestrictAddressFamilies` set), verified with
 `systemd-analyze security` (a score per unit asserted by
-`tests/hardening.nix`); the option map, the secrets discipline and the
+`nixos/tests/hardening.nix`); the option map, the secrets discipline and the
 reload/restart story: [../nixos/README.md](../nixos/README.md).
 
 ## 7. Supply chain and ACLs

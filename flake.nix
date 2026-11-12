@@ -35,8 +35,8 @@
         in
         nixpkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
           # the sandbox pass, verified in a VM: both units scored with
-          # systemd-analyze security (tests/hardening.nix)
-          hardening = pkgs.callPackage ./tests/hardening.nix { };
+          # systemd-analyze security (nixos/tests/hardening.nix)
+          hardening = pkgs.callPackage ./nixos/tests/hardening.nix { };
         }
       );
 

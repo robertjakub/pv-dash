@@ -60,17 +60,17 @@ The kinds — every row of the tables below carries one:
 
 | command | kind | description |
 |---|---|---|
-| `help` | command (internal) | describe a word (help \<setting>) or map every knob (help config) |
+| `help` | command (internal) |  |
 | `inspect` | command | one pretty dump of everything (the state, the counters, the caps) |
-| `ping` | command (internal) | keep-alive: answers pong |
-| `quit` | command | close the session |
+| `ping` | command (internal) |  |
+| `quit` | command |  |
 | `request` | namespace | the state machinery: the dump written and restored, the daemon reloaded |
-| `request dump` | command (hidden) | write the state dump: the live setting overrides, sealed (when the daemon has a dump path) |
+| `request dump` | command (hidden) |  |
 | `request reload` | command | save the live overrides and restart the whole daemon (the config file and the flags are re-resolved) |
-| `request reload-config` | command | re-read the config file (the SIGHUP path) |
-| `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
+| `request reload-config` | command |  |
+| `request restore` | command (hidden) |  |
 | `set` | command | configure a setting (set log-queries on, set metrics enable on) |
-| `show` | command | print a setting's live value, or a report |
+| `show` | command |  |
 | `shutdown` | command | stop the dashboard server (asks to confirm) |
 | `clear` | command | restore a setting to its configured value (clear log-queries, clear system log-level) |
 
@@ -126,7 +126,7 @@ the control plane: the tokens, the ops role's RBAC policy, the trusted peers
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `control-port` | `set control port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | JSON-lines control server target: unix socket path |
+| `control-port` | `set control port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | control server target: unix socket path or TCP port on 127.0.0.1 |
 | `control-token` | — | startup-only (secret) | `TOKEN` | `--control-token` / `CONTROL_TOKEN` | require a token on control connections: the client authenticates with {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `control-trust-uids` | `set control trust-uids` | settable | `UID,...` | `--control-trust-uids` / `CONTROL_TRUST_UIDS` | extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted |
 | `control-socket-group` | `set control socket-group` | settable | `on\|off` | `--control-socket-group` / `CONTROL_SOCKET_GROUP` | leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600) |
@@ -171,8 +171,8 @@ the backup count
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation |
-| `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit log at UTC midnight |
+| `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit trail at this size in MB, keeping N backups; 0 = no size rotation |
+| `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit trail at UTC midnight |
 | `audit-files` | `set audit rotate files` | settable | `N` | `--audit-files` / `AUDIT_FILES` | rotated audit backups to keep |
 
 ### dump

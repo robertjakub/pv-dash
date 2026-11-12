@@ -137,8 +137,8 @@ client no rule decides refuses; "any" = 0.0.0.0/0, the whole space);
 checked at accept — a client off the ACL is closed without a reply
 .TP
 .BI \-\-metrics\-max\-clients " metrics-max-clients"
-maximum concurrent /metrics clients; extras get an immediate 503, 0 =
-unlimited
+maximum concurrent HTTP clients on the /metrics endpoint; extras get an
+immediate 503, 0 = unlimited
 .TP
 .BI \-\-metrics\-client\-timeout " metrics-client-timeout"
 seconds an idle /metrics client is kept before the socket times out, 0 =

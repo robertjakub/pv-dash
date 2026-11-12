@@ -29,12 +29,81 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from scriptlib import TOOLS
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, REPO)   # the canon fold rides the loader's own implementation
 WIDTH = 118
 
-KEY_RANK = ('name', 'flag', 'env', 'no-env', 'conv', 'group', 'live', 'alias', 'negates',
+KEY_RANK = ('name', 'flag', 'env', 'no-env', 'conv', 'shared', 'group', 'live', 'alias', 'negates',
             'setting-help', 'values', 'hint', 'value-help', 'default', 'help',
             'min', 'max', 'check', 'secret', 'internal', 'hidden', 'restart', 'node')
 KNOWN = set(KEY_RANK)
+
+# the help-canon wave: the gated fields (what the knob SAYS + what the knob
+# IS) the family passes compare, and the (section, name, field) exemptions —
+# the intentional drift, each with its reason
+GATED = ('setting-help', 'help', 'value-help', 'hint', 'values',
+         'flag', 'env', 'min', 'max', 'secret', 'hidden', 'restart')
+SECTION_FIELD = {'show': 'setting-help', 'commands': 'help'}
+
+EXEMPT = {
+    ('commands', 'clear'): ('help',),  # the tool's own clear examples
+    ('commands', 'inspect'): ('help',),  # the tool's own dump contents
+    ('commands', 'request'): ('help',),  # the tool's own verb list
+    ('commands', 'request-dump'): ('help',),  # the daemon vs the fake noun
+    ('commands', 'request-reload'): ('help',),  # the reload's per-tool resolution note
+    ('commands', 'request-reload-config'): ('help',),  # the fake's values re-apply note
+    ('commands', 'request-restart'): ('help',),  # the upstream restart vs the session drop
+    ('commands', 'request-restore'): ('help',),  # the daemon vs the fake noun
+    ('commands', 'set'): ('help',),  # the tool's own set examples
+    ('commands', 'show'): ('help',),  # the cache's report list
+    ('commands', 'shutdown'): ('help',),  # the tool's own name
+    ('options', 'allow-write'): ('help', 'setting-help', 'value-help',),  # the cache forwards, the fake accepts
+    ('options', 'audit'): ('setting-help',),  # the audit tag prefixes (CACHE/SCR/INV/DSH) ride the prose
+    ('options', 'audit-forward'): ('help',),  # the audit tag prefixes ride the prose
+    ('options', 'audit-log'): ('help', 'setting-help',),  # the audit tag prefixes ride the prose
+    ('options', 'auth-token'): ('help', 'setting-help',),  # the endpoints differ
+    ('options', 'client-timeout'): ('help', 'setting-help',),  # Modbus vs HTTP vs keep-alive semantics
+    ('options', 'connect-acl'): ('help', 'setting-help', 'value-help',),  # the mirror wording stays local (the hint/values aligned)
+    ('options', 'control'): ('setting-help',),  # the cache's control plane names the target first
+    ('options', 'control-log-replies'): ('env',),  # the dashboard's env twin; the daemons read none
+    ('options', 'control-ops-token'): ('help', 'setting-help',),  # the cache's show,flush policy
+    ('options', 'control-port'): ('help', 'setting-help',),  # the inverter's unix-only wording; the helps carry the tool's ctl name
+    ('options', 'control-socket-group'): ('help', 'setting-help',),  # the fake's why-tail
+    ('options', 'control-trust-uids'): ('help', 'setting-help',),  # the fake's env note tail
+    ('options', 'control/ops'): ('setting-help',),  # the cache's ops role names the second token
+    ('options', 'dump'): ('setting-help',),  # the cache's dump words (the cached knobs' prose names the cache)
+    ('options', 'dump-interval'): ('setting-help',),  # the cache's dump words
+    ('options', 'dump-key'): ('help', 'setting-help',),  # the cache's dump words; the scraper's semicolon fixed via the block
+    ('options', 'dump-path'): ('help', 'setting-help',),  # the cache's dump words
+    ('options', 'local-time'): ('env',),  # the fake reads no env twin
+    ('options', 'log-access'): ('env', 'help', 'setting-help', 'value-help',),  # connects/disconnects vs HTTP requests
+    ('options', 'log-level'): ('help', 'value-help',),  # the DEBUG detail differs per tool
+    ('options', 'max-clients'): ('help', 'setting-help',),  # Modbus vs HTTP client semantics
+    ('options', 'max-conn-per-ip'): ('help', 'setting-help',),  # Modbus vs HTTP per-IP semantics
+    ('options', 'max-kwp'): ('help', 'setting-help',),  # the cap vs the simulation prose (the hint aligned to kW)
+    ('options', 'metrics'): ('setting-help',),  # the per-tool /metrics prose
+    ('options', 'metrics-client-timeout'): ('env',),  # the fake reads no env twin
+    ('options', 'metrics-listen'): ('env', 'help', 'setting-help',),  # the cache's reload note; the fake reads no env twin
+    ('options', 'metrics-max-clients'): ('env',),  # the fake reads no env twin
+    ('options', 'metrics-max-conn-per-ip'): ('env',),  # the fake reads no env twin
+    ('options', 'metrics-server'): ('env', 'help', 'setting-help',),  # the per-tool /metrics prose; the fake reads no env twin
+    ('options', 'metrics-token'): ('help', 'setting-help',),  # the endpoints differ
+    ('options', 'metrics/limits'): ('setting-help',),  # the caps prose differs per side
+    ('options', 'modbus'): ('setting-help',),  # the session side differs (client upstream vs served fake)
+    ('options', 'modbus-auth'): ('help', 'setting-help', 'value-help',),  # the auth scheme's audience differs (client/upstream/server)
+    ('options', 'modbus-auth-key'): ('help', 'setting-help',),  # the key's audience differs (the cache's clients vs the handshake)
+    ('options', 'modbus-interval'): ('help', 'setting-help',),  # the polling side differs
+    ('options', 'modbus-merge-gap'): ('max', 'setting-help',),  # the register spaces differ (the max 100 vs 125 too)
+    ('options', 'modbus-profile'): ('help', 'setting-help', 'value-help',),  # the profile prose differs per side
+    ('options', 'modbus-timeout'): ('help', 'setting-help',),  # the timeout side differs
+    ('options', 'no-audit-log'): ('help', 'setting-help',),  # the audit tag prefixes ride the prose
+    ('options', 'restore-on-start'): ('help',),  # the daemon/fake/server noun and the env note differ
+    ('options', 'system'): ('setting-help',),  # the socket's per-tool purpose
+    ('options', 'upstream'): ('env', 'help', 'hint', 'setting-help',),  # the Modbus upstream vs the Prometheus URL
+    ('options', 'write'): ('setting-help',),  # the write gates differ per side
+    ('show', 'connections'): ('setting-help',),  # the per-tool clients (Modbus peers vs HTTP vs pages)
+    ('show', 'metrics-acl-table'): ('setting-help',),  # the long spell vs the report pointer
+    ('show', 'version'): ('setting-help',),  # each tool's own version string
+}
 
 
 def draft_hint(row):
@@ -79,7 +148,23 @@ def draft_value_help(row):
     return {w: 'TODO: when does one pick %s?' % w for w in vals}
 
 
-def proposals(row):
+def draft_shared(row, canon):
+    """The canon key the row's prose already spells: the options block whose
+    setting-help or help byte-matches the row's. The flip's mechanical
+    helper — the editor's p walk offers it one Enter at a time. None when
+    the row refs already, is a node, or speaks its own prose everywhere."""
+    if not canon or row.get('shared') or row.get('node'):
+        return None
+    for key, block in (canon.get('options') or {}).items():
+        if not isinstance(block, dict):
+            continue
+        for f in ('setting-help', 'help'):
+            if row.get(f) and block.get(f) == row[f]:
+                return key
+    return None
+
+
+def proposals(row, canon=None):
     """The fields this row could draft: [(field, draft, why)] — the
     read-only --propose report's and the editor's prefills' shared
     source. Nothing here writes itself into a registry."""
@@ -93,6 +178,9 @@ def proposals(row):
     d = draft_value_help(row)
     if d:
         out.append(('value-help', d, 'the completable values lack notes'))
+    d = draft_shared(row, canon)
+    if d:
+        out.append(('shared', d, "the row's prose rides the canon block %s" % d))
     return out
 
 
@@ -213,7 +301,7 @@ def lint(path):
             unknown = sorted(set(r) - KNOWN)
             if unknown:
                 nits.append('%s: %s: unknown key(s) %s' % (path, key, ', '.join(unknown)))
-            if key == 'show' and not r.get('setting-help'):
+            if key == 'show' and not r.get('setting-help') and not r.get('shared'):
                 nits.append('%s: show: %r carries no description' % (path, r.get('name')))
 
     # the namespace discipline: a knob's '/'-prefix with no node row is an
@@ -284,6 +372,8 @@ def main():
                             '--propose' in sys.argv[1:])
     write = not check and not diff and not propose
     if propose:
+        from common.settings.options import load_canon
+        canon = load_canon()
         for tool in TOOLS:
             path = os.path.join(REPO, tool, 'lib', 'options.json')
             try:
@@ -295,7 +385,7 @@ def main():
                 if not isinstance(meta[key], list):
                     continue
                 for r in meta[key]:
-                    for field, draft, why in proposals(r):
+                    for field, draft, why in proposals(r, canon):
                         print('%s %s/%s: %s — propose %s\n    %s' %
                               (tool, key, r['name'], why, field,
                                json.dumps(draft, ensure_ascii=False)))

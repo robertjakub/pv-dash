@@ -63,7 +63,7 @@ class Option:
     def __init__(self, name, flag, env, help='', conv=str, default=None, live=None,
                  secret=False, choices=None, negates=None, group=None, alias=None, restart=False,
                  setting_help=None, values=None, hint=None, value_help=None,
-                 min=None, max=None, check=None, node=False, hidden=False, no_env=None, gate=False):
+                 min=None, max=None, check=None, node=False, hidden=False, no_env=None):
         self.name = name
         self.flag = flag
         self.env = env
@@ -90,7 +90,6 @@ class Option:
         self.node = bool(node)    # a hierarchy node: no flag/env/conv/live — the row
                                   # names a live-path prefix and carries its setting-help
         self.hidden = bool(hidden)   # never lists in the ?/TAB pools (the wire still answers)
-        self.gate = bool(gate)    # an access-control knob: its namespace lists marked (the / rule)
         self.static_default = None   # the registry row's `default` — the resolver's
                                      # static rung (the ladder's last layer); the argparse
                                      # `default` above stays unset so the flag reads unset
@@ -348,22 +347,10 @@ def _listing(name, options, node=None, hidden_words=()):
     words = {}
     for o in options:
         if o.hidden:
-            # the / rule: the walk-in lists the hidden rows marked — the
-            # bare path still answers (the root never homes them but the
-            # guard keeps the rule uniform)
-            if home(o) == name:
-                for spelling in (o.live, o.alias):
-                    if spelling and spelling.startswith(prefix):
-                        rest = spelling[len(prefix):]
-                        _slot(words, rest.split('/')[0] + '/', o, '/' not in rest)
-            continue
+            continue   # the pools' rule: the hidden rows never list (the typed path still answers)
         if o.node:
             if o.name != name and o.name.startswith(prefix):
-                word = o.name[len(prefix):].split('/')[0]
-                if any((x.hidden or x.gate) and (x.live or x.alias) and
-                       (x.live or x.alias).startswith(o.name + '/') for x in options):
-                    word += '/'   # the subtree hides knobs or bears a gate — the listing says so
-                _slot(words, word, o, False)
+                _slot(words, o.name[len(prefix):].split('/')[0], o, False)
         elif o.name not in hidden_words and home(o) == name:
             for spelling in (o.live, o.alias):   # the console's own words — the walk's next segment
                 if spelling and spelling.startswith(prefix):
@@ -399,17 +386,18 @@ def describe_command_node(commands, help_map, groups, hidden, name):
     renders the setting namespaces — the node-first descriptions (a word
     that is itself a namespace describes by its node row, whose help and
     group COMMAND_HELP/COMMAND_GROUPS carry beside the commands), the
-    display groups' sections, the hidden rows listing MARKED (`word/` —
-    the / rule: the walk-in shows the namespace's quiet set, the typed
-    path answers the bare word). None when nothing lists (the
+    display groups' sections, the hidden rows never listing (the pools'
+    rule; the typed path still answers). None when nothing lists (the
     name is no command node)."""
     prefix = name + '/'
     words = {}
     for w in commands:
+        if w in hidden:
+            continue   # the pools' rule: the hidden rows never list (the typed path still answers)
         if w.startswith(prefix):
             word = w[len(prefix):].split('/')[0]
             if word and word not in words:
-                words[(word + '/') if w in hidden else word] = help_map.get(prefix + word, '')
+                words[word] = help_map.get(prefix + word, '')
     if not words:
         return None
     buckets = {}
@@ -423,14 +411,12 @@ def describe_command_node(commands, help_map, groups, hidden, name):
 
 def describe_root(options, show_options=(), hidden_words=()):
     """The bare `show` answer — the wire's root listing: every visible
-    flat knob word homed at the root, the namespace nodes' walk words (a
-    node whose subtree hides knobs lists marked, `dump/` — the / rule)
-    and the show reports' words one per row, the display groups' sections.
+    flat knob word homed at the root, the namespace nodes' walk words and
+    the show reports' words one per row, the display groups' sections.
     `hidden_words` carries the runtime-gated words — the dump-gated
     `dump-interval` lists only while the dump node is on, and the caller
-    knows. The hidden reports (config, knobs) never list — the / rule
-    marks KNOB namespaces, the reports are their own quiet set."""
-    return _listing('', tuple(options) + tuple(o for o in show_options if not o.hidden), None, hidden_words)
+    knows."""
+    return _listing('', tuple(options) + tuple(show_options), None, hidden_words)
 
 
 def render_config_script(options, values, comment=None):
@@ -770,7 +756,7 @@ def option_rows(rows, choices=None):
                      hint=row.get('hint'), value_help=row.get('value-help'),
                      min=row.get('min'), max=row.get('max'), check=row.get('check'), hidden=as_bool(row.get('hidden')),
                      restart=as_bool(row.get('restart')), no_env=row.get('no-env'),
-                     node=as_bool(row.get('node')), gate=as_bool(row.get('gate')))
+                     node=as_bool(row.get('node')))
         if 'default' in row:
             opt.static_default = row['default']
         elif opt.conv is bool and not opt.negates:
@@ -800,7 +786,7 @@ class Setting:
     place a knob's vocabulary lives."""
 
     def __init__(self, name, help, values=(), hint=None, value_help=None, group=None, alias=None,
-                 restart=False, secret=False, live=None, show_report=False, gate=False):
+                 restart=False, secret=False, live=None, show_report=False):
         self.name = name
         self.help = help
         self.values = values              # completable words
@@ -812,7 +798,6 @@ class Setting:
         self.restart = restart            # startup-only: set/clear answers the restart note
         self.secret = secret              # a token: the dump/show-config placeholder rule, the paste-back gate
         self.show_report = show_report    # a show-section row: never a set/clear target
-        self.gate = gate                  # an access-control knob: its namespace lists marked (the / rule)
 
     @property
     def display_group(self):
@@ -847,12 +832,10 @@ def settings_of(options):
                 continue
             seen.add(o.live)
             out.append(Setting(o.name, o.setting_help or o.help, o.values, o.hint, o.value_help,
-                               o.group, o.alias, restart=o.restart, secret=o.secret, live=o.live,
-                               gate=o.gate))
+                               o.group, o.alias, restart=o.restart, secret=o.secret, live=o.live))
         elif o.restart:
             out.append(Setting(o.name, o.setting_help or o.help, o.values, o.hint, o.value_help,
-                               o.group, o.alias, restart=o.restart, secret=o.secret, live=o.live,
-                               gate=o.gate))
+                               o.group, o.alias, restart=o.restart, secret=o.secret, live=o.live))
     return tuple(out)
 
 

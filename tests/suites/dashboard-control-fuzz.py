@@ -254,8 +254,8 @@ def main():
         check('rider: the wire help describes a command row',
               st == 'ok' and 'restore a setting' in tx, '%s %s' % (st, tx))
         st, tx = roundtrip(CTRL_PORT, signed('help request'))
-        check('rider: the wire help lists a command namespace',
-              st == 'ok' and 'reload' in tx and 'reload-config' in tx, '%s %s' % (st, tx))
+        check('rider: the wire help over a fully-hidden namespace answers the node one-liner',
+              st == 'ok' and tx == 'the state machinery: the dump written and restored, the daemon reloaded', '%s %s' % (st, tx))
         st, tx = roundtrip(CTRL_PORT, signed('help bogus'))
         check('rider: the unknown topic is the reworded two-space error',
               st == 'fail' and tx == 'unknown command or setting bogus (try ?)', '%s %s' % (st, tx))

@@ -105,37 +105,15 @@ def pools(commands, internal, hidden, spellings, nodes, commands_help,
     describe_word = make_describe_word(nodes, commands_help, spellings)
     state = {'dump': False}
     gated = ('request/dump', 'request/restore') + tuple(dump_gate)
-    global _marked_namespaces, _hidden_commands, _marked_settings, _hidden_settings_paths
-    _hidden_commands = frozenset(hidden)
-    _marked_namespaces = frozenset(
-        prefix for h in _hidden_commands
-        for prefix in ('/'.join(h.split('/')[:i]) for i in range(1, len(h.split('/'))))
-        if prefix not in _hidden_commands)
-    _hidden_settings_paths = frozenset(hidden_settings)
-    _marked_settings = frozenset(
-        prefix for h in _hidden_settings_paths
-        for prefix in ('/'.join(h.split('/')[:i]) for i in range(1, len(h.split('/'))))
-        if prefix not in _hidden_settings_paths)
-    seen, gate_paths = set(), set()
-    for row in spellings.values():
-        if getattr(row, 'gate', False) and id(row) not in seen:
-            seen.add(id(row))
-            live = row.live or row.alias
-            if live and '/' in live:
-                gate_paths.add('/'.join(live.split('/')[:-1]))
-    _marked_settings = frozenset(_marked_settings | gate_paths)
 
     def command_pool():
         """The first words the daemon offers right now: the dump-gated
         rows ride the welcome's probe (they list only while a dump path is
         configured); the internal rows (the machinery's own words) and the
-        other hidden rows never list — a namespace whose members hide
-        lists marked (the * rule: `*request`), so the walk-in word stays
-        discoverable."""
-        pool = tuple(n for n in commands
+        other hidden rows never list."""
+        return tuple(n for n in commands
                      if n not in internal
                      and (n not in hidden or (state['dump'] and n in gated)))
-        return pool + tuple(sorted(w for w in _marked_namespaces if w not in pool))
 
     def setting_pool():
         """The show-branch pool: the console spellings (the hidden rows
@@ -250,15 +228,13 @@ def _grouped(matches, base):
     return secs + [(label, sorted(ws, key=str.lower)) for label, ws in buckets.items()]
 
 
-def sectioned_rows(sections, desc, hint, marked=frozenset()):
+def sectioned_rows(sections, desc, hint):
     """The listing: a blank line, then each [section] header, its entries
     padded two spaces under it — the descriptions aligned to one column across all the sections.
     The render is the wire's describe_node's own (the ? output is the
     golden master — common/settings/options.py render_word_sections); the console
-    adds the hint line. `marked` carries the words the / rule lists marked —
-    the bare word describes and completes, the render shows `name/` (the
-    wire's node help answers the same mark)."""
-    rows = render_word_sections([(label, [((w + '/') if w in marked else w, desc(w)) for w in ws]) for label, ws in sections])
+    adds the hint line."""
+    rows = render_word_sections([(label, [(w, desc(w)) for w in ws]) for label, ws in sections])
     if hint:
         rows.append('    ' + hint)
     return rows
@@ -267,10 +243,6 @@ def sectioned_rows(sections, desc, hint, marked=frozenset()):
 _last_listed = None   # the completer is called several times per attempt;
                       # list each distinct buffer only once
 _prompt = None        # the session's prompt; the completer re-echoes it after the list
-_marked_namespaces = frozenset()   # the command namespace words the / rule lists marked (request/)
-_hidden_commands = frozenset()     # the hidden command paths — the walk-in listings mark their segments
-_marked_settings = frozenset()     # the setting node paths whose subtree hides knobs (dump/)
-_hidden_settings_paths = frozenset()  # the hidden knob spellings — the walk-in listings mark their segments
 _token = None             # the control token: every frame is signed with it when set
 _require_reply_mac = False   # True once the token handshake happened (TCP): unsigned replies are fatal
 
@@ -492,7 +464,7 @@ def candidates(buf):
                 s = None   # a show report never offers a value
         if s is not None:
             if head == 'clear':
-                return [], '%s - %s' % (s.name, s.help), None, [], frozenset()   # the path is whole; clear takes no value — ? describes it
+                return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole; clear takes no value — ? describes it
             values_mode = True
             pool = tuple(s.values)
             words = set(pool)
@@ -511,24 +483,14 @@ def candidates(buf):
         if s is not None:
             _, cont = setting_path_pool(done[1:] + [''], _SPEC['setting_pool'](), _SPEC['spellings'])
             if not cont:
-                return [], '%s - %s' % (s.name, s.help), None, [], frozenset()   # the path is whole and childless; ? describes the report
+                return [], '%s - %s' % (s.name, s.help), None, []   # the path is whole and childless; ? describes the report
             pool, hint = cont, None   # a namespace too: the report answers on Enter, TAB walks on
-            hid = tuple(sorted({h[len(base) + 1:].split('/')[0] for h in _hidden_settings_paths
-                                if h.startswith(base + '/')}))   # the namespace's hidden knobs walk in marked
-            pool = tuple(pool) + tuple(x for x in hid if x not in pool)
         else:
             pool, hint = segs, None
-            if base:   # the namespace's hidden knobs walk in marked (the bare path still answers)
-                hid = tuple(sorted({h[len(base) + 1:].split('/')[0] for h in _hidden_settings_paths
-                                    if h.startswith(base + '/')}))
-                pool = tuple(pool) + tuple(x for x in hid if x not in pool)
         desc = lambda w, base=base: _SPEC['describe']((base + '/' if base else '') + w)
     else:
         base = '/'.join(w.lower() for w in done)   # the command path spelled so far — a segment's
         pool, hint = command_path_pool(done, _SPEC['command_pool']()), None
-        hid = tuple(sorted({h[len(base) + 1:].split('/')[0] for h in _hidden_commands
-                            if h.startswith(base + '/')}))   # the namespace's hidden rows walk in marked
-        pool = tuple(pool) + tuple(s for s in hid if s not in pool)
         # the double-meaning node (the alias-first-segment rule): the
         # command word may also head the rows' alias/live paths — `write`
         # walks its command children AND the write-acl alias's next
@@ -548,22 +510,9 @@ def candidates(buf):
             pool = tuple(pool) + tuple(g for g in segs if g not in pool)
             desc = lambda w, base=base: _SPEC['describe']((base + '/' if base else '') + w)
     if pool is None:                      # a value shape with no completable words
-        return [], hint, desc, [('values', [])], frozenset()
+        return [], hint, desc, [('values', [])]
     matches = [w for w in pool if w.startswith(text.lower())]
-    sections = _sections(head, len(done), matches, values_mode, base)
-    # the / rule: a word with hidden depth lists marked — a namespace word
-    # carrying hidden rows (`request/`, `dump/`) and the hidden rows
-    # themselves in the walk-in (`reload/`, `dump-key/`); the bare word
-    # completes and describes, the render shows the mark (the wire's node
-    # help answers the same rows marked)
-    paths = set()
-    for w in {x for _, ws in sections for x in ws}:
-        full = (base + '/' + w) if base else w
-        if full in _marked_namespaces or full in _hidden_commands \
-                or full in _marked_settings or full in _hidden_settings_paths:
-            paths.add(w)
-    marked = frozenset(paths)
-    return matches, hint, desc, sections, marked
+    return matches, hint, desc, _sections(head, len(done), matches, values_mode, base)
 
 def complete(text, state):
     """TAB completer, console-style: extend the word silently while the common
@@ -573,7 +522,7 @@ def complete(text, state):
     column-packs or skips its own listings) — and yield no match so the
     editor just redraws the line."""
     global _last_listed
-    matches, hint, desc, sections, marked = candidates(readline.get_line_buffer())
+    matches, hint, desc, sections = candidates(readline.get_line_buffer())
     if state >= len(matches):
         return None
     if len(matches) > 1:
@@ -583,7 +532,7 @@ def complete(text, state):
         buf = readline.get_line_buffer()
         if state == 0 and _last_listed != buf:
             _last_listed = buf
-            rows = sectioned_rows(sections, desc, hint, marked)
+            rows = sectioned_rows(sections, desc, hint)
             # the list, a blank line, then the prompt + line again — editline
             # does NOT redraw after the completer, so we do it ourselves;
             # pause='never': readline owns the terminal mid-completion
@@ -602,8 +551,8 @@ def print_options(buf):
     display groups (`# --- group ---` headers; the ungrouped words bare on
     top) plus [values]; a value shape with no completable words still shows
     its hint."""
-    matches, hint, desc, sections, marked = candidates(buf)
-    rows = sectioned_rows(sections, desc, hint, marked)
+    matches, hint, desc, sections = candidates(buf)
+    rows = sectioned_rows(sections, desc, hint)
     if not rows:
         page_out(T('cli.invalid_input'))
         return

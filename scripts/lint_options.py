@@ -42,7 +42,7 @@ sys.path.insert(0, REPO)   # the canon fold rides the loader's own implementatio
 WIDTH = 118
 
 KEY_RANK = ('name', 'flag', 'env', 'no-env', 'conv', 'shared', 'only', 'group', 'live', 'alias', 'negates',
-            'setting-help', 'values', 'hint', 'value-help', 'default', 'help', 'gate',
+            'setting-help', 'values', 'hint', 'value-help', 'default', 'help',
             'min', 'max', 'check', 'secret', 'internal', 'hidden', 'restart', 'node')
 KNOWN = set(KEY_RANK)
 
@@ -50,7 +50,7 @@ KNOWN = set(KEY_RANK)
 # IS) the family passes compare, and the (section, name, field) exemptions —
 # the intentional drift, each with its reason
 GATED = ('setting-help', 'help', 'value-help', 'hint', 'values',
-         'flag', 'env', 'min', 'max', 'secret', 'hidden', 'restart', 'gate')
+         'flag', 'env', 'min', 'max', 'secret', 'hidden', 'restart')
 SECTION_FIELD = {'show': 'setting-help', 'commands': 'help'}
 
 EXEMPT = {
@@ -244,7 +244,7 @@ def render_registry(meta):
     return '{\n' + ',\n'.join(parts) + '\n}\n'
 
 
-BOOL_KEYS = frozenset(('secret', 'internal', 'hidden', 'restart', 'node', 'gate'))
+BOOL_KEYS = frozenset(('secret', 'internal', 'hidden', 'restart', 'node'))
 
 
 def normalize_bools(meta):

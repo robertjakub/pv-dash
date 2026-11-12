@@ -98,8 +98,8 @@ pkgs.testers.nixosTest (
       # the services still serve their surfaces sandboxed: the control
       # sockets speak (the ctl inside the VM), the metrics answer, the
       # dashboard page loads
-      machine.succeed("/run/current-system/sw/bin/modbus-scraper-ctl --control-port /run/modbus-scraper/control.socket show version")
-      machine.succeed("/run/current-system/sw/bin/dashboard-ctl --control-port /run/dashboard/control.socket show version")
+      machine.succeed("/run/current-system/sw/bin/modbus-scraper-cli --control-port /run/modbus-scraper/control.socket show version")
+      machine.succeed("/run/current-system/sw/bin/dashboard-cli --control-port /run/dashboard/control.socket show version")
       machine.succeed("curl -fsS http://127.0.0.1:9350/metrics | head -1")
       machine.succeed("curl -fsS http://127.0.0.1:8080/ | head -1")
     '';

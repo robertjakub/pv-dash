@@ -53,7 +53,6 @@ COPY --chown=pvsuite --from=examples modbus-cache-filter.json config-defaults/se
 RUN echo placeholder > config-defaults/modbus-auth.token
 RUN chmod +x cache/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/cache/bin/modbus-cache.py /usr/local/bin/modbus-cache \
-    && ln -s /pv-suite/cache/bin/modbus-cache-ctl.py /usr/local/bin/modbus-cache-ctl \
     && ln -s /pv-suite/cache/bin/modbus-cache-cli.py /usr/local/bin/modbus-cache-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
@@ -74,4 +73,4 @@ CMD ["modbus-cache", "--listen", "0.0.0.0:15502", "--audit-log", "-"]
 # a trusted peer over SO_PEERCRED, so no token is needed). Disabling the
 # control plane (CTL=0) fails the check.
 HEALTHCHECK --interval=5m --timeout=5s --start-period=15s --retries=3 \
-    CMD ["modbus-cache-ctl", "show", "version"]
+    CMD ["modbus-cache-cli", "show", "version"]

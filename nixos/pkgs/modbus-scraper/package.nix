@@ -21,7 +21,6 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
 
     install -Dm755 bin/modbus-scraper.py $out/share/modbus-scraper/modbus-scraper.py
-    install -Dm755 bin/modbus-scraper-ctl.py $out/share/modbus-scraper/modbus-scraper-ctl.py
     install -Dm755 bin/modbus-scraper-cli.py $out/share/modbus-scraper/modbus-scraper-cli.py
     install -dm755 $out/share/modbus-scraper/lib
     install -m644 lib/*.py lib/defaults.json lib/metrics.json lib/options.json $out/share/modbus-scraper/lib/
@@ -55,8 +54,6 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper \
       --add-flags "$out/share/modbus-scraper/modbus-scraper.py"
-    makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper-ctl \
-      --add-flags "$out/share/modbus-scraper/modbus-scraper-ctl.py"
     makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper-cli \
       --add-flags "$out/share/modbus-scraper/modbus-scraper-cli.py"
 
@@ -74,7 +71,7 @@ stdenv.mkDerivation (finalAttrs: {
       Polls Modbus TCP inverters over FC3/FC4 registers and exposes the
       huawei_*_watts metrics the dashboard expects (the metric names follow
       the dashboard contract), plus health gauges, at /metrics in the
-      Prometheus text format. Includes modbus-scraper-ctl and modbus-scraper-cli, CLI
+      Prometheus text format. Includes modbus-scraper-cli, the CLI client (one-shot, batch, console)
       clients for the JSON-lines control server (inspect, the live
       settings, request poll now, the config reload, shutdown — the token-signed
       wire). Python standard library only, no third-party dependencies.

@@ -45,7 +45,6 @@ RUN mkdir -p config-defaults \
     && echo placeholder > config-defaults/modbus-auth.token
 RUN chmod +x inverter/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/inverter/bin/modbus-fake-inverter.py /usr/local/bin/fake-inverter \
-    && ln -s /pv-suite/inverter/bin/modbus-fake-ctl.py /usr/local/bin/fake-ctl \
     && ln -s /pv-suite/inverter/bin/modbus-fake-cli.py /usr/local/bin/fake-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
@@ -61,4 +60,4 @@ CMD ["fake-inverter", "--listen", "0.0.0.0:5502", "--audit-log", "-"]
 # default socket follows the CMD's listen port; the check runs as root — a
 # trusted peer over SO_PEERCRED, so no token is needed).
 HEALTHCHECK --interval=5m --timeout=5s --start-period=15s --retries=3 \
-    CMD ["fake-ctl", "show", "version"]
+    CMD ["fake-cli", "show", "version"]

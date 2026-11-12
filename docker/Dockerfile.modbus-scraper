@@ -57,7 +57,6 @@ RUN echo placeholder > config-defaults/modbus-auth.token \
     && echo placeholder > config-defaults/metrics.token
 RUN chmod +x scraper/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/scraper/bin/modbus-scraper.py /usr/local/bin/modbus-scraper \
-    && ln -s /pv-suite/scraper/bin/modbus-scraper-ctl.py /usr/local/bin/modbus-scraper-ctl \
     && ln -s /pv-suite/scraper/bin/modbus-scraper-cli.py /usr/local/bin/modbus-scraper-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
@@ -77,4 +76,4 @@ CMD ["modbus-scraper", "--listen", "0.0.0.0:9350"]
 # default socket follows the CMD's listen port; the check runs as root —
 # a trusted peer over SO_PEERCRED, so no token is needed).
 HEALTHCHECK --interval=5m --timeout=5s --start-period=15s --retries=3 \
-    CMD ["modbus-scraper-ctl", "ping"]
+    CMD ["modbus-scraper-cli", "ping"]

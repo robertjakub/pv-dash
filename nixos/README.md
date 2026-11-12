@@ -27,7 +27,7 @@ nix run .#modbus-fake-inverter -- --static --control-port 15599
 nix build .#modbus-scraper       # or any other package
 ```
 
-Each package installs the daemon, its `*-ctl` / `*-cli` clients, the
+Each package installs the daemon, its `*-cli` client, the
 generated man pages under `share/man/man1/` and — where the tool has them —
 the bundled profile, the `examples/` samples and the JSON Schemas (the
 shared one from `shared/schema/`, the tool-local ones from `schema/`).

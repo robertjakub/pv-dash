@@ -25,13 +25,13 @@ artifacts. The pattern:
   entrypoint runs as root only to seed the config volume and drops to
   `pvsuite` via `su-exec` — the tool never runs as root
 - the tools symlinked onto `PATH` (the inverter image: `fake-inverter`,
-  `fake-ctl`, `fake-cli`; the cache image: `modbus-cache`, `modbus-cache-ctl`,
+  `fake-cli`; the cache image: `modbus-cache`,
   `modbus-cache-cli`; the scraper image: `modbus-scraper`,
-  `modbus-scraper-ctl`, `modbus-scraper-cli`; the dashboard image:
-  `dashboard`, `dashboard-ctl`, `dashboard-cli`), `bash` for interactive
+  `modbus-scraper-cli`; the dashboard image:
+  `dashboard`, `dashboard-cli`), `bash` for interactive
   runs
 - a **HEALTHCHECK** on every image: the Modbus tools answer over their
-  unix control socket (`<tool>-ctl ping` / `show version` — the check
+  unix control socket (`<tool>-cli ping` / `show version` — the check
   runs as root, a trusted peer over SO_PEERCRED, so no token is needed;
   disabling the control plane with `CTL=0` fails the check — and so does
   a live `set control-port off` on a running container, by design; a

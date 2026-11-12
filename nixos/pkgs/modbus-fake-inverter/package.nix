@@ -21,7 +21,6 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
 
     install -Dm755 bin/modbus-fake-inverter.py $out/share/modbus-fake-inverter/modbus-fake-inverter.py
-    install -Dm755 bin/modbus-fake-ctl.py $out/share/modbus-fake-inverter/modbus-fake-ctl.py
     install -Dm755 bin/modbus-fake-cli.py $out/share/modbus-fake-inverter/modbus-fake-cli.py
     install -dm755 $out/share/modbus-fake-inverter/lib
     install -m644 lib/*.py lib/defaults.json lib/options.json $out/share/modbus-fake-inverter/lib/
@@ -53,8 +52,6 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-fake-inverter \
       --add-flags "$out/share/modbus-fake-inverter/modbus-fake-inverter.py"
-    makeWrapper ${lib.getExe python3} $out/bin/modbus-fake-ctl \
-      --add-flags "$out/share/modbus-fake-inverter/modbus-fake-ctl.py"
     makeWrapper ${lib.getExe python3} $out/bin/modbus-fake-cli \
       --add-flags "$out/share/modbus-fake-inverter/modbus-fake-cli.py"
 
@@ -74,7 +71,7 @@ stdenv.mkDerivation (finalAttrs: {
       from inverter profiles): day curve or static demo values, the
       modbus-cache diagnostics block, an optional line-protocol control
       server (set/show values at runtime) and seeded chaos injection.
-      Includes modbus-fake-ctl and modbus-fake-cli, CLI clients for the control server.
+      Includes modbus-fake-cli, the CLI client (one-shot, batch, console) for the control server.
       Python standard library only.
     '';
     license = lib.licenses.bsd3;

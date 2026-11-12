@@ -10,6 +10,20 @@ This file keeps **Unreleased and the current release** only — the release
 history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHANGELOG.md).
 
 ## Unreleased
+### Changed
+
+- **BREAKING: the four `*-ctl` clients retire into `*-cli`** — one client
+  per tool, the invocation shape picks the mode: command words one-shot
+  (`modbus-cache-cli show config` — the raw verdict head prints, exit
+  `0` ok / `1` connection error / `2` misuse), piped stdin batch (the
+  script lines run in order, the same raw faces), a bare terminal the
+  console session. No compat shim; the migration spell is
+  `modbus-cache-ctl <command>` → `modbus-cache-cli <command>` (same flags,
+  same envs, byte-identical replies — the HEALTHCHECKs, the nix wrappers
+  and the docker PATH follow). The console keeps its faces (quiet `ok`,
+  the confirm guards, the pager); the one-shot/batch keep the raw bytes
+  and audit CONNECT/DISCONNECT only.
+
 ### Added
 
 - **the four CLIs** — **the console pager**: every console reply prints

@@ -732,7 +732,7 @@ re-open — is the history half:
   `batteryFlag` default); the man pages rebuilt.
 - **the rename + env-prefix wave** — the bins and clients carry their
   man-page names (the dash names: `modbus-cache.py`,
-  `modbus-cache-ctl.py`, `modbus-scraper*.py`, `modbus-fake-*.py`,
+  `modbus-scraper*.py`, `modbus-fake-*.py`,
   `dashboard-*.py`); every env twin then wore its tool's prefix —
   `MCH_*` (cache), `SCR_*` (scraper), `INV_*` (fake), `DSH_*`
   (dashboard, the generic docker envs retired) — since retired by the

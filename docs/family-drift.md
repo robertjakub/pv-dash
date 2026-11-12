@@ -55,8 +55,8 @@ copy-paste twins), the similarity pass pairs cross-file bodies over the
 **The exact pass**: 0 duplicate group(s) in >= 2 files.
 
 
-**The similarity pass**: 54 cross-file pair(s) over the ratio
-floor (30 of them the man-page prose, per-tool by
+**The similarity pass**: 36 cross-file pair(s) over the ratio
+floor (12 of them the man-page prose, per-tool by
 design); the top non-man pairs:
 
 | ratio | pair |
@@ -240,7 +240,7 @@ canon the operators grep for.
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
 **The phrase canon**: 25 log phrase(s) shared by >= 2 tools;
-90 tool-local. The canon (the lead clause, the tools that speak it):
+89 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
@@ -284,7 +284,7 @@ the family canon: same cause, same code, same text shape.
 **The rc summary** + **the distinct refusal texts** (the literal
 message args — the family's refusal canon):
 
-- rc 0 (the clean exits): 9; rc 1 (the binds): 16; rc 2 (the CLI mistakes): 4; 0 site(s) raising a variable (the message/`rc` computed —
+- rc 0 (the clean exits): 8; rc 1 (the binds): 11; rc 2 (the CLI mistakes): 4; 0 site(s) raising a variable (the message/`rc` computed —
   the common SystemExit(str) prints the message and exits 1).
 
 The refusal texts (the literal SystemExit args, sorted):

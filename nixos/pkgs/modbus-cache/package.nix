@@ -21,7 +21,6 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
 
     install -Dm755 bin/modbus-cache.py $out/share/modbus-cache/modbus-cache.py
-    install -Dm755 bin/modbus-cache-ctl.py $out/share/modbus-cache/modbus-cache-ctl.py
     install -Dm755 bin/modbus-cache-cli.py $out/share/modbus-cache/modbus-cache-cli.py
     install -dm755 $out/share/modbus-cache/lib
     install -m644 lib/*.py lib/defaults.json lib/options.json $out/share/modbus-cache/lib/
@@ -58,8 +57,6 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-cache \
       --add-flags "$out/share/modbus-cache/modbus-cache.py"
-    makeWrapper ${lib.getExe python3} $out/bin/modbus-cache-ctl \
-      --add-flags "$out/share/modbus-cache/modbus-cache-ctl.py"
     makeWrapper ${lib.getExe python3} $out/bin/modbus-cache-cli \
       --add-flags "$out/share/modbus-cache/modbus-cache-cli.py"
 
@@ -79,7 +76,7 @@ stdenv.mkDerivation (finalAttrs: {
       interval while any number of clients connect and are served FC3 reads
       from an in-memory cache. Reads outside the cached ranges and other
       function codes are forwarded to the device (serialized). Includes
-      modbus-cache-ctl and modbus-cache-cli, CLI clients for the JSON-lines control
+      modbus-cache-cli, the CLI client (one-shot, batch, console) for the JSON-lines control
       server. Python standard library only, no third-party dependencies.
     '';
     license = lib.licenses.bsd3;

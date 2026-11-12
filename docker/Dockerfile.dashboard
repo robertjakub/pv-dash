@@ -43,7 +43,6 @@ COPY --chown=pvsuite examples/dashboard.conf dashboard/
 COPY --chown=pvsuite examples/config.js examples/page.token config-defaults/
 RUN chmod +x dashboard/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/dashboard/bin/dashboard.py /usr/local/bin/dashboard \
-    && ln -s /pv-suite/dashboard/bin/dashboard-ctl.py /usr/local/bin/dashboard-ctl \
     && ln -s /pv-suite/dashboard/bin/dashboard-cli.py /usr/local/bin/dashboard-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
@@ -65,4 +64,4 @@ CMD ["dashboard", "--listen", "0.0.0.0:8080"]
 # default socket follows the bundled conf's port; the check runs as root —
 # a trusted peer over SO_PEERCRED, so no token is needed).
 HEALTHCHECK --interval=5m --timeout=5s --start-period=15s --retries=3 \
-    CMD ["dashboard-ctl", "ping"]
+    CMD ["dashboard-cli", "ping"]

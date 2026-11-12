@@ -60,20 +60,20 @@ The kinds — every row of the tables below carries one:
 
 | command | kind | description |
 |---|---|---|
-| `help` | command (internal) | describe a word (help \<setting>) or map every knob (help config) |
+| `help` | command (internal) |  |
 | `inspect` | command | one pretty dump of everything (the state, the counters, the caps) |
-| `ping` | command (internal) | keep-alive: answers pong |
-| `quit` | command | close the session |
+| `ping` | command (internal) |  |
+| `quit` | command |  |
 | `request` | namespace | the state machinery: the dump written and restored, the config re-read, the poll woken, the session dropped |
-| `request dump` | command (hidden) | write the state dump: the live setting overrides, sealed (when the daemon has a dump path) |
+| `request dump` | command (hidden) |  |
 | `request poll` | namespace | the poll loop's manual wake |
 | `request poll now` | command | wake the poll loop immediately |
 | `request reload` | command | save the live overrides and restart the whole daemon (the config file and the flags are re-resolved) |
-| `request reload-config` | command | re-read the config file (the SIGHUP path) |
+| `request reload-config` | command |  |
 | `request restart` | command | drop the Modbus session (reconnects on the next poll) |
-| `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
+| `request restore` | command (hidden) |  |
 | `set` | command | configure a setting (set metrics interval 5, set log-access on) |
-| `show` | command | print a setting's live value, or a report |
+| `show` | command |  |
 | `shutdown` | command | stop the scraper (asks to confirm) |
 | `clear` | command | restore a setting to its configured value (clear modbus interval, clear system log-level) |
 
@@ -93,7 +93,7 @@ the inverter Modbus settings
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `upstream` | `set modbus upstream` | settable | `HOST:PORT` | `--upstream` / `UPSTREAM` | the inverter Modbus endpoint |
-| `modbus-unit` | `set modbus unit` | settable | `ID` | `--modbus-unit` / `MODBUS_UNIT` | Modbus unit ID |
+| `modbus-unit` | `set modbus unit` | settable | `ID` | `--modbus-unit` / `MODBUS_UNIT` | the Modbus unit id the session speaks |
 | `modbus-offset` | `set modbus offset` | settable | `N` | `--modbus-offset` / `MODBUS_OFFSET` | added to register addresses |
 | `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth settings: the Modbus scheme the poll session speaks (modbus auth — suite or none) and the bearer token the metrics endpoint requires (auth token) |
 | `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
@@ -122,7 +122,7 @@ ceilings
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `max-kwp` | `set modbus caps max-pv` | settable | `KW` | `--max-kwp` / `MAX_KWP` | maximum PV array kWp |
+| `max-kwp` | `set modbus caps max-pv` | settable | `kW` | `--max-kwp` / `MAX_KWP` | maximum PV array kWp |
 | `max-grid-kw` | `set modbus caps max-grid` | settable | `KW` | `--max-grid-kw` / `MAX_GRID_KW` | maximum grid kW, either direction |
 
 ### system
@@ -143,9 +143,9 @@ the /metrics serving limits (the client caps and the idle timeouts)
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `metrics-max-clients` | `set metrics limits max-clients` | settable | `N` | `--metrics-max-clients` / `METRICS_MAX_CLIENTS` | simultaneous HTTP clients on /metrics; extras get an immediate 503 |
-| `metrics-client-timeout` | `set metrics limits timeout` | settable | `s` | `--metrics-client-timeout` / `METRICS_CLIENT_TIMEOUT` | kick idle keep-alive HTTP clients after this long |
-| `metrics-max-conn-per-ip` | `set metrics limits max-conn-per-ip` | settable | `N` | `--metrics-max-conn-per-ip` / `METRICS_MAX_CONN_PER_IP` | simultaneous HTTP connections from one peer IP |
+| `metrics-max-clients` | `set metrics limits max-clients` | settable | `N` | `--metrics-max-clients` / `METRICS_MAX_CLIENTS` | maximum concurrent /metrics clients; extras get an immediate 503, 0 = unlimited |
+| `metrics-client-timeout` | `set metrics limits timeout` | settable | `s` | `--metrics-client-timeout` / `METRICS_CLIENT_TIMEOUT` | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
+| `metrics-max-conn-per-ip` | `set metrics limits max-conn-per-ip` | settable | `N` | `--metrics-max-conn-per-ip` / `METRICS_MAX_CONN_PER_IP` | maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit |
 
 ### control
 
@@ -153,7 +153,7 @@ the control plane: the tokens, the ops role's RBAC policy, the trusted peers
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `control-port` | `set control port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | JSON-lines control server target: unix socket path |
+| `control-port` | `set control port` | settable | `PATH\|PORT` | `--control-port` / `CTL` | control server target: unix socket path or TCP port on 127.0.0.1 |
 | `control-token` | — | startup-only (secret) | `TOKEN` | `--control-token` / `CONTROL_TOKEN` | require a token on control connections: the client authenticates with {"cmd": "auth", "token":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `control-trust-uids` | `set control trust-uids` | settable | `UID,...` | `--control-trust-uids` / `CONTROL_TRUST_UIDS` | extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted |
 | `control-socket-group` | `set control socket-group` | settable | `on\|off` | `--control-socket-group` / `CONTROL_SOCKET_GROUP` | leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600) |
@@ -190,12 +190,13 @@ the SCR audit trail: the sink, the forwarding, the rotation, the kill switch
 
 ### audit/rotate
 
-the audit trail's rotation: the size trigger and the backup count
+the audit trail's rotation: the size trigger, the UTC-midnight trigger and
+the backup count
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation |
-| `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit log at UTC midnight |
+| `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit trail at this size in MB, keeping N backups; 0 = no size rotation |
+| `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit trail at UTC midnight |
 | `audit-files` | `set audit rotate files` | settable | `N` | `--audit-files` / `AUDIT_FILES` | rotated audit backups to keep |
 
 ### dump

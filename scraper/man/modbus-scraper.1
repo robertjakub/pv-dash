@@ -113,14 +113,16 @@ listen address HOST:PORT
 log timestamps in the system time zone instead of UTC
 .TP
 .BI \-\-metrics\-max\-clients " metrics-max-clients"
-maximum concurrent HTTP clients; extras get an immediate 503
+maximum concurrent HTTP clients on the /metrics endpoint; extras get an
+immediate 503, 0 = unlimited
 .TP
 .BI \-\-metrics\-client\-timeout " metrics-client-timeout"
-seconds an idle keep\-alive HTTP client is kept before being kicked
+seconds an idle /metrics client is kept before the socket times out, 0 =
+the built\-in 5 s cap
 .TP
 .BI \-\-metrics\-max\-conn\-per\-ip " metrics-max-conn-per-ip"
-maximum concurrent HTTP connections from one peer IP; extras get an
-immediate 503
+maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
+limit
 .TP
 .BI \-\-control\-port " control-port"
 JSON\-lines control server target: unix socket path or TCP port number
@@ -165,12 +167,13 @@ require Authorization: Bearer <token> on all requests; the value may be
 LoadCredential rides as file:/run/credentials/...)
 .TP
 .BI \-\-metrics\-acl " metrics-acl"
-clients allowed to connect to /metrics: "any", "none" (refuse everyone),
-comma\-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or
-"file:<path>" — the standalone ip\-prefix acl file (the gate object
-{"type": "ip\-prefix", "rules": [{"type": "allow"|"deny", "prefix":
-\&...}]}: the last matching rule decides, a client no rule decides
-refuses; "any" = 0.0.0.0/0, the whole space)
+clients allowed to connect to the /metrics endpoint: "any", "none"
+(refuse everyone), comma\-separated IPs/prefixes like
+10.0.0.7,10.48.0.0/16, or "file:<path>" — the standalone ip\-prefix acl
+file (the gate object {"type": "ip\-prefix", "rules": [{"type":
+"allow"|"deny", "prefix": ...}]}: the last matching rule decides, a
+client no rule decides refuses; "any" = 0.0.0.0/0, the whole space);
+checked at accept — a client off the ACL is closed without a reply
 .TP
 .BI \-\-audit\-log " audit-log"
 SCR audit trail: a file path or \- for stdout (the docker/journald way);
@@ -231,7 +234,7 @@ state rides encrypted (an HMAC\-SHA256 counter\-mode keystream,
 authenticated — a restore refuses a wrong or missing key, and a
 configured key refuses an unsealed dump); the reload re\-exec
 re\-resolves the same key, so the state file reads on the other side; no
-key = the dumps stay 0600 plaintext with the integrity hash a dump path
+key = the dumps stay 0600 plaintext with the integrity hash; a dump path
 without a key warns at start and on set; the value may be `file:<path>`
 — the first line of an owner\-only 0600 file (a systemd LoadCredential
 rides as file:/run/credentials/...)

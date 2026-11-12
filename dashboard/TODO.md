@@ -6,7 +6,7 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 ## Done (the highlights; the git history has the details)
 
 The help-canon wave moved the registry's family-wide texts to
-shared/options-help.json: 47 rows reference their canon block and the
+shared/options.json: 47 rows reference their canon block and the
 loader folds the block under the row's own fields. The alignment: the
 control-port setting-help matches the TCP tools, the metrics-max-clients
 spelling settles on the /metrics form with its help on the endpoint form,

@@ -6,7 +6,7 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 ## Done (the highlights; the git history has the details)
 
 The help-canon wave moved the registry's family-wide texts to
-shared/options-help.json: 49 rows reference their canon block and the
+shared/options.json: 49 rows reference their canon block and the
 loader folds the block under the row's own fields. The alignment: the
 fake's connect-acl takes the full value grammar (the cache's
 any|none|IP,...|file:<path> hint and the any/none words — the TAB pool

@@ -6,7 +6,7 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 ## Done (the highlights; the git history has the details)
 
 The help-canon wave moved the registry's family-wide texts to
-shared/options-help.json: 50 rows reference their canon block (`shared`:
+shared/options.json: 50 rows reference their canon block (`shared`:
 "<name>") and the loader folds the block under the row's own fields —
 the per-tool prose (the dump family's cached words, the ops role's
 show,flush policy) stays inline as the override. The alignment restored

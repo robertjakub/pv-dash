@@ -12,7 +12,7 @@ answers):
   fold applied — the truth the daemons load), every field on one line,
   the drifting fields spelled per tool, `*` marking the off-majority
   values;
-- what a move to shared/options-help.json takes — the canon state (the
+- what a move to shared/options.json takes — the canon state (the
   block, the refs, the inline-wins deviations, the row-borne fields the
   block lacks) and the verdict: the fields the block could carry
   (byte-identical on every carrier), the console placements the house
@@ -66,12 +66,12 @@ def key_rank(field):
 def load(order):
     """The canon + the four registries (raw, whole JSON). A missing file
     or a parse failure exits 1."""
-    canon_path = os.path.join(ROOT, 'shared', 'options-help.json')
+    canon_path = os.path.join(ROOT, 'shared', 'options.json')
     try:
         with open(canon_path, encoding='utf-8') as f:
             canon = json.load(f)
     except (OSError, ValueError) as e:
-        print('option_diff.py: shared/options-help.json: %s' % e)
+        print('option_diff.py: shared/options.json: %s' % e)
         raise SystemExit(1)
     raw = {}
     for tool in order:
@@ -164,7 +164,7 @@ def report(raw, canon, order, name, section, rows):
         print('  (no fields)')
     print('')
 
-    print('## canon — shared/options-help.json')
+    print('## canon — shared/options.json')
     if ref_keys:
         for key in ref_keys:
             block = blocks.get(key)
@@ -202,7 +202,7 @@ def report(raw, canon, order, name, section, rows):
               'fails it — ref it or drop it)' % (section, name))
     print('')
 
-    print('## move — what riding shared/options-help.json takes')
+    print('## move — what riding shared/options.json takes')
     every = [f for f in fields
              if all(f in rows[t] for t in carriers)
              and len(value_groups(rows, carriers, f)) == 1]

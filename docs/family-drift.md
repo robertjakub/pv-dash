@@ -226,7 +226,7 @@ The landed knob legs (the audit rotation bounds family-wide, the
 `audit-daily` one shape, the env-or-note completion):
 [history/family-drift.md](history/family-drift.md).
 
-**The canon coverage** (shared/options-help.json — the registry
+**The canon coverage** (shared/options.json — the registry
 texts the rows ref; the drift and must-ref gates live in
 `lint_options --check`, the exempt names ride it):
 

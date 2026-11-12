@@ -69,7 +69,7 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   byte-identical field on one line and the drift one tool per line
   (`*` on the off-majority values), the canon state (the block, the
   refs, the inline-wins deviations, the block gaps) and the move
-  verdict — what riding shared/options-help.json takes: the fields the
+  verdict — what riding shared/options.json takes: the fields the
   block could carry (byte-identical on every carrier), the console
   placements the house keeps on the rows, the gated drift with its
   exempt status, and the must-ref / byte-equal-twins predictions. The

@@ -6,7 +6,7 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 ## Done (the highlights; the git history has the details)
 
 The help-canon wave moved the registry's family-wide texts to
-shared/options-help.json: 44 rows reference their canon block and the
+shared/options.json: 44 rows reference their canon block and the
 loader folds the block under the row's own fields. The alignment is the
 scraper's biggest: the /metrics cap trio (metrics-max-clients,
 metrics-client-timeout, metrics-max-conn-per-ip) speaks the cache's

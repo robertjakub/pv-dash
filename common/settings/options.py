@@ -360,7 +360,8 @@ def _listing(name, options, node=None, hidden_words=()):
         if o.node:
             if o.name != name and o.name.startswith(prefix):
                 word = o.name[len(prefix):].split('/')[0]
-                if any((x.hidden or x.gate) and x.live and x.live.startswith(o.name + '/') for x in options):
+                if any((x.hidden or x.gate) and (x.live or x.alias) and
+                       (x.live or x.alias).startswith(o.name + '/') for x in options):
                     word += '/'   # the subtree hides knobs or bears a gate — the listing says so
                 _slot(words, word, o, False)
         elif o.name not in hidden_words and home(o) == name:
@@ -560,7 +561,7 @@ _CANON = None
 
 
 def load_canon():
-    """shared/options-help.json at the tree root — the directory that
+    """shared/options.json at the tree root — the directory that
     contains common/ (the texts.py walk, spelled locally: the loaders
     import flat, so the walk cannot be imported from the render module).
     Cached; an absent file reads as no canon (the rows speak inline — the
@@ -571,7 +572,7 @@ def load_canon():
     if _CANON is None:
         tree = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         try:
-            with open(os.path.join(tree, 'shared', 'options-help.json'), encoding='utf-8') as f:
+            with open(os.path.join(tree, 'shared', 'options.json'), encoding='utf-8') as f:
                 _CANON = json.load(f)
         except FileNotFoundError:
             _CANON = {}
@@ -612,7 +613,7 @@ def canon_fold(row, canon, section='options', label='registry'):
     blocks = canon.get(section) or {}
     if key not in blocks:
         raise ValueError('%s: the row %r refs the canon key %r — no such block in '
-                         'shared/options-help.json' % (label, row.get('name'), key))
+                         'shared/options.json' % (label, row.get('name'), key))
     field = 'setting-help' if section == 'show' else 'help'
     block = blocks[key]
     if section == 'options':

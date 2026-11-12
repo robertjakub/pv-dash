@@ -40,7 +40,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -dm755 $out/share/dashboard/shared
     install -m644 ${../../../shared}/texts.json $out/share/dashboard/shared/
     install -m644 ${../../../shared}/tags.json $out/share/dashboard/shared/
-    install -m644 ${../../../shared}/options-help.json $out/share/dashboard/shared/
+    install -m644 ${../../../shared}/options.json $out/share/dashboard/shared/
     install -dm755 $out/share/dashboard/common/modbus
     install -m644 ${../../../common}/modbus/*.py $out/share/dashboard/common/modbus/
     install -m644 ${../../../common}/modbus/protocol.json $out/share/dashboard/common/modbus/

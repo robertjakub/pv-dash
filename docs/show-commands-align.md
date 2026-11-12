@@ -38,7 +38,7 @@ without changing tool semantics.
 
 ## the fly order
 
-1. The two `show` blocks land in shared/options-help.json; the four
+1. The two `show` blocks land in shared/options.json; the four
    metrics-acl-table rows and four version rows thin-ref (the block text
    replaces every inline descr).
 2. The `('show', 'metrics-acl-table')` and `('show', 'version')`

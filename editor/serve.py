@@ -12,7 +12,7 @@ of the rows the registries already carry.
 
 Endpoints:
   GET  /          the page
-  GET  /api/registry   the four tool registries + shared/options-help.json, parsed
+  GET  /api/registry   the four tool registries + shared/options.json, parsed
   POST /api/save      {edits: [{tool, section, name, set: {k: v}, del: [k]}]}
   POST /api/lint      the lint_options --check + check_options reports
 
@@ -38,7 +38,7 @@ from scriptlib import TOOLS  # noqa: E402
 
 SECTIONS = ('options', 'show', 'commands')
 SECTION_FIELD = dict(lo.SECTION_FIELD)
-SHARED_PATH = os.path.join(REPO, 'shared', 'options-help.json')
+SHARED_PATH = os.path.join(REPO, 'shared', 'options.json')
 PAGE_PATH = os.path.join(HERE, 'index.html')
 SAVE_LOCK = threading.Lock()
 
@@ -54,7 +54,7 @@ def registry():
         with open(path, encoding='utf-8') as f:
             files[tool] = {'path': os.path.relpath(path, REPO), 'sections': json.load(f)}
     with open(SHARED_PATH, encoding='utf-8') as f:
-        files['shared'] = {'path': 'shared/options-help.json', 'sections': json.load(f)}
+        files['shared'] = {'path': 'shared/options.json', 'sections': json.load(f)}
     return {'tools': list(TOOLS), 'sections': list(SECTIONS), 'key_rank': list(lo.KEY_RANK),
             'section_field': SECTION_FIELD, 'files': files}
 

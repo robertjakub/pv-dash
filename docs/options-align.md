@@ -3,7 +3,7 @@
 Status: **landed** — the verdicts below mark `ok` as flown; the ledger at the bottom records the outcome.
 
 The one-knob-one-source rule: a knob's fields live in the canon block
-(`shared/options-help.json`) when they are family-true, in the row when they
+(`shared/options.json`) when they are family-true, in the row when they
 are the tool's own; the row's inline field wins over the block; the lint's
 `EXEMPT` table is the drift ledger's audit trail — every entry carries its
 reason, every dead entry retires.
@@ -101,7 +101,7 @@ same wave).
 
 1. Group 1 FOLD (block edits + thin refs), then Group 2 ALIGN (prose +
    bound edits in the rows), the compare gate re-checks after each group.
-2. The blocks land in `shared/options-help.json`; the rows that ref nothing
+2. The blocks land in `shared/options.json`; the rows that ref nothing
    else become thin `{ "name": ..., "shared": ... }` refs.
 3. The exempt retires ride the same commits: modbus-interval,
    modbus-timeout, no-audit-log, restore-on-start, client-timeout,

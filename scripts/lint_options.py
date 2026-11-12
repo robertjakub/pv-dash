@@ -18,7 +18,7 @@ keys, missing names/descriptions, duplicate names, the `only` mark —
 a known tool, the file's own tool, never beside `shared` (the canon
 ref is the family-wide mark; `only` pins the knob tool-exclusive) —
 and — the big one — a row that does not read back as the canonical
-form. The shared/options-help.json is the fifth file under the gate: a
+form. The shared/options.json is the fifth file under the gate: a
 block may carry every row key but the three placement keys (`name` —
 the flat name IS the block's key; `only`; `shared` — the ref itself),
 no unknown keys, a show/commands dict block speaks its section's
@@ -42,7 +42,7 @@ sys.path.insert(0, REPO)   # the canon fold rides the loader's own implementatio
 WIDTH = 118
 
 KEY_RANK = ('name', 'flag', 'env', 'no-env', 'conv', 'shared', 'only', 'group', 'live', 'alias', 'negates',
-            'setting-help', 'values', 'hint', 'value-help', 'default', 'help',
+            'setting-help', 'values', 'hint', 'value-help', 'default', 'help', 'gate',
             'min', 'max', 'check', 'secret', 'internal', 'hidden', 'restart', 'node')
 KNOWN = set(KEY_RANK)
 
@@ -50,7 +50,7 @@ KNOWN = set(KEY_RANK)
 # IS) the family passes compare, and the (section, name, field) exemptions —
 # the intentional drift, each with its reason
 GATED = ('setting-help', 'help', 'value-help', 'hint', 'values',
-         'flag', 'env', 'min', 'max', 'secret', 'hidden', 'restart')
+         'flag', 'env', 'min', 'max', 'secret', 'hidden', 'restart', 'gate')
 SECTION_FIELD = {'show': 'setting-help', 'commands': 'help'}
 
 EXEMPT = {
@@ -244,7 +244,7 @@ def render_registry(meta):
     return '{\n' + ',\n'.join(parts) + '\n}\n'
 
 
-BOOL_KEYS = frozenset(('secret', 'internal', 'hidden', 'restart', 'node'))
+BOOL_KEYS = frozenset(('secret', 'internal', 'hidden', 'restart', 'node', 'gate'))
 
 
 def normalize_bools(meta):
@@ -270,7 +270,7 @@ def _norm_row_bools(r):
 
 
 def render_canon(canon):
-    """The canonical text of shared/options-help.json — the registries' one
+    """The canonical text of shared/options.json — the registries' one
     render, one shape up: the file's sections and blocks keep their landed
     order (the orphan gate keys on it), a dict block's fields render in the
     row rank (the block bools normalized — the flat show/commands strings
@@ -416,10 +416,10 @@ def family_lint():
     Returns the nits; main() prints them and exits 1."""
     from common.settings.options import canon_fold
     try:
-        with open(os.path.join(REPO, 'shared', 'options-help.json'), encoding='utf-8') as f:
+        with open(os.path.join(REPO, 'shared', 'options.json'), encoding='utf-8') as f:
             canon = json.load(f)
     except (OSError, ValueError) as e:
-        return ['shared/options-help.json: does not parse: %s' % e]
+        return ['shared/options.json: does not parse: %s' % e]
     metas = {}
     for tool in TOOLS:
         with open(os.path.join(REPO, tool, 'lib', 'options.json'), encoding='utf-8') as f:
@@ -574,13 +574,13 @@ def main():
                 sys.stdout.writelines(difflib.unified_diff(
                     disk.splitlines(True), canon.splitlines(True),
                     path, path + ' (canonical)'))
-    canon_path = os.path.join(REPO, 'shared', 'options-help.json')
+    canon_path = os.path.join(REPO, 'shared', 'options.json')
     try:
         with open(canon_path, encoding='utf-8') as f:
             canon_disk = f.read()
         canon_text = render_canon(json.loads(canon_disk))
     except (OSError, ValueError) as e:
-        print('shared/options-help.json: does not parse: %s' % e)
+        print('shared/options.json: does not parse: %s' % e)
         bad = True
     else:
         if canon_text == canon_disk:
@@ -588,9 +588,9 @@ def main():
         elif write:
             with open(canon_path, 'w', encoding='utf-8') as f:
                 f.write(canon_text)
-            print('shared/options-help.json: reformatted')
+            print('shared/options.json: reformatted')
         else:
-            print('shared/options-help.json: off the canonical layout')
+            print('shared/options.json: off the canonical layout')
             bad = True
             if diff:
                 import difflib

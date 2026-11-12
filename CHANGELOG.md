@@ -26,7 +26,10 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   was the vanishing case). The gate criterion joins as the second
   mark source: a node whose subtree bears an access-control knob
   lists marked too — the cache's `acl/` (its connect/write children
-  are visible; the mark says "this namespace speaks the gates").
+  are visible; the mark says "this namespace speaks the gates"). The
+  gate flag rides the canon (`shared/options.json`) and the canon file
+  renames to `shared/options.json` — it carries the wiring and the
+  marks, not only the help.
 
 - **The show/commands canon wave (docs/show-commands-align.md)** — the
   `show` section's last two drifts fold: `metrics-acl-table` speaks the
@@ -97,7 +100,7 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 - **the registry texts wear one canon** — the family-wide option texts
   (`setting-help`, `help`, `value-help`, `hint`, `values`, and the wiring
   that agrees: `flag`, `env`, `conv`, `min`/`max`, the marks) move to
-  `shared/options-help.json`; a registry row references its block with
+  `shared/options.json`; a registry row references its block with
   `"shared": "<name>"` and the loader folds the block under the row's own
   fields (the inline field wins — the per-tool override). One edit updates
   every tool's --help, man page, wire help and docs. The accidental
@@ -139,7 +142,7 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   `modbus-unit`/`modbus-read-delay` (the options rows),
   `uplink`/`uplink-sources` (the show rows) and
   `request-poll-now`/`request/poll` (the command rows) fold from
-  `shared/options-help.json` (the first two-tool partial blocks), and
+  `shared/options.json` (the first two-tool partial blocks), and
   `shutdown` joins them family-wide: the four helps align to
   "stop the server (asks to confirm)" and the lint's `shutdown`
   exemption retires. The MANUALs, the man pages and `family_drift`'s

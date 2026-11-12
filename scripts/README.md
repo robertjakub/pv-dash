@@ -38,7 +38,7 @@ scripts.
   derivation, the bundled configs naming registry options
   only. `python3 scripts/check_options.py` (the ten-suite battery's
   precondition).
-- **[`lint/lint_options.py`](lint/lint_options.py)** — lint + reformat the four
+- **[`lint/options.py`](lint/options.py)** — lint + reformat the four
   `lib/options.json` registries: the canonical row order, the
   hand-formatted layout (edits must be surgical — the lint enforces
   it). `--check` for the gates.
@@ -77,7 +77,7 @@ scripts.
   shape agreeing, still inline) and the shape-field drifts that block a
   shared definition; `live`/`alias`/`node`/`no-env`/`group` are the
   per-tool console placements and never gate a match. Report only —
-  the form gates live in `lint/lint_options.py`, the tool-vs-tool identity
+  the form gates live in `lint/options.py`, the tool-vs-tool identity
   fields in `compare_options.py`. `--tool` names the tools comma
   separated with `all` the default.
 - **`option_diff.py`** — one flat name, every tool, every section: the
@@ -93,7 +93,7 @@ scripts.
   block could carry (byte-identical on every carrier), the console
   placements the house keeps on the rows, the gated drift with its
   exempt status, and the must-ref / byte-equal-twins predictions. The
-  verdict re-uses `lint/lint_options.py`'s own GATED/EXEMPT/SECTION_FIELD/
+  verdict re-uses `lint/options.py`'s own GATED/EXEMPT/SECTION_FIELD/
   KEY_RANK and the loader's `canon_fold` — it can never drift from the
   gates it predicts. `python3 scripts/option_diff.py <flat-name>`;
   `--tool` names the tools comma separated with `all` the default.
@@ -103,7 +103,7 @@ scripts.
 The linters live in [`lint/`](lint) — one directory, the registry and
 prose gates apart from the runners:
 
-- **[`lint/lint_acl.py`](lint/lint_acl.py)** — the acl gate-objects: the standalone
+- **[`lint/acl.py`](lint/acl.py)** — the acl gate-objects: the standalone
   `file:<path>` targets and the `extras/examples/` acl files; the typed
   rule chain's grammar. Bare run globs the root.
 - **`validate_json.py`** — the JSON documents against a JSON Schema
@@ -119,7 +119,7 @@ prose gates apart from the runners:
   [docs/family-drift.md](../docs/family-drift.md); the verdict prose
   lives in the script's blocks. `--check` exits 1 when the doc is
   stale.
-- **[`lint/lint_readmes.py`](lint/lint_readmes.py)** — the four tool READMEs' skeleton gate: the
+- **[`lint/readmes.py`](lint/readmes.py)** — the four tool READMEs' skeleton gate: the
   `##` canon in order (how it works → usage → configuration → runtime
   control → the tool's own sections in the feature slot → security →
   testing → Nix / NixOS → source layout → license) and a `### Signals`
@@ -133,15 +133,15 @@ prose gates apart from the runners:
 The four live in [`generators/`](generators) — one directory, the
 shipped-artifact renderers apart from the gates:
 
-- **`generators/gen_man.py`** — the man pages from the live parsers + each
+- **`generators/man.py`** — the man pages from the live parsers + each
   tool's `lib/man.py` prose (`--man` renders through the bin; the
   shipped pages regenerate).
-- **`generators/gen_manual.py`** — the four `<tool>/MANUAL.md` pages from the
+- **`generators/manual.py`** — the four `<tool>/MANUAL.md` pages from the
   registries: every command, knob and show report the tool's control
   wire answers, the kind of each (command, settable — set/clear — or
   show-only; the startup-only knobs marked), the flag/env twin, the
   value shape. `--check` fails a stale page.
-- **`generators/gen_examples.py`** — the family's example files from the
+- **`generators/examples.py`** — the family's example files from the
   registries, one generator + `--check` for both surfaces: the four
   docker env examples (`docker/env/<tool>.env.example` — the full
   env-twin set per tool, grouped by the knob's namespace node, the
@@ -150,7 +150,7 @@ shipped-artifact renderers apart from the gates:
   (`<tool>/examples/<conf>` — every knob the registry declares, every
   line commented at its default, the secrets in their `file:<path>`
   form). `--check` fails a drifted example.
-- **`generators/gen_sbom.py`** — the CycloneDX 1.5 SBOM (docs/sbom/), the
+- **`generators/sbom.py`** — the CycloneDX 1.5 SBOM (docs/sbom/), the
   stdlib-only claim machine-checked.
 
 The generated pages and their gates (never hand-edit — an editorial
@@ -160,10 +160,10 @@ edit to the rendered page dies at the next run):
 | Page | Generator | Gate |
 |---|---|---|
 | [docs/family-drift.md](../docs/family-drift.md) + the seed ledger | `family_drift.py` | `--check` |
-| `<tool>/MANUAL.md` (×4) | `generators/gen_manual.py` | `--check` |
-| `docker/env/<tool>.env.example` (×4) + `<tool>/examples/*.conf` (×4) | `generators/gen_examples.py` | `--check` |
-| `<tool>/man/*.1` (×4) | `generators/gen_man.py` | `mandoc -Tlint` |
-| [docs/sbom/](../docs/sbom/SBOM.md) (the SBOM pair) | `generators/gen_sbom.py` | `--check` |
+| `<tool>/MANUAL.md` (×4) | `generators/manual.py` | `--check` |
+| `docker/env/<tool>.env.example` (×4) + `<tool>/examples/*.conf` (×4) | `generators/examples.py` | `--check` |
+| `<tool>/man/*.1` (×4) | `generators/man.py` | `mandoc -Tlint` |
+| [docs/sbom/](../docs/sbom/SBOM.md) (the SBOM pair) | `generators/sbom.py` | `--check` |
 
 ## The release
 
@@ -178,8 +178,8 @@ edit to the rendered page dies at the next run):
 ## Keeping it honest
 
 ```bash
-python3 scripts/check_options.py && python3 scripts/lint/lint_options.py --check
-python3 scripts/lint/lint_readmes.py --check    # the READMEs' skeleton gate
+python3 scripts/check_options.py && python3 scripts/lint/options.py --check
+python3 scripts/lint/readmes.py --check    # the READMEs' skeleton gate
 python3 scripts/family_drift.py            # regenerate the drift doc
 python3 scripts/family_drift.py --check    # stale doc fails
 ```
@@ -196,7 +196,7 @@ python3 scripts/family_drift.py --check    # stale doc fails
     canon buckets the `SystemExit(variable)` sites properly (the
     nearest-text walk is linear over the enclosing block; make it the
     enclosing function's last literal).
-  - the dropped riders: gen_man.py's regeneration rides
+  - the dropped riders: man.py's regeneration rides
     release.py's flow explicitly (the `--tests none` re-run path
     should not skip the doc regens silently).
 - **consolidate**

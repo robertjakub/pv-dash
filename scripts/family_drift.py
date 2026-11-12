@@ -84,7 +84,7 @@ import difflib
 import hashlib
 import importlib
 import json
-import lint.lint_readmes as lint_readmes
+import lint.readmes as readme_lint
 import os
 import re
 import subprocess
@@ -209,9 +209,9 @@ def knobs_deltas(rows, names):
 
 def canon_coverage():
     """The help-canon's split: the canon blocks per section, the refing rows
-    per tool, the exempt names lint_options carries. The drift gate lives in
-    lint_options --check — this report shows the fold's reach."""
-    from lint.lint_options import EXEMPT
+    per tool, the exempt names options carries. The drift gate lives in
+    lint/options --check — this report shows the fold's reach."""
+    from lint.options import EXEMPT
     with open(os.path.join(REPO, 'shared', 'suite', 'options.json'), encoding='utf-8') as f:
         canon = json.load(f)
     refs = {t: {} for t in TOOLS}
@@ -868,13 +868,13 @@ RENDER_FINDINGS = """\
 The findings:
 
 - **The man ladders line up** (the same section order, the tool's own
-  sections appended at the tail) — the gen_man.py generator owns the
+  sections appended at the tail) — the man.py generator owns the
   shape; the drift risk is a hand-edited page, which this sweep
   flags by the .SH ladder changing.
 - **The README skeleton** is the one-skeleton wave's shape (how it
   works -> usage -> configuration -> runtime control -> the features
   -> security -> testing -> nix -> source layout -> license) and
-  `scripts/lint/lint_readmes.py --check` pins it: the canon H2s in order,
+  `scripts/lint/readmes.py --check` pins it: the canon H2s in order,
   the tool's own sections only in the slot between runtime control
   and security, and a `### Signals` block leading the Runtime-control
   H3s — this sweep prints the gate's verdict beside the ladders."""
@@ -888,7 +888,7 @@ The findings:
   *File option present — nothing else may be declared. The inline secret
   options are removed-option tombstones the module system refuses at
   eval; the env-file keys are freeform and carry no parity claim.
-- The registry keeps its docs-side role: gen_examples.py renders the
+- The registry keeps its docs-side role: examples.py renders the
   docker/env examples and the tools' example confs the settings key
   list is lifted from, and the
   nixos/README.md tables document the contract per tool."""
@@ -1220,7 +1220,7 @@ def emit():
     canon, refs, n_exempt = canon_coverage()
     ap('**The canon coverage** (shared/suite/options.json — the registry')
     ap('texts the rows ref; the drift and must-ref gates live in')
-    ap('`lint_options --check`, the exempt names ride it):')
+    ap('`lint/options --check`, the exempt names ride it):')
     ap('')
     ap('| section | blocks | ' + ' | '.join(f'{t} refs' for t in TOOLS) + ' |')
     ap('|---|---|' + '---|' * len(TOOLS))
@@ -1230,7 +1230,7 @@ def emit():
            + ' | '.join(str(refs[t][section]) for t in TOOLS) + ' |')
     ap('')
     ap(f'The exempt (intentionally per-tool) names: **{n_exempt}** —')
-    ap('each with its reason in `scripts/lint/lint_options.py`.')
+    ap('each with its reason in `scripts/lint/options.py`.')
     ap('')
 
     # ---- 4. the wire-text sweep
@@ -1303,11 +1303,11 @@ def emit():
     for t in TOOLS:
         ap(f'- {t}: ' + (' -> '.join(readmes.get(t) or ['NO README'])))
     ap('')
-    ap('The skeleton verdict (`scripts/lint/lint_readmes.py --check` gates it):')
+    ap('The skeleton verdict (`scripts/lint/readmes.py --check` gates it):')
     ap('')
     for t in TOOLS:
         rel = f'{t}/README.md'
-        findings = lint_readmes.readme_findings(rel)
+        findings = readme_lint.readme_findings(rel)
         ap(f'- {t}: ' + ('OK' if not findings else '; '.join(findings)))
     ap('')
     ap(RENDER_FINDINGS)

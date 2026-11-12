@@ -148,7 +148,7 @@ sit. Pass each one on every start — by flag, by env, or as `file:<path>`
 lands in `ps` — the file form is the shipped way (the audit's F9/F12).
 
 `examples/modbus-cache.conf` is a sample in the set grammar — GENERATED
-(`scripts/generators/gen_examples.py`) from `lib/options.json`, every knob the
+(`scripts/generators/examples.py`) from `lib/options.json`, every knob the
 registry declares, every line commented at its default; `show config`
 regenerates the script from the running daemon (secrets hidden) and `help
 config` maps every knob to its control command.
@@ -533,7 +533,7 @@ cache/
 │   └── modbus-cache-cli.py     # console-style interactive control session
 ├── examples/
 │   └── modbus-cache.conf    # sample config in the set grammar
-├── man/                     # the generated man pages (scripts/generators/gen_man.py)
+├── man/                     # the generated man pages (scripts/generators/man.py)
 └── lib/
     ├── defaults.json     # the static constants: diagnostics block, log levels (the protocol
     ├── statics.py       #   limits live in shared/suite/protocol.json)

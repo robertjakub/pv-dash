@@ -41,10 +41,10 @@ desc, the unknown keys after), the matchers inline, the trailing newline.
 The content is untouched — descs, matchers and their spellings land
 byte-for-byte as parsed.
 
-  python3 scripts/lint/lint_acl.py                # the shipped example(s)
-  python3 scripts/lint/lint_acl.py my.json        # lint + reformat in place
-  python3 scripts/lint/lint_acl.py --check        # report only, exit 1 if off-form
-  python3 scripts/lint/lint_acl.py --diff         # show the unified diff, no write
+  python3 scripts/lint/acl.py                # the shipped example(s)
+  python3 scripts/lint/acl.py my.json        # lint + reformat in place
+  python3 scripts/lint/acl.py --check        # report only, exit 1 if off-form
+  python3 scripts/lint/acl.py --diff         # show the unified diff, no write
 """
 import difflib
 import glob

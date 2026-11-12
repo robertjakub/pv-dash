@@ -12,8 +12,8 @@ The suite version, the nixpkgs pin, the alpine base, the apk set and the
 per-tool module counts all come off the tree too; nothing in the pair is
 hand-maintained.
 
-  python3 scripts/generators/gen_sbom.py           # regenerate both files in place
-  python3 scripts/generators/gen_sbom.py --check   # verify: regenerate + diff; drift = exit 1
+  python3 scripts/generators/sbom.py           # regenerate both files in place
+  python3 scripts/generators/sbom.py --check   # verify: regenerate + diff; drift = exit 1
 
 Stdlib only."""
 import argparse
@@ -55,7 +55,7 @@ ZRENDER_RE = re.compile(r'version:"(\d+\.\d+\.\d+)"\}\)')
 
 
 def fail(msg):
-    sys.exit('gen_sbom: %s' % msg)
+    sys.exit('sbom: %s' % msg)
 
 
 def read(path):
@@ -315,7 +315,7 @@ def render_md(f):
 > Suite version **%(v)s** (the tree; `version_string()` appends `-<short
 > git>` in a checkout). Machine-readable copy:
 > [`sbom.cdx.json`](sbom.cdx.json) (CycloneDX 1.5). **Generated** by
-> [`scripts/generators/gen_sbom.py`](../../scripts/generators/gen_sbom.py) — the import scan
+> [`scripts/generators/sbom.py`](../../scripts/generators/sbom.py) — the import scan
 > gates the render and the vendored ECharts version is read out of the
 > bundle itself; re-run the script, never hand-edit either file
 > (`--check` regenerates and diffs, and the release workflow runs it).
@@ -388,7 +388,7 @@ grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashb
 
 ```bash
 # the gate — regenerate and diff; the release workflow runs --check
-python3 scripts/generators/gen_sbom.py --check
+python3 scripts/generators/sbom.py --check
 
 # the human form of the import scan (module level; the generator's ast
 # walk is stricter)
@@ -433,13 +433,13 @@ def main():
     args = ap.parse_args()
 
     f = gather()
-    stale = any([emit(SBOM_MD, render_md(f), args.check, 'gen_sbom',
-                      rerun='python3 scripts/generators/gen_sbom.py'),
-                 emit(SBOM_CDX, render_cdx(f), args.check, 'gen_sbom',
-                      rerun='python3 scripts/generators/gen_sbom.py')])
+    stale = any([emit(SBOM_MD, render_md(f), args.check, 'sbom',
+                      rerun='python3 scripts/generators/sbom.py'),
+                 emit(SBOM_CDX, render_cdx(f), args.check, 'sbom',
+                      rerun='python3 scripts/generators/sbom.py')])
     if stale:
         sys.exit(1)
-    print('gen_sbom: the claim holds — stdlib + %s only; echarts %s (+ zrender %s), '
+    print('sbom: the claim holds — stdlib + %s only; echarts %s (+ zrender %s), '
           'suite %s, nixpkgs %s @ %s, alpine %s (%s)' % (
               '/'.join(FIRST_PARTY), f['vendor']['echarts'], f['vendor']['zrender'],
               f['version'], f['nix']['ref'], f['nix']['rev'], f['docker']['tag'],

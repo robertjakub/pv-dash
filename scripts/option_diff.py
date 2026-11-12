@@ -19,7 +19,7 @@ answers):
   keeps on the rows, and the gated drift the family lint refuses
   without an EXEMPT entry (the exempt ones named as already carried).
 
-The verdict re-uses lint_options.py's own GATED/EXEMPT/KEY_RANK and the
+The verdict re-uses lint/options.py's own GATED/EXEMPT/KEY_RANK and the
 loader's canon_fold — it can never drift from the gates it predicts.
 
   python3 scripts/option_diff.py modbus-unit          # one knob, all tools
@@ -34,7 +34,7 @@ import os
 import sys
 
 from lib import REPO as ROOT, TOOLS   # the scripts' common lib
-from lint.lint_options import EXEMPT, GATED, KEY_RANK, SECTION_FIELD
+from lint.options import EXEMPT, GATED, KEY_RANK, SECTION_FIELD
 from common.settings.options import canon_fold
 SECTIONS = ('options', 'show', 'commands')
 NOUN = {'options': 'knob', 'show': 'show row', 'commands': 'commands row'}
@@ -223,7 +223,7 @@ def report(raw, canon, order, name, section, rows):
         held = [f for f in gated if f in ex]
         if free:
             print('  the gated drift — align the rows or exempt it in '
-                  'lint_options.py: %s' % ', '.join(free))
+                  'lint/options.py: %s' % ', '.join(free))
         if held:
             print('  the gated drift, already exempt: %s' % ', '.join(held))
     if only_marked:

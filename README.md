@@ -63,8 +63,8 @@ pv-suite/
 │                 #   family_drift, validate_json, set_group/set_live,
 │                 #   release.py, audit_verify.py
 │   ├── lib/      # the scripts' common lib (the loaders, the tree-walk, emit)
-│   ├── lint/     # the linters: lint_acl/lint_options/lint_readmes/lint_texts
-│   └── generators/  # the four generators: gen_man/gen_manual/gen_examples/gen_sbom
+│   ├── lint/     # the linters: acl/options/readmes/texts
+│   └── generators/  # the four generators: man/manual/examples/sbom
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))
 ├── extras/       # the operator-side packs: alerts/, examples/, graylog/ ([docs](extras/README.md))

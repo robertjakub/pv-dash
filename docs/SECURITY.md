@@ -335,7 +335,7 @@ verification and the per-revision walk (rev. 1–31):
 ## 9. Verification
 
 All ten suites print ALL PASS on the revised tree; `nix flake check`,
-`scripts/check_options.py` + `scripts/lint/lint_options.py --check` clean; the
+`scripts/check_options.py` + `scripts/lint/options.py --check` clean; the
 man pages regenerate (`mandoc -Tlint` clean). The per-finding verification
 and the per-revision walk-throughs: [history/AUDIT.md](history/AUDIT.md).
 

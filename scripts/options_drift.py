@@ -25,7 +25,7 @@ the loader's own canon_fold — the truth the daemons load):
 The shape fields are the family contract (flag, env, conv, default, the
 bounds, the values, the markers); live/alias/node/no-env/group are the
 per-tool console placements and never gate a match. A report only — the
-form gates live in lint_options.py, the tool-vs-tool identity fields in
+form gates live in lint/options.py, the tool-vs-tool identity fields in
 compare_options.py.
 
   python3 scripts/options_drift.py                 # all four tools

@@ -2,7 +2,7 @@
 """The READMEs' skeleton gate: the four tool READMEs speak ONE `##` section
 order (the one-skeleton wave's canon), and this lint keeps them speaking it.
 
-    python3 scripts/lint/lint_readmes.py --check   # exit 1 on any finding
+    python3 scripts/lint/readmes.py --check   # exit 1 on any finding
 
 The canon — every tool README, in this order:
 
@@ -101,10 +101,10 @@ def main():
         rel = os.path.join(t, 'README.md')
         for msg in readme_findings(rel):
             bad += 1
-            print('lint_readmes: %s: %s' % (rel, msg))
+            print('readmes: %s: %s' % (rel, msg))
     if bad:
-        raise SystemExit('lint_readmes: %d finding(s) across %d READMEs' % (bad, len(TOOLS)))
-    print('lint_readmes: OK — the %d tool READMEs speak the skeleton' % len(TOOLS))
+        raise SystemExit('readmes: %d finding(s) across %d READMEs' % (bad, len(TOOLS)))
+    print('readmes: OK — the %d tool READMEs speak the skeleton' % len(TOOLS))
 
 
 if __name__ == '__main__':

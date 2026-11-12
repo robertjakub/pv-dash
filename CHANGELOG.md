@@ -127,6 +127,23 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Changed
 
+- **The lint/generator stems drop their prefixes** — the eight movers wear
+  the directory as the family name: `scripts/lint/`'s `lint_acl.py`,
+  `lint_options.py`, `lint_readmes.py`, `lint_texts.py` become `acl.py`,
+  `options.py`, `readmes.py`, `texts.py`, and `scripts/generators/`'s
+  `gen_man.py`, `gen_manual.py`, `gen_examples.py`, `gen_sbom.py` become
+  `man.py`, `manual.py`, `examples.py`, `sbom.py`. The self-references
+  follow (the docstring invocations, the message prefixes, `lib/emit.py`'s
+  tags + re-run hints), the importers re-point (`editor.py`,
+  `family_drift.py`, `option_diff.py`), the rendered constants re-point and
+  the generated layer regenerates (the MANUAL footers, the env examples'
+  and the example confs' GENERATED headers, the SBOM prose's link + re-run
+  line; the man pages byte-identical), release.yml's SBOM `--check` leg
+  follows, the drift doc regenerates and the live docs' mentions re-point
+  (the scripts README, the tool READMEs' generator lines, the common/shared
+  READMEs, the schemas' lint notes, the docs pages; the history records
+  keep their landed spellings).
+
 - **BREAKING: the inverter's profile knob speaks the cache's spelling** —
   `profile` becomes `modbus-profile` (the flag `--modbus-profile`, the
   `$MODBUS_PROFILE` env twin, the config-file key, the state-dump keys and

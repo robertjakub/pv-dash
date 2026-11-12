@@ -43,7 +43,7 @@ without changing tool semantics.
    replaces every inline descr).
 2. The `('show', 'metrics-acl-table')` and `('show', 'version')`
    exemptions retire — only when the rows fully resolve.
-3. Gates: `lint_options.py --check`, `check_options.py`, the regen
+3. Gates: `lint/options.py --check`, `check_options.py`, the regen
    `--check`s, `options_drift.py`, then the per-tool commits and the
    battery before any push.
 

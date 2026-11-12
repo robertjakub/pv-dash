@@ -228,7 +228,7 @@ The landed knob legs (the audit rotation bounds family-wide, the
 
 **The canon coverage** (shared/suite/options.json — the registry
 texts the rows ref; the drift and must-ref gates live in
-`lint_options --check`, the exempt names ride it):
+`lint/options --check`, the exempt names ride it):
 
 | section | blocks | cache refs | scraper refs | inverter refs | dashboard refs |
 |---|---|---|---|---|---|
@@ -237,7 +237,7 @@ texts the rows ref; the drift and must-ref gates live in
 | commands | 16 | 16 | 16 | 13 | 13 |
 
 The exempt (intentionally per-tool) names: **39** —
-each with its reason in `scripts/lint/lint_options.py`.
+each with its reason in `scripts/lint/options.py`.
 
 ## The wire-text sweep — the log/audit canon
 
@@ -368,7 +368,7 @@ READMEs' `##` skeletons.
 - inverter: How it works -> Usage -> Configuration -> Runtime control -> Served registers (the default profile) -> Internal registers (not in the profile) -> Chaos injection (`--chaos`) -> Audit trail -> Security -> Testing -> Source layout -> License
 - dashboard: How it works -> Usage -> Configuration -> Runtime control -> Behind a reverse proxy -> Metrics source -> Security -> Testing -> Source layout -> License
 
-The skeleton verdict (`scripts/lint/lint_readmes.py --check` gates it):
+The skeleton verdict (`scripts/lint/readmes.py --check` gates it):
 
 - cache: OK
 - scraper: OK
@@ -378,13 +378,13 @@ The skeleton verdict (`scripts/lint/lint_readmes.py --check` gates it):
 The findings:
 
 - **The man ladders line up** (the same section order, the tool's own
-  sections appended at the tail) — the gen_man.py generator owns the
+  sections appended at the tail) — the man.py generator owns the
   shape; the drift risk is a hand-edited page, which this sweep
   flags by the .SH ladder changing.
 - **The README skeleton** is the one-skeleton wave's shape (how it
   works -> usage -> configuration -> runtime control -> the features
   -> security -> testing -> nix -> source layout -> license) and
-  `scripts/lint/lint_readmes.py --check` pins it: the canon H2s in order,
+  `scripts/lint/readmes.py --check` pins it: the canon H2s in order,
   the tool's own sections only in the slot between runtime control
   and security, and a `### Signals` block leading the Runtime-control
   H3s — this sweep prints the gate's verdict beside the ladders.
@@ -422,7 +422,7 @@ The findings:
   *File option present — nothing else may be declared. The inline secret
   options are removed-option tombstones the module system refuses at
   eval; the env-file keys are freeform and carry no parity claim.
-- The registry keeps its docs-side role: gen_examples.py renders the
+- The registry keeps its docs-side role: examples.py renders the
   docker/env examples and the tools' example confs the settings key
   list is lifted from, and the
   nixos/README.md tables document the contract per tool.

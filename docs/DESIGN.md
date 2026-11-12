@@ -74,12 +74,12 @@ release.
    ```bash
    python3 scripts/family_drift.py --check
    python3 scripts/check_options.py
-   python3 scripts/lint/lint_options.py --check
-   python3 scripts/lint/lint_texts.py
-   python3 scripts/generators/gen_manual.py --check
-   python3 scripts/generators/gen_examples.py --check
-   python3 scripts/generators/gen_sbom.py --check
-   python3 scripts/generators/gen_man.py && mandoc -Tlint <tool>/man/*.1
+   python3 scripts/lint/options.py --check
+   python3 scripts/lint/texts.py
+   python3 scripts/generators/manual.py --check
+   python3 scripts/generators/examples.py --check
+   python3 scripts/generators/sbom.py --check
+   python3 scripts/generators/man.py && mandoc -Tlint <tool>/man/*.1
    ```
 
    A red gate means the generated layer is stale — regenerate (and fix
@@ -128,4 +128,4 @@ release.
 Prose lines ≤ 80 characters (the tables and code blocks are exempt);
 the man pages wrap at 72; strict cmark-gfm shape (the lint and the
 book build watch it); the texts the code renders ride
-shared/suite/texts.json (`scripts/lint/lint_texts.py`), not the docs.
+shared/suite/texts.json (`scripts/lint/texts.py`), not the docs.

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""The static-texts registry's gate, the lint_options shape. The registry
+"""The static-texts registry's gate, the options.py shape. The registry
 (shared/suite/texts.json at the tree root) must parse; every leaf must be a string; every key
 segment must be a clean lowercase word; every reference in the tree must
 resolve; every key must be referenced somewhere (the orphan gate); and no
 two leaves may share a value (one text, one home).
 
-    python3 scripts/lint/lint_texts.py --check   # exit 1 on any failure
+    python3 scripts/lint/texts.py --check   # exit 1 on any failure
 
 A reference is a bare T call with a single quoted dotted key — the
 consumer imports the loader as `from common.render.texts import T`. The suites
@@ -32,14 +32,14 @@ def leaves(node, prefix=''):
     out = {}
     for k, v in node.items():
         if not SEGMENT.match(k):
-            raise SystemExit('lint_texts: unclean key segment %r' % k)
+            raise SystemExit('texts: unclean key segment %r' % k)
         path = '%s.%s' % (prefix, k) if prefix else k
         if isinstance(v, dict):
             out.update(leaves(v, path))
         elif isinstance(v, str):
             out[path] = v
         else:
-            raise SystemExit('lint_texts: %s: the leaf is not a string' % path)
+            raise SystemExit('texts: %s: the leaf is not a string' % path)
     return out
 
 
@@ -48,7 +48,7 @@ def main():
         with open(REGISTRY, encoding='utf-8') as f:
             texts = leaves(json.load(f))
     except (OSError, ValueError) as e:
-        raise SystemExit('lint_texts: the registry is unreadable: %s' % e)
+        raise SystemExit('texts: the registry is unreadable: %s' % e)
 
     refs, files = set(), 0
     for root in SCAN_ROOTS:
@@ -78,9 +78,9 @@ def main():
 
     if bad:
         for b in bad:
-            print('lint_texts: ' + b)
+            print('texts: ' + b)
         raise SystemExit(1)
-    print('lint_texts: %d key(s), %d reference(s) across %d file(s) — clean'
+    print('texts: %d key(s), %d reference(s) across %d file(s) — clean'
           % (len(texts), len(refs), files))
 
 

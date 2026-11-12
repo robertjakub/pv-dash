@@ -4,7 +4,7 @@ run with --man (which prints its roff page to stdout via lib/man.py) and the
 output lands in the tool's man/<page>.1 — the pages are GENERATED, never
 hand-edited. Stdlib only.
 
-  python3 scripts/generators/gen_man.py   # from anywhere; the repo root is derived
+  python3 scripts/generators/man.py   # from anywhere; the repo root is derived
 """
 import os
 import subprocess
@@ -33,16 +33,16 @@ def main():
         if run.returncode != 0 or not run.stdout.startswith('.TH '):
             first_err = run.stderr.strip().splitlines()[-1] if run.stderr.strip() \
                 else 'no output'
-            print('gen_man: %s: FAILED (exit %d): %s' % (tool, run.returncode, first_err))
+            print('man: %s: FAILED (exit %d): %s' % (tool, run.returncode, first_err))
             failures.append(tool)
             continue
         page = os.path.join(ROOT, page_rel)
         os.makedirs(os.path.dirname(page), exist_ok=True)
         with open(page, 'w') as f:
             f.write(run.stdout)
-        print('gen_man: %s -> %s' % (tool, page_rel))
+        print('man: %s -> %s' % (tool, page_rel))
     if failures:
-        raise SystemExit('gen_man: %d page(s) failed: %s' % (len(failures), ', '.join(failures)))
+        raise SystemExit('man: %d page(s) failed: %s' % (len(failures), ', '.join(failures)))
 
 
 if __name__ == '__main__':

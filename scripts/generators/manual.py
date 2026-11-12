@@ -6,8 +6,8 @@ and the description — from the per-tool registries (lib/options.json via
 lib/options.py, the one-knob-one-source rows). The files are GENERATED:
 edit the registry and re-run, never the markdown.
 
-  python3 scripts/generators/gen_manual.py          # render the four pages
-  python3 scripts/generators/gen_manual.py --check  # exit 1 when a shipped page drifts
+  python3 scripts/generators/manual.py          # render the four pages
+  python3 scripts/generators/manual.py --check  # exit 1 when a shipped page drifts
 
 Stdlib only."""
 import os
@@ -293,7 +293,7 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
     w(wrap('%s Part of the pv-suite family. The daemon\'s own `--help` and '
            'the man page (`%s --man`) carry the startup surface; this page '
            'carries the control wire. **Generated** from `lib/options.json` '
-           '(the one-knob-one-source rows) by `scripts/generators/gen_manual.py` — '
+           '(the one-knob-one-source rows) by `scripts/generators/manual.py` — '
            'edit the registry and re-run, never this file.' % (blurb, daemon_bin)))
     w('')
     w('## Speaking to the daemon')
@@ -397,8 +397,8 @@ def main(argv):
                       example, token_mandatory, conf, rows, shows, meta)
         raw_angle_guard(page, daemon)
         path = os.path.join(REPO, tool, 'MANUAL.md')
-        drift = emit(path, page, check, 'gen_manual',
-                     rerun='python3 scripts/generators/gen_manual.py') or drift
+        drift = emit(path, page, check, 'manual',
+                     rerun='python3 scripts/generators/manual.py') or drift
     if check:
         if drift:
             return 1

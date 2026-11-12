@@ -7,7 +7,7 @@ banners, the wire's fixed replies, the daemon bind/startup lines. The
 dotted key resolves through the namespaces; the caller applies the
 %-format — the format applies only when args ride the call (a template
 whose %% must fold always rides args). A literal % inside a template
-doubles. The gate is scripts/lint_texts.py: every reference in the tree
+doubles. The gate is scripts/lint/texts.py: every reference in the tree
 resolves, every key is referenced (the orphan gate), no two leaves share
 a value. Stdlib only."""
 import json

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The scraper's man pages, generated (common/render/manpage.py): the OPTIONS
 sections render from the tools' argparse parsers, the prose sections live
-here as roff. scripts/generators/gen_man.py writes the shipped man/*.1 from these;
+here as roff. scripts/generators/man.py writes the shipped man/*.1 from these;
 `modbus-scraper --man` (and the ctl/cli's --man) prints the same page."""
 from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_DAEMON, options_section, page
 

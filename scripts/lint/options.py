@@ -26,9 +26,9 @@ description field, and the file itself renders in the canonical layout
 (the sections and blocks in their landed order, a block's fields in the
 row rank).
 
-  python3 scripts/lint/lint_options.py             # reformat in place + report
-  python3 scripts/lint/lint_options.py --check     # report only, exit 1 if off-form
-  python3 scripts/lint/lint_options.py --diff      # show the unified diff, no write
+  python3 scripts/lint/options.py             # reformat in place + report
+  python3 scripts/lint/options.py --check     # report only, exit 1 if off-form
+  python3 scripts/lint/options.py --diff      # show the unified diff, no write
 """
 import json
 import os

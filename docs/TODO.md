@@ -204,7 +204,7 @@ they name the wire.
   and `:267`, `inverter/bin/modbus-fake-inverter.py:395`,
   `dashboard/bin/dashboard.py:348`) plus two live refusals
   (`dashboard/lib/control.py:189`, `inverter/lib/control.py:323`).
-  `lint_texts.py` cannot see a literal that equals a leaf. Outcome:
+  `texts.py` cannot see a literal that equals a leaf. Outcome:
   the leaves win; the lint learns the literal-equals-leaf check.
 - **the cache's dump/restore replies are a fourth dialect** —
   `ok dumped %d word(s), %d setting(s) to ...` vs the family's
@@ -261,7 +261,7 @@ they name the wire.
   (show knobs + help config via `control_command()`,
   `common/settings/options.py:390-408`),
   `*(restart)*` / `startup-only (secret)` (MANUAL.md,
-  `scripts/generators/gen_manual.py:143-146`), `restart: true` + the wire phrase
+  `scripts/generators/manual.py:143-146`), `restart: true` + the wire phrase
   (only the cache's man carries the trio now, `cache/lib/man.py:98-107`),
   and "restart to apply" (inverter/README.md:204). Outcome: a
   two-phrase lexicon in `shared/suite/texts.json`, every surface renders it,
@@ -397,7 +397,7 @@ they name the wire.
   flanked by the unit-range and audit-bounds rows, and the sweep's
   field table reads the rows (`default`/`min`/`max`/`live`).
 - the env examples are **GENERATED from the registries**
-  (`scripts/generators/gen_examples.py --check`): the full registry env-twin set per
+  (`scripts/generators/examples.py --check`): the full registry env-twin set per
   tool (50/39/34/38), grouped by the knob's namespace node, the image's
   own CMD/ENV values as the sample lines with the pin notes (the
   compose's environment pins marked per knob), the secrets' lines
@@ -405,7 +405,7 @@ they name the wire.
   the entrypoint — the gate that replaced the "check_options (or
   family_drift) diffs the registry env twins against
   `docker/env/*.env.example`" open item;
-- `lint_texts.py` flags a **literal that equals a leaf** after
+- `texts.py` flags a **literal that equals a leaf** after
   `%`-normalisation — still missing.
 - the breaking renames (the scraper's `auth-token` → `metrics-token`,
   the unit unification) ship with the **alias map** (the rows' `alias`
@@ -527,12 +527,12 @@ re-open — is the history half:
   (`cache-fuzz 10000`, `scrape-fuzz 10000`, `control-fuzz`, the stress
   suite) plus `docker compose up` (the Prometheus answers, no tracebacks
   in the logs).
-- **the SBOM / supply-chain note** `[common]` — **done**: `scripts/generators/gen_sbom.py`
+- **the SBOM / supply-chain note** `[common]` — **done**: `scripts/generators/sbom.py`
   generates both [sbom/SBOM.md](sbom/SBOM.md) + `sbom/sbom.cdx.json` from
   the tree (the import scan gates the render — a foreign dependency fails
   the generation; the vendored ECharts version and its bundled zrender are
   read out of the shipped bundle itself), and the release workflow's `sbom`
-  job runs `gen_sbom.py --check` (regenerate + diff), so the pair cannot go
+  job runs `sbom.py --check` (regenerate + diff), so the pair cannot go
   stale silently.
 - **the release discipline** `[common]` — **done**: `scripts/release.py`
   (the orchestrator: the version sweep, the changelog rename, the

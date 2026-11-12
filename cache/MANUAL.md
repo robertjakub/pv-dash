@@ -5,7 +5,7 @@ single-client devices: it polls the inverter once and serves every client
 from the cache. Part of the pv-suite family. The daemon's own `--help` and
 the man page (`modbus-cache --man`) carry the startup surface; this page
 carries the control wire. **Generated** from `lib/options.json` (the
-one-knob-one-source rows) by `scripts/generators/gen_manual.py` — edit the
+one-knob-one-source rows) by `scripts/generators/manual.py` — edit the
 registry and re-run, never this file.
 
 ## Speaking to the daemon

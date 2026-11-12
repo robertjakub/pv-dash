@@ -1,5 +1,8 @@
 {
   "options": {
+    "audit": {
+      "setting-help": "the audit trail: the sink, the forwarding, the rotation, the kill switch"
+    },
     "audit-daily": {
       "flag": "--audit-daily",
       "env": "AUDIT_DAILY",
@@ -29,7 +32,8 @@
       "conv": "str",
       "setting-help": "also forward every audit line: the local syslog mirror or a remote collector (the off-box copy)",
       "hint": "none|syslog|syslog:/PATH|udp://HOST|tcp://HOST",
-      "default": "none"
+      "default": "none",
+      "help": "also forward the audit trail: syslog (the local socket auto-scan), syslog:/path (an explicit socket), udp://host[:514] (RFC5426, best-effort) or tcp://host[:514] (RFC6587 framing) — the off-box copy carries the per-writer hash chain, so a scheduled search at the collector can alert on a chain break; docs/AUDIT.md"
     },
     "audit-forward-format": {
       "flag": "--audit-forward-format",
@@ -62,8 +66,10 @@
       "flag": "--audit-log",
       "env": "AUDIT_LOG",
       "conv": "str",
+      "setting-help": "the audit trail's file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home",
       "hint": "PATH|-|none",
-      "default": ""
+      "default": "",
+      "help": "the audit trail: a file path or - for stdout (the docker/journald way); `none` turns the local file off (with a forward spelled that is the remote-only mode); the XDG state home when unset"
     },
     "audit-max-mb": {
       "flag": "--audit-max-mb",
@@ -83,11 +89,13 @@
       "flag": "--client-timeout",
       "env": "CLIENT_TIMEOUT",
       "conv": "float",
+      "setting-help": "disconnect clients silent for this long",
       "hint": "s",
       "value-help": {
         "0": "never disconnect idle clients"
       },
       "default": 300.0,
+      "help": "disconnect clients silent for this many seconds, 0 = never",
       "min": 0,
       "max": 86400
     },
@@ -128,7 +136,8 @@
       "conv": "str",
       "setting-help": "control server target: unix socket path or TCP port on 127.0.0.1",
       "hint": "PATH|PORT",
-      "default": ""
+      "default": "",
+      "help": "JSON-lines control server target: unix socket path or TCP port number on 127.0.0.1; 0 = off"
     },
     "control-socket-group": {
       "flag": "--control-socket-group",
@@ -201,7 +210,8 @@
       "conv": "str",
       "setting-help": "the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval",
       "hint": "<file>",
-      "default": ""
+      "default": "",
+      "help": "the state dump: the live setting overrides (the tokens apart) as one JSON, written 0600 with an integrity hash (a restore refuses a tampered, unsigned or group-writable dump); dumped on the request dump command, the graceful shutdown and every --dump-interval seconds; loaded on start only with --restore-on-start, on demand with the request restore command"
     },
     "listen": {
       "flag": "--listen",
@@ -246,11 +256,13 @@
       "flag": "--max-clients",
       "env": "MAX_CLIENTS",
       "conv": "int",
+      "setting-help": "simultaneous client limit",
       "hint": "N",
       "value-help": {
         "0": "no limit"
       },
       "default": 64,
+      "help": "refuse further connections past this many simultaneous clients, 0 = no limit",
       "min": 0,
       "max": 4096
     },
@@ -258,11 +270,13 @@
       "flag": "--max-conn-per-ip",
       "env": "MAX_CONN_PER_IP",
       "conv": "int",
+      "setting-help": "simultaneous connections from one peer IP",
       "hint": "N",
       "value-help": {
         "0": "no per-IP limit (the default)"
       },
       "default": 0,
+      "help": "refuse further connections from one peer IP past this many simultaneous connections, 0 = no per-IP limit",
       "min": 0,
       "max": 4096
     },
@@ -304,6 +318,10 @@
       "conv": "int",
       "setting-help": "maximum concurrent /metrics clients; extras get an immediate 503, 0 = unlimited",
       "hint": "N",
+      "value-help": {
+        "0": "no limit"
+      },
+      "default": 64,
       "help": "maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited",
       "min": 0,
       "max": 4096
@@ -314,6 +332,9 @@
       "conv": "int",
       "setting-help": "maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit",
       "hint": "N",
+      "value-help": {
+        "0": "no per-IP limit (the default)"
+      },
       "default": 0,
       "help": "maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit",
       "min": 0,
@@ -321,7 +342,9 @@
     },
     "metrics-server": {
       "flag": "--metrics-server",
+      "env": "METRICS_SERVER",
       "conv": "bool",
+      "setting-help": "the tool's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen)",
       "values": [
         "on",
         "off"
@@ -330,13 +353,16 @@
         "off": "no metrics endpoint (the default)",
         "on": "serve /metrics on the configured listen address"
       },
-      "default": false
+      "default": false,
+      "help": "serve the tool's own Prometheus /metrics endpoint (the live `set metrics enable` toggle exists too)"
     },
     "metrics-token": {
       "flag": "--metrics-token",
       "env": "METRICS_TOKEN",
       "conv": "str",
+      "setting-help": "the metrics bearer token (Authorization: Bearer) — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file)",
       "hint": "TOKEN",
+      "help": "require Authorization: Bearer <token> on the /metrics endpoint (the same scheme the scraper speaks); the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
       "secret": true,
       "hidden": true,
       "restart": true
@@ -345,12 +371,18 @@
       "flag": "--modbus-auth",
       "env": "MODBUS_AUTH",
       "conv": "str",
+      "setting-help": "the Modbus auth scheme: suite (the crypt handshake) or none",
       "values": [
         "suite",
         "none"
       ],
       "hint": "suite|none",
-      "default": "none"
+      "value-help": {
+        "suite": "after every connect, prove the shared key with the suite handshake — the peer answers OK, or ERR and the connection fails",
+        "none": "no auth (the default)"
+      },
+      "default": "none",
+      "help": "the Modbus auth scheme: `suite` demands the crypt handshake (magic + nonce + HMAC proof of the shared key) right after every connect — the peer answers OK, or ERR and the session drops; none/empty = no auth at all"
     },
     "modbus-auth-key": {
       "flag": "--modbus-auth-key",
@@ -361,12 +393,41 @@
       "hidden": true,
       "restart": true
     },
+    "modbus-interval": {
+      "flag": "--modbus-interval",
+      "env": "MODBUS_INTERVAL",
+      "conv": "float",
+      "setting-help": "seconds between polls of the upstream",
+      "hint": "s",
+      "default": 10.0,
+      "help": "seconds between polls",
+      "min": 0,
+      "max": 86400
+    },
     "modbus-profile": {
       "flag": "--modbus-profile",
       "env": "MODBUS_PROFILE",
       "conv": "str",
+      "setting-help": "device profile JSON (a bare name resolves in profiles/profiles/)",
+      "values": [
+        "default"
+      ],
       "hint": "<file>",
-      "default": "sun2000"
+      "value-help": {
+        "default": "the shipped sun2000 profile"
+      },
+      "default": "sun2000",
+      "help": "device profile JSON (the shared profiles/ schema)"
+    },
+    "modbus-timeout": {
+      "flag": "--modbus-timeout",
+      "env": "MODBUS_TIMEOUT",
+      "conv": "float",
+      "setting-help": "Modbus connect/read timeout in seconds",
+      "hint": "s",
+      "help": "Modbus connect/read timeout in seconds",
+      "min": 0,
+      "max": 60
     },
     "modbus-read-delay": {
       "flag": "--modbus-read-delay",
@@ -397,11 +458,13 @@
       "flag": "--no-audit-log",
       "env": "NO_AUDIT_LOG",
       "conv": "bool",
+      "setting-help": "disable the audit trail entirely",
       "values": [
         "on",
         "off"
       ],
-      "default": false
+      "default": false,
+      "help": "disable the audit trail"
     },
     "restore-on-start": {
       "flag": "--restore-on-start",
@@ -413,6 +476,7 @@
         "off"
       ],
       "default": false,
+      "help": "load the state dump when the daemon starts (needs --dump-path) — a restart serves last-known values instead of cold misses; without it the dump loads on demand",
       "restart": true
     },
     "upstream": {
@@ -421,8 +485,14 @@
     }
   },
   "show": {
-    "config": "the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***)",
-    "knobs": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes",
+    "config": {
+      "setting-help": "the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***)",
+      "hidden": true
+    },
+    "knobs": {
+      "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes",
+      "hidden": true
+    },
     "uplink": "the inverter link: session counters, per-block latency and errors",
     "uplink-sources": "the register map: one row per polled register — fc, register, the range that fetches it, source"
   },

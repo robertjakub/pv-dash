@@ -167,7 +167,7 @@ four registries; 34 names carry in all four:
 | dashboard | `auth`, `auth-token`, `client-timeout`, `config-js`, `log-queries`, `max-clients`, `max-conn-per-ip`, `metrics-listen`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
 **The shared knobs whose fields disagree** (8 of
-34 knobs, 14 drifted field(s)) — one row per
+34 knobs, 13 drifted field(s)) — one row per
 knob+field, the tools grouped by the value each carries:
 
 | knob | field | the values (the tools carrying each) |
@@ -183,7 +183,6 @@ knob+field, the tools grouped by the value each carries:
 | `metrics-client-timeout` | `default` | `5.0` (cache, inverter, dashboard) · `300.0` (scraper) |
 | `metrics-max-clients` | `env` | `METRICS_MAX_CLIENTS` (cache, scraper, dashboard) · *absent* (inverter) |
 | `metrics-max-clients` | `live` | `metrics/limits/max-clients` (cache, scraper) · `·` (inverter, dashboard) |
-| `metrics-max-clients` | `default` | `64` (cache, scraper, inverter) · `16` (dashboard) |
 | `metrics-max-conn-per-ip` | `env` | `METRICS_MAX_CONN_PER_IP` (cache, scraper, dashboard) · *absent* (inverter) |
 | `metrics-max-conn-per-ip` | `live` | `metrics/limits/max-conn-per-ip` (cache, scraper) · `·` (inverter, dashboard) |
 
@@ -233,11 +232,11 @@ texts the rows ref; the drift and must-ref gates live in
 
 | section | blocks | cache refs | scraper refs | inverter refs | dashboard refs |
 |---|---|---|---|---|---|
-| options | 43 | 43 | 37 | 40 | 38 |
+| options | 46 | 46 | 40 | 41 | 39 |
 | show | 4 | 4 | 4 | 2 | 2 |
 | commands | 10 | 10 | 10 | 8 | 8 |
 
-The exempt (intentionally per-tool) names: **57** —
+The exempt (intentionally per-tool) names: **45** —
 each with its reason in `scripts/lint_options.py`.
 
 ## The wire-text sweep — the log/audit canon

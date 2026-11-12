@@ -114,15 +114,15 @@ map, the auth schemes both directions
 |---|---|---|---|---|---|
 | `upstream` | `set modbus upstream` | settable (restart) | `HOST:PORT` | `--upstream` / `UPSTREAM` | the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502) |
 | `modbus-unit` | `set modbus unit` | settable | `ID` | `--modbus-unit` / `MODBUS_UNIT` | the Modbus unit id the session speaks |
-| `modbus-timeout` | `set modbus timeout` | settable | `s` | `--modbus-timeout` / `MODBUS_TIMEOUT` | upstream Modbus connect/read timeout in seconds |
-| `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth scheme the cache's own Modbus clients must speak: suite (the crypt handshake) or none |
+| `modbus-timeout` | `set modbus timeout` | settable | `s` | `--modbus-timeout` / `MODBUS_TIMEOUT` | Modbus connect/read timeout in seconds |
+| `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the Modbus auth scheme: suite (the crypt handshake) or none |
 | `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the suite handshake's shared key for the cache's clients, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 | `modbus-auth-upstream` | `set modbus auth-upstream` | settable | `suite\|waveshare\|none` | `--modbus-auth-upstream` / `MODBUS_UPSTREAM_AUTH` | the auth scheme the cache speaks to the upstream inverter: suite (the crypt handshake), waveshare (the gateway connection password) or none |
 | `modbus-auth-upstream-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-upstream-key` / `MODBUS_UPSTREAM_AUTH_KEY` | the key the cache presents upstream: the suite handshake's shared key (min 16 characters) or the Waveshare gateway password (`file:<path>` reads an owner-only file) *(hidden)* |
-| `modbus-interval` | `set modbus interval` | settable | `s` | `--modbus-interval` / `MODBUS_INTERVAL` | seconds between cache polls of the device |
+| `modbus-interval` | `set modbus interval` | settable | `s` | `--modbus-interval` / `MODBUS_INTERVAL` | seconds between polls of the upstream |
 | `modbus-read-delay` | `set modbus read-delay` | settable | `s` | `--modbus-read-delay` / `MODBUS_READ_DELAY` | seconds between consecutive device reads within a poll cycle |
 | `modbus-merge-gap` | `set modbus merge-gap` | settable | `registers` | `--modbus-merge-gap` / `MODBUS_MERGE_GAP` | max register gap when merging ranges into block reads; the plan rebuilds |
-| `modbus-profile` | `set modbus profile` | settable | `\<file>` | `--modbus-profile` / `MODBUS_PROFILE` | device profile JSON: the register ranges to cache (a bare name resolves in profiles/profiles/) |
+| `modbus-profile` | `set modbus profile` | settable | `\<file>` | `--modbus-profile` / `MODBUS_PROFILE` | device profile JSON (a bare name resolves in profiles/profiles/) |
 | `selection` | `set modbus selection` | settable | `\<file>\|all\|none` | `--selection` / `SELECTION` | selection JSON: which profile names to fetch ("all" = every entry, "none" = cache nothing) |
 
 ### system
@@ -167,7 +167,7 @@ the bearer token and the connection caps
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / `METRICS_SERVER` | the cache's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
+| `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / `METRICS_SERVER` | the tool's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
 | `metrics-listen` | `set metrics listen` | settable (restart) | `HOST:PORT` | `--metrics-listen` / `METRICS_LISTEN` | the metrics bind address HOST:PORT — the set records the value, the restart (request reload) applies it |
 | `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | the metrics bearer token (Authorization: Bearer) — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
@@ -185,8 +185,7 @@ limits
 
 ### audit
 
-the CACHE audit trail: the sink, the forwarding, the rotation, the kill
-switch
+the audit trail: the sink, the forwarding, the rotation, the kill switch
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
@@ -249,8 +248,8 @@ the write gates: the forwarding toggle and the register ranges
 | `show uplink` | show-only | the inverter link: session counters, per-block latency and errors |
 | `show uplink-sources` | show-only | the register map: one row per polled register — fc, register, the range that fetches it, source |
 | `show version` | show-only | the modbus-cache version |
-| `show config` | show-only | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
-| `show knobs` | show-only | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
+| `show config` | show-only (hidden) | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
+| `show knobs` | show-only (hidden) | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
 | `show write-registers-table` | show-only | the write-registers gate as its acl chain: one allow/deny line per range (the profile's rules with their descs when the knob rides profile) |
 | `show connect-acl-table` | show-only | the connect ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs |
 | `show write-acl-table` | show-only | the write ACL as its rule chain, one entry per line (the acl/connect/table report for acl/write) |

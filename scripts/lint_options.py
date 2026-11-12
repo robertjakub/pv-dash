@@ -65,11 +65,7 @@ EXEMPT = {
     ('commands', 'set'): ('help',),  # the tool's own set examples
     ('commands', 'show'): ('help',),  # the cache's report list
     ('options', 'allow-write'): ('help', 'setting-help', 'value-help',),  # the cache forwards, the fake accepts
-    ('options', 'audit'): ('setting-help',),  # the audit tag prefixes (CACHE/SCR/INV/DSH) ride the prose
-    ('options', 'audit-forward'): ('help',),  # the audit tag prefixes ride the prose
-    ('options', 'audit-log'): ('help', 'setting-help',),  # the audit tag prefixes ride the prose
     ('options', 'auth-token'): ('help', 'setting-help',),  # the endpoints differ
-    ('options', 'client-timeout'): ('help', 'setting-help',),  # Modbus vs HTTP vs keep-alive semantics
     ('options', 'connect-acl'): ('help', 'setting-help', 'value-help',),  # the mirror wording stays local (the hint/values aligned)
     ('options', 'control'): ('setting-help',),  # the cache's control plane names the target first
     ('options', 'control-log-replies'): ('env',),  # the dashboard's env twin; the daemons read none
@@ -85,26 +81,18 @@ EXEMPT = {
     ('options', 'local-time'): ('env',),  # the fake reads no env twin
     ('options', 'log-access'): ('env', 'help', 'setting-help', 'value-help',),  # connects/disconnects vs HTTP requests
     ('options', 'log-level'): ('help', 'value-help',),  # the DEBUG detail differs per tool
-    ('options', 'max-clients'): ('help', 'setting-help',),  # Modbus vs HTTP client semantics
-    ('options', 'max-conn-per-ip'): ('help', 'setting-help',),  # Modbus vs HTTP per-IP semantics
     ('options', 'max-kwp'): ('help', 'setting-help',),  # the cap vs the simulation prose (the hint aligned to kW)
     ('options', 'metrics'): ('setting-help',),  # the per-tool /metrics prose
     ('options', 'metrics-client-timeout'): ('env',),  # the fake reads no env twin
     ('options', 'metrics-listen'): ('env', 'help', 'setting-help',),  # the cache's reload note; the fake reads no env twin
     ('options', 'metrics-max-clients'): ('env',),  # the fake reads no env twin
     ('options', 'metrics-max-conn-per-ip'): ('env',),  # the fake reads no env twin
-    ('options', 'metrics-server'): ('env', 'help', 'setting-help',),  # the per-tool /metrics prose; the fake reads no env twin
-    ('options', 'metrics-token'): ('help', 'setting-help',),  # the endpoints differ
+    ('options', 'metrics-token'): ('help',),  # the dashboard's F13 bind note stays inline
+    ('options', 'metrics-server'): ('env',),  # the fake reads no env twin
     ('options', 'metrics/limits'): ('setting-help',),  # the caps prose differs per side
     ('options', 'modbus'): ('setting-help',),  # the session side differs (client upstream vs served fake)
-    ('options', 'modbus-auth'): ('help', 'setting-help', 'value-help',),  # the auth scheme's audience differs (client/upstream/server)
     ('options', 'modbus-auth-key'): ('help', 'setting-help',),  # the key's audience differs (the cache's clients vs the handshake)
-    ('options', 'modbus-interval'): ('help', 'setting-help',),  # the polling side differs
     ('options', 'modbus-merge-gap'): ('max', 'setting-help',),  # the register spaces differ (the max 100 vs 125 too)
-    ('options', 'modbus-profile'): ('help', 'setting-help', 'value-help',),  # the profile prose differs per side
-    ('options', 'modbus-timeout'): ('help', 'setting-help',),  # the timeout side differs
-    ('options', 'no-audit-log'): ('help', 'setting-help',),  # the audit tag prefixes ride the prose
-    ('options', 'restore-on-start'): ('help',),  # the daemon/fake/server noun and the env note differ
     ('options', 'system'): ('setting-help',),  # the socket's per-tool purpose
     ('options', 'upstream'): ('env', 'help', 'hint', 'setting-help',),  # the Modbus upstream vs the Prometheus URL
     ('options', 'write'): ('setting-help',),  # the write gates differ per side

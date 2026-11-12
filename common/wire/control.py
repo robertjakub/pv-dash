@@ -48,6 +48,8 @@ CLI_RECONNECT = CONTROL_WIRE_DEFAULTS['cli_reconnect']
 CLI_RECONNECT_WAIT_S = CONTROL_WIRE_DEFAULTS['cli_reconnect_wait_s']
 CLI_IDLE_TIMEOUT_S = CONTROL_WIRE_DEFAULTS['cli_idle_timeout_s']
 CLI_MAX_LINE_BYTES_S = CONTROL_WIRE_DEFAULTS['cli_max_line_bytes_s']
+CLI_MIN_HEIGHT = CONTROL_WIRE_DEFAULTS['cli_min_height']   # the tty console's row floor
+CLI_MIN_WIDTH = CONTROL_WIRE_DEFAULTS['cli_min_width']     # the tty console's column floor
 
 
 def num(text, label, what):

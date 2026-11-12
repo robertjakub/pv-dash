@@ -71,6 +71,11 @@ The sweep types — what we are sweeping:
 13. THE SECRET-SURFACE SWEEP. Every secret-marked row: the file:
     support, the placeholder render rule, the restart/dump posture —
     one matrix.
+14. THE CONSOLE-PRINT SWEEP. The cli session path (common/wire/cli.py
+    and the four bin/*-cli.py) prints through the pager's one door
+    (page_out/display) — a naked print( with an argument is the drift
+    (the bare print() breathing room is the loop's own); the finding
+    fails --check.
 
 Each sweep's section states its method, then the generated findings,
 then the editorial verdicts."""
@@ -608,6 +613,35 @@ def secrets(rows):
     return matrix, markers
 
 
+# ------------------------------------------------- the console-print sweep
+
+CONSOLE_SESSION_FILES = (
+    'common/wire/cli.py',
+    'cache/bin/modbus-cache-cli.py', 'scraper/bin/modbus-scraper-cli.py',
+    'inverter/bin/modbus-fake-cli.py', 'dashboard/bin/dashboard-cli.py',
+)
+
+
+def naked_prints():
+    """The console-print sweep: the cli session path prints through the
+    pager's one door (page_out/display) — a naked print( carrying an
+    argument (or a file=/end= keyword) in common/wire/cli.py or a
+    bin/*-cli.py is the drift; the bare print() blank (the pre-prompt
+    breathing room) is the loop's own and stays. Returns (rel, line)
+    findings; --check fails on any."""
+    out = []
+    for rel in CONSOLE_SESSION_FILES:
+        try:
+            tree = ast.parse(open(os.path.join(REPO, rel), encoding='utf-8').read(), rel)
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+                    and node.func.id == 'print' and (node.args or node.keywords):
+                out.append((rel, node.lineno))
+    return out
+
+
 # ------------------------------------------------------ the doc emitter
 
 CODE_HEAD = """\
@@ -711,6 +745,15 @@ merge, the tools column carries the coverage (a knob missing from a
 tool is the visible gap). The secret-posture markers (`parse_secret`,
 the `SECRET_REMOVED` placeholder, the `file:` scheme) across the
 tree."""
+
+CONSOLEPRINT_HEAD = """\
+## The console-print sweep — the one pager door
+
+The cli session path (common/wire/cli.py + the four bin/*-cli.py)
+prints through `page_out`/`display` only: a naked `print(` with an
+argument is the drift (the bare `print()` pre-prompt blank is the
+loop's own). `--check` fails on any finding — the door holds or the
+wave explains itself."""
 
 SURFACE_CENSUS = """\
 The listener census (ten listeners):
@@ -1096,6 +1139,8 @@ def emit():
     ap('    registries; the shipped examples re-parsed.')
     ap('13. **The secret-surface sweep** — the secret rows and the')
     ap('    posture markers.')
+    ap('14. **The console-print sweep** — the cli session path prints')
+    ap('    through the one pager door; a naked print( fails --check.')
     ap('')
 
     # ---- 1. the code sweep
@@ -1467,6 +1512,23 @@ def emit():
     ap(SECRET_FINDINGS)
     ap('')
 
+    # ---- 14. the console-print sweep
+    naked = naked_prints()
+    ap(CONSOLEPRINT_HEAD)
+    ap('')
+    if naked:
+        ap('**The naked print(s)** — the door leaked:')
+        ap('')
+        for rel, line in naked:
+            ap(f'- `{rel}:{line}`')
+        ap('')
+    else:
+        ap(f'The door holds: {len(CONSOLE_SESSION_FILES)} session-path files,')
+        ap('every print through `page_out`/`display` (the bare pre-prompt')
+        ap('blinks excepted).')
+        ap('')
+    ap('')
+
     # ---- the remediation TODOs
     ap(REMEDIATION)
     ap('')
@@ -1490,6 +1552,7 @@ def main():
             cur = None
         stale = cur != doc
         grown = seed_guard(seeds)
+        naked = naked_prints()
         if stale:
             print('family-drift.md is stale (scripts/family_drift.py regenerates)')
         if grown:
@@ -1497,9 +1560,14 @@ def main():
             for s in grown[:10]:
                 print(f"  {s['id']}  ({s['kind']}, suggested: {s['suite']})")
             print('a knob/command/canon phrase shipped without its test — write the tests, then regenerate the ledger')
-        if stale or grown:
+        if naked:
+            print('the console-print sweep: %d naked print(s) in the cli session path:' % len(naked))
+            for rel, line in naked:
+                print(f'  {rel}:{line}')
+            print('the session prints through page_out/display — see the wave doc')
+        if stale or grown or naked:
             raise SystemExit(1)
-        print('family-drift.md is current; the seed ledger knows every open promise')
+        print('family-drift.md is current; the seed ledger knows every open promise; the pager door holds')
         return
     with open(DOC, 'w', encoding='utf-8') as f:
         f.write(doc)

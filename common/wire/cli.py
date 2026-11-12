@@ -2,9 +2,12 @@
 """The console-style cli client, one implementation for the family: the
 signed wire session, the reconnect cycle, the keepalive thread, the
 readline TAB completion and the typed-command loop with the confirm guards.
-The per-tool bins keep their prose and their registry wiring — the pools,
-the candidates ladder, the welcome greeting and (for the fake) the
-verb-first loop — passed here as a spec dict to run_cli(). Stdlib only."""
+Every console render prints through the one pager door (page_out) — long
+replies pause at a page (the more(1) keys), piped output prints whole,
+and a too-small terminal refuses the tty edition. The per-tool bins keep
+their prose and their registry wiring — the pools, the candidates ladder,
+the welcome greeting and (for the fake) the verb-first loop — passed here
+as a spec dict to run_cli(). Stdlib only."""
 import argparse
 import getpass
 import json
@@ -20,17 +23,29 @@ try:
 except ImportError:
     readline = None
 
+try:
+    import termios
+    import tty
+except ImportError:   # no termios: the pause falls back to line input
+    termios = None
+    tty = None
+
 from common.runtime.audit import AUDIT_FORWARD_FORMATS, AuditLog, audit_quote
 from common.settings.config import parse_secret, resolve_target
 from common.render.human import secs
 from common.settings.options import command_path_pool, match_setting_path, render_word_sections, setting_path_pool
 from common.render.texts import T
+from common.wire.control import CLI_MIN_HEIGHT, CLI_MIN_WIDTH
 from common.wire.wiresec import sign_request, verify_reply
 
 KEEPALIVE_ENV = 'CLI_KEEPALIVE'   # ping interval in seconds; 0 = off
+PAGE_ENV = 'CLI_PAGE_SIZE'        # lines per page; 0 = off, unset/blank = auto
+MORE_SUFFIX = ' ...'              # the screen cap's tail marker (a space then three dots)
 
 _SPEC = None   # the tool's specifics — set by run_cli() before anything reads it
 _keepalive_s = 0.0   # the parsed CLI_KEEPALIVE interval — run_cli() sets it before session() runs
+_page_size = None    # the pager: None = auto (the terminal height), 0 = off, N = fixed —
+                     # set by run_cli() (flag > env) and overridden by the session's `page` command
 
 
 def translate(cmd, spellings=None):
@@ -73,13 +88,18 @@ def pools(commands, internal, hidden, spellings, nodes, commands_help,
     paths — the words TAB offers and `?` lists; the cli translates them to
     the flat registry names when it sends — a not-yet-live knob never
     lists, the hidden and internal rows never list) and the welcome prints
-    the family banner. The dump-gated rows (`request dump`, `request
-    restore` and the `dump-interval` setting, plus the caller's dump_gate
-    extras — the cache's `request/dump/with-cache`) list only while a dump
-    path is configured: the welcome probes `show dump-path` first (there
-    is nothing to dump into otherwise — the wire would answer the clean
-    err). Returns (pool_names, describe_word, command_pool, setting_pool,
-    welcome)."""
+    the family banner. The session-local `page` command joins the pool as
+    the cli-side pin row (beside quit/ping — described, listed, completed;
+    never a registry row: the wire would lie). The dump-gated rows (`request
+    dump`, `request restore` and the `dump-interval` setting, plus the
+    caller's dump_gate extras — the cache's `request/dump/with-cache`) list
+    only while a dump path is configured: the welcome probes `show
+    dump-path` first (there is nothing to dump into otherwise — the wire
+    would answer the clean err). Returns (pool_names, describe_word,
+    command_pool, setting_pool, welcome)."""
+    commands = tuple(commands) + ('page',)   # the local pin row: the completer and the
+    commands_help = dict(commands_help)      # listing know it, the wire never does
+    commands_help['page'] = T('cli.page_help')
     describe_word = make_describe_word(nodes, commands_help, spellings)
     state = {'dump': False}
     gated = ('request/dump', 'request/restore') + tuple(dump_gate)
@@ -110,8 +130,8 @@ def pools(commands, internal, hidden, spellings, nodes, commands_help,
         hint."""
         reply = exchange(sock, wire('show dump-path'))
         state['dump'] = bool(reply) and reply[3:].split('=', 1)[-1].strip() not in ('', 'off', 'none')
-        print(T('banner.welcome') % banner_name)
-        print(T('banner.hint'))
+        page_out(T('banner.welcome') % banner_name)
+        page_out(T('banner.hint'))
 
     return describe_word, command_pool, setting_pool, welcome
 
@@ -150,7 +170,7 @@ def daemon_exit_notice(text):
     except (ValueError, IndexError, AttributeError):
         pass
     m = re.search(r'daemon-exit: (.*)', raw)
-    print(T('cli.daemon_exit') % (m.group(1).strip() if m else T('cli.daemon_exit_fallback')))
+    page_out(T('cli.daemon_exit') % (m.group(1).strip() if m else T('cli.daemon_exit_fallback')))
     sys.stdout.flush()
 
 
@@ -241,6 +261,137 @@ def keepalive_env(default_s):
         return float(raw)
     except ValueError:
         raise SystemExit(T('cli.keepalive_invalid') % raw)
+
+
+def page_env():
+    """The CLI_PAGE_SIZE override, parsed once at startup: unset or blank
+    rides auto (the terminal height), a non-negative integer is the fixed
+    page size (0 = off), anything else is the family's one-line refusal —
+    SystemExit before the connect, never the bare int() traceback."""
+    raw = os.environ.get(PAGE_ENV, '')
+    if not raw.strip():
+        return None
+    if raw.strip().isdigit():
+        return int(raw)
+    raise SystemExit(T('cli.page_invalid') % raw)
+
+
+def terminal_size():
+    """The TRUE terminal size (columns, lines): os.get_terminal_size() on
+    the stdout fd, the safe (24, 80) fallback when the ioctl fails. No
+    environment in the path — the startup floors and the auto page size
+    measure the terminal itself (ruling 10: no env, knob or flag says
+    otherwise)."""
+    try:
+        return os.get_terminal_size(sys.__stdout__.fileno())
+    except (OSError, ValueError, AttributeError):
+        return os.terminal_size((24, 80))
+
+
+def cap_line(line, width):
+    """The screen cap: a line wider than the terminal shortens with
+    ' ...' on the end — the tail lost on screen, still on the wire and in
+    the audit. A width too narrow to carry the suffix prints the line
+    as-is (unreachable above the cli_min_width floor, kept for the
+    fallback shape). Counted in characters: the family's console texts
+    are single-width."""
+    if width < len(MORE_SUFFIX) + 1 or len(line) <= width:
+        return line
+    return line[:width - len(MORE_SUFFIX)] + MORE_SUFFIX
+
+
+def page_plan(total, size):
+    """The pager's pure arithmetic — the render plan for `total` lines at
+    `size` lines per page: one (start, stop, more) per page, more=True
+    marking the pause after it. total <= size is one page with no pause,
+    the final page never pauses, size <= 0 (off) or no lines never pause.
+    page_out walks the same shape live (a return key re-steps the next
+    page to one line); the regtest pins this form with no tty."""
+    plan = []
+    idx = 0
+    while 0 < size and idx < total:
+        stop = min(idx + size, total)
+        plan.append((idx, stop, stop < total))
+        idx = stop
+    return plan
+
+
+def page_out(text, *, pause='gate', stream='out'):
+    """The console's ONE output door — every session-path render prints
+    through here. The gate: stdin AND stdout terminals. Off a terminal
+    (a pipe, a script, a captured run) the text prints whole, byte-for-byte
+    as before, and no pause can ever fire. On a terminal every line wears
+    the screen cap (the ' ...' shortening) and a text taller than the page
+    size pauses: space = the next page, return = one more line, q = stop
+    the rest (the command already ran — only the rendering stops). The
+    width is re-measured per call, so a resized window is honored; the
+    line count stays logical (a truncated line counts once).
+    pause='never' routes but exempts the pause — the TAB listing (readline
+    owns the terminal) and the stderr diagnostics (a dead session must not
+    prompt). stream='err' keeps the diagnostics on stderr. The prompts
+    (input(), the confirm question) and the pre-prompt blank line are not
+    output and stay outside the door."""
+    out = sys.stderr if stream == 'err' else sys.stdout
+    lines = text.split('\n')
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        for ln in lines:
+            out.write(ln + '\n')
+        return
+    width = terminal_size().columns
+    if width >= len(MORE_SUFFIX) + 1:
+        lines = [cap_line(ln, width) for ln in lines]
+    if _page_size is not None and _page_size == 0:
+        size = 0                       # the session's page 0: the door stays, no pause
+    elif _page_size is not None:
+        size = _page_size              # a fixed page (flag > env > the page command)
+    else:
+        size = max(6, terminal_size().lines - 2)   # auto: the pause line + the returning prompt
+    if pause == 'never' or size == 0 or len(lines) <= size:
+        for ln in lines:
+            out.write(ln + '\n')
+        return
+    idx, step = 0, size
+    while True:
+        for ln in lines[idx:idx + step]:
+            out.write(ln + '\n')
+        idx += step
+        if idx >= len(lines):
+            return
+        out.write(T('cli.more_status') % (idx, len(lines)) + '\n')
+        out.flush()
+        key = _read_key()
+        if key == 'q':
+            return
+        step = 1 if key in ('\r', '\n') else size   # return = one more line, space/other = the page
+
+
+def _read_key():
+    """One key at the pause, the terminal in cbreak: ' ' (and any other
+    key) = the next page, return = one more line, q = stop the rest.
+    ^C at the pause stops the rest too — it must NOT kill the session the
+    way ^C at input() does. EOF = the same stop. termios restored before
+    the next prompt. No termios: the line-input fallback (an empty line =
+    the next page, q = the rest)."""
+    if termios is None:
+        try:
+            line = input()
+        except (EOFError, KeyboardInterrupt):
+            return 'q'
+        return 'q' if line.strip().lower() == 'q' else ' '
+    fd = sys.stdin.fileno()
+    saved = None
+    try:
+        saved = termios.tcgetattr(fd)
+        tty.setcbreak(fd)
+        ch = sys.stdin.read(1)
+    except KeyboardInterrupt:
+        return 'q'
+    except (OSError, ValueError):
+        return 'q'
+    finally:
+        if saved is not None:
+            termios.tcsetattr(fd, termios.TCSADRAIN, saved)
+    return ch if ch in ('\r', '\n') else (ch or 'q')
 
 
 def keepalive(sock, interval, audit=None):
@@ -381,8 +532,9 @@ def complete(text, state):
             _last_listed = buf
             rows = sectioned_rows(sections, desc, hint)
             # the list, a blank line, then the prompt + line again — editline
-            # does NOT redraw after the completer, so we do it ourselves
-            print('\n' + '\n'.join(rows) + '\n')
+            # does NOT redraw after the completer, so we do it ourselves;
+            # pause='never': readline owns the terminal mid-completion
+            page_out('\n' + '\n'.join(rows) + '\n', pause='never')
             sys.stdout.write(_prompt + buf)
             sys.stdout.flush()
         return None
@@ -400,10 +552,9 @@ def print_options(buf):
     matches, hint, desc, sections = candidates(buf)
     rows = sectioned_rows(sections, desc, hint)
     if not rows:
-        print(T('cli.invalid_input'))
+        page_out(T('cli.invalid_input'))
         return
-    for row in rows:
-        print(row)
+    page_out('\n'.join(rows))
 
 
 def connect_once(addr, is_unix, timeout):
@@ -419,25 +570,25 @@ def reconnect(addr, is_unix, args, audit=None):
     immediately, --reconnect-wait seconds between the tries — every
     attempt audited. Returns the new socket, or None when the tries run
     out."""
-    print(T('cli.reconnecting') % args.reconnect)
+    page_out(T('cli.reconnecting') % args.reconnect)
     for attempt in range(1, args.reconnect + 1):
         try:
             s = connect_once(addr, is_unix, args.timeout)
         except OSError as e:
-            print(T('cli.reconnect_attempt_failed') % (attempt, e))
+            page_out(T('cli.reconnect_attempt_failed') % (attempt, e))
             if audit:
                 audit.event('RECONNECT', 'attempt=%d total=%d status=failed error=%s'
                             % (attempt, args.reconnect, audit_quote(e)))
             if attempt < args.reconnect:
-                print(T('cli.reconnecting_in')
-                      % (secs(args.reconnect_wait), attempt + 1, args.reconnect))
+                page_out(T('cli.reconnecting_in')
+                         % (secs(args.reconnect_wait), attempt + 1, args.reconnect))
                 time.sleep(args.reconnect_wait)
             continue
         if audit:
             audit.event('RECONNECT', 'attempt=%d total=%d status=ok' % (attempt, args.reconnect))
-        print(T('cli.reconnected') % _SPEC['label'])
+        page_out(T('cli.reconnected') % _SPEC['label'])
         return s
-    print(T('cli.reconnect_failed'))
+    page_out(T('cli.reconnect_failed'))
     if audit:
         audit.event('RECONNECT', 'total=%d status=gave-up' % args.reconnect)
     return None
@@ -456,7 +607,7 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
                 if token and not is_unix:
                     reply = exchange(sock, json.dumps({'cmd': 'auth', 'token': token}, ensure_ascii=False))
                     if not reply or not reply.startswith('ok'):
-                        print(T('shared.auth_failed') % (reply or 'no reply'), file=sys.stderr)
+                        page_out(T('shared.auth_failed') % (reply or 'no reply'), stream='err', pause='never')
                         return 1
                     _require_reply_mac = True   # the handshake holds: unsigned replies are fatal
                 if sys.stdin.isatty():
@@ -477,7 +628,7 @@ def session(sock, prompt, audit=None, token=None, is_unix=False, addr=None, args
                 except OSError:
                     pass
                 if not args.reconnect:
-                    print(T('cli.connection_lost'), file=sys.stderr)
+                    page_out(T('cli.connection_lost'), stream='err', pause='never')
                     return 1
                 sock = reconnect(addr, is_unix, args, audit)
                 if sock is None:
@@ -514,15 +665,15 @@ def display(text):
     if first == 'ok':
         return                      # quiet success: no message, no marker
     if first.startswith('ok '):
-        print('\n'.join([first.split(' ', 1)[1]] + rest))
+        page_out('\n'.join([first.split(' ', 1)[1]] + rest))
     elif first.startswith('err '):
-        print('\n'.join([T('shared.error_face') % first.split(' ', 1)[1]] + rest))
+        page_out('\n'.join([T('shared.error_face') % first.split(' ', 1)[1]] + rest))
     elif first.startswith('note '):
-        print('\n'.join([T('shared.plain_face') % first.split(' ', 1)[1]] + rest))
+        page_out('\n'.join([T('shared.plain_face') % first.split(' ', 1)[1]] + rest))
     elif first.startswith('bye'):
-        print('\n'.join([T('shared.plain_face') % first] + rest))
+        page_out('\n'.join([T('shared.plain_face') % first] + rest))
     else:
-        print(text)                 # an unheaded reply (the fake's own shapes) prints as-is
+        page_out(text)                 # an unheaded reply (the fake's own shapes) prints as-is
 
 
 def typed_loop(sock, prompt, audit=None):
@@ -530,7 +681,10 @@ def typed_loop(sock, prompt, audit=None):
     ConnectionLost) surfaces out of the loop so the session can run its
     reconnect cycle; the clean exits return. The tool's spec tunes the
     renders: silent_ok(low) replies confirm silently, render(low, reply)
-    prints a special table itself."""
+    prints a special table itself. Every reply prints through the pager
+    door; the local `page` command tunes the session's page size here —
+    never sent."""
+    global _page_size
     while True:
         try:
             print()                     # breathing room: every prompt on a fresh line
@@ -549,7 +703,29 @@ def typed_loop(sock, prompt, audit=None):
                 audit.command(cmd, 'local')
             return
         if low == 'ping':               # local: the wire pings belong to the keepalive thread
-            print(T('cli.pong'))
+            page_out(T('cli.pong'))
+            continue
+        if low == 'page' or low.startswith('page '):
+            # the session-local pager command — intercepted BEFORE the wire:
+            # the daemon never learns of it, the registries have no row
+            if audit:
+                audit.command(cmd, 'local')
+            arg = cmd[5:].strip() if len(cmd) > 5 else ''
+            if not arg:
+                pass                    # bare `page`: the state line below
+            elif arg.lower() == 'auto':
+                _page_size = None       # follow the terminal again
+            elif arg.isdigit():
+                _page_size = int(arg)   # 0 = off, N = fixed
+            else:
+                display('err ' + T('cli.page_bad') % arg)
+                continue
+            if _page_size is None:
+                page_out(T('cli.page_state') % ('%d (auto)' % max(6, terminal_size().lines - 2)))
+            elif _page_size == 0:
+                page_out(T('cli.page_state') % '%d (off)' % _page_size)
+            else:
+                page_out(T('cli.page_state') % str(_page_size))
             continue
         if low in ('?', 'help'):
             if audit:
@@ -579,9 +755,9 @@ def typed_loop(sock, prompt, audit=None):
             raise ConnectionLost(T('cli.closed_without_bye'))
         if low.startswith(('set ', 'clear ')):
             if reply.startswith('note ') or 'restart required' in reply:
-                print(T('shared.plain_face') % reply.split(' ', 1)[1])   # the startup-only knob: the note type, or the refused secret's fail — a note face, not a verdict
+                page_out(T('shared.plain_face') % reply.split(' ', 1)[1])   # the startup-only knob: the note type, or the refused secret's fail — a note face, not a verdict
             elif reply.startswith('ok'):
-                print(T('cli.changed'))   # the one ok face keeping the marker
+                page_out(T('cli.changed'))   # the one ok face keeping the marker
             else:
                 display(reply)
         elif _SPEC['silent_ok'] and _SPEC['silent_ok'](low) and reply.startswith('ok'):
@@ -592,13 +768,13 @@ def typed_loop(sock, prompt, audit=None):
             body = reply.split(' ', 1)[1]
             head, _, rest = body.partition('\n')
             if rest and ' ' not in head and '=' not in head:
-                print(rest)             # the report rows (the command already said the name)
+                page_out(rest)             # the report rows (the command already said the name)
             elif '\n' not in body and '=' in body:
-                print(body.split('=', 1)[1])   # show <setting>: the bare value
+                page_out(body.split('=', 1)[1])   # show <setting>: the bare value
             else:
-                print(body)
+                page_out(body)
         elif low == 'inspect' and reply.startswith('ok inspect\n'):
-            print('\n'.join(reply.splitlines()[1:]))   # the dump itself is the answer
+            page_out('\n'.join(reply.splitlines()[1:]))   # the dump itself is the answer
         else:
             display(reply)
 
@@ -609,10 +785,10 @@ def confirm_shutdown(sock):
         ans = input(T('cli.confirm_shutdown'))
     except (EOFError, KeyboardInterrupt):
         print()
-        print(T('cli.aborted'))
+        page_out(T('cli.aborted'))
         return False
     if ans.strip().lower() not in ('', 'y', 'yes'):
-        print(T('cli.aborted'))
+        page_out(T('cli.aborted'))
         return False
     try:
         reply = exchange(sock, wire('shutdown'))
@@ -675,7 +851,7 @@ def run_cli(spec):
     """The whole cli ladder: the parser (the tool's name, socket, examples),
     the man page, the audit trail, the token parse, the connect, the CONNECT
     audit, the readline bootstrap and the session with its reconnect cycle."""
-    global _SPEC, _keepalive_s
+    global _SPEC, _keepalive_s, _page_size
     _SPEC = spec
     p = argparse.ArgumentParser(description='console-style CLI for the %s (TCP or unix socket).' % spec['daemon_label'])
     p.add_argument('--control-port', default=None, help='control server target: unix socket path or TCP port on 127.0.0.1, auto-detected (env CTL when unset) — same flag as %s' % spec['self_note'])
@@ -691,6 +867,8 @@ def run_cli(spec):
     p.add_argument('--audit-max-mb', type=float, default=spec['audit_max_mb'], help='rotate the audit log at this size, 0 = off')
     p.add_argument('--audit-files', type=int, default=spec['audit_files'], help='rotated audit backups to keep')
     p.add_argument('--no-audit-log', action='store_true', help='disable the audit trail')
+    p.add_argument('--page-size', type=int, default=None, metavar='N',
+                   help='console pager: N lines per page (0 = off, empty = the terminal height; env CLI_PAGE_SIZE)')
     p.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (%s --man | man -l -)' % spec['cli_name'])
     args = p.parse_args()
     if args.man:
@@ -698,6 +876,18 @@ def run_cli(spec):
         raise SystemExit(0)
 
     _keepalive_s = keepalive_env(spec['keepalive_s'])
+    _page_size = args.page_size if args.page_size is not None else page_env()
+
+    # the tty edition's startup floors: a terminal too small to hold a
+    # console refuses before the connect — one line, rc 1, never a
+    # traceback. Piped/scripted runs never check; the terminal's own size
+    # is the only say (no env, knob or flag sets or waives a floor).
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        size = terminal_size()
+        if size.lines < CLI_MIN_HEIGHT:
+            raise SystemExit(T('cli.min_height') % (size.lines, CLI_MIN_HEIGHT))
+        if size.columns < CLI_MIN_WIDTH:
+            raise SystemExit(T('cli.min_width') % (size.columns, CLI_MIN_WIDTH))
 
     token = args.control_token or os.environ.get('CONTROL_TOKEN')
     token = parse_secret(token, 'control-token')   # the inline form may be file:<path> — the same loader
@@ -720,7 +910,7 @@ def run_cli(spec):
     try:
         s = connect_once(addr, isinstance(addr, str), args.timeout)
     except OSError as e:
-        print(T('shared.cannot_reach') % (label, e), file=sys.stderr)
+        page_out(T('shared.cannot_reach') % (label, e), stream='err', pause='never')
         raise SystemExit(1)
     if audit:
         audit.event('CONNECT', 'target=%s user=%s' % (audit_quote(label), getpass.getuser()))

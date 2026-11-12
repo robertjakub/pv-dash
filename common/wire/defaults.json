@@ -4,5 +4,7 @@
   "cli_reconnect": 3,
   "cli_reconnect_wait_s": 10.0,
   "cli_idle_timeout_s": 300,
-  "cli_max_line_bytes_s": 1048576
+  "cli_max_line_bytes_s": 1048576,
+  "cli_min_height": 20,
+  "cli_min_width": 64
 }

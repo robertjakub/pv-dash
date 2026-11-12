@@ -43,7 +43,7 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 - **the registry texts wear one canon** — the family-wide option texts
   (`setting-help`, `help`, `value-help`, `hint`, `values`, and the wiring
-  that agrees: `flag`, `env`, `min`/`max`, the marks) move to
+  that agrees: `flag`, `env`, `conv`, `min`/`max`, the marks) move to
   `shared/options-help.json`; a registry row references its block with
   `"shared": "<name>"` and the loader folds the block under the row's own
   fields (the inline field wins — the per-tool override). One edit updates

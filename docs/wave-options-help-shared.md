@@ -349,6 +349,12 @@ updated with the canon); `python3 scripts/gen_man.py` + `mandoc -Tlint` clean;
 
 ## The execution notes
 
+- `conv` rides the canon too (the user's Nov 12 close-out call): 37 of the
+  41 option blocks carry it — the foldable-but-ungated tier in action, the
+  gate never compares it, the byte-equal inline conv folds away. The env
+  faces that read the raw JSON's conv (gen_examples' sample values) resolve
+  the refs through the loader's own fold — the raw-reader enumeration grew
+  by one.
 - The upstream `values` gap resolved to EXEMPT: the scraper's `[":5502"]`
   list is its own (a port-shorthand the other tools' semantics do not
   share), the cache/dashboard rows carry no `values` (a gap does not

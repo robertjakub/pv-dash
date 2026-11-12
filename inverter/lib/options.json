@@ -224,9 +224,9 @@
     { "name": "request-restore", "shared": "request-restore", "live": "request/restore",
       "help": "re-apply a state dump's overrides (when the fake has a dump path)" },
     { "name": "reset", "help": "clear all pins + the write overlay" },
-    { "name": "set", "help": "configure a setting (set soc auto, set scenario noon)" },
+    { "name": "set", "shared": "set" },
     { "name": "show", "shared": "show" },
     { "name": "shutdown", "shared": "shutdown" },
-    { "name": "clear", "help": "restore a setting to its configured value (clear pv, clear seed)" }
+    { "name": "clear", "shared": "clear" }
   ]
 }

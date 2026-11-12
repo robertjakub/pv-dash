@@ -73,10 +73,10 @@ The kinds — every row of the tables below carries one:
 | `request reload-config` | command | re-read the config file (the values re-apply over the running machines) |
 | `request restore` | command (hidden) | re-apply a state dump's overrides (when the fake has a dump path) |
 | `reset` | command | clear all pins + the write overlay |
-| `set` | command | configure a setting (set soc auto, set scenario noon) |
+| `set` | command | configure a setting live: set \<setting> \<value> |
 | `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the server (asks to confirm) |
-| `clear` | command | restore a setting to its configured value (clear pv, clear seed) |
+| `clear` | command | restore a setting to its configured value: clear \<setting> |
 | `set register \<addr> \<value>` | command | the Modbus write emulation: plant a register value in the write overlay — reads answer it, reset clears it |
 | `set coil \<addr> \<0\|1>` | command | the write emulation: plant a coil value (the coil space, FC1/FC5/FC15 see it, reset clears it) |
 | `set discrete \<addr> \<0\|1>` | command | the write emulation: plant a discrete-input value (the discrete space, FC2 sees it, reset clears it) |

@@ -168,8 +168,8 @@ they name the wire.
   `scraper:161`). Outcome: `modbus/interval` in both (the knob polls
   the device on both tools).
 - **near-miss console paths** `[scraper]` `[inverter]` — `max-kwp`
-  consoles as `caps/max-pv` on the scraper and bare `max-kwp` on the
-  inverter (hint `KW` vs `kW`, `scraper/lib/options.json:47` vs
+  consoles as `modbus/caps/max-pv` on the scraper and bare `max-kwp` on
+  the inverter (hint `KW` vs `kW`, `scraper/lib/options.json:57` vs
   `inverter:57`); `connect-acl` consoles as `acl/connect` on the cache
   and bare on the inverter, whose help also omits the `file:<path>`
   form its sibling supports (`cache/lib/options.json:80` vs

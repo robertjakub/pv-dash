@@ -37,6 +37,20 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Changed
 
+- **scraper** — **the sanity caps re-home under modbus**: the live paths
+  re-key `metrics/caps/max-pv` -> `modbus/caps/max-pv` and
+  `metrics/caps/max-grid` -> `modbus/caps/max-grid` (`set modbus caps
+  max-pv 7`, `show modbus caps` walks the node — the `metrics caps`
+  spelling answers unknown setting; the flat names `max-kwp`/
+  `max-grid-kw` and the flags/env/config keys stay) — the caps police
+  the polled readings (a breach fails the poll, /metrics answers 503),
+  so the poll side owns them; the re-home retires the dead "the display
+  caps the percentages clamp to" prose (nothing clamps — the caps always
+  rejected readings), the `modbus/caps` node lands with honest help and
+  the metrics node's help drops the display caps. The README's conf
+  example + set/clear row, the man prose and the generated surfaces
+  follow.
+
 - **cache, scraper, fake inverter — BREAKING: the suite-auth knobs rename**
   (the flag/env twins follow the knob names, the family's `--modbus-*`
   shape): `auth-key` → `modbus-auth-key` (`--auth-key`/`AUTH_KEY` →

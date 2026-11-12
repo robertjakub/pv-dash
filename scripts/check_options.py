@@ -341,9 +341,11 @@ def check_tool(tool):
         # `settings` is the freeform env-file attrset (its keys are the bare
         # env names, unvalidated); the secrets keep the *File credential
         # options only (the inline forms are tombstones the module system
-        # refuses); the survivors are the structural options. The
+        # refuses); the survivors are the structural options — the
+        # enable/package/settings/openFirewall core plus the account pair
+        # user/group (the DynamicUser default, pvsuite when named). The
         # NIX_NAMES renames died with the knob options.
-        want = {'enable', 'package', 'openFirewall', 'settings'}
+        want = {'enable', 'package', 'openFirewall', 'settings', 'user', 'group'}
         # the secret rows ride *File credentials — except the two marks that
         # are not secrets in the credential sense (the dashboard's static
         # dir and the public front-end config)

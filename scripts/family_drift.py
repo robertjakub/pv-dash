@@ -45,10 +45,11 @@ The sweep types — what we are sweeping:
    groups, the README skeletons. Catches a section that grew on one
    tool and not the others.
 7. THE NIXOS-PARITY SWEEP. The structural check: the modules declare
-   exactly enable/package/openFirewall/settings (+ the dashboard's
-   solarConfig/staticDir) and every registry secret row's *File
-   credential option — the knob options are gone (the settings wave:
-   the freeform env-file attrset, the LoadCredential secrets).
+   exactly enable/package/openFirewall/settings (+ the account pair
+   user/group and the dashboard's solarConfig/staticDir) and every
+   registry secret row's *File credential option — the knob options
+   are gone (the settings wave: the freeform env-file attrset, the
+   LoadCredential secrets).
 8. THE DOCKER/ENV SWEEP. The compose files, the env files and the
    entrypoints text-scanned for the env-var names and the published
    ports, matched against the registries' env twins and the default
@@ -1324,9 +1325,10 @@ def emit():
         ap(f'| {t} | {", ".join(f"`{n}`" for n in sorted(nix[t])) if nix[t] else "no module.nix"} |')
     ap('')
     ap('**The structural contract** — exactly `enable`/`package`/')
-    ap('`openFirewall`/`settings`, every registry secret row\'s `*File`,')
-    ap("and the dashboard's `solarConfig`/`staticDir` (the removed knob")
-    ap('options and inline secrets are tombstones the module system refuses):')
+    ap('`openFirewall`/`settings` + the account pair `user`/`group`, every')
+    ap("registry secret row's `*File`, and the dashboard's")
+    ap('`solarConfig`/`staticDir` (the removed knob options and inline')
+    ap('secrets are tombstones the module system refuses):')
     ap('')
     for t in TOOLS:
         if nix[t]:
@@ -1338,7 +1340,7 @@ def emit():
                 return parts[0] + ''.join(p.capitalize() for p in parts[1:]) + 'File'
 
             reg_names = {norm(n) for n in rows[t]}
-            want = {'enable', 'package', 'openFirewall', 'settings'}
+            want = {'enable', 'package', 'openFirewall', 'settings', 'user', 'group'}
             # the secret-marked rows ride *File credentials — except the two
             # marks that are not secrets in the credential sense (the
             # dashboard's static dir and the public front-end config)

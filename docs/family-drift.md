@@ -400,15 +400,16 @@ type/default left to drift; the check is structural.
 
 | tool | module options declared |
 |---|---|
-| cache | `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `metricsTokenFile`, `modbusAuthKeyFile`, `modbusAuthUpstreamKeyFile`, `openFirewall`, `package`, `settings` |
-| scraper | `authTokenFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `modbusAuthKeyFile`, `openFirewall`, `package`, `settings` |
+| cache | `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `group`, `metricsTokenFile`, `modbusAuthKeyFile`, `modbusAuthUpstreamKeyFile`, `openFirewall`, `package`, `settings`, `user` |
+| scraper | `authTokenFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `group`, `modbusAuthKeyFile`, `openFirewall`, `package`, `settings`, `user` |
 | inverter | no module.nix |
-| dashboard | `authTokenFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `metricsTokenFile`, `openFirewall`, `package`, `settings`, `solarConfig`, `staticDir` |
+| dashboard | `authTokenFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `group`, `metricsTokenFile`, `openFirewall`, `package`, `settings`, `solarConfig`, `staticDir`, `user` |
 
 **The structural contract** — exactly `enable`/`package`/
-`openFirewall`/`settings`, every registry secret row's `*File`,
-and the dashboard's `solarConfig`/`staticDir` (the removed knob
-options and inline secrets are tombstones the module system refuses):
+`openFirewall`/`settings` + the account pair `user`/`group`, every
+registry secret row's `*File`, and the dashboard's
+`solarConfig`/`staticDir` (the removed knob options and inline
+secrets are tombstones the module system refuses):
 
 - cache: exactly the structural contract
 - scraper: exactly the structural contract

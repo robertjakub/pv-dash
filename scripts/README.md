@@ -39,6 +39,16 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   the default). The census's one home — the registries are the truth,
   this is the cross-tool view
   on demand.
+- **`compare_options.py`** — the knobs compared across the tools: the
+  rows grouped by their flat name, the four identity fields checked
+  (the flat name, the live path, the env twin, the flag) — identical
+  in every tool that carries the knob = the common candidates (the
+  shared-definition list); any drift prints as a per-tool table, one
+  line per field, `*` on the drifted values, the drifting fields
+  named on the knob's header line; the single-tool knobs and the
+  near-misses (one live path answering to several flat names, an
+  alias only some tools carry) follow as notes. `--tool` names the
+  tools comma separated with `all` the default.
 
 ## The checks (the shipped artifacts)
 

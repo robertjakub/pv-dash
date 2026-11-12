@@ -5,6 +5,24 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The console-pager wave put every cli render through one door
+(common/wire/cli.py's page_out): a reply taller than the screen pauses at a
+page (the cbreak `-- more --` reader, the more(1) keys — space/return/q),
+`--page-size`/`CLI_PAGE_SIZE` set the size, the session-local `page` command
+retunes it live (never sent — no registry row, audited local), a line wider
+than the screen shortens with ` ...` (the wire keeps the tail), and a
+terminal under 20 rows/64 columns refuses the tty edition before the connect
+(cli_min_height/cli_min_width in wire/defaults.json; piped runs print
+byte-for-byte and never check). The one-client wave retired the `-ctl` bin
+into `modbus-cache-cli`: run_client's three modes by invocation shape (words
+= one-shot with the raw verdict head, rc 0/1/2; piped stdin = batch; bare
+tty = the console), the HEALTHCHECK and the README/nix spellings follow.
+The regtest carries the pager pins (the pure arithmetic + the pty smoke: the
+pause, the live page command, the floor refusals, the cap, the daemon audit
+proving page never rode the wire) and the batch/console re-pins; the
+console-only furniture (the confirm guard, the idle keepalive, the local ?
+shapes) rides the pty helpers in tests/harness.py.
+
 The NixOS settings wave inverted the module (nixos/modules/
 modbus-cache.nix): the ~40 dedicated knob options are gone — one freeform
 `settings` attrset renders verbatim `NAME=value` lines into the unit's

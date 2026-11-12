@@ -5,6 +5,20 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The console-pager wave put every cli render through one door
+(common/wire/cli.py's page_out): a reply taller than the screen pauses at a
+page (the cbreak `-- more --` reader, the more(1) keys — space/return/q),
+`--page-size`/`CLI_PAGE_SIZE` set the size, the session-local `page` command
+retunes it live (never sent — no registry row, audited local), a line wider
+than the screen shortens with ` ...` (the wire keeps the tail), and a
+terminal under 20 rows/64 columns refuses the tty edition before the connect
+(cli_min_height/cli_min_width in wire/defaults.json; piped runs print
+byte-for-byte and never check). The one-client wave retired the `-ctl` bin
+into the `dashboard-cli`: run_client's three modes by invocation shape (words = one-shot
+with the raw verdict head, rc 0/1/2; piped stdin = batch; bare tty = the
+console), the HEALTHCHECK and the README/nix spellings follow.
+dashboard-control-fuzz's spawns re-spell to the cli bin and
+the hardening VM test speaks the cli spelling.
 The NixOS settings wave inverted the module (nixos/modules/dashboard.nix):
 the dedicated knob options are gone — one freeform `settings` attrset
 renders verbatim `NAME=value` lines into the unit's systemd EnvironmentFile

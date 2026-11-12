@@ -5,6 +5,21 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The console-pager wave put every cli render through one door
+(common/wire/cli.py's page_out): a reply taller than the screen pauses at a
+page (the cbreak `-- more --` reader, the more(1) keys — space/return/q),
+`--page-size`/`CLI_PAGE_SIZE` set the size, the session-local `page` command
+retunes it live (never sent — no registry row, audited local), a line wider
+than the screen shortens with ` ...` (the wire keeps the tail), and a
+terminal under 20 rows/64 columns refuses the tty edition before the connect
+(cli_min_height/cli_min_width in wire/defaults.json; piped runs print
+byte-for-byte and never check). The one-client wave retired the `-ctl` bin
+into the `modbus-scraper-cli`: run_client's three modes by invocation shape (words = one-shot
+with the raw verdict head, rc 0/1/2; piped stdin = batch; bare tty = the
+console), the HEALTHCHECK and the README/nix spellings follow.
+The regtest's piped pins re-spell to the batch contract and the
+fake-console pty pins carry the console shapes (the set-position `?` listing,
+the idle keepalive, the batch's CONNECT/DISCONNECT-only audit trail).
 The show-uplink wave brought the cache's two gold pieces to the scraper's
 upstream Modbus link: the poll block planner hoisted to
 common/modbus/blocks.py (the cache imports it back unchanged) merges the

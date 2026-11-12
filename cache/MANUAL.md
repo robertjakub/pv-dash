@@ -62,10 +62,10 @@ The kinds — every row of the tables below carries one:
 
 | command | kind | description |
 |---|---|---|
-| `help` | command (internal) |  |
+| `help` | command (internal) | describe a word (help \<setting>) or map every knob (help config) |
 | `inspect` | command | one pretty dump of everything (the status, the map, the counters, the write gate) |
-| `ping` | command (internal) |  |
-| `quit` | command |  |
+| `ping` | command (internal) | keep-alive: answers pong |
+| `quit` | command | close the session |
 | `request` | namespace | the state machinery: the dump written and restored, the cache dropped, the poll woken, the daemon reloaded |
 | `request flush` | namespace | drop the cached registers and repoll now |
 | `request flush cache` | command | drop the cached registers, repoll now (request flush cache) |
@@ -74,9 +74,9 @@ The kinds — every row of the tables below carries one:
 | `request dump` | namespace (hidden) | the state dump: the live overrides written sealed (with-cache carries the cached register words too) |
 | `request dump with-cache` | command (hidden) | the dump carries the cached register words too |
 | `request reload` | command | save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values) |
-| `request reload-config` | command |  |
+| `request reload-config` | command | re-read the config file (the SIGHUP path) |
 | `request restart` | command (hidden) | restart the upstream session: connection + cache dropped, repoll |
-| `request restore` | command (hidden) |  |
+| `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
 | `set` | command | configure a setting live: set \<setting> \<value> |
 | `show` | command | runtime state: show \<setting\|connections\|cache\|uplink\|version\|knobs> |
 | `shutdown` | command | stop the proxy gracefully (asks to confirm) |

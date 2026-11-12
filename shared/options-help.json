@@ -552,7 +552,18 @@
     },
     "request-poll-now": "wake the poll loop immediately",
     "request/poll": "the poll loop's manual wake",
-    "request-reload-config": "re-read the config file (the SIGHUP path)",
+    "request-reload": {
+      "help": "save the live overrides and restart the whole daemon",
+      "hidden": true
+    },
+    "request-reload-config": {
+      "help": "re-read the config file (the SIGHUP path)",
+      "hidden": true
+    },
+    "request-restart": {
+      "help": "restart the upstream session",
+      "hidden": true
+    },
     "request-restore": {
       "help": "re-apply a state dump's overrides (when the daemon has a dump path)",
       "hidden": true

@@ -105,15 +105,23 @@ def pools(commands, internal, hidden, spellings, nodes, commands_help,
     describe_word = make_describe_word(nodes, commands_help, spellings)
     state = {'dump': False}
     gated = ('request/dump', 'request/restore') + tuple(dump_gate)
+    global _marked_namespaces, _hidden_commands
+    _hidden_commands = frozenset(hidden)
+    _marked_namespaces = frozenset(
+        prefix for h in _hidden_commands
+        for prefix in h.split('/')[:-1] if prefix not in _hidden_commands)
 
     def command_pool():
         """The first words the daemon offers right now: the dump-gated
         rows ride the welcome's probe (they list only while a dump path is
         configured); the internal rows (the machinery's own words) and the
-        other hidden rows never list."""
-        return tuple(n for n in commands
+        other hidden rows never list — a namespace whose members hide
+        lists marked (the * rule: `*request`), so the walk-in word stays
+        discoverable."""
+        pool = tuple(n for n in commands
                      if n not in internal
                      and (n not in hidden or (state['dump'] and n in gated)))
+        return pool + tuple(sorted(w for w in _marked_namespaces if w not in pool))
 
     def setting_pool():
         """The show-branch pool: the console spellings (the hidden rows
@@ -228,13 +236,15 @@ def _grouped(matches, base):
     return secs + [(label, sorted(ws, key=str.lower)) for label, ws in buckets.items()]
 
 
-def sectioned_rows(sections, desc, hint):
+def sectioned_rows(sections, desc, hint, marked=frozenset()):
     """The listing: a blank line, then each [section] header, its entries
     padded two spaces under it — the descriptions aligned to one column across all the sections.
     The render is the wire's describe_node's own (the ? output is the
     golden master — common/settings/options.py render_word_sections); the console
-    adds the hint line."""
-    rows = render_word_sections([(label, [(w, desc(w)) for w in ws]) for label, ws in sections])
+    adds the hint line. `marked` carries the namespace words the * rule
+    lists marked — the bare word describes and completes, the render shows
+    `*name` (the wire's node help answers the same mark)."""
+    rows = render_word_sections([(label, [(('*' + w) if w in marked else w, desc(w)) for w in ws]) for label, ws in sections])
     if hint:
         rows.append('    ' + hint)
     return rows
@@ -243,6 +253,8 @@ def sectioned_rows(sections, desc, hint):
 _last_listed = None   # the completer is called several times per attempt;
                       # list each distinct buffer only once
 _prompt = None        # the session's prompt; the completer re-echoes it after the list
+_marked_namespaces = frozenset()   # the namespace words the * rule lists marked (*request)
+_hidden_commands = frozenset()     # the hidden command paths — the walk-in listings mark their segments
 _token = None             # the control token: every frame is signed with it when set
 _require_reply_mac = False   # True once the token handshake happened (TCP): unsigned replies are fatal
 
@@ -491,6 +503,9 @@ def candidates(buf):
     else:
         base = '/'.join(w.lower() for w in done)   # the command path spelled so far — a segment's
         pool, hint = command_path_pool(done, _SPEC['command_pool']()), None
+        hid = tuple(sorted({h[len(base) + 1:].split('/')[0] for h in _hidden_commands
+                            if h.startswith(base + '/')}))   # the namespace's hidden rows walk in marked
+        pool = tuple(pool) + tuple(s for s in hid if s not in pool)
         # the double-meaning node (the alias-first-segment rule): the
         # command word may also head the rows' alias/live paths — `write`
         # walks its command children AND the write-acl alias's next
@@ -510,9 +525,16 @@ def candidates(buf):
             pool = tuple(pool) + tuple(g for g in segs if g not in pool)
             desc = lambda w, base=base: _SPEC['describe']((base + '/' if base else '') + w)
     if pool is None:                      # a value shape with no completable words
-        return [], hint, desc, [('values', [])]
+        return [], hint, desc, [('values', [])], frozenset()
     matches = [w for w in pool if w.startswith(text.lower())]
-    return matches, hint, desc, _sections(head, len(done), matches, values_mode, base)
+    sections = _sections(head, len(done), matches, values_mode, base)
+    # the * rule: a namespace word carrying hidden rows lists marked — the
+    # bare word completes, the listing shows the mark (the wire's node help
+    # answers the same rows marked)
+    marked = frozenset(w for w in {x for _, ws in sections for x in ws}
+                       if ((base + '/' + w) if base else w) in _marked_namespaces
+                       or ((base + '/' + w) if base else w) in _hidden_commands)
+    return matches, hint, desc, sections, marked
 
 def complete(text, state):
     """TAB completer, console-style: extend the word silently while the common
@@ -522,7 +544,7 @@ def complete(text, state):
     column-packs or skips its own listings) — and yield no match so the
     editor just redraws the line."""
     global _last_listed
-    matches, hint, desc, sections = candidates(readline.get_line_buffer())
+    matches, hint, desc, sections, marked = candidates(readline.get_line_buffer())
     if state >= len(matches):
         return None
     if len(matches) > 1:
@@ -532,7 +554,7 @@ def complete(text, state):
         buf = readline.get_line_buffer()
         if state == 0 and _last_listed != buf:
             _last_listed = buf
-            rows = sectioned_rows(sections, desc, hint)
+            rows = sectioned_rows(sections, desc, hint, marked)
             # the list, a blank line, then the prompt + line again — editline
             # does NOT redraw after the completer, so we do it ourselves;
             # pause='never': readline owns the terminal mid-completion
@@ -551,8 +573,8 @@ def print_options(buf):
     display groups (`# --- group ---` headers; the ungrouped words bare on
     top) plus [values]; a value shape with no completable words still shows
     its hint."""
-    matches, hint, desc, sections = candidates(buf)
-    rows = sectioned_rows(sections, desc, hint)
+    matches, hint, desc, sections, marked = candidates(buf)
+    rows = sectioned_rows(sections, desc, hint, marked)
     if not rows:
         page_out(T('cli.invalid_input'))
         return

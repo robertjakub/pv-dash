@@ -1,6 +1,6 @@
 # registry-align — the show + commands sections (and the options residual)
 
-Status: **landed** — flown as proposed (the pending verdicts took their proposed calls; request-restart stays KEEP). The same contract as
+Status: **landed** — flown as proposed (the pending verdicts took their proposed calls; request-restart's KEEP later flipped by ruling — see the commands table). The same contract as
 [options-align.md](options-align.md) (FOLD / ALIGN / KEEP), applied to the
 registry's other two sections. The byte-compare behind the tables ran after
 the key-alignment wave landed (60 canon blocks, 42 family-wide, 0 dead).
@@ -20,10 +20,11 @@ the key-alignment wave landed (60 canon blocks, 42 family-wide, 0 dead).
 | knob | verdict | today | proposal | review |
 |---|---|---|---|---|
 | help, ping, quit, show, shutdown, request-poll-now, request/poll | — | on the canon, the rows agree | nothing | ok |
-| request-dump, request-restore, request-reload-config | KEEP | the inverter's help says "the fake" where the blocks say "the daemon" | the fake nouns are the fake's truth (options-align §3 carry-over); the exempts stay | ok |
-| request-restart | QUESTION | the cache hides the row (`hidden: true`), the scraper shows it ("drop the Modbus session (reconnects on the next poll)"); no canon block | propose KEEP — the scraper's visibility may be deliberate (its restart is the mild session drop); flip to ALIGN (hide family-wide) if not | ok |
-| request-reload | KEEP | the per-tool parentheticals say what re-resolves (the restart-marked knobs / the config file and flags / the flags and env) | the reloaders genuinely differ; no block | ok |
-| request (node), inspect | KEEP | the tool's own machinery words and dump contents | the exempts stay | ok |
+| request-dump, request-restore, request-reload-config | KEEP → flown further | the inverter's help says "the fake" where the blocks say "the daemon" | the fake nouns are the fake's truth (options-align §3 carry-over); the exempts stay | ok |
+| request-restart | QUESTION → ALIGN — flown | the cache hid the row, the scraper showed it; no canon block | the user's ruling (Nov 12): hidden family-wide — a canon block {the upstream-session floor help, hidden}; the scraper's session-drop help stays inline (the exempt stands) | ok |
+| request-reload | KEEP → ALIGN — flown | the per-tool parentheticals say what re-resolves (the restart-marked knobs / the config file and flags / the flags and env) | the user's ruling: hidden family-wide — a canon block {the daemon-restart floor help, hidden}; the parentheticals stay inline (the exempt stands) | ok |
+| request (node), inspect | KEEP — flown further | the tool's own machinery words and dump contents | floor blocks landed (options-align's ledger): inspect + request speak the family floor, the tools keep their tails | ok |
+| the * rule | ALIGN — flown | the hidden rows never listed in ?/TAB; a namespace whose every member hides vanished from the root ? (the fake's request) | the console's * rule: a namespace word carrying hidden rows lists `*request` (marked, completable bare); `help request` walks in and lists the hidden rows marked; the typed path answers bare, family-wide | ok |
 | clear, set | ALIGN — flown | the three tools carried per-tool examples where the cache's row teaches the grammar | the cache's grammar forms are the family texts (`set <setting> <value>` / `clear <setting>`) — two new commands blocks, the example tails drop (the ?-walk and TAB walk the real knobs), both exemptions retired | ok |
 
 ## the options residual (for completeness)

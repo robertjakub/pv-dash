@@ -386,18 +386,17 @@ def describe_command_node(commands, help_map, groups, hidden, name):
     renders the setting namespaces — the node-first descriptions (a word
     that is itself a namespace describes by its node row, whose help and
     group COMMAND_HELP/COMMAND_GROUPS carry beside the commands), the
-    display groups' sections, the hidden rows never listing (the pools'
-    rule; the typed path still answers). None when nothing lists (the
+    display groups' sections, the hidden rows listing MARKED (`*word` —
+    the * rule: the walk-in shows the namespace's quiet set, the typed
+    path answers the bare word). None when nothing lists (the
     name is no command node)."""
     prefix = name + '/'
     words = {}
     for w in commands:
-        if w in hidden:
-            continue   # the pools' rule: the hidden rows never list (the typed path still answers)
         if w.startswith(prefix):
             word = w[len(prefix):].split('/')[0]
             if word and word not in words:
-                words[word] = help_map.get(prefix + word, '')
+                words[('*' + word) if w in hidden else word] = help_map.get(prefix + word, '')
     if not words:
         return None
     buckets = {}

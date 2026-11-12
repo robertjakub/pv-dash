@@ -6,16 +6,17 @@ and the description — from the per-tool registries (lib/options.json via
 lib/options.py, the one-knob-one-source rows). The files are GENERATED:
 edit the registry and re-run, never the markdown.
 
-  python3 scripts/gen_manual.py          # render the four pages
-  python3 scripts/gen_manual.py --check  # exit 1 when a shipped page drifts
+  python3 scripts/generators/gen_manual.py          # render the four pages
+  python3 scripts/generators/gen_manual.py --check  # exit 1 when a shipped page drifts
 
 Stdlib only."""
-import json
 import os
 import sys
 
-REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-sys.path.insert(0, REPO)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # scripts/ — the common lib rides there
+from lib import REPO
+from lib.emit import emit
+from lib.registry import folded as fold_rows, raw as raw_registry, wired
 
 # the daemons in the chain order the README tells: fake -> cache -> scraper,
 # then the dashboard that renders the numbers — the tool dir, the daemon
@@ -70,27 +71,17 @@ WIDTH = 76
 
 
 def load(tool_dir):
-    """The tool's wired rows (the import dance: one module
-    named `options` at a time) plus the raw registry (the commands/show
-    sections' row order and flags — the loader keys them by live word and
-    drops the node rows, the page wants both)."""
-    sys.path.insert(0, os.path.join(REPO, tool_dir, 'lib'))
-    sys.modules.pop('options', None)
-    mod = __import__('options')
-    sys.path.pop(0)
-    with open(os.path.join(REPO, tool_dir, 'lib', 'options.json'), encoding='utf-8') as f:
-        meta = json.load(f)
-    rows, shows = tuple(mod.OPTIONS), tuple(mod.SHOW_OPTIONS)
-    sys.modules.pop('options', None)
+    """The tool's wired rows (the import dance in lib/registry) plus the raw
+    registry (the commands/show sections' row order and flags — the loader
+    keys them by live word and drops the node rows, the page wants both)."""
+    opts, _verbs, shows, _mod = wired(tool_dir)
+    meta = raw_registry(tool_dir)
     # the commands table reads the raw rows' marks (internal/hidden/live) —
-    # the canon refs resolve here too (the fold is the loader's own, the
-    # row's inline field wins)
-    from common.settings.options import canon_fold, load_canon
-    canon = load_canon()
+    # the show/commands sections' canon refs resolve here too (the fold is
+    # the loader's own, the row's inline field wins)
     for section in ('show', 'commands'):
-        meta[section] = [canon_fold(r, canon, section, tool_dir)
-                         for r in meta.get(section) or []]
-    return rows, shows, meta
+        meta[section] = fold_rows(tool_dir, section, meta)
+    return tuple(opts), tuple(shows), meta
 
 
 def wrap(text):
@@ -302,7 +293,7 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
     w(wrap('%s Part of the pv-suite family. The daemon\'s own `--help` and '
            'the man page (`%s --man`) carry the startup surface; this page '
            'carries the control wire. **Generated** from `lib/options.json` '
-           '(the one-knob-one-source rows) by `scripts/gen_manual.py` — '
+           '(the one-knob-one-source rows) by `scripts/generators/gen_manual.py` — '
            'edit the registry and re-run, never this file.' % (blurb, daemon_bin)))
     w('')
     w('## Speaking to the daemon')
@@ -399,24 +390,17 @@ def raw_angle_guard(text, path):
 
 def main(argv):
     check = '--check' in argv
-    drift = []
+    drift = False
     for tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example, token_mandatory, conf in TOOLS:
         rows, shows, meta = load(tool)
         page = render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port,
                       example, token_mandatory, conf, rows, shows, meta)
         raw_angle_guard(page, daemon)
         path = os.path.join(REPO, tool, 'MANUAL.md')
-        if check:
-            with open(path, encoding='utf-8') as f:
-                if f.read() != page:
-                    drift.append(path)
-        else:
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(page)
-            print('wrote %s' % path)
+        drift = emit(path, page, check, 'gen_manual',
+                     rerun='python3 scripts/generators/gen_manual.py') or drift
     if check:
         if drift:
-            print('drift: %s' % ', '.join(drift))
             return 1
         print('manual pages up to date')
     return 0

@@ -37,11 +37,8 @@ import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from scriptlib import TOOLS
+from lib import REPO as ROOT, TOOLS   # the scripts' common lib
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECTIONS = ('options', 'show', 'commands')
 FIELD = {'show': 'setting-help', 'commands': 'help'}   # the text a plain-string block fills
 PLACEMENT = ('live', 'alias', 'node', 'no-env', 'group')

@@ -4,13 +4,13 @@ run with --man (which prints its roff page to stdout via lib/man.py) and the
 output lands in the tool's man/<page>.1 — the pages are GENERATED, never
 hand-edited. Stdlib only.
 
-  python3 scripts/gen_man.py          # from anywhere; the repo root is derived
+  python3 scripts/generators/gen_man.py   # from anywhere; the repo root is derived
 """
 import os
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 # (tool, bin relative to the repo root, shipped page relative to the repo root)
 TOOLS = (

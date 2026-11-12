@@ -2,7 +2,7 @@
 """The READMEs' skeleton gate: the four tool READMEs speak ONE `##` section
 order (the one-skeleton wave's canon), and this lint keeps them speaking it.
 
-    python3 scripts/lint_readmes.py --check   # exit 1 on any finding
+    python3 scripts/lint/lint_readmes.py --check   # exit 1 on any finding
 
 The canon — every tool README, in this order:
 
@@ -24,10 +24,8 @@ the same verdict beside the `##` ladders it reports. Stdlib only."""
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from scriptlib import TOOLS
-
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # scripts/ — the common lib rides there
+from lib import REPO, TOOLS   # the scripts' common lib
 
 
 CANON = ('How it works', 'Usage', 'Configuration', 'Runtime control',

@@ -26,19 +26,17 @@ description field, and the file itself renders in the canonical layout
 (the sections and blocks in their landed order, a block's fields in the
 row rank).
 
-  python3 scripts/lint_options.py             # reformat in place + report
-  python3 scripts/lint_options.py --check     # report only, exit 1 if off-form
-  python3 scripts/lint_options.py --diff      # show the unified diff, no write
+  python3 scripts/lint/lint_options.py             # reformat in place + report
+  python3 scripts/lint/lint_options.py --check     # report only, exit 1 if off-form
+  python3 scripts/lint/lint_options.py --diff      # show the unified diff, no write
 """
 import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from scriptlib import TOOLS
-
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, REPO)   # the canon fold rides the loader's own implementation
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # scripts/ — the common lib rides there
+from lib import REPO, TOOLS   # the scripts' common lib — the canon fold rides the loader's own
+from lib.registry import raw as raw_registry
 WIDTH = 118
 
 KEY_RANK = ('name', 'flag', 'env', 'no-env', 'conv', 'shared', 'only', 'group', 'live', 'alias', 'negates',
@@ -420,10 +418,7 @@ def family_lint():
             canon = json.load(f)
     except (OSError, ValueError) as e:
         return ['shared/suite/options.json: does not parse: %s' % e]
-    metas = {}
-    for tool in TOOLS:
-        with open(os.path.join(REPO, tool, 'lib', 'options.json'), encoding='utf-8') as f:
-            metas[tool] = json.load(f)
+    metas = {tool: raw_registry(tool) for tool in TOOLS}
     nits = []
     # (a) the resolution pass
     BLOCK_KEYS = frozenset(('name', 'only', 'shared'))

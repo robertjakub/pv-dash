@@ -5,7 +5,7 @@ segment must be a clean lowercase word; every reference in the tree must
 resolve; every key must be referenced somewhere (the orphan gate); and no
 two leaves may share a value (one text, one home).
 
-    python3 scripts/lint_texts.py --check   # exit 1 on any failure
+    python3 scripts/lint/lint_texts.py --check   # exit 1 on any failure
 
 A reference is a bare T call with a single quoted dotted key — the
 consumer imports the loader as `from common.render.texts import T`. The suites
@@ -15,7 +15,7 @@ import json
 import os
 import re
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REGISTRY = os.path.join(REPO, 'shared', 'suite', 'texts.json')
 SCAN_ROOTS = ['common',
               os.path.join('cache', 'bin'), os.path.join('cache', 'lib'),

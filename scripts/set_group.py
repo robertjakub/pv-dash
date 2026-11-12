@@ -17,9 +17,7 @@ import json
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-from scriptlib import row_span   # the shared registry-editing helper
+from lib import REPO as ROOT, row_span   # the scripts' common lib
 
 
 def main():

@@ -23,11 +23,7 @@ import os
 import sys
 from collections import Counter
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the repo root — the canon fold rides the loader's own
-from scriptlib import TOOLS
-
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from lib import REPO as ROOT, TOOLS   # the scripts' common lib — the canon fold rides the loader's own
 FIELDS = ('live', 'env', 'flag')
 
 

@@ -60,9 +60,11 @@ pv-suite/
 ├── tests/        # the battery runner (tests/battery/ behind the
 │                 #   tests/battery.py wrapper) + the suites, one or more per Modbus tool
 ├── scripts/      # the gates + editors: check/lint, editor.py,
-│                 #   lint_readmes/lint_texts/lint_acl, family_drift, gen_man/gen_manual/gen_examples,
-│                 #   gen_sbom, validate_json, set_group/set_live,
+│                 #   family_drift, validate_json, set_group/set_live,
 │                 #   release.py, audit_verify.py
+│   ├── lib/      # the scripts' common lib (the loaders, the tree-walk, emit)
+│   ├── lint/     # the linters: lint_acl/lint_options/lint_readmes/lint_texts
+│   └── generators/  # the four generators: gen_man/gen_manual/gen_examples/gen_sbom
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))
 ├── extras/       # the operator-side packs: alerts/, examples/, graylog/ ([docs](extras/README.md))

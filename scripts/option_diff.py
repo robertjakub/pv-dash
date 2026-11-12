@@ -33,13 +33,9 @@ import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from scriptlib import TOOLS
-from lint_options import EXEMPT, GATED, KEY_RANK, SECTION_FIELD
+from lib import REPO as ROOT, TOOLS   # the scripts' common lib
+from lint.lint_options import EXEMPT, GATED, KEY_RANK, SECTION_FIELD
 from common.settings.options import canon_fold
-
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECTIONS = ('options', 'show', 'commands')
 NOUN = {'options': 'knob', 'show': 'show row', 'commands': 'commands row'}
 PLACEMENT = ('live', 'alias', 'node', 'no-env', 'group')

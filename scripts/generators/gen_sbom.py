@@ -12,20 +12,21 @@ The suite version, the nixpkgs pin, the alpine base, the apk set and the
 per-tool module counts all come off the tree too; nothing in the pair is
 hand-maintained.
 
-  python3 scripts/gen_sbom.py           # regenerate both files in place
-  python3 scripts/gen_sbom.py --check   # verify: regenerate + diff; drift = exit 1
+  python3 scripts/generators/gen_sbom.py           # regenerate both files in place
+  python3 scripts/generators/gen_sbom.py --check   # verify: regenerate + diff; drift = exit 1
 
 Stdlib only."""
 import argparse
 import ast
-import difflib
 import json
 import os
 import re
 import sys
 import textwrap
 
-REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # scripts/ — the common lib rides there
+from lib import REPO
+from lib.emit import emit
 SBOM_MD = os.path.join(REPO, 'docs', 'sbom', 'SBOM.md')
 SBOM_CDX = os.path.join(REPO, 'docs', 'sbom', 'sbom.cdx.json')
 VENDOR = os.path.join(REPO, 'dashboard', 'static', 'vendor', 'echarts.min.js')
@@ -314,7 +315,7 @@ def render_md(f):
 > Suite version **%(v)s** (the tree; `version_string()` appends `-<short
 > git>` in a checkout). Machine-readable copy:
 > [`sbom.cdx.json`](sbom.cdx.json) (CycloneDX 1.5). **Generated** by
-> [`scripts/gen_sbom.py`](../../scripts/gen_sbom.py) — the import scan
+> [`scripts/generators/gen_sbom.py`](../../scripts/generators/gen_sbom.py) — the import scan
 > gates the render and the vendored ECharts version is read out of the
 > bundle itself; re-run the script, never hand-edit either file
 > (`--check` regenerates and diffs, and the release workflow runs it).
@@ -387,7 +388,7 @@ grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashb
 
 ```bash
 # the gate — regenerate and diff; the release workflow runs --check
-python3 scripts/gen_sbom.py --check
+python3 scripts/generators/gen_sbom.py --check
 
 # the human form of the import scan (module level; the generator's ast
 # walk is stricter)
@@ -425,25 +426,6 @@ def gather():
     return f
 
 
-def emit(path, content, check):
-    """Write the file (or, under --check, report the drift). True = the
-    file moved."""
-    rel = os.path.relpath(path, REPO)
-    if os.path.exists(path) and read(path) == content:
-        print('gen_sbom: %s current' % rel)
-        return False
-    if check:
-        diff = '\n'.join(difflib.unified_diff(read(path).splitlines(), content.splitlines(),
-                                              'a/' + rel, 'b/' + rel, lineterm=''))
-        print(diff)
-        print('gen_sbom: %s is stale — re-run python3 scripts/gen_sbom.py' % rel)
-        return True
-    with open(path, 'w', encoding='utf-8') as fh:
-        fh.write(content)
-    print('gen_sbom: wrote %s' % rel)
-    return False
-
-
 def main():
     ap = argparse.ArgumentParser(description='generate the SBOM pair from the tree')
     ap.add_argument('--check', action='store_true',
@@ -451,8 +433,10 @@ def main():
     args = ap.parse_args()
 
     f = gather()
-    stale = any([emit(SBOM_MD, render_md(f), args.check),
-                 emit(SBOM_CDX, render_cdx(f), args.check)])
+    stale = any([emit(SBOM_MD, render_md(f), args.check, 'gen_sbom',
+                      rerun='python3 scripts/generators/gen_sbom.py'),
+                 emit(SBOM_CDX, render_cdx(f), args.check, 'gen_sbom',
+                      rerun='python3 scripts/generators/gen_sbom.py')])
     if stale:
         sys.exit(1)
     print('gen_sbom: the claim holds — stdlib + %s only; echarts %s (+ zrender %s), '

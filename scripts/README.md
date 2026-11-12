@@ -1,12 +1,32 @@
 # Scripts
 
 The repo's tooling — everything `scripts/` carries: the option
-registries' gates and editors, the generators, the release runner and
-the drift workflow. All stdlib-only, mode 644 (the family's bins run
-via `python3`, no exec bits), the shared plumbing seeded in
-`scriptlib.py`. The tools' own stories live in their READMEs; this
-directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
-— the scripts' debts stay with the scripts.
+registries' gates and editors, the linters, the generators, the release
+runner and the drift workflow. All stdlib-only, mode 644 (the family's
+bins run via `python3`, no exec bits), the shared plumbing in
+[`lib/`](#the-common-lib), the linters in [`lint/`](#the-checks), the
+generators in [`generators/`](#the-generators). The tools' own stories
+live in their READMEs; this directory's TODO section is separate from
+[docs/TODO.md](../docs/TODO.md) — the scripts' debts stay with the
+scripts.
+
+## The common lib
+
+- **`lib/`** — the scripts' own package: `lib/__init__.py` carries the
+  flat helpers (the four-tool chain, the registries' row-locator, the
+  live-name rule) and puts the repo root on sys.path at import (the
+  per-script `REPO = dirname(dirname(…))` dances died with it);
+  `lib/registry.py` is the one loader home (the wired `lib/options.py`
+  rows — the one-module-named-`options`-at-a-time dance — the raw
+  `options.json` read and the loader's own canon fold, the per-tool
+  SURFACES map); `lib/walk.py` is the one tree-walk (every per-tool
+  lib/bin module + every common module); `lib/emit.py` is the
+  emit-and-check doc writer (render, write or diff, exit 1 on stale —
+  the generators' `--check` rides it). The NAME is contested: the
+  per-tool `lib/` packages own `lib` wherever a tool root precedes
+  `scripts/` on sys.path, so `editor.py` opens the house's
+  one-module-named-`lib`-at-a-time dance around its imports — the rule
+  is documented in `lib/__init__.py`.
 
 ## The registries (read, gate, edit)
 
@@ -18,7 +38,7 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   derivation, the bundled configs naming registry options
   only. `python3 scripts/check_options.py` (the ten-suite battery's
   precondition).
-- **`lint_options.py`** — lint + reformat the four
+- **[`lint/lint_options.py`](lint/lint_options.py)** — lint + reformat the four
   `lib/options.json` registries: the canonical row order, the
   hand-formatted layout (edits must be surgical — the lint enforces
   it). `--check` for the gates.
@@ -28,7 +48,7 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   <file>` (the standalone gate's editor — the loader-gated save,
   the SIGINT-blocked writes, the ^C-safe dialogs).
 - **`set_group.py` / `set_live.py`** — the one-field surgical
-  setters (an option row's `group` / `live`), riding `scriptlib.py`'s
+  setters (an option row's `group` / `live`), riding `lib`'s
   row-locator and the live-name rule.
 - **`list_options.py`** — the knobs' one-line listing, one flat table
   with the tool as the first column (the live names, the flags, the
@@ -57,7 +77,7 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   shape agreeing, still inline) and the shape-field drifts that block a
   shared definition; `live`/`alias`/`node`/`no-env`/`group` are the
   per-tool console placements and never gate a match. Report only —
-  the form gates live in `lint_options.py`, the tool-vs-tool identity
+  the form gates live in `lint/lint_options.py`, the tool-vs-tool identity
   fields in `compare_options.py`. `--tool` names the tools comma
   separated with `all` the default.
 - **`option_diff.py`** — one flat name, every tool, every section: the
@@ -73,14 +93,17 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   block could carry (byte-identical on every carrier), the console
   placements the house keeps on the rows, the gated drift with its
   exempt status, and the must-ref / byte-equal-twins predictions. The
-  verdict re-uses `lint_options.py`'s own GATED/EXEMPT/SECTION_FIELD/
+  verdict re-uses `lint/lint_options.py`'s own GATED/EXEMPT/SECTION_FIELD/
   KEY_RANK and the loader's `canon_fold` — it can never drift from the
   gates it predicts. `python3 scripts/option_diff.py <flat-name>`;
   `--tool` names the tools comma separated with `all` the default.
 
 ## The checks (the shipped artifacts)
 
-- **`lint_acl.py`** — the acl gate-objects: the standalone
+The linters live in [`lint/`](lint) — one directory, the registry and
+prose gates apart from the runners:
+
+- **[`lint/lint_acl.py`](lint/lint_acl.py)** — the acl gate-objects: the standalone
   `file:<path>` targets and the `extras/examples/` acl files; the typed
   rule chain's grammar. Bare run globs the root.
 - **`validate_json.py`** — the JSON documents against a JSON Schema
@@ -96,7 +119,7 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   [docs/family-drift.md](../docs/family-drift.md); the verdict prose
   lives in the script's blocks. `--check` exits 1 when the doc is
   stale.
-- **`lint_readmes.py`** — the four tool READMEs' skeleton gate: the
+- **[`lint/lint_readmes.py`](lint/lint_readmes.py)** — the four tool READMEs' skeleton gate: the
   `##` canon in order (how it works → usage → configuration → runtime
   control → the tool's own sections in the feature slot → security →
   testing → Nix / NixOS → source layout → license) and a `### Signals`
@@ -107,15 +130,18 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
 
 ## The generators
 
-- **`gen_man.py`** — the man pages from the live parsers + each
+The four live in [`generators/`](generators) — one directory, the
+shipped-artifact renderers apart from the gates:
+
+- **`generators/gen_man.py`** — the man pages from the live parsers + each
   tool's `lib/man.py` prose (`--man` renders through the bin; the
   shipped pages regenerate).
-- **`gen_manual.py`** — the four `<tool>/MANUAL.md` pages from the
+- **`generators/gen_manual.py`** — the four `<tool>/MANUAL.md` pages from the
   registries: every command, knob and show report the tool's control
   wire answers, the kind of each (command, settable — set/clear — or
   show-only; the startup-only knobs marked), the flag/env twin, the
   value shape. `--check` fails a stale page.
-- **`gen_examples.py`** — the family's example files from the
+- **`generators/gen_examples.py`** — the family's example files from the
   registries, one generator + `--check` for both surfaces: the four
   docker env examples (`docker/env/<tool>.env.example` — the full
   env-twin set per tool, grouped by the knob's namespace node, the
@@ -124,7 +150,7 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   (`<tool>/examples/<conf>` — every knob the registry declares, every
   line commented at its default, the secrets in their `file:<path>`
   form). `--check` fails a drifted example.
-- **`gen_sbom.py`** — the CycloneDX 1.5 SBOM (docs/sbom/), the
+- **`generators/gen_sbom.py`** — the CycloneDX 1.5 SBOM (docs/sbom/), the
   stdlib-only claim machine-checked.
 
 The generated pages and their gates (never hand-edit — an editorial
@@ -134,10 +160,10 @@ edit to the rendered page dies at the next run):
 | Page | Generator | Gate |
 |---|---|---|
 | [docs/family-drift.md](../docs/family-drift.md) + the seed ledger | `family_drift.py` | `--check` |
-| `<tool>/MANUAL.md` (×4) | `gen_manual.py` | `--check` |
-| `docker/env/<tool>.env.example` (×4) + `<tool>/examples/*.conf` (×4) | `gen_examples.py` | `--check` |
-| `<tool>/man/*.1` (×4) | `gen_man.py` | `mandoc -Tlint` |
-| [docs/sbom/](../docs/sbom/SBOM.md) (the SBOM pair) | `gen_sbom.py` | `--check` |
+| `<tool>/MANUAL.md` (×4) | `generators/gen_manual.py` | `--check` |
+| `docker/env/<tool>.env.example` (×4) + `<tool>/examples/*.conf` (×4) | `generators/gen_examples.py` | `--check` |
+| `<tool>/man/*.1` (×4) | `generators/gen_man.py` | `mandoc -Tlint` |
+| [docs/sbom/](../docs/sbom/SBOM.md) (the SBOM pair) | `generators/gen_sbom.py` | `--check` |
 
 ## The release
 
@@ -152,8 +178,8 @@ edit to the rendered page dies at the next run):
 ## Keeping it honest
 
 ```bash
-python3 scripts/check_options.py && python3 scripts/lint_options.py --check
-python3 scripts/lint_readmes.py --check    # the READMEs' skeleton gate
+python3 scripts/check_options.py && python3 scripts/lint/lint_options.py --check
+python3 scripts/lint/lint_readmes.py --check    # the READMEs' skeleton gate
 python3 scripts/family_drift.py            # regenerate the drift doc
 python3 scripts/family_drift.py --check    # stale doc fails
 ```
@@ -174,17 +200,9 @@ python3 scripts/family_drift.py --check    # stale doc fails
     release.py's flow explicitly (the `--tests none` re-run path
     should not skip the doc regens silently).
 - **consolidate**
-  - `scriptlib.py` grows: the tree-walk (the
-    tools × lib/bin + common iteration) is re-implemented in
-    `family_drift.py`'s `targets()`, `check_options.py` and
-    `lint_options.py` — one walk, one home.
-  - the registry loader: the rows/commands/show parse block is
-    triplicated (check_options, lint_options, family_drift's knobs
-    sweep) — one `load_registry(tool)` in scriptlib, the editors and
-    the sweeps on it.
-  - the doc-writer helper: the emit-and-check pattern (render, diff,
-    exit 1 on stale) is family_drift.py's `--check` and
-    gen_sbom's shape — one helper, all generators on it.
+  - *(closed — the scripts/lib wave)*: the tree-walk is `lib/walk.py`'s
+    one `targets()`, the registry parse block is `lib/registry.py`'s
+    loaders, the emit-and-check pattern is `lib/emit.py`'s.
 - **drift check**
   - `family_drift.py --check` joins release.py's gates: a stale
     drift doc (or a regenerating sweep that would change it) fails

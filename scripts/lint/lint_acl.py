@@ -41,10 +41,10 @@ desc, the unknown keys after), the matchers inline, the trailing newline.
 The content is untouched — descs, matchers and their spellings land
 byte-for-byte as parsed.
 
-  python3 scripts/lint_acl.py                # the shipped example(s)
-  python3 scripts/lint_acl.py my.json        # lint + reformat in place
-  python3 scripts/lint_acl.py --check        # report only, exit 1 if off-form
-  python3 scripts/lint_acl.py --diff         # show the unified diff, no write
+  python3 scripts/lint/lint_acl.py                # the shipped example(s)
+  python3 scripts/lint/lint_acl.py my.json        # lint + reformat in place
+  python3 scripts/lint/lint_acl.py --check        # report only, exit 1 if off-form
+  python3 scripts/lint/lint_acl.py --diff         # show the unified diff, no write
 """
 import difflib
 import glob
@@ -53,12 +53,23 @@ import json
 import os
 import sys
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 for _p in (os.path.join(REPO, 'cache'), REPO):
     sys.path.insert(0, _p)
 
+# `lib` is contested: the cache's own lib/ package (the gate loader here)
+# and the scripts' common lib (lib/) both answer to it — and a process that
+# imported a SIBLING lint module first already bound the scripts' lib (the
+# import order inside lint/ is free). The house's
+# one-module-named-`lib`-at-a-time dance: save the bound package, fetch the
+# cache's loader while the name is free, bind the saved package back.
+_lib_saved = sys.modules.pop('lib', None)
+for _k in [k for k in sys.modules if k.startswith('lib.')]:
+    sys.modules.pop(_k)
 from lib.config import _GATE_TYPES, load_write_gate_file   # noqa: E402
 from lib.statics import MAX_REGISTERS         # noqa: E402
+if _lib_saved is not None:
+    sys.modules['lib'] = _lib_saved
 
 
 def lint_desc(d, where):

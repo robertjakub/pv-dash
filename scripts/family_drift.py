@@ -84,17 +84,17 @@ import difflib
 import hashlib
 import importlib
 import json
-import lint_readmes
+import lint.lint_readmes as lint_readmes
 import os
 import re
 import subprocess
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from scriptlib import TOOLS
+from lib import REPO, TOOLS   # the scripts' common lib
+from lib.emit import emit as emit_page
+from lib.registry import folded as fold_rows, raw as raw_registry
+from lib.walk import targets
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, REPO)   # the canon fold rides the loader's own implementation
 DOC = os.path.join(REPO, 'docs', 'family-drift.md')
 SEEDS = os.path.join(REPO, 'docs', 'family-drift-seeds.json')
 
@@ -102,26 +102,6 @@ REGTEST = {'cache': 'cache-regtest.py', 'scraper': 'scrape-regtest.py',
            'inverter': 'inverter-regtest.py', 'dashboard': 'dashboard-control-fuzz.py'}
 
 # ---------------------------------------------------------------- targets
-
-
-def targets():
-    """Every per-tool lib/bin module + every common module, as (where,
-    relpath, abspath) — `where` is the tool or 'common'."""
-    out = []
-    for t in TOOLS:
-        for sub in ('lib', 'bin'):
-            d = os.path.join(REPO, t, sub)
-            for f in sorted(os.listdir(d)):
-                if f.endswith('.py'):
-                    out.append((t, f'{t}/{sub}/' + f, os.path.join(d, f)))
-    d = os.path.join(REPO, 'common')
-    for root, dirs, files in os.walk(d):
-        dirs[:] = [x for x in dirs if x != '__pycache__']
-        for f in sorted(files):
-            if f.endswith('.py'):
-                p = os.path.join(root, f)
-                out.append(('common', os.path.relpath(p, REPO), p))
-    return out
 
 
 # --------------------------------------------------------- the code sweep
@@ -201,14 +181,9 @@ def knobs():
     """The four registries' rows + commands — the EFFECTIVE rows (the canon
     refs resolved: the fold is the loader's own, so the sweep compares the
     truth the daemons load, the block-carried fields included)."""
-    from common.settings.options import canon_fold, load_canon
-    canon = load_canon()
-    rows, cmds = {}, {}
-    for t in TOOLS:
-        with open(os.path.join(REPO, t, 'lib', 'options.json'), encoding='utf-8') as f:
-            m = json.load(f)
-        rows[t] = {r['name']: canon_fold(r, canon, 'options', t) for r in m['options']}
-        cmds[t] = [c.get('live') or c['name'] for c in m.get('commands') or []]
+    rows = {t: {r['name']: r for r in fold_rows(t, 'options')} for t in TOOLS}
+    cmds = {t: [c.get('live') or c['name'] for c in raw_registry(t).get('commands') or []]
+            for t in TOOLS}
     return rows, cmds
 
 
@@ -236,13 +211,12 @@ def canon_coverage():
     """The help-canon's split: the canon blocks per section, the refing rows
     per tool, the exempt names lint_options carries. The drift gate lives in
     lint_options --check — this report shows the fold's reach."""
-    from lint_options import EXEMPT
+    from lint.lint_options import EXEMPT
     with open(os.path.join(REPO, 'shared', 'suite', 'options.json'), encoding='utf-8') as f:
         canon = json.load(f)
     refs = {t: {} for t in TOOLS}
     for t in TOOLS:
-        with open(os.path.join(REPO, t, 'lib', 'options.json'), encoding='utf-8') as f:
-            m = json.load(f)
+        m = raw_registry(t)
         for section in ('options', 'show', 'commands'):
             rows = m.get(section) or []
             refs[t][section] = sum(1 for r in rows if r.get('shared'))
@@ -900,7 +874,7 @@ The findings:
 - **The README skeleton** is the one-skeleton wave's shape (how it
   works -> usage -> configuration -> runtime control -> the features
   -> security -> testing -> nix -> source layout -> license) and
-  `scripts/lint_readmes.py --check` pins it: the canon H2s in order,
+  `scripts/lint/lint_readmes.py --check` pins it: the canon H2s in order,
   the tool's own sections only in the slot between runtime control
   and security, and a `### Signals` block leading the Runtime-control
   H3s — this sweep prints the gate's verdict beside the ladders."""
@@ -1256,7 +1230,7 @@ def emit():
            + ' | '.join(str(refs[t][section]) for t in TOOLS) + ' |')
     ap('')
     ap(f'The exempt (intentionally per-tool) names: **{n_exempt}** —')
-    ap('each with its reason in `scripts/lint_options.py`.')
+    ap('each with its reason in `scripts/lint/lint_options.py`.')
     ap('')
 
     # ---- 4. the wire-text sweep
@@ -1329,7 +1303,7 @@ def emit():
     for t in TOOLS:
         ap(f'- {t}: ' + (' -> '.join(readmes.get(t) or ['NO README'])))
     ap('')
-    ap('The skeleton verdict (`scripts/lint_readmes.py --check` gates it):')
+    ap('The skeleton verdict (`scripts/lint/lint_readmes.py --check` gates it):')
     ap('')
     for t in TOOLS:
         rel = f'{t}/README.md'
@@ -1583,15 +1557,9 @@ def main():
         print(f'seed ledger: {len(seeds)} open promise(s) -> {os.path.relpath(SEEDS, REPO)}')
         return
     if '--check' in sys.argv:
-        try:
-            cur = open(DOC, encoding='utf-8').read()
-        except OSError:
-            cur = None
-        stale = cur != doc
+        stale = emit_page(DOC, doc, True, 'family_drift')
         grown = seed_guard(seeds)
         naked = naked_prints()
-        if stale:
-            print('family-drift.md is stale (scripts/family_drift.py regenerates)')
         if grown:
             print(f'family-drift-seeds.json: {len(grown)} NEW uncovered promise(s) the ledger does not know:')
             for s in grown[:10]:
@@ -1606,11 +1574,9 @@ def main():
             raise SystemExit(1)
         print('family-drift.md is current; the seed ledger knows every open promise; the pager door holds')
         return
-    with open(DOC, 'w', encoding='utf-8') as f:
-        f.write(doc)
+    emit_page(DOC, doc, False, 'family_drift')
     if not os.path.exists(SEEDS):
         write_seeds(seeds)   # the first run seeds the ledger; the waves shrink it
-    print('regenerated', os.path.relpath(DOC, REPO))
 
 
 if __name__ == '__main__':

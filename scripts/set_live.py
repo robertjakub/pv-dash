@@ -22,9 +22,7 @@ import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-from scriptlib import clean_path, row_span   # the shared registry-editing helpers
+from lib import REPO as ROOT, clean_path, row_span   # the scripts' common lib
 
 
 def main():

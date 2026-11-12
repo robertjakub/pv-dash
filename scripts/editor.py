@@ -54,7 +54,7 @@ unless --type says otherwise) and the file lands on the first save
 
 Save is loader-gated: common/settings/config.py's _write_gate_object (the
 schema is the daemon's, not the editor's) refuses the write, and the
-landed file is always the canonical layout (scripts/lint_acl.py's
+landed file is always the canonical layout (scripts/lint/lint_acl.py's
 renderer — content byte-for-byte as edited). The lint's no-op / dead
 rule / overlap findings warn but never block — the loader accepts them.
 
@@ -81,10 +81,25 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 for _p in (ROOT, os.path.join(ROOT, 'scripts'), os.path.join(ROOT, 'cache')):
     sys.path.insert(0, _p)
 
-from lint_acl import fmt_gate, label, lint_desc, lint_gate, lint_matcher   # noqa: E402
-from lint_options import lint, proposals, render_registry   # noqa: E402
+# `lib` is a contested name: the cache's own lib/ package (the gate loader
+# below) and the scripts' common lib (scripts/lib) both answer to it, and
+# the cache root precedes scripts/ on the path. The house's
+# one-module-named-`lib`-at-a-time dance: the cache's bindings land first,
+# the window re-binds `lib` to the scripts' package for the scripts-side
+# imports, then the cache's module object binds back.
+
+from lint.lint_acl import fmt_gate, label, lint_desc, lint_gate, lint_matcher   # noqa: E402
 from lib.config import _GATE_TYPES, _write_gate_object   # the loader's own gate validator  # noqa: E402
-from scriptlib import clean_path, row_span   # the shared registry-editing helpers  # noqa: E402
+
+_lib_cache = sys.modules.pop('lib')                       # — the window opens
+for _k in [k for k in sys.modules if k.startswith('lib.')]:
+    sys.modules.pop(_k)
+_cache_root = os.path.join(ROOT, 'cache')   # lint_acl's own inserts ride along — every copy out
+sys.path[:] = [p for p in sys.path if p != _cache_root]
+from lint.lint_options import lint, proposals, render_registry   # noqa: E402
+from lib import clean_path, row_span   # the scripts' common registry-editing helpers  # noqa: E402
+sys.path.insert(0, _cache_root)
+sys.modules['lib'] = _lib_cache                           # — the window closes
 
 try:
     import readline

@@ -18,20 +18,12 @@ import re
 import subprocess
 import sys
 
-REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-sys.path.insert(0, REPO)
+from lib import REPO   # the scripts' common lib
+from lib.registry import SURFACES, wired as load_registry
 
 from common.modbus.protocol import PROTOCOL
 from common.runtime.audit import AUDIT_FILES_MAX, AUDIT_FILES_MIN, AUDIT_MAX_MB_MAX, AUDIT_MAX_MB_MIN
 from common.settings.options import default_ops_verbs
-
-# tool -> (bin script, registry module dir, nixos module, README, bundled config, flag-table headings)
-TOOLS = {
-    'cache': ('cache/bin/modbus-cache.py', 'cache', 'nixos/modules/modbus-cache.nix', 'cache/README.md', 'cache/examples/modbus-cache.conf'),
-    'scraper': ('scraper/bin/modbus-scraper.py', 'scraper', 'nixos/modules/modbus-scraper.nix', 'scraper/README.md', 'scraper/examples/modbus-scraper.conf'),
-    'inverter': ('inverter/bin/modbus-fake-inverter.py', 'inverter', None, 'inverter/README.md', 'inverter/examples/modbus-fake-inverter.conf'),
-    'dashboard': ('dashboard/bin/dashboard.py', 'dashboard', 'nixos/modules/dashboard.nix', 'dashboard/README.md', 'dashboard/examples/dashboard.conf'),
-}
 
 # the env twins spell bare names (DUMP_INTERVAL, LOG_ACCESS) — the one
 # control env is the common CTL, no tool-tag spelling may return (the
@@ -50,14 +42,6 @@ NO_ROW_DEFAULT = {
     'inverter': {'seed': 'a per-run choice — no default'},
     'dashboard': {},
 }
-
-
-def load_registry(tool_dir):
-    sys.path.insert(0, os.path.join(REPO, tool_dir, 'lib'))
-    sys.modules.pop('options', None)
-    mod = __import__('options')
-    sys.path.pop(0)
-    return mod.OPTIONS, mod.KNOWN_VERBS
 
 
 def control_checks(tool_dir):
@@ -109,8 +93,9 @@ def bundled_config_names(config, options):
 def check_tool(tool):
     """One tool: returns [(ok, message)] rows."""
     rows = []
-    bin_script, tool_dir, module_nix, readme, config = TOOLS[tool]
-    options, verbs = load_registry(tool_dir)
+    bin_script, module_nix, readme, config = SURFACES[tool]
+    tool_dir = tool
+    options, verbs, _shows, mod = load_registry(tool_dir)
     flags = {'--' + o.name for o in options if o.flag}   # control-only settings carry no flag
 
     # the env twins and the tool's own sources carry no tool-tag prefix:
@@ -276,7 +261,6 @@ def check_tool(tool):
                  % (tool, ' — bad rows: %s' % ', '.join(bad_restart) if bad_restart else '')))
     # the registry's `show` section: the custom show words — clean unique
     # words, a description each
-    mod = sys.modules['options']
     show_words = list(mod.SHOW_WORDS)
     show_dupes = sorted({w for w in show_words if show_words.count(w) > 1})
     show_spaced = sorted(w for w in show_words if any(c.isspace() for c in w))
@@ -391,11 +375,11 @@ def check_tool(tool):
 
 
 def main():
-    wanted = sys.argv[1:] or list(TOOLS)
+    wanted = sys.argv[1:] or list(SURFACES)
     ok = True
     for tool in wanted:
-        if tool not in TOOLS:
-            print('unknown tool %s (try %s)' % (tool, ', '.join(TOOLS)))
+        if tool not in SURFACES:
+            print('unknown tool %s (try %s)' % (tool, ', '.join(SURFACES)))
             return 1
         for good, message in check_tool(tool):
             print(('PASS ' if good else 'FAIL ') + message)

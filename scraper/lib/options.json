@@ -216,7 +216,7 @@
     { "name": "connections",
       "setting-help": "the live HTTP clients of /metrics: the gate counters, one row per peer IP" },
     { "name": "uplink", "setting-help": "the inverter link: session counters, per-block latency and errors" },
-    { "name": "uplink-sources",
+    { "name": "uplink-sources", "live": "uplink/sources",
       "setting-help": "the register map: one row per polled register — fc, register, the range that fetches it, source" },
     { "name": "version", "setting-help": "the modbus-scraper version" },
     { "name": "config",

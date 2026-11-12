@@ -1786,13 +1786,13 @@ try:
     r = sctl('show version', 15597)
     check('scraper control: show version', r.startswith('ok modbus-scraper'), r[:80])
     r = sctl('show modbus caps', 15597)
-    check('scraper control: show modbus caps walks the sanity node', r.startswith('ok modbus/caps')
+    check('scraper control: show modbus caps walks the sanity node', r.startswith('ok')
           and 'max-pv' in r and 'max-grid' in r, r[:120])
-    r = sctl('set modbus caps max-pv 7', 15597)
-    check('scraper control: the caps set speaks the modbus path', r.startswith('ok max-kwp=7'), r[:80])
+    r = sctl('set max-kwp 7', 15597)
+    check('scraper control: the caps set answers the flat wire name', r.startswith('ok max-kwp=7'), r[:80])
     r = sctl('show metrics caps', 15597)
     check('scraper control: the retired metrics caps spelling refuses', r.startswith('fail'), r[:80])
-    r = sctl('clear modbus caps max-pv', 15597)
+    r = sctl('clear max-kwp', 15597)
     check('scraper control: the caps clear returns the configured value', r.startswith('ok max-kwp=6'), r[:80])
     r = sctl('set metric-prefix deye', 15597)
     check('scraper control: the prefix set re-builds the spec', r.startswith('ok metric-prefix=deye'), r[:80])
@@ -1857,7 +1857,7 @@ try:
     words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
     check('scraper control: the hierarchy node answers its namespace (the ? shape)',
-          words == ['auth', 'grid-positive-import', 'interval', 'merge-gap', 'offset', 'profile',
+          words == ['auth', 'caps', 'grid-positive-import', 'interval', 'merge-gap', 'offset', 'profile',
                     'read-delay', 'timeout', 'unit', 'upstream'], r[:160])
     # 6b-2. the register map lives in the device profile: `set profile` swaps
     #        it live, a profile without the power registers rolls back
@@ -2249,7 +2249,7 @@ try:
     words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
     check('scraper_ctl: show modbus answers the live words (the grouped sections, the direct children)',
-          r.returncode == 0 and words == ['auth', 'grid-positive-import', 'interval', 'merge-gap', 'offset',
+          r.returncode == 0 and words == ['auth', 'caps', 'grid-positive-import', 'interval', 'merge-gap', 'offset',
                                           'profile', 'read-delay', 'timeout', 'unit', 'upstream'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
@@ -2258,9 +2258,12 @@ try:
              if line.strip() and not line.strip().startswith('[')]
     check("scraper_ctl: the bare show answers the root in the console's own words",
           r.returncode == 0 and words == ['audit', 'config', 'connections', 'control', 'dump', 'inputs',
-                                          'knobs', 'metrics', 'modbus', 'system', 'uplink', 'uplink-sources',
-                                          'version'],
+                                          'knobs', 'metrics', 'modbus', 'system', 'uplink', 'version'],
           repr(r.stdout[:240]))
+    r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
+                        'show', 'uplink', 'sources'], capture_output=True, text=True, timeout=15)
+    check('scraper_ctl: show uplink sources spells the register map (the ctl translates)',
+          r.returncode == 0 and r.stdout.startswith('ok uplink-sources\n'), repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'show', 'control', 'ops'], capture_output=True, text=True, timeout=15)
     check('scraper_ctl: the node walk answers the intermediate node', r.returncode == 0

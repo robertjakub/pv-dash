@@ -124,6 +124,16 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   `shared` (the canon ref is the family-wide mark) and the family pass
   fails any other registry rowing the same name. Unmarked rows stay free
   to grow family-wide; the mark records the deliberate exclusion.
+- **tests/battery/battery_kill.py** — the slot killer beside the runner
+  and the status view (no wrapper — the docs spelling is
+  `python3 tests/battery/battery_kill.py …`): the slots/slot<N> links
+  name the live runs; TERM lands first so the runner's own handler
+  NOTEs the status and frees the link, the runner's whole descendant
+  tree (the suite copy + the daemons it spawned) is collected before
+  the first signal and TERMed alongside, and what outlives the grace
+  window gets KILLed (the killer NOTEs the status and frees the link
+  itself — the same end state a TERMed run leaves). Names take `2` or
+  `slot2`; no names = every live slot; nothing live is exit 0.
 
 ### Changed
 

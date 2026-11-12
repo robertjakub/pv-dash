@@ -62,11 +62,11 @@ The kinds — every row of the tables below carries one:
 | command | kind | description |
 |---|---|---|
 | `exit` | command (hidden) | close the session |
-| `help` | command (internal) | describe a word (help \<setting>) or map every knob (help config) |
+| `help` | command (internal) |  |
 | `inspect` | command | one pretty dump of everything: the status, the machines, the overlay |
 | `logout` | command (hidden) | close the session |
-| `ping` | command (internal) | keep-alive: answers pong |
-| `quit` | command | close the session |
+| `ping` | command (internal) |  |
+| `quit` | command |  |
 | `request` | namespace | the state machinery: the dump written and restored, the fake restarted |
 | `request dump` | command (hidden) | write the state dump: the live setting overrides, sealed (when the fake has a dump path) |
 | `request reload` | command | save the live overrides and restart the whole daemon (the flags and the env are re-resolved) |
@@ -74,7 +74,7 @@ The kinds — every row of the tables below carries one:
 | `request restore` | command (hidden) | re-apply a state dump's overrides (when the fake has a dump path) |
 | `reset` | command | clear all pins + the write overlay |
 | `set` | command | configure a setting (set soc auto, set scenario noon) |
-| `show` | command | print a setting's live value, or a report |
+| `show` | command |  |
 | `shutdown` | command | stop the fake inverter (asks to confirm) |
 | `clear` | command | restore a setting to its configured value (clear pv, clear seed) |
 | `set register \<addr> \<value>` | command | the Modbus write emulation: plant a register value in the write overlay — reads answer it, reset clears it |
@@ -117,12 +117,12 @@ translate). The namespaces group them.
 | `grid-frequency` | `set grid-frequency` | settable | `Hz` | `--grid-frequency` / — | nominal grid frequency; the machine wanders around it |
 | `grid-frequency-wander` | `set grid-frequency-wander` | settable | `Hz` | `--grid-frequency-wander` / — | the frequency machine's clamp in Hz around the nominal; 0 = the flat frequency |
 | `seed` | `set seed` | settable | `N` | `--seed` / — | re-seed the chaos RNG |
-| `connect-acl` | `set connect-acl` | settable | `\<acl>` | `--connect-acl` / `CONNECT_ACL` | the Modbus clients allowed to connect (the cache's connect-acl, mirrored: "any", "none", or a comma-separated IP/CIDR list) |
+| `connect-acl` | `set connect-acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--connect-acl` / `CONNECT_ACL` | the Modbus clients allowed to connect (the cache's connect-acl, mirrored: "any", "none", or a comma-separated IP/CIDR list) |
 | `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous Modbus client limit |
 | `client-timeout` | `set client-timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | disconnect Modbus clients silent for this long |
 | `max-conn-per-ip` | `set max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous Modbus connections from one peer IP |
 | `metrics-listen` | — | startup-only | `HOST:PORT` | `--metrics-listen` / — | the metrics bind address HOST:PORT |
-| `metrics-max-clients` | — | startup-only | `N` | `--metrics-max-clients` / — | maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited |
+| `metrics-max-clients` | — | startup-only | `N` | `--metrics-max-clients` / — | maximum concurrent /metrics clients; extras get an immediate 503, 0 = unlimited |
 | `metrics-client-timeout` | — | startup-only | `s` | `--metrics-client-timeout` / — | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
 | `metrics-max-conn-per-ip` | — | startup-only | `N` | `--metrics-max-conn-per-ip` / — | maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit |
 
@@ -207,8 +207,8 @@ the backup count
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation |
-| `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit log at UTC midnight |
+| `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit trail at this size in MB, keeping N backups; 0 = no size rotation |
+| `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit trail at UTC midnight |
 | `audit-files` | `set audit rotate files` | settable | `N` | `--audit-files` / `AUDIT_FILES` | rotated audit backups to keep |
 
 ### dump
@@ -230,8 +230,8 @@ the state dump: the live overrides' file, the restore-on-start
 | `show metrics-acl-table` | show-only | the metrics ACL as its rule chain, one entry per line (the metrics/acl report) |
 | `show registers` | show-only | the loaded profile's register map with the current values |
 | `show version` | show-only | the fake-inverter version |
-| `show config` | show-only (hidden) | the startup options as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
-| `show knobs` | show-only (hidden) | the dictionary of the registry: every knob, its flag, its env twin, its section, how it changes |
+| `show config` | show-only (hidden) | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
+| `show knobs` | show-only (hidden) | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
 
 The ?/TAB pools, `show knobs` and `help config` all render from the same
 rows this page was generated from.

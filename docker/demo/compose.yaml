@@ -6,10 +6,10 @@
 # contexts carry no Dockerfile of their own; compose resolves the
 # dockerfile relative to the context); the shared profiles/ directory, the entrypoint
 # and the common/ package + shared/ ride in as named contexts. The production shape
-# (real device, the four services: cache + scraper + prometheus +
-# dashboard) is the sibling prod/ stack — see ../README.md.
-# Run one service: docker compose up -d fake-inverter
-# Run the stack:         docker compose up -d (inverter + cache + scraper + prometheus + dashboard)
+# (real device, the three services + your external collector) is the sibling
+# prod/ stack — see ../README.md.
+# Run one service: docker compose up -d modbus-fake-inverter
+# Run the stack:         docker compose up -d (the fake + the cache + the scraper + prometheus + the dashboard)
 #
 # The services share the `config` volume mounted at /config: on start
 # the entrypoint seeds it with the REQUIRED file artifacts (the generated
@@ -39,7 +39,7 @@
 # The Modbus hops ship authenticated the same way: one shared suite key
 # (modbus-auth.token, generated into the volume on the first seed like the
 # tokens) proven by the PVA1/HMAC handshake on every connect —
-# fake-inverter demands it (its server side), the cache proves it
+# modbus-fake-inverter demands it (its server side), the cache proves it
 # upstream and demands it from its own clients, the scraper proves it.
 # The environment: blocks pin the scheme + the file: reference;
 # environment beats env_file, so the per-tool env files cannot override
@@ -51,23 +51,23 @@
 # file = the image defaults). The SAME files serve plain
 # `docker run --env-file` runs. See ../README.md.
 services:
-  fake-inverter:
+  modbus-fake-inverter:
     build:
       context: ../../inverter
-      dockerfile: ../docker/Dockerfile.fake-inverter
+      dockerfile: ../docker/Dockerfile.modbus-fake-inverter
       additional_contexts:
         profiles: ../../profiles
         scripts: ..
         common: ../../common
         shared: ../../shared
-    image: fake-inverter
+    image: modbus-fake-inverter
     environment:
       # the server side: every client proves the stack's suite key right
       # after connect — ERR and the client is dropped
       MODBUS_AUTH: suite
       MODBUS_AUTH_KEY: file:/config/modbus-auth.token
     env_file:
-      - path: ../env/fake.env
+      - path: ../env/modbus-fake-inverter.env
         required: false
     volumes:
       - config:/config
@@ -101,7 +101,7 @@ services:
     networks:
       - modbus
     depends_on:
-      - fake-inverter
+      - modbus-fake-inverter
     restart: unless-stopped
 
   modbus-scraper:

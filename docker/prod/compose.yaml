@@ -15,7 +15,7 @@
 #   1. cp ../env/cache.env.example ../env/cache-production.env and set
 #      UPSTREAM — the file is REQUIRED here (no required: false): the
 #      stack refuses to start without it, because the image default
-#      (fake-inverter:5502) only ever resolves in the demo. The prod copy
+#      (modbus-fake-inverter:5502) only ever resolves in the demo. The prod copy
 #      carries the -production name (the demo stack reads
 #      ../env/cache.env) so one checkout can run both stacks. If the
 #      device (or its gateway) speaks an auth scheme, set

@@ -19,12 +19,12 @@ one `internal: true` network.
 
 ```bash
 cd docker/demo
-docker compose up -d fake-inverter              # build + serve on the internal network
-docker compose up -d modbus-cache               # + the cache proxy (upstream: fake-inverter)
+docker compose up -d modbus-fake-inverter       # build + serve on the internal network
+docker compose up -d modbus-cache               # + the cache proxy (upstream: modbus-fake-inverter)
 docker compose up -d modbus-scraper             # + the exporter (upstream: modbus-cache)
 docker compose up -d prometheus                 # + the scraper's Prometheus, scraping modbus-scraper:9350
 docker compose up -d dashboard                  # + the dashboard, proxying the internal Prometheus
-docker compose exec --user pvsuite fake-inverter fake-cli   # a console session on the control server
+docker compose exec --user pvsuite modbus-fake-inverter modbus-fake-cli   # a console session on the control server
 docker compose down
 ```
 
@@ -51,55 +51,55 @@ One `internal: true` network (`pv-modbus`), nothing published on the host,
 one shared `config` volume seeded by the entrypoints, and the two secrets
 generated into that volume: the bearer token gating the exporter and the
 suite key authenticating the Modbus hops (every connect proves it —
-fake-inverter demands the handshake from the cache, the cache demands it
+modbus-fake-inverter demands the handshake from the cache, the cache demands it
 from the scraper and proves it upstream). The arrows are the traffic;
 every listener binds inside the network only:
 
 ```text
         HOST - 127.0.0.1:8080 published (the dashboard's UI), nothing else
-   ┌─────────────────────────────────────────────────────────────────────┐
-   │                                                                     │
-   │   internal network "pv-modbus"                                      │
-   │   ┌──────────────────────────────────────────────────────────┐      │
-   │   │                                                          │      │
-   │   │  ┌──────────────┐  FC3/4 reads  ┌──────────────┐         │      │
-   │   │  │fake-inverter │◄────10s poll──┤ modbus-cache │         │      │
-   │   │  │  (the device)│────values────►│    15502     │         │      │
-   │   │  └──────▲───────┘               └──────┬───────┘         │      │
-   │   │         │ the suite handshake -        │ 10s poll        │      │
-   │   │         │ proved on every connect      │ /metrics        │      │
-   │   │         │ (writes stay gated:          │ (bearer token)  │      │
-   │   │         │ allow-write off, write-acl/  │                 │      │
-   │   │         │ write-registers none)        │                 │      │
-   │   │         └──────────────────────────────┘                 │      │
-   │   │                                        │                 │      │
-   │   │   Suite key (0600) ──────────►         ▼                 │      │
-   │   │   Bearer token (0600) ──────► ┌──────────────┐           │      │
-   │   │                               │modbus-scraper│           │      │
-   │   │                               │    9350      │           │      │
-   │   │                               └──────┬───────┘           │      │
-   │   │                                      │ scrape 10s        │      │
-   │   │                                      ▼                   │      │
-   │   │                               ┌──────────────┐           │      │
-   │   │                        9090   │  prometheus  │           │      │
-   │   │              ┌───── /prom ────│ (TSDB volume)│           │      │
-   │   │              │                └──────────────┘           │      │
-   │   │              ▼                                           │      │
-   │   │      ┌──────────────┐                                    │      │
-   │   │      │  dashboard   │ 8080 ── the one published port     │      │
-   │   │      └──────────────┘        (127.0.0.1 only)            │      │
-   │   └──────────────────────────────────────────────────────────┘      │
-   │                                                                     │
-   │   shared "config" volume (/config): metrics.token,                  │
-   │   modbus-auth.token, the JSON specs, config.js - mounted by         │
-   │   the Modbus services + the dashboard; prometheus reads it          │
-   │   read-only                                                         │
-   │                                                                     │
-   │   docker compose exec <service> ... - the way in                    │
-   └─────────────────────────────────────────────────────────────────────┘
+   ┌────────────────────────────────────────────────────────────────────────────┐
+   │                                                                            │
+   │   internal network "pv-modbus"                                             │
+   │   ┌─────────────────────────────────────────────────────────────────┐      │
+   │   │                                                                 │      │
+   │   │  ┌─────────────────────┐  FC3/4 reads  ┌──────────────┐         │      │
+   │   │  │modbus-fake-inverter │◄────10s poll──┤ modbus-cache │         │      │
+   │   │  │  (the device)       │────values────►│    15502     │         │      │
+   │   │  └──────▲──────────────┘               └──────┬───────┘         │      │
+   │   │         │ the suite handshake -               │ 10s poll        │      │
+   │   │         │ proved on every connect             │ /metrics        │      │
+   │   │         │ (writes stay gated:                 │ (bearer token)  │      │
+   │   │         │ allow-write off, write-acl/         │                 │      │
+   │   │         │ write-registers none)               │                 │      │
+   │   │         └─────────────────────────────────────┘                 │      │
+   │   │                                               │                 │      │
+   │   │   Suite key (0600) ──────────►                ▼                 │      │
+   │   │   Bearer token (0600) ──────►        ┌──────────────┐           │      │
+   │   │                                      │modbus-scraper│           │      │
+   │   │                                      │    9350      │           │      │
+   │   │                                      └──────┬───────┘           │      │
+   │   │                                             │ scrape 10s        │      │
+   │   │                                             ▼                   │      │
+   │   │                                      ┌──────────────┐           │      │
+   │   │                               9090   │  prometheus  │           │      │
+   │   │              ┌───── /prom ───────────│ (TSDB volume)│           │      │
+   │   │              │                       └──────────────┘           │      │
+   │   │              ▼                                                  │      │
+   │   │      ┌──────────────┐                                           │      │
+   │   │      │  dashboard   │ 8080 ── the one published port            │      │
+   │   │      └──────────────┘        (127.0.0.1 only)                   │      │
+   │   └─────────────────────────────────────────────────────────────────┘      │
+   │                                                                            │
+   │   shared "config" volume (/config): metrics.token,                         │
+   │   modbus-auth.token, the JSON specs, config.js - mounted by                │
+   │   the Modbus services + the dashboard; prometheus reads it                 │
+   │   read-only                                                                │
+   │                                                                            │
+   │   docker compose exec <service> ... - the way in                           │
+   └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **fake-inverter** — the device; its Modbus is the only "hardware" in the
+- **modbus-fake-inverter** — the device; its Modbus is the only "hardware" in the
   demo, and it demands the suite handshake on every connect (the shared
   generated key — the internal network is the boundary, the handshake is
   the proof).

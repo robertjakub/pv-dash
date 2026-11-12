@@ -45,9 +45,9 @@ sys.path.insert(0, REPO)
 
 # ---------------------------------------------------------------- the
 # env files: the daemons in the gen_manual.py chain order — the tool
-# dir, the daemon name, the env-file stem (the shipped
-# env/<stem>.env.example — the fake's file spells fake, the tool dir is
-# inverter), the intro paragraphs (the compose-consumption story the
+# dir, the daemon name (the env-file stem IS the daemon name: the
+# shipped env/<stem>.env.example), the intro paragraphs (the
+# compose-consumption story the
 # shared header does not carry), the DEMO sample values (the image's own
 # — the CMD flag or an ENV where one pins the knob, else the registry
 # default) and the per-knob docker notes — DEMO/NOTES keys are registry
@@ -78,7 +78,7 @@ ENV_TOOLS = (
       'optional, the prod copy REQUIRED: UPSTREAM is the operator\'s '
       'decision there); where a stack\'s environment block pins a knob '
       '(environment beats env_file) the notes below mark it.',),
-     {'upstream': 'fake-inverter:5502',
+     {'upstream': 'modbus-fake-inverter:5502',
       'selection': '/config/selection.json',
       'listen': '0.0.0.0:15502',
       'audit-log': '-'},
@@ -117,7 +117,7 @@ ENV_TOOLS = (
                      '/config/metrics.token (environment beats env_file) '
                      '— this line is the plain-docker spelling')},
      ),
-    ('inverter', 'fake-inverter', 'fake',
+    ('inverter', 'modbus-fake-inverter', 'modbus-fake-inverter',
      ('The demo compose reads the file (env_file:, required: false — no '
       'file = the image defaults); prod runs no fake service.',),
      {'listen': '0.0.0.0:5502',
@@ -172,7 +172,7 @@ CONF_TOOLS = (
       'default --config target — where the CMD flags and the env twins '
       'carry the deployment shape. Copy the file, uncomment what you '
       'change.',), {}),
-    ('inverter', 'fake-inverter', 'modbus-fake-inverter.conf',
+    ('inverter', 'modbus-fake-inverter', 'modbus-fake-inverter.conf',
      ('The dev wrapper (`inverter/dev`) points --config here; the docker '
       'image copies the file to /pv-suite/inverter/'
       'modbus-fake-inverter.conf — the '

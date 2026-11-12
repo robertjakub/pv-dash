@@ -56,12 +56,12 @@ RUN chmod +x cache/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/cache/bin/modbus-cache-cli.py /usr/local/bin/modbus-cache-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
-# UPSTREAM is the image's default upstream peer (fake-inverter:5502 — the
-# compose stack's fake service; the flag would pin it past every env).
+# UPSTREAM is the image's default upstream peer (modbus-fake-inverter:5502 —
+# the compose stack's fake service; the flag would pin it past every env).
 # The bundled conf loads via the built-in default --config target
 # (/pv-suite/cache/modbus-cache.conf) — env and flags override it.
 ENV SELECTION=/config/selection.json \
-    UPSTREAM=fake-inverter:5502
+    UPSTREAM=modbus-fake-inverter:5502
 VOLUME /config
 ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 

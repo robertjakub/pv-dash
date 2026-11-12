@@ -6,8 +6,8 @@
 
 The suite is stdlib-only, so the containers are trivial: `alpine` + `apk add
 python3`, no pip, no venv, ~50 MB images. One Dockerfile per tool, named
-after the tool's daemon — `Dockerfile.fake-inverter`,
-`Dockerfile.modbus-cache`, `Dockerfile.modbus-scraper`,
+after the tool's daemon — `Dockerfile.modbus-cache`,
+`Dockerfile.modbus-fake-inverter`, `Dockerfile.modbus-scraper`,
 `Dockerfile.dashboard` — plus `Dockerfile.prometheus` for the demo
 stack's collector, and the stack wiring in two compose projects:
 
@@ -24,8 +24,8 @@ artifacts. The pattern:
 - an unprivileged **`pvsuite`** user (`adduser -D`, `COPY --chown`); the
   entrypoint runs as root only to seed the config volume and drops to
   `pvsuite` via `su-exec` — the tool never runs as root
-- the tools symlinked onto `PATH` (the inverter image: `fake-inverter`,
-  `fake-cli`; the cache image: `modbus-cache`,
+- the tools symlinked onto `PATH` (the inverter image: `modbus-fake-inverter`,
+  `modbus-fake-cli`; the cache image: `modbus-cache`,
   `modbus-cache-cli`; the scraper image: `modbus-scraper`,
   `modbus-scraper-cli`; the dashboard image:
   `dashboard`, `dashboard-cli`), `bash` for interactive
@@ -72,8 +72,8 @@ Three operator decisions, each called out in the compose file's comments:
 
 - **the device address** — `env/cache-production.env` is **required**
   here (no `required: false`): the stack refuses to start without it,
-  because the image's default `UPSTREAM` (`fake-inverter:5502`) only ever
-  resolves in the demo. Set `UPSTREAM=HOST:PORT` to the device.
+  because the image's default `UPSTREAM` (`modbus-fake-inverter:5502`) only
+  ever resolves in the demo. Set `UPSTREAM=HOST:PORT` to the device.
 - **the device's auth** (optional) — if the device or its gateway speaks
   an auth scheme, set `MODBUS_UPSTREAM_AUTH=suite|waveshare` and
   `MODBUS_UPSTREAM_AUTH_KEY` in the same env file: the upstream credential is
@@ -101,7 +101,8 @@ blockquote, usage and topology diagram:
 ## The env files (one per tool)
 
 Each image has its own env file, shipped as an example:
-`env/cache.env.example`, `env/scraper.env.example`, `env/fake.env.example`,
+`env/cache.env.example`, `env/scraper.env.example`,
+`env/modbus-fake-inverter.env.example`,
 `env/dashboard.env.example`, `env/prometheus.env.example` — `cp
 env/<tool>.env.example env/<tool>.env` and edit. The compose stacks
 copy-name the files per stack: the demo reads `env/<tool>.env`, prod reads
@@ -156,7 +157,7 @@ standalone runs). The fake's simulation envs (`CHAOS`, `MAX_KWP`,
 `STRICT`, `TIME`, `TIME_SCALE`) are ordinary env twins — they apply at
 start (flag > env > the image's bundled conf) and SIGHUP re-applies
 them: retune a running fake with
-`docker compose kill -s HUP fake-inverter`.
+`docker compose kill -s HUP modbus-fake-inverter`.
 
 ### env or the config volume?
 
@@ -245,21 +246,21 @@ is down behind the cache while the cache keeps serving last-known values).
 
 ## The images, one by one
 
-### fake-inverter (`Dockerfile.fake-inverter`)
+### modbus-fake-inverter (`Dockerfile.modbus-fake-inverter`)
 
 The demo device for development and testing — see the
 [fake inverter](../inverter/README.md):
 
 ```bash
 cd docker
-docker build -f ../docker/Dockerfile.fake-inverter -t fake-inverter \
+docker build -f ../docker/Dockerfile.modbus-fake-inverter -t modbus-fake-inverter \
     --build-context profiles=../profiles \
     --build-context shared=../shared \
     --build-context scripts=../docker --build-context common=../common ../inverter
-docker run --rm -p 127.0.0.1:5502:5502 fake-inverter      # loopback-published, serves on 0.0.0.0:5502 in the container
-docker run --rm -it fake-inverter bash                    # poke around as pvsuite
-docker run --rm -p 127.0.0.1:5502:5502 fake-inverter \
-    fake-inverter --modbus-profile deye-sg04lp3 --timezone local    # any flags via the CMD override
+docker run --rm -p 127.0.0.1:5502:5502 modbus-fake-inverter   # loopback-published, serves on 0.0.0.0:5502 in the container
+docker run --rm -it modbus-fake-inverter bash              # poke around as pvsuite
+docker run --rm -p 127.0.0.1:5502:5502 modbus-fake-inverter \
+    modbus-fake-inverter --modbus-profile deye-sg04lp3 --timezone local    # any flags via the CMD override
 ```
 
 The bundled conf (`/pv-suite/inverter/modbus-fake-inverter.conf`, the default
@@ -282,7 +283,7 @@ docker build -f ../docker/Dockerfile.modbus-cache -t modbus-cache \
     --build-context profiles=../profiles \
     --build-context shared=../shared \
     --build-context scripts=../docker --build-context common=../common ../cache
-docker run --rm -p 127.0.0.1:15502:15502 modbus-cache    # upstream defaults to fake-inverter:5502 (the image's UPSTREAM env)
+docker run --rm -p 127.0.0.1:15502:15502 modbus-cache    # upstream defaults to modbus-fake-inverter:5502 (the image's UPSTREAM env)
 docker run --rm -it modbus-cache bash          # poke around as pvsuite
 docker run --rm -p 127.0.0.1:15502:15502 modbus-cache \
     modbus-cache --upstream 192.168.1.100:5502          # any flags via the CMD override

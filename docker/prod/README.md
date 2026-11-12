@@ -40,7 +40,7 @@ Each is called out in the compose file's comments:
 
 - **the device address** — `env/cache-production.env` is **required**
   (no `required: false`): the image's default `UPSTREAM`
-  (`fake-inverter:5502`) only ever resolves in the demo. Set
+  (`modbus-fake-inverter:5502`) only ever resolves in the demo. Set
   `UPSTREAM=HOST:PORT` to the device.
 - **the device's own auth** (optional) — if the device or its gateway
   speaks an auth scheme, set `MODBUS_UPSTREAM_AUTH=suite|waveshare` and

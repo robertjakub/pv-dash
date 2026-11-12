@@ -5,24 +5,24 @@
 # Build (the context = ../inverter, the profiles = ../profiles, the entrypoint
 # = ../docker/entrypoints, the shared code = ../common):
 #   cd docker
-#   docker build -f ../docker/Dockerfile.fake-inverter -t fake-inverter \
+#   docker build -f ../docker/Dockerfile.modbus-fake-inverter -t modbus-fake-inverter \
 #       --build-context profiles=../profiles \
 #       --build-context shared=../shared \
 #       --build-context scripts=../docker --build-context common=../common ../inverter
 #   # or: docker compose up -d
 #
 # Run:
-#   docker run --rm -p 127.0.0.1:5502:5502 fake-inverter   # loopback-published; the compose stack publishes nothing
-#   docker run --rm -it fake-inverter bash                 # poke around as pvsuite
-#   docker run --rm -p 127.0.0.1:5502:5502 fake-inverter \
-#       fake-inverter --modbus-profile deye-sg04lp3 --timezone local    # any flags via the CMD override
+#   docker run --rm -p 127.0.0.1:5502:5502 modbus-fake-inverter   # loopback-published; the compose stack publishes nothing
+#   docker run --rm -it modbus-fake-inverter bash                 # poke around as pvsuite
+#   docker run --rm -p 127.0.0.1:5502:5502 modbus-fake-inverter \
+#       modbus-fake-inverter --modbus-profile deye-sg04lp3 --timezone local    # any flags via the CMD override
 #
 # The config volume: the entrypoint seeds /config with the required file
 # artifacts (for the fake: the generated suite key only — the volume is
 # there for symmetry with the other images and for future use).
 # The bundled conf is NOT in the volume — the tool loads the image's
 # /pv-suite/inverter/modbus-fake-inverter.conf (the default --config target) and the
-# per-tool env file env/fake.env overrides it.
+# per-tool env file env/modbus-fake-inverter.env overrides it.
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \
@@ -44,8 +44,8 @@ COPY --chown=pvsuite examples/modbus-fake-inverter.conf inverter/modbus-fake-inv
 RUN mkdir -p config-defaults \
     && echo placeholder > config-defaults/modbus-auth.token
 RUN chmod +x inverter/bin/*.py /usr/local/bin/pv-entrypoint \
-    && ln -s /pv-suite/inverter/bin/modbus-fake-inverter.py /usr/local/bin/fake-inverter \
-    && ln -s /pv-suite/inverter/bin/modbus-fake-cli.py /usr/local/bin/fake-cli
+    && ln -s /pv-suite/inverter/bin/modbus-fake-inverter.py /usr/local/bin/modbus-fake-inverter \
+    && ln -s /pv-suite/inverter/bin/modbus-fake-cli.py /usr/local/bin/modbus-fake-cli
 
 # The entrypoint runs as root only to seed /config, then drops to pvsuite.
 # The bundled conf loads via the built-in default --config target
@@ -54,10 +54,10 @@ VOLUME /config
 ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 
 EXPOSE 5502
-CMD ["fake-inverter", "--listen", "0.0.0.0:5502", "--audit-log", "-"]
+CMD ["modbus-fake-inverter", "--listen", "0.0.0.0:5502", "--audit-log", "-"]
 
 # Liveness: the ctl answers over the fake's unix control socket (the
 # default socket follows the CMD's listen port; the check runs as root — a
 # trusted peer over SO_PEERCRED, so no token is needed).
 HEALTHCHECK --interval=5m --timeout=5s --start-period=15s --retries=3 \
-    CMD ["fake-cli", "show", "version"]
+    CMD ["modbus-fake-cli", "show", "version"]

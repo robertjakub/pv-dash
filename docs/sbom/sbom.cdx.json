@@ -204,14 +204,14 @@
       ]
     },
     {
-      "bom-ref": "image:fake-inverter",
+      "bom-ref": "image:modbus-fake-inverter",
       "type": "container",
-      "name": "fake-inverter",
+      "name": "modbus-fake-inverter",
       "version": "0.4.3",
       "properties": [
         {
           "name": "pv-suite:dockerfile",
-          "value": "docker/Dockerfile.fake-inverter"
+          "value": "docker/Dockerfile.modbus-fake-inverter"
         }
       ]
     },
@@ -298,7 +298,7 @@
       "dependsOn": []
     },
     {
-      "ref": "image:fake-inverter",
+      "ref": "image:modbus-fake-inverter",
       "dependsOn": [
         "alpine",
         "apk:python3",

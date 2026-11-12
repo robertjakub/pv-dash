@@ -41,6 +41,16 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   the confirm guards, the pager); the one-shot/batch keep the raw bytes
   and audit CONNECT/DISCONNECT only.
 
+- **the docker names speak the daemon** — the fake inverter's image,
+  compose service and env file rename to the daemon's own:
+  `Dockerfile.modbus-fake-inverter`, service/image `modbus-fake-inverter`
+  (the in-image PATH symlinks `modbus-fake-inverter`/`modbus-fake-cli`),
+  `env/modbus-fake-inverter.env(.example)`; the cache image's default
+  `UPSTREAM` follows the demo peer (`modbus-fake-inverter:5502`) and the
+  SBOM's container refs follow. The compose spells become
+  `docker compose exec modbus-fake-inverter modbus-fake-cli` and
+  `docker compose kill -s HUP modbus-fake-inverter`.
+
 ### Added
 
 - **the four CLIs** — **the console pager**: every console reply prints

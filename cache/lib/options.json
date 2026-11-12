@@ -192,7 +192,7 @@
       "help": "restart the upstream session: connection + cache dropped, repoll" },
     { "name": "request-restore", "shared": "request-restore", "live": "request/restore" },
     { "name": "set", "shared": "set" },
-    { "name": "show", "shared": "show", "help": "print a setting's live value, or a report" },
+    { "name": "show", "shared": "show" },
     { "name": "shutdown", "shared": "shutdown" },
     { "name": "clear", "shared": "clear" }
   ]

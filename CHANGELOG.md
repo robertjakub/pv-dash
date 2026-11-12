@@ -137,6 +137,24 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Changed
 
+- **The similarity pass's common blocks move home** — the AST similarity
+  sweep (scripts/family_drift.py's own pair pass, cross-tool over the four
+  libs) pointed the wave and the top pairs moved: the Modbus session
+  counters (`exchanges`/`connects`/`errors`/`last_error*`/
+  `connected_since`/`bytes_in`/`bytes_out`), `after_connect` and
+  `_exchange` hoist into `common/modbus/client.py` `ClientBase` (the
+  scraper's docstring had marked the hoist "a move, not a rename" — the
+  MBAP head check reads the base's `MAX_PDU` off the protocol tree), the
+  per-block `show uplink` tally lands in `common/modbus/blocks.py`
+  `block_stat` (the cache's Proxy and the scraper's Scraper kept 0.97-twin
+  bodies; `DeviceError`'s exception code is the one pinned spelling), and
+  the four `lib/options.py` loaders' shared glue — the defaults.json/
+  choices/KNOWN_VERBS fill (`load_options_module`) and the fourteen-line
+  registry-view unpack (`unpack_registry_view`) — rides
+  `common/settings/options.py`. The drift report regenerates (36 → 32
+  cross-file pairs, the four top rows gone); --help/--man byte-identical
+  across the eight bins, the lint/generator gates green.
+
 - **The lint/generator stems drop their prefixes** — the eight movers wear
   the directory as the family name: `scripts/lint/`'s `lint_acl.py`,
   `lint_options.py`, `lint_readmes.py`, `lint_texts.py` become `acl.py`,

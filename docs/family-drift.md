@@ -55,32 +55,32 @@ copy-paste twins), the similarity pass pairs cross-file bodies over the
 **The exact pass**: 0 duplicate group(s) in >= 2 files.
 
 
-**The similarity pass**: 36 cross-file pair(s) over the ratio
+**The similarity pass**: 32 cross-file pair(s) over the ratio
 floor (12 of them the man-page prose, per-tool by
 design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
-| 0.99 | `cache/lib/proxy.py:240` `_block_stat` <-> `scraper/lib/poller.py:106` `_block_stat` |
-| 0.98 | `scraper/lib/options.py:28` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.96 | `cache/lib/upstream.py:30` `_exchange` <-> `scraper/lib/protocol.py:78` `_exchange` |
-| 0.94 | `cache/lib/options.py:25` `_load_options` <-> `scraper/lib/options.py:28` `_load_options` |
-| 0.94 | `cache/lib/upstream.py:14` `__init__` <-> `scraper/lib/protocol.py:28` `__init__` |
+| 0.96 | `cache/lib/options.py:23` `_load_options` <-> `scraper/lib/options.py:25` `_load_options` |
 | 0.93 | `scraper/bin/modbus-scraper.py:46` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
-| 0.92 | `cache/lib/options.py:25` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
+| 0.93 | `cache/lib/options.py:23` `_load_options` <-> `dashboard/lib/options.py:24` `_load_options` |
+| 0.93 | `scraper/lib/options.py:25` `_load_options` <-> `dashboard/lib/options.py:24` `_load_options` |
 | 0.90 | `scraper/bin/modbus-scraper.py:241` `graceful_stop` <-> `dashboard/bin/dashboard.py:474` `graceful_stop` |
-| 0.88 | `inverter/lib/options.py:28` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
-| 0.86 | `cache/lib/options.py:25` `_load_options` <-> `inverter/lib/options.py:28` `_load_options` |
-| 0.86 | `scraper/lib/options.py:28` `_load_options` <-> `inverter/lib/options.py:28` `_load_options` |
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
+| 0.85 | `cache/lib/options.py:23` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
+| 0.85 | `scraper/lib/options.py:25` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
+| 0.85 | `inverter/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:24` `_load_options` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.83 | `inverter/lib/control.py:96` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
 | 0.82 | `cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1380` `run_dump_interval` |
 | 0.78 | `cache/lib/control.py:798` `uplink_report` <-> `scraper/lib/control.py:474` `uplink_report` |
-| 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
+| 0.78 | `cache/lib/upstream.py:16` `read` <-> `scraper/lib/protocol.py:63` `_read` |
 | 0.78 | `inverter/lib/control.py:466` `acl_table_report` <-> `dashboard/lib/control.py:296` `acl_table_report` |
 | 0.76 | `scraper/lib/control.py:119` `__init__` <-> `inverter/lib/control.py:96` `__init__` |
 | 0.76 | `scraper/lib/server.py:89` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
+| 0.75 | `scraper/lib/control.py:119` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
+| 0.74 | `cache/lib/config.py:127` `load_profile_write_gate` <-> `common/settings/config.py:444` `load_write_gate_file` |
+| 0.72 | `common/settings/config.py:14` `resolve_target` <-> `common/runtime/daemon.py:44` `default_config_path` |
 
 ## The surface sweep — the listeners, the wire and the loops
 

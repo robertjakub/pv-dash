@@ -61,7 +61,7 @@ By default the proxy **binds to 127.0.0.1:15502** (loopback only) — pass
 Add **`--dry-run`** to validate the configuration and the register map and
 print the effective settings without binding the listen port or contacting
 the inverter — handy for checking NixOS-rendered config files
-(`--config /nix/store/…-modbus_cache.conf --dry-run`). Exit codes: `0` =
+(`--config /nix/store/…-modbus-cache.conf --dry-run`). Exit codes: `0` =
 valid; `1` = invalid (reason on stderr, stdout stays clean); `2` =
 command-line misuse.
 
@@ -77,7 +77,7 @@ Settings are resolved in this order (first hit wins), mirroring
    `show knobs` prints every knob with its env twin
 3. Config file (the set grammar: every line a `set <name> <value>` in the
    CLI spelling) — `--config` picks the file (default:
-   `modbus_cache.conf` next to `modbus-cache.py`, then the subproject
+   `modbus-cache.conf` next to `modbus-cache.py`, then the subproject
    root's sample; a missing file is fine)
 
 Every setting is validated before use — nonsense values abort with a clean
@@ -147,7 +147,7 @@ sit. Pass each one on every start — by flag, by env, or as `file:<path>`
 (the first line of an owner-only `0600` file). A token passed as a flag
 lands in `ps` — the file form is the shipped way (the audit's F9/F12).
 
-`examples/modbus_cache.conf` is a sample in the set grammar — GENERATED
+`examples/modbus-cache.conf` is a sample in the set grammar — GENERATED
 (`scripts/gen_examples.py`) from `lib/options.json`, every knob the
 registry declares, every line commented at its default; `show config`
 regenerates the script from the running daemon (secrets hidden) and `help
@@ -529,7 +529,7 @@ cache/
 │   ├── modbus-cache-ctl.py     # one-shot control client (args / piped commands)
 │   └── modbus-cache-cli.py     # console-style interactive control session
 ├── examples/
-│   ├── modbus_cache.conf    # sample config in the set grammar
+│   ├── modbus-cache.conf    # sample config in the set grammar
 │   └── selection.json       # example selection: the essential monitoring set
 ├── schema/                  # the JSON Schema (draft 2020-12): the selection file
 ├── man/                     # the generated man pages (scripts/gen_man.py)

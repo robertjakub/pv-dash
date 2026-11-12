@@ -48,7 +48,7 @@ logger = logging.getLogger('modbus-cache')
 def parse_args():
     ap = build_parser(OPTIONS, description='Modbus TCP caching proxy for single-client devices.')
     ap.add_argument('--config', default=None,
-                    help='config file — the set grammar: every line a `set <name> <value>`, comments start with # ($CONFIG, then modbus_cache.conf next to this script, then the subproject root)')
+                    help='config file — the set grammar: every line a `set <name> <value>`, comments start with # ($CONFIG, then modbus-cache.conf next to this script, then the subproject root)')
     ap.add_argument('--dry-run', action='store_true', help='validate the configuration and register map, print the effective settings and exit (nothing is bound or connected)')
     ap.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-cache --man | man -l -)')
     args = ap.parse_args()
@@ -57,7 +57,7 @@ def parse_args():
         sys.stdout.write(daemon_page(ap))
         raise SystemExit(0)
     if args.config is None:
-        args.config = default_config_path(SCRIPT_DIR, 'modbus_cache.conf')
+        args.config = default_config_path(SCRIPT_DIR, 'modbus-cache.conf')
     return args
 
 

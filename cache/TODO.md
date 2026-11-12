@@ -429,7 +429,7 @@ config-equivalent trust at rest, docs/SECURITY.md rev. 9's F23), the process
 re-execs with the same argv, the fresh start re-resolves the config (the
 `restart: true` knobs take their configured values) and re-applies the
 saved overrides once, consuming the file (a state older than two minutes
-discards as stale). The bundled `modbus_cache.conf` rebuilt in the CLI
+discards as stale). The bundled `modbus-cache.conf` rebuilt in the CLI
 spelling (every line `set <path words> <value>`; the sample's
 `set audit requests` line included), and the registry rows lost the
 `section` field — the display `group` is the one grouping.

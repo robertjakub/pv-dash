@@ -44,7 +44,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -dm755 $out/share/modbus-cache/common/modbus
     install -m644 ${../../../common}/modbus/*.py $out/share/modbus-cache/common/modbus/
     install -m644 ${../../../common}/modbus/protocol.json $out/share/modbus-cache/common/modbus/
-    install -Dm644 examples/modbus_cache.conf $out/share/modbus-cache/modbus_cache.conf
+    install -Dm644 examples/modbus-cache.conf $out/share/modbus-cache/modbus-cache.conf
     install -Dm644 examples/selection.json $out/share/modbus-cache/selection.json
     install -Dm644 ${../../../extras/examples}/acl-write-registers.json $out/share/modbus-cache/acl-write-registers.json
     install -Dm644 ${../../../extras/examples}/acl-ip-prefix.json $out/share/modbus-cache/acl-ip-prefix.json

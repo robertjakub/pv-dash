@@ -24,7 +24,7 @@
 # artifacts on start (files the volume lacks are copied in, existing ones
 # stay) — for the cache that is /config/selection.json (SELECTION): edit it
 # there, it survives recreation. The bundled conf is NOT in the volume —
-# the tool loads the image's /pv-suite/cache/modbus_cache.conf (the default
+# the tool loads the image's /pv-suite/cache/modbus-cache.conf (the default
 # --config target) and the per-tool env file (env/cache.env — the demo and
 # plain-docker spelling; the prod copy carries -production) overrides its
 # knobs (see ../docker/README.md); a flag beats the env: `docker run ...
@@ -42,7 +42,7 @@ COPY --from=common modbus/*.py common/modbus/
 COPY --from=shared texts.json shared/
 COPY --chown=pvsuite bin/ cache/bin/
 COPY --chown=pvsuite lib/ cache/lib/
-COPY --chown=pvsuite examples/modbus_cache.conf examples/selection.json cache/
+COPY --chown=pvsuite examples/modbus-cache.conf examples/selection.json cache/
 COPY --chown=pvsuite --from=examples acl-write-registers.json cache/
 COPY --chown=pvsuite examples/selection.json config-defaults/
 # the suite key's placeholder: the entrypoint materializes any *.token in
@@ -60,7 +60,7 @@ RUN chmod +x cache/bin/*.py /usr/local/bin/pv-entrypoint \
 # UPSTREAM is the image's default upstream peer (fake-inverter:5502 — the
 # compose stack's fake service; the flag would pin it past every env).
 # The bundled conf loads via the built-in default --config target
-# (/pv-suite/cache/modbus_cache.conf) — env and flags override it.
+# (/pv-suite/cache/modbus-cache.conf) — env and flags override it.
 ENV SELECTION=/config/selection.json \
     UPSTREAM=fake-inverter:5502
 VOLUME /config

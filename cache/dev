@@ -6,6 +6,6 @@
 # flags/env pass through: cache/dev --dry-run, cache/dev --allow-write
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
 exec python3 "$DIR/bin/modbus-cache.py" \
-    --config "$DIR/examples/modbus_cache.conf" \
+    --config "$DIR/examples/modbus-cache.conf" \
     --selection "$DIR/examples/selection.json" \
     --upstream "${UPSTREAM:-10.48.3.137:5502}" "$@"

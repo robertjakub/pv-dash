@@ -310,7 +310,7 @@ and **zero tracebacks** in the logs.
 | `lib/control.py` | the JSON-lines control server (the signed wire, the peer-cred shortcut) |
 | `lib/defaults.json` / `lib/statics.py` | the non-knob statics (log levels, the proxy timeout) / its loader — the knobs' defaults ride the registry rows |
 | `examples/config.js` | the user-settings example (`SOLAR_CONFIG`), served at `/config.js` |
-| `man/*.1` | the man pages — **generated** (`--man`, `scripts/gen_man.py`) |
+| `man/*.1` | the man pages — **generated** (`--man`, `scripts/generators/gen_man.py`) |
 
 ## License
 

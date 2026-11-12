@@ -57,15 +57,15 @@ config.js to serve at /config.js (startup\-only: pass \-\-config\-js by
 flag/env/config and restart)
 .TP
 .BI \-\-max\-clients " max-clients"
-maximum concurrent HTTP clients (pages + proxy); extras get an immediate
-503
+refuse further connections past this many simultaneous clients, 0 = no
+limit
 .TP
 .BI \-\-client\-timeout " client-timeout"
-seconds an idle keep\-alive HTTP client is kept before being kicked
+disconnect clients silent for this many seconds, 0 = never
 .TP
 .BI \-\-max\-conn\-per\-ip " max-conn-per-ip"
-maximum concurrent HTTP connections from one peer IP; extras get an
-immediate 503
+refuse further connections from one peer IP past this many simultaneous
+connections, 0 = no per\-IP limit
 .TP
 .BI \-\-auth\-token " auth-token"
 require Authorization: Bearer <token> on the page, config.js and the
@@ -77,7 +77,7 @@ value may be `file:<path>` — the first line of an owner\-only 0600 file
 .TP
 .BI \-\-control\-port " control-port"
 JSON\-lines control server target: unix socket path or TCP port number
-on 127.0.0.1 (e.g. 15598); 0 = off. Talk to it with dashboard\-ctl.py
+on 127.0.0.1; 0 = off
 .TP
 .BI \-\-control\-token " control-token"
 require a token on control connections: the client authenticates with
@@ -112,13 +112,13 @@ the plain 0600) ($CONTROL_SOCKET_GROUP)
 DEBUG\-log the full output of every control command
 .TP
 .B \-\-metrics\-server
-serve the dashboard's own Prometheus /metrics endpoint (the uptime, the
-request counters, the proxied query total, the client gate) — off unless
-toggled (the live `set metrics enable` toggle), and a token is mandatory
-beyond loopback (a token\-less non\-loopback bind refuses to start, F13)
+serve the tool's own Prometheus /metrics endpoint (the live `set metrics
+enable` toggle exists too)
 .TP
 .BI \-\-metrics\-listen " metrics-listen"
-the metrics bind address HOST:PORT
+the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every
+interface, a token is mandatory beyond loopback (a token\-less
+non\-loopback bind refuses to start, F13)
 .TP
 .BI \-\-metrics\-token " metrics-token"
 require Authorization: Bearer <token> on the /metrics endpoint —
@@ -149,13 +149,12 @@ maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
 limit
 .TP
 .BI \-\-audit\-log " audit-log"
-DSH audit trail: a file path or \- for stdout (the docker/journald way);
+the audit trail: a file path or \- for stdout (the docker/journald way);
 `none` turns the local file off (with a forward spelled that is the
-remote\-only mode); the XDG state home
-(~/.local/state/dashboard/audit.log) when unset
+remote\-only mode); the XDG state home when unset
 .TP
 .BI \-\-audit\-forward " audit-forward"
-also forward the DSH audit trail: syslog (the local socket auto\-scan),
+also forward the audit trail: syslog (the local socket auto\-scan),
 syslog:/path (an explicit socket), udp://host[:514] (RFC5426,
 best\-effort) or tcp://host[:514] (RFC6587 framing) — the off\-box copy
 carries the per\-writer hash chain, so a scheduled search at the
@@ -182,7 +181,7 @@ also rotate the audit log at UTC midnight
 rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
-disable the DSH audit trail
+disable the audit trail
 .TP
 .BI \-\-log\-level " log-level"
 log level; DEBUG logs every request
@@ -197,12 +196,12 @@ log every HTTP request at INFO
 log timestamps in the system time zone instead of UTC
 .TP
 .BI \-\-dump\-path " dump-path"
-the state dump: the live setting overrides (the toggles, the caps, the
-log surface — the tokens apart) as one JSON, written 0600 with an
-integrity hash (a restore refuses a tampered, unsigned or
-group\-writable dump); dumped on the request dump command, the graceful
-shutdown and every \-\-dump\-interval seconds; loaded on start only with
-\-\-restore\-on\-start, on demand with the request restore command
+the state dump: the live setting overrides (the tokens apart) as one
+JSON, written 0600 with an integrity hash (a restore refuses a tampered,
+unsigned or group\-writable dump); dumped on the request dump command,
+the graceful shutdown and every \-\-dump\-interval seconds; loaded on
+start only with \-\-restore\-on\-start, on demand with the request
+restore command
 .TP
 .BI \-\-dump\-key " dump-key"
 the key that seals the state dumps and the reload's state file: the
@@ -220,9 +219,9 @@ seconds between the automatic state dumps, 0 = on request (the request
 dump command and the shutdown)
 .TP
 .B \-\-restore\-on\-start
-load the state dump when the server starts (needs \-\-dump\-path) — the
-live overrides ride again instead of a cold start; without it the dump
-loads on demand
+load the state dump when the daemon starts (needs \-\-dump\-path) — a
+restart serves last\-known values instead of cold misses; without it the
+dump loads on demand
 .TP
 .B \-\-config
 config file — the set grammar: every line a `set <name> <value>`,

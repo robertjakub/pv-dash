@@ -703,6 +703,11 @@ try:
     check('show uplink-sources: the register map (fc, register, range, source)',
           r.startswith('ok uplink-sources\n') and vhead.split() == ['fc', 'register', 'range', 'source']
           and 'fc3' in r, r[:200])
+    r = subprocess.run([sys.executable, ctl, '--control-port', str(15514 + BASE),
+                        '--control-token', 'sekrit', 'show', 'uplink', 'sources'],
+                       capture_output=True, text=True)
+    check('show uplink sources: the console words spell the register map (the ctl translates)',
+          r.returncode == 0 and r.stdout.startswith('ok uplink-sources\n'), r.stdout[:120])
 
     # selection none: the map empties, every read forwards, nothing is stored
     r = ctl_cmd('set selection none', 15514 + BASE)
@@ -1456,7 +1461,7 @@ try:
     check("bare show: the root in the console's own words (the gated word hidden while the dump is off)",
           words == ['acl', 'audit', 'cache', 'config', 'connections', 'control', 'dump',
                     'knobs', 'limits', 'metrics', 'modbus', 'system',
-                    'uplink', 'uplink-sources', 'version', 'write'],
+                    'uplink', 'version', 'write'],
           r[:220])
     r = ctl_cmd('set audit-max-mb 5', 15530 + BASE)
     check('audit rotate: max-size set', r.startswith('ok audit-max-mb=5'), r[:90])

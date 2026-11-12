@@ -5,7 +5,7 @@ section renders from the tool's argparse parser (the flags and their help
 live once, so `--help` and the man page can never drift), the prose
 sections are roff text kept next to the tool, and `--man` prints the page
 to stdout (`modbus-cache --man | man -l -` works in a container with no man
-pages installed). scripts/gen_man.py regenerates the shipped man/*.1 files
+pages installed). scripts/generators/gen_man.py regenerates the shipped man/*.1 files
 from the same builders. Stdlib only.
 
 The family's one section ladder per page class (the LADDERS table): a

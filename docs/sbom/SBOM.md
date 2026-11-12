@@ -3,7 +3,7 @@
 > Suite version **0.4.3** (the tree; `version_string()` appends `-<short
 > git>` in a checkout). Machine-readable copy:
 > [`sbom.cdx.json`](sbom.cdx.json) (CycloneDX 1.5). **Generated** by
-> [`scripts/gen_sbom.py`](../../scripts/gen_sbom.py) — the import scan
+> [`scripts/generators/gen_sbom.py`](../../scripts/generators/gen_sbom.py) — the import scan
 > gates the render and the vendored ECharts version is read out of the
 > bundle itself; re-run the script, never hand-edit either file
 > (`--check` regenerates and diffs, and the release workflow runs it).
@@ -72,7 +72,7 @@ Every name in that list is stdlib (`argparse`, `ast`, `collections`,
 
 ```bash
 # the gate — regenerate and diff; the release workflow runs --check
-python3 scripts/gen_sbom.py --check
+python3 scripts/generators/gen_sbom.py --check
 
 # the human form of the import scan (module level; the generator's ast
 # walk is stricter)

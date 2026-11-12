@@ -237,7 +237,7 @@ texts the rows ref; the drift and must-ref gates live in
 | commands | 16 | 16 | 16 | 13 | 13 |
 
 The exempt (intentionally per-tool) names: **39** —
-each with its reason in `scripts/lint_options.py`.
+each with its reason in `scripts/lint/lint_options.py`.
 
 ## The wire-text sweep — the log/audit canon
 
@@ -368,7 +368,7 @@ READMEs' `##` skeletons.
 - inverter: How it works -> Usage -> Configuration -> Runtime control -> Served registers (the default profile) -> Internal registers (not in the profile) -> Chaos injection (`--chaos`) -> Audit trail -> Security -> Testing -> Source layout -> License
 - dashboard: How it works -> Usage -> Configuration -> Runtime control -> Behind a reverse proxy -> Metrics source -> Security -> Testing -> Source layout -> License
 
-The skeleton verdict (`scripts/lint_readmes.py --check` gates it):
+The skeleton verdict (`scripts/lint/lint_readmes.py --check` gates it):
 
 - cache: OK
 - scraper: OK
@@ -384,7 +384,7 @@ The findings:
 - **The README skeleton** is the one-skeleton wave's shape (how it
   works -> usage -> configuration -> runtime control -> the features
   -> security -> testing -> nix -> source layout -> license) and
-  `scripts/lint_readmes.py --check` pins it: the canon H2s in order,
+  `scripts/lint/lint_readmes.py --check` pins it: the canon H2s in order,
   the tool's own sections only in the slot between runtime control
   and security, and a `### Signals` block leading the Runtime-control
   H3s — this sweep prints the gate's verdict beside the ladders.

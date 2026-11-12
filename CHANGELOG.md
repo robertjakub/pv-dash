@@ -12,6 +12,35 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
+- **The scripts/lint/ split** — the four linters move from `scripts/` to
+  `scripts/lint/` (`lint_acl.py`, `lint_options.py`, `lint_readmes.py`,
+  `lint_texts.py` — the package docstring carries the rule; `lint` was an
+  uncontested name, no tool imports it). The linters are IMPORTED, unlike
+  the generators: the consumers speak the package spelling
+  (`editor.py`'s two imports ride its existing `lib` dance window,
+  `family_drift.py`, `option_diff.py`); each mover carries the one
+  `sys.path` insert the deeper directory demands and the docstring
+  invocations re-point. The drift report's rendered strings re-point
+  (docs/family-drift.md regenerated), and the live
+  docs' `scripts/lint_*` mentions follow (docs/DESIGN.md,
+  docs/SECURITY.md, common/README.md, the scripts README's bullets +
+  honest block).
+
+- **The scripts/generators/ split** — the four generators move from
+  `scripts/` to `scripts/generators/` (`gen_man.py`, `gen_manual.py`,
+  `gen_examples.py`, `gen_sbom.py` — the shipped-artifact renderers
+  apart from the gates; `family_drift.py` stays a check). Each mover
+  carries the one `sys.path` insert the deeper directory demands; the
+  rendered constants speak the new path (the MANUAL.md footers, the env
+  examples' and the example confs' GENERATED headers, the SBOM prose's
+  link + re-run line), `lib/emit.py`'s stale report takes the caller's
+  re-run command, release.yml's SBOM `--check` leg re-points, and the
+  live docs' `scripts/gen_*` mentions follow (the per-tool TODO history
+  records keep their landed spellings). The man pages, the MANUAL pages,
+  the examples and the SBOM pair regenerated — the man pages' diff also
+  carries the help-prose catch-up the registries' canon wave had left
+  unregenerated.
+
 - **The scripts/lib package** — `scripts/scriptlib.py` grows into
   `scripts/lib/`, the scripts' common lib (the scripts README's TODO
   consolidate list): the flat helpers (`TOOLS`, the row-locator, the
@@ -58,7 +87,7 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   canon and the registries.
 - **the canon renames to `shared/options.json`** — it carries the
   wiring and the marks, not only the help; every reference moves with
-  the rename (the loader, the lints, the editor pair, the four nix
+  the rename (the loader, the lints, the editor, the four nix
   packages, the docs).
 
 - **The show/commands canon wave (docs/show-commands-align.md)** — the
@@ -204,7 +233,7 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   (`shared/schema/` stays put — the schemas keep their own home and
   README). The loaders re-pin (`common/render/texts.py`,
   `common/settings/options.py`, `common/runtime/audit.py` — the tree-root
-  walk now joins the `suite` segment), the lints and the editor pair
+  walk now joins the `suite` segment), the lints and the editor
   follow, the four `package.nix` files install the trio to
   `share/<tool>/shared/suite/` and the four Dockerfiles COPY
   `suite/texts.json` to `shared/suite/`; the docs and the per-tool TODOs
@@ -506,6 +535,16 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   The battery's run dir always pre-existed; the CI shape is the one
   that needs the create (validated in the CI shape: a bare, non-
   existent PV_RUN_DIR, cache-control-fuzz quick, ALL PASS).
+
+### Removed
+
+- **the `editor/` web editor** — `editor/serve.py` +
+  `editor/index.html`, the registries' one-page browser editor (the
+  four registries + the suite options JSON over a stdlib API, the save
+  re-rendering through `lint_options`) — dies whole, `PV_EDITOR_ROOT`
+  with it. It never rode a release; `scripts/editor.py` (the terminal
+  editor) stays the one editor, and the lint package's consumers list
+  and the CHANGELOG's own lint-split entry drop the mentions.
 
 ## 0.4.3 — 2026-11-11
 ### Changed

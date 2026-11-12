@@ -107,7 +107,7 @@ same wave).
    modbus-timeout, no-audit-log, restore-on-start, client-timeout,
    max-clients, max-conn-per-ip, metrics-token, modbus-auth, modbus-profile
    — each only when its fields fully resolve.
-4. Regenerate: `scripts/gen_manual.py`, `scripts/gen_examples.py` (the
+4. Regenerate: `scripts/generators/gen_manual.py`, `scripts/generators/gen_examples.py` (the
    Manuals and the conf examples render the aligned prose).
 5. Gates: `lint_options.py --check`, `check_options.py`, both regen
    `--check`s, `options_drift.py` (expected: blocks 58 → ~66, candidates

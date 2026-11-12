@@ -261,7 +261,7 @@ they name the wire.
   (show knobs + help config via `control_command()`,
   `common/settings/options.py:390-408`),
   `*(restart)*` / `startup-only (secret)` (MANUAL.md,
-  `scripts/gen_manual.py:143-146`), `restart: true` + the wire phrase
+  `scripts/generators/gen_manual.py:143-146`), `restart: true` + the wire phrase
   (only the cache's man carries the trio now, `cache/lib/man.py:98-107`),
   and "restart to apply" (inverter/README.md:204). Outcome: a
   two-phrase lexicon in `shared/suite/texts.json`, every surface renders it,
@@ -397,7 +397,7 @@ they name the wire.
   flanked by the unit-range and audit-bounds rows, and the sweep's
   field table reads the rows (`default`/`min`/`max`/`live`).
 - the env examples are **GENERATED from the registries**
-  (`scripts/gen_examples.py --check`): the full registry env-twin set per
+  (`scripts/generators/gen_examples.py --check`): the full registry env-twin set per
   tool (50/39/34/38), grouped by the knob's namespace node, the image's
   own CMD/ENV values as the sample lines with the pin notes (the
   compose's environment pins marked per knob), the secrets' lines
@@ -527,7 +527,7 @@ re-open — is the history half:
   (`cache-fuzz 10000`, `scrape-fuzz 10000`, `control-fuzz`, the stress
   suite) plus `docker compose up` (the Prometheus answers, no tracebacks
   in the logs).
-- **the SBOM / supply-chain note** `[common]` — **done**: `scripts/gen_sbom.py`
+- **the SBOM / supply-chain note** `[common]` — **done**: `scripts/generators/gen_sbom.py`
   generates both [sbom/SBOM.md](sbom/SBOM.md) + `sbom/sbom.cdx.json` from
   the tree (the import scan gates the render — a foreign dependency fails
   the generation; the vendored ECharts version and its bundled zrender are

@@ -35,7 +35,7 @@ TOOLS = (
      'A dependency-free (Python stdlib only) Prometheus exporter that polls '
      'a Modbus device and exposes the metrics at /metrics.',
      'modbus-scraper-ctl', 'modbus-scraper-cli', '/tmp/modbus-scraper-9350.socket',
-     '15509', 'poll now', True, 'scraper/examples/modbus-scraper.conf'),
+     '15509', 'request poll now', True, 'scraper/examples/modbus-scraper.conf'),
     ('inverter', 'fake-inverter', 'modbus-fake-inverter',
      'A dependency-free (Python stdlib only) Modbus TCP server that plays '
      'an inverter — the battery, the smart meter, the diagnostics — for '

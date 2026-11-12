@@ -70,7 +70,7 @@ design); the top non-man pairs:
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.83 | `inverter/lib/control.py:96` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
-| 0.82 | `cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1376` `run_dump_interval` |
+| 0.82 | `cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1378` `run_dump_interval` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
 | 0.78 | `inverter/lib/control.py:466` `acl_table_report` <-> `dashboard/lib/control.py:296` `acl_table_report` |
 | 0.76 | `scraper/lib/control.py:117` `__init__` <-> `inverter/lib/control.py:96` `__init__` |
@@ -149,7 +149,7 @@ by semantic family — the knob layer is the one source --help, the man
 pages, the set grammar, the NixOS modules and the README checks read,
 so a drifted row travels wide.
 
-**The shape**: 234 knob rows across the
+**The shape**: 235 knob rows across the
 four registries; 34 names carry in all four:
 
 `audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-instance`, `audit-log`, `audit-max-mb`, `audit/rotate`, `client-timeout`, `control`, `control-log-replies`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `local-time`, `log-access`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
@@ -159,12 +159,12 @@ four registries; 34 names carry in all four:
 | tool | only-there knobs |
 |---|---|
 | cache | `acl`, `allow-write`, `auth-key`, `auth-upstream`, `auth-upstream-key`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `profile`, `read-delay`, `requests-audit`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
-| scraper | `auth-key`, `auth-token`, `caps`, `grid-positive-import`, `interval`, `max-grid-kw`, `max-kwp`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-offset`, `modbus-unit`, `profile`, `timeout`, `upstream` |
+| scraper | `auth-key`, `auth-token`, `grid-positive-import`, `interval`, `max-grid-kw`, `max-kwp`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/caps`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-offset`, `modbus-unit`, `profile`, `read-delay`, `timeout`, `upstream` |
 | inverter | `allow-write`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
 | dashboard | `auth`, `auth-token`, `config-js`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
-**The shared knobs whose fields disagree** (9 of
-34 knobs, 10 drifted field(s)) — one row per
+**The shared knobs whose fields disagree** (8 of
+34 knobs, 9 drifted field(s)) — one row per
 knob+field, the tools grouped by the value each carries:
 
 | knob | field | the values (the tools carrying each) |
@@ -172,7 +172,6 @@ knob+field, the tools grouped by the value each carries:
 | `client-timeout` | `live` | `limits/client-timeout` (cache) · `metrics/limits/timeout` (scraper) · `client-timeout` (inverter, dashboard) |
 | `control-log-replies` | `env` | *absent* (cache, scraper, inverter) · `CONTROL_LOG_REPLIES` (dashboard) |
 | `control-ops-verbs` | `default` | `show,flush` (cache) · `show` (scraper, inverter, dashboard) |
-| `dump-interval` | `live` | `dump/interval` (cache) · `dump-interval` (scraper, inverter, dashboard) |
 | `listen` | `default` | `127.0.0.1:15502` (cache) · `127.0.0.1:9350` (scraper) · `127.0.0.1:5502` (inverter) · `127.0.0.1:8080` (dashboard) |
 | `local-time` | `env` | `LOCAL_TIME` (cache, scraper, dashboard) · *absent* (inverter) |
 | `log-access` | `env` | `LOG_ACCESS` (cache, scraper, dashboard) · *absent* (inverter) |
@@ -182,8 +181,8 @@ knob+field, the tools grouped by the value each carries:
 
 **The command vocabularies** (the wire words per tool):
 
-- cache: `help`, `inspect`, `ping`, `quit`, `request`, `request/flush`, `request/flush/cache`, `request/dump`, `request/dump`, `request/dump/with-cache`, `request/reload`, `request/reload-config`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `clear`
-- scraper: `help`, `inspect`, `ping`, `poll`, `poll/now`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `clear`
+- cache: `help`, `inspect`, `ping`, `quit`, `request`, `request/flush`, `request/flush/cache`, `request/poll`, `request/poll/now`, `request/dump`, `request/dump`, `request/dump/with-cache`, `request/reload`, `request/reload-config`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `clear`
+- scraper: `help`, `inspect`, `ping`, `quit`, `request`, `request/dump`, `request/poll`, `request/poll/now`, `request/reload`, `request/reload-config`, `request/restart`, `request/restore`, `set`, `show`, `shutdown`, `clear`
 - inverter: `exit`, `help`, `inspect`, `logout`, `ping`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restore`, `reset`, `set`, `show`, `shutdown`, `clear`
 - dashboard: `help`, `inspect`, `ping`, `quit`, `request`, `request/dump`, `request/reload`, `request/reload-config`, `request/restore`, `set`, `show`, `shutdown`, `clear`
 
@@ -196,7 +195,7 @@ knob+field, the tools grouped by the value each carries:
   restart-marked overrides fold in the exec).
 - `reset` (the SIGUSR1 scenario reset) + `exit`/`logout` — the fake's
   console verbs (F11).
-- `poll/now` — the scraper's poll trigger.
+- `request/poll/now` — the scraper's poll trigger.
 
 The findings:
 
@@ -237,8 +236,8 @@ canon the operators grep for.
 | dashboard | `ACL-FILE`, `RELOAD`, `SHUTDOWN`, `START` |
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
-**The phrase canon**: 23 log phrase(s) shared by >= 2 tools;
-90 tool-local. The canon (the lead clause, the tools that speak it):
+**The phrase canon**: 24 log phrase(s) shared by >= 2 tools;
+89 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
@@ -257,6 +256,7 @@ canon the operators grep for.
 | `restore-on-start:` | dashboard, inverter, scraper |
 | `control: state dumped to` | cache, common |
 | `control: state restored from` | cache, common |
+| `control: request poll now the loop wakes immedia` | cache, scraper |
 | `control: the dump to` | cache, common |
 | `sighup: reloaded` | cache, inverter |
 | `poll cycle crashed ` | cache, scraper |

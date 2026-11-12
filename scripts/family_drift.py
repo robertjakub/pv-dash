@@ -779,7 +779,7 @@ KNOBS_VERBS = """\
   restart-marked overrides fold in the exec).
 - `reset` (the SIGUSR1 scenario reset) + `exit`/`logout` — the fake's
   console verbs (F11).
-- `poll/now` — the scraper's poll trigger."""
+- `request/poll/now` — the scraper's poll trigger."""
 
 KNOBS_FINDINGS = """\
 The findings:

@@ -1233,6 +1233,22 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
 
 ### Added
 
+- **tests** — **the shared suite harness lands**: `tests/harness.py` —
+  the import IS the boot (the PV_RUN_DIR gate, the scratch, the
+  profile/port-base binding, the NOTE stamp) and the star import
+  carries the check accumulator, the daemon spawn/teardown
+  (`start`/`procs`/`kill_all`) and the Modbus frame helpers (`recvn`,
+  `pack_mbap`, `mbap`). All ten suites graduate onto it — the private
+  gate/check/frame copies die, the suites keep their paths, port
+  consts and thin wrappers. Three latent bugs died in the graduation:
+  the crash handlers of four suites printed FAIL and fell through to
+  exit 0 (the battery's SUITE row believed the exit code, the tally's
+  log grep did not); the harness check now stringifies its detail and
+  indents every line (audit-chain embeds the verifier's own FAIL
+  verdict lines as details — at column 0 they posed as check rows);
+  and a pure pack builder joined the transaction helper it was
+  hand-inlined in.
+
 - **extras** — **the audit trail's Graylog content pack lands under
   `extras/graylog/`** (the new extras/ home for the operator-side packs
   nothing in the build or runtime path consumes):

@@ -277,7 +277,7 @@ def main():
                     'metrics-max-clients': '%d' % cfg['metrics_max_clients'],
                     'metrics-client-timeout': '%g' % cfg['metrics_client_timeout'],
                     'metrics-max-conn-per-ip': '%d' % cfg['metrics_max_conn_per_ip'],
-                    'requests-audit': 'off' if not cfg['requests_audit_s'] else '%g' % cfg['requests_audit_s'],
+                    'audit-requests': 'off' if not cfg['requests_audit_s'] else '%g' % cfg['requests_audit_s'],
                     'dump-interval': 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval'],
                     'log-level': cfg['level'],
                     'local-time': 'on' if cfg['local_time'] else 'off',

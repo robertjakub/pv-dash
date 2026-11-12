@@ -132,7 +132,7 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--audit-forward` | off | also forward every audit line: `syslog` (the local socket auto-scan), `syslog:/path`, `udp://host[:514]` (RFC5426) or `tcp://host[:514]` (RFC6587) — the off-box copy, F10 |
 | `--audit-forward-format` | `rfc5424` | the remote forward's envelope: `rfc5424` or `cef` — the local syslog forms keep the verbatim send |
 | `--audit-max-mb` / `--audit-daily` / `--audit-files` / `--no-audit-log` | `10` / off / `3` / off | rotation at size / at UTC midnight / backups kept / the off switch |
-| `--requests-audit` | `300` | audit one `REQUESTS` tally per client per this many seconds, `0` = off |
+| `--audit-requests` | `300` | audit one `REQUESTS` tally per client per this many seconds, `0` = off |
 | **Logging** | | |
 | `--log-level` | `INFO` | `DEBUG` adds per-client traffic and per-poll detail |
 | `--log-access` | off | log client connects/disconnects at `INFO` |
@@ -488,7 +488,7 @@ audit's F10): any edit, deletion or reordering shows up as a chain break in
 a journald dump on stdin). **Every wire command is audited once, by the
 server** (with the client peer, the role, and the frame's mac when the wire
 is signed); the per-client **request accounting** rides the same trail (one
-`REQUESTS` event per client per `--requests-audit` period, plus a final
+`REQUESTS` event per client per `--audit-requests` period, plus a final
 tally on every disconnect). The trail is thread-safe and flushed per event.
 
 Useful filters:

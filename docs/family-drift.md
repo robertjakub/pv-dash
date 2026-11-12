@@ -119,7 +119,7 @@ The findings:
   the scraper's are the same shape — `while True: try poll_once()
   except log-crashed; wait(interval) on a wake Event; clear` — with
   the deltas as the content (the cache's duration stats and the
-  requests-audit timer; the scraper's clamped wait and the live
+  audit-requests timer; the scraper's clamped wait and the live
   interval re-read). A fold needs three hooks for two users; the
   shape is the doc's to keep, not the code's.
 - **The /metrics tier (at parity).** The common server owns the
@@ -159,7 +159,7 @@ four registries; 34 names carry in all four:
 
 | tool | only-there knobs |
 |---|---|
-| cache | `acl`, `allow-write`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-auth-upstream`, `modbus-auth-upstream-key`, `profile`, `read-delay`, `requests-audit`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
+| cache | `acl`, `allow-write`, `audit-requests`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-auth-upstream`, `modbus-auth-upstream-key`, `profile`, `read-delay`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
 | scraper | `auth-token`, `grid-positive-import`, `interval`, `max-grid-kw`, `max-kwp`, `merge-gap`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-offset`, `modbus-unit`, `modbus/caps`, `profile`, `read-delay`, `timeout`, `upstream` |
 | inverter | `allow-write`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `modbus-auth-key`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
 | dashboard | `auth`, `auth-token`, `config-js`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
@@ -427,7 +427,7 @@ published port not backed by a registry default is a lie.
 | `docker/demo/compose.yaml` | `AUTH_TOKEN`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `MODBUS_AUTH`, `MODBUS_AUTH_KEY`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
 | `docker/entrypoints/entrypoint-prometheus.sh` | `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `SECURITY`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
 | `docker/entrypoints/entrypoint.sh` | `JSON`, `README`, `REQUIRED`, `SECURITY` | — |
-| `docker/env/cache.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN` … | — |
+| `docker/env/cache.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUDIT_REQUESTS`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP` … | — |
 | `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONFIG_JS`, `CONTROL_LOG_REPLIES`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP` … | — |
 | `docker/env/fake.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CIDR`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |

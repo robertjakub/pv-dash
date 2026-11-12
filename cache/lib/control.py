@@ -369,12 +369,12 @@ class ControlServer(_ControlServer):
                 p.metrics_srv.max_per_ip = v
                 p.metrics_srv._http.gate.max_per_ip = v
             return '%d' % v
-        if key == 'requests-audit':
+        if key == 'audit-requests':
             if val in ('off', 'none', '0'):
                 p.requests_audit_s = 0
                 p.config['requests_audit_s'] = 0
                 return 'off'
-            v = num(val, 'requests-audit', 'seconds or off')
+            v = num(val, 'audit-requests', 'seconds or off')
             self._gate_range(key, v, 'seconds')
             p.requests_audit_s = v
             p.config['requests_audit_s'] = v
@@ -515,7 +515,7 @@ class ControlServer(_ControlServer):
             return '%d' % p.metrics_caps[2]
         if key == 'dump-with-cache':
             return 'on' if p.dump_with_cache else 'off'
-        if key == 'requests-audit':
+        if key == 'audit-requests':
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
         if key == 'log-access':
             return 'on' if p.log_access else 'off'
@@ -711,7 +711,7 @@ class ControlServer(_ControlServer):
             'metrics-max-clients': p.metrics_caps[0],
             'metrics-client-timeout': p.metrics_caps[1],
             'metrics-max-conn-per-ip': p.metrics_caps[2],
-            'requests-audit': p.requests_audit_s,
+            'audit-requests': p.requests_audit_s,
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'log-access': 'on' if p.log_access else 'off',
             'profile': p.config.get('profile'), 'selection': p.config.get('selection') or 'all',

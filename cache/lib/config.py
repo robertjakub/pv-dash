@@ -32,7 +32,7 @@ OPT = {o.name: o for o in OPTIONS}
 
 
 def off_float(text):
-    """The off-worded floats (cache-ttl, requests-audit): the documented
+    """The off-worded floats (cache-ttl, audit-requests): the documented
     off word rides as 0 — the wire branches' own mapping. A plain number
     parses as before; the row's min/max bounds stay validate_config's."""
     return 0.0 if str(text).strip().lower() in ('off', 'none') else float(text)
@@ -314,8 +314,8 @@ def validate_config(cfg):
         fail('cache_ttl', 'must be >= 0')
     if cfg['cache_ttl'] > OPT['cache-ttl'].max:
         fail('cache_ttl', 'must be <= %g' % OPT['cache-ttl'].max)
-    if cfg['requests_audit_s'] > OPT['requests-audit'].max:
-        fail('requests_audit', 'must be <= %g' % OPT['requests-audit'].max)
+    if cfg['requests_audit_s'] > OPT['audit-requests'].max:
+        fail('audit-requests', 'must be <= %g' % OPT['audit-requests'].max)
     if cfg['max_clients'] < 0:
         fail('max_clients', 'must be >= 0')
     if cfg['client_timeout'] < 0:
@@ -343,7 +343,7 @@ def validate_config(cfg):
     if not (AUDIT_FILES_MIN <= cfg['audit_files'] <= AUDIT_FILES_MAX):
         fail('audit_files', 'must be %d..%d' % (AUDIT_FILES_MIN, AUDIT_FILES_MAX))
     if cfg['requests_audit_s'] < 0:
-        fail('requests_audit', 'must be >= 0 (0 = off)')
+        fail('audit-requests', 'must be >= 0 (0 = off)')
     if cfg['dump_interval'] < 0:
         fail('dump_interval', 'must be >= 0 (0 = off)')
     if cfg['dump_interval'] and not cfg['dump_path']:
@@ -477,8 +477,8 @@ def resolve_config(args, script_dir=None):
                                strict_bounds=True),
         'no_audit_log': resolve_bool(getattr(args, 'no_audit_log', False) or None, 'NO_AUDIT_LOG',
                                      'no_audit_log', DEFAULTS['no_audit_log']),
-        'requests_audit_s': resolve(getattr(args, 'requests_audit', None), 'REQUESTS_AUDIT',
-                                    'requests_audit_s', DEFAULTS['requests_audit'], off_float),
+        'requests_audit_s': resolve(getattr(args, 'audit_requests', None), 'AUDIT_REQUESTS',
+                                    'requests_audit_s', DEFAULTS['audit_requests'], off_float),
         'dump_path': resolve(getattr(args, 'dump_path', None), 'DUMP_PATH',
                              'dump_path', DEFAULTS['dump_path'], str),
         'dump_key': parse_secret((resolve(getattr(args, 'dump_key', None), 'DUMP_KEY',

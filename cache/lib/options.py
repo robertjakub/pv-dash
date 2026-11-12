@@ -57,7 +57,7 @@ OPTIONS = _load_options()
 OPTION_BY_NAME = {o.name: o for o in OPTIONS}
 
 # the resolved-config keys that do not follow the name.replace('-', '_') rule
-CFG_KEYS = {'log-level': 'level', 'requests-audit': 'requests_audit_s', 'cache-ttl': 'cache_ttl'}
+CFG_KEYS = {'log-level': 'level', 'audit-requests': 'requests_audit_s', 'cache-ttl': 'cache_ttl'}
 
 # the control grammar's live settings — the SAME rows, viewed from the wire
 # (the `set`/`clear` vocabulary, the console completions and word-help);

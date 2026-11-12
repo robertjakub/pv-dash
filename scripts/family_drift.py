@@ -747,7 +747,7 @@ The findings:
   the scraper's are the same shape — `while True: try poll_once()
   except log-crashed; wait(interval) on a wake Event; clear` — with
   the deltas as the content (the cache's duration stats and the
-  requests-audit timer; the scraper's clamped wait and the live
+  audit-requests timer; the scraper's clamped wait and the live
   interval re-read). A fold needs three hooks for two users; the
   shape is the doc's to keep, not the code's.
 - **The /metrics tier (at parity).** The common server owns the

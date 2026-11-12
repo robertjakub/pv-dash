@@ -238,7 +238,7 @@
     { "name": "no-audit-log", "flag": "--no-audit-log", "env": "NO_AUDIT_LOG", "conv": "bool",
       "live": "audit/disable", "setting-help": "disable the audit trail entirely", "values": [ "on", "off" ],
       "default": false, "help": "disable the CACHE audit trail" },
-    { "name": "requests-audit", "flag": "--requests-audit", "env": "REQUESTS_AUDIT", "conv": "float",
+    { "name": "audit-requests", "flag": "--audit-requests", "env": "AUDIT_REQUESTS", "conv": "float",
       "live": "audit/requests", "setting-help": "audit one REQUESTS tally per client per this many seconds",
       "values": [ "off" ], "hint": "s|off", "value-help": { "off": "no per-client request tallies" }, "default": 300,
       "help": "audit one REQUESTS tally per client per this many seconds, 0 = off", "min": 1, "max": 86400 },

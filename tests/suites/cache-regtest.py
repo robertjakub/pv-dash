@@ -692,6 +692,11 @@ try:
           r.startswith('ok knobs') and '--interval' in r and '$INTERVAL' in r
           and 'set modbus interval <value>' in r and '--control-ops-token' in r and ', secret' in r
           and 'set modbus upstream <value>, restart' in r, r[:200])   # the restart-marked knob carries the suffix
+    body = r.split('\n')
+    names = [ln.split()[0] for ln in body[2:] if ln.strip()]
+    check('show knobs: one flattened table sorted by name under a header',
+          body[1].split() == ['knob', 'flag', 'env', 'change'] and names == sorted(names)
+          and '# --- ' not in r, repr(body[1][:120]))
     r = ctl_cmd('help knobs', 15514 + BASE)
     check('help knobs: the same dictionary under the help verb', r.startswith('ok knobs'), r[:80])
     r = ctl_cmd('show uplink', 15514 + BASE)
@@ -1219,12 +1224,13 @@ try:
     check('show config: the clear ttl returns the configured value',
           'set cache ttl 30.0' in r, r[:160])   # the default is the tree's flat 30 s
     ctl_cmd('set write-registers any', 15530 + BASE)
-    # requests-audit: the live name is the wire spelling (the branch keys it)
-    r = ctl_cmd('set requests-audit 120', 15530 + BASE)
-    check('audit requests: the live set answers the path name', r.startswith('ok requests-audit='), r[:90])
-    r = ctl_cmd('show requests-audit', 15530 + BASE)
-    check('audit requests: the show answers the tally seconds', r == 'ok requests-audit=2.00m', r)
-    ctl_cmd('clear requests-audit', 15530 + BASE)
+    # audit-requests: the live name is the wire spelling (the branch keys it)
+    r = ctl_cmd('set audit-requests 120', 15530 + BASE)
+    check('audit requests: the flat name answers the set (the words spelling rides the console)',
+          r.startswith('ok audit-requests='), r[:90])
+    r = ctl_cmd('show audit-requests', 15530 + BASE)
+    check('audit requests: the show answers the tally seconds', r == 'ok audit-requests=2.00m', r)
+    ctl_cmd('clear audit-requests', 15530 + BASE)
     # the live caps: raising the cap serves the second concurrent client, lowering 503s it again
     r = ctl_cmd('set metrics-max-clients 2', 15530 + BASE)
     check('metrics limits: the live cap set', r.startswith('ok metrics-max-clients=2'), r[:90])
@@ -1687,7 +1693,7 @@ try:
                    '--listen', '127.0.0.1:%d' % (15521 + BASE), '--interval', '1', '--cache-ttl', '3',
                    '--allow-write', '--control-port', '%d' % (15522 + BASE),
                    '--profile', fc4map, '--audit-log', os.path.join(SCRATCH, 'reg_audit_fc4.log')],
-                  log=os.path.join(SCRATCH, 'reg_fc4.log'), env_extra={'REQUESTS_AUDIT': '1',
+                  log=os.path.join(SCRATCH, 'reg_fc4.log'), env_extra={'AUDIT_REQUESTS': '1',
                                                      'CONTROL_TOKEN': 'sekrit'})
     time.sleep(2.5)
     b = rd(32064, 2, port=15521 + BASE)

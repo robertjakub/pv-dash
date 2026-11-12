@@ -145,7 +145,7 @@ they name the wire.
   away. Outcome: the alias dies; `metrics/listen` is the /metrics bind
   only.
 - **the access-audit trio, three names, one job** `[all]` —
-  `requests-audit` (cache, `cache/lib/options.json:230`, an interval
+  `audit-requests` (cache, `cache/lib/options.json:241`, an interval
   knob), `log-access` (scraper/dashboard, on/off), `log-queries`
   (dashboard only, no startup env, `dashboard/lib/options.json:153`);
   the inverter has none. The cache row's own `min: 1` contradicts its

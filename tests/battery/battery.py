@@ -128,14 +128,14 @@ NAME = re.sub(r'\s+', ' ', NAME).strip()[:64].strip()
 
 PROFILE = ARGS[0] if ARGS else 'commit'
 PROFILES = {
-    'commit':    ('cache-stress cache-fuzz cache-control-fuzz audit-chain control-fuzz dashboard-control-fuzz inverter-regtest scrape-fuzz', 100, 1, 15545, 15977),
-    'common':    ('audit-chain control-fuzz cache-control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', 100, 1, 15545, 15977),
-    'cache':     ('cache-regtest cache-fuzz cache-control-fuzz audit-chain', 100, 0, None, None),
-    'inverter':  ('inverter-regtest control-fuzz audit-chain', 100, 0, None, None),
-    'scraper':   ('scrape-regtest scrape-fuzz audit-chain', 100, 0, None, None),
-    'dashboard': ('dashboard-control-fuzz audit-chain', 100, 0, None, None),
-    'quick':     ('cache-regtest inverter-regtest scrape-regtest audit-chain cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', 300, 0, None, None),
-    'full':      ('cache-regtest inverter-regtest scrape-regtest audit-chain cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', '', 0, None, None),
+    'commit':    ('check-options cache-stress cache-fuzz cache-control-fuzz audit-chain control-fuzz dashboard-control-fuzz inverter-regtest scrape-fuzz', 100, 1, 15545, 15977),
+    'common':    ('check-options audit-chain control-fuzz cache-control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', 100, 1, 15545, 15977),
+    'cache':     ('check-options cache-regtest cache-fuzz cache-control-fuzz audit-chain', 100, 0, None, None),
+    'inverter':  ('check-options inverter-regtest control-fuzz audit-chain', 100, 0, None, None),
+    'scraper':   ('check-options scrape-regtest scrape-fuzz audit-chain', 100, 0, None, None),
+    'dashboard': ('check-options dashboard-control-fuzz audit-chain', 100, 0, None, None),
+    'quick':     ('check-options cache-regtest inverter-regtest scrape-regtest audit-chain cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', 300, 0, None, None),
+    'full':      ('check-options cache-regtest inverter-regtest scrape-regtest audit-chain cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', '', 0, None, None),
 }
 if PROFILE in PROFILES:
     SUITES = PROFILES[PROFILE][0].split()

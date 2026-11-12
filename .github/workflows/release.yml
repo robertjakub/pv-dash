@@ -17,6 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         suite:
+          - check-options.py
           - cache-regtest.py
           - scrape-regtest.py
           - cache-stress.py

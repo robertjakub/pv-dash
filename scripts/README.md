@@ -36,8 +36,9 @@ scripts.
   NixOS-option parity, the row defaults present and conv-typed (a
   secret carries none), the ops-verbs default pinned to the
   derivation, the bundled configs naming registry options
-  only. `python3 scripts/check_options.py` (the ten-suite battery's
-  precondition).
+   only. `python3 scripts/check_options.py` — and a battery suite
+   itself: [tests/check-options.py](../tests/suites/check-options.py)
+   runs the gate first in every profile and re-emits its rows.
 - **[`lint/options.py`](lint/options.py)** — lint + reformat the four
   `lib/options.json` registries: the canonical row order, the
   hand-formatted layout (edits must be surgical — the lint enforces

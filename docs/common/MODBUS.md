@@ -13,7 +13,7 @@ The dashboard never speaks Modbus.
 One scheme, three shapes: every tool runs the same Modbus TCP dialect —
 the same MBAP framing, the same exception rules, the same optional `suite`
 auth handshake — with the family's one protocol tree
-(`common/modbus/protocol.json`): the limits (max_pdu 253,
+(`shared/suite/protocol.json`): the limits (max_pdu 253,
 max_registers 65536, max_count 125, max_bits 2000), the unit-id range
 (1..247 — every tool checks the configured unit against it, and the two
 Modbus server faces refuse out-of-range unit ids in-band with exception
@@ -162,7 +162,7 @@ The one table is `FC_NAMES` (`common/modbus/protocol.py`); `describe_fc`
 renders `FC6 (write single register)` or bare `FC<n>` for unlisted codes.
 The cache's sets: `READ_FUNCS = (1, 2, 3, 4)` — the four address spaces,
 each cached separately — and `WRITE_FUNCS = {5, 6, 15, 16, 22, 23}`, both
-from the shared `common/modbus/protocol.json`'s `read_funcs`/`write_funcs`.
+from the family's `shared/suite/protocol.json`'s `read_funcs`/`write_funcs`.
 Unknown codes forward untouched. The scraper is **read-only** — it never
 issues writes (no write API — the shared client exposes reads only); only
 the cache originates them (when enabled), and the fake implements
@@ -274,7 +274,7 @@ FC   byte_count   packed bits          # byte_count = (count + 7) // 8
 
 Bit `i` of the request span lives in byte `i >> 3`, bit position `i & 7`.
 Read quantity: 1..2000 bits (the spec's `0x7D0`; `MAX_BITS` in the
-shared `common/modbus/protocol.json`). The cache stores each bit as a 0/1 word in its
+shared `shared/suite/protocol.json`). The cache stores each bit as a 0/1 word in its
 `(fc, addr)` map and repacks on reply; the scraper's `read_bits` returns
 one 0/1 per address. The fake serves FC1 from its coil space (profile
 `bit`/`fc: 1` entries + the FC5/FC15 writes + `set coil`), FC2 from the
@@ -323,7 +323,7 @@ drop the coil space (FC1).
 
 The builder is `exception_frame` (`common/modbus/protocol.py`): a PDU of
 `[func | 0x80, code]`, `length = 3`. Codes the suite generates
-(the `exceptions` block of the shared `common/modbus/protocol.json`):
+(the `exceptions` block of the family's `shared/suite/protocol.json`):
 
 | Code | Name | When |
 |---|---|---|
@@ -423,7 +423,7 @@ replayed to clients).
 
 The knobs name the cell's owner — the console spelling of the knob behind
 the number (`set modbus timeout <v>` on the ctl speaks it). The knob-less
-rows are the shared tree's constants (`common/modbus/protocol.json`) —
+rows are the shared tree's constants (`shared/suite/protocol.json`) —
 `max_pdu`, `max_count`, the register space and the listen backlog carry
 no knob.
 

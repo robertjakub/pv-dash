@@ -393,7 +393,7 @@ scraper/
 └── lib/
     ├── defaults.json      # the static constants: diagnostics block, log levels (the protocol
     ├── metrics.json       # the built-in inputs + the four canonical metrics + the scraper_* specs
-    ├── statics.py         #   limits live in common/modbus/protocol.json)
+    ├── statics.py         #   limits live in shared/suite/protocol.json)
     ├── protocol.py        # Modbus TCP client (hardened framing)
     ├── config.py          # settings resolution + validation
     ├── metrics.py         # metrics.json loader

@@ -103,7 +103,7 @@ they name the wire.
   the inverter stays `unit` with no env twin and no live at all
   (`inverter/lib/options.json:50` — startup-only by absence). The
   range half landed: one shared tree gates every tool with a unit knob
-  (`common/modbus/protocol.json` — 1..247, `unit_in_range`; start and
+  (`shared/suite/protocol.json` — 1..247, `unit_in_range`; start and
   reload validate, the Modbus servers refuse out-of-range ids in-band,
   `check_options.py` gates the check). What remains: the scraper's row
   still declares `min: 0, max: 255` and only its live set gates on it

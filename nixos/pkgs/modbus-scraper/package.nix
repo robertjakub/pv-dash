@@ -36,14 +36,14 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../../../common}/serve/*.py $out/share/modbus-scraper/common/serve/
     install -dm755 $out/share/modbus-scraper/common/wire
     install -m644 ${../../../common}/wire/*.py $out/share/modbus-scraper/common/wire/
-    install -m644 ${../../../common}/wire/defaults.json $out/share/modbus-scraper/common/wire/
+    install -m644 ${../../../shared}/suite/wire.json $out/share/modbus-scraper/shared/suite/
     install -dm755 $out/share/modbus-scraper/shared/suite
     install -m644 ${../../../shared}/suite/texts.json $out/share/modbus-scraper/shared/suite/
     install -m644 ${../../../shared}/suite/tags.json $out/share/modbus-scraper/shared/suite/
     install -m644 ${../../../shared}/suite/options.json $out/share/modbus-scraper/shared/suite/
     install -dm755 $out/share/modbus-scraper/common/modbus
     install -m644 ${../../../common}/modbus/*.py $out/share/modbus-scraper/common/modbus/
-    install -m644 ${../../../common}/modbus/protocol.json $out/share/modbus-scraper/common/modbus/
+    install -m644 ${../../../shared}/suite/protocol.json $out/share/modbus-scraper/shared/suite/
     install -Dm644 examples/metrics.json $out/share/modbus-scraper/metrics.json
     install -Dm644 examples/modbus-scraper.conf $out/share/modbus-scraper/modbus-scraper.conf
     install -Dm644 ${../../../extras/alerts}/scraper.yml $out/share/modbus-scraper/alerts.yml

@@ -36,8 +36,8 @@ from common.runtime.version import version_string
 from common.wire.wiresec import ROLE_ADMIN, ROLE_OPS, command_verb, proof_tag, role_allows, \
     role_tag, sanitize_command, sign_reply, verify_request_mac
 
-_here = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(_here, 'defaults.json'), encoding='utf-8') as _f:
+_tree = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+with open(os.path.join(_tree, 'shared', 'suite', 'wire.json'), encoding='utf-8') as _f:
     CONTROL_WIRE_DEFAULTS = json.load(_f)    # the shared control-wire tree (flat: the cli_* keys)
 
 # the clients' wire constants, off the same tree (the four lib/statics.py

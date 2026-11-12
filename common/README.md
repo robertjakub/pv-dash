@@ -34,8 +34,8 @@ the ACL map, the defaults ladder:
 
 ## `wire/` — the signed control wire, both ends
 
-The wire's own defaults tree is `defaults.json` beside the modules — a
-flat `cli_*` tree (the timeout/keepalive/reconnect cluster, the
+The wire's own defaults tree is `shared/suite/wire.json` at the tree
+root — a flat `cli_*` tree (the timeout/keepalive/reconnect cluster, the
 session's idle cap and the line cap; one home for the family, the
 tools' `statics.py` alias it).
 
@@ -44,7 +44,6 @@ tools' `statics.py` alias it).
 | `control.py` | the control server's base: the wire tier (the unix/TCP listener with the 0600/0660 mode, the peer-cred trusted peers, the admin/ops roles, the HMAC frame verification — the reply status speaks `ok`/`fail`/`note`/`bye`), the listener's live-rebind family (rev. 22: `set control/port` swaps the socket bind-first, the failed bind rolls back, the sessions keep serving; the F5 refusal guards the live wire through `refuse_tokenless_rebind`/`refuse_token_drop`), the buffered session handler, the registry surfaces (help config / show knobs / the golden `show config`), the family's `command()` walk (the spine: the help/topic ladder, the set/clear pair, the show reports, the request namespace — the subclasses ride the hooks) and the dump/reload family — the four tools subclass it with their grammar wiring and their reports |
 | `wiresec.py` | the control wire's integrity layer: the full-HMAC frame signing/verification, the token auth, the RBAC roles (admin / the read-only ops shift) |
 | `cred.py` | peer-credential lookup for the unix control sockets (`SO_PEERCRED`/`LOCAL_PEERCRED`) — the kernel-vouched trusted peers |
-| `protocol.json` | the Modbus family's one shared tree: the protocol limits (max_pdu/max_count/max_bits/max_registers/socket_timeout), the unit range, the read/write FC policy, the exception codes and the registers' type->words map — the three Modbus tools' `statics.py` project it, the `modbus timeout` knobs ride its socket_timeout |
 
 | `cli.py` | the console-style cli client, one implementation: the signed session with its reconnect cycle, the keepalive thread, the readline TAB completion and the typed-command loop with the confirm guards — the four `*-cli` bins keep their pools, candidates ladder, welcome and (the fake) its verb-first loop, passed as a spec dict |
 

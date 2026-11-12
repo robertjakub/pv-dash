@@ -36,14 +36,14 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../../../common}/serve/*.py $out/share/modbus-fake-inverter/common/serve/
     install -dm755 $out/share/modbus-fake-inverter/common/wire
     install -m644 ${../../../common}/wire/*.py $out/share/modbus-fake-inverter/common/wire/
-    install -m644 ${../../../common}/wire/defaults.json $out/share/modbus-fake-inverter/common/wire/
+    install -m644 ${../../../shared}/suite/wire.json $out/share/modbus-fake-inverter/shared/suite/
     install -dm755 $out/share/modbus-fake-inverter/shared/suite
     install -m644 ${../../../shared}/suite/texts.json $out/share/modbus-fake-inverter/shared/suite/
     install -m644 ${../../../shared}/suite/tags.json $out/share/modbus-fake-inverter/shared/suite/
     install -m644 ${../../../shared}/suite/options.json $out/share/modbus-fake-inverter/shared/suite/
     install -dm755 $out/share/modbus-fake-inverter/common/modbus
     install -m644 ${../../../common}/modbus/*.py $out/share/modbus-fake-inverter/common/modbus/
-    install -m644 ${../../../common}/modbus/protocol.json $out/share/modbus-fake-inverter/common/modbus/
+    install -m644 ${../../../shared}/suite/protocol.json $out/share/modbus-fake-inverter/shared/suite/
     install -dm755 $out/share/modbus-fake-inverter/profiles
     install -m644 ${../../../profiles/profiles}/*.json $out/share/modbus-fake-inverter/profiles/
     install -Dm644 ${../../../extras/examples}/acl-ip-prefix.json $out/share/modbus-fake-inverter/acl-ip-prefix.json

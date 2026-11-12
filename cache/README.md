@@ -536,7 +536,7 @@ cache/
 ├── man/                     # the generated man pages (scripts/gen_man.py)
 └── lib/
     ├── defaults.json     # the static constants: diagnostics block, log levels (the protocol
-    ├── statics.py       #   limits live in common/modbus/protocol.json)
+    ├── statics.py       #   limits live in shared/suite/protocol.json)
     ├── options.json     # the registry: one row per knob (the flags, the env twins, the help)
     ├── options.py       # its loader + the control-grammar wiring
     ├── config.py        # settings resolution + device-profile/acl-gate loading

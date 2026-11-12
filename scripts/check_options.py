@@ -222,7 +222,7 @@ def check_tool(tool):
                  '%s: the ops-verbs row\'s default matches the registry\'s default_ops_verbs%s'
                  % (tool, '' if got_verbs == expected_verbs
                     else ' — row: %r, derived: %r' % (got_verbs, expected_verbs))))
-    # the family's unit-id range (common/modbus/protocol.json): every tool
+    # the family's unit-id range (shared/suite/protocol.json): every tool
     # with a unit knob checks the configured unit against it — the
     # dashboard (no unit knob) sits out
     if any(o.name in ('unit', 'modbus-unit') for o in options):

@@ -178,6 +178,22 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   re-spell. The packaged and in-image layouts mirror the checkout again —
   the loaders' walk is unchanged in shape, one segment deeper.
 
+- **the protocol + wire constants join shared/suite/** —
+  `common/modbus/protocol.json` becomes `shared/suite/protocol.json` and
+  `common/wire/defaults.json` becomes `shared/suite/wire.json` (the
+  domain-named home: options / texts / tags / protocol / wire; the four
+  `<tool>/lib/defaults.json` statics keep their name and their
+  module-relative loads). The two loaders swap beside-the-module opens
+  for the tree-root walk (`common/modbus/protocol.py`,
+  `common/wire/control.py`), the four `package.nix` files install the
+  pair into `share/<tool>/shared/suite/`, and the four Dockerfiles COPY
+  them into `/pv-suite/shared/suite/` — which also fixes the images'
+  latent absence (the `*.py` COPY globs never carried the two JSONs
+  beside their modules, so an in-image import would have died on the
+  open). MODBUS.md, the tree notes, the TODOs and the READMEs re-spell;
+  the protocol.json row moves from common/README's wire table into the
+  shared/README table it belongs in.
+
 ### Added
 
 - **the four CLIs** — **the console pager**: every console reply prints

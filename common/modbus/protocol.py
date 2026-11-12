@@ -4,8 +4,8 @@ helpers, the bit packing, the function code table, the suite auth
 handshake and the Waveshare connection-password handshake. The client
 (scraper, cache upstream) and the servers (cache listener, fake inverter)
 layer their own framing on top; the family's protocol limits live in
-protocol.json beside this module (one tree, no per-tool drift) — the
-tools' lib/statics.py alias them."""
+shared/suite/protocol.json at the tree root (one tree, no per-tool
+drift) — the tools' lib/statics.py alias them."""
 import hashlib
 import hmac
 import json
@@ -13,8 +13,8 @@ import os
 import secrets
 import struct
 
-_here = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(_here, 'protocol.json'), encoding='utf-8') as _f:
+_tree = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+with open(os.path.join(_tree, 'shared', 'suite', 'protocol.json'), encoding='utf-8') as _f:
     PROTOCOL = json.load(_f)                 # the family's one protocol tree
 
 

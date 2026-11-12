@@ -24,7 +24,7 @@ page (the cbreak `-- more --` reader, the more(1) keys — space/return/q),
 retunes it live (never sent — no registry row, audited local), a line wider
 than the screen shortens with ` ...` (the wire keeps the tail), and a
 terminal under 20 rows/64 columns refuses the tty edition before the connect
-(cli_min_height/cli_min_width in wire/defaults.json; piped runs print
+(cli_min_height/cli_min_width in shared/suite/wire.json; piped runs print
 byte-for-byte and never check). The one-client wave retired the `-ctl` bin
 into `modbus-cache-cli`: run_client's three modes by invocation shape (words
 = one-shot with the raw verdict head, rc 0/1/2; piped stdin = batch; bare

@@ -217,7 +217,7 @@ the state dump: the live overrides' file, the restore-on-start
 | `show connections` | show-only | the live HTTP clients of /metrics: the gate counters, one row per peer IP |
 | `show uplink` | show-only | the inverter link: session counters, per-block latency and errors |
 | `show uplink-sources` | show-only | the register map: one row per polled register — fc, register, the range that fetches it, source |
-| `show version` | show-only | the modbus-scraper version |
+| `show version` | show-only | the suite version |
 | `show config` | show-only (hidden) | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
 | `show knobs` | show-only (hidden) | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
 | `show inputs` | show-only | the declared compute expression inputs (the reserved four and the spec's declared entries), each bracketed with the metric whose value it carries |

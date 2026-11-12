@@ -109,15 +109,14 @@
       "setting-help": "the live HTTP clients of /metrics: the gate counters, one row per peer IP" },
     { "name": "uplink", "shared": "uplink" },
     { "name": "uplink-sources", "shared": "uplink-sources", "live": "uplink/sources" },
-    { "name": "version", "setting-help": "the modbus-scraper version" },
+    { "name": "version", "shared": "version" },
     { "name": "config", "shared": "config" },
     { "name": "knobs", "shared": "knobs" },
     { "name": "inputs",
       "setting-help": "the declared compute expression inputs (the reserved four and the spec's declared entries), each bracketed with the metric whose value it carries" },
     { "name": "inputs-metrics", "live": "inputs/metrics",
       "setting-help": "the exported metrics: one [section]-bracketed line per metric the exposition serves (the built-in scraper_* block included), sorted by name" },
-    { "name": "metrics-acl-table", "live": "metrics/acl/table",
-      "setting-help": "the metrics ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs" }
+    { "name": "metrics-acl-table", "shared": "metrics-acl-table", "live": "metrics/acl/table" }
   ],
   "commands": [
     { "name": "help", "shared": "help" },

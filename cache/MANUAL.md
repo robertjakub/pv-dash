@@ -62,10 +62,10 @@ The kinds — every row of the tables below carries one:
 
 | command | kind | description |
 |---|---|---|
-| `help` | command (internal) | describe a word (help \<setting>) or map every knob (help config) |
+| `help` | command (internal) |  |
 | `inspect` | command | one pretty dump of everything (the status, the map, the counters, the write gate) |
-| `ping` | command (internal) | keep-alive: answers pong |
-| `quit` | command | close the session |
+| `ping` | command (internal) |  |
+| `quit` | command |  |
 | `request` | namespace | the state machinery: the dump written and restored, the cache dropped, the poll woken, the daemon reloaded |
 | `request flush` | namespace | drop the cached registers and repoll now |
 | `request flush cache` | command | drop the cached registers, repoll now (request flush cache) |
@@ -74,9 +74,9 @@ The kinds — every row of the tables below carries one:
 | `request dump` | namespace (hidden) | the state dump: the live overrides written sealed (with-cache carries the cached register words too) |
 | `request dump with-cache` | command (hidden) | the dump carries the cached register words too |
 | `request reload` | command | save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values) |
-| `request reload-config` | command | re-read the config file (the SIGHUP path) |
+| `request reload-config` | command |  |
 | `request restart` | command (hidden) | restart the upstream session: connection + cache dropped, repoll |
-| `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
+| `request restore` | command (hidden) |  |
 | `set` | command | configure a setting live: set \<setting> \<value> |
 | `show` | command | runtime state: show \<setting\|connections\|cache\|uplink\|version\|knobs> |
 | `shutdown` | command | stop the proxy gracefully (asks to confirm) |
@@ -179,7 +179,7 @@ limits
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `metrics-max-clients` | `set metrics limits max-clients` | settable | `N` | `--metrics-max-clients` / `METRICS_MAX_CLIENTS` | simultaneous HTTP clients on /metrics; extras get an immediate 503 |
+| `metrics-max-clients` | `set metrics limits max-clients` | settable | `N` | `--metrics-max-clients` / `METRICS_MAX_CLIENTS` | maximum concurrent /metrics clients; extras get an immediate 503, 0 = unlimited |
 | `metrics-client-timeout` | `set metrics limits timeout` | settable | `s` | `--metrics-client-timeout` / `METRICS_CLIENT_TIMEOUT` | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
 | `metrics-max-conn-per-ip` | `set metrics limits max-conn-per-ip` | settable | `N` | `--metrics-max-conn-per-ip` / `METRICS_MAX_CONN_PER_IP` | maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit |
 
@@ -204,9 +204,9 @@ the backup count
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit trail at this size in MB, 0 = no size rotation |
+| `audit-max-mb` | `set audit rotate max-size` | settable | `MB` | `--audit-max-mb` / `AUDIT_MAX_MB` | rotate the audit trail at this size in MB, keeping N backups; 0 = no size rotation |
 | `audit-daily` | `set audit rotate daily` | settable | `on\|off` | `--audit-daily` / `AUDIT_DAILY` | also rotate the audit trail at UTC midnight |
-| `audit-files` | `set audit rotate files` | settable | `N` | `--audit-files` / `AUDIT_FILES` | the rotated audit backups kept |
+| `audit-files` | `set audit rotate files` | settable | `N` | `--audit-files` / `AUDIT_FILES` | rotated audit backups to keep |
 
 ### dump
 

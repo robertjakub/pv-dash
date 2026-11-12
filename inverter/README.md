@@ -131,7 +131,7 @@ the config names one and the start refuses. The flags:
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the Modbus caps (refuse past the count / kick the silent / per-IP cap; `0` = no limit; `$MAX_CLIENTS` / `$CLIENT_TIMEOUT` / `$MAX_CONN_PER_IP`) |
 | `--connect-acl` | any | the Modbus clients allowed to connect: `any`, `none`, or a comma-separated IP/CIDR list — the family ACL map lives in [docs/common/ACL.md](../docs/common/ACL.md) |
 | `--allow-write` | off | accept Modbus writes (FC05/06/15/16): a write lands in the write overlay, logged and audited; off = every write refused with exception 01 |
-| `--modbus-auth` / `--auth-key` | `none` | the auth scheme the fake's Modbus clients must speak: `suite` = the crypt handshake (the scraper takes the matching `--modbus-auth suite --auth-key …`); the key is a secret, `file:<path>` welcome |
+| `--modbus-auth` / `--modbus-auth-key` | `none` | the auth scheme the fake's Modbus clients must speak: `suite` = the crypt handshake (the scraper takes the matching `--modbus-auth suite --modbus-auth-key …`); the key is a secret, `file:<path>` welcome |
 | `--metrics-server` / `--metrics-listen` | off / `127.0.0.1:9352` | the fake's own Prometheus `/metrics` (live-settable `set metrics-server on/off`; refuses to start beyond loopback without `--metrics-token` — the F13 shape) |
 | `--metrics-token` / `--metrics-acl` | off / `any` | the /metrics bearer token (`file:<path>` welcome) / the connect ACL (the ip-prefix grammar) |
 | `--metrics-max-clients` / `--metrics-client-timeout` / `--metrics-max-conn-per-ip` | `64` / `5` / `0` | the metrics caps |

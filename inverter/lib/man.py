@@ -45,7 +45,7 @@ the scrapers read (FC06/FC16 the registers, FC05/FC15 the coils, plus
 \\fB--chaos\\fR answers a fraction of requests hostile.
 .PP
 Modbus auth (\\fB--modbus-auth\\fR): with \\fBsuite\\fR the fake's clients prove
-a shared key (\\fB--auth-key\\fR, min 16 characters) with a crypt
+a shared key (\\fB--modbus-auth-key\\fR, min 16 characters) with a crypt
 handshake right after every connect \\(em 52 bytes: magic, fresh nonce,
 HMAC\\-SHA256 proof; the fake answers \\fBOK\\fR (plain Modbus follows) or
 \\fBERR\\fR (the client is dropped before it ever sees a register).

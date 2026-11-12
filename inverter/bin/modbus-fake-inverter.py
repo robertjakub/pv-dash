@@ -249,9 +249,9 @@ def main():
     connect_acl = parse_acl(args.connect_acl, 'connect-acl')
     modbus_auth = parse_auth_type(args.modbus_auth, 'modbus-auth')
     modbus_auth_key = check_auth_key(
-        parse_secret((args.auth_key or '').strip() or None, 'auth-key'), 'auth-key')
+        parse_secret((args.modbus_auth_key or '').strip() or None, 'auth-key'), 'auth-key')
     if modbus_auth and not modbus_auth_key:
-        logger.error('the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)')
+        logger.error('the suite auth needs a key: set --modbus-auth-key/$MODBUS_AUTH_KEY too (min 16 characters)')
         raise SystemExit(1)
     chaos = Chaos(args.chaos, seed=args.seed)
     dump_key = parse_secret((args.dump_key or '').strip() or None, 'dump-key')
@@ -331,7 +331,7 @@ def main():
                                     'control-token': bool(control_token),
                                     'control-ops-token': bool(control_ops_token),
                                     'metrics-token': bool(metrics_token),
-                                    'auth-key': bool(modbus_auth_key),
+                                    'modbus-auth-key': bool(modbus_auth_key),
                                     'dump-key': bool(dump_key)}),
                                 dump_path=args.dump_path, restore_on_start=args.restore_on_start,
                                 dump_key=dump_key, dump_interval=args.dump_interval,

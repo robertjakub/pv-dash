@@ -146,7 +146,7 @@ the Modbus session the fake serves: the auth scheme its clients must speak
 |---|---|---|---|---|---|
 | `profile` | `set modbus profile` | settable | `\<file>` | `--profile` / `PROFILE` | inverter profile (JSON: name -> register + optional type/scale) |
 | `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth scheme the fake's Modbus clients must speak: suite (the crypt handshake) or none |
-| `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
+| `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 
 ### write
 

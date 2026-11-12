@@ -39,7 +39,7 @@ the scrapers read (FC06/FC16 the registers, FC05/FC15 the coils, plus
 \fB--chaos\fR answers a fraction of requests hostile.
 .PP
 Modbus auth (\fB--modbus-auth\fR): with \fBsuite\fR the fake's clients prove
-a shared key (\fB--auth-key\fR, min 16 characters) with a crypt
+a shared key (\fB--modbus-auth-key\fR, min 16 characters) with a crypt
 handshake right after every connect \(em 52 bytes: magic, fresh nonce,
 HMAC\-SHA256 proof; the fake answers \fBOK\fR (plain Modbus follows) or
 \fBERR\fR (the client is dropped before it ever sees a register).
@@ -117,7 +117,7 @@ the crypt handshake (magic + nonce + HMAC proof of the shared key) right
 after every connect and drops the client on ERR/anything else;
 none/empty = no auth at all — the trusted\-LAN posture
 .TP
-.BI \-\-auth\-key " auth-key"
+.BI \-\-modbus\-auth\-key " modbus-auth-key"
 the shared key the fake's clients prove with the suite handshake (min 16
 characters); the value may be `file:<path>` — the first line of an
 owner\-only 0600 file (a systemd LoadCredential rides as

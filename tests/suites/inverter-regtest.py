@@ -983,7 +983,7 @@ def main():
         L_KEY = 'inv-suite-key-16chars!'
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (L_MODBUS),
                                        '--control-port', str(L_CTL), '--modbus-auth', 'suite',
-                                       '--auth-key', L_KEY],
+                                       '--modbus-auth-key', L_KEY],
                                       stdout=open(LOG + '.l', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.1)
         c = connect(L_MODBUS)
@@ -1023,19 +1023,19 @@ def main():
         check('suite auth: a bad magic answers ERR verbatim', verdict == b'ERR', verdict.hex())
         tx = ctl(L_CTL, 'show modbus-auth')
         check('suite auth: show modbus auth reads suite', tx == 'ok modbus-auth=suite', tx)
-        tx = ctl(L_CTL, 'show auth-key')
-        check('suite auth: the key never shows', tx.startswith('% error: auth-key is a secret'), tx[:80])
+        tx = ctl(L_CTL, 'show modbus-auth-key')
+        check('suite auth: the key never shows', tx.startswith('% error: modbus-auth-key is a secret'), tx[:80])
         tx = ctl(L_CTL, 'show modbus')
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
         check('node walk: the modbus listing answers the live words (the key never lists)',
-              words == ['auth', 'profile'] and 'auth-key' not in tx, tx[:160])
+              words == ['auth', 'profile'] and 'modbus-auth-key' not in tx, tx[:160])
         tx = ctl(L_CTL, 'show')
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
         check("node walk: the bare show answers the root in the console's own words",
               words == ['audit', 'batt', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
-                        'connect-acl', 'connections', 'control', 'dump', 'dump-interval', 'grid',
+                        'connect-acl', 'connections', 'control', 'dump', 'grid',
                         'grid-frequency', 'grid-frequency-wander', 'grid-outage',
                         'grid-voltage', 'grid-voltage-wander', 'load', 'max-clients', 'max-conn-per-ip', 'max-kwp',
                         'metrics', 'modbus', 'mppt', 'pv', 'registers', 'scenario', 'seed',
@@ -1044,13 +1044,13 @@ def main():
         tx = ctl(L_CTL, 'show control ops')
         check('node walk: the intermediate node lists its live children',
               tx.startswith('ok') and 'verbs' in tx and 'read-only ops role' in tx, tx[:80])
-        tx = ctl(L_CTL, 'clear auth-key')
+        tx = ctl(L_CTL, 'clear modbus-auth-key')
         check('suite auth: clear refuses the key (startup-only)',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:80])
-        tx = ctl(L_CTL, 'set auth-key short')
+        tx = ctl(L_CTL, 'set modbus-auth-key short')
         check('suite auth: startup-only — the short-key set refuses with the rest',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:100])
-        tx = ctl(L_CTL, 'set auth-key %s' % ('x' * 16))
+        tx = ctl(L_CTL, 'set modbus-auth-key %s' % ('x' * 16))
         check('suite auth: startup-only — the key set refuses (the dump-key treatment)',
               tx.startswith('% error: restart required (startup-only knob)'), tx[:80])
         c = connect(L_MODBUS)

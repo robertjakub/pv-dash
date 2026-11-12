@@ -79,8 +79,8 @@ regenerates the script from the running scraper (secrets hidden):
 # (the live path as words; the flat dashed knob name reads too, for older files)
 set modbus upstream 127.0.0.1:5502
 set modbus unit 1
-set metrics caps max-pv 6
-set metrics caps max-grid 12
+set modbus caps max-pv 6
+set modbus caps max-grid 12
 set system listen 127.0.0.1:9350
 set modbus interval 10
 set system log-level INFO
@@ -164,7 +164,7 @@ command, settable (`set`/`clear`) or show-only — is tabled in
 
 | Command | Effect |
 |---|---|
-| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `modbus interval`, `modbus timeout`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), the `metrics limits` caps, `metrics caps max-pv`/`metrics caps max-grid`, `system log-access`, `system log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit instance`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
+| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `modbus interval`, `modbus timeout`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), the `metrics limits` caps, `modbus caps max-pv`/`modbus caps max-grid`, `system log-access`, `system log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit instance`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
 | `show uplink` | the inverter link: session counters plus one row per poll block — status, latency, failures |
 | `show uplink-sources` | the register map: one row per polled register — fc, register, the range that fetches it, source |
 | `show connections` | the live HTTP clients of /metrics |

@@ -107,13 +107,23 @@ the inverter Modbus settings
 ### metrics
 
 the Prometheus /metrics exposition: the listen address, the serving limits,
-the display caps, the bearer auth, the connect ACL, the spec and the prefix
+the bearer auth, the connect ACL, the spec and the prefix
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `metrics-spec` | `set metrics filter` | settable | `PATH\|-` | `--metrics-spec` / `METRICS_SPEC` | metrics spec JSON, sectioned: {inputs: {name: {help}}, metrics: {key: {profile?, expr?, when?, help, type?}}, scraper:...} — the metrics entries are register- (profile) or expression-fed (expr/when) over the declared inputs (show inputs), merged in memory over the built-in lib/metrics.json scraper_* block |
 | `metric-prefix` | `set metrics prefix` | settable | `PREFIX` | `--metric-prefix` / `METRIC_PREFIX` | the prefix on the profile- and compute-fed metric names |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
+
+### modbus/caps
+
+the sanity caps the polled readings must pass: the PV array and the grid
+ceilings
+
+| knob | set / clear | kind | value | flag / env | description |
+|---|---|---|---|---|---|
+| `max-kwp` | `set modbus caps max-pv` | settable | `KW` | `--max-kwp` / `MAX_KWP` | maximum PV array kWp |
+| `max-grid-kw` | `set modbus caps max-grid` | settable | `KW` | `--max-grid-kw` / `MAX_GRID_KW` | maximum grid kW, either direction |
 
 ### system
 
@@ -126,16 +136,6 @@ the daemon's own serving socket: the listen address
 | `control-log-replies` | `set system log-replies` | settable | `on\|off` | `--control-log-replies` / — | DEBUG-log the full output of every control command (plainly: the command and its status log) |
 | `log-access` | `set system log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log every HTTP request at INFO |
 | `log-level` | `set system log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
-
-### metrics/caps
-
-the display caps the percentages clamp to: the PV array and the grid
-ceilings
-
-| knob | set / clear | kind | value | flag / env | description |
-|---|---|---|---|---|---|
-| `max-kwp` | `set metrics caps max-pv` | settable | `KW` | `--max-kwp` / `MAX_KWP` | maximum PV array kWp |
-| `max-grid-kw` | `set metrics caps max-grid` | settable | `KW` | `--max-grid-kw` / `MAX_GRID_KW` | maximum grid kW, either direction |
 
 ### metrics/limits
 

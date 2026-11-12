@@ -270,10 +270,9 @@ The control server speaks JSON lines ({"cmd": "..."} ->
 configured and refuses to start without one). Commands:
 \fBset\fR/\fBclear\fR/\fBshow\fR/\fBhelp\fR (the settings: modbus
 interval, modbus timeout, the modbus read delay, the modbus merge gap (the
-poll plan rebuilds), the metrics limits caps,
-the metrics caps
-max-pv/max-grid,
-log-access, log-level, control socket-group (re-modes the live unix socket
+poll plan rebuilds), the modbus caps sanity pair max-pv/max-grid, the
+metrics limits caps, log-access, log-level, control socket-group (re-modes
+the live unix socket
 0600/0660) \(em and the startup-only secrets: control token, the ops
 token, metrics auth token \(em the wire refuses set/clear, the value
 never rendering \(em \fBshow <secret>\fR refuses), \fBshow uplink\fR

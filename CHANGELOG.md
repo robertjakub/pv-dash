@@ -10,6 +10,15 @@ This file keeps **Unreleased and the current release** only — the release
 history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHANGELOG.md).
 
 ## Unreleased
+### Added
+
+- The registry's `only` mark — a row may name its one tool
+  (`"only": "scraper"`) to pin the knob tool-exclusive: the lint gates
+  the mark to a known tool in the file's own registry, refuses it beside
+  `shared` (the canon ref is the family-wide mark) and the family pass
+  fails any other registry rowing the same name. Unmarked rows stay free
+  to grow family-wide; the mark records the deliberate exclusion.
+
 ### Changed
 
 - **BREAKING: the inverter's profile knob speaks the cache's spelling** —

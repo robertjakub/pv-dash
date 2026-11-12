@@ -14,8 +14,11 @@ One canonical layout, so the hand styles stop diverging:
     six, the trailing newline.
 
 The lint (beyond scripts/check_options.py's grammar checks): unknown
-keys, missing names/descriptions, duplicate names, and — the big one —
-a row that does not read back as the canonical form.
+keys, missing names/descriptions, duplicate names, the `only` mark —
+a known tool, the file's own tool, never beside `shared` (the canon
+ref is the family-wide mark; `only` pins the knob tool-exclusive) —
+and — the big one — a row that does not read back as the canonical
+form.
 
   python3 scripts/lint_options.py             # reformat in place + report
   python3 scripts/lint_options.py --check     # report only, exit 1 if off-form
@@ -32,7 +35,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)   # the canon fold rides the loader's own implementation
 WIDTH = 118
 
-KEY_RANK = ('name', 'flag', 'env', 'no-env', 'conv', 'shared', 'group', 'live', 'alias', 'negates',
+KEY_RANK = ('name', 'flag', 'env', 'no-env', 'conv', 'shared', 'only', 'group', 'live', 'alias', 'negates',
             'setting-help', 'values', 'hint', 'value-help', 'default', 'help',
             'min', 'max', 'check', 'secret', 'internal', 'hidden', 'restart', 'node')
 KNOWN = set(KEY_RANK)
@@ -301,6 +304,18 @@ def lint(path):
             unknown = sorted(set(r) - KNOWN)
             if unknown:
                 nits.append('%s: %s: unknown key(s) %s' % (path, key, ', '.join(unknown)))
+            if 'only' in r:
+                own_tool = path.split(os.sep)[-3]
+                only = r['only']
+                if only not in TOOLS:
+                    nits.append('%s: %s: the only mark %r is not one of %s'
+                                % (path, key, only, ', '.join(TOOLS)))
+                elif only != own_tool:
+                    nits.append('%s: %s: the only mark %r names another tool\'s registry'
+                                % (path, key, only))
+                if r.get('shared'):
+                    nits.append('%s: %s: %r carries only and shared — the canon ref is the '
+                                'family-wide mark, pick one' % (path, key, r.get('name')))
             if key == 'show' and not r.get('setting-help') and not r.get('shared'):
                 nits.append('%s: show: %r carries no description' % (path, r.get('name')))
 
@@ -425,6 +440,22 @@ def family_lint():
                 if key is not None and key not in (canon.get(section) or {}):
                     nits.append('%s: the %s row %r refs the unknown canon key %r'
                                 % (t, section, r['name'], key))
+    # (a2) the exclusivity pass — an `only` mark pins the knob to its one
+    # tool: no other registry may row the same name in the same section
+    seated = {}
+    for t in TOOLS:
+        for section in ('options', 'show', 'commands'):
+            for r in metas[t].get(section) or []:
+                seated.setdefault((section, r['name']), []).append(t)
+    for t in TOOLS:
+        for section in ('options', 'show', 'commands'):
+            for r in metas[t].get(section) or []:
+                if r.get('only') is None:
+                    continue
+                peers = [x for x in seated.get((section, r['name']), []) if x != t]
+                if peers:
+                    nits.append('%s: the %s row %r marks only=%s but %s also rows the name'
+                                % (t, section, r['name'], r['only'], ', '.join(peers)))
     # (b) + (c): the effective rows per name
     for section in ('options', 'show', 'commands'):
         field_names = GATED if section == 'options' else (SECTION_FIELD[section],)

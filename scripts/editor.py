@@ -219,7 +219,7 @@ def dialog_wrapper(dialog, ed):
 # ---------------------------------------------------------------- the options face
 
 PROJECTS = ('cache', 'scraper', 'inverter', 'dashboard')
-INLINE = ('name', 'flag', 'env', 'conv', 'shared', 'group', 'live', 'alias', 'negates')
+INLINE = ('name', 'flag', 'env', 'conv', 'shared', 'only', 'group', 'live', 'alias', 'negates')
 EDITABLE = ('shared', 'group', 'live', 'alias', 'setting-help', 'hint', 'value-help', 'default', 'hidden', 'restart')
 SHOW_EDITABLE = ('shared', 'group', 'live', 'alias', 'setting-help', 'hidden')   # the registry's `show` rows: the
                                                                                  # canon ref, the bucket, the live

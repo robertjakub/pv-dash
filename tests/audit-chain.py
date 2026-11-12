@@ -18,26 +18,13 @@ import sys
 import tempfile
 import time
 
-if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
-    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
-             'a standalone run shares /tmp scratch and collides across sessions)')
-print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+from harness import *   # the boot: the gate, the NOTE stamp — the shared check accumulator
 
-PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
-    else os.environ.get('PV_SUITE_PROFILE', 'quick')
-
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V = os.path.join(REPO, 'scripts', 'audit_verify.py')
 sys.path.insert(0, REPO)
 from common.runtime.audit import AuditLog, entry_hash, GENESIS, audit_quote, audit_escape   # noqa: E402
 
-FAILURES = []
-
-
-def check(name, ok, detail=''):
-    print(('PASS ' if ok else 'FAIL ') + name + (' — ' + str(detail) if detail and not ok else ''))
-    if not ok:
-        FAILURES.append(name)
+FAILURES = failures   # the suite's upper-case name for the shared accumulator
 
 
 def verify(*paths, rc=0, quiet=False, verbose=False, contain=None, absent=None):

@@ -28,9 +28,13 @@ procs = []
 
 
 def check(name, cond, detail=''):
-    # the detail may be any shape (inverter passes filtered log-row LISTS
-    # for the fail diagnostics) — stringify at the render, never concat
-    print('%s %s%s' % ('PASS' if cond else 'FAIL', name, (' — ' + str(detail)) if detail else ''))
+    # the detail may be any shape (lists of log rows, captured tool output
+    # that itself speaks PASS/FAIL verdict lines) — it stringifies at the
+    # render and every line INDENTS, so a captured '^FAIL' can never pose
+    # as a check row in the log (the tally greps the column)
+    txt = str(detail) if detail else ''
+    print('%s %s%s' % ('PASS' if cond else 'FAIL', name,
+                       (' — ' + txt.replace('\n', '\n     ')) if txt else ''))
     if not cond:
         failures.append(name)
 

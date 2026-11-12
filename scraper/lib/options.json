@@ -114,10 +114,10 @@
   ],
   "commands": [
     { "name": "help", "shared": "help" },
-    { "name": "inspect", "help": "one pretty dump of everything (the state, the counters, the caps)" },
+    { "name": "inspect", "shared": "inspect" },
     { "name": "ping", "shared": "ping" },
     { "name": "quit", "shared": "quit" },
-    { "name": "request",
+    { "name": "request", "shared": "request",
       "help": "the state machinery: the dump written and restored, the config re-read, the poll woken, the session dropped",
       "node": true },
     { "name": "request-dump", "shared": "request-dump", "live": "request/dump" },

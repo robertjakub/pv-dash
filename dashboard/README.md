@@ -78,7 +78,7 @@ directly, which requires CORS to be allowed.
 
 All settings live in `config.js` (the shipped example is
 `examples/config.js`, served at `/config.js`; relocate with `--config-js`,
-`$CONFIG_JS` or `set config-js <file>` in `server.conf` — if the override
+`$CONFIG_JS` or `set config-js <file>` in `dashboard.conf` — if the override
 file is missing, `/config.js` 404s and the page boots with built-in
 defaults):
 
@@ -121,15 +121,15 @@ locations are configurable (`?config=<path>` / `?i18n=<path>`); a failed
 load falls back to the files next to the page, then to the built-in
 defaults.
 
-The server's settings resolve CLI > env > `server.conf` > defaults — the
+The server's settings resolve CLI > env > `dashboard.conf` > defaults — the
 env twins are the knobs' bare upper-snake names (`LISTEN`,
 `PROM_URL`, `PROM_PREFIX`, `STATIC_DIR`, `CONFIG_JS`,
 `AUTH_TOKEN`, the caps, `LOG_ACCESS`, `CTL`, `CONTROL_TOKEN`, …). The
-`server.conf` sample speaks the set grammar (every line a `set <name>
+`dashboard.conf` sample speaks the set grammar (every line a `set <name>
 <value>`):
 
 ```conf
-# the dashboard's server.conf — every line is a set command
+# the dashboard's dashboard.conf — every line is a set command
 set system listen 127.0.0.1:8080
 # set auth token file:/path/to/page.token   (mandatory beyond loopback, F21)
 set upstream http://localhost:9090
@@ -190,7 +190,7 @@ python3 bin/dashboard-cli.py                        # the console: TAB completio
 | `set` / `clear` | the live settings: the caps, `system log-access`, `log-queries`, `system log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — `system listen` (the serve address, `show listen` answers it) is startup-only and answers the restart note like the tokens (`control token`, `control ops token`, `metrics token`, `auth token`): pass them by flag/env/config |
 | `show <setting>` / `show knobs` / `show connections` | the value / the registry / the live HTTP clients per peer IP |
 | `inspect` | the one-page dump for a bug report |
-| `request reload-config` | re-read `server.conf` (the SIGHUP path; the listen address and port are bound and stay) |
+| `request reload-config` | re-read `dashboard.conf` (the SIGHUP path; the listen address and port are bound and stay) |
 | `request reload` | the whole-daemon restart that keeps the sets: the live overrides save to `<config>.reload`, the process re-execs and re-applies them once (overridden secrets save as `*** SECRET REMOVED ***`, the reply names them) |
 | `request dump` / `request restore` | the state dump (`--dump-path`): the live overrides as one `0600` JSON with an integrity hash; `--dump-key` seals it; the `--dump-interval` loop rewrites it live; every secret value takes a `file:` reference |
 | `shutdown` / `help <setting>` | graceful stop / one setting's description |
@@ -297,9 +297,9 @@ and **zero tracebacks** in the logs.
 | `static/style.css` | all styling (dark/light themes, layout, flow diagram) |
 | `static/boot.js` / `static/i18n.js` | the config/i18n loader (must stay in `<head>`) / the translations |
 | `static/vendor/echarts.min.js` | vendored ECharts 5.5.1 (Apache-2.0) — no CDN needed |
-| `bin/dashboard.py` / `server.conf` | static server + Prometheus proxy (serves `static/` by default) |
+| `bin/dashboard.py` / `dashboard.conf` | static server + Prometheus proxy (serves `static/` by default) |
 | `bin/dashboard-ctl.py` / `bin/dashboard-cli.py` | the control clients: one-shot / batch and the console session |
-| `lib/config.py` | settings resolution (CLI > env > the `server.conf` set grammar > defaults) + the control-target resolution |
+| `lib/config.py` | settings resolution (CLI > env > the `dashboard.conf` set grammar > defaults) + the control-target resolution |
 | `lib/options.json` + `lib/options.py` | the knob registry and its loader (one source for the wire, the completions and the docs) |
 | `lib/control.py` | the JSON-lines control server (the signed wire, the peer-cred shortcut) |
 | `lib/defaults.json` / `lib/statics.py` | the non-knob statics (log levels, the proxy timeout) / its loader — the knobs' defaults ride the registry rows |

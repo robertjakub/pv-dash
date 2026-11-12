@@ -32,7 +32,7 @@ take `--control-port` (env `CTL`), `--timeout`, `--control-token`, the audit
 flags and `--man`; the cli adds `--reconnect` / `--reconnect-wait`.
 
 A knob's value resolves at start as flag > env > config script > default;
-the config file (the bundled `dashboard/examples/server.conf`) speaks the
+the config file (the bundled `dashboard/examples/dashboard.conf`) speaks the
 same grammar — `set <name> <value>` lines in the registry's flat keys,
 `--dry-run` prints the effective settings. No defaults live in these tables:
 `show config` prints the effective values, the READMEs are the reference.

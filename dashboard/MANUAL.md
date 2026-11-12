@@ -122,7 +122,8 @@ query bootstraps the session cookie
 
 ### control
 
-the control plane: the tokens, the ops role's RBAC policy, the trusted peers
+the control plane: the target, the tokens, the ops role's RBAC policy, the
+trusted peers
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|

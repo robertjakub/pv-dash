@@ -145,7 +145,7 @@ def configured_defaults(args, frozen, profile_text, connect_acl, modbus_auth,
         'modbus-auth': modbus_auth or 'none',
         'metrics-server': 'on' if args.metrics_server else 'off',
         'metrics-acl': acl_value_text(metrics_acl),
-        'profile': profile_text,
+        'modbus-profile': profile_text,
         'log-level': args.log_level,
         'dump-path': args.dump_path or 'off',
         'restore-on-start': 'on' if args.restore_on_start else 'off',
@@ -235,7 +235,7 @@ def main():
         for problem in problems:
             logger.error(problem)
         raise SystemExit(1)
-    profile_text = args.profile
+    profile_text = args.modbus_profile
     profile_path = resolve_profile(profile_text)
     simulator = Simulator(PEAK_RATIO * args.max_kwp * 1000.0, args.static, frozen,
                           battery_kwh=args.battery_kwh,
@@ -369,12 +369,12 @@ def main():
         labels = apply_demo(simulator, chaos, fake, {
             'chaos': args.chaos, 'max_kwp': args.max_kwp, 'strict': args.strict,
             'time': args.time or 'live', 'time_scale': args.time_scale,
-            'profile': resolve_profile(args.profile),
+            'modbus_profile': resolve_profile(args.modbus_profile),
             'log_level': args.log_level})
         summary = ', '.join(labels)
         control.reloaded(summary, dump_interval=args.dump_interval,
                          applied=('chaos', 'max-kwp', 'strict', 'time', 'time-scale',
-                                  'profile', 'log-level'))
+                                  'modbus-profile', 'log-level'))
         if control.audit:
             control.audit.event('RELOAD', 'result=ok settings=%d changed=%s'
                                 % (len(labels), audit_quote(','.join(labels))))

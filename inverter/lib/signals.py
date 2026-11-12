@@ -27,8 +27,8 @@ def apply_demo(simulator, chaos, fake, values):
     """The demo knobs onto the machines from typed values — the SIGHUP
     env layer and the config reloader's re-read (the bin's apply_reload)
     share it. The keys: chaos (float), max_kwp (float), strict (bool),
-    time ('auto'/'live'/HH:MM), time_scale (float), profile (a profile
-    path), log_level (a level name); absent or None keeps the knob's
+    time ('auto'/'live'/HH:MM), time_scale (float), modbus_profile (a
+    profile path), log_level (a level name); absent or None keeps the knob's
     current value. All-or-nothing: every value parses (the profile loads)
     before anything applies — a bad one raises and the caller keeps the
     previous settings. Returns the applied labels."""
@@ -55,10 +55,10 @@ def apply_demo(simulator, chaos, fake, values):
         if not 0 < v <= 1440:
             raise ValueError('TIME_SCALE must be 0 < N <= 1440, got %r' % v)
         plan.append(('time-scale=x%g' % v, lambda v=v: simulator.set_time_scale(v)))
-    v = values.get('profile')
+    v = values.get('modbus_profile')
     if v is not None:
         new_map = load_profile(v)   # eager: a bad profile keeps everything
-        plan.append(('profile=%s: %s' % (profile_label(new_map.path), new_map.description),
+        plan.append(('modbus-profile=%s: %s' % (profile_label(new_map.path), new_map.description),
                      lambda m=new_map: simulator.set_profile(m)))
     v = values.get('log_level')
     if v is not None:
@@ -133,9 +133,9 @@ class SignalBox:
                 if not 0 < x <= 1440:
                     raise ValueError('TIME_SCALE must be 0 < N <= 1440, got %r' % v)
                 values['time_scale'] = x
-            v = env.get('PROFILE')
+            v = env.get('MODBUS_PROFILE')
             if v:
-                values['profile'] = v.strip()
+                values['modbus_profile'] = v.strip()
             v = env.get('LOG_LEVEL')
             if v:
                 values['log_level'] = v

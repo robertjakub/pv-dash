@@ -2125,7 +2125,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # decides, a register no rule decides refuses) — the deye profile allows
     # the TOU schedule slots (148-177) and the grid-start registers (127-128)
     deye = os.path.join(REPO, 'profiles', 'profiles', 'deye-sg05lp3.json')
-    start([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15584 + BASE), '--profile', deye,
+    start([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15584 + BASE), '--modbus-profile', deye,
            '--control-port', '0', '--allow-write'], log=os.path.join(SCRATCH, 'reg_deye_fake.log'))
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
            '--listen', '127.0.0.1:%d' % (15585 + BASE), '--modbus-interval', '1', '--modbus-profile', 'deye-sg05lp3',

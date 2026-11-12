@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The profile knob wears the family's `modbus-` prefix (breaking):
+`profile`/`--profile`/`PROFILE` become `modbus-profile`/`--modbus-profile`/
+`MODBUS_PROFILE` — the registry row, the wire's set/clear/show dispatch
+keys, the defaults, the state-dump keys and the reload's applied-set
+follow; the live path `modbus/profile` and the console words (`set modbus
+profile`) are unchanged, the SIGHUP env layer re-reads `MODBUS_PROFILE`,
+and a stored dump keyed by the old name restores SKIPPED. One flat name
+per knob across the family — the cache is the master, the scraper's poll
+knobs wore the prefix first.
+
 The console-pager wave put every cli render through one door
 (common/wire/cli.py's page_out): a reply taller than the screen pauses at a
 page (the cbreak `-- more --` reader, the more(1) keys — space/return/q),

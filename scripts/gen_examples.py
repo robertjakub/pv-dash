@@ -126,7 +126,7 @@ ENV_TOOLS = (
       'audit-log': CMD_PIN,
       'modbus-auth': SUITE_KEY_DEMO,
       'modbus-auth-key': SUITE_KEY_DEMO,
-      'profile': BOTH_LAYERS,
+      'modbus-profile': BOTH_LAYERS,
       'log-level': BOTH_LAYERS,
       'chaos': SIGHUP_LIVE,
       'max-kwp': SIGHUP_LIVE,

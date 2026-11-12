@@ -248,7 +248,7 @@ def main():
             {'name': 'device-insulation', 'register': 500, 'type': 'f32', 'scale': 1},
         ]}, open(split_prof, 'w'))
         procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (S_MODBUS),
-                                       '--control-port', '0', '--profile', split_prof],
+                                       '--control-port', '0', '--modbus-profile', split_prof],
                                       stdout=open(LOG + '.i', 'w'), stderr=subprocess.STDOUT))
         time.sleep(1.0)
         ci = connect(S_MODBUS)

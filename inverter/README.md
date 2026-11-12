@@ -81,8 +81,8 @@ and the **inverter profile** maps each name onto a register address and
 encoding. The format, the semantics and the shipped devices are documented
 once in [profiles/README.md](../profiles/README.md). `show registers`
 prints the loaded profile as a table, `set modbus profile <name|path>` swaps it
-live, `--profile` / `PROFILE` pick it at start; `clear profile` returns to
-the configured map.
+live, `--modbus-profile` / `MODBUS_PROFILE` pick it at start; `clear modbus
+profile` returns to the configured map.
 
 ## Usage
 
@@ -121,7 +121,7 @@ the config names one and the start refuses. The flags:
 | Flag | Default | Meaning |
 |---|---|---|
 | `--listen` / `--unit` | `127.0.0.1:5502` / `1` | the Modbus TCP serve address `HOST:PORT` and the unit id served |
-| `--profile` | `sun2000` | register-map profile: the built-in name or a JSON path (`PROFILE` when unset) |
+| `--modbus-profile` | `sun2000` | register-map profile: the built-in name or a JSON path (`MODBUS_PROFILE` when unset) |
 | `--static` / `--battery-kwh` | off / `6.9` | static demo values / the battery's usable capacity in kWh |
 | `--max-kwp` | `6` | PV array size in kWp (peak = 75 % of it) |
 | `--grid-voltage` / `--grid-frequency` | `230` / `50` | nominal grid phase voltage (120 or 230) / frequency |

@@ -217,7 +217,7 @@ try:
                     {'name': 'battery-soc', 'register': 40123, 'type': 'u16', 'scale': 1, 'scrape': True},
                 ]}, open(prof, 'w'))
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--strict', '--listen', '127.0.0.1:%d' % (15590 + BASE),
-                                   '--control-port', '0', '--profile', prof],
+                                   '--control-port', '0', '--modbus-profile', prof],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
@@ -245,7 +245,7 @@ try:
                     {'name': 'grid-power', 'register': 40003, 'type': 'i32', 'scale': 1, 'scrape': True},
                 ]}, open(prof4, 'w'))
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--strict', '--listen', '127.0.0.1:%d' % (15547 + BASE),
-                                   '--control-port', '0', '--profile', prof4],
+                                   '--control-port', '0', '--modbus-profile', prof4],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
@@ -346,7 +346,7 @@ try:
         'coil_flag': {'profile': 'meter-status', 'help': 'an FC1 bit row'},
     }}, open(specx, 'w'))
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15548 + BASE),
-                                   '--control-port', '0', '--profile', profx],
+                                   '--control-port', '0', '--modbus-profile', profx],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
@@ -373,7 +373,7 @@ try:
                     {'name': 'grid-power', 'register': 40003, 'type': 'f32', 'scale': 1},
                 ]}, open(profs, 'w'))
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15549 + BASE),
-                                   '--control-port', '0', '--profile', profs],
+                                   '--control-port', '0', '--modbus-profile', profs],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
@@ -394,7 +394,7 @@ try:
     # 1b. the shipped Deye profile end-to-end: real Deye addresses (SG03LP1
     # family), SoC reported as plain percent (gain 1), omitted registers = 0
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--strict', '--listen', '127.0.0.1:%d' % (15596 + BASE),
-                                   '--control-port', '0', '--profile', 'deye-sg03lp1'],
+                                   '--control-port', '0', '--modbus-profile', 'deye-sg03lp1'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
@@ -415,7 +415,7 @@ try:
 
     # 1c. the Deye three-phase profile (SG04LP3): 6xx registers, SoC gain 1
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--strict', '--listen', '127.0.0.1:%d' % (15598 + BASE),
-                                   '--control-port', '0', '--profile', 'deye-sg04lp3'],
+                                   '--control-port', '0', '--modbus-profile', 'deye-sg04lp3'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_base.ini'),
@@ -439,11 +439,11 @@ try:
 
     # 1d. the SUN-12K-SG05LP3-EU profile (shares the SG04LP3 map)
     r = subprocess.run([sys.executable, F, '--dry-run', '--static',
-                        '--profile', 'deye-sg05lp3'], capture_output=True, text=True)
+                        '--modbus-profile', 'deye-sg05lp3'], capture_output=True, text=True)
     check('deye-sg05lp3: profile loads (dry-run rc 0)', r.returncode == 0
           and 'Deye SUN-12K-SG05LP3-EU' in r.stderr, r.stderr.strip()[-80:])
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15593 + BASE),
-                                   '--control-port', '0', '--profile', 'deye-sg05lp3'],
+                                   '--control-port', '0', '--modbus-profile', 'deye-sg05lp3'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     b = read3(672, 2, 15593)
@@ -1086,7 +1086,7 @@ try:
                 ]}, open(prof, 'w'))
 
     fake_prof = subprocess.Popen([sys.executable, F, '--static', '--strict', '--listen', '127.0.0.1:%d' % (15592 + BASE),
-                                  '--control-port', '0', '--profile', prof],
+                                  '--control-port', '0', '--modbus-profile', prof],
                                  stdout=open(os.path.join(SCRATCH, 'scr_prof.log'), 'w'), stderr=subprocess.STDOUT)
     procs.append(fake_prof)
     time.sleep(0.8)
@@ -1105,7 +1105,7 @@ try:
                 'registers': [{'name': 'device-status', 'register': 32089, 'type': 'u16', 'scale': 1,
                                'desc': 'running status code'}]}, open(stmap, 'w'))
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15595 + BASE),
-                                   '--control-port', '0', '--profile', stmap],
+                                   '--control-port', '0', '--modbus-profile', stmap],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     time.sleep(0.7)
     b = read3(32089, 1, 15595)
@@ -1115,18 +1115,18 @@ try:
     badprof = os.path.join(SCRATCH, 'scr_prof_bad.json')
     _json.dump({'registers': [{'name': 'mystery-value', 'register': 32064, 'type': 'i32', 'scale': 1}]},
                open(badprof, 'w'))
-    r = subprocess.run([sys.executable, F, '--dry-run', '--profile', badprof], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, F, '--dry-run', '--modbus-profile', badprof], capture_output=True, text=True)
     check('profile: a name the fake cannot simulate is accepted but never served', r.returncode == 0
           and 'mystery-value' in open(badprof).read(), r.stderr.strip()[-90:])
 
     fake_env = subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15594 + BASE),
                                  '--control-port', '0'],
                                 stdout=open(os.path.join(SCRATCH, 'scr_prof2.log'), 'w'), stderr=subprocess.STDOUT,
-                                env={**os.environ, 'PROFILE': prof})
+                                env={**os.environ, 'MODBUS_PROFILE': prof})
     procs.append(fake_env)
     time.sleep(0.8)
     r = read3(40001, 2, 15594)
-    check('profile: PROFILE env selects the map', r[0] == 3 and struct.unpack('>i', r[2:6])[0] == 4000, r.hex())
+    check('profile: MODBUS_PROFILE env selects the map', r[0] == 3 and struct.unpack('>i', r[2:6])[0] == 4000, r.hex())
     prof2 = os.path.join(SCRATCH, 'scr_prof_custom2.json')
     _json.dump({'registers': [{'name': 'pv-power', 'register': 40003, 'type': 'i32', 'scale': 1}]},
                open(prof2, 'w'))
@@ -1154,8 +1154,8 @@ try:
     check('control: the built-in profile answers to its name (sun2000)', r.returncode == 0
           and r.stdout.startswith('ok modbus-profile=SUN2000 with optional LUNA2000 battery and meter (sun2000)'),
           r.stdout.strip())
-    r = subprocess.run([sys.executable, F, '--dry-run', '--profile', 'sun2000'], capture_output=True, text=True)
-    check('profile: --profile sun2000 resolves the built-in (dry-run rc 0)', r.returncode == 0, r.stderr[-80:])
+    r = subprocess.run([sys.executable, F, '--dry-run', '--modbus-profile', 'sun2000'], capture_output=True, text=True)
+    check('profile: --modbus-profile sun2000 resolves the built-in (dry-run rc 0)', r.returncode == 0, r.stderr[-80:])
     r = read3(32064, 2, 15570)
     check('profile: the default map is back', r[0] == 3 and struct.unpack('>i', r[2:6])[0] == 4000, r.hex())
     os.kill(fake_env.pid, signal.SIGTERM)

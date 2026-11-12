@@ -67,14 +67,16 @@ graceful shutdown."""
 The control server speaks JSON lines ({"cmd": "..."} ->
 {"status": "ok|fail|note|bye", "text": "..."}; TCP requires the token when
 configured and refuses to start without one). Commands:
-\\fBset\\fR/\\fBunset\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: metrics
-interval, modbus timeout, the metrics limits caps, caps max-pv/max-grid,
+\\fBset\\fR/\\fBclear\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: modbus
+interval, modbus timeout, the modbus read delay, the metrics limits caps,
+the metrics caps
+max-pv/max-grid,
 log-access, log-level, control socket-group (re-modes the live unix socket
 0600/0660) \\(em and the startup-only secrets: control token, the ops
 token, metrics auth token \\(em the wire refuses set/clear, the value
 never rendering \\(em \\fBshow <secret>\\fR refuses), \\fBshow connections\\fR
 (the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
-(the dictionary of the registry), \\fBpoll now\\fR,
+(the dictionary of the registry), \\fBrequest poll now\\fR,
 \\fBinspect\\fR, \\fBrequest reload-config\\fR (the SIGHUP path),
 \\fBrequest reload\\fR (the whole-daemon restart that keeps the sets: the
 live overrides save to a state file beside the config, the process
@@ -161,11 +163,11 @@ the frame, keyed by the token)."""
     examples = """.SH EXAMPLES
 .RS
 .IP \\(bu 2
-.B modbus-scraper-ctl poll now
+.B modbus-scraper-ctl request poll now
 .IP \\(bu 2
 .B modbus-scraper-ctl show version
 .IP \\(bu 2
-.B printf 'inspect\\enpoll now\\en' | modbus-scraper-ctl
+.B printf 'inspect\\enrequest poll now\\en' | modbus-scraper-ctl
 .RE"""
     environment = """.SH ENVIRONMENT
 .TP

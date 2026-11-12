@@ -76,10 +76,10 @@ regenerates the script from the running scraper (secrets hidden):
 # (the live path as words; the flat dashed knob name reads too, for older files)
 set modbus upstream 127.0.0.1:5502
 set modbus unit 1
-set caps max-pv 6
-set caps max-grid 12
+set metrics caps max-pv 6
+set metrics caps max-grid 12
 set system listen 127.0.0.1:9350
-set metrics interval 10
+set modbus interval 10
 set system log-level INFO
 ```
 
@@ -92,6 +92,7 @@ set system log-level INFO
 | `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
 | `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
 | `--max-kwp` / `--max-grid-kw` | `6` / `12` | the sanity caps in kW: above the cap → HTTP 503 + error log; `0` = off |
+| `--read-delay` | `0.05` | seconds between consecutive device reads within a poll cycle (the slow-dongle pacing); `0` = no wait |
 | `--grid-positive-import` | off | grid register positive means import |
 | `--timeout` / `--interval` | `3` / `10` | Modbus timeout, seconds / seconds between Modbus polls |
 | `--listen` | `127.0.0.1:9350` | exporter bind address `HOST:PORT` (loopback by default; beyond loopback `--auth-token` is mandatory, F13) |
@@ -145,7 +146,7 @@ it off, a TCP port number binds `127.0.0.1:PORT` instead). Talk to it with
 
 ```bash
 python3 scraper/bin/modbus-scraper-ctl.py show upstream
-printf 'set interval 5\npoll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
+printf 'set interval 5\nrequest poll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
 python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
 ```
 
@@ -159,9 +160,9 @@ command, settable (`set`/`clear`) or show-only — is tabled in
 
 | Command | Effect |
 |---|---|
-| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `metrics interval`, `modbus timeout`, the `metrics limits` caps, `caps max-pv`/`caps max-grid`, `system log-access`, `system log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit instance`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
-| `poll now` | the loop wakes immediately |
+| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `modbus interval`, `modbus timeout`, `modbus read-delay`, the `metrics limits` caps, `metrics caps max-pv`/`metrics caps max-grid`, `system log-access`, `system log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit instance`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
 | `show connections` | the live HTTP clients of /metrics |
+| `request poll now` | the loop wakes immediately |
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |
 | `request restart` | the Modbus session drops; the next poll reconnects |
 | `request reload` | the whole-daemon restart that keeps the sets: the live overrides save to `<config>.reload`, the process re-execs and re-applies them once (overridden secrets save as `*** SECRET REMOVED ***`, the reply names them) |

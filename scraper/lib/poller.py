@@ -29,7 +29,7 @@ class Scraper:
         self.poll_secs_sum = 0.0
         self.poll_secs_max = 0.0
         self.poll_count = 0
-        self.wake = threading.Event()   # `poll now` on the control server: the wait ends immediately
+        self.wake = threading.Event()   # `request poll now` on the control server: the wait ends immediately
 
     def reload(self, cfg):
         """Apply a freshly resolved config (SIGHUP); the socket reconnects on the next poll."""
@@ -86,13 +86,38 @@ class Scraper:
     def poll_once(self):
         cfg = self.cfg
         started = time.monotonic()
+        delay = cfg.get('read_delay', 0.0)
+        first = True
+        paced = True   # the read delay paces a healthy device; failures sweep unpaced
+
+        def paced_read(pn):
+            """One device read with the read-delay pacing: the wait lands
+            before every read but the first, and a failed read sweeps the
+            next one unpaced (the cache's gold shape)."""
+            nonlocal first, paced
+            if first:
+                first = False
+            elif delay and paced:
+                time.sleep(delay)
+            try:
+                value = self._read(pn)
+            except Exception:
+                paced = False
+                raise
+            paced = True
+            return value
+
         try:
-            pv_raw = self._read('pv-power')
-            grid_raw = self._read('grid-power')
+            pv_raw = paced_read('pv-power')
+            grid_raw = paced_read('grid-power')
             # the battery reads ride when the spec bound the registers (a
             # profile without them keeps the battery metrics absent)
-            batt_raw = self._read('battery-power') if 'battery-power' in cfg['sources'] else 0
-            soc = self._read('battery-soc') if 'battery-soc' in cfg['sources'] else None
+            batt_raw = paced_read('battery-power') if 'battery-power' in cfg['sources'] else 0
+            soc = paced_read('battery-soc') if 'battery-soc' in cfg['sources'] else None
+            if first:
+                first = False
+            elif delay and paced:
+                time.sleep(delay)
             diag = self._read_diag()
         except Exception as e:
             self.client.close()
@@ -110,7 +135,7 @@ class Scraper:
             if pn in ('pv-power', 'grid-power', 'battery-power', 'battery-soc'):
                 continue
             try:
-                value = self._read(pn)
+                value = paced_read(pn)
             except Exception as e:
                 logger.warning('read of %s (%s) failed, the metric stays absent (%s)',
                                pn, src['metric'], e)

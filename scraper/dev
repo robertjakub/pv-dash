@@ -1,11 +1,13 @@
 #!/bin/sh
 # the dev launcher: the daemon straight from the checkout against the
 # shipped samples — the packaged-root defaults don't exist in a source
-# tree (the loader never reaches into examples/ on its own). The upstream
+# tree (the loader never reaches into examples/ on its own). The audit
+# trail rides stdout (-) so the dev terminal streams it. The upstream
 # is the fake inverter: $UPSTREAM overrides. Extra flags/env pass
 # through: scraper/dev --dry-run, scraper/dev --profile deye-sg04lp3
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
 exec python3 "$DIR/bin/modbus-scraper.py" \
     --config "$DIR/examples/modbus-scraper.conf" \
     --metrics-spec "$DIR/examples/metrics.json" \
+    --audit-log - \
     --upstream "${UPSTREAM:-127.0.0.1:15502}" "$@"

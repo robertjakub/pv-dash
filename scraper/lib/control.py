@@ -85,8 +85,8 @@ class ControlServer(_ControlServer):
     the token first when one is configured; the unix socket relies on
     filesystem permissions. A second, read-only token (ops_token) may be
     configured beside the admin token: it authenticates into its policy's
-    verbs only — no set/clear, no poll now, no request reload, no reload, no
-    restart, no shutdown (common/wire/wiresec.py's roles). `stopper` is the
+    verbs only — no set/clear, no request poll now, no request reload, no
+    reload, no restart, no shutdown (common/wire/wiresec.py's roles). `stopper` is the
     graceful-stop callback shared with the signal handlers; it runs after the
     shutdown reply left the wire."""
 
@@ -135,7 +135,7 @@ class ControlServer(_ControlServer):
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, clear <setting>, inspect, show <setting|connections|'
-                'version|config|knobs>, poll now, request reload-config')
+                'version|config|knobs>, request poll now, request reload-config')
         cmds += ', request reload, request restart, shutdown, quit'
         return self.command_help_tail(cmds)
 
@@ -147,10 +147,10 @@ class ControlServer(_ControlServer):
         """The scraper's own verbs beside the family's request namespace:
         the poll-now nudge and the modbus session drop (the reconnect
         happens on the next poll)."""
-        if low == 'poll now':
+        if low == 'request poll now':
             self.scraper.wake.set()
-            logger.info('control: poll now (the loop wakes immediately)')
-            return 'ok poll now (the loop wakes immediately, %s)' % self.summary()
+            logger.info('control: request poll now (the loop wakes immediately)')
+            return 'ok request poll now (the loop wakes immediately, %s)' % self.summary()
         if low == 'request restart':
             self.scraper.client.close()
             logger.info('control: the modbus session dropped (reconnects on the next poll)')
@@ -195,6 +195,13 @@ class ControlServer(_ControlServer):
                 raise ValueError(T('wire.interval_range'))
             with s.lock:
                 s.cfg['interval'] = v
+            s.wake.set()
+            return secs(v)
+        if key == 'read-delay':
+            v = num(val, 'read-delay', 'seconds')
+            self._gate_range(key, v, 'seconds')
+            with s.lock:
+                s.cfg['read_delay'] = v
             s.wake.set()
             return secs(v)
         if key == 'timeout':
@@ -353,6 +360,8 @@ class ControlServer(_ControlServer):
             cfg = dict(s.cfg)
         if key == 'interval':
             return secs(cfg['interval'])
+        if key == 'read-delay':
+            return secs(cfg['read_delay'])
         if key == 'timeout':
             return secs(cfg['timeout'])
         if key == 'metrics-max-clients':
@@ -407,6 +416,7 @@ class ControlServer(_ControlServer):
             'profile': cfg['profile'],
             'grid-positive-import': 'on' if cfg['grid_positive_import'] else 'off',
             'interval': cfg['interval'],
+            'read-delay': cfg['read_delay'],
             'metrics-spec': cfg['metrics_spec'],
             'metric-prefix': cfg['metric_prefix'],
             'max-kwp': cfg['max_kwp'],

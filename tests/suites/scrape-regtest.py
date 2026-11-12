@@ -1739,7 +1739,7 @@ try:
 
     # 6. the scraper's control plane (the cache's shape, mirrored): the
     # signed wire (the full sha256 HMAC keyed by the token), the live
-    # settings, poll now, the config re-read, the request reload, the Modbus
+    # settings, the request poll now, the config re-read, the request reload, the Modbus
     # request restart, the shutdown
     import hashlib
     import hmac as _hmac
@@ -1826,10 +1826,10 @@ try:
     check('scraper control: a bad value refused', r.startswith('fail interval must be'), r[:80])
     r = sctl('help clear', 15597)
     check('scraper control: help <command> describes the row',
-          r == 'ok restore a setting to its configured value (clear metrics interval, clear system log-level)', r)
+          r == 'ok restore a setting to its configured value (clear modbus interval, clear system log-level)', r)
     r = sctl('help request', 15597)
     check('scraper control: help <command node> lists the namespace (the ? shape)',
-          r.startswith('ok ') and all(w in r for w in ('dump', 'reload', 'reload-config', 'restart', 'restore')), r[:200])
+          r.startswith('ok ') and all(w in r for w in ('poll', 'reload', 'reload-config', 'restart')), r[:200])
     r = sctl('help request reload', 15597)
     check('scraper control: help <deep command path> describes the row', r.startswith('ok save the live overrides'), r[:110])
     r = sctl('help bogus', 15597)
@@ -1875,7 +1875,7 @@ try:
     r = sctl('show knobs', 15597)
     check('scraper control: show knobs, the dictionary of the registry — flag, env twin, how it changes',
           r.startswith('ok knobs') and '--metric-prefix' in r and '$METRIC_PREFIX' in r
-          and 'set metrics interval <value>' in r and ', secret' in r, r[:200])
+          and 'set modbus interval <value>' in r and ', secret' in r, r[:200])
     r = sctl('show inputs', 15597)
     check('scraper control: show inputs shows the declared inputs only, aligned, the help capped',
           r.startswith('ok inputs') and '[battery_net_watts]' in r
@@ -1890,8 +1890,8 @@ try:
     r = sctl('show inputs-metrics', 15597)
     check('scraper control: the dashed spelling answers the same report',
           r.startswith('ok inputs-metrics') and 'huawei_battery_charge_watts' in r, r[:80])
-    r = sctl('poll now', 15597)
-    check('scraper control: poll now', r.startswith('ok poll now'), r[:80])
+    r = sctl('request poll now', 15597)
+    check('scraper control: request poll now', r.startswith('ok request poll now'), r[:80])
     r = sctl('request reload-config', 15597)
     check('scraper control: request reload-config', r.startswith('ok reloaded'), r[:80])
     # 6b-3. the secrets on the wire: startup-only (the dump-key treatment) —
@@ -1936,7 +1936,7 @@ try:
           oct(dumpst.st_mode & 0o777))
     raw = open(os.path.join(SCRATCH, 'scr_regtest_state.json')).read()
     check('scraper control: the dump carries the settings, never the secrets',
-          '"metrics/interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw
+          '"modbus/interval"' in raw and 'sekrit' not in raw and 'ctok9' not in raw and 'bearer9' not in raw
           and 'auth-token' not in raw and 'control-token' not in raw, raw[:240])
     r = sctl('set interval 1', 15597)
     r = sctl('request restore', 15597)
@@ -2089,8 +2089,8 @@ try:
     check('scraper control: the ops token reads (show knobs, a show verb)', r.startswith('ok knobs'), r[:80])
     r = sctl('set interval 5', 15598, token='opssecret')
     check('scraper control: the ops token cannot set', r.startswith('fail forbidden:') and 'admin' in r, r[:80])
-    r = sctl('poll now', 15598, token='opssecret')
-    check('scraper control: the ops token cannot poll now', r.startswith('fail forbidden:'), r[:80])
+    r = sctl('request poll now', 15598, token='opssecret')
+    check('scraper control: the ops token cannot request poll now', r.startswith('fail forbidden:'), r[:80])
     r = sctl('request restart', 15598, token='opssecret')
     check('scraper control: the ops token cannot request restart', r.startswith('fail forbidden:'), r[:80])
     r = sctl('shutdown', 15598, token='opssecret')
@@ -2189,7 +2189,7 @@ try:
     check('scraper_ctl: a piped batch', r.returncode == 0 and 'ok interval=5.00s' in r.stdout
           and 'ok modbus-scraper' in r.stdout, repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, CLIB, '--control-port', '15597', '--control-token', STOK],
-                       input='set log-access off\nshow metrics interval\nquit\n', capture_output=True, text=True, timeout=15)
+                       input='set log-access off\nshow modbus interval\nquit\n', capture_output=True, text=True, timeout=15)
     check('scraper_cli: the console session', r.returncode == 0 and '5' in r.stdout
           and 'Welcome to the modbus-scraper console' not in r.stdout, repr(r.stdout[:120]))
     stok_file = os.path.join(SCRATCH, 'scr_ctl_fuzz_token')
@@ -2213,7 +2213,7 @@ try:
     words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
     check("scraper_ctl: the bare show answers the root in the console's own words",
-          r.returncode == 0 and words == ['audit', 'caps', 'config', 'connections', 'control', 'dump',
+          r.returncode == 0 and words == ['audit', 'config', 'connections', 'control', 'dump',
                                           'dump-interval', 'inputs', 'knobs', 'metrics', 'modbus', 'system',
                                           'version'],
           repr(r.stdout[:240]))
@@ -2222,7 +2222,7 @@ try:
     check('scraper_ctl: the node walk answers the intermediate node', r.returncode == 0
           and r.stdout.startswith('ok') and 'verbs the read-only ops role' in r.stdout, repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, CLIB, '--control-port', '15597'],
-                       input='show metrics interval\nquit\n', capture_output=True, text=True, timeout=15,
+                       input='show modbus interval\nquit\n', capture_output=True, text=True, timeout=15,
                        env={**os.environ, 'CONTROL_TOKEN': 'file:' + stok_file})
     check('scraper_cli: honors CONTROL_TOKEN=file:...', r.returncode == 0 and '5' in r.stdout,
           repr(r.stdout[:120]))

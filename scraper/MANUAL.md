@@ -13,7 +13,7 @@ The control server is a JSON-lines listener: a unix socket (the default
 `/tmp/modbus-scraper-9350.socket`) or a TCP port on 127.0.0.1 — the
 `--control-port` flag, env `CTL`, `0` = off. Two clients speak it:
 
-    python3 bin/modbus-scraper-ctl.py --control-port 15509 poll now
+    python3 bin/modbus-scraper-ctl.py --control-port 15509 request poll now
     python3 bin/modbus-scraper-cli.py
 
 - the **ctl** runs one command per invocation (or a batch on stdin);
@@ -63,19 +63,19 @@ The kinds — every row of the tables below carries one:
 | `help` | command (internal) | describe a word (help \<setting>) or map every knob (help config) |
 | `inspect` | command | one pretty dump of everything (the state, the counters, the caps) |
 | `ping` | command (internal) | keep-alive: answers pong |
-| `poll` | namespace | the poll loop's manual wake |
-| `poll now` | command | wake the poll loop immediately |
 | `quit` | command | close the session |
-| `request` | namespace | the state machinery: the dump written and restored, the config re-read, the session dropped |
-| `request dump` | command | write the state dump: the live setting overrides, sealed (when the daemon has a dump path) |
+| `request` | namespace | the state machinery: the dump written and restored, the config re-read, the poll woken, the session dropped |
+| `request dump` | command (hidden) | write the state dump: the live setting overrides, sealed (when the daemon has a dump path) |
+| `request poll` | namespace | the poll loop's manual wake |
+| `request poll now` | command | wake the poll loop immediately |
 | `request reload` | command | save the live overrides and restart the whole daemon (the config file and the flags are re-resolved) |
 | `request reload-config` | command | re-read the config file (the SIGHUP path) |
 | `request restart` | command | drop the Modbus session (reconnects on the next poll) |
-| `request restore` | command | re-apply a state dump's overrides (when the daemon has a dump path) |
+| `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
 | `set` | command | configure a setting (set metrics interval 5, set log-access on) |
 | `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the scraper (asks to confirm) |
-| `clear` | command | restore a setting to its configured value (clear metrics interval, clear system log-level) |
+| `clear` | command | restore a setting to its configured value (clear modbus interval, clear system log-level) |
 
 ## Knobs
 
@@ -85,11 +85,6 @@ words (the live path as words — the config files and the state dumps speak
 them; the flat registry name answers the same set everywhere, the ctls
 translate). The namespaces group them.
 
-### general
-
-| knob | set / clear | kind | value | flag / env | description |
-|---|---|---|---|---|---|
-| `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 
 ### modbus
 
@@ -103,31 +98,21 @@ the inverter Modbus settings
 | `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth settings: the Modbus scheme the poll session speaks (modbus auth — suite or none) and the bearer token the metrics endpoint requires (auth token) |
 | `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 | `timeout` | `set modbus timeout` | settable | `s` | `--timeout` / `TIMEOUT` | Modbus connect/read timeout |
+| `read-delay` | `set modbus read-delay` | settable | `s` | `--read-delay` / `READ_DELAY` | seconds between consecutive device reads within a poll cycle |
 | `profile` | `set modbus profile` | settable | `\<file>` | `--profile` / `PROFILE` | device profile JSON: the registers the metrics read (a bare name resolves in profiles/profiles/) |
 | `grid-positive-import` | `set modbus grid-positive-import` | settable | `on\|off` | `--grid-positive-import` / `GRID_POSITIVE_IMPORT` | grid register positive when importing |
+| `interval` | `set modbus interval` | settable | `s` | `--interval` / `INTERVAL` | seconds between polls of the inverter |
 
 ### metrics
 
-the Prometheus /metrics exposition: the listen address, the poll interval,
-the serving limits, the bearer auth, the connect ACL, the spec and the
-prefix
+the Prometheus /metrics exposition: the listen address, the serving limits,
+the display caps, the bearer auth, the connect ACL, the spec and the prefix
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `metrics-spec` | `set metrics filter` | settable | `PATH\|-` | `--metrics-spec` / `METRICS_SPEC` | metrics spec JSON, sectioned: {inputs: {name: {help}}, metrics: {key: {profile?, expr?, when?, help, type?}}, scraper:...} — the metrics entries are register- (profile) or expression-fed (expr/when) over the declared inputs (show inputs), merged in memory over the built-in lib/metrics.json scraper_* block |
 | `metric-prefix` | `set metrics prefix` | settable | `PREFIX` | `--metric-prefix` / `METRIC_PREFIX` | the prefix on the profile- and compute-fed metric names |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
-| `interval` | `set metrics interval` | settable | `s` | `--interval` / `INTERVAL` | seconds between polls of the inverter |
-
-### caps
-
-the display caps the percentages clamp to: the PV array and the grid
-ceilings
-
-| knob | set / clear | kind | value | flag / env | description |
-|---|---|---|---|---|---|
-| `max-kwp` | `set caps max-pv` | settable | `KW` | `--max-kwp` / `MAX_KWP` | maximum PV array kWp |
-| `max-grid-kw` | `set caps max-grid` | settable | `KW` | `--max-grid-kw` / `MAX_GRID_KW` | maximum grid kW, either direction |
 
 ### system
 
@@ -140,6 +125,16 @@ the daemon's own serving socket: the listen address
 | `control-log-replies` | `set system log-replies` | settable | `on\|off` | `--control-log-replies` / — | DEBUG-log the full output of every control command (plainly: the command and its status log) |
 | `log-access` | `set system log-access` | settable | `on\|off` | `--log-access` / `LOG_ACCESS` | log every HTTP request at INFO |
 | `log-level` | `set system log-level` | settable | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
+
+### metrics/caps
+
+the display caps the percentages clamp to: the PV array and the grid
+ceilings
+
+| knob | set / clear | kind | value | flag / env | description |
+|---|---|---|---|---|---|
+| `max-kwp` | `set metrics caps max-pv` | settable | `KW` | `--max-kwp` / `MAX_KWP` | maximum PV array kWp |
+| `max-grid-kw` | `set metrics caps max-grid` | settable | `KW` | `--max-grid-kw` / `MAX_GRID_KW` | maximum grid kW, either direction |
 
 ### metrics/limits
 
@@ -169,7 +164,7 @@ configured verbs (the default: show)
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/clear, no poll now, no request reload, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show) (no set/clear, no request poll now, no request reload, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `control-ops-verbs` | `set control ops verbs` | settable | `VERB,...` | `--control-ops-verbs` / `CONTROL_OPS_VERBS` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated |
 
 ### metrics/auth
@@ -210,6 +205,7 @@ the state dump: the live overrides' file, the restore-on-start
 |---|---|---|---|---|---|
 | `dump-path` | `set dump path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval |
 | `dump-key` | — | startup-only (secret) | `TEXT` | `--dump-key` / `DUMP_KEY` | the key that seals the state dumps (the reload's state file too) (`file:<path>` reads an owner-only file) *(hidden)* |
+| `dump-interval` | `set dump interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 | `restore-on-start` | `set dump restore-on-start` | settable (restart) | `on\|off` | `--restore-on-start` / `RESTORE_ON_START` | the dump loads on start (off: on demand with request restore) |
 
 ## Show reports

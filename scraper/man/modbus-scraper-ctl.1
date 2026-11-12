@@ -22,8 +22,8 @@ control server target: unix socket path or TCP port on 127.0.0.1,
 auto\-detected (env CTL when unset) — same flag as the scraper itself
 .TP
 .B command
-control command, e.g. inspect, show config, set interval 5, poll now,
-request reload, request restart, shutdown
+control command, e.g. inspect, show config, set interval 5, request poll
+now, request reload, request restart, shutdown
 .TP
 .BI \-\-timeout " N"
 socket timeout in seconds
@@ -58,11 +58,11 @@ disable the audit trail
 .SH EXAMPLES
 .RS
 .IP \(bu 2
-.B modbus-scraper-ctl poll now
+.B modbus-scraper-ctl request poll now
 .IP \(bu 2
 .B modbus-scraper-ctl show version
 .IP \(bu 2
-.B printf 'inspect\enpoll now\en' | modbus-scraper-ctl
+.B printf 'inspect\enrequest poll now\en' | modbus-scraper-ctl
 .RE
 
 .SH ENVIRONMENT

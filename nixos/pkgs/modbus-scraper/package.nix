@@ -76,7 +76,7 @@ stdenv.mkDerivation (finalAttrs: {
       the dashboard contract), plus health gauges, at /metrics in the
       Prometheus text format. Includes modbus-scraper-ctl and modbus-scraper-cli, CLI
       clients for the JSON-lines control server (inspect, the live
-      settings, poll now, the config reload, shutdown — the token-signed
+      settings, request poll now, the config reload, shutdown — the token-signed
       wire). Python standard library only, no third-party dependencies.
     '';
     license = lib.licenses.bsd3;

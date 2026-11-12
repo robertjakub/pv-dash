@@ -300,7 +300,8 @@ Which registers are actually **fetched** comes from a selection file —
 `--selection` flag, env `SELECTION`, config `set modbus selection`; the
 default fetches **every** profile entry (`all`), and **`none`** empties the
 map: every read forwards and nothing is stored. The shipped
-`examples/selection.json` is the essential SUN2000 monitoring set. The
+`extras/examples/modbus-cache-filter.json` is the essential SUN2000
+monitoring set. The
 65000-65003 diagnostics block is never fetched — the cache synthesizes it.
 
 For slow dongles the poller reads the map in as **few transactions as
@@ -529,9 +530,7 @@ cache/
 │   ├── modbus-cache-ctl.py     # one-shot control client (args / piped commands)
 │   └── modbus-cache-cli.py     # console-style interactive control session
 ├── examples/
-│   ├── modbus-cache.conf    # sample config in the set grammar
-│   └── selection.json       # example selection: the essential monitoring set
-├── schema/                  # the JSON Schema (draft 2020-12): the selection file
+│   └── modbus-cache.conf    # sample config in the set grammar
 ├── man/                     # the generated man pages (scripts/gen_man.py)
 └── lib/
     ├── defaults.json     # the static constants: diagnostics block, log levels (the protocol

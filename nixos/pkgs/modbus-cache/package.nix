@@ -45,12 +45,12 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../../../common}/modbus/*.py $out/share/modbus-cache/common/modbus/
     install -m644 ${../../../common}/modbus/protocol.json $out/share/modbus-cache/common/modbus/
     install -Dm644 examples/modbus-cache.conf $out/share/modbus-cache/modbus-cache.conf
-    install -Dm644 examples/selection.json $out/share/modbus-cache/selection.json
+    install -Dm644 ${../../../extras/examples}/modbus-cache-filter.json $out/share/modbus-cache/modbus-cache-filter.json
     install -Dm644 ${../../../extras/examples}/acl-write-registers.json $out/share/modbus-cache/acl-write-registers.json
     install -Dm644 ${../../../extras/examples}/acl-ip-prefix.json $out/share/modbus-cache/acl-ip-prefix.json
     install -Dm644 ${../../../shared}/schema/acl-write-registers.schema.json $out/share/modbus-cache/acl-write-registers.schema.json
     install -Dm644 ${../../../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-cache/acl-ip-prefix.schema.json
-    install -Dm644 schema/selection.schema.json $out/share/modbus-cache/selection.schema.json
+    install -Dm644 ${../../../shared}/schema/modbus-cache-filter.schema.json $out/share/modbus-cache/modbus-cache-filter.schema.json
     install -Dm644 ${../../../extras/alerts}/cache.yml $out/share/modbus-cache/alerts.yml
     install -dm755 $out/share/modbus-cache/profiles
     install -m644 ${../../../profiles/profiles}/*.json $out/share/modbus-cache/profiles/

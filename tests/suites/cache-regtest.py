@@ -371,7 +371,7 @@ try:
 
     start([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15512 + BASE), '--control-port', '0', '--allow-write'])
     # the shipped example selection: the essential set, by name
-    SEL = os.path.join(CACHE_DIR, 'examples', 'selection.json')
+    SEL = os.path.join(REPO, 'extras', 'examples', 'modbus-cache-filter.json')
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
            '--listen', '127.0.0.1:%d' % (15518 + BASE), '--interval', '1', '--profile', R,
            '--selection', SEL], log=os.path.join(SCRATCH, 'reg_sel.log'))

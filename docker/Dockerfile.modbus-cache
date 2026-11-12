@@ -42,9 +42,9 @@ COPY --from=common modbus/*.py common/modbus/
 COPY --from=shared texts.json shared/
 COPY --chown=pvsuite bin/ cache/bin/
 COPY --chown=pvsuite lib/ cache/lib/
-COPY --chown=pvsuite examples/modbus-cache.conf examples/selection.json cache/
+COPY --chown=pvsuite examples/modbus-cache.conf cache/
 COPY --chown=pvsuite --from=examples acl-write-registers.json cache/
-COPY --chown=pvsuite examples/selection.json config-defaults/
+COPY --chown=pvsuite --from=examples modbus-cache-filter.json config-defaults/selection.json
 # the suite key's placeholder: the entrypoint materializes any *.token in
 # config-defaults as a random value on the first seed (the bundled content
 # is never copied) — the compose stacks point the cache's two auth sides

@@ -227,10 +227,10 @@ replaced, unlinked on shutdown).
 .I ~/.local/state/modbus-cache/audit.log
 the audit trail when \\fB--audit-log\\fR is unset.
 .TP
-.I cache/examples/modbus-cache.conf ", " cache/examples/selection.json ,
-.I examples/acl-write-registers.json
+.I cache/examples/modbus-cache.conf ", " extras/examples/modbus-cache-filter.json ,
+.I extras/examples/acl-write-registers.json
 the packaged sample config, the example selection and the example acl
-file at the repo root (the deye write policy for \\fB--write-registers
+file in the shared examples home (the deye write policy for \\fB--write-registers
 file:<path>\\fR \\(em
 a group/world-readable acl file warns in the log, the audit trail
 (ACL-FILE) and on the set/clear reply; chmod 0600 silences it)."""

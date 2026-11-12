@@ -30,7 +30,7 @@ example file.
 The prometheus env example stays hand-written (its PROM_* knobs belong
 to entrypoint-prometheus.sh, not a registry) — --check cross-checks its
 PROM_* names against the entrypoint so no line promises a knob the
-entrypoint does not read. The other example files (selection.json,
+entrypoint does not read. The other example files (modbus-cache-filter.json,
 metrics.json, config.js, the tokens, the acl jsons) stay hand-written
 too — this script renders only the env files and the conf scripts.
 

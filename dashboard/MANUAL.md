@@ -69,10 +69,10 @@ The kinds — every row of the tables below carries one:
 | `request reload` | command | save the live overrides and restart the whole daemon (the config file and the flags are re-resolved) |
 | `request reload-config` | command | re-read the config file (the SIGHUP path) |
 | `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
-| `set` | command | configure a setting (set log-queries on, set metrics enable on) |
+| `set` | command | configure a setting live: set \<setting> \<value> |
 | `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the server (asks to confirm) |
-| `clear` | command | restore a setting to its configured value (clear log-queries, clear system log-level) |
+| `clear` | command | restore a setting to its configured value: clear \<setting> |
 
 ## Knobs
 

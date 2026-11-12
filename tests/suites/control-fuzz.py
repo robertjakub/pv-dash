@@ -9,11 +9,8 @@ serving afterwards.
 Checks: ALL PASS (or a FAILURES list; exit 1). A dead daemon or a refused
 port fails its named check — the suite never tracebacks.
 """
-import hashlib
-import hmac
 import json as _json
 import os
-import socket
 import struct
 import subprocess
 import sys
@@ -22,91 +19,9 @@ import time
 
 from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check accumulator
 
-
-def wiremac(token, payload):
-    """The control wire's frame mac: the full sha256 HMAC, keyed by the token."""
-    return hmac.new(token.encode(), payload.encode(), hashlib.sha256).hexdigest()
-
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
-FAILURES = failures   # the suite's upper-case name for the shared accumulator
-
-
-def connect(port, timeout=5.0):
-    s = socket.create_connection(('127.0.0.1', port), timeout=timeout)
-    return s
-
-
-def roundtrip(port, wire_bytes, timeout=5.0):
-    """Send raw bytes, read one line, parse the JSON; (status, text) or ('dead', ...)."""
-    try:
-        s = connect(port, timeout)
-        s.sendall(wire_bytes)
-        buf = b''
-        while not buf.endswith(b'\n'):
-            chunk = s.recv(65536)
-            if not chunk:
-                s.close()
-                return 'dead', 'connection closed without a reply'
-            buf += chunk
-        s.close()
-        obj = _json.loads(buf.decode('utf-8', 'replace'))
-        return str(obj.get('status')), str(obj.get('text', ''))
-    except (OSError, ValueError) as e:
-        return 'boom', str(e)
-
-
-def authed_roundtrip(port, token, cmd, timeout=5.0):
-    """Auth with the token, send the mac'd command, read one reply: a dict.
-    Asserts nothing — the caller checks the mac against the token it passed
-    (the ops sessions must be signed with the ops key, the admin ones with
-    the admin key)."""
-    try:
-        s = connect(port, timeout)
-        s.sendall(_json.dumps({'cmd': 'auth', 'token': token}).encode() + b'\n')
-        buf = b''
-        while not buf.endswith(b'\n'):
-            chunk = s.recv(65536)
-            if not chunk:
-                s.close()
-                return {'status': 'dead', 'text': 'connection closed during auth'}
-            buf += chunk
-        auth = _json.loads(buf.decode('utf-8', 'replace'))
-        if auth.get('status') != 'ok':
-            s.close()
-            return {'status': 'auth-fail', 'text': str(auth.get('text', ''))}
-        s.sendall(_json.dumps({'cmd': cmd, 'mac': wiremac(token, cmd)}).encode() + b'\n')
-        buf = b''
-        while not buf.endswith(b'\n'):
-            chunk = s.recv(65536)
-            if not chunk:
-                s.close()
-                return {'status': 'dead', 'text': 'connection closed without a reply'}
-            buf += chunk
-        s.close()
-        obj = _json.loads(buf.decode('utf-8', 'replace'))
-        obj['_mac_ok'] = obj.get('mac') == wiremac(token, '%s %s' % (obj.get('status'), obj.get('text', '')))
-        return obj
-    except (OSError, ValueError) as e:
-        return {'status': 'boom', 'text': str(e)}
-
-
-
-def wait_port(port, timeout=20):
-    """The daemon's startup race: the bind lands when it lands (the pyc, the
-    profile load, the audit init) — poll-connect instead of a blind sleep.
-    False when the port never opened — the caller fails its named check."""
-    end = time.monotonic() + timeout
-    while True:
-        try:
-            socket.create_connection(('127.0.0.1', port), timeout=1).close()
-            return True
-        except OSError:
-            if time.monotonic() >= end:
-                return False
-            time.sleep(0.2)
-
-class QuickDone(Exception):
-    pass
+wiremac = wire_mac          # the suite's two-arg spelling of the shared frame mac
+roundtrip = control_roundtrip   # the raw form: this suite's ports carry no handshake
 
 
 def main():

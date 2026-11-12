@@ -9,8 +9,6 @@ afterwards.
 Checks: ALL PASS (or a FAILURES list; exit 1). A dead daemon or a refused
 port fails its named check — the suite never tracebacks.
 """
-import hashlib
-import hmac
 import json as _json
 import os
 import socket
@@ -23,7 +21,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check accumulator
 
 P = os.path.join(REPO, 'dashboard', 'bin', 'dashboard.py')
-FAILURES = failures   # the suite's upper-case name for the shared accumulator
 TOKEN = 'sekrit'
 PROM_PORT = 15970 + BASE     # the stub Prometheus
 HTTP_PORT = 15971 + BASE     # the dashboard's page/proxy surface
@@ -34,20 +31,6 @@ OPS_HTTP_PORT = 15973 + BASE   # the ops-token'd dashboard (the read-only role, 
 OPS_CTRL_PORT = 15974 + BASE
 PAGES_PORT = 15975 + BASE    # the token'd page (the F21 auth round)
 PAGES_CTL = 15977 + BASE
-
-def wait_port(port, timeout=20):
-    """The daemon's startup race: the bind lands when it lands — poll-connect
-    instead of a blind sleep. False when the port never opened — the caller
-    fails its named check."""
-    end = time.monotonic() + timeout
-    while True:
-        try:
-            socket.create_connection(('127.0.0.1', port), timeout=1).close()
-            return True
-        except OSError:
-            if time.monotonic() >= end:
-                return False
-            time.sleep(0.2)
 
 
 def wait_file(path, timeout=10):
@@ -75,94 +58,25 @@ class PromStub(BaseHTTPRequestHandler):
         pass
 
 
-def wiremac(payload):
-    """The control wire's frame mac: the full sha256 HMAC, keyed by the token."""
-    import hashlib
-    import hmac
-    return hmac.new(TOKEN.encode(), payload.encode(), hashlib.sha256).hexdigest()
+def wiremac(payload):   # the suite's thin wrapper: the TOKEN'd frame mac
+    return wire_mac(TOKEN, payload)
 
 
-def signed(cmd):
-    """The signed wire form of one command (the token'd server refuses the unsigned)."""
-    return _json.dumps({'cmd': cmd, 'mac': wiremac(cmd)}).encode() + b'\n'
+def signed(cmd):   # the signed wire form (the token'd server refuses the unsigned)
+    return signed_wire(cmd, TOKEN)
 
 
 def ops_roundtrip(cmd, token=OPS_TOKEN, port=None, unsigned=False, timeout=5.0):
-    """Auth with the given token (the ops or the admin one), send the command,
-    read one reply: (status, text, mac-verifies-with-the-same-token)."""
-    port = port or OPS_CTRL_PORT
-    try:
-        s = connect(port, timeout)
-        s.sendall(_json.dumps({'cmd': 'auth', 'token': token}).encode() + b'\n')
-        buf = b''
-        while not buf.endswith(b'\n'):
-            chunk = s.recv(65536)
-            if not chunk:
-                s.close()
-                return 'dead', 'connection closed during auth', False
-            buf += chunk
-        auth = _json.loads(buf.decode('utf-8', 'replace'))
-        if auth.get('status') != 'ok':
-            s.close()
-            return 'auth-fail', str(auth.get('text', '')), False
-        if token and not unsigned:
-            mac = hmac.new(token.encode(), cmd.encode(), hashlib.sha256).hexdigest()
-            s.sendall(_json.dumps({'cmd': cmd, 'mac': mac}).encode() + b'\n')
-        else:
-            s.sendall(_json.dumps({'cmd': cmd}).encode() + b'\n')
-        buf = b''
-        while not buf.endswith(b'\n'):
-            chunk = s.recv(65536)
-            if not chunk:
-                s.close()
-                return 'dead', 'connection closed without a reply', False
-            buf += chunk
-        s.close()
-        obj = _json.loads(buf.decode('utf-8', 'replace'))
-        want = hmac.new(token.encode(), ('%s %s' % (obj.get('status'), obj.get('text', ''))).encode(),
-                        hashlib.sha256).hexdigest()
-        return str(obj.get('status')), str(obj.get('text', '')), obj.get('mac') == want
-    except (OSError, ValueError) as e:
-        return 'boom', str(e), False
-
-
-def connect(port, timeout=5.0):
-    s = socket.create_connection(('127.0.0.1', port), timeout=timeout)
-    return s
+    """The suite's thin wrapper: OPS_CTRL_PORT is the default port."""
+    return ops_control_roundtrip(cmd, token, port or OPS_CTRL_PORT, unsigned, timeout)
 
 
 def roundtrip(port, wire_bytes, timeout=5.0):
-    """Send raw bytes, read one line, parse the JSON; (status, text) or ('dead', ...).
-    On the control port the token handshake runs first (the F5 rule: a TCP
-    control port refuses to start without a token)."""
-    try:
-        s = connect(port, timeout)
-        if port in (AUTH_PORT, PAGES_CTL):
-            s.sendall(_json.dumps({'cmd': 'auth', 'token': TOKEN}).encode() + b'\n')
-            buf = b''
-            while not buf.endswith(b'\n'):
-                chunk = s.recv(65536)
-                if not chunk:
-                    s.close()
-                    return 'dead', 'connection closed during auth'
-                buf += chunk
-        s.sendall(wire_bytes)
-        buf = b''
-        while not buf.endswith(b'\n'):
-            chunk = s.recv(65536)
-            if not chunk:
-                s.close()
-                return 'dead', 'connection closed without a reply'
-            buf += chunk
-        s.close()
-        obj = _json.loads(buf.decode('utf-8', 'replace'))
-        return str(obj.get('status')), str(obj.get('text', ''))
-    except (OSError, ValueError) as e:
-        return 'boom', str(e)
+    """The suite's thin wrapper: on the token'd control ports the handshake
+    runs first (the F5 rule: a TCP control port refuses to start without a
+    token)."""
+    return control_roundtrip(port, wire_bytes, timeout, (AUTH_PORT, PAGES_CTL), TOKEN)
 
-
-class QuickDone(Exception):
-    pass
 
 
 def main():

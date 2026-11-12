@@ -12,12 +12,38 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
+- **The scripts/lib package** — `scripts/scriptlib.py` grows into
+  `scripts/lib/`, the scripts' common lib (the scripts README's TODO
+  consolidate list): the flat helpers (`TOOLS`, the row-locator, the
+  live-name rule) re-home in `lib/__init__.py` beside `registry.py` (one
+  loader home — the wired-rows import dance, the raw `options.json` read
+  and the loader's own canon fold, plus the per-tool SURFACES map),
+  `walk.py` (the one tree-walk — `family_drift.py`'s `targets()`
+  re-homed) and `emit.py` (the emit-and-check doc writer — the
+  generators' `--check` rides one helper; the stale report prints a
+  unified diff now). The eleven `scriptlib` importers speak
+  `from lib import …` and the per-script repo-root path dances die
+  (importing the package puts the repo root on sys.path). `lib` is a
+  contested name — the per-tool `lib/` packages own it wherever a tool
+  root precedes `scripts/` on the path — so `editor.py` opens the house's
+  one-module-named-`lib`-at-a-time dance around its imports (the cache's
+  gate loader binds first, the window re-binds the scripts' package); the
+  rule is documented in `lib/__init__.py`.
+
 - **The tests/lib split** — `tests/harness.py` moves to
   `tests/lib/harness.py` (the third dir of the tests split, the
   suites/battery twin): the twelve wrappers pre-seed `tests/lib` onto
   sys.path, the suite bodies keep the bare `from harness import *`, the
   harness's REPO walk gains the lib/ depth; tests/lib/README.md lands
-  and the suites README's pointer follows.
+  and the suites README's pointer follows. The harness then absorbs the
+  wire layer the suites carried as private copies — `wait_port`,
+  `connect`, `QuickDone`, the `FAILURES` accumulator alias and the
+  control-wire clients (`wire_mac`, `signed_wire`, `control_roundtrip`
+  with the auth_ports/token parameters, `ops_control_roundtrip`,
+  `authed_roundtrip`): the three control-fuzz suites bind thin wrappers
+  (which of their ports speak the handshake, the default ops port), six
+  suites drop their QuickDone copies, five the FAILURES alias, and the
+  hashlib/hmac/socket imports prune where the copies died.
 
 - **The floor blocks + the hidden ruling** — the `inspect` and `request`
   commands gain canon blocks speaking the family floor (the tools keep

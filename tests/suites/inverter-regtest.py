@@ -30,7 +30,6 @@ import time
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 CTL = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py')
 LOG = os.path.join(SCRATCH, 'inv_regtest.log')
-FAILURES = failures   # the suite's upper-case name for the shared accumulator (the doc + the tail speak FAILURES)
 
 A_MODBUS, A_CTL = 15970 + BASE, 15971 + BASE        # --max-clients 1
 B_MODBUS, B_CTL = 15972 + BASE, 15973 + BASE        # --client-timeout 1
@@ -80,10 +79,6 @@ def eof_soon(sock, seconds=3.0):
         return sock.recv(4096) == b'' and time.monotonic() - t0 < seconds
     except OSError:
         return False
-
-
-class QuickDone(Exception):
-    pass
 
 
 def main():

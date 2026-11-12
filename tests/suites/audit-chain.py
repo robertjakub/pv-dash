@@ -24,8 +24,6 @@ V = os.path.join(REPO, 'scripts', 'audit_verify.py')
 sys.path.insert(0, REPO)
 from common.runtime.audit import AuditLog, entry_hash, GENESIS, audit_quote, audit_escape   # noqa: E402
 
-FAILURES = failures   # the suite's upper-case name for the shared accumulator
-
 
 def verify(*paths, rc=0, quiet=False, verbose=False, contain=None, absent=None):
     cmd = [sys.executable, V] + (['-v'] if verbose else []) + (['-q'] if quiet else []) + list(paths)
@@ -37,10 +35,6 @@ def verify(*paths, rc=0, quiet=False, verbose=False, contain=None, absent=None):
     if absent:
         ok = ok and not any(a in out for a in absent)
     return ok, out
-
-
-class QuickDone(Exception):
-    pass
 
 
 def main():

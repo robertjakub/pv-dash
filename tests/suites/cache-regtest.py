@@ -124,9 +124,6 @@ class EvilUpstream:
         self.running = False
         self.srv.close()
 
-class QuickDone(Exception):
-    pass
-
 
 try:
     # 1. baseline: strict fake (undefined regs rejected with 02) + cache

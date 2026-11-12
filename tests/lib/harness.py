@@ -147,3 +147,143 @@ def pty_send(m, text):
     """one write to the pty master: a command line ('quit\\n') or one pause
     key ('q' — no newline, the pager reads a single char)."""
     os.write(m, text.encode())
+
+
+FAILURES = failures   # the suites' upper-case name for the same accumulator list
+
+
+class QuickDone(Exception):
+    pass
+
+
+def wait_port(port, timeout=20):
+    """The daemon's startup race: the bind lands when it lands (the pyc, the
+    profile load, the audit init) — poll-connect instead of a blind sleep.
+    False when the port never opened — the caller fails its named check."""
+    import socket
+    end = time.monotonic() + timeout
+    while True:
+        try:
+            socket.create_connection(('127.0.0.1', port), timeout=1).close()
+            return True
+        except OSError:
+            if time.monotonic() >= end:
+                return False
+            time.sleep(0.2)
+
+
+def connect(port, timeout=5.0):
+    import socket
+    return socket.create_connection(('127.0.0.1', port), timeout=timeout)
+
+
+def _recv_line(s):
+    """one newline-terminated JSON frame off the socket, or None on eof —
+    the read loop every control client here shares"""
+    buf = b''
+    while not buf.endswith(b'\n'):
+        chunk = s.recv(65536)
+        if not chunk:
+            return None
+        buf += chunk
+    return buf
+
+
+def wire_mac(token, payload):
+    """The control wire's frame mac: the full sha256 HMAC, keyed by the token."""
+    import hashlib
+    import hmac
+    return hmac.new(token.encode(), payload.encode(), hashlib.sha256).hexdigest()
+
+
+def signed_wire(cmd, token):
+    """The signed wire form of one command (the token'd server refuses the unsigned)."""
+    import json as _json
+    return _json.dumps({'cmd': cmd, 'mac': wire_mac(token, cmd)}).encode() + b'\n'
+
+
+def control_roundtrip(port, wire_bytes, timeout=5.0, auth_ports=(), token=None):
+    """Send raw bytes, read one line, parse the JSON; (status, text) or
+    ('dead', ...). A port in auth_ports speaks the token handshake first
+    (the F5 rule: a TCP control port refuses to start without a token) —
+    the suites bind their own thin wrappers naming which of their ports
+    those are."""
+    import json as _json
+    try:
+        s = connect(port, timeout)
+        if port in auth_ports:
+            s.sendall(_json.dumps({'cmd': 'auth', 'token': token}).encode() + b'\n')
+            buf = _recv_line(s)
+            if buf is None:
+                s.close()
+                return 'dead', 'connection closed during auth'
+        s.sendall(wire_bytes)
+        buf = _recv_line(s)
+        s.close()
+        if buf is None:
+            return 'dead', 'connection closed without a reply'
+        obj = _json.loads(buf.decode('utf-8', 'replace'))
+        return str(obj.get('status')), str(obj.get('text', ''))
+    except (OSError, ValueError) as e:
+        return 'boom', str(e)
+
+
+def ops_control_roundtrip(cmd, token, port, unsigned=False, timeout=5.0):
+    """Auth with the given token (the ops or the admin one), send the command,
+    read one reply: (status, text, mac-verifies-with-the-same-token) — the
+    ops sessions must be signed and answered with the ops key, the admin
+    ones with the admin key. The suites bind the default token and port."""
+    import json as _json
+    try:
+        s = connect(port, timeout)
+        s.sendall(_json.dumps({'cmd': 'auth', 'token': token}).encode() + b'\n')
+        buf = _recv_line(s)
+        if buf is None:
+            s.close()
+            return 'dead', 'connection closed during auth', False
+        auth = _json.loads(buf.decode('utf-8', 'replace'))
+        if auth.get('status') != 'ok':
+            s.close()
+            return 'auth-fail', str(auth.get('text', '')), False
+        if token and not unsigned:
+            mac = wire_mac(token, cmd)
+            s.sendall(_json.dumps({'cmd': cmd, 'mac': mac}).encode() + b'\n')
+        else:
+            s.sendall(_json.dumps({'cmd': cmd}).encode() + b'\n')
+        buf = _recv_line(s)
+        s.close()
+        if buf is None:
+            return 'dead', 'connection closed without a reply', False
+        obj = _json.loads(buf.decode('utf-8', 'replace'))
+        want = wire_mac(token, '%s %s' % (obj.get('status'), obj.get('text', '')))
+        return str(obj.get('status')), str(obj.get('text', '')), obj.get('mac') == want
+    except (OSError, ValueError) as e:
+        return 'boom', str(e), False
+
+
+def authed_roundtrip(port, token, cmd, timeout=5.0):
+    """Auth with the token, send the mac'd command, read one reply: a dict.
+    Asserts nothing — the caller checks the mac against the token it passed
+    (the ops sessions must be signed with the ops key, the admin ones with
+    the admin key)."""
+    import json as _json
+    try:
+        s = connect(port, timeout)
+        s.sendall(_json.dumps({'cmd': 'auth', 'token': token}).encode() + b'\n')
+        buf = _recv_line(s)
+        if buf is None:
+            return {'status': 'dead', 'text': 'connection closed during auth'}
+        auth = _json.loads(buf.decode('utf-8', 'replace'))
+        if auth.get('status') != 'ok':
+            s.close()
+            return {'status': 'auth-fail', 'text': str(auth.get('text', ''))}
+        s.sendall(signed_wire(cmd, token))
+        buf = _recv_line(s)
+        s.close()
+        if buf is None:
+            return {'status': 'dead', 'text': 'connection closed without a reply'}
+        obj = _json.loads(buf.decode('utf-8', 'replace'))
+        obj['_mac_ok'] = obj.get('mac') == wire_mac(token, '%s %s' % (obj.get('status'), obj.get('text', '')))
+        return obj
+    except (OSError, ValueError) as e:
+        return {'status': 'boom', 'text': str(e)}

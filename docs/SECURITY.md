@@ -220,7 +220,8 @@ the intended demo feature, gated by control-server access only.
 - **Supply chain** — stdlib-only, zero third-party dependencies; Nix-pinned
   builds; the shared `common/` package narrows the review surface instead
   of widening it.
-- **Platform hardening** — systemd `DynamicUser`, `NoNewPrivileges`,
+- **Platform hardening** — systemd `DynamicUser` (or the named static
+  account — the family's shared `pvsuite` identity), `NoNewPrivileges`,
   `ProtectSystem=strict`, `PrivateTmp`, `LoadCredential`; explicit socket
   modes after bind, never the umask (F8); unprivileged containers, root
   dropped before exec; the compose demo internal-only and publishes nothing
@@ -290,7 +291,8 @@ one `internal: true` network and publishes nothing on the host; the prod
 stack fronts real hardware with your own external collector. The
 topologies and the env-file rules: [../docker/README.md](../docker/README.md).
 
-The NixOS modules sandbox every service (`DynamicUser`, `NoNewPrivileges`,
+The NixOS modules sandbox every service (`DynamicUser` — or the named static
+account, the family's shared `pvsuite` identity — plus `NoNewPrivileges`,
 `ProtectSystem=strict`, `PrivateTmp`, `LoadCredential` and the
 `SystemCallFilter`/`RestrictAddressFamilies` set), verified with
 `systemd-analyze security` (a score per unit asserted by

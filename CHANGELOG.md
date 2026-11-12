@@ -134,8 +134,43 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   window gets KILLed (the killer NOTEs the status and frees the link
   itself — the same end state a TERMed run leaves). Names take `2` or
   `slot2`; no names = every live slot; nothing live is exit 0.
+- **The NixOS modules grow the account pair** — `user`/`group` on all three
+  service modules: null (the default) keeps the systemd `DynamicUser`; a
+  name renders `User=`/`Group=` instead, and the module creates the account
+  (a system user, no login) unless the host already defines the same
+  `users.users` entry. `pvsuite`/`pvsuite` is the family's shared identity —
+  one owner across the three daemons for the state dumps and the control
+  sockets. A `group` without `user` refuses at eval (a group alone would run
+  the daemon as root), naming `root` warns, and the modules now install the
+  package (the daemon, the `*-cli` client, the man pages) into
+  `environment.systemPackages` — the ctl surface is spoken through the cli,
+  which fixes the hardening VM test's long-latent
+  `/run/current-system/sw/bin/<tool>-cli` calls (no module had ever put the
+  cli on the system path, and the tests/nixos/ → nixos/tests/ move had left
+  the file's `../nixos/...` self-imports pointing at a nonexistent
+  `nixos/nixos/` — CI's `nix flake check --no-build` never caught either).
+  The hardening test gains a second node running the cache under
+  `pvsuite`/`pvsuite` (User/Group/DynamicUser asserted, the RuntimeDirectory
+  owned by the account, the ctl speaking through it).
 
 ### Changed
+
+- **The four tool trees move under `apps/`** — `cache/`, `scraper/`,
+  `inverter/` and `dashboard/` become `apps/cache/`, `apps/scraper/`,
+  `apps/inverter/` and `apps/dashboard/`; the repo root now separates the
+  products (`apps/`), the shared code (`common/`, `shared/`) and the
+  support trees (docker, docs, nixos, profiles, scripts, tests, extras).
+  No behavior change: the eight bins' repo-root sys.path bootstrap gains
+  one dirname, the scripts' resolvers (scripts/lib/registry.py, walk.py,
+  the linters and the generators) carry the `apps/` segment, the suites'
+  daemon paths follow, the compose build contexts re-anchor
+  (`context: ../../apps/<tool>`, `dockerfile: ../../docker/…`), the Nix
+  packages' `src` moves (`lib.cleanSource ../../../apps/<tool>`) and the
+  docker image layout is untouched (`/pv-suite/<tool>/` inside the
+  container is the image's own). The generated surfaces regenerate (the
+  eight man pages, the four MANUAL.md pages, the example confs, the SBOM
+  pair, docs/family-drift.md); the READMEs, the book pages and the docs
+  re-point; the ten suites pass through the battery runner.
 
 - **The similarity pass's common blocks move home** — the AST similarity
   sweep (scripts/family_drift.py's own pair pass, cross-tool over the four

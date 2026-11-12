@@ -78,10 +78,14 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   aware of the five files: the registries and the canon file route through
   the loaders or fold the refs explicitly (`compare_options`,
   `list_options`, `gen_examples`, `gen_manual`, `family_drift`'s sweeps —
-  whose reports read the effective rows now), the linter and the raw
-  editors stay raw by design, `lint_options` renders the canon file in
-  the canonical layout (the sections and blocks in their landed order, a
-  block's fields in the row rank) beside the four registries.
+  whose reports read the effective rows now, and the new
+  `options_drift` report: the knobs in their folded form against the
+  canon — the blocks' adoption census, the inline-wins deviations, the
+  block gaps, the promotion list and the shape-field drifts), the
+  linter and the raw editors stay raw by design, `lint_options` renders
+  the canon file in the canonical layout (the sections and blocks in
+  their landed order, a block's fields in the row rank) beside the four
+  registries.
 
 - **the docker names speak the daemon** — the fake inverter's image,
   compose service and env file rename to the daemon's own:

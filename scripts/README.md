@@ -49,6 +49,17 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   near-misses (one live path answering to several flat names, an
   alias only some tools carry) follow as notes. `--tool` names the
   tools comma separated with `all` the default.
+- **`options_drift.py`** — the knobs compared against the canon: every
+  knob in its FOLDED form (the loader's own `canon_fold`), the canon
+  blocks' adoption census (FAMILY / partial / DEAD), the rows that
+  contradict their own block (the inline-wins overrides) beside the
+  block gaps (the fold-up candidates), the promotion list (the whole
+  shape agreeing, still inline) and the shape-field drifts that block a
+  shared definition; `live`/`alias`/`node`/`no-env`/`group` are the
+  per-tool console placements and never gate a match. Report only —
+  the form gates live in `lint_options.py`, the tool-vs-tool identity
+  fields in `compare_options.py`. `--tool` names the tools comma
+  separated with `all` the default.
 
 ## The checks (the shipped artifacts)
 

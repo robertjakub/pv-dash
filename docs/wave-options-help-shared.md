@@ -213,7 +213,9 @@ registries + the canon file): through the loaders — `check_options`, the
 daemons, the clis; the explicit fold — `gen_examples` (the options rows),
 `gen_manual` (the show/commands rows), `compare_options`, `list_options`,
 `family_drift`'s knobs sweep (the effective rows: the report's secret
-census reads the block-carried marks now); raw BY DESIGN — `lint_options`
+census reads the block-carried marks now), `options_drift` (the
+canon-vs-registries report — the folded knobs, the adoption census, the
+deviations and the promotion list); raw BY DESIGN — `lint_options`
 (the layout linter; it gates the canon blocks AND the canon file's own
 layout), the `editor` (the raw-surface editor, the canon display beside),
 `set_group`/`set_live` (the surgical field editors — the fields they edit

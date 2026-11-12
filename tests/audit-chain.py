@@ -6,5 +6,5 @@ import runpy
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)   # tests/ — the harness home (run_path prepends the suite's own dir)
+sys.path.insert(0, os.path.join(HERE, 'lib'))   # tests/lib — the harness home (run_path prepends the suite's own dir)
 runpy.run_path(os.path.join(HERE, 'suites', 'audit-chain.py'), run_name='__main__')

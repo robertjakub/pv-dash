@@ -12,6 +12,13 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
+- **The tests/lib split** — `tests/harness.py` moves to
+  `tests/lib/harness.py` (the third dir of the tests split, the
+  suites/battery twin): the twelve wrappers pre-seed `tests/lib` onto
+  sys.path, the suite bodies keep the bare `from harness import *`, the
+  harness's REPO walk gains the lib/ depth; tests/lib/README.md lands
+  and the suites README's pointer follows.
+
 - **The floor blocks + the hidden ruling** — the `inspect` and `request`
   commands gain canon blocks speaking the family floor (the tools keep
   their richer inline tails); the request `restart`/`reload*` commands

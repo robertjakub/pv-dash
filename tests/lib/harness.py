@@ -11,7 +11,8 @@ import subprocess
 import sys
 import time
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# lib/ -> tests/ -> the repo root
 
 if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (tests/battery.py)
     sys.exit('suite: run through tests/battery.py (the run dir + the port slot; '

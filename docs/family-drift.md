@@ -74,11 +74,11 @@ design); the top non-man pairs:
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.83 | `inverter/lib/control.py:96` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
 | 0.82 | `cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1378` `run_dump_interval` |
+| 0.78 | `cache/lib/control.py:798` `uplink_report` <-> `scraper/lib/control.py:479` `uplink_report` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
 | 0.78 | `inverter/lib/control.py:466` `acl_table_report` <-> `dashboard/lib/control.py:296` `acl_table_report` |
 | 0.76 | `scraper/lib/control.py:119` `__init__` <-> `inverter/lib/control.py:96` `__init__` |
 | 0.76 | `scraper/lib/server.py:89` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `scraper/lib/control.py:119` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
 
 ## The surface sweep — the listeners, the wire and the loops
 

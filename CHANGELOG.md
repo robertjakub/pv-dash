@@ -25,10 +25,10 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   errors — the `ModbusTCP` client now keeps the cache's `Upstream`
   counter block) plus one row per poll block with status, latency
   (last/mean/max), failures and last error; **`show uplink-sources`**
-  (both tools) widens the table — the sources column rides right after
-  the range, naming the profile registers the block pools (one name,
-  comma-separated when pooled) — while plain `show uplink` stays the
-  lean health table; `inspect` carries the poll plan. Also fixes the
+  (both tools) spells the register map — one row per polled register
+  with its fc, register address, the range that fetches it and the
+  source name — while plain `show uplink` stays the lean block-health
+  table; `inspect` carries the poll plan. Also fixes the
   fresh-start dump crash:
   the read-delay wave left `read_delay` unresolved in the startup config,
   so any `request dump`/reload state save killed the control session

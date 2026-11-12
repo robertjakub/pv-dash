@@ -23,7 +23,7 @@
 # stay) — for the scraper those are /config/metrics.json (METRICS_SPEC) and
 # the generated /config/metrics.token: edit the spec there, it survives
 # recreation. The bundled conf is NOT in the volume — the tool loads the
-# image's /pv-suite/scraper/scraper.conf (the default --config target) and
+# image's /pv-suite/scraper/modbus-scraper.conf (the default --config target) and
 # the per-tool env file (env/scraper.env — the demo and plain-docker
 # spelling; the prod copy carries -production) overrides its knobs (see
 # ../docker/README.md; a flag beats the env: `docker run ... modbus-scraper
@@ -46,7 +46,7 @@ COPY --from=common modbus/*.py common/modbus/
 COPY --from=shared texts.json shared/
 COPY --chown=pvsuite bin/ scraper/bin/
 COPY --chown=pvsuite lib/ scraper/lib/
-COPY --chown=pvsuite examples/scraper.conf examples/metrics.json scraper/
+COPY --chown=pvsuite examples/modbus-scraper.conf examples/metrics.json scraper/
 COPY --chown=pvsuite examples/metrics.json examples/metrics.token config-defaults/
 # the suite key's placeholder: the entrypoint materializes any *.token in
 # config-defaults as a random value on the first seed (the bundled content
@@ -62,7 +62,7 @@ RUN chmod +x scraper/bin/*.py /usr/local/bin/pv-entrypoint \
 # UPSTREAM is the image's default upstream peer (modbus-cache:15502 — the
 # compose stack's cache service; the flag would pin it past every env).
 # The bundled conf loads via the built-in default --config target
-# (/pv-suite/scraper/scraper.conf) — env and flags override it.
+# (/pv-suite/scraper/modbus-scraper.conf) — env and flags override it.
 ENV METRICS_SPEC=/config/metrics.json \
     UPSTREAM=modbus-cache:15502
 VOLUME /config

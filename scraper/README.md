@@ -57,7 +57,7 @@ Settings are resolved in this order (first hit wins), mirroring
    the full twin set is the generated
    [`docker/env/scraper.env.example`](../docker/env/scraper.env.example)
 3. Config file — the set-grammar script (`set <name> <value>` lines) —
-   `--config` picks the file (default: `$CONFIG`, then `scraper.conf` next
+   `--config` picks the file (default: `$CONFIG`, then `modbus-scraper.conf` next
    to the script, then the subproject root's sample; missing file is fine)
 4. Built-in defaults
 
@@ -66,7 +66,7 @@ config file is fatal, nonsense values abort with a clean one-line error
 instead of failing later at runtime. The only soft spot is `timeout >
 interval`: that logs a warning (polls run back-to-back) instead of failing.
 
-`examples/scraper.conf` is a sample in the set grammar — GENERATED
+`examples/modbus-scraper.conf` is a sample in the set grammar — GENERATED
 (`scripts/gen_examples.py`) from `lib/options.json`, every knob the
 registry declares, every line commented at its default; `show config`
 regenerates the script from the running scraper (secrets hidden):
@@ -374,7 +374,7 @@ scraper/
 │   ├── modbus-scraper-ctl.py     # one-shot / batch control client
 │   └── modbus-scraper-cli.py     # console-style control session
 ├── examples/
-│   ├── scraper.conf         # sample config in the set grammar
+│   ├── modbus-scraper.conf  # sample config in the set grammar
 │   └── metrics.json         # the phase rows' + the compute expressions' specs
 ├── schema/
 │   └── metrics.schema.json  # the metrics spec's JSON Schema (draft 2020-12)

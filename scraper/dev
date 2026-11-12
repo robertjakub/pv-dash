@@ -6,6 +6,6 @@
 # through: scraper/dev --dry-run, scraper/dev --profile deye-sg04lp3
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
 exec python3 "$DIR/bin/modbus-scraper.py" \
-    --config "$DIR/examples/scraper.conf" \
+    --config "$DIR/examples/modbus-scraper.conf" \
     --metrics-spec "$DIR/examples/metrics.json" \
     --upstream "${UPSTREAM:-127.0.0.1:15502}" "$@"

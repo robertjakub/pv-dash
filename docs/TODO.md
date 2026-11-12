@@ -743,8 +743,8 @@ re-open — is the history half:
   control port; the constants audit put `log_levels` in every tool's
   `lib/static.json` (and the metrics-endpoint defaults on the dashboard),
   and the scraper's register map now lives in the device profile alone —
-  the register/scale knobs are gone and `set profile` swaps the map live
-  (a bad profile rolls back).
+  the register/scale knobs are gone and `set modbus profile` swaps the map
+  live (a bad profile rolls back).
 - **the config-format wave** — the ini is gone (the breaking wave): the
   config files speak the control grammar (`set <name> <value>` lines, `#`
   comments — a config file pipes through a ctl client), `show config`

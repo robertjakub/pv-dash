@@ -2,53 +2,16 @@
 """The single Modbus TCP upstream connection to the inverter, shared by all threads (stdlib only)."""
 import struct
 import threading
-import time
 
-from common.modbus import (ClientBase, ModbusError, check_data_bytes,
-                           check_head, check_reply, frame,
-                           unpack_bits)
-from .statics import BIT_READ_FUNCS, MAX_PDU
+from common.modbus import (ClientBase, check_data_bytes, check_reply,
+                           frame, unpack_bits)
+from .statics import BIT_READ_FUNCS
 
 
 class Upstream(ClientBase):
     def __init__(self, host, port, unit, timeout, auth=None, auth_key=None):
         super().__init__(host, port, unit, timeout, auth=auth, auth_key=auth_key)
         self.lock = threading.Lock()
-        self.exchanges = 0         # completed request/reply exchanges
-        self.connects = 0          # successful connects (2 = one reconnect)
-        self.errors = 0            # failed exchanges (timeout, reset, bad frame)
-        self.last_error = None     # the text of the last failure
-        self.last_error_at = None  # monotonic
-        self.connected_since = None
-        self.bytes_in = 0
-        self.bytes_out = 0
-
-    def after_connect(self):
-        self.connects += 1
-        self.connected_since = time.monotonic()
-
-    def _exchange(self, out, want_txn):
-        try:
-            if not self.sock:
-                self._connect()
-            self.sock.sendall(out)
-            self.bytes_out += len(out)
-            head = self._recv_exact(7)
-            self.bytes_in += len(head)
-            txn, proto, length, unit = check_head(head, MAX_PDU)
-            body = self._recv_exact(length - 1)
-            self.bytes_in += len(body)
-            if txn != want_txn:
-                raise ModbusError('transaction id mismatch')
-            if proto != 0:
-                raise ModbusError('unexpected protocol id %d' % proto)
-        except (ModbusError, OSError) as e:
-            self.errors += 1
-            self.last_error = str(e)
-            self.last_error_at = time.monotonic()
-            raise
-        self.exchanges += 1
-        return txn, proto, length, unit, body
 
     def read(self, fc, addr, count):
         """One FC1-FC4 read (coils/discrete inputs return 0/1 per address);

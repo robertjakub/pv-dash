@@ -543,15 +543,71 @@ def as_bool(v):
 _CONV = {'str': str, 'int': int, 'float': float, 'bool': bool}
 
 
+_CANON = None
+
+
+def load_canon():
+    """shared/options-help.json at the tree root — the directory that
+    contains common/ (the texts.py walk, spelled locally: the loaders
+    import flat, so the walk cannot be imported from the render module).
+    Cached; an absent file reads as no canon (the rows speak inline — the
+    editor and the lints open stripped trees), a row's unknown ref fails
+    LOUD at the fold: the registries are lint-gated, a typo must never
+    load as silence."""
+    global _CANON
+    if _CANON is None:
+        tree = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        try:
+            with open(os.path.join(tree, 'shared', 'options-help.json'), encoding='utf-8') as f:
+                _CANON = json.load(f)
+        except FileNotFoundError:
+            _CANON = {}
+    return _CANON
+
+
+def canon_fold(row, canon, section='options', label='registry'):
+    """The row's canon block folded under it: the block carries the
+    family-wide fields, the row's inline field wins (the per-tool override —
+    the escape hatch the whole-row ref keeps). The options blocks never
+    carry `name` — the flat name IS the block's key, not a field. The
+    show/commands canon is the flat word -> text map: the description field
+    (setting-help for the show rows, help for the command rows) falls to it
+    only when the row carries none — an `exit` row refs `quit`'s block by
+    name. An unknown `shared` key raises ValueError naming the row."""
+    key = row.get('shared')
+    if key is None:
+        return row
+    blocks = canon.get(section) or {}
+    if key not in blocks:
+        raise ValueError('%s: the row %r refs the canon key %r — no such block in '
+                         'shared/options-help.json' % (label, row.get('name'), key))
+    if section != 'options':
+        eff = dict(row)
+        field = 'setting-help' if section == 'show' else 'help'
+        if field not in eff:
+            eff[field] = blocks[key]
+        return eff
+    if 'name' in blocks[key]:
+        raise ValueError('%s: the canon block %r carries "name" — the flat name is the '
+                         'block\'s key, never a field' % (label, key))
+    return {**blocks[key], **row}
+
+
 def load_registry(here, choices=None):
     """The one registry load the four lib/options.py share: options.json
     next to the loader — the rows through option_rows (the choices wired
     per tool; the rows carry their defaults), the `show`/`commands`
     sections through parse_registry_sections (the caller folds them into
-    its globals). Returns (rows, sections, options); the module imports
-    flat (the loaders walk lib/ on sys.path — scripts/check_options.py)."""
+    its globals). Every section's rows fold their canon block first
+    (load_canon/canon_fold — the row's inline field wins). Returns (rows,
+    sections, options); the module imports flat (the loaders walk lib/ on
+    sys.path — scripts/check_options.py)."""
     with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
         meta = json.load(f)
+    canon = load_canon()
+    meta['options'] = [canon_fold(r, canon, 'options', here) for r in meta['options']]
+    meta['show'] = [canon_fold(r, canon, 'show', here) for r in meta.get('show') or []]
+    meta['commands'] = [canon_fold(r, canon, 'commands', here) for r in meta.get('commands') or []]
     return meta['options'], parse_registry_sections(meta), \
         option_rows(meta['options'], choices=choices or {})
 

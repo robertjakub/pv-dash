@@ -479,10 +479,10 @@ class ControlServer(_ControlServer):
     def uplink_report(self, with_sources=False):
         """The inverter link: the session counters (connects, exchanges,
         bytes, errors) and one row per poll block with its status, latency
-        and last error — `show uplink-sources` widens the table with the
-        block's sources column right after the range, naming the profile
-        registers it pools (the cache's gold report over the scraper's
-        fetch)."""
+        and last error — `show uplink-sources` spells the register map
+        instead: one row per polled register with its fc, register address,
+        the range that fetches it and the source name (the health columns
+        stay the blocks')."""
         s = self.scraper
         u = s.client
         now = time.monotonic()
@@ -512,30 +512,29 @@ class ControlServer(_ControlServer):
             % (secs(s.cfg['interval']), secs(s.cfg.get('read_delay') or 0.0), s.cfg.get('merge_gap') or 0,
                secs(s.poll_secs_last), secs(mean), secs(s.poll_secs_max), last_ok, len(blocks)),
         ]
-        cells = []
-        for fc, start, count, leaves in blocks:
-            names = (', '.join(n for lf in leaves for n in leaf_sources.get(lf, ()))
-                     if with_sources else None)
-            st = stats.get((fc, start, count))
-            if st is None:
-                row = ('fc%d' % fc, '%d:%d' % (start, count), 'pending', '-', '-', '-', '0', '-')
-            else:
+        if with_sources:
+            head = ('fc', 'register', 'range', 'source')
+            cells = [('fc%d' % lf[0], '%d' % lf[1], '%d:%d' % (start, count),
+                      ', '.join(leaf_sources.get(lf, ())) or '-')
+                     for _, start, count, leaves in blocks for lf in leaves]
+        else:
+            head = ('fc', 'range', 'status', 'last', 'mean', 'max', 'fails', 'last error')
+            cells = []
+            for fc, start, count, leaves in blocks:
+                st = stats.get((fc, start, count))
+                if st is None:
+                    cells.append(('fc%d' % fc, '%d:%d' % (start, count), 'pending', '-', '-', '-', '0', '-'))
+                    continue
                 if st['last_err'] is None:
                     status, err = 'ok', '-'
                 elif st['last_code'] is not None:
                     status, err = 'ex %d' % st['last_code'], st['last_err']
                 else:
                     status, err = 'error', st['last_err']
-                row = ('fc%d' % fc, '%d:%d' % (start, count), status, secs(st['last']),
-                       secs(st['sum'] / st['ok_n']) if st['ok_n'] else '-',
-                       secs(st['max']), '%d' % st['fails'], err)
-            if names is not None:
-                row = row[:2] + (names,) + row[2:]   # the sources column rides after the range
-            cells.append(row)
+                cells.append(('fc%d' % fc, '%d:%d' % (start, count), status, secs(st['last']),
+                              secs(st['sum'] / st['ok_n']) if st['ok_n'] else '-',
+                              secs(st['max']), '%d' % st['fails'], err))
         if cells:
-            head = (('fc', 'range', 'sources', 'status', 'last', 'mean', 'max', 'fails', 'last error')
-                    if with_sources else
-                    ('fc', 'range', 'status', 'last', 'mean', 'max', 'fails', 'last error'))
             widths = [max(len(h), max((len(r[i]) for r in cells), default=0)) for i, h in enumerate(head)]
             rows.append('  '.join(h.ljust(w) for h, w in zip(head, widths)))
             for r in cells:

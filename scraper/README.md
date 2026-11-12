@@ -166,7 +166,7 @@ command, settable (`set`/`clear`) or show-only — is tabled in
 |---|---|
 | `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `modbus interval`, `modbus timeout`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), the `metrics limits` caps, `metrics caps max-pv`/`metrics caps max-grid`, `system log-access`, `system log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit instance`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
 | `show uplink` | the inverter link: session counters plus one row per poll block — status, latency, failures |
-| `show uplink-sources` | the uplink table widened: the sources column after the range names the profile registers each block pools |
+| `show uplink-sources` | the register map: one row per polled register — fc, register, the range that fetches it, source |
 | `show connections` | the live HTTP clients of /metrics |
 | `request poll now` | the loop wakes immediately |
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |

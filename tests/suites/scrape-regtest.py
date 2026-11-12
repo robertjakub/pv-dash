@@ -1909,13 +1909,11 @@ try:
           len(uprows) > 1 and 'ms' in uprows[1], uprows[1] if len(uprows) > 1 else '')
     r = sctl('show uplink-sources', 15597)
     vhead = next((ln for ln in r.splitlines() if ln.startswith('fc')), '')
-    vhi = {w: i for i, w in enumerate(vhead.split())}
     vrows = [ln for ln in r.splitlines()
-             if len(ln) > 2 and ln.startswith('fc') and ln[2].isdigit()]   # the data rows (the header spells 'fc  range')
-    check('scraper control: show uplink-sources widens the table (sources after the range, the pooled names)',
-          r.startswith('ok uplink-sources\n') and 'range' in vhi and 'sources' in vhi and 'status' in vhi
-          and vhi['range'] < vhi['sources'] < vhi['status'] and 'pv-power' in r
-          and any(', ' in ln for ln in vrows), repr(r.splitlines()[4:6]) if len(r.splitlines()) > 5 else r[:160])
+             if len(ln) > 2 and ln.startswith('fc') and ln[2].isdigit()]   # the data rows (the header spells 'fc  register')
+    check('scraper control: show uplink-sources spells the register map (fc, register, range, source)',
+          r.startswith('ok uplink-sources\n') and vhead.split() == ['fc', 'register', 'range', 'source']
+          and 'pv-power' in r and vrows and len(vrows) > len(uprows) - 1, repr(r.splitlines()[4:6]) if len(r.splitlines()) > 5 else r[:160])
     r = sctl('set merge-gap 0', 15597)
     check('scraper control: set merge-gap 0 rebuilds the plan (each range alone)',
           r.startswith('ok merge-gap=0'), r[:90])

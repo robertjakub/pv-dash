@@ -191,8 +191,8 @@ the state dump: the live overrides' file, the restore-on-start
 | report | kind | description |
 |---|---|---|
 | `show connections` | show-only | the live HTTP clients: the gate counters, one row per peer IP |
-| `show metrics-acl-table` | show-only | the metrics ACL as its rule chain, one entry per line (the metrics/acl report) |
-| `show version` | show-only | the dashboard version |
+| `show metrics-acl-table` | show-only | the metrics ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs |
+| `show version` | show-only | the suite version |
 | `show config` | show-only (hidden) | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
 | `show knobs` | show-only (hidden) | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
 

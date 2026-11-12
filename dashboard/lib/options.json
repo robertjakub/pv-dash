@@ -84,9 +84,8 @@
   ],
   "show": [
     { "name": "connections", "setting-help": "the live HTTP clients: the gate counters, one row per peer IP" },
-    { "name": "metrics-acl-table", "live": "metrics/acl/table",
-      "setting-help": "the metrics ACL as its rule chain, one entry per line (the metrics/acl report)" },
-    { "name": "version", "setting-help": "the dashboard version" },
+    { "name": "metrics-acl-table", "shared": "metrics-acl-table", "live": "metrics/acl/table" },
+    { "name": "version", "shared": "version" },
     { "name": "config", "shared": "config" },
     { "name": "knobs", "shared": "knobs" }
   ],

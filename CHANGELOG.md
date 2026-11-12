@@ -12,6 +12,19 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Changed
 
+- **tests** — **the suite bodies move under `tests/suites/`**: the ten
+  graduated suites' real modules live there; `tests/<name>.py` become
+  thin wrappers (`runpy`, `__name__='__main__'`) so the battery's suite
+  names, the zz_ pgrep copy and the CI legs never change — the wrapper
+  pre-seeds `tests/` onto sys.path (run_path prepends the suite's own
+  dir, the harness home rides in front of it). tests/ is the python
+  entry layer (the wrappers + harness.py); the lone nix file moved out
+  to `nixos/tests/hardening.nix` where the testers.nixosTest convention
+  lives. Validated: the full battery on the moved set — 9/10 green and
+  one leg lost to the cross-session pkill contention (the concurrent
+  battery's serial pre-suite sweep kills family daemons globally, not
+  slot-scoped), the solo cache-regtest rerun ALL PASS 3m27s.
+
 - **scripts** — **the battery runner is python**: `scripts/battery.py`
   replaces the sh twin — the same CLI (the profiles, the explicit
   suite names, `--stop`/`--name`/`--depth`), the same state home

@@ -251,9 +251,14 @@ Proceed with shutdown? [confirm] y
 
 TAB completes commands, settings and their values; `set`/`clear` confirm
 `% changed`, errors print `% error: <message>`, the ok replies print bare.
-While idle the CLI sends wire pings (every 55 s, `CLI_KEEPALIVE` to tune);
-when the connection dies it retries `--reconnect` times (default 3) with
-`--reconnect-wait` seconds (default 10) and resumes on the first success.
+Every reply prints through the console's pager: a reply taller than the
+screen pauses (`-- more --`), space prints the next page, return one more
+line, `q` stops the rest — `--page-size`/`CLI_PAGE_SIZE` set the page size
+(0 = off), the session-local `page` command retunes it live (never sent to
+the daemon), and a terminal smaller than 20 rows or 64 columns refuses to
+start. While idle the CLI sends wire pings (every 55 s, `CLI_KEEPALIVE` to
+tune); when the connection dies it retries `--reconnect` times (default 3)
+with `--reconnect-wait` seconds (default 10) and resumes on the first success.
 The session is audited (the clients' shared `cli` writer role,
 `application=CACHE tag=cli`), the commands are audited by the
 server (`application=CACHE tag=daemon`).

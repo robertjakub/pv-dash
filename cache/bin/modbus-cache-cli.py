@@ -40,10 +40,10 @@ describe_word, command_pool, setting_pool, welcome = cli.pools(
 
 
 def _render_special(low, reply):
-    """The cache's special render: the per-entry cache-all table prints bare
-    (the loop's shared branches cover the rest)."""
+    """The cache's special render: the per-entry cache-all table prints
+    through the pager (the loop's shared branches cover the rest)."""
     if low == 'show cache-all' and reply.startswith('ok cache-all\n'):
-        print('\n'.join(reply.splitlines()[1:]))   # the per-entry table itself
+        cli.page_out('\n'.join(reply.splitlines()[1:]))   # the per-entry table itself
         return True
     return False
 

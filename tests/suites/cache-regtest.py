@@ -601,6 +601,182 @@ try:
     check('control: the group socket speaks (the owner, us)', r.returncode == 0
           and 'modbus-cache 0.4.3' in r.stdout, repr(r.stdout[-120:]))
 
+    # 5b-2. the console pager: the pure arithmetic (no tty) + the pty smoke
+    #       (the welcome-wave trick: a real pty against a real daemon — the
+    #       floors refuse the tty edition, the listing pauses at the page,
+    #       q stops the rest, the local `page` command retunes the session
+    #       and never rides the wire — the daemon audit is the proof)
+    import fcntl
+    import pty
+    import select
+    import termios
+
+    sys.path.insert(0, REPO)
+    from common.wire import cli as cli_mod
+
+    check('pager: the plan slices a 10-line text at 4 (the final page never pauses)',
+          cli_mod.page_plan(10, 4) == [(0, 4, True), (4, 8, True), (8, 10, False)],
+          cli_mod.page_plan(10, 4))
+    check('pager: a text at the page size is one page, no pause',
+          cli_mod.page_plan(5, 5) == [(0, 5, False)], cli_mod.page_plan(5, 5))
+    check('pager: no lines and page 0 (off) never pause',
+          cli_mod.page_plan(0, 4) == [] and cli_mod.page_plan(10, 0) == [],
+          (cli_mod.page_plan(0, 4), cli_mod.page_plan(10, 0)))
+    check('pager: the cap shortens with " ..." ending at the width',
+          cli_mod.cap_line('x' * 100, 70) == 'x' * 66 + ' ...', len(cli_mod.cap_line('x' * 100, 70)))
+    check('pager: a short line and a suffix-narrow width ride the cap untouched',
+          cli_mod.cap_line('short', 70) == 'short' and cli_mod.cap_line('x' * 10, 3) == 'x' * 10,
+          (cli_mod.cap_line('short', 70), cli_mod.cap_line('x' * 10, 3)))
+
+    PTY_CTL, PTY_LISTEN, PTY_DEAD = 15521 + BASE, 15522 + BASE, 15598 + BASE
+
+    def pty_cli(rows, cols, args=(), env_extra=None, port=PTY_CTL):
+        """the cli on a real pty sized rows x cols: stdin/stdout/stderr on
+        the slave — the tty edition the suites' piped runs never see."""
+        m, s = pty.openpty()
+        fcntl.ioctl(s, termios.TIOCSWINSZ, struct.pack('HHHH', rows, cols, 0, 0))
+        env = {**os.environ, 'CONTROL_TOKEN': 'sekrit', 'TERM': 'dumb'}
+        if env_extra:
+            env.update(env_extra)
+        p = subprocess.Popen([sys.executable, K, '--control-port', str(port), *args],
+                             stdin=s, stdout=s, stderr=s, env=env)
+        os.close(s)
+        procs.append(p)
+        return m, p
+
+    def pty_read(m, quiet=0.5, limit=8.0):
+        """read the master until it goes quiet (the reply whole) or the
+        limit passes."""
+        out = b''
+        end = time.time() + limit
+        while time.time() < end:
+            r, _, _ = select.select([m], [], [], quiet)
+            if not r:
+                if out:
+                    break
+                continue
+            try:
+                chunk = os.read(m, 65536)
+            except OSError:
+                break
+            if not chunk:
+                break
+            out += chunk
+        return out.decode('utf-8', 'replace')
+
+    def pty_send(m, text):
+        os.write(m, text.encode())
+
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
+           '--listen', '127.0.0.1:%d' % PTY_LISTEN, '--modbus-interval', '1', '--modbus-profile', R,
+           '--control-port', str(PTY_CTL), '--audit-log', os.path.join(SCRATCH, 'reg_audit_pty.log')],
+          log=os.path.join(SCRATCH, 'reg_pty.log'), env_extra={'CONTROL_TOKEN': 'sekrit'})
+    time.sleep(2)
+
+    m, p = pty_cli(24, 80, ['--page-size', '5', '--audit-log', os.path.join(SCRATCH, 'reg_audit_pty_cli.log')])
+    out = pty_read(m)
+    check('pager pty: the welcome greets the pty session',
+          'Welcome to the modbus-cache console' in out and 'cache:%d > ' % PTY_CTL in out, repr(out[-120:]))
+    pty_send(m, '?\n')
+    out = pty_read(m)
+    check('pager pty: ? pauses at the page size with the more(1) keys',
+          '-- more -- 5/' in out and '(space: page, return: line, q: stop)' in out, repr(out[-160:]))
+    check('pager pty: the listing tail waits behind the pause', 'asks to confirm' not in out, repr(out[-160:]))
+    pty_send(m, 'q')
+    out = pty_read(m)
+    check('pager pty: q stops the rest and returns the prompt',
+          'cache:%d > ' % PTY_CTL in out and 'asks to confirm' not in out, repr(out[-120:]))
+    pty_send(m, 'quit\n')
+    pty_read(m)
+    p.wait(timeout=10)
+    os.close(m)
+    check('pager pty: the paged session quits clean', p.returncode == 0, p.returncode)
+
+    m, p = pty_cli(24, 80, ['--page-size', '0'])
+    pty_read(m)
+    pty_send(m, '?\n')
+    out = pty_read(m, limit=10.0)
+    check('pager pty: page size 0 prints the whole listing, no pause',
+          'asks to confirm' in out and '-- more --' not in out, repr(out[-160:]))
+    check('pager pty: the local page row lists with its pin description',
+          'page' in out and 'never sent' in out, repr(out[-160:]))
+    pty_send(m, 'quit\n')
+    pty_read(m)
+    p.wait(timeout=10)
+    os.close(m)
+
+    m, p = pty_cli(24, 80, ['--audit-log', os.path.join(SCRATCH, 'reg_audit_pty_cli.log')])
+    pty_read(m)
+    pty_send(m, 'page\n')
+    out = pty_read(m)
+    check('pager pty: bare page shows the auto state (the terminal height minus 2)',
+          'page 22 (auto)' in out, repr(out[-120:]))
+    pty_send(m, 'page 3\n')
+    pty_read(m)
+    pty_send(m, 'page\n')
+    out = pty_read(m)
+    check('pager pty: page 3 sets the session size (the bare state names it)',
+          'page 3' in out and 'page 22' not in out, repr(out[-120:]))
+    pty_send(m, '?\n')
+    out = pty_read(m)
+    check('pager pty: the ? listing re-pages live at 3', '-- more -- 3/' in out, repr(out[-160:]))
+    pty_send(m, 'q')
+    pty_read(m)
+    pty_send(m, 'page auto\n')
+    out = pty_read(m)
+    check('pager pty: page auto follows the terminal again', 'page 22 (auto)' in out, repr(out[-120:]))
+    pty_send(m, 'page bogus\n')
+    out = pty_read(m)
+    check('pager pty: a bogus page value is the clean err face',
+          '% error: invalid page size' in out and 'Traceback' not in out, repr(out[-160:]))
+    pty_send(m, 'quit\n')
+    pty_read(m)
+    p.wait(timeout=10)
+    os.close(m)
+
+    m, p = pty_cli(10, 80, port=PTY_DEAD)
+    out = pty_read(m)
+    rc = p.wait(timeout=10)
+    os.close(m)
+    check('pager pty: a 10-row terminal refuses the tty edition before the connect (rc 1, one line)',
+          rc == 1 and 'rows tall' in out and 'cli_min_height' in out
+          and 'Traceback' not in out and 'cannot reach' not in out, repr((rc, out[:160])))
+
+    m, p = pty_cli(24, 50, port=PTY_DEAD)
+    out = pty_read(m)
+    rc = p.wait(timeout=10)
+    os.close(m)
+    check('pager pty: a 50-column terminal refuses the tty edition (no env, knob or flag waives it)',
+          rc == 1 and 'columns wide' in out and 'cli_min_width' in out and 'Traceback' not in out,
+          repr((rc, out[:160])))
+
+    m, p = pty_cli(24, 70, ['--page-size', '0'])
+    pty_read(m)
+    pty_send(m, 'show knobs\n')
+    out = pty_read(m, limit=10.0)
+    rows = out.splitlines()
+    check('pager pty: no console line exceeds the screen width',
+          all(len(ln) <= 70 for ln in rows),
+          [ln for ln in rows if len(ln) > 70][:2])
+    check('pager pty: a long row shortens with " ..." on the end',
+          any(ln.endswith(' ...') for ln in rows), repr(rows[-3:]))
+    pty_send(m, 'quit\n')
+    pty_read(m)
+    p.wait(timeout=10)
+    os.close(m)
+    r = ctl_cmd('show knobs', PTY_CTL)
+    check('pager pty: the wire keeps the tail (the raw one-shot prints the same rows whole)',
+          any(len(ln) > 70 for ln in r.splitlines()), r[:160])
+
+    time.sleep(0.5)
+    pty_daemon_audit = open(os.path.join(SCRATCH, 'reg_audit_pty.log')).read()
+    check('pager pty: the daemon audit never saw page (the local command never rides the wire)',
+          "'page'" not in pty_daemon_audit and "cmd='show dump-path'" in pty_daemon_audit,
+          pty_daemon_audit[-200:])
+    pty_cli_audit = open(os.path.join(SCRATCH, 'reg_audit_pty_cli.log')).read()
+    check('pager pty: the cli audit records the page command local',
+          "cmd='page'" in pty_cli_audit and 'result=local' in pty_cli_audit, pty_cli_audit[-200:])
+
     # 5c. cache_ctl: the one-shot client (args, piped batches, token)
     ctl = os.path.join(CACHE_DIR, 'bin', 'modbus-cache-ctl.py')
     r = subprocess.run([sys.executable, ctl, '--control-port', '%d' % (15514 + BASE), 'show', 'upstream'],

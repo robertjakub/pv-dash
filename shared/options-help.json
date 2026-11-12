@@ -1,153 +1,166 @@
 {
   "options": {
     "audit-daily": {
+      "flag": "--audit-daily",
+      "env": "AUDIT_DAILY",
+      "conv": "bool",
       "setting-help": "also rotate the audit trail at UTC midnight",
-      "help": "also rotate the audit log at UTC midnight",
       "values": [
         "on",
         "off"
       ],
-      "flag": "--audit-daily",
-      "env": "AUDIT_DAILY",
-      "conv": "bool"
+      "default": false,
+      "help": "also rotate the audit log at UTC midnight"
     },
     "audit-files": {
-      "setting-help": "rotated audit backups to keep",
-      "help": "rotated audit backups to keep",
-      "hint": "N",
       "flag": "--audit-files",
       "env": "AUDIT_FILES",
+      "conv": "int",
+      "setting-help": "rotated audit backups to keep",
+      "hint": "N",
+      "default": 3,
+      "help": "rotated audit backups to keep",
       "min": 1,
-      "max": 100,
-      "conv": "int"
+      "max": 100
     },
     "audit-forward": {
-      "setting-help": "also forward every audit line: the local syslog mirror or a remote collector (the off-box copy)",
-      "hint": "none|syslog|syslog:/PATH|udp://HOST|tcp://HOST",
       "flag": "--audit-forward",
       "env": "AUDIT_FORWARD",
-      "conv": "str"
+      "conv": "str",
+      "setting-help": "also forward every audit line: the local syslog mirror or a remote collector (the off-box copy)",
+      "hint": "none|syslog|syslog:/PATH|udp://HOST|tcp://HOST",
+      "default": "none"
     },
     "audit-forward-format": {
+      "flag": "--audit-forward-format",
+      "env": "AUDIT_FORWARD_FORMAT",
+      "conv": "str",
+      "alias": "audit/forward-format",
       "setting-help": "the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send",
-      "help": "the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send (remote targets only)",
-      "value-help": {
-        "cef": "the CEF additive wrapping, msg= carries the native line",
-        "rfc5424": "the syslog envelope, the native line verbatim in the MSG"
-      },
-      "hint": "rfc5424|cef",
       "values": [
         "rfc5424",
         "cef"
       ],
-      "flag": "--audit-forward-format",
-      "env": "AUDIT_FORWARD_FORMAT",
-      "conv": "str"
+      "hint": "rfc5424|cef",
+      "value-help": {
+        "cef": "the CEF additive wrapping, msg= carries the native line",
+        "rfc5424": "the syslog envelope, the native line verbatim in the MSG"
+      },
+      "default": "rfc5424",
+      "help": "the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send (remote targets only)"
     },
     "audit-instance": {
-      "setting-help": "the audit lines' instance word: the writer daemon's identity — the control port when unset, the override when spelled",
-      "help": "the audit lines' instance=<id> word — which daemon wrote the line: the control port when unset/empty (unique per host by construction), the override when spelled; 1-64 characters (letters, digits, . _ : @ -); make an override unique among everything that shares one collector",
-      "hint": "ID",
       "flag": "--audit-instance",
       "env": "AUDIT_INSTANCE",
-      "conv": "str"
+      "conv": "str",
+      "setting-help": "the audit lines' instance word: the writer daemon's identity — the control port when unset, the override when spelled",
+      "hint": "ID",
+      "default": "",
+      "help": "the audit lines' instance=<id> word — which daemon wrote the line: the control port when unset/empty (unique per host by construction), the override when spelled; 1-64 characters (letters, digits, . _ : @ -); make an override unique among everything that shares one collector"
     },
     "audit-log": {
-      "hint": "PATH|-|none",
       "flag": "--audit-log",
       "env": "AUDIT_LOG",
-      "conv": "str"
+      "conv": "str",
+      "hint": "PATH|-|none",
+      "default": ""
     },
     "audit-max-mb": {
-      "setting-help": "rotate the audit trail at this size in MB, keeping N backups; 0 = no size rotation",
-      "help": "rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation",
-      "hint": "MB",
       "flag": "--audit-max-mb",
       "env": "AUDIT_MAX_MB",
+      "conv": "float",
+      "setting-help": "rotate the audit trail at this size in MB, keeping N backups; 0 = no size rotation",
+      "hint": "MB",
+      "default": 10.0,
+      "help": "rotate the audit log at this size in MB, keeping N backups; 0 = no size rotation",
       "min": 0,
-      "max": 1048576,
-      "conv": "float"
+      "max": 1048576
     },
     "audit/rotate": {
       "setting-help": "the audit trail's rotation: the size trigger, the UTC-midnight trigger and the backup count"
     },
     "client-timeout": {
-      "hint": "s",
       "flag": "--client-timeout",
       "env": "CLIENT_TIMEOUT",
-      "min": 0,
-      "max": 86400,
       "conv": "float",
+      "hint": "s",
       "value-help": {
         "0": "never disconnect idle clients"
-      }
+      },
+      "default": 300.0,
+      "min": 0,
+      "max": 86400
     },
     "control": {
       "setting-help": "the control plane: the tokens, the ops role's RBAC policy, the trusted peers"
     },
     "control-log-replies": {
+      "flag": "--control-log-replies",
+      "conv": "bool",
       "setting-help": "DEBUG-log the full output of every control command (plainly: the command and its status log)",
-      "help": "DEBUG-log the full output of every control command",
       "values": [
         "on",
         "off"
       ],
-      "flag": "--control-log-replies",
-      "conv": "bool"
+      "default": false,
+      "help": "DEBUG-log the full output of every control command"
     },
     "control-ops-token": {
-      "hint": "TOKEN",
       "flag": "--control-ops-token",
       "env": "CONTROL_OPS_TOKEN",
+      "conv": "str",
+      "hint": "TOKEN",
       "secret": true,
       "hidden": true,
-      "restart": true,
-      "conv": "str"
+      "restart": true
     },
     "control-ops-verbs": {
-      "setting-help": "the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated",
-      "help": "the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated",
-      "hint": "VERB,...",
       "flag": "--control-ops-verbs",
       "env": "CONTROL_OPS_VERBS",
-      "conv": "str"
+      "conv": "str",
+      "setting-help": "the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated",
+      "hint": "VERB,...",
+      "help": "the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated"
     },
     "control-port": {
-      "hint": "PATH|PORT",
       "flag": "--control-port",
       "env": "CTL",
       "conv": "str",
-      "setting-help": "control server target: unix socket path or TCP port on 127.0.0.1"
+      "setting-help": "control server target: unix socket path or TCP port on 127.0.0.1",
+      "hint": "PATH|PORT",
+      "default": ""
     },
     "control-socket-group": {
+      "flag": "--control-socket-group",
+      "env": "CONTROL_SOCKET_GROUP",
+      "conv": "bool",
       "setting-help": "leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600)",
-      "help": "leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600) ($CONTROL_SOCKET_GROUP)",
       "values": [
         "on",
         "off"
       ],
-      "flag": "--control-socket-group",
-      "env": "CONTROL_SOCKET_GROUP",
-      "conv": "bool"
+      "default": false,
+      "help": "leave the unix control socket group-accessible (chmod 0660 instead of the plain 0600) ($CONTROL_SOCKET_GROUP)"
     },
     "control-token": {
-      "setting-help": "require a token on control connections: the client authenticates with {\"cmd\": \"auth\", \"token\":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file)",
-      "help": "require a token on control connections: the client authenticates with {\"cmd\": \"auth\", \"token\":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
-      "hint": "TOKEN",
       "flag": "--control-token",
       "env": "CONTROL_TOKEN",
+      "conv": "str",
+      "setting-help": "require a token on control connections: the client authenticates with {\"cmd\": \"auth\", \"token\":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token (`file:<path>` = the token from an owner-only file)",
+      "hint": "TOKEN",
+      "help": "require a token on control connections: the client authenticates with {\"cmd\": \"auth\", \"token\":...}; over the unix socket a trusted peer (root, the daemon's own user or --control-trust-uids — SO_PEERCRED) skips the token; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
       "secret": true,
       "hidden": true,
-      "restart": true,
-      "conv": "str"
+      "restart": true
     },
     "control-trust-uids": {
-      "setting-help": "extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted",
-      "help": "extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted",
-      "hint": "UID,...",
       "flag": "--control-trust-uids",
       "env": "CONTROL_TRUST_UIDS",
-      "conv": "str"
+      "conv": "str",
+      "setting-help": "extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted",
+      "hint": "UID,...",
+      "default": "",
+      "help": "extra peer uids the unix control socket trusts without the token (SO_PEERCRED — a local systemd unit speaks without the secret); root and the daemon's own user are always trusted"
     },
     "control/ops": {
       "setting-help": "the read-only ops role: the second token that scopes its sessions to the configured verbs (the default: show)"
@@ -156,212 +169,226 @@
       "setting-help": "the state dump: the live overrides' file, the restore-on-start"
     },
     "dump-interval": {
+      "flag": "--dump-interval",
+      "env": "DUMP_INTERVAL",
+      "conv": "float",
       "setting-help": "seconds between the automatic state dumps (the live setting overrides)",
-      "help": "seconds between the automatic state dumps, 0 = on request (the request dump command and the shutdown)",
+      "values": [
+        "off"
+      ],
+      "hint": "s|off",
       "value-help": {
         "off": "only request dump and the shutdown dump"
       },
-      "hint": "s|off",
-      "values": [
-        "off"
-      ],
-      "flag": "--dump-interval",
-      "env": "DUMP_INTERVAL",
+      "default": 0.0,
+      "help": "seconds between the automatic state dumps, 0 = on request (the request dump command and the shutdown)",
       "min": 1,
-      "max": 86400,
-      "conv": "float"
+      "max": 86400
     },
     "dump-key": {
-      "setting-help": "the key that seals the state dumps (the reload's state file too) (`file:<path>` reads an owner-only file)",
       "flag": "--dump-key",
       "env": "DUMP_KEY",
+      "conv": "str",
+      "setting-help": "the key that seals the state dumps (the reload's state file too) (`file:<path>` reads an owner-only file)",
+      "help": "the key that seals the state dumps and the reload's state file: the state rides encrypted (an HMAC-SHA256 counter-mode keystream, authenticated — a restore refuses a wrong or missing key, and a configured key refuses an unsealed dump); the reload re-exec re-resolves the same key, so the state file reads on the other side; no key = the dumps stay 0600 plaintext with the integrity hash; a dump path without a key warns at start and on set; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
       "secret": true,
       "hidden": true,
-      "restart": true,
-      "conv": "str",
-      "help": "the key that seals the state dumps and the reload's state file: the state rides encrypted (an HMAC-SHA256 counter-mode keystream, authenticated — a restore refuses a wrong or missing key, and a configured key refuses an unsealed dump); the reload re-exec re-resolves the same key, so the state file reads on the other side; no key = the dumps stay 0600 plaintext with the integrity hash; a dump path without a key warns at start and on set; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)"
+      "restart": true
     },
     "dump-path": {
-      "setting-help": "the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval",
-      "hint": "<file>",
       "flag": "--dump-path",
       "env": "DUMP_PATH",
-      "conv": "str"
+      "conv": "str",
+      "setting-help": "the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval",
+      "hint": "<file>",
+      "default": ""
     },
     "listen": {
-      "setting-help": "listen address HOST:PORT",
-      "help": "listen address HOST:PORT",
-      "hint": "HOST:PORT",
       "flag": "--listen",
       "env": "LISTEN",
+      "conv": "str",
+      "setting-help": "listen address HOST:PORT",
+      "hint": "HOST:PORT",
+      "help": "listen address HOST:PORT",
       "hidden": true,
-      "restart": true,
-      "conv": "str"
+      "restart": true
     },
     "local-time": {
-      "setting-help": "log timestamps in the system time zone instead of UTC",
-      "help": "log timestamps in the system time zone instead of UTC",
-      "values": [
-        "on",
-        "off"
-      ],
       "flag": "--local-time",
       "env": "LOCAL_TIME",
-      "conv": "bool"
-    },
-    "log-access": {
+      "conv": "bool",
+      "setting-help": "log timestamps in the system time zone instead of UTC",
       "values": [
         "on",
         "off"
       ],
+      "default": false,
+      "help": "log timestamps in the system time zone instead of UTC"
+    },
+    "log-access": {
       "flag": "--log-access",
       "env": "LOG_ACCESS",
-      "conv": "bool"
+      "conv": "bool",
+      "values": [
+        "on",
+        "off"
+      ],
+      "default": false
     },
     "log-level": {
-      "setting-help": "log verbosity",
       "flag": "--log-level",
       "env": "LOG_LEVEL",
-      "conv": "str"
+      "conv": "str",
+      "setting-help": "log verbosity",
+      "default": "INFO"
     },
     "max-clients": {
+      "flag": "--max-clients",
+      "env": "MAX_CLIENTS",
+      "conv": "int",
+      "hint": "N",
       "value-help": {
         "0": "no limit"
       },
-      "hint": "N",
-      "flag": "--max-clients",
-      "env": "MAX_CLIENTS",
+      "default": 64,
       "min": 0,
-      "max": 4096,
-      "conv": "int"
+      "max": 4096
     },
     "max-conn-per-ip": {
+      "flag": "--max-conn-per-ip",
+      "env": "MAX_CONN_PER_IP",
+      "conv": "int",
+      "hint": "N",
       "value-help": {
         "0": "no per-IP limit (the default)"
       },
-      "hint": "N",
-      "flag": "--max-conn-per-ip",
-      "env": "MAX_CONN_PER_IP",
+      "default": 0,
       "min": 0,
-      "max": 4096,
-      "conv": "int"
+      "max": 4096
     },
     "metrics-acl": {
+      "flag": "--metrics-acl",
+      "env": "METRICS_ACL",
+      "conv": "str",
       "setting-help": "clients allowed to connect to /metrics: \"any\", \"none\", comma-separated IPs/prefixes, or file:<path> (the ip-prefix acl file)",
-      "help": "clients allowed to connect to the /metrics endpoint: \"any\", \"none\" (refuse everyone), comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or \"file:<path>\" — the standalone ip-prefix acl file (the gate object {\"type\": \"ip-prefix\", \"rules\": [{\"type\": \"allow\"|\"deny\", \"prefix\": ...}]}: the last matching rule decides, a client no rule decides refuses; \"any\" = 0.0.0.0/0, the whole space); checked at accept — a client off the ACL is closed without a reply",
-      "value-help": {
-        "any": "every client may connect (the default)",
-        "none": "no client may connect: every connection is rejected"
-      },
-      "hint": "any|none|IP,...|file:<path>",
       "values": [
         "any",
         "none"
       ],
-      "flag": "--metrics-acl",
-      "env": "METRICS_ACL",
-      "conv": "str"
+      "hint": "any|none|IP,...|file:<path>",
+      "value-help": {
+        "any": "every client may connect (the default)",
+        "none": "no client may connect: every connection is rejected"
+      },
+      "default": "any",
+      "help": "clients allowed to connect to the /metrics endpoint: \"any\", \"none\" (refuse everyone), comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or \"file:<path>\" — the standalone ip-prefix acl file (the gate object {\"type\": \"ip-prefix\", \"rules\": [{\"type\": \"allow\"|\"deny\", \"prefix\": ...}]}: the last matching rule decides, a client no rule decides refuses; \"any\" = 0.0.0.0/0, the whole space); checked at accept — a client off the ACL is closed without a reply"
     },
     "metrics-client-timeout": {
-      "setting-help": "seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap",
-      "help": "seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap",
-      "hint": "s",
       "flag": "--metrics-client-timeout",
       "env": "METRICS_CLIENT_TIMEOUT",
+      "conv": "float",
+      "setting-help": "seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap",
+      "hint": "s",
+      "help": "seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap",
       "min": 0,
-      "max": 86400,
-      "conv": "float"
+      "max": 86400
     },
     "metrics-listen": {
-      "hint": "HOST:PORT",
       "flag": "--metrics-listen",
-      "conv": "str"
+      "conv": "str",
+      "hint": "HOST:PORT"
     },
     "metrics-max-clients": {
-      "hint": "N",
       "flag": "--metrics-max-clients",
       "env": "METRICS_MAX_CLIENTS",
-      "min": 0,
-      "max": 4096,
       "conv": "int",
       "setting-help": "maximum concurrent /metrics clients; extras get an immediate 503, 0 = unlimited",
-      "help": "maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited"
+      "hint": "N",
+      "help": "maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited",
+      "min": 0,
+      "max": 4096
     },
     "metrics-max-conn-per-ip": {
-      "setting-help": "maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit",
-      "help": "maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit",
-      "hint": "N",
       "flag": "--metrics-max-conn-per-ip",
       "env": "METRICS_MAX_CONN_PER_IP",
+      "conv": "int",
+      "setting-help": "maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit",
+      "hint": "N",
+      "default": 0,
+      "help": "maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit",
       "min": 0,
-      "max": 4096,
-      "conv": "int"
+      "max": 4096
     },
     "metrics-server": {
+      "flag": "--metrics-server",
+      "conv": "bool",
+      "values": [
+        "on",
+        "off"
+      ],
       "value-help": {
         "off": "no metrics endpoint (the default)",
         "on": "serve /metrics on the configured listen address"
       },
-      "values": [
-        "on",
-        "off"
-      ],
-      "flag": "--metrics-server",
-      "conv": "bool"
+      "default": false
     },
     "metrics-token": {
-      "hint": "TOKEN",
       "flag": "--metrics-token",
       "env": "METRICS_TOKEN",
+      "conv": "str",
+      "hint": "TOKEN",
       "secret": true,
       "hidden": true,
-      "restart": true,
-      "conv": "str"
+      "restart": true
     },
     "modbus-auth": {
-      "hint": "suite|none",
+      "flag": "--modbus-auth",
+      "env": "MODBUS_AUTH",
+      "conv": "str",
       "values": [
         "suite",
         "none"
       ],
-      "flag": "--modbus-auth",
-      "env": "MODBUS_AUTH",
-      "conv": "str"
+      "hint": "suite|none",
+      "default": "none"
     },
     "modbus-auth-key": {
-      "hint": "KEY",
       "flag": "--modbus-auth-key",
       "env": "MODBUS_AUTH_KEY",
+      "conv": "str",
+      "hint": "KEY",
       "secret": true,
       "hidden": true,
-      "restart": true,
-      "conv": "str"
+      "restart": true
     },
     "modbus-profile": {
-      "hint": "<file>",
       "flag": "--modbus-profile",
       "env": "MODBUS_PROFILE",
-      "conv": "str"
+      "conv": "str",
+      "hint": "<file>",
+      "default": "sun2000"
     },
     "no-audit-log": {
+      "flag": "--no-audit-log",
+      "env": "NO_AUDIT_LOG",
+      "conv": "bool",
       "values": [
         "on",
         "off"
       ],
-      "flag": "--no-audit-log",
-      "env": "NO_AUDIT_LOG",
-      "conv": "bool"
+      "default": false
     },
     "restore-on-start": {
+      "flag": "--restore-on-start",
+      "env": "RESTORE_ON_START",
+      "conv": "bool",
       "setting-help": "the dump loads on start (off: on demand with request restore)",
       "values": [
         "on",
         "off"
       ],
-      "flag": "--restore-on-start",
-      "env": "RESTORE_ON_START",
-      "restart": true,
-      "conv": "bool"
+      "default": false,
+      "restart": true
     },
     "upstream": {
       "flag": "--upstream",
@@ -373,12 +400,24 @@
     "knobs": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes"
   },
   "commands": {
-    "help": "describe a word (help <setting>) or map every knob (help config)",
-    "ping": "keep-alive: answers pong",
+    "help": {
+      "help": "describe a word (help <setting>) or map every knob (help config)",
+      "internal": true
+    },
+    "ping": {
+      "help": "keep-alive: answers pong",
+      "internal": true
+    },
     "quit": "close the session",
-    "request-dump": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)",
+    "request-dump": {
+      "help": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)",
+      "hidden": true
+    },
     "request-reload-config": "re-read the config file (the SIGHUP path)",
-    "request-restore": "re-apply a state dump's overrides (when the daemon has a dump path)",
+    "request-restore": {
+      "help": "re-apply a state dump's overrides (when the daemon has a dump path)",
+      "hidden": true
+    },
     "show": "print a setting's live value, or a report"
   }
 }

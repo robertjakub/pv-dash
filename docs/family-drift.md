@@ -175,16 +175,16 @@ knob+field, the tools grouped by the value each carries:
 | `control-log-replies` | `env` | *absent* (cache, scraper, inverter) · `CONTROL_LOG_REPLIES` (dashboard) |
 | `control-ops-verbs` | `default` | `show,flush` (cache) · `show` (scraper, inverter, dashboard) |
 | `listen` | `default` | `127.0.0.1:15502` (cache) · `127.0.0.1:9350` (scraper) · `127.0.0.1:5502` (inverter) · `127.0.0.1:8080` (dashboard) |
-| `local-time` | `env` | `·` (cache, scraper, dashboard) · *absent* (inverter) |
-| `log-access` | `env` | `·` (cache, scraper, dashboard) · *absent* (inverter) |
+| `local-time` | `env` | `LOCAL_TIME` (cache, scraper, dashboard) · *absent* (inverter) |
+| `log-access` | `env` | `LOG_ACCESS` (cache, scraper, dashboard) · *absent* (inverter) |
 | `log-access` | `hidden` | `True` (cache) · `·` (scraper, inverter, dashboard) |
-| `metrics-client-timeout` | `env` | `·` (cache, scraper, dashboard) · *absent* (inverter) |
+| `metrics-client-timeout` | `env` | `METRICS_CLIENT_TIMEOUT` (cache, scraper, dashboard) · *absent* (inverter) |
 | `metrics-client-timeout` | `live` | `metrics/limits/timeout` (cache, scraper) · `·` (inverter, dashboard) |
 | `metrics-client-timeout` | `default` | `5.0` (cache, inverter, dashboard) · `300.0` (scraper) |
-| `metrics-max-clients` | `env` | `·` (cache, scraper, dashboard) · *absent* (inverter) |
+| `metrics-max-clients` | `env` | `METRICS_MAX_CLIENTS` (cache, scraper, dashboard) · *absent* (inverter) |
 | `metrics-max-clients` | `live` | `metrics/limits/max-clients` (cache, scraper) · `·` (inverter, dashboard) |
 | `metrics-max-clients` | `default` | `64` (cache, scraper, inverter) · `16` (dashboard) |
-| `metrics-max-conn-per-ip` | `env` | `·` (cache, scraper, dashboard) · *absent* (inverter) |
+| `metrics-max-conn-per-ip` | `env` | `METRICS_MAX_CONN_PER_IP` (cache, scraper, dashboard) · *absent* (inverter) |
 | `metrics-max-conn-per-ip` | `live` | `metrics/limits/max-conn-per-ip` (cache, scraper) · `·` (inverter, dashboard) |
 
 **The command vocabularies** (the wire words per tool):
@@ -616,12 +616,17 @@ tool is the visible gap). The secret-posture markers (`parse_secret`,
 the `SECRET_REMOVED` placeholder, the `file:` scheme) across the
 tree.
 
-5 secret-marked row(s) across 4 knob(s), consolidated by posture:
+23 secret-marked row(s) across 9 knob(s), consolidated by posture:
 
 | knob | tools | live | restart | hidden |
 |---|---|---|---|---|
 | `auth-token` | dashboard, scraper | yes | yes | yes |
 | `config-js` | dashboard | yes | yes | yes |
+| `control-ops-token` | all four | yes | yes | yes |
+| `control-token` | all four | yes | yes | yes |
+| `dump-key` | all four | yes | yes | yes |
+| `metrics-token` | cache, dashboard, inverter | yes | yes | yes |
+| `modbus-auth-key` | cache, inverter, scraper | yes | yes | yes |
 | `modbus-auth-upstream-key` | cache | yes | yes | yes |
 | `static-dir` | dashboard | yes | yes | yes |
 

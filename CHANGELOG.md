@@ -67,7 +67,21 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   the lint's named exemption list); `family_drift` reports the coverage,
   and `editor.py options` speaks the canon (the ref edits, the
   block-carried fields show marked `(canon)`, the `p` walk proposes the
-  ref).
+  ref). The blocks then unify the rest of the row: a block may carry
+  every row key but the three placement keys (`name` — the flat name IS
+  the block's key; `only`; `shared` — the ref itself), and the carried-
+  unanimous fields moved in — the 27 `default`s and the one `alias` ride
+  the blocks, the show/commands blocks speak dict blocks (`internal`,
+  `hidden` ride beside the description), the raw readers (`gen_manual`)
+  resolve the refs, and the manual pages' command tables speak the
+  block-carried descriptions their empty cells had lost. Every script is
+  aware of the five files: the registries and the canon file route through
+  the loaders or fold the refs explicitly (`compare_options`,
+  `list_options`, `gen_examples`, `gen_manual`, `family_drift`'s sweeps —
+  whose reports read the effective rows now), the linter and the raw
+  editors stay raw by design, `lint_options` renders the canon file in
+  the canonical layout (the sections and blocks in their landed order, a
+  block's fields in the row rank) beside the four registries.
 
 - **the docker names speak the daemon** — the fake inverter's image,
   compose service and env file rename to the daemon's own:

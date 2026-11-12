@@ -123,8 +123,11 @@ inline is the same override rule.)
 
 Rules:
 
-- The block carries every field but `name` — the flat name is the block's
-  key, not a field. The gate freezes the subset the family must agree on:
+- The block carries every field but the three placement keys — `name`
+  (the flat name is the block's key), `only` (the tool-exclusive mark, a
+  block is family-wide by definition) and `shared` (the ref itself); the
+  fold and the lint gate all three. The gate freezes the subset the family
+  must agree on:
   what the knob SAYS (`setting-help`/`help`/`value-help`/`hint`/`values`)
   and what the knob IS (`flag`/`env`/`min`/`max`/`secret`/`hidden`/
   `restart`) — byte-identical or exempt. The rest (`live`/`alias`, `conv`,
@@ -205,7 +208,19 @@ resolution lands there, once for the family:
 
 Execution item: enumerate every reader that parses `options.json` RAW
 (bypassing `load_registry`) — each must resolve refs too, or be shown to
-route through the loaders.
+route through the loaders. CLOSED Nov 12 (the awareness census, all five
+registries + the canon file): through the loaders — `check_options`, the
+daemons, the clis; the explicit fold — `gen_examples` (the options rows),
+`gen_manual` (the show/commands rows), `compare_options`, `list_options`,
+`family_drift`'s knobs sweep (the effective rows: the report's secret
+census reads the block-carried marks now); raw BY DESIGN — `lint_options`
+(the layout linter; it gates the canon blocks AND the canon file's own
+layout), the `editor` (the raw-surface editor, the canon display beside),
+`set_group`/`set_live` (the surgical field editors — the fields they edit
+stay inline by ruling); no registry reads — `gen_sbom`, `release`. The
+packaging ships the canon file (all four `package.nix` install lines, the
+docker `shared=` context — a packaged tree without it fails loud at the
+fold).
 
 ## The editor
 
@@ -371,3 +386,12 @@ updated with the canon); `python3 scripts/gen_man.py` + `mandoc -Tlint` clean;
   inverter's `connect-acl` hint + `values` (the TAB pool completes now).
 - The audit-max-mb canon restores "keeping N backups" family-wide — the
   cache's lost tail was the drift the wave's census caught.
+- The unification pass (the user's Nov 12 ruling: the block carries every
+  row key but name/only/shared) hoisted the carried-unanimous fields — 27
+  `default`s and the `audit-forward-format` `alias` into the options
+  blocks, `internal`/`hidden` into four command dict blocks (help, ping,
+  request-dump, request-restore) — the rows keep the per-tool wiring
+  (`live` stays inline: the raw namespace lints read it) and the byte-
+  effective rows proved unchanged before the write. `gen_manual`'s raw
+  commands read resolves the refs now, which fixed the pages' empty
+  command-description cells (the block-carried helps the raw read lost).

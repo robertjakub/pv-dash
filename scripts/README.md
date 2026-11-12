@@ -141,7 +141,7 @@ edit to the rendered page dies at the next run):
 
 ## The release
 
-- **`release.py`** — the orchestrator: the battery (scripts/battery.py
+- **`release.py`** — the orchestrator: the battery (tests/battery.py
   `full` — the runner owns the run dir, the tally and the failed-run
   backups; the `--tests quick` pair rides `--depth full`) + the nix build
   gate first, the version bump, the CHANGELOG split maintenance

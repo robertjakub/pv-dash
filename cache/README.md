@@ -514,10 +514,10 @@ stdlib only, each starts its own fake inverter + proxy on scratch ports and
 cleans up after itself:
 
 ```bash
-scripts/battery.sh cache              # the cache profile: the regtest, the two fuzzes,
-                                      # the audit chain (the stress suite rides quick/full)
-scripts/battery.sh cache-regtest      # one suite — every run needs the runner (the suites
-                                      # refuse without the runner's PV_RUN_DIR)
+tests/battery.py cache              # the cache profile: the regtest, the two fuzzes,
+                                    # the audit chain (the stress suite rides quick/full)
+tests/battery.py cache-regtest      # one suite — every run needs the runner (the suites
+                                    # refuse without the runner's PV_RUN_DIR)
 ```
 
 Every scenario must end with the proxy alive and **zero tracebacks** in the

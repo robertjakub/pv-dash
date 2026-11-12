@@ -4,7 +4,7 @@
 Fires hostile client traffic (binary junk, huge request lines, wrong methods,
 pipelined+nulls, partial requests, slow trickle) at a live scraper instance
 and verifies it stays up, keeps serving correct metrics and never prints a
-traceback. Runs through scripts/battery.sh: tests/scrape-fuzz.py [rounds] [quick|full]
+traceback. Runs through tests/battery.py: tests/scrape-fuzz.py [rounds] [quick|full]
 """
 import os
 import random

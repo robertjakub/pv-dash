@@ -384,9 +384,9 @@ The fake is the suites' workhorse — it is exercised from the suite-root
 [`tests/`](../tests/):
 
 ```bash
-scripts/battery.sh inverter        # the inverter profile: the fake's regtest, the
-                                   #   control fuzz, the audit chain (the suites refuse
-                                   #   without the runner's PV_RUN_DIR)
+tests/battery.py inverter        # the inverter profile: the fake's regtest, the
+                                 #   control fuzz, the audit chain (the suites refuse
+                                 #   without the runner's PV_RUN_DIR)
 ```
 
 Every scenario must end with the fake alive and **zero tracebacks** in the

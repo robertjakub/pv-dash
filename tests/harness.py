@@ -13,8 +13,8 @@ import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.py)
-    sys.exit('suite: run through scripts/battery.py (the run dir + the port slot; '
+if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (tests/battery.py)
+    sys.exit('suite: run through tests/battery.py (the run dir + the port slot; '
              'a standalone run shares scratch and collides across sessions)')
 SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
 os.makedirs(SCRATCH, exist_ok=True)   # the CI legs set a fixed path the battery never made

@@ -7,18 +7,18 @@ local battery rides this runner too (release.py's `full` profile); the
 CI release workflow keeps its own per-suite matrix legs; the nightly
 keeps the full budgets.
 
-    scripts/battery.py                # commit: the fast set, cache-fuzz at 100 (~3 min) — parallel-safe
-    scripts/battery.py common         # the spine's commit set (~4 min) — parallel-safe
-    scripts/battery.py cache          # the cache's commit set: the regtest + the fuzzes (~5 min) — serial
-    scripts/battery.py scraper        # the scraper's commit set (~6 min) — serial
-    scripts/battery.py inverter       # the fake's commit set (~1 min) — serial
-    scripts/battery.py dashboard      # the dashboard's commit set (~1 min) — serial
-    scripts/battery.py quick          # all ten, the fuzzes at 300 (~3 min) — serial
-    scripts/battery.py full           # all ten, the suite defaults — the nightly, serial
-    scripts/battery.py <suite> ...    # explicit names, e.g. cache-regtest inverter-regtest
-    scripts/battery.py --depth full <suite> ...  # explicit names at the nightly depth (the regtests' full profile + the fuzzes' full spread) — the release's recovery pair rides this
-    scripts/battery.py --stop ...     # the flag may sit anywhere: the first FAILED suite ends the run — the tally marks the rest SKIPPED
-    scripts/battery.py --name <label> ...  # label the run with the wave/chat that asked for it — the flag may sit anywhere: the status carries a `wave:` line (the battery_status.py view shows it)
+    tests/battery.py                # commit: the fast set, cache-fuzz at 100 (~3 min) — parallel-safe
+    tests/battery.py common         # the spine's commit set (~4 min) — parallel-safe
+    tests/battery.py cache          # the cache's commit set: the regtest + the fuzzes (~5 min) — serial
+    tests/battery.py scraper        # the scraper's commit set (~6 min) — serial
+    tests/battery.py inverter       # the fake's commit set (~1 min) — serial
+    tests/battery.py dashboard      # the dashboard's commit set (~1 min) — serial
+    tests/battery.py quick          # all ten, the fuzzes at 300 (~3 min) — serial
+    tests/battery.py full           # all ten, the suite defaults — the nightly, serial
+    tests/battery.py <suite> ...    # explicit names, e.g. cache-regtest inverter-regtest
+    tests/battery.py --depth full <suite> ...  # explicit names at the nightly depth (the regtests' full profile + the fuzzes' full spread) — the release's recovery pair rides this
+    tests/battery.py --stop ...     # the flag may sit anywhere: the first FAILED suite ends the run — the tally marks the rest SKIPPED
+    tests/battery.py --name <label> ...  # label the run with the wave/chat that asked for it — the flag may sit anywhere: the status carries a `wave:` line (the battery_status.py view shows it)
 
 Every run works inside its own dedicated dir: <root>/<run-id>/ where the
 root is ~/.local/state/pvbattery (XDG_STATE_HOME respected — the state
@@ -59,7 +59,7 @@ import sys
 import tarfile
 import time
 
-REPO = pathlib.Path(__file__).resolve().parent.parent
+REPO = pathlib.Path(__file__).resolve().parent.parent.parent
 HOME_ROOT = os.environ.get('XDG_STATE_HOME', os.path.expanduser('~/.local/state')) + '/pvbattery'
 
 # the one-time /tmp migration: the battery lived at /tmp/pvbattery until

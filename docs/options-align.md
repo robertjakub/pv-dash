@@ -113,7 +113,7 @@ same wave).
    `--check`s, `options_drift.py` (expected: blocks 58 → ~66, candidates
    8 → 0, 0 dead; the exempt count shrinks by the retirements).
 6. Per-tool commits (the canon + lint edits ride the first), then the
-   battery: `scripts/battery.sh` — the ten suites before any push.
+   battery: `tests/battery.py` — the ten suites before any push.
 
 ## Out of scope
 

@@ -285,9 +285,9 @@ authenticating reverse proxy. The full story is
 ## Testing
 
 ```bash
-scripts/battery.sh dashboard             # the dashboard profile: the control fuzz +
-                                         #   the audit chain (the suites refuse without
-                                         #   the runner's PV_RUN_DIR)
+tests/battery.py dashboard             # the dashboard profile: the control fuzz +
+                                       #   the audit chain (the suites refuse without
+                                       #   the runner's PV_RUN_DIR)
 ```
 
 Plus the `/config.js` fuzz pin in the same suite (a bogus override file

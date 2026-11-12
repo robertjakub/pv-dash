@@ -57,10 +57,11 @@ pv-suite/
 │                 #   modules (modules/<tool>.nix) and the [Nix reference](nixos/README.md)
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))
 ├── common/       # the shared Python package — render/ runtime/ settings/ wire/ serve/ modbus/ ([docs](common/README.md))
-├── tests/        # the test suites, one or more per Modbus tool
+├── tests/        # the battery runner (tests/battery/ behind the
+│                 #   tests/battery.py wrapper) + the suites, one or more per Modbus tool
 ├── scripts/      # the gates + editors: check/lint, editor.py,
 │                 #   lint_readmes/lint_texts/lint_acl, family_drift, gen_man/gen_manual/gen_examples,
-│                 #   gen_sbom, validate_json, set_group/set_live, battery.py, battery_status.py,
+│                 #   gen_sbom, validate_json, set_group/set_live,
 │                 #   release.py, audit_verify.py
 ├── docker/       # one alpine image per Modbus tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))
@@ -82,7 +83,7 @@ pv-suite/
 
 ## Testing
 
-The suites always run through the battery — `scripts/battery.sh` owns the
+The suites always run through the battery — `tests/battery.py` owns the
 run dir (the suites' /tmp scratch rewrites into it), the port-space slot
 (concurrent batteries take disjoint port spaces), the daemon reaping
 between suites and the tally; a suite run outside it refuses (the marker
@@ -91,11 +92,11 @@ across sessions). The release verification and the CI matrix set the same
 marker for their legs.
 
 ```bash
-scripts/battery.sh                    # the commit loop: the fast set, the fuzz budgets at 100 (~3 min)
-scripts/battery.sh quick              # all ten, the fuzz budgets at 300 (~3 min) — the pre-push loop
-scripts/battery.sh full               # all ten, the suite defaults — the nightly
-scripts/battery.sh cache              # the cache's commit set (~5 min); scraper, inverter, dashboard, common likewise
-scripts/battery.sh control-fuzz       # named suite(s) — e.g. the one you are iterating on
+tests/battery.py                    # the commit loop: the fast set, the fuzz budgets at 100 (~3 min)
+tests/battery.py quick              # all ten, the fuzz budgets at 300 (~3 min) — the pre-push loop
+tests/battery.py full               # all ten, the suite defaults — the nightly
+tests/battery.py cache              # the cache's commit set (~5 min); scraper, inverter, dashboard, common likewise
+tests/battery.py control-fuzz       # named suite(s) — e.g. the one you are iterating on
 ```
 
 The ten suites (stdlib only, scratch ports, self-cleaning; each prints

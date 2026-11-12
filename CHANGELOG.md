@@ -12,24 +12,21 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
-- **The floor blocks + the / rule** — the `inspect` and `request`
+- **The floor blocks + the hidden ruling** — the `inspect` and `request`
   commands gain canon blocks speaking the family floor (the tools keep
   their richer inline tails); the request `restart`/`reload*` commands
   hide family-wide (the canon blocks carry the floor helps + `hidden`,
-  the per-tool parentheticals stay inline); and the console's / rule:
-  a word with hidden depth lists marked with the trailing slash — a
-  namespace word carrying hidden rows lists `request/` in the root ?
-  and `dump/`, `control/`, `metrics/`, `system/` in `show ?`, the
-  walk-ins (`help request`, `show dump`) list the hidden rows marked
-  (`reload/`, `dump-key/`) — completable and typed bare, so a namespace
-  whose every member hides stays discoverable (the fake's `request`
-  was the vanishing case). The gate criterion joins as the second
-  mark source: a node whose subtree bears an access-control knob
-  lists marked too — the cache's `acl/` (its connect/write children
-  are visible; the mark says "this namespace speaks the gates"). The
-  gate flag rides the canon (`shared/options.json`) and the canon file
-  renames to `shared/options.json` — it carries the wiring and the
-  marks, not only the help.
+  the per-tool parentheticals stay inline). The console's / mark (a
+  namespace word carrying hidden rows listing marked, the gate
+  criterion joining as a second source) flew and retired within this
+  cycle: the hidden rows never list again — the pools' rule (the typed
+  path still answers; `help request` over a fully-hidden namespace
+  answers the node one-liner), and the `gate` flag is gone from the
+  canon and the registries.
+- **the canon renames to `shared/options.json`** — it carries the
+  wiring and the marks, not only the help; every reference moves with
+  the rename (the loader, the lints, the editor pair, the four nix
+  packages, the docs).
 
 - **The show/commands canon wave (docs/show-commands-align.md)** — the
   `show` section's last two drifts fold: `metrics-acl-table` speaks the
@@ -158,6 +155,16 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   SBOM's container refs follow. The compose spells become
   `docker compose exec modbus-fake-inverter modbus-fake-cli` and
   `docker compose kill -s HUP modbus-fake-inverter`.
+
+- **the battery runner moves into tests/** — `scripts/battery.py` +
+  `battery_status.py` become `tests/battery/battery.py` +
+  `battery_status.py` behind thin runpy wrappers `tests/battery.py` /
+  `tests/battery_status.py` (the twin of the suite wrappers: the real
+  bodies in a subdir, the docs spelling stays flat). The spelling
+  everywhere is `python3 tests/battery.py …` — release.py's call, the
+  harness refusal message, the five READMEs, docs/options-align.md and
+  the suites' docstrings (which still said the retired
+  `scripts/battery.sh`); scripts/ keeps the gates + editors only.
 
 ### Added
 

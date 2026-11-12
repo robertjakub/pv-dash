@@ -370,9 +370,9 @@ stdlib only, each starts its own fake inverter + exporters on scratch
 ports and cleans up after itself:
 
 ```bash
-scripts/battery.sh scraper        # the scraper profile: the regtest, the fuzz, the
-                                  #   audit chain (the suites refuse without the
-                                  #   runner's PV_RUN_DIR)
+tests/battery.py scraper        # the scraper profile: the regtest, the fuzz, the
+                                #   audit chain (the suites refuse without the
+                                #   runner's PV_RUN_DIR)
 ```
 
 Every scenario must end with the exporter serving correct metrics and

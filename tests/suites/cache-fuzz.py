@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Client-garbage fuzz for modbus-cache.
 
-Runs through scripts/battery.sh: tests/cache-fuzz.py [iterations] [quick|full]
+Runs through tests/battery.py: tests/cache-fuzz.py [iterations] [quick|full]
 Starts its own fake inverter + proxy on scratch ports and cleans up.
 Every request must be answered; lying MBAP lengths must close the
 connection. The proxy must never crash or log a traceback.

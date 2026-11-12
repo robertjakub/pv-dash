@@ -62,11 +62,11 @@ The kinds — every row of the tables below carries one:
 | command | kind | description |
 |---|---|---|
 | `exit` | command (hidden) | close the session |
-| `help` | command (internal) |  |
+| `help` | command (internal) | describe a word (help \<setting>) or map every knob (help config) |
 | `inspect` | command | one pretty dump of everything: the status, the machines, the overlay |
 | `logout` | command (hidden) | close the session |
-| `ping` | command (internal) |  |
-| `quit` | command |  |
+| `ping` | command (internal) | keep-alive: answers pong |
+| `quit` | command | close the session |
 | `request` | namespace | the state machinery: the dump written and restored, the fake restarted |
 | `request dump` | command (hidden) | write the state dump: the live setting overrides, sealed (when the fake has a dump path) |
 | `request reload` | command | save the live overrides and restart the whole daemon (the flags and the env are re-resolved) |
@@ -74,7 +74,7 @@ The kinds — every row of the tables below carries one:
 | `request restore` | command (hidden) | re-apply a state dump's overrides (when the fake has a dump path) |
 | `reset` | command | clear all pins + the write overlay |
 | `set` | command | configure a setting (set soc auto, set scenario noon) |
-| `show` | command |  |
+| `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the fake inverter (asks to confirm) |
 | `clear` | command | restore a setting to its configured value (clear pv, clear seed) |
 | `set register \<addr> \<value>` | command | the Modbus write emulation: plant a register value in the write overlay — reads answer it, reset clears it |

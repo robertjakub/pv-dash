@@ -95,7 +95,7 @@
     { "name": "quit", "shared": "quit" },
     { "name": "request", "shared": "request", "node": true },
     { "name": "request-dump", "shared": "request-dump", "live": "request/dump" },
-    { "name": "request-reload", "live": "request/reload",
+    { "name": "request-reload", "shared": "request-reload", "live": "request/reload",
       "help": "save the live overrides and restart the whole daemon (the config file and the flags are re-resolved)" },
     { "name": "request-reload-config", "shared": "request-reload-config", "live": "request/reload-config" },
     { "name": "request-restore", "shared": "request-restore", "live": "request/restore" },

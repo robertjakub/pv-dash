@@ -4,7 +4,7 @@
 # tree (the loader never reaches into examples/ on its own). The audit
 # trail rides stdout (-) so the dev terminal streams it. The upstream
 # is the fake inverter: $UPSTREAM overrides. Extra flags/env pass
-# through: scraper/dev --dry-run, scraper/dev --profile deye-sg04lp3
+# through: scraper/dev --dry-run, scraper/dev --modbus-profile deye-sg04lp3
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
 exec python3 "$DIR/bin/modbus-scraper.py" \
     --config "$DIR/examples/modbus-scraper.conf" \

@@ -109,7 +109,7 @@ copy-name the files per stack: the demo reads `env/<tool>.env`, prod reads
 required there), so one checkout runs both stacks without the copies
 colliding on knobs like `UPSTREAM`. The names are
 **bare env twins** the tool's own docs speak (`UPSTREAM`, `MODBUS_INTERVAL`,
-`TTL`, `PROFILE`, `METRICS_PREFIX`, `LOG_LEVEL`, …) — one file per tool,
+`TTL`, `MODBUS_PROFILE`, `METRICS_PREFIX`, `LOG_LEVEL`, …) — one file per tool,
 so no namespacing is needed (the Prometheus file is the exception: its
 `PROM_*` knobs belong to `entrypoint-prometheus.sh`, not a pv-suite
 tool). Every line starts commented; the defaults live in the image.
@@ -259,7 +259,7 @@ docker build -f ../docker/Dockerfile.fake-inverter -t fake-inverter \
 docker run --rm -p 127.0.0.1:5502:5502 fake-inverter      # loopback-published, serves on 0.0.0.0:5502 in the container
 docker run --rm -it fake-inverter bash                    # poke around as pvsuite
 docker run --rm -p 127.0.0.1:5502:5502 fake-inverter \
-    fake-inverter --profile deye-sg04lp3 --timezone local    # any flags via the CMD override
+    fake-inverter --modbus-profile deye-sg04lp3 --timezone local    # any flags via the CMD override
 ```
 
 The bundled conf (`/pv-suite/inverter/modbus-fake-inverter.conf`, the default

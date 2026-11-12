@@ -12,6 +12,15 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Changed
 
+- **BREAKING: the inverter's profile knob speaks the cache's spelling** —
+  `profile` becomes `modbus-profile` (the flag `--modbus-profile`, the
+  `$MODBUS_PROFILE` env twin, the config-file key, the state-dump keys and
+  the defaults follow; the live path `modbus/profile` and the console words
+  `set modbus profile …` are unchanged). One flat name per knob across the
+  three tools — the cache is the master, the scraper's poll knobs wore the
+  prefix first. A stored dump keyed by the old name restores SKIPPED, a
+  legacy config line answers unknown setting.
+
 - **BREAKING: the scraper's three /metrics limit knobs speak the cache's
   spellings** — `max-clients`/`client-timeout`/`max-conn-per-ip` become
   `metrics-max-clients`/`metrics-client-timeout`/`metrics-max-conn-per-ip`

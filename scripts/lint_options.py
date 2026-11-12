@@ -18,7 +18,13 @@ keys, missing names/descriptions, duplicate names, the `only` mark —
 a known tool, the file's own tool, never beside `shared` (the canon
 ref is the family-wide mark; `only` pins the knob tool-exclusive) —
 and — the big one — a row that does not read back as the canonical
-form.
+form. The shared/options-help.json is the fifth file under the gate: a
+block may carry every row key but the three placement keys (`name` —
+the flat name IS the block's key; `only`; `shared` — the ref itself),
+no unknown keys, a show/commands dict block speaks its section's
+description field, and the file itself renders in the canonical layout
+(the sections and blocks in their landed order, a block's fields in the
+row rank).
 
   python3 scripts/lint_options.py             # reformat in place + report
   python3 scripts/lint_options.py --check     # report only, exit 1 if off-form
@@ -271,11 +277,34 @@ def normalize_bools(meta):
         for r in rows:
             if not isinstance(r, dict):
                 continue
-            for k in BOOL_KEYS:
-                if r.get(k) == 'on':
-                    r[k] = True
-                elif r.get(k) == 'off':
-                    r[k] = False
+            _norm_row_bools(r)
+
+
+def _norm_row_bools(r):
+    for k in BOOL_KEYS:
+        if r.get(k) == 'on':
+            r[k] = True
+        elif r.get(k) == 'off':
+            r[k] = False
+
+
+def render_canon(canon):
+    """The canonical text of shared/options-help.json — the registries' one
+    render, one shape up: the file's sections and blocks keep their landed
+    order (the orphan gate keys on it), a dict block's fields render in the
+    row rank (the block bools normalized — the flat show/commands strings
+    render bare), two-space indent per level, the trailing newline."""
+    out = {}
+    for section, blocks in canon.items():
+        out_blocks = {}
+        for key, block in blocks.items():
+            if isinstance(block, dict):
+                _norm_row_bools(block)
+                rank = {k: i for i, k in enumerate(KEY_RANK)}
+                block = {k: block[k] for k in sorted(block, key=lambda k: rank.get(k, len(KEY_RANK)))}
+            out_blocks[key] = block
+        out[section] = out_blocks
+    return json.dumps(out, ensure_ascii=False, indent=2) + '\n'
 
 
 def lint(path):
@@ -405,19 +434,38 @@ def family_lint():
 
     Returns the nits; main() prints them and exits 1."""
     from common.settings.options import canon_fold
-    with open(os.path.join(REPO, 'shared', 'options-help.json'), encoding='utf-8') as f:
-        canon = json.load(f)
+    try:
+        with open(os.path.join(REPO, 'shared', 'options-help.json'), encoding='utf-8') as f:
+            canon = json.load(f)
+    except (OSError, ValueError) as e:
+        return ['shared/options-help.json: does not parse: %s' % e]
     metas = {}
     for tool in TOOLS:
         with open(os.path.join(REPO, tool, 'lib', 'options.json'), encoding='utf-8') as f:
             metas[tool] = json.load(f)
     nits = []
     # (a) the resolution pass
+    BLOCK_KEYS = frozenset(('name', 'only', 'shared'))
+    CANON_KNOWN = KNOWN - BLOCK_KEYS
     for section, blocks in canon.items():
+        field = SECTION_FIELD.get(section)
         for key, block in blocks.items():
-            if section == 'options' and isinstance(block, dict) and 'name' in block:
-                nits.append('the canon block %s/%s carries "name" — the flat name is '
-                            'the block\'s key, never a field' % (section, key))
+            if isinstance(block, dict):
+                bad = sorted(BLOCK_KEYS & set(block))
+                if bad:
+                    nits.append('the canon block %s/%s carries %s — never a block field '
+                                '(the name is the block\'s key, only/shared are the row\'s '
+                                'placement marks)' % (section, key, ', '.join(map(repr, bad))))
+                unknown = sorted(set(block) - CANON_KNOWN)
+                if unknown:
+                    nits.append('the canon block %s/%s: unknown key(s) %s'
+                                % (section, key, ', '.join(unknown)))
+                if section != 'options' and field not in block:
+                    nits.append('the canon block %s/%s speaks no %s'
+                                % (section, key, field))
+            elif section == 'options':
+                nits.append('the canon block %s/%s is not an object — the options '
+                            'blocks carry the row fields' % (section, key))
             refs = sum(1 for t in TOOLS
                        for r in (metas[t].get(section) or [])
                        if isinstance(r, dict) and r.get('shared') == key)
@@ -481,9 +529,10 @@ def family_lint():
                 for v, ts in vals.items():
                     if len(ts) < 3:
                         continue
-                    block_has = (section != 'options' and block == json.loads(v)) or \
-                                (section == 'options' and isinstance(block, dict)
-                                 and _canon_text(block.get(f)) == v)
+                    if isinstance(block, dict):
+                        block_has = _canon_text(block.get(f)) == v
+                    else:
+                        block_has = section != 'options' and block == json.loads(v)
                     if (section, name) in EXEMPT and f in EXEMPT.get((section, name), ()):
                         continue
                     if not block_has:
@@ -544,13 +593,37 @@ def main():
                 sys.stdout.writelines(difflib.unified_diff(
                     disk.splitlines(True), canon.splitlines(True),
                     path, path + ' (canonical)'))
+    canon_path = os.path.join(REPO, 'shared', 'options-help.json')
+    try:
+        with open(canon_path, encoding='utf-8') as f:
+            canon_disk = f.read()
+        canon_text = render_canon(json.loads(canon_disk))
+    except (OSError, ValueError) as e:
+        print('shared/options-help.json: does not parse: %s' % e)
+        bad = True
+    else:
+        if canon_text == canon_disk:
+            pass
+        elif write:
+            with open(canon_path, 'w', encoding='utf-8') as f:
+                f.write(canon_text)
+            print('shared/options-help.json: reformatted')
+        else:
+            print('shared/options-help.json: off the canonical layout')
+            bad = True
+            if diff:
+                import difflib
+                sys.stdout.writelines(difflib.unified_diff(
+                    canon_disk.splitlines(True), canon_text.splitlines(True),
+                    canon_path, canon_path + ' (canonical)'))
     family = family_lint()
     for nit in family:
         print(nit)
         bad = True
     if bad:
         sys.exit(1)
-    print('lint: all four registries clean and canonical (the family passes too)')
+    print('lint: the four registries and the canon file clean and canonical '
+          '(the family passes too)')
 
 
 if __name__ == '__main__':

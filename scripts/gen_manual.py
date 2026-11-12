@@ -82,6 +82,14 @@ def load(tool_dir):
         meta = json.load(f)
     rows, shows = tuple(mod.OPTIONS), tuple(mod.SHOW_OPTIONS)
     sys.modules.pop('options', None)
+    # the commands table reads the raw rows' marks (internal/hidden/live) —
+    # the canon refs resolve here too (the fold is the loader's own, the
+    # row's inline field wins)
+    from common.settings.options import canon_fold, load_canon
+    canon = load_canon()
+    for section in ('show', 'commands'):
+        meta[section] = [canon_fold(r, canon, section, tool_dir)
+                         for r in meta.get(section) or []]
     return rows, shows, meta
 
 

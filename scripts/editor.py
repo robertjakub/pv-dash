@@ -407,27 +407,31 @@ class OptionsEditor:
             return {}
 
     def canon_block(self, row):
-        """The row's canon block (the section's flat text on the show/command
-        faces), or None when the row carries no ref."""
+        """The row's canon block (the section's flat text — or the dict
+        block carrying the row's fields — on the show/command faces), or
+        None when the row carries no ref."""
         section = 'show' if self.is_show(row) else ('commands' if self.is_cmd(row) else 'options')
         return (self.canon.get(section) or {}).get(row.get('shared') or '')
 
     def effective(self, row, key):
         """(value, from_canon): the row's inline field, else — when the row
         refs a block carrying it — the block's answer (the fold's, shown
-        marked `canon`)."""
+        marked `canon`). The show/commands blocks speak the description
+        field flat or as a dict block carrying the row's fields."""
         if key in row:
             return row[key], False
         block = self.canon_block(row)
         if block is None:
             return None, False
         section = 'show' if self.is_show(row) else ('commands' if self.is_cmd(row) else 'options')
-        if section == 'options':
-            if isinstance(block, dict) and key in block:
+        if isinstance(block, dict):
+            if key in block:
                 return block[key], True
-        elif isinstance(block, str) and key == ('setting-help' if section == 'show' else 'help'):
-            return block, True
-        return None, False
+            return None, False
+        if section == 'options':
+            return None, False
+        return (block, True) if key == ('setting-help' if section == 'show' else 'help') \
+            else (None, False)
 
     def _stamp(self):
         st = os.stat(self.path)
@@ -576,11 +580,15 @@ class OptionsEditor:
         if block is None:
             keys = ', '.join(sorted((self.canon.get(section) or {}))) or 'none yet'
             return False, 'err no canon key %r in shared/options-help.json (%s: %s)' % (text, section, keys)
-        if section == 'options' and isinstance(block, dict) and 'name' in block:
-            return False, "err the canon block %r carries \"name\" — the flat name is the block's key" % text
+        if isinstance(block, dict):
+            bad = sorted({'name', 'only', 'shared'} & set(block))
+            if bad:
+                return False, ('err the canon block %r carries %s — never a block field '
+                               '(the name is the block\'s key, only/shared are the row\'s '
+                               'placement marks)' % (text, ', '.join(map(repr, bad))))
         self.row['shared'] = text
         twins = []
-        if section == 'options' and isinstance(block, dict):
+        if isinstance(block, dict):
             twins = sorted(k for k, v in block.items()
                            if k in self.row and json.dumps(self.row[k], ensure_ascii=False, sort_keys=True)
                            == json.dumps(v, ensure_ascii=False, sort_keys=True))

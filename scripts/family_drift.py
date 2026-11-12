@@ -94,6 +94,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from scriptlib import TOOLS
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, REPO)   # the canon fold rides the loader's own implementation
 DOC = os.path.join(REPO, 'docs', 'family-drift.md')
 SEEDS = os.path.join(REPO, 'docs', 'family-drift-seeds.json')
 
@@ -197,12 +198,16 @@ FIELDS = ('flag', 'env', 'conv', 'live', 'group', 'default', 'values',
 
 
 def knobs():
-    """The four registries' rows + commands."""
+    """The four registries' rows + commands — the EFFECTIVE rows (the canon
+    refs resolved: the fold is the loader's own, so the sweep compares the
+    truth the daemons load, the block-carried fields included)."""
+    from common.settings.options import canon_fold, load_canon
+    canon = load_canon()
     rows, cmds = {}, {}
     for t in TOOLS:
         with open(os.path.join(REPO, t, 'lib', 'options.json'), encoding='utf-8') as f:
             m = json.load(f)
-        rows[t] = {r['name']: r for r in m['options']}
+        rows[t] = {r['name']: canon_fold(r, canon, 'options', t) for r in m['options']}
         cmds[t] = [c.get('live') or c['name'] for c in m.get('commands') or []]
     return rows, cmds
 
